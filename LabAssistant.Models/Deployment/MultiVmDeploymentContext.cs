@@ -1,0 +1,8 @@
+﻿using System.Collections.Generic;
+
+namespace LabAssistant.Models.Deployment;
+
+public class MultiVmDeploymentContext
+{
+    public List<VmDeploymentContext> VmContexts { get; set; } = new();
+}

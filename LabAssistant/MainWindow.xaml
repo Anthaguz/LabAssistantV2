@@ -1,0 +1,26 @@
+<Window x:Class="LabAssistant.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Icon="pack://application:,,,/Resources/LabAssistant.ico"
+        Title="Lab Assistant" Height="600" Width="1000">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <!-- Sidebar width -->
+            <ColumnDefinition Width="*"/>
+            <!-- Main content -->
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <StackPanel Background="#FF2D2D30" Orientation="Vertical">
+            <Button Content="Deploy VMs" Name="DeployButton" Margin="10" Click="DeployButton_Click"/>
+            <Button Content="Templates" Name="TemplatesButton" Margin="10" Click="TemplatesButton_Click"/>
+            <Button Content="Switches" Name="SwitchesButton" Margin="10" Click="SwitchesButton_Click"/>
+            <Button Content="Settings" Name="SettingsButton" Margin="10" Click="SettingsButton_Click"/>
+            <Button Content="Logs" Name="LogsButton" Margin="10" Click="LogsButton_Click"/>
+        </StackPanel>
+
+        <!-- Main Content Frame -->
+        <Frame x:Name="MainFrame" Grid.Column="1" NavigationUIVisibility="Hidden"/>
+    </Grid>
+</Window>

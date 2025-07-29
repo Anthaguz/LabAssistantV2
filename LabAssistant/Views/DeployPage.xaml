@@ -1,0 +1,132 @@
+﻿<Page x:Class="LabAssistant.Views.DeployPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="DeployPage"
+      Background="{StaticResource SystemPageBackgroundBrush}">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*"/>
+            <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                   Text="Lab Deployment Overview"
+                   FontSize="24"
+                   Foreground="{StaticResource SystemBaseHighColor}"
+                   Margin="0,0,0,20"/>
+
+        <!-- Controls -->
+        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,20">
+            <Button Style="{StaticResource FluentButtonStyle}" Content="Add VM" Command="{Binding AddVmCommand}" Margin="0,0,10,0" Width="100"/>
+            <Button Style="{StaticResource FluentButtonStyle}" Content="Deploy" Command="{Binding DeployAllCommand}" Width="100"/>
+            <ProgressBar Width="100" Height="20" IsIndeterminate="{Binding IsDeploying}" Margin="10,0,0,0"/>
+        </StackPanel>
+
+        <!-- VM Cards + Logs -->
+        <Grid Grid.Row="2" Grid.ColumnSpan="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*"/>
+                <ColumnDefinition Width="2*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- VM Cards -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,10,0">
+                <ItemsControl ItemsSource="{Binding VmEntries}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource VmCardStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition />
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Main clickable area for opening VM detail -->
+                                    <Button Command="{Binding DataContext.OpenVmDetailCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                        CommandParameter="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="16"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Center"
+                                        Cursor="Hand"
+                                        Grid.ColumnSpan="3">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition />
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Text="{Binding VmName}"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource SystemBaseHighColor}"
+                                               VerticalAlignment="Center"/>
+
+                                            <!-- Trash icon button -->
+                                            <Button Style="{StaticResource TrashIconButtonStyle}"
+                                                    Command="{Binding DataContext.DeleteVmCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                CommandParameter="{Binding}"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Cursor="Hand"
+                                                ToolTip="Remove VM"
+                                                Grid.Column="1"
+                                                Padding="0"
+                                                Margin="12,0,0,0">
+                                                <TextBlock Text="&#xE74D;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="16"
+                                                   Foreground="{StaticResource SystemBaseLowColor}"
+                                                   VerticalAlignment="Center"/>
+                                            </Button>
+
+                                            <!-- Arrow icon -->
+                                            <TextBlock Text="&#xE76C;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="16"
+                                               Foreground="{StaticResource SystemBaseLowColor}"
+                                               VerticalAlignment="Center"
+                                               Grid.Column="2"
+                                               Margin="12,0,0,0"/>
+                                        </Grid>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Logs Panel -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="10,0,0,0">
+                <ItemsControl ItemsSource="{Binding LogGroups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Expander Header="{Binding VmName}" IsExpanded="True" Margin="0,0,0,10">
+                                <ItemsControl ItemsSource="{Binding Entries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="12" Margin="10,0,0,2"
+                                                       Foreground="{StaticResource SystemBaseHighColor}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>

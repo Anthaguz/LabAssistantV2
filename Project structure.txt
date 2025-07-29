@@ -1,0 +1,12 @@
+﻿LabAssistant (WinUI 3 App - View layer)
+ └── Views/
+ └── ViewModels/ 
+ └── App.xaml / MainWindow.xaml
+LabAssistant.Models
+ └── Domain objects, enums, DTOs
+LabAssistant.Data
+ └── Repositories, EF Core context (if applicable)
+LabAssistant.Business
+ └── Business logic classes, validation, coordination
+LabAssistant.Services
+ └── External APIs, file services, configuration, etc.

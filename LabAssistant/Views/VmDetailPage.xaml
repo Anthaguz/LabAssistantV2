@@ -1,0 +1,95 @@
+﻿<Page x:Class="LabAssistant.Views.VmDetailPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+      xmlns:behaviors="clr-namespace:LabAssistant.Behaviors"
+      Title="VmDetailPage"
+      Background="{StaticResource SystemPageBackgroundBrush}">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Breadcrumb -->
+            <RowDefinition Height="*"/>
+            <!-- Scrollable Content -->
+            <RowDefinition Height="Auto"/>
+            <!-- Action Buttons -->
+        </Grid.RowDefinitions>
+
+        <!-- Breadcrumb Header -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
+            <Button Click="ApplyChanges"
+                    Content="←"
+                    Width="32"
+                    Height="32"
+                    Style="{StaticResource FluentButtonStyle}"
+                    Margin="0,0,10,0"/>
+            <TextBlock Text="{Binding VmName}" 
+                       FontSize="24" 
+                       FontWeight="Bold"
+                       Foreground="{StaticResource SystemBaseHighColor}"
+                       VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Scrollable Config Section -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- VM Name -->
+                <TextBlock Text="VM Name:" 
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource SystemBaseMidColor}"/>
+                <TextBox Text="{Binding VmName, UpdateSourceTrigger=PropertyChanged}" 
+                         Width="300" 
+                         Margin="0,5"
+                         Background="{StaticResource SystemPanelBackgroundColor}"
+                         Foreground="{StaticResource SystemBaseHighColor}"/>
+
+                <!-- VHD Path -->
+                <TextBlock Text="VHD Path:" 
+                           FontWeight="SemiBold" 
+                           Margin="0,10,0,0"
+                           Foreground="{StaticResource SystemBaseMidColor}"/>
+                <TextBox Text="{Binding VhdPath, UpdateSourceTrigger=PropertyChanged}" 
+                         Width="300" 
+                         Margin="0,5"
+                         Background="{StaticResource SystemPanelBackgroundColor}"
+                         Foreground="{StaticResource SystemBaseHighColor}"/>
+
+                <!-- Virtual Switch -->
+                <TextBlock Text="Virtual Switch:" 
+                           FontWeight="SemiBold" 
+                           Margin="0,10,0,0"
+                           Foreground="{StaticResource SystemBaseMidColor}"/>
+                <ComboBox ItemsSource="{Binding AvailableSwitches}"
+                          SelectedItem="{Binding SelectedSwitchName}"
+                          Width="300"
+                          Margin="0,5"/>
+
+                <!-- Options -->
+                <CheckBox Content="Configure Time Zone" 
+                          IsChecked="{Binding ConfigureTimeZone}" 
+                          Margin="0,10"
+                          Foreground="{StaticResource SystemBaseHighColor}"/>
+                <CheckBox Content="Install Software" 
+                          IsChecked="{Binding InstallSoftware}" 
+                          Margin="0,5"
+                          Foreground="{StaticResource SystemBaseHighColor}"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer Action Buttons -->
+        <!--<StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Apply" 
+                    Command="{Binding ApplyChanges}" 
+                    Style="{StaticResource FluentButtonStyle}" 
+                    Margin="0,0,10,0" Width="100"/>
+
+            <Button Content="Cancel"
+                    Command="{Binding CancelChangesCommand}"
+                    Style="{StaticResource FluentButtonStyle}"
+                    Width="100"
+                    Margin="0,0,10,0"/>
+        </StackPanel>-->
+    </Grid>
+</Page>
