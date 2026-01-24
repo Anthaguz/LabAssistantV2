@@ -1,0 +1,21 @@
+{
+  "version": "v0",
+  "items": [
+    {
+      "id": "win-server-2022-gen2",
+      "path": "C:/Lab/VHDX/WinServer2022.vhdx",
+      "osName": "Windows Server",
+      "osVersion": "2022",
+      "generation": 2,
+      "notes": "Core edition, patched 2026-01"
+    },
+    {
+      "id": "ubuntu-2204-gen2",
+      "path": "C:/Lab/VHDX/Ubuntu2204.vhdx",
+      "osName": "Ubuntu",
+      "osVersion": "22.04",
+      "generation": 2,
+      "notes": "Cloud-init enabled"
+    }
+  ]
+}
