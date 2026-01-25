@@ -26,6 +26,11 @@ namespace LabAssistant
             MainFrame.Navigate(new Views.TemplatesPage());
         }
 
+        private void VhdxCatalogButton_Click(object sender, RoutedEventArgs e)
+        {
+            MainFrame.Navigate(new Views.VhdxCatalogPage());
+        }
+
         private void SwitchesButton_Click(object sender, RoutedEventArgs e)
         {
             MainFrame.Navigate(new Views.SwitchesPage());
