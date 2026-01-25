@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Text.Json;
+using LabAssistant.Services.Catalog;
 using LabAssistant.Models.Configuration;
 
 namespace LabAssistant.Services.Configuration
@@ -35,11 +36,13 @@ namespace LabAssistant.Services.Configuration
 
                 ValidateSettings();
                 EnsureAllConfiguredDirectoriesExist();
+                EnsureCatalogFileExists();
             }
             catch (Exception)
             {
                 Settings = GetDefaultSettings(); // fallback
                 EnsureAllConfiguredDirectoriesExist();
+                EnsureCatalogFileExists();
                 Save();
             }
         }
@@ -89,6 +92,12 @@ namespace LabAssistant.Services.Configuration
         {
             if (!string.IsNullOrWhiteSpace(path) && !Directory.Exists(path))
                 Directory.CreateDirectory(path);
+        }
+
+        private static void EnsureCatalogFileExists()
+        {
+            var store = new VhdxCatalogStore();
+            store.EnsureCatalogFileExists(Settings.CatalogPath);
         }
 
         private static void ValidateSettings()

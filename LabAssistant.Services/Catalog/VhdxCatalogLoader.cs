@@ -19,7 +19,6 @@ public class VhdxCatalogLoader
 
         if (!File.Exists(catalogPath))
         {
-            result.Errors.Add($"Catalog file not found: {catalogPath}");
             return result;
         }
 
@@ -54,11 +53,5 @@ public class VhdxCatalogLoader
         }
 
         return result;
-    }
-
-    private sealed class VhdxCatalogDocument
-    {
-        public string Version { get; set; } = "v0";
-        public List<VhdxCatalogItem> Items { get; set; } = new();
     }
 }
