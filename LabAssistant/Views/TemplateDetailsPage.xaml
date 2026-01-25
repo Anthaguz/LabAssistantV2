@@ -12,6 +12,9 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock x:Name="TemplateNameText" FontSize="24" FontWeight="Bold"/>
             <TextBlock x:Name="TemplateDescriptionText" Margin="0,4,0,0"/>
+            <TextBlock Text="Tip: Select a VM and use Select VHDX to map the base disk."
+                       Margin="0,6,0,0"
+                       Foreground="Gray"/>
             <Button Content="Select VHDX for Selected VM"
                     Width="220"
                     Margin="0,10,0,0"
