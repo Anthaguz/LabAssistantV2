@@ -17,6 +17,14 @@ public class DryRunDeploymentPipeline
 
     public DryRunDeploymentResult Run(LabTemplate template)
     {
+        if (template.VmTemplates.Count == 0)
+        {
+            var emptyPlan = new DeploymentPlan();
+            var emptyResult = new DryRunDeploymentResult(emptyPlan);
+            emptyResult.Errors.Add("No VM templates found.");
+            return emptyResult;
+        }
+
         var plan = _planBuilder.Build(template);
         var result = new DryRunDeploymentResult(plan);
 

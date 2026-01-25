@@ -16,6 +16,11 @@ public partial class DryRunResultsPage : Page
         _result = result;
         InitializeComponent();
         SummaryText.Text = $"Steps: {result.Plan.Steps.Count}";
+        if (result.Errors.Count > 0)
+        {
+            ErrorText.Text = string.Join(System.Environment.NewLine, result.Errors);
+            ErrorText.Visibility = Visibility.Visible;
+        }
         StepsList.ItemsSource = result.Plan.Steps;
     }
 
