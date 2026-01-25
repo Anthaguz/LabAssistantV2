@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,8 +15,6 @@ public partial class TemplateDetailsPage : Page
 {
     private readonly LabTemplate _template;
     private readonly string _templateKey;
-    private readonly VhdxCatalogLoader _catalogLoader = new VhdxCatalogLoader();
-
     public TemplateDetailsPage(LabTemplate template)
     {
         _template = template;
@@ -54,25 +51,26 @@ public partial class TemplateDetailsPage : Page
         }
     }
 
-    private List<VhdxCatalogItem> LoadCatalogItems()
+    private List<VhdxCatalogItem> LoadCatalogItems(bool silent = false)
     {
         var catalogPath = SettingsManager.Settings.CatalogPath;
         if (string.IsNullOrWhiteSpace(catalogPath))
         {
-            System.Windows.MessageBox.Show("Catalog path is not configured.", "Select VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            if (!silent)
+            {
+                System.Windows.MessageBox.Show("Catalog path is not configured.", "Select VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
             return new List<VhdxCatalogItem>();
         }
 
-        if (!File.Exists(catalogPath))
-        {
-            System.Windows.MessageBox.Show($"Catalog file not found: {catalogPath}", "Select VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-            return new List<VhdxCatalogItem>();
-        }
-
-        var result = _catalogLoader.Load(catalogPath);
+        var store = new VhdxCatalogStore();
+        var result = store.Load(catalogPath);
         if (result.Errors.Count > 0)
         {
-            System.Windows.MessageBox.Show(string.Join(Environment.NewLine, result.Errors), "Catalog Errors", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            if (!silent)
+            {
+                System.Windows.MessageBox.Show(string.Join(Environment.NewLine, result.Errors), "Catalog Errors", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
         }
 
         return result.Items;
@@ -86,6 +84,9 @@ public partial class TemplateDetailsPage : Page
             return;
         }
 
+        var catalogItems = LoadCatalogItems(silent: true);
+        var catalogById = catalogItems.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
+
         foreach (var vm in _template.VmTemplates)
         {
             var selection = selections.FirstOrDefault(item =>
@@ -95,7 +96,14 @@ public partial class TemplateDetailsPage : Page
             if (selection != null)
             {
                 vm.VhdxId = selection.VhdxId;
-                vm.VhdPath = selection.VhdPath;
+                if (!string.IsNullOrWhiteSpace(selection.VhdxId) && catalogById.TryGetValue(selection.VhdxId, out var catalogItem))
+                {
+                    vm.VhdPath = catalogItem.Path;
+                }
+                else
+                {
+                    vm.VhdPath = selection.VhdPath;
+                }
             }
         }
     }
