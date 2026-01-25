@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -31,5 +32,13 @@ public partial class DryRunResultsPage : Page
             var json = JsonSerializer.Serialize(_result.Plan, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(dialog.FileName, json);
         }
+    }
+
+    private void CopyLogs_Click(object sender, RoutedEventArgs e)
+    {
+        var logs = _result.Logs.Count == 0
+            ? "No logs available."
+            : string.Join(System.Environment.NewLine, _result.Logs);
+        System.Windows.Clipboard.SetText(logs);
     }
 }
