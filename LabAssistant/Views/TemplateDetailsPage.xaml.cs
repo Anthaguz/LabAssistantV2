@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,6 +24,7 @@ public partial class TemplateDetailsPage : Page
         TemplateNameText.Text = _template.Name;
         TemplateDescriptionText.Text = _template.Description ?? string.Empty;
         ApplyPersistedSelections();
+        ResolveMissingVhdxSelections();
         VmListView.ItemsSource = _template.VmTemplates;
     }
 
@@ -124,5 +126,42 @@ public partial class TemplateDetailsPage : Page
         });
 
         SettingsManager.Save();
+    }
+
+    private void ResolveMissingVhdxSelections()
+    {
+        var catalogItems = LoadCatalogItems();
+        if (catalogItems.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var vm in _template.VmTemplates)
+        {
+            if (!string.IsNullOrWhiteSpace(vm.VhdPath) && File.Exists(vm.VhdPath))
+            {
+                continue;
+            }
+
+            var message = $"VHDX for VM '{vm.Name}' is missing. Select a replacement from the catalog?";
+            var promptResult = System.Windows.MessageBox.Show(message, "Missing VHDX", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
+            if (promptResult != MessageBoxResult.Yes)
+            {
+                System.Windows.MessageBox.Show($"Missing VHDX for VM '{vm.Name}' was not resolved.", "Missing VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                continue;
+            }
+
+            var dialog = new VhdxSelectorDialog(catalogItems);
+            if (dialog.ShowDialog() == true && dialog.SelectedItem != null)
+            {
+                vm.VhdxId = dialog.SelectedItem.Id;
+                vm.VhdPath = dialog.SelectedItem.Path;
+                SaveSelection(vm);
+            }
+            else
+            {
+                System.Windows.MessageBox.Show($"Missing VHDX for VM '{vm.Name}' was not resolved.", "Missing VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
+        }
     }
 }
