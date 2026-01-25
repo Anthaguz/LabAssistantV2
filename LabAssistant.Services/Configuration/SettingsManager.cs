@@ -10,6 +10,7 @@ namespace LabAssistant.Services.Configuration
         private static readonly string BaseFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         private static readonly string AppRoot = Path.Combine(BaseFolder, "LabAssistant");
         private static readonly string AppConfigFolder = Path.Combine(AppRoot, "Config");
+        private static readonly string CatalogFolder = Path.Combine(AppRoot, "Catalog");
         private static readonly string SettingsFilePath = Path.Combine(AppConfigFolder, "settings.json");
 
         public static AppSettings Settings { get; private set; } = new();
@@ -69,6 +70,7 @@ namespace LabAssistant.Services.Configuration
                 LogFolder = Path.Combine(AppRoot, "Logs"),
                 VmBasePath = Path.Combine(AppRoot, "VMs"),
                 DifferencingDiskBasePath = Path.Combine(AppRoot, "Disks"),
+                CatalogPath = Path.Combine(CatalogFolder, "vhdx-catalog.json"),
                 DefaultVmMemoryMb = 2048,
                 DefaultCpuCount = 2
             };
@@ -80,6 +82,7 @@ namespace LabAssistant.Services.Configuration
             EnsureDirectoryExists(Settings.LogFolder);
             EnsureDirectoryExists(Settings.VmBasePath);
             EnsureDirectoryExists(Settings.DifferencingDiskBasePath);
+            EnsureDirectoryExists(Path.GetDirectoryName(Settings.CatalogPath) ?? string.Empty);
         }
 
         private static void EnsureDirectoryExists(string path)
@@ -109,6 +112,9 @@ namespace LabAssistant.Services.Configuration
 
             if (Settings.DefaultCpuCount <= 0)
                 Settings.DefaultCpuCount = defaults.DefaultCpuCount;
+
+            if (string.IsNullOrWhiteSpace(Settings.CatalogPath))
+                Settings.CatalogPath = defaults.CatalogPath;
         }
 
         public static string SettingsPath => SettingsFilePath;

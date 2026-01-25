@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
-using LabAssistant.Services;
+using LabAssistant.Services.Configuration;
 using LabAssistant.Services.Templates;
 
 namespace LabAssistant.Views
@@ -26,7 +26,8 @@ namespace LabAssistant.Views
         {
             _templates.Clear();
 
-            foreach (var folder in SettingsManager.Current.TemplatePaths)
+            var folder = SettingsManager.Settings.TemplateFolder;
+            if (!string.IsNullOrWhiteSpace(folder))
             {
                 if (Directory.Exists(folder))
                 {

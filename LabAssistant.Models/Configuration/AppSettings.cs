@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace LabAssistant.Models.Configuration;
 
@@ -12,4 +13,7 @@ public class AppSettings
     public int DefaultVmMemoryMb { get; set; } = 2048;
     public int DefaultCpuCount { get; set; } = 2;
 
+    public string CatalogPath { get; set; } = string.Empty;
+
+    public List<TemplateVhdxSelection> TemplateSelections { get; set; } = new();
 }
