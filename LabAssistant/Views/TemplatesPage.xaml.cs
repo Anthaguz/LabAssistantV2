@@ -1,7 +1,7 @@
-﻿using System;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
@@ -37,12 +37,20 @@ namespace LabAssistant.Views
 
             TemplatesListBox.ItemsSource = null;
             TemplatesListBox.ItemsSource = _templates;
-            EmptyStateText.Visibility = _templates.Count == 0 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            EmptyStateText.Visibility = _templates.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ReloadTemplates_Click(object sender, RoutedEventArgs e)
         {
             LoadTemplates();
+        }
+
+        private void TemplatesListBox_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (TemplatesListBox.SelectedItem is LabTemplate template)
+            {
+                NavigationService?.Navigate(new TemplateDetailsPage(template));
+            }
         }
     }
 }
