@@ -12,12 +12,9 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="Template Paths" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
-            <ListBox x:Name="TemplatePathsList" Height="120" />
-            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                <Button Content="Add Path" Width="100" Margin="0,0,10,0" Click="AddPath_Click"/>
-                <Button Content="Remove Selected" Width="150" Click="RemovePath_Click"/>
-            </StackPanel>
+            <TextBlock Text="Template Folder" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+            <TextBox x:Name="TemplateFolderBox" Height="30"/>
+            <Button Content="Change Template Folder" Width="190" Margin="0,10,0,0" Click="ChangeTemplateFolder_Click"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,20">

@@ -1,4 +1,4 @@
-namespace LabAssistant.Models;
+namespace LabAssistant.Models.Configuration;
 
 public class TemplateVhdxSelection
 {

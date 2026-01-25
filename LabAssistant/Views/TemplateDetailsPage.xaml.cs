@@ -6,18 +6,14 @@ using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
-using LabAssistant.Models;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Services.Catalog;
-using LabAssistant.Services;
+using LabAssistant.Services.Configuration;
 
 namespace LabAssistant.Views;
 
 public partial class TemplateDetailsPage : Page
 {
-    private static readonly string CatalogPath =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "LabAssistant", "catalog", "vhdx-catalog.json");
-
     private readonly LabTemplate _template;
     private readonly string _templateKey;
     private readonly VhdxCatalogLoader _catalogLoader = new VhdxCatalogLoader();
@@ -60,13 +56,20 @@ public partial class TemplateDetailsPage : Page
 
     private List<VhdxCatalogItem> LoadCatalogItems()
     {
-        if (!File.Exists(CatalogPath))
+        var catalogPath = SettingsManager.Settings.CatalogPath;
+        if (string.IsNullOrWhiteSpace(catalogPath))
         {
-            System.Windows.MessageBox.Show($"Catalog file not found: {CatalogPath}", "Select VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show("Catalog path is not configured.", "Select VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             return new List<VhdxCatalogItem>();
         }
 
-        var result = _catalogLoader.Load(CatalogPath);
+        if (!File.Exists(catalogPath))
+        {
+            System.Windows.MessageBox.Show($"Catalog file not found: {catalogPath}", "Select VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            return new List<VhdxCatalogItem>();
+        }
+
+        var result = _catalogLoader.Load(catalogPath);
         if (result.Errors.Count > 0)
         {
             System.Windows.MessageBox.Show(string.Join(Environment.NewLine, result.Errors), "Catalog Errors", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
@@ -77,7 +80,7 @@ public partial class TemplateDetailsPage : Page
 
     private void ApplyPersistedSelections()
     {
-        var selections = SettingsManager.Current.TemplateSelections;
+        var selections = SettingsManager.Settings.TemplateSelections;
         if (selections.Count == 0)
         {
             return;
@@ -99,7 +102,7 @@ public partial class TemplateDetailsPage : Page
 
     private void SaveSelection(VmTemplate vm)
     {
-        var selections = SettingsManager.Current.TemplateSelections;
+        var selections = SettingsManager.Settings.TemplateSelections;
         selections.RemoveAll(item =>
             string.Equals(item.TemplateId, _templateKey, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(item.VmName, vm.Name, StringComparison.OrdinalIgnoreCase));
@@ -112,6 +115,6 @@ public partial class TemplateDetailsPage : Page
             VhdPath = vm.VhdPath ?? string.Empty
         });
 
-        SettingsManager.SaveSettings();
+        SettingsManager.Save();
     }
 }
