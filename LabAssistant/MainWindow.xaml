@@ -21,6 +21,24 @@
         </StackPanel>
 
         <!-- Main Content Frame -->
-        <Frame x:Name="MainFrame" Grid.Column="1" NavigationUIVisibility="Hidden"/>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border x:Name="ErrorBanner"
+                    Grid.Row="0"
+                    Background="#FFFFE1"
+                    BorderBrush="#FFCC00"
+                    BorderThickness="1"
+                    Padding="8"
+                    Margin="10"
+                    Visibility="Collapsed">
+                <TextBlock x:Name="ErrorBannerText" Foreground="Black"/>
+            </Border>
+
+            <Frame x:Name="MainFrame" Grid.Row="1" NavigationUIVisibility="Hidden"/>
+        </Grid>
     </Grid>
 </Window>

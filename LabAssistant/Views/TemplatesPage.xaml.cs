@@ -32,6 +32,10 @@ namespace LabAssistant.Views
                 {
                     var loadResult = _templateLoader.LoadFromFolder(folder, Array.Empty<VhdxCatalogItem>());
                     _templates.AddRange(loadResult.Templates);
+                    if (loadResult.Errors.Count > 0)
+                    {
+                        MainWindow.CurrentInstance?.ShowError(string.Join(Environment.NewLine, loadResult.Errors));
+                    }
                 }
             }
 
