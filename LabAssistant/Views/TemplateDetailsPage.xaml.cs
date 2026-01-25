@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using LabAssistant.Business.Compatibility;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
 using LabAssistant.Models.Configuration;
@@ -16,15 +17,18 @@ public partial class TemplateDetailsPage : Page
 {
     private readonly LabTemplate _template;
     private readonly string _templateKey;
+    private readonly Dictionary<string, string> _requiredVhdxIdsByVmName = new(StringComparer.OrdinalIgnoreCase);
     public TemplateDetailsPage(LabTemplate template)
     {
         _template = template;
         _templateKey = string.IsNullOrWhiteSpace(_template.Id) ? _template.Name : _template.Id;
+        CaptureRequiredVhdxIds();
         InitializeComponent();
         TemplateNameText.Text = _template.Name;
         TemplateDescriptionText.Text = _template.Description ?? string.Empty;
         ApplyPersistedSelections();
         ResolveMissingVhdxSelections();
+        ShowCompatibilityWarnings();
         VmListView.ItemsSource = _template.VmTemplates;
     }
 
@@ -126,6 +130,56 @@ public partial class TemplateDetailsPage : Page
         });
 
         SettingsManager.Save();
+    }
+
+    private void CaptureRequiredVhdxIds()
+    {
+        foreach (var vm in _template.VmTemplates)
+        {
+            if (!string.IsNullOrWhiteSpace(vm.VhdxId))
+            {
+                _requiredVhdxIdsByVmName[vm.Name] = vm.VhdxId!;
+            }
+        }
+    }
+
+    private void ShowCompatibilityWarnings()
+    {
+        if (_requiredVhdxIdsByVmName.Count == 0)
+        {
+            return;
+        }
+
+        var catalogItems = LoadCatalogItems(silent: true);
+        if (catalogItems.Count == 0)
+        {
+            return;
+        }
+
+        var catalogById = catalogItems.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
+        var warnings = new List<string>();
+
+        foreach (var vm in _template.VmTemplates)
+        {
+            if (!_requiredVhdxIdsByVmName.TryGetValue(vm.Name, out var requiredId))
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(vm.VhdxId) ||
+                !catalogById.TryGetValue(requiredId, out var required) ||
+                !catalogById.TryGetValue(vm.VhdxId, out var selected))
+            {
+                continue;
+            }
+
+            warnings.AddRange(VhdxCompatibilityChecker.Check(required, selected, vm.Name));
+        }
+
+        if (warnings.Count > 0)
+        {
+            System.Windows.MessageBox.Show(string.Join(Environment.NewLine, warnings), "VHDX Compatibility Warnings", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void ResolveMissingVhdxSelections()
