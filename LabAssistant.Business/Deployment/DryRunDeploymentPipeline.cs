@@ -7,10 +7,12 @@ namespace LabAssistant.Business.Deployment;
 public class DryRunDeploymentPipeline
 {
     private readonly DeploymentPlanBuilder _planBuilder;
+    private readonly IDryRunLogger _logger;
 
-    public DryRunDeploymentPipeline(DeploymentPlanBuilder planBuilder)
+    public DryRunDeploymentPipeline(DeploymentPlanBuilder planBuilder, IDryRunLogger logger)
     {
         _planBuilder = planBuilder;
+        _logger = logger;
     }
 
     public DryRunDeploymentResult Run(LabTemplate template)
@@ -20,7 +22,9 @@ public class DryRunDeploymentPipeline
 
         foreach (var step in plan.Steps)
         {
-            result.Logs.Add($"{DateTime.UtcNow:O} {step.VmName} - {step.Name}");
+            var entry = $"{DateTime.UtcNow:O} {step.VmName} - {step.Name}";
+            _logger.Log(entry);
+            result.Logs.Add(entry);
         }
 
         return result;
