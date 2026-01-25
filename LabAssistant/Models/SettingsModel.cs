@@ -12,5 +12,7 @@ namespace LabAssistant.Models
         };
 
         public string LogsPath { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "LabAssistant", "Logs");
+
+        public List<TemplateVhdxSelection> TemplateSelections { get; set; } = new List<TemplateVhdxSelection>();
     }
 }
