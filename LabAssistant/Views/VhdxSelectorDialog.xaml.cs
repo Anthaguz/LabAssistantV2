@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
 
 namespace LabAssistant.Views;
@@ -15,11 +16,11 @@ public partial class VhdxSelectorDialog : Window
         _items = items
             .Select(item => new VhdxSelectorItem(item))
             .ToList();
-        CatalogListBox.ItemsSource = _items;
+        CatalogListView.ItemsSource = _items;
     }
 
     public VhdxCatalogItem? SelectedItem
-        => (CatalogListBox.SelectedItem as VhdxSelectorItem)?.Item;
+        => (CatalogListView.SelectedItem as VhdxSelectorItem)?.Item;
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
@@ -42,10 +43,27 @@ public partial class VhdxSelectorDialog : Window
         public VhdxSelectorItem(VhdxCatalogItem item)
         {
             Item = item;
-            DisplayText = $"{item.Id} - {item.OsName} {item.OsVersion}";
         }
 
         public VhdxCatalogItem Item { get; }
-        public string DisplayText { get; }
+        public string Id => Item.Id;
+        public string OsName => Item.OsName;
+        public string OsVersion => Item.OsVersion;
+        public string Path => Item.Path;
+        public string Notes => Item.Notes ?? string.Empty;
+    }
+
+    private void CatalogListView_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (CatalogListView.View is not GridView gridView)
+        {
+            return;
+        }
+
+        foreach (var column in gridView.Columns)
+        {
+            column.Width = 0;
+            column.Width = double.NaN;
+        }
     }
 }
