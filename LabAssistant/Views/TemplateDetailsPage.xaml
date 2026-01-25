@@ -1,0 +1,30 @@
+<Page x:Class="LabAssistant.Views.TemplateDetailsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="TemplateDetailsPage">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock x:Name="TemplateNameText" FontSize="24" FontWeight="Bold"/>
+            <TextBlock x:Name="TemplateDescriptionText" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <ListView x:Name="VmListView" Grid.Row="1">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="VM" DisplayMemberBinding="{Binding Name}" Width="180"/>
+                    <GridViewColumn Header="Memory (MB)" DisplayMemberBinding="{Binding MemoryMb}" Width="120"/>
+                    <GridViewColumn Header="CPUs" DisplayMemberBinding="{Binding CpuCount}" Width="80"/>
+                    <GridViewColumn Header="VHDX" DisplayMemberBinding="{Binding VhdxId}" Width="200"/>
+                    <GridViewColumn Header="VHD Path" DisplayMemberBinding="{Binding VhdPath}" Width="260"/>
+                    <GridViewColumn Header="Switch" DisplayMemberBinding="{Binding SwitchName}" Width="160"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </Grid>
+</Page>
