@@ -39,6 +39,6 @@ public partial class DryRunResultsPage : Page
         var logs = _result.Logs.Count == 0
             ? "No logs available."
             : string.Join(System.Environment.NewLine, _result.Logs);
-        Clipboard.SetText(logs);
+        System.Windows.Clipboard.SetText(logs);
     }
 }
