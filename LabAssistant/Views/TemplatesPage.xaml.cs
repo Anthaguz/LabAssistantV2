@@ -1,18 +1,20 @@
 ﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using LabAssistant.Models;
+using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Templates;
 using LabAssistant.Services;
+using LabAssistant.Services.Templates;
 
 namespace LabAssistant.Views
 {
     public partial class TemplatesPage : Page
     {
-        private List<TemplateModel> _templates = new List<TemplateModel>();
+        private readonly LabTemplateLoader _templateLoader = new LabTemplateLoader();
+        private readonly List<LabTemplate> _templates = new List<LabTemplate>();
 
         public TemplatesPage()
         {
@@ -28,28 +30,14 @@ namespace LabAssistant.Views
             {
                 if (Directory.Exists(folder))
                 {
-                    var jsonFiles = Directory.GetFiles(folder, "*.json", SearchOption.TopDirectoryOnly);
-                    foreach (var file in jsonFiles)
-                    {
-                        try
-                        {
-                            var content = File.ReadAllText(file);
-                            var template = JsonSerializer.Deserialize<TemplateModel>(content);
-                            if (template != null)
-                            {
-                                _templates.Add(template);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Windows.MessageBox.Show($"Failed to load template {file}: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
-                    }
+                    var loadResult = _templateLoader.LoadFromFolder(folder, Array.Empty<VhdxCatalogItem>());
+                    _templates.AddRange(loadResult.Templates);
                 }
             }
 
             TemplatesListBox.ItemsSource = null;
             TemplatesListBox.ItemsSource = _templates;
+            EmptyStateText.Visibility = _templates.Count == 0 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
         }
 
         private void ReloadTemplates_Click(object sender, RoutedEventArgs e)
