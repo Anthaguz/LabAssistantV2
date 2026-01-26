@@ -15,6 +15,7 @@
         <StackPanel Background="#FF2D2D30" Orientation="Vertical">
             <Button Content="Deploy VMs" Name="DeployButton" Margin="10" Click="DeployButton_Click"/>
             <Button Content="Templates" Name="TemplatesButton" Margin="10" Click="TemplatesButton_Click"/>
+            <Button Content="Template Editor" Name="TemplateEditorButton" Margin="10" Click="TemplateEditorButton_Click"/>
             <Button Content="VHDX Catalog" Name="VhdxCatalogButton" Margin="10" Click="VhdxCatalogButton_Click"/>
             <Button Content="Switches" Name="SwitchesButton" Margin="10" Click="SwitchesButton_Click"/>
             <Button Content="Settings" Name="SettingsButton" Margin="10" Click="SettingsButton_Click"/>
