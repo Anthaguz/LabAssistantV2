@@ -30,22 +30,26 @@
 
                 <StackPanel Grid.Column="0" Grid.Row="0" Margin="0,0,12,12">
                     <TextBlock Text="Template Id" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TemplateIdBox" Height="28"/>
+                    <TextBox Height="28"
+                             Text="{Binding Template.Id, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Grid.Row="0" Margin="0,0,0,12">
                     <TextBlock Text="Version" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TemplateVersionBox" Height="28"/>
+                    <TextBox Height="28"
+                             Text="{Binding Template.Version, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,0,12,0">
                     <TextBlock Text="Name" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TemplateNameBox" Height="28"/>
+                    <TextBox Height="28"
+                             Text="{Binding Template.Name, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Grid.Row="1">
                     <TextBlock Text="Description" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TemplateDescriptionBox" Height="28"/>
+                    <TextBox Height="28"
+                             Text="{Binding Template.Description, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -56,29 +60,44 @@
                 CornerRadius="4"
                 Padding="12">
             <StackPanel>
-                <TextBlock Text="Virtual Machines" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                <ListView x:Name="VmListView" Height="260">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="Name" Width="180"/>
-                            <GridViewColumn Header="CPU" Width="80"/>
-                            <GridViewColumn Header="Memory (MB)" Width="120"/>
-                            <GridViewColumn Header="VHDX" Width="240"/>
-                        </GridView>
-                    </ListView.View>
-                    <ListViewItem>
-                        <Border BorderBrush="#FFCCCCCC"
-                                BorderThickness="1"
-                                CornerRadius="4"
-                                Background="#FFF8F8F8"
-                                Padding="12"
-                                Margin="6">
-                            <TextBlock Text="No VMs yet. This area will list template VMs."
-                                       FontStyle="Italic"
-                                       Foreground="#FF666666"/>
-                        </Border>
-                    </ListViewItem>
-                </ListView>
+                <DockPanel Margin="0,0,0,10">
+                    <TextBlock Text="Virtual Machines"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               DockPanel.Dock="Left"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                        <Button Content="Add VM" Width="90" Margin="0,0,8,0" Click="AddVm_Click"/>
+                        <Button Content="Remove VM" Width="110" Click="RemoveVm_Click"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <DataGrid x:Name="VmDataGrid"
+                          ItemsSource="{Binding VmTemplates}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          SelectionMode="Single"
+                          Height="260">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Name"
+                                            Width="160"
+                                            Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
+                        <DataGridTextColumn Header="Memory (MB)"
+                                            Width="110"
+                                            Binding="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}"/>
+                        <DataGridTextColumn Header="CPU"
+                                            Width="70"
+                                            Binding="{Binding CpuCount, UpdateSourceTrigger=PropertyChanged}"/>
+                        <DataGridTextColumn Header="Switch Name"
+                                            Width="140"
+                                            Binding="{Binding SwitchName, UpdateSourceTrigger=PropertyChanged}"/>
+                        <DataGridTextColumn Header="VHDX Id"
+                                            Width="140"
+                                            Binding="{Binding VhdxId, UpdateSourceTrigger=PropertyChanged}"/>
+                        <DataGridTextColumn Header="VHDX Path"
+                                            Width="220"
+                                            Binding="{Binding VhdPath, UpdateSourceTrigger=PropertyChanged}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
             </StackPanel>
         </Border>
     </Grid>
