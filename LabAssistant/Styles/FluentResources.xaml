@@ -97,32 +97,38 @@
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
                         <Border x:Name="Border"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{StaticResource ControlCornerRadius}">
-                            <DockPanel>
-                                <TextBlock Text="{TemplateBinding SelectionBoxItem}"
-                                       Foreground="{TemplateBinding Foreground}"
-                                       FontSize="{TemplateBinding FontSize}"
-                                       FontWeight="{TemplateBinding FontWeight}"
-                                       Margin="6,2,0,2"
-                                       VerticalAlignment="Center"
-                                       HorizontalAlignment="Left"/>
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{StaticResource ControlCornerRadius}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                                <ToggleButton DockPanel.Dock="Right"
-                                  IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
-                                  Focusable="False"
-                                  ClickMode="Press"
-                                  Width="24"
-                                  Margin="4,2,4,2"
-                                  Cursor="Hand"
-                                  Background="{StaticResource SystemAccentColor}"
-                                  Foreground="{StaticResource SystemBaseHighColor}"
-                                  BorderBrush="{StaticResource SystemAccentMutedColor}"
-                                  BorderThickness="1"
-                                  Padding="0"
-                                  Content="▾">
+                                <TextBlock Text="{TemplateBinding SelectionBoxItem}"
+                                           Foreground="{TemplateBinding Foreground}"
+                                           FontSize="{TemplateBinding FontSize}"
+                                           FontWeight="{TemplateBinding FontWeight}"
+                                           Margin="6,2,0,2"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Left"
+                                           Grid.Column="0"/>
+
+                                <ToggleButton Grid.Column="1"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                              Focusable="False"
+                                              ClickMode="Press"
+                                              Width="24"
+                                              Margin="4,2,4,2"
+                                              Cursor="Hand"
+                                              Background="{StaticResource SystemAccentColor}"
+                                              Foreground="{StaticResource SystemBaseHighColor}"
+                                              BorderBrush="{StaticResource SystemAccentMutedColor}"
+                                              BorderThickness="1"
+                                              Padding="0"
+                                              Content="▾">
                                     <ToggleButton.Style>
                                         <Style TargetType="ToggleButton">
                                             <Setter Property="Background" Value="{StaticResource SystemAccentColor}"/>
@@ -133,11 +139,11 @@
                                                 <Setter.Value>
                                                     <ControlTemplate TargetType="ToggleButton">
                                                         <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
+                                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                                CornerRadius="4">
                                                             <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                                                                              VerticalAlignment="Center"/>
                                                         </Border>
                                                     </ControlTemplate>
                                                 </Setter.Value>
@@ -153,7 +159,7 @@
                                         </Style>
                                     </ToggleButton.Style>
                                 </ToggleButton>
-                            </DockPanel>
+                            </Grid>
                         </Border>
 
                         <Popup Name="Popup"

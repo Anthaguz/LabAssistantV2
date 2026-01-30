@@ -9,6 +9,7 @@ public static class ViewModelRegistration
     {
         //services.AddSingleton<MainViewModel>();
         services.AddSingleton<DeploymentViewModel>();
+        services.AddTransient<TemplateEditorViewModel>();
         // Add more view models here
         return services;
     }

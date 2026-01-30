@@ -3,6 +3,14 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="TemplateEditorPage">
 
+    <Page.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </Page.Resources>
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -10,7 +18,22 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Template Editor" FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
+        <StackPanel Margin="0,0,0,20">
+            <DockPanel>
+                <TextBlock Text="Template Editor"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           DockPanel.Dock="Left"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <Button Content="Open" Width="70" Margin="0,0,8,0" Click="OpenTemplate_Click"/>
+                    <Button Content="Save" Width="70" Margin="0,0,8,0" Click="SaveTemplate_Click"/>
+                    <Button Content="Save As" Width="80" Click="SaveTemplateAs_Click"/>
+                </StackPanel>
+            </DockPanel>
+            <TextBlock Text="{Binding CurrentTemplatePath}"
+                       Foreground="#FF666666"
+                       Margin="0,6,0,0"/>
+        </StackPanel>
 
         <Border Grid.Row="1"
                 BorderBrush="#FFDDDDDD"
@@ -30,75 +53,111 @@
 
                 <StackPanel Grid.Column="0" Grid.Row="0" Margin="0,0,12,12">
                     <TextBlock Text="Template Id" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox Height="28"
-                             Text="{Binding Template.Id, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Text="{Binding Template.Id, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Grid.Row="0" Margin="0,0,0,12">
                     <TextBlock Text="Version" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox Height="28"
-                             Text="{Binding Template.Version, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Text="{Binding Template.Version, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,0,12,0">
                     <TextBlock Text="Name" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox Height="28"
-                             Text="{Binding Template.Name, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Text="{Binding Template.Name, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Grid.Row="1">
                     <TextBlock Text="Description" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox Height="28"
-                             Text="{Binding Template.Description, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Text="{Binding Template.Description, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <Border Grid.Row="2"
-                BorderBrush="#FFDDDDDD"
-                BorderThickness="1"
-                CornerRadius="4"
-                Padding="12">
-            <StackPanel>
-                <DockPanel Margin="0,0,0,10">
-                    <TextBlock Text="Virtual Machines"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               DockPanel.Dock="Left"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                        <Button Content="Add VM" Width="90" Margin="0,0,8,0" Click="AddVm_Click"/>
-                        <Button Content="Remove VM" Width="110" Click="RemoveVm_Click"/>
-                    </StackPanel>
-                </DockPanel>
+        <Grid Grid.Row="2">
+            <Border x:Name="VmListPanel"
+                    BorderBrush="#FFDDDDDD"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="12">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock Text="Virtual Machines"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   DockPanel.Dock="Left"/>
+                        <Button Content="Add VM" Width="90" Click="AddVm_Click" DockPanel.Dock="Right"/>
+                    </DockPanel>
 
-                <DataGrid x:Name="VmDataGrid"
-                          ItemsSource="{Binding VmTemplates}"
-                          AutoGenerateColumns="False"
-                          CanUserAddRows="False"
-                          SelectionMode="Single"
-                          Height="260">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Name"
-                                            Width="160"
-                                            Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
-                        <DataGridTextColumn Header="Memory (MB)"
-                                            Width="110"
-                                            Binding="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}"/>
-                        <DataGridTextColumn Header="CPU"
-                                            Width="70"
-                                            Binding="{Binding CpuCount, UpdateSourceTrigger=PropertyChanged}"/>
-                        <DataGridTextColumn Header="Switch Name"
-                                            Width="140"
-                                            Binding="{Binding SwitchName, UpdateSourceTrigger=PropertyChanged}"/>
-                        <DataGridTextColumn Header="VHDX Id"
-                                            Width="140"
-                                            Binding="{Binding VhdxId, UpdateSourceTrigger=PropertyChanged}"/>
-                        <DataGridTextColumn Header="VHDX Path"
-                                            Width="220"
-                                            Binding="{Binding VhdPath, UpdateSourceTrigger=PropertyChanged}"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </StackPanel>
-        </Border>
+                    <ScrollViewer Height="260" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding VmTemplates}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#FFCCCCCC"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <Button Click="OpenVmDetail_Click"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Padding="12"
+                                                    HorizontalContentAlignment="Stretch"
+                                                    VerticalContentAlignment="Center"
+                                                    Grid.ColumnSpan="3"
+                                                    Tag="{Binding}">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="16"
+                                                               FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding MemoryMb, StringFormat=Memory (MB): {0}}"
+                                                               Foreground="#FF666666"
+                                                               Margin="0,4,0,0"/>
+                                                    <TextBlock Text="{Binding CpuCount, StringFormat=CPU: {0}}"
+                                                               Foreground="#FF666666"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Button Click="RemoveVm_Click"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Padding="0"
+                                                    Margin="0,0,8,0"
+                                                    Cursor="Hand"
+                                                    Grid.Column="1"
+                                                    VerticalAlignment="Center"
+                                                    Tag="{Binding}">
+                                                <TextBlock Text="&#xE74D;"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="16"
+                                                           Foreground="#FF666666"
+                                                           VerticalAlignment="Center"/>
+                                            </Button>
+
+                                            <TextBlock Text="&#xE76C;"
+                                                       FontFamily="Segoe Fluent Icons"
+                                                       FontSize="16"
+                                                       Foreground="#FF666666"
+                                                       VerticalAlignment="Center"
+                                                       Grid.Column="2"
+                                                       Margin="0,0,12,0"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <Frame x:Name="VmDetailFrame"
+                   NavigationUIVisibility="Hidden"
+                   Visibility="Collapsed"/>
+        </Grid>
     </Grid>
 </Page>

@@ -1,0 +1,88 @@
+<Page x:Class="LabAssistant.Views.TemplateVmDetailPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="TemplateVmDetailPage">
+
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
+            <Button Click="BackButton_Click"
+                    Content="&lt;-"
+                    Width="32"
+                    Height="32"
+                    Margin="0,0,10,0"/>
+            <StackPanel>
+                <TextBlock Text="{Binding VmTemplate.Name}"
+                           FontSize="22"
+                           FontWeight="Bold"/>
+                <TextBlock Text="VM Settings"
+                           Foreground="#FF666666"/>
+            </StackPanel>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Expander Header="General" IsExpanded="True" Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="VM Name" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBox Text="{Binding VmTemplate.Name, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+                </Expander>
+
+                <Expander Header="Resources" IsExpanded="True" Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="Memory (MB)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBox Text="{Binding VmTemplate.MemoryMb, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <TextBlock Text="CPU Count" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <TextBox Text="{Binding VmTemplate.CpuCount, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+                </Expander>
+
+                <Expander Header="Network" IsExpanded="False" Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="{Binding SwitchWarning}"
+                                   Foreground="#FFC00000"
+                                   Margin="0,0,0,8"
+                                   Visibility="{Binding ShowSwitchWarning, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="Virtual Switch" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding AvailableSwitches}"
+                                  SelectedItem="{Binding VmTemplate.SwitchName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEnabled="{Binding HasSwitches}"
+                                  IsEditable="False"/>
+                    </StackPanel>
+                </Expander>
+
+                <Expander Header="OS" IsExpanded="False" Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="VHDX Id" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBox Text="{Binding VmTemplate.VhdxId, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <TextBlock Text="VHDX Path" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <TextBox Text="{Binding VmTemplate.VhdPath, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+                </Expander>
+
+                <Expander Header="Roles" IsExpanded="False">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="Role configurations will appear here."
+                                   Foreground="#FF666666"/>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
