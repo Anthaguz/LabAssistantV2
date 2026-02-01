@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -9,7 +10,10 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows;
 using LabAssistant.Business;
+using LabAssistant.Models.Validation;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Catalog;
+using LabAssistant.Services.Configuration;
 
 namespace LabAssistant.ViewModels
 {
@@ -167,6 +171,43 @@ namespace LabAssistant.ViewModels
             CurrentTemplatePath = filePath;
         }
 
+        public TemplateValidationSummary ValidateForSave()
+        {
+            SyncVmTemplates();
+            var warnings = new List<string>();
+            var errors = new List<string>();
+
+            var catalogStore = new VhdxCatalogStore();
+            var catalogResult = catalogStore.Load(SettingsManager.Settings.CatalogPath);
+            if (catalogResult.Errors.Count > 0)
+            {
+                warnings.AddRange(catalogResult.Errors.Select(error => $"Catalog: {error}"));
+            }
+
+            var validation = LabTemplateValidator.Validate(Template, catalogResult.Items);
+            errors.AddRange(validation.Errors);
+
+            var catalogIds = new HashSet<string>(
+                catalogResult.Items.Select(item => item.Id),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var vm in Template.VmTemplates)
+            {
+                if (string.IsNullOrWhiteSpace(vm.VhdxId))
+                {
+                    continue;
+                }
+
+                if (!catalogIds.Contains(vm.VhdxId))
+                {
+                    var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name;
+                    errors.Add($"VM '{vmName}' references missing VHDX id '{vm.VhdxId}'.");
+                }
+            }
+
+            return new TemplateValidationSummary(errors, warnings);
+        }
+
         private void VmTemplates_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             SyncVmTemplates();
@@ -223,5 +264,18 @@ namespace LabAssistant.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    public class TemplateValidationSummary
+    {
+        public TemplateValidationSummary(IEnumerable<string> errors, IEnumerable<string> warnings)
+        {
+            Errors = errors.ToList();
+            Warnings = warnings.ToList();
+        }
+
+        public List<string> Errors { get; }
+
+        public List<string> Warnings { get; }
     }
 }
