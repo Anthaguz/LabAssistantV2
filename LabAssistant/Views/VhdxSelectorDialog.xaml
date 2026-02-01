@@ -23,7 +23,6 @@
                     <GridViewColumn Header="OS" DisplayMemberBinding="{Binding OsName}"/>
                     <GridViewColumn Header="Version" DisplayMemberBinding="{Binding OsVersion}"/>
                     <GridViewColumn Header="Path" DisplayMemberBinding="{Binding Path}"/>
-                    <GridViewColumn Header="Id" DisplayMemberBinding="{Binding Id}"/>
                 </GridView>
             </ListView.View>
         </ListView>
