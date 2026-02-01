@@ -2,17 +2,31 @@
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business;
 using LabAssistant.Models.Deployment;
-using LabAssistant.Services.Logging;
+using LabAssistant.Models.Templates;
 using LabAssistant.Services.Configuration;
+using LabAssistant.Services.Logging;
 using Microsoft.VisualBasic.Logging;
+using System;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using LabAssistant;
 using LabAssistant.Views;
 
 namespace LabAssistant.ViewModels;
 
 public partial class DeploymentViewModel : ObservableObject
 {
+    private static readonly JsonSerializerOptions TemplateJsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private readonly VirtualSwitchProvider _switchProvider;
     private readonly MultiVmDeploymentCoordinator _coordinator;
     public Action<string>? LogHandler { get; set; }
@@ -121,6 +135,111 @@ public partial class DeploymentViewModel : ObservableObject
         };
 
 
+    }
+
+    [RelayCommand]
+    private void SaveAsTemplate()
+    {
+        if (VmEntries.Count == 0)
+        {
+            System.Windows.MessageBox.Show(
+                "Add at least one VM before saving as a template.",
+                "Save as Template",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+            return;
+        }
+
+        var owner = (MainWindow)System.Windows.Application.Current.MainWindow;
+        var nameDialog = new InputDialog("Enter template name")
+        {
+            Owner = owner
+        };
+        if (nameDialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var templateName = nameDialog.ResponseText.Trim();
+        if (string.IsNullOrWhiteSpace(templateName))
+        {
+            System.Windows.MessageBox.Show(
+                "Template name is required.",
+                "Save as Template",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
+        var templateId = Guid.NewGuid().ToString("N");
+
+        var template = new LabTemplate
+        {
+            Id = templateId,
+            Name = templateName,
+            Version = "v0",
+            VmTemplates = VmEntries.Select(entry =>
+            {
+                var context = entry.DeploymentContext;
+                var baseVhdPath = !string.IsNullOrWhiteSpace(context.VhdDifferencingParentPath)
+                    ? context.VhdDifferencingParentPath
+                    : context.VhdPath;
+
+                return new VmTemplate
+                {
+                    Name = context.VmName,
+                    MemoryMb = context.MemoryMb,
+                    CpuCount = context.CpuCount,
+                    SwitchName = context.VirtualSwitchName,
+                    VhdPath = baseVhdPath
+                };
+            }).ToList()
+        };
+
+        var templateFolder = SettingsManager.Settings.TemplateFolder;
+        if (string.IsNullOrWhiteSpace(templateFolder))
+        {
+            templateFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "LabAssistant",
+                "Templates");
+        }
+
+        Directory.CreateDirectory(templateFolder);
+        var fileName = GetTemplateFileName(template.Name, templateFolder);
+        var filePath = Path.Combine(templateFolder, fileName);
+        var json = JsonSerializer.Serialize(template, TemplateJsonOptions);
+        File.WriteAllText(filePath, json);
+
+        System.Windows.MessageBox.Show(
+            $"Template saved to {filePath}",
+            "Save as Template",
+            System.Windows.MessageBoxButton.OK,
+            System.Windows.MessageBoxImage.Information);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(value.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "lab-template" : sanitized;
+    }
+
+    private static string GetTemplateFileName(string templateName, string folderPath)
+    {
+        var baseName = SanitizeFileName(templateName);
+        var fileName = $"{baseName}.json";
+        var filePath = Path.Combine(folderPath, fileName);
+        var suffix = 1;
+
+        while (File.Exists(filePath))
+        {
+            fileName = $"{baseName}-{suffix}.json";
+            filePath = Path.Combine(folderPath, fileName);
+            suffix++;
+        }
+
+        return fileName;
     }
 
     [RelayCommand]
