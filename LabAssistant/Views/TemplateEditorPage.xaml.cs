@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Templates;
@@ -101,6 +102,11 @@ namespace LabAssistant.Views
                 return;
             }
 
+            if (!ValidateBeforeSave())
+            {
+                return;
+            }
+
             try
             {
                 _viewModel.SaveToFile(_viewModel.CurrentTemplatePath);
@@ -126,6 +132,11 @@ namespace LabAssistant.Views
 
             if (dialog.ShowDialog() == true)
             {
+                if (!ValidateBeforeSave())
+                {
+                    return;
+                }
+
                 try
                 {
                     _viewModel.SaveToFile(dialog.FileName);
@@ -160,6 +171,35 @@ namespace LabAssistant.Views
             }
 
             return "lab-template.json";
+        }
+
+        private bool ValidateBeforeSave()
+        {
+            var summary = _viewModel.ValidateForSave();
+            if (summary.Errors.Count > 0)
+            {
+                var message = "Fix the following before saving:" + Environment.NewLine
+                              + string.Join(Environment.NewLine, summary.Errors.Select(error => $"- {error}"));
+                System.Windows.MessageBox.Show(
+                    message,
+                    "Validation Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return false;
+            }
+
+            if (summary.Warnings.Count > 0)
+            {
+                var message = "Warnings:" + Environment.NewLine
+                              + string.Join(Environment.NewLine, summary.Warnings.Select(warning => $"- {warning}"));
+                System.Windows.MessageBox.Show(
+                    message,
+                    "Validation Warning",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            return true;
         }
     }
 }
