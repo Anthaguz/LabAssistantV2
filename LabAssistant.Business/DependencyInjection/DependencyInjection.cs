@@ -59,20 +59,14 @@
 //    }
 //}
 
-using LabAssistant.Business;
 using LabAssistant.Business.Deployment;
-using LabAssistant.Models.PowerShell;
-using LabAssistant.Services.Configuration;
-using LabAssistant.Services.HyperV;
-using LabAssistant.Services.Logging;
-using LabAssistant.Services.PowerShell;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Business;
 
-public static class DependencyInjection
+public static class BusinessServiceCollectionExtensions
 {
-    public static IServiceCollection AddLabAssistantServices(this IServiceCollection services)
+    public static IServiceCollection AddBusinessServices(this IServiceCollection services)
     {
         // Steps (registered as transient so each pipeline gets a clean instance)
         services.AddTransient<CreateVmFolderStep>();
@@ -87,34 +81,8 @@ public static class DependencyInjection
         services.AddTransient<InstallSoftwareStep>();
         services.AddTransient<CheckHyperVStep>();
 
-        // PowerShell and session management
-        services.AddSingleton<ISessionResolver, SessionResolver>();
-        services.AddTransient<IPersistentPowerShellSession, PersistentPowerShellSession>();
-        services.AddSingleton<IPowerShellExecutor, PowerShellExecutor>();
-
-        // Factory for creating new standalone PowerShell session
-        services.AddTransient<Func<IPersistentPowerShellSession>>(provider =>
-        {
-            return () => provider.GetRequiredService<IPersistentPowerShellSession>();
-        });
-
-
-        // Factory for creating new PowerShellHandle
-        services.AddTransient<Func<PowerShellHandle>>(_ => () => new PowerShellHandle());
-
-        // Factory for creating HyperVService from a session
-        services.AddTransient<Func<IPersistentPowerShellSession, IHyperVService>>(provider => session =>
-            new HyperVService(session)
-        );
-
-        //Providers
         services.AddTransient<VirtualSwitchProvider>();
-
-
-        // Pipeline builder for conditional chaining
         services.AddTransient<DeploymentPipelineBuilder>();
-
-        // Multi-VM coordinator
         services.AddSingleton<MultiVmDeploymentCoordinator>();
 
         return services;
