@@ -196,6 +196,17 @@ public partial class DeploymentViewModel : ObservableObject
             }).ToList()
         };
 
+        var reviewDialog = new TemplateSaveReviewDialog(
+            new TemplateSaveReviewModel(template.Name, template.Id, template.VmTemplates.Count))
+        {
+            Owner = owner
+        };
+
+        if (reviewDialog.ShowDialog() != true)
+        {
+            return;
+        }
+
         var templateFolder = SettingsManager.Settings.TemplateFolder;
         if (string.IsNullOrWhiteSpace(templateFolder))
         {
