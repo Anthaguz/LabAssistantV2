@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using LabAssistant.Models.Catalog;
 using LabAssistant.Data.Catalog;
+using LabAssistant.Models.Catalog;
 using Xunit;
 
-namespace LabAssistant.Business.Tests.Tests;
+namespace LabAssistant.Data.Tests;
 
 public class VhdxCatalogStoreTests
 {
@@ -46,6 +46,19 @@ public class VhdxCatalogStoreTests
         Assert.True(loadResult.IsValid);
         Assert.Single(loadResult.Items);
         Assert.Equal("win-2022", loadResult.Items[0].Id);
+    }
+
+    [Fact]
+    public void Load_ReturnsError_WhenJsonIsInvalid()
+    {
+        var store = new VhdxCatalogStore();
+        var path = BuildTempPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "{ invalid json");
+
+        var result = store.Load(path);
+
+        Assert.NotEmpty(result.Errors);
     }
 
     private static string BuildTempPath()
