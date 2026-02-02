@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using LabAssistant.Models.Catalog;
 using LabAssistant.Data.Catalog;
+using LabAssistant.Models.Catalog;
 using Xunit;
 
-namespace LabAssistant.Business.Tests.Tests;
+namespace LabAssistant.Data.Tests;
 
 public class VhdxCatalogStoreTests
 {

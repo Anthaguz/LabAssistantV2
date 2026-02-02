@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using InfrastructureServices = LabAssistant.Services.ServiceCollectionExtensions;
 using Xunit;
 
-namespace LabAssistant.Business.Tests.Tests.Architecture;
+namespace LabAssistant.UI.Tests;
 
 public class DependencyInjectionWiringTests
 {

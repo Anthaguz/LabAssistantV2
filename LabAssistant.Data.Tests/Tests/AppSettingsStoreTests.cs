@@ -3,7 +3,7 @@ using System.IO;
 using LabAssistant.Data.Configuration;
 using Xunit;
 
-namespace LabAssistant.Business.Tests.Tests.Persistence;
+namespace LabAssistant.Data.Tests;
 
 public class AppSettingsStoreTests
 {
