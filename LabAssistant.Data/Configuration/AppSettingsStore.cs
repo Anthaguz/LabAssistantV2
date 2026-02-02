@@ -6,28 +6,38 @@ namespace LabAssistant.Data.Configuration;
 
 public sealed class AppSettingsStore : IAppSettingsStore
 {
-    private static readonly string BaseFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-    private static readonly string AppRoot = Path.Combine(BaseFolder, "LabAssistant");
-    private static readonly string AppConfigFolder = Path.Combine(AppRoot, "Config");
-    private static readonly string CatalogFolder = Path.Combine(AppRoot, "Catalog");
-    private static readonly string SettingsFilePath = Path.Combine(AppConfigFolder, "settings.json");
+    private readonly string _appRoot;
+    private readonly string _appConfigFolder;
+    private readonly string _catalogFolder;
+    private readonly string _settingsFilePath;
+
+    public AppSettingsStore(string? appRoot = null)
+    {
+        var baseFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        _appRoot = string.IsNullOrWhiteSpace(appRoot)
+            ? Path.Combine(baseFolder, "LabAssistant")
+            : appRoot;
+        _appConfigFolder = Path.Combine(_appRoot, "Config");
+        _catalogFolder = Path.Combine(_appRoot, "Catalog");
+        _settingsFilePath = Path.Combine(_appConfigFolder, "settings.json");
+    }
 
     public AppSettings Settings { get; private set; } = new();
 
-    public string SettingsPath => SettingsFilePath;
+    public string SettingsPath => _settingsFilePath;
 
     public void LoadOrCreate()
     {
         try
         {
-            if (!Directory.Exists(AppConfigFolder))
+            if (!Directory.Exists(_appConfigFolder))
             {
-                Directory.CreateDirectory(AppConfigFolder);
+                Directory.CreateDirectory(_appConfigFolder);
             }
 
-            if (File.Exists(SettingsFilePath))
+            if (File.Exists(_settingsFilePath))
             {
-                string json = File.ReadAllText(SettingsFilePath);
+                string json = File.ReadAllText(_settingsFilePath);
                 Settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
             }
             else
@@ -57,7 +67,7 @@ public sealed class AppSettingsStore : IAppSettingsStore
     public void Save()
     {
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(SettingsFilePath, json);
+        File.WriteAllText(_settingsFilePath, json);
     }
 
     public void ResetToDefault()
@@ -95,15 +105,15 @@ public sealed class AppSettingsStore : IAppSettingsStore
         Save();
     }
 
-    private static AppSettings GetDefaultSettings()
+    private AppSettings GetDefaultSettings()
     {
         return new AppSettings
         {
-            TemplateFolder = Path.Combine(AppRoot, "Templates"),
-            LogFolder = Path.Combine(AppRoot, "Logs"),
-            VmBasePath = Path.Combine(AppRoot, "VMs"),
-            DifferencingDiskBasePath = Path.Combine(AppRoot, "Disks"),
-            CatalogPath = Path.Combine(CatalogFolder, "vhdx-catalog.json"),
+            TemplateFolder = Path.Combine(_appRoot, "Templates"),
+            LogFolder = Path.Combine(_appRoot, "Logs"),
+            VmBasePath = Path.Combine(_appRoot, "VMs"),
+            DifferencingDiskBasePath = Path.Combine(_appRoot, "Disks"),
+            CatalogPath = Path.Combine(_catalogFolder, "vhdx-catalog.json"),
             DefaultVmMemoryMb = 2048,
             DefaultCpuCount = 2
         };

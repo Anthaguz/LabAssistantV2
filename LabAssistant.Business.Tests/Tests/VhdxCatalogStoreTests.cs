@@ -48,6 +48,19 @@ public class VhdxCatalogStoreTests
         Assert.Equal("win-2022", loadResult.Items[0].Id);
     }
 
+    [Fact]
+    public void Load_ReturnsError_WhenJsonIsInvalid()
+    {
+        var store = new VhdxCatalogStore();
+        var path = BuildTempPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "{ invalid json");
+
+        var result = store.Load(path);
+
+        Assert.NotEmpty(result.Errors);
+    }
+
     private static string BuildTempPath()
     {
         var folder = Path.Combine(Path.GetTempPath(), "LabAssistantTests", Guid.NewGuid().ToString("N"));
