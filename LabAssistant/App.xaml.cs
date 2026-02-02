@@ -1,5 +1,6 @@
-using LabAssistant.Services.Configuration;
 using LabAssistant.Business;
+using LabAssistant.Services.Configuration;
+using InfrastructureServices = LabAssistant.Services.ServiceCollectionExtensions;
 using Microsoft.Extensions.DependencyInjection;
 using System.Windows;
 
@@ -17,7 +18,8 @@ namespace LabAssistant
 
             // Configure DI
             var serviceCollection = new ServiceCollection();
-            serviceCollection.AddLabAssistantServices();      // Business + Services
+            InfrastructureServices.AddInfrastructureServices(serviceCollection);    // Services
+            serviceCollection.AddBusinessServices();          // Business
             serviceCollection.AddLabAssistantViewModels();    // ViewModels
 
             Services = serviceCollection.BuildServiceProvider();
