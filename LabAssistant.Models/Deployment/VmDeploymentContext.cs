@@ -15,6 +15,7 @@ namespace LabAssistant.Models.Deployment
         public string VhdPath { get; set; } = string.Empty;
         public bool IsVhdDifferencing { get; set; } = false; 
         public string VhdDifferencingParentPath { get; set; } = string.Empty;
+        public string? VhdxId { get; set; }
 
         //Network Configuration
         public string VirtualSwitchName { get; set; } = string.Empty;
