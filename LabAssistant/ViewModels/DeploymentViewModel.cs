@@ -1,17 +1,14 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
-using LabAssistant.Services.Configuration;
 using LabAssistant.Services.Logging;
-using Microsoft.VisualBasic.Logging;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using LabAssistant;
 using LabAssistant.Views;
@@ -20,15 +17,10 @@ namespace LabAssistant.ViewModels;
 
 public partial class DeploymentViewModel : ObservableObject
 {
-    private static readonly JsonSerializerOptions TemplateJsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     private readonly VirtualSwitchProvider _switchProvider;
     private readonly MultiVmDeploymentCoordinator _coordinator;
+    private readonly IAppSettingsStore _settingsStore;
+    private readonly ILabTemplateStore _templateStore;
     public Action<string>? LogHandler { get; set; }
 
     public ObservableCollection<string> AvailableSwitches { get; } = new();
@@ -44,7 +36,11 @@ public partial class DeploymentViewModel : ObservableObject
 
     public ObservableCollection<VmEntryViewModel> VmEntries { get; }
 
-    public DeploymentViewModel(MultiVmDeploymentCoordinator coordinator, VirtualSwitchProvider switchProvider)
+    public DeploymentViewModel(
+        MultiVmDeploymentCoordinator coordinator,
+        VirtualSwitchProvider switchProvider,
+        IAppSettingsStore settingsStore,
+        ILabTemplateStore templateStore)
     {
         LogHandler = message =>
         {
@@ -56,6 +52,8 @@ public partial class DeploymentViewModel : ObservableObject
 
         _switchProvider = switchProvider;
         _coordinator = coordinator;
+        _settingsStore = settingsStore;
+        _templateStore = templateStore;
         VmEntries = new ObservableCollection<VmEntryViewModel>();
         _ = LoadAvailableSwitches();
 
@@ -67,8 +65,11 @@ public partial class DeploymentViewModel : ObservableObject
         var switches = await _switchProvider.GetVirtualSwitchesAsync();
         AvailableSwitches.Clear();
         foreach (var s in switches)
+        {
             AvailableSwitches.Add(s);
+        }
     }
+
     public void AddLog(Guid vmId, string vmName, string message)
     {
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
@@ -80,9 +81,10 @@ public partial class DeploymentViewModel : ObservableObject
                 LogGroups.Add(group);
             }
 
-            // Update name in case it changed
             if (group.VmName != vmName)
+            {
                 group.VmName = vmName;
+            }
 
             group.Entries.Add(message);
         });
@@ -93,14 +95,19 @@ public partial class DeploymentViewModel : ObservableObject
     {
         RemoveVm(vmEntry);
     }
+
     public void RemoveVm(VmEntryViewModel vmEntry)
     {
         if (VmEntries.Contains(vmEntry))
+        {
             VmEntries.Remove(vmEntry);
+        }
 
         var logGroup = LogGroups.FirstOrDefault(g => g.VmId == vmEntry.DeploymentContext.VmId);
         if (logGroup != null)
+        {
             LogGroups.Remove(logGroup);
+        }
     }
 
     [RelayCommand]
@@ -118,11 +125,11 @@ public partial class DeploymentViewModel : ObservableObject
             VirtualSwitchName = AvailableSwitches.FirstOrDefault() ?? "",
             MemoryMb = 2048,
             CpuCount = 2,
-            VmPath = $"{SettingsManager.Settings.VmBasePath}\\{vmName}",
-            VhdPath = $"{SettingsManager.Settings.VmBasePath}\\{vmName}\\{vmName}.vhdx",
+            VmPath = $"{_settingsStore.Settings.VmBasePath}\\{vmName}",
+            VhdPath = $"{_settingsStore.Settings.VmBasePath}\\{vmName}\\{vmName}.vhdx",
             LogCallback = msg => AddLog(VmId, vmName, msg)
         };
-        var vmEntry = new VmEntryViewModel(context, this);
+        var vmEntry = new VmEntryViewModel(context, this, _settingsStore);
         VmEntries.Add(vmEntry);
         vmEntry.PropertyChanged += (_, e) =>
         {
@@ -130,11 +137,11 @@ public partial class DeploymentViewModel : ObservableObject
             {
                 var logGroup = LogGroups.FirstOrDefault(g => g.VmId == context.VmId);
                 if (logGroup != null)
+                {
                     logGroup.VmName = vmEntry.VmName;
+                }
             }
         };
-
-
     }
 
     [RelayCommand]
@@ -201,7 +208,7 @@ public partial class DeploymentViewModel : ObservableObject
             return;
         }
 
-        var templateFolder = SettingsManager.Settings.TemplateFolder;
+        var templateFolder = _settingsStore.Settings.TemplateFolder;
         if (string.IsNullOrWhiteSpace(templateFolder))
         {
             templateFolder = Path.Combine(
@@ -210,11 +217,7 @@ public partial class DeploymentViewModel : ObservableObject
                 "Templates");
         }
 
-        Directory.CreateDirectory(templateFolder);
-        var fileName = GetTemplateFileName(template.Name, templateFolder);
-        var filePath = Path.Combine(templateFolder, fileName);
-        var json = JsonSerializer.Serialize(template, TemplateJsonOptions);
-        File.WriteAllText(filePath, json);
+        var filePath = _templateStore.SaveToFolder(templateFolder, template.Name, template);
 
         System.Windows.MessageBox.Show(
             $"Template saved to {filePath}",
@@ -223,29 +226,6 @@ public partial class DeploymentViewModel : ObservableObject
             System.Windows.MessageBoxImage.Information);
     }
 
-    private static string SanitizeFileName(string value)
-    {
-        var invalidChars = Path.GetInvalidFileNameChars();
-        var sanitized = new string(value.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
-        return string.IsNullOrWhiteSpace(sanitized) ? "lab-template" : sanitized;
-    }
-
-    private static string GetTemplateFileName(string templateName, string folderPath)
-    {
-        var baseName = SanitizeFileName(templateName);
-        var fileName = $"{baseName}.json";
-        var filePath = Path.Combine(folderPath, fileName);
-        var suffix = 1;
-
-        while (File.Exists(filePath))
-        {
-            fileName = $"{baseName}-{suffix}.json";
-            filePath = Path.Combine(folderPath, fileName);
-            suffix++;
-        }
-
-        return fileName;
-    }
 
     [RelayCommand]
     private async Task DeployAllAsync()
@@ -265,7 +245,9 @@ public partial class DeploymentViewModel : ObservableObject
         foreach (var ctx in multiContext.VmContexts)
         {
             foreach (var log in ctx.Logs)
+            {
                 Logs.Add($"[{ctx.VmName}] {log}");
+            }
         }
 
         DebugLogger.Log("All deployments completed.");

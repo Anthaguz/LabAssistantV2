@@ -60,6 +60,12 @@
 //}
 
 using LabAssistant.Business.Deployment;
+using LabAssistant.Data.Catalog;
+using LabAssistant.Data.Configuration;
+using LabAssistant.Data.Templates;
+using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Configuration;
+using LabAssistant.Models.Templates;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Business;
@@ -85,6 +91,14 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<DeploymentPipelineBuilder>();
         services.AddSingleton<MultiVmDeploymentCoordinator>();
 
+        return services;
+    }
+
+    public static IServiceCollection AddPersistenceServices(this IServiceCollection services)
+    {
+        services.AddSingleton<IAppSettingsStore, AppSettingsStore>();
+        services.AddSingleton<IVhdxCatalogStore, VhdxCatalogStore>();
+        services.AddSingleton<ILabTemplateStore, LabTemplateStore>();
         return services;
     }
 }

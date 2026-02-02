@@ -3,31 +3,22 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using System.Windows;
 using LabAssistant.Business;
-using LabAssistant.Models.Validation;
+using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
-using LabAssistant.Services.Catalog;
-using LabAssistant.Services.Configuration;
+using LabAssistant.Models.Validation;
 
 namespace LabAssistant.ViewModels
 {
     public class TemplateEditorViewModel : INotifyPropertyChanged
     {
-        private static readonly JsonSerializerOptions TemplateJsonOptions = new()
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
-
         private readonly VirtualSwitchProvider? _switchProvider;
+        private readonly IAppSettingsStore _settingsStore;
+        private readonly IVhdxCatalogStore _catalogStore;
+        private readonly ILabTemplateStore _templateStore;
         private LabTemplate _template;
         private ObservableCollection<VmTemplate> _vmTemplates;
         private string? _currentTemplatePath;
@@ -35,14 +26,16 @@ namespace LabAssistant.ViewModels
         private string _switchWarning = string.Empty;
         private string? _defaultSwitchName;
 
-        public TemplateEditorViewModel()
-            : this(null)
-        {
-        }
-
-        public TemplateEditorViewModel(VirtualSwitchProvider? switchProvider)
+        public TemplateEditorViewModel(
+            VirtualSwitchProvider? switchProvider,
+            IAppSettingsStore settingsStore,
+            IVhdxCatalogStore catalogStore,
+            ILabTemplateStore templateStore)
         {
             _switchProvider = switchProvider;
+            _settingsStore = settingsStore;
+            _catalogStore = catalogStore;
+            _templateStore = templateStore;
             _template = new LabTemplate { Version = "v0" };
             _vmTemplates = new ObservableCollection<VmTemplate>();
             _vmTemplates.CollectionChanged += VmTemplates_CollectionChanged;
@@ -149,13 +142,7 @@ namespace LabAssistant.ViewModels
 
         public void LoadFromFile(string filePath)
         {
-            var json = File.ReadAllText(filePath);
-            var template = JsonSerializer.Deserialize<LabTemplate>(json, TemplateJsonOptions);
-            if (template == null)
-            {
-                throw new InvalidOperationException("Template file could not be loaded.");
-            }
-
+            var template = _templateStore.LoadFromFile(filePath);
             Template = template;
             VmTemplates = new ObservableCollection<VmTemplate>(template.VmTemplates ?? new());
             SyncVmTemplates();
@@ -166,8 +153,7 @@ namespace LabAssistant.ViewModels
         public void SaveToFile(string filePath)
         {
             SyncVmTemplates();
-            var json = JsonSerializer.Serialize(Template, TemplateJsonOptions);
-            File.WriteAllText(filePath, json);
+            _templateStore.SaveToFile(filePath, Template);
             CurrentTemplatePath = filePath;
         }
 
@@ -177,8 +163,7 @@ namespace LabAssistant.ViewModels
             var warnings = new List<string>();
             var errors = new List<string>();
 
-            var catalogStore = new VhdxCatalogStore();
-            var catalogResult = catalogStore.Load(SettingsManager.Settings.CatalogPath);
+            var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
             if (catalogResult.Errors.Count > 0)
             {
                 warnings.AddRange(catalogResult.Errors.Select(error => $"Catalog: {error}"));

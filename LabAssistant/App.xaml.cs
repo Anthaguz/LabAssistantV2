@@ -1,5 +1,6 @@
 using LabAssistant.Business;
-using LabAssistant.Services.Configuration;
+using LabAssistant.Models.Configuration;
+using LabAssistant.Services.Logging;
 using InfrastructureServices = LabAssistant.Services.ServiceCollectionExtensions;
 using Microsoft.Extensions.DependencyInjection;
 using System.Windows;
@@ -13,16 +14,17 @@ namespace LabAssistant
         {
             base.OnStartup(e);
 
-            // Load or create the application settings
-            SettingsManager.LoadOrCreate();
-
             // Configure DI
             var serviceCollection = new ServiceCollection();
             InfrastructureServices.AddInfrastructureServices(serviceCollection);    // Services
             serviceCollection.AddBusinessServices();          // Business
+            serviceCollection.AddPersistenceServices();       // Data-backed persistence
             serviceCollection.AddLabAssistantViewModels();    // ViewModels
 
             Services = serviceCollection.BuildServiceProvider();
+            var settingsStore = Services.GetRequiredService<IAppSettingsStore>();
+            settingsStore.LoadOrCreate();
+            DebugLogger.SetLogFolder(settingsStore.Settings.LogFolder);
             var mainWindow = new MainWindow();
             mainWindow.Show();
         }

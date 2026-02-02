@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Services.Catalog;
+using LabAssistant.Data.Catalog;
 using Xunit;
 
 namespace LabAssistant.Business.Tests.Tests;

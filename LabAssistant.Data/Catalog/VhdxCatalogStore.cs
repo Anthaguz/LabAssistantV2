@@ -1,14 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Validation;
 
-namespace LabAssistant.Services.Catalog;
+namespace LabAssistant.Data.Catalog;
 
-public class VhdxCatalogStore
+public class VhdxCatalogStore : IVhdxCatalogStore
 {
     private readonly VhdxCatalogLoader _loader = new();
 

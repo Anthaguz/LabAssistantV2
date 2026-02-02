@@ -4,27 +4,30 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Services.Catalog;
-using LabAssistant.Services.Configuration;
+using LabAssistant.Models.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views;
 
 public partial class VhdxCatalogPage : Page
 {
     private readonly ObservableCollection<VhdxCatalogItem> _items = new();
-    private readonly VhdxCatalogStore _store = new();
+    private readonly IVhdxCatalogStore _store;
+    private readonly IAppSettingsStore _settingsStore;
 
     public VhdxCatalogPage()
     {
         InitializeComponent();
+        _store = App.Services.GetRequiredService<IVhdxCatalogStore>();
+        _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
         CatalogListView.ItemsSource = _items;
-        CatalogPathText.Text = SettingsManager.Settings.CatalogPath;
+        CatalogPathText.Text = _settingsStore.Settings.CatalogPath;
         LoadCatalog();
     }
 
     private void LoadCatalog()
     {
-        var catalogPath = SettingsManager.Settings.CatalogPath;
+        var catalogPath = _settingsStore.Settings.CatalogPath;
         CatalogPathText.Text = catalogPath;
 
         var result = _store.Load(catalogPath);
@@ -42,7 +45,7 @@ public partial class VhdxCatalogPage : Page
 
     private bool SaveCatalog()
     {
-        var result = _store.Save(SettingsManager.Settings.CatalogPath, _items);
+        var result = _store.Save(_settingsStore.Settings.CatalogPath, _items);
         if (!result.IsValid)
         {
             System.Windows.MessageBox.Show(string.Join(Environment.NewLine, result.Errors), "Catalog Save Errors", MessageBoxButton.OK, MessageBoxImage.Warning);

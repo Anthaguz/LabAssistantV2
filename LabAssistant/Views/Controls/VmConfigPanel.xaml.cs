@@ -4,20 +4,23 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Services.Catalog;
-using LabAssistant.Services.Configuration;
+using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views.Controls
 {
     public partial class VmConfigPanel : System.Windows.Controls.UserControl
     {
-        private readonly VhdxCatalogStore _catalogStore = new();
+        private readonly IVhdxCatalogStore _catalogStore;
+        private readonly IAppSettingsStore _settingsStore;
         private List<VhdxCatalogItem> _catalogItems = new();
 
         public VmConfigPanel()
         {
             InitializeComponent();
+            _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+            _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             Loaded += (_, _) => UpdateSelectedVhdxDisplay();
             DataContextChanged += (_, _) => UpdateSelectedVhdxDisplay();
         }
@@ -105,7 +108,7 @@ namespace LabAssistant.Views.Controls
 
         private void LoadCatalog(bool showErrors)
         {
-            var result = _catalogStore.Load(SettingsManager.Settings.CatalogPath);
+            var result = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
             _catalogItems = result.Items.ToList();
 
             if (showErrors && result.Errors.Count > 0)
@@ -120,7 +123,7 @@ namespace LabAssistant.Views.Controls
 
         private bool SaveCatalog()
         {
-            var result = _catalogStore.Save(SettingsManager.Settings.CatalogPath, _catalogItems);
+            var result = _catalogStore.Save(_settingsStore.Settings.CatalogPath, _catalogItems);
             if (!result.IsValid)
             {
                 System.Windows.MessageBox.Show(
