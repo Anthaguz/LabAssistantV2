@@ -151,33 +151,26 @@ public partial class DeploymentViewModel : ObservableObject
         }
 
         var owner = (MainWindow)System.Windows.Application.Current.MainWindow;
-        var nameDialog = new InputDialog("Enter template name")
+        var detailsDialog = new TemplateSaveDetailsDialog(null, null, "v0")
         {
             Owner = owner
         };
-        if (nameDialog.ShowDialog() != true)
+        if (detailsDialog.ShowDialog() != true)
         {
             return;
         }
 
-        var templateName = nameDialog.ResponseText.Trim();
-        if (string.IsNullOrWhiteSpace(templateName))
-        {
-            System.Windows.MessageBox.Show(
-                "Template name is required.",
-                "Save as Template",
-                System.Windows.MessageBoxButton.OK,
-                System.Windows.MessageBoxImage.Warning);
-            return;
-        }
-
+        var templateName = detailsDialog.TemplateName;
+        var templateDescription = detailsDialog.TemplateDescription;
+        var templateVersion = detailsDialog.TemplateVersion;
         var templateId = Guid.NewGuid().ToString("N");
 
         var template = new LabTemplate
         {
             Id = templateId,
             Name = templateName,
-            Version = "v0",
+            Description = string.IsNullOrWhiteSpace(templateDescription) ? null : templateDescription,
+            Version = templateVersion,
             VmTemplates = VmEntries.Select(entry =>
             {
                 var context = entry.DeploymentContext;
@@ -191,13 +184,14 @@ public partial class DeploymentViewModel : ObservableObject
                     MemoryMb = context.MemoryMb,
                     CpuCount = context.CpuCount,
                     SwitchName = context.VirtualSwitchName,
+                    VhdxId = context.VhdxId,
                     VhdPath = baseVhdPath
                 };
             }).ToList()
         };
 
         var reviewDialog = new TemplateSaveReviewDialog(
-            new TemplateSaveReviewModel(template.Name, template.Id, template.VmTemplates.Count))
+            new TemplateSaveReviewModel(template.Name, template.Id, template.VmTemplates.Count, template.Description, template.Version))
         {
             Owner = owner
         };
@@ -284,6 +278,6 @@ public partial class DeploymentViewModel : ObservableObject
     {
         selectedVm.StartEditing();
         var mainWindow = (MainWindow)System.Windows.Application.Current.MainWindow;
-        mainWindow.MainContentFrame.Navigate(new VmDetailPage(selectedVm));
+        mainWindow.MainContentFrame.Navigate(new VmDetailPage(this, selectedVm, () => mainWindow.MainContentFrame.Navigate(new Views.DeployPage())));
     }
 }

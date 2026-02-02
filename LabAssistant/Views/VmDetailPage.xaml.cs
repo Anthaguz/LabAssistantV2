@@ -1,32 +1,23 @@
-﻿using LabAssistant.ViewModels;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using LabAssistant.ViewModels;
 
 namespace LabAssistant.Views
 {
     public partial class VmDetailPage : Page
     {
-        public VmDetailPage(VmEntryViewModel vmEntry)
+        private readonly System.Action _onBack;
+
+        public VmDetailPage(DeploymentViewModel deploymentViewModel, VmEntryViewModel vmEntry, System.Action onBack)
         {
             InitializeComponent();
-            DataContext = vmEntry;
+            DataContext = new DeployVmConfigContext(deploymentViewModel, vmEntry.DeploymentContext);
+            _onBack = onBack;
         }
 
-        private void ApplyChanges(object sender, RoutedEventArgs e)
+        private void BackButton_Click(object sender, RoutedEventArgs e)
         {
-            ((MainWindow)System.Windows.Application.Current.MainWindow).MainContentFrame.Navigate( new Views.DeployPage());
+            _onBack();
         }
     }
 }
