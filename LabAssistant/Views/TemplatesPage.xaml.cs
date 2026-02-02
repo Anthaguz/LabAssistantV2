@@ -1,25 +1,27 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Services.Catalog;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
-using LabAssistant.Services.Configuration;
-using LabAssistant.Services.Templates;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views
 {
     public partial class TemplatesPage : Page
     {
-        private readonly LabTemplateLoader _templateLoader = new LabTemplateLoader();
+        private readonly ILabTemplateStore _templateStore;
+        private readonly IVhdxCatalogStore _catalogStore;
+        private readonly IAppSettingsStore _settingsStore;
         private readonly List<LabTemplate> _templates = new List<LabTemplate>();
 
         public TemplatesPage()
         {
             InitializeComponent();
+            _templateStore = App.Services.GetRequiredService<ILabTemplateStore>();
+            _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+            _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             LoadTemplates();
         }
 
@@ -27,29 +29,26 @@ namespace LabAssistant.Views
         {
             _templates.Clear();
 
-            var folder = SettingsManager.Settings.TemplateFolder;
+            var folder = _settingsStore.Settings.TemplateFolder;
             if (!string.IsNullOrWhiteSpace(folder))
             {
-                if (Directory.Exists(folder))
+                var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
+                var loadResult = _templateStore.LoadFromFolder(folder, catalogResult.Items);
+                _templates.AddRange(loadResult.Templates);
+                var errors = new List<string>();
+                if (catalogResult.Errors.Count > 0)
                 {
-                    var catalogResult = new VhdxCatalogStore().Load(SettingsManager.Settings.CatalogPath);
-                    var loadResult = _templateLoader.LoadFromFolder(folder, catalogResult.Items);
-                    _templates.AddRange(loadResult.Templates);
-                    var errors = new List<string>();
-                    if (catalogResult.Errors.Count > 0)
-                    {
-                        errors.AddRange(catalogResult.Errors);
-                    }
+                    errors.AddRange(catalogResult.Errors);
+                }
 
-                    if (loadResult.Errors.Count > 0)
-                    {
-                        errors.AddRange(loadResult.Errors);
-                    }
+                if (loadResult.Errors.Count > 0)
+                {
+                    errors.AddRange(loadResult.Errors);
+                }
 
-                    if (errors.Count > 0)
-                    {
-                        MainWindow.CurrentInstance?.ShowError(string.Join(Environment.NewLine, errors));
-                    }
+                if (errors.Count > 0)
+                {
+                    MainWindow.CurrentInstance?.ShowError(string.Join(Environment.NewLine, errors));
                 }
             }
 

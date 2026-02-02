@@ -1,4 +1,3 @@
-﻿using LabAssistant.Services.Configuration;
 using System;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -8,9 +7,23 @@ namespace LabAssistant.Services.Logging
     public static class DebugLogger
     {
         private static readonly object _lock = new();
+        private static string? _logFolder;
 
-        private static string LogFilePath =>
-            Path.Combine(SettingsManager.Settings.LogFolder, "log.txt");
+        private static string LogFilePath
+        {
+            get
+            {
+                var folder = string.IsNullOrWhiteSpace(_logFolder)
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LabAssistant", "Logs")
+                    : _logFolder;
+                return Path.Combine(folder, "log.txt");
+            }
+        }
+
+        public static void SetLogFolder(string logFolder)
+        {
+            _logFolder = logFolder;
+        }
 
         public static void Log(
             string message = "",
@@ -51,6 +64,5 @@ namespace LabAssistant.Services.Logging
                 Log($"PowerShell Error for '{command}': \n{error}");
             }
         }
-
     }
 }

@@ -1,10 +1,9 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
-using LabAssistant.Services.Configuration;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 
 namespace LabAssistant.ViewModels;
 
@@ -13,12 +12,14 @@ public partial class VmEntryViewModel : ObservableObject
     public VmDeploymentContext DeploymentContext { get; }
     public ObservableCollection<string> AvailableSwitches => _parentDeploymentViewModel.AvailableSwitches;
     private readonly DeploymentViewModel _parentDeploymentViewModel;
+    private readonly IAppSettingsStore _settingsStore;
     private string _originalVmName = string.Empty;
     private string _originalVhdPath = string.Empty;
     private string _originalSelectedSwitchName = string.Empty;
     private bool _originalConfigureTimeZone = false;
     private bool _originalInstallSoftware = false;
-    public VmEntryViewModel(VmDeploymentContext context, DeploymentViewModel parent)
+
+    public VmEntryViewModel(VmDeploymentContext context, DeploymentViewModel parent, IAppSettingsStore settingsStore)
     {
         DeploymentContext = context;
 
@@ -28,8 +29,9 @@ public partial class VmEntryViewModel : ObservableObject
         configureTimeZone = context.ConfigureTimeZone;
         installSoftware = context.InstallSoftware;
         _parentDeploymentViewModel = parent;
-
+        _settingsStore = settingsStore;
     }
+
     public void StartEditing()
     {
         _originalVmName = VmName;
@@ -50,6 +52,7 @@ public partial class VmEntryViewModel : ObservableObject
         ConfigureTimeZone = _originalConfigureTimeZone;
         InstallSoftware = _originalInstallSoftware;
     }
+
     // Used for switching UI between label and textbox
     [ObservableProperty]
     private bool isEditingName = false;
@@ -69,14 +72,13 @@ public partial class VmEntryViewModel : ObservableObject
     [ObservableProperty]
     private bool installSoftware;
 
-
     [RelayCommand]
     private void StopEditing() => IsEditingName = false;
 
     partial void OnVmNameChanged(string value)
     {
         DeploymentContext.VmName = value;
-        DeploymentContext.VmPath = $@"{SettingsManager.Settings.VmBasePath}\{value}";
+        DeploymentContext.VmPath = $@"{_settingsStore.Settings.VmBasePath}\{value}";
         DeploymentContext.VhdPath = $@"{DeploymentContext.VmPath}\{value}.vhdx";
 
         // Update local VhdPath to reflect change in GUI

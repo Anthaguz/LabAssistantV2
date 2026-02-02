@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using LabAssistant.Services.Configuration;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 
 namespace LabAssistant.ViewModels
@@ -8,12 +8,14 @@ namespace LabAssistant.ViewModels
     public class DeployVmConfigContext : INotifyPropertyChanged, IVmConfigContext
     {
         private readonly DeploymentViewModel _deploymentViewModel;
+        private readonly IAppSettingsStore _settingsStore;
         private readonly VmDeploymentContext _context;
 
-        public DeployVmConfigContext(DeploymentViewModel deploymentViewModel, VmDeploymentContext context)
+        public DeployVmConfigContext(DeploymentViewModel deploymentViewModel, VmDeploymentContext context, IAppSettingsStore settingsStore)
         {
             _deploymentViewModel = deploymentViewModel;
             _context = context;
+            _settingsStore = settingsStore;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -26,7 +28,7 @@ namespace LabAssistant.ViewModels
                 if (_context.VmName != value)
                 {
                     _context.VmName = value;
-                    _context.VmPath = $@"{SettingsManager.Settings.VmBasePath}\{value}";
+                    _context.VmPath = $@"{_settingsStore.Settings.VmBasePath}\{value}";
                     _context.VhdPath = $@"{_context.VmPath}\{value}.vhdx";
                     OnPropertyChanged(nameof(Name));
                 }

@@ -6,10 +6,9 @@ using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Business.Compatibility;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Models.Templates;
 using LabAssistant.Models.Configuration;
-using LabAssistant.Services.Catalog;
-using LabAssistant.Services.Configuration;
+using LabAssistant.Models.Templates;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views;
 
@@ -17,11 +16,16 @@ public partial class TemplateDetailsPage : Page
 {
     private readonly LabTemplate _template;
     private readonly string _templateKey;
+    private readonly IAppSettingsStore _settingsStore;
+    private readonly IVhdxCatalogStore _catalogStore;
     private readonly Dictionary<string, string> _requiredVhdxIdsByVmName = new(StringComparer.OrdinalIgnoreCase);
+
     public TemplateDetailsPage(LabTemplate template)
     {
         _template = template;
         _templateKey = string.IsNullOrWhiteSpace(_template.Id) ? _template.Name : _template.Id;
+        _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
+        _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
         CaptureRequiredVhdxIds();
         InitializeComponent();
         TemplateNameText.Text = _template.Name;
@@ -59,7 +63,7 @@ public partial class TemplateDetailsPage : Page
 
     private List<VhdxCatalogItem> LoadCatalogItems(bool silent = false)
     {
-        var catalogPath = SettingsManager.Settings.CatalogPath;
+        var catalogPath = _settingsStore.Settings.CatalogPath;
         if (string.IsNullOrWhiteSpace(catalogPath))
         {
             if (!silent)
@@ -69,8 +73,7 @@ public partial class TemplateDetailsPage : Page
             return new List<VhdxCatalogItem>();
         }
 
-        var store = new VhdxCatalogStore();
-        var result = store.Load(catalogPath);
+        var result = _catalogStore.Load(catalogPath);
         if (result.Errors.Count > 0)
         {
             if (!silent)
@@ -84,7 +87,7 @@ public partial class TemplateDetailsPage : Page
 
     private void ApplyPersistedSelections()
     {
-        var selections = SettingsManager.Settings.TemplateSelections;
+        var selections = _settingsStore.Settings.TemplateSelections;
         if (selections.Count == 0)
         {
             return;
@@ -116,7 +119,7 @@ public partial class TemplateDetailsPage : Page
 
     private void SaveSelection(VmTemplate vm)
     {
-        var selections = SettingsManager.Settings.TemplateSelections;
+        var selections = _settingsStore.Settings.TemplateSelections;
         selections.RemoveAll(item =>
             string.Equals(item.TemplateId, _templateKey, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(item.VmName, vm.Name, StringComparison.OrdinalIgnoreCase));
@@ -129,7 +132,7 @@ public partial class TemplateDetailsPage : Page
             VhdPath = vm.VhdPath ?? string.Empty
         });
 
-        SettingsManager.Save();
+        _settingsStore.Save();
     }
 
     private void CaptureRequiredVhdxIds()

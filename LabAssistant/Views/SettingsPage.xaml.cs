@@ -1,22 +1,26 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
-using LabAssistant.Services.Configuration;
-
+using LabAssistant.Models.Configuration;
+using LabAssistant.Services.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views
 {
     public partial class SettingsPage : Page
     {
+        private readonly IAppSettingsStore _settingsStore;
+
         public SettingsPage()
         {
             InitializeComponent();
+            _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             LoadSettingsIntoUI();
         }
 
         private void LoadSettingsIntoUI()
         {
-            TemplateFolderBox.Text = SettingsManager.Settings.TemplateFolder;
-            LogsPathBox.Text = SettingsManager.Settings.LogFolder;
+            TemplateFolderBox.Text = _settingsStore.Settings.TemplateFolder;
+            LogsPathBox.Text = _settingsStore.Settings.LogFolder;
         }
 
         private void ChangeTemplateFolder_Click(object sender, RoutedEventArgs e)
@@ -24,7 +28,7 @@ namespace LabAssistant.Views
             var dialog = new System.Windows.Forms.FolderBrowserDialog();
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                SettingsManager.Settings.TemplateFolder = dialog.SelectedPath;
+                _settingsStore.Settings.TemplateFolder = dialog.SelectedPath;
                 TemplateFolderBox.Text = dialog.SelectedPath;
             }
         }
@@ -34,20 +38,21 @@ namespace LabAssistant.Views
             var dialog = new System.Windows.Forms.FolderBrowserDialog();
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                SettingsManager.Settings.LogFolder = dialog.SelectedPath;
+                _settingsStore.Settings.LogFolder = dialog.SelectedPath;
                 LogsPathBox.Text = dialog.SelectedPath;
+                DebugLogger.SetLogFolder(dialog.SelectedPath);
             }
         }
 
         private void SaveSettings_Click(object sender, RoutedEventArgs e)
         {
-            SettingsManager.Save();
+            _settingsStore.Save();
             System.Windows.MessageBox.Show("Settings saved successfully!", "Lab Assistant", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ReloadSettings_Click(object sender, RoutedEventArgs e)
         {
-            SettingsManager.Reload();
+            _settingsStore.Reload();
             LoadSettingsIntoUI();
         }
     }

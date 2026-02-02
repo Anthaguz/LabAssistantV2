@@ -1,9 +1,8 @@
-using System.IO;
 using System.Text.Json;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Validation;
 
-namespace LabAssistant.Services.Catalog;
+namespace LabAssistant.Data.Catalog;
 
 public class VhdxCatalogLoader
 {

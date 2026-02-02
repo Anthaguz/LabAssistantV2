@@ -3,8 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
-using LabAssistant.Services.Configuration;
 using LabAssistant.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,11 +13,13 @@ namespace LabAssistant.Views
     public partial class TemplateEditorPage : Page
     {
         private readonly TemplateEditorViewModel _viewModel;
+        private readonly IAppSettingsStore _settingsStore;
 
         public TemplateEditorPage()
         {
             InitializeComponent();
             _viewModel = App.Services.GetRequiredService<TemplateEditorViewModel>();
+            _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             DataContext = _viewModel;
         }
 
@@ -152,10 +154,12 @@ namespace LabAssistant.Views
             }
         }
 
-        private static string GetInitialTemplateDirectory()
+        private string GetInitialTemplateDirectory()
         {
-            var folder = SettingsManager.Settings.TemplateFolder;
-            return string.IsNullOrWhiteSpace(folder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) : folder;
+            var folder = _settingsStore.Settings.TemplateFolder;
+            return string.IsNullOrWhiteSpace(folder)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                : folder;
         }
 
         private string GetDefaultTemplateFileName()

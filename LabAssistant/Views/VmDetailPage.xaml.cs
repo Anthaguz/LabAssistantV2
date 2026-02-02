@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views
 {
@@ -11,7 +13,8 @@ namespace LabAssistant.Views
         public VmDetailPage(DeploymentViewModel deploymentViewModel, VmEntryViewModel vmEntry, System.Action onBack)
         {
             InitializeComponent();
-            DataContext = new DeployVmConfigContext(deploymentViewModel, vmEntry.DeploymentContext);
+            var settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
+            DataContext = new DeployVmConfigContext(deploymentViewModel, vmEntry.DeploymentContext, settingsStore);
             _onBack = onBack;
         }
 
