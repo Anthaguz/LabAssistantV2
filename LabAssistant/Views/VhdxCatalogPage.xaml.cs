@@ -161,6 +161,8 @@ public partial class VhdxCatalogPage : Page
             OsName = source.OsName,
             OsVersion = source.OsVersion,
             Generation = source.Generation,
+            SizeBytes = source.SizeBytes,
+            Signature = source.Signature,
             Notes = source.Notes
         };
     }

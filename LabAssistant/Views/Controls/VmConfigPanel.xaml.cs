@@ -103,6 +103,7 @@ namespace LabAssistant.Views.Controls
 
             Context.VhdxId = item.Id;
             Context.VhdPath = item.Path;
+            Context.VhdxSignature = VhdxSignature.Build(item);
             UpdateSelectedVhdxDisplay();
         }
 

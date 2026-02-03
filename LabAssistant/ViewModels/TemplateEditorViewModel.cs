@@ -157,6 +157,44 @@ namespace LabAssistant.ViewModels
             CurrentTemplatePath = filePath;
         }
 
+        public int AutoResolveMissingVhdxBySignature()
+        {
+            SyncVmTemplates();
+            var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
+            var catalogItems = catalogResult.Items;
+            var catalogIds = new HashSet<string>(
+                catalogItems.Select(item => item.Id),
+                StringComparer.OrdinalIgnoreCase);
+
+            var resolvedCount = 0;
+            foreach (var vm in Template.VmTemplates)
+            {
+                var hasId = !string.IsNullOrWhiteSpace(vm.VhdxId);
+                var hasValidId = hasId && catalogIds.Contains(vm.VhdxId!);
+                if (hasValidId)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(vm.VhdxSignature))
+                {
+                    continue;
+                }
+
+                var matches = VhdxSignature.FindMatches(vm.VhdxSignature, catalogItems);
+                if (matches.Count == 1)
+                {
+                    var match = matches[0];
+                    vm.VhdxId = match.Id;
+                    vm.VhdPath = match.Path;
+                    vm.VhdxSignature = match.Signature;
+                    resolvedCount++;
+                }
+            }
+
+            return resolvedCount;
+        }
+
         public List<MissingVhdxReference> GetMissingVhdxReferences()
         {
             SyncVmTemplates();

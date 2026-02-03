@@ -32,6 +32,10 @@ public class VhdxCatalogLoader
             if (document?.Items != null)
             {
                 result.Items.AddRange(document.Items);
+                foreach (var item in result.Items)
+                {
+                    item.Signature = VhdxSignature.Build(item);
+                }
             }
             else
             {

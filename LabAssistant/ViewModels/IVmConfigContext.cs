@@ -8,6 +8,7 @@ namespace LabAssistant.ViewModels
         string? SwitchName { get; set; }
         string? VhdxId { get; set; }
         string? VhdPath { get; set; }
+        string? VhdxSignature { get; set; }
         System.Collections.ObjectModel.ObservableCollection<string> AvailableSwitches { get; }
         bool HasSwitches { get; }
         bool ShowSwitchWarning { get; }

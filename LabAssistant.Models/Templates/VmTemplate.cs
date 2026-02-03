@@ -31,6 +31,11 @@ public class VmTemplate
     public string? VhdPath { get; set; }
 
     /// <summary>
+    /// Signature of the selected VHDX (optional, helps with portability).
+    /// </summary>
+    public string? VhdxSignature { get; set; }
+
+    /// <summary>
     /// Virtual switch name override (optional).
     /// </summary>
     public string? SwitchName { get; set; }

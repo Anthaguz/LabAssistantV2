@@ -31,6 +31,16 @@ public class VhdxCatalogItem
     public int Generation { get; set; }
 
     /// <summary>
+    /// Optional size of the VHDX file in bytes (helps with signature matching).
+    /// </summary>
+    public long? SizeBytes { get; set; }
+
+    /// <summary>
+    /// Stable signature derived from OS info + generation (+ optional size).
+    /// </summary>
+    public string? Signature { get; set; }
+
+    /// <summary>
     /// Freeform notes about the image (optional).
     /// </summary>
     public string? Notes { get; set; }

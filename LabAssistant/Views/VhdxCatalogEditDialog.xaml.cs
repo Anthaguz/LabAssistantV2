@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Windows;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Validation;
@@ -88,6 +89,8 @@ public partial class VhdxCatalogEditDialog : Window
         Item.OsVersion = osVersion;
         Item.Generation = generation;
         Item.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes;
+        Item.SizeBytes = TryGetFileSize(path);
+        Item.Signature = VhdxSignature.Build(Item);
 
         var validation = VhdxCatalogValidator.Validate(new[] { Item });
         if (!validation.IsValid)
@@ -98,5 +101,29 @@ public partial class VhdxCatalogEditDialog : Window
 
         errorMessage = string.Empty;
         return true;
+    }
+
+    private static long? TryGetFileSize(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (File.Exists(path))
+            {
+                return new FileInfo(path).Length;
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+
+        return null;
     }
 }

@@ -96,6 +96,19 @@ namespace LabAssistant.ViewModels
             }
         }
 
+        public string? VhdxSignature
+        {
+            get => _vmTemplate.VhdxSignature;
+            set
+            {
+                if (_vmTemplate.VhdxSignature != value)
+                {
+                    _vmTemplate.VhdxSignature = value;
+                    OnPropertyChanged(nameof(VhdxSignature));
+                }
+            }
+        }
+
         public ObservableCollection<string> AvailableSwitches => _editorViewModel.AvailableSwitches;
 
         public bool HasSwitches => _editorViewModel.HasSwitches;
