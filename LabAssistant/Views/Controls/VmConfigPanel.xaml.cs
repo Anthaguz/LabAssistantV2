@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
@@ -15,6 +17,8 @@ namespace LabAssistant.Views.Controls
         private readonly IVhdxCatalogStore _catalogStore;
         private readonly IAppSettingsStore _settingsStore;
         private List<VhdxCatalogItem> _catalogItems = new();
+        private INotifyPropertyChanged? _contextNotifier;
+        private readonly Dictionary<Control, (Brush brush, Thickness thickness)> _borderDefaults = new();
 
         public VmConfigPanel()
         {
@@ -22,7 +26,12 @@ namespace LabAssistant.Views.Controls
             _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             Loaded += (_, _) => UpdateSelectedVhdxDisplay();
-            DataContextChanged += (_, _) => UpdateSelectedVhdxDisplay();
+            DataContextChanged += (_, _) =>
+            {
+                AttachContextHandlers();
+                UpdateSelectedVhdxDisplay();
+                UpdateValidationIndicators();
+            };
         }
 
         private IVmConfigContext? Context => DataContext as IVmConfigContext;
@@ -203,6 +212,122 @@ namespace LabAssistant.Views.Controls
 
             SelectedVhdxText.Text = "No VHDX selected";
             SelectedVhdxPathText.Text = string.Empty;
+            UpdateValidationIndicators();
+        }
+
+        private void AttachContextHandlers()
+        {
+            if (_contextNotifier != null)
+            {
+                _contextNotifier.PropertyChanged -= ContextOnPropertyChanged;
+                _contextNotifier = null;
+            }
+
+            _contextNotifier = Context as INotifyPropertyChanged;
+            if (_contextNotifier != null)
+            {
+                _contextNotifier.PropertyChanged += ContextOnPropertyChanged;
+            }
+        }
+
+        private void ContextOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(IVmConfigContext.Name)
+                or nameof(IVmConfigContext.MemoryMb)
+                or nameof(IVmConfigContext.CpuCount)
+                or nameof(IVmConfigContext.SwitchName)
+                or nameof(IVmConfigContext.VhdxId)
+                or nameof(IVmConfigContext.VhdPath))
+            {
+                UpdateValidationIndicators();
+            }
+        }
+
+        private void UpdateValidationIndicators()
+        {
+            if (Context == null)
+            {
+                return;
+            }
+
+            var nameError = string.IsNullOrWhiteSpace(Context.Name)
+                ? "VM name is required."
+                : string.Empty;
+            SetWarning(NameBox, NameWarningText, nameError, isError: true);
+
+            var memoryError = Context.MemoryMb <= 0
+                ? "Memory must be a positive number."
+                : string.Empty;
+            SetWarning(MemoryBox, MemoryWarningText, memoryError, isError: true);
+
+            var cpuError = Context.CpuCount <= 0
+                ? "CPU count must be a positive number."
+                : string.Empty;
+            SetWarning(CpuBox, CpuWarningText, cpuError, isError: true);
+
+            var switchWarning = string.Empty;
+            if (Context.HasSwitches && string.IsNullOrWhiteSpace(Context.SwitchName))
+            {
+                switchWarning = "Select a virtual switch.";
+            }
+            SetWarning(SwitchBox, SwitchWarningText, switchWarning, isError: false);
+
+            var vhdxWarning = string.Empty;
+            if (string.IsNullOrWhiteSpace(Context.VhdxId) && string.IsNullOrWhiteSpace(Context.VhdPath))
+            {
+                vhdxWarning = "Select a base VHDX before deployment.";
+            }
+            else if (!string.IsNullOrWhiteSpace(Context.VhdxId))
+            {
+                LoadCatalog(showErrors: false);
+                var hasMatch = _catalogItems.Any(item =>
+                    string.Equals(item.Id, Context.VhdxId, StringComparison.OrdinalIgnoreCase));
+                if (!hasMatch)
+                {
+                    vhdxWarning = "Selected VHDX is not in the local catalog.";
+                }
+            }
+
+            SetWarning(VhdxWarningText, vhdxWarning, isError: false);
+        }
+
+        private void SetWarning(TextBlock target, string message, bool isError)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                target.Visibility = Visibility.Collapsed;
+                target.Text = string.Empty;
+                return;
+            }
+
+            target.Text = message;
+            target.Foreground = isError ? Brushes.IndianRed : Brushes.DarkOrange;
+            target.Visibility = Visibility.Visible;
+        }
+
+        private void SetWarning(Control control, TextBlock target, string message, bool isError)
+        {
+            SetWarning(target, message, isError);
+            SetControlBorder(control, !string.IsNullOrWhiteSpace(message), isError ? Brushes.IndianRed : Brushes.DarkOrange);
+        }
+
+        private void SetControlBorder(Control control, bool highlight, Brush brush)
+        {
+            if (!_borderDefaults.TryGetValue(control, out var defaults))
+            {
+                defaults = (control.BorderBrush, control.BorderThickness);
+                _borderDefaults[control] = defaults;
+            }
+
+            if (!highlight)
+            {
+                control.BorderBrush = defaults.brush;
+                control.BorderThickness = defaults.thickness;
+                return;
+            }
+
+            control.BorderBrush = brush;
+            control.BorderThickness = new Thickness(1.5);
         }
     }
 }
