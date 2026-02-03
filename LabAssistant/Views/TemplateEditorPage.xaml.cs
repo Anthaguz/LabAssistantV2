@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
 using LabAssistant.ViewModels;
@@ -15,6 +16,7 @@ namespace LabAssistant.Views
         private readonly TemplateEditorViewModel _viewModel;
         private readonly IAppSettingsStore _settingsStore;
         private readonly IAppPaths _appPaths;
+        private readonly IVhdxCatalogStore _catalogStore;
 
         public TemplateEditorPage()
         {
@@ -22,6 +24,7 @@ namespace LabAssistant.Views
             _viewModel = App.Services.GetRequiredService<TemplateEditorViewModel>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             _appPaths = App.Services.GetRequiredService<IAppPaths>();
+            _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
             DataContext = _viewModel;
         }
 
@@ -86,6 +89,7 @@ namespace LabAssistant.Views
                 try
                 {
                     _viewModel.LoadFromFile(dialog.FileName);
+                    ResolveMissingVhdxReferences();
                 }
                 catch (Exception ex)
                 {
@@ -181,6 +185,19 @@ namespace LabAssistant.Views
 
         private bool ValidateBeforeSave()
         {
+            var missing = _viewModel.GetMissingVhdxReferences();
+            if (missing.Count > 0)
+            {
+                var message = "Resolve missing VHDX mappings before saving:" + Environment.NewLine
+                              + string.Join(Environment.NewLine, missing.Select(item => $"- {item.VmName} missing '{item.MissingId}'"));
+                System.Windows.MessageBox.Show(
+                    message,
+                    "Missing VHDX",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return false;
+            }
+
             var summary = _viewModel.ValidateForSave();
             if (summary.Errors.Count > 0)
             {
@@ -206,6 +223,41 @@ namespace LabAssistant.Views
             }
 
             return true;
+        }
+
+        private void ResolveMissingVhdxReferences()
+        {
+            var missing = _viewModel.GetMissingVhdxReferences();
+            if (missing.Count == 0)
+            {
+                return;
+            }
+
+            var dialog = new MissingVhdxResolutionDialog(missing, _catalogStore, _settingsStore)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (dialog.ShowDialog() != true)
+            {
+                System.Windows.MessageBox.Show(
+                    "Missing VHDX mappings were not resolved. Saving and deployment will be blocked until resolved.",
+                    "Missing VHDX",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            foreach (var item in dialog.Items)
+            {
+                if (item.SelectedOption == null)
+                {
+                    continue;
+                }
+
+                item.Reference.Vm.VhdxId = item.SelectedOption.Item.Id;
+                item.Reference.Vm.VhdPath = item.SelectedOption.Item.Path;
+            }
         }
     }
 }
