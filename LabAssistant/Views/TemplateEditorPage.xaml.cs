@@ -17,7 +17,7 @@ namespace LabAssistant.Views
         private readonly IAppSettingsStore _settingsStore;
         private readonly IAppPaths _appPaths;
         private readonly IVhdxCatalogStore _catalogStore;
-        private TemplateEditorViewModel.VmValidationField? _pendingFieldFocus;
+        private VmValidationField? _pendingFieldFocus;
 
         public TemplateEditorPage()
         {
@@ -269,7 +269,7 @@ namespace LabAssistant.Views
             VmDetailFrame.Navigate(new TemplateVmDetailPage(_viewModel, item.Vm, ShowVmList, () => FocusField(item.Field)));
         }
 
-        private void FocusField(TemplateEditorViewModel.VmValidationField field)
+        private void FocusField(VmValidationField field)
         {
             if (VmDetailFrame.Content is not TemplateVmDetailPage page)
             {
@@ -278,19 +278,19 @@ namespace LabAssistant.Views
 
             switch (field)
             {
-                case TemplateEditorViewModel.VmValidationField.Name:
+                case VmValidationField.Name:
                     page.FocusField(VmDetailField.Name);
                     break;
-                case TemplateEditorViewModel.VmValidationField.MemoryMb:
+                case VmValidationField.MemoryMb:
                     page.FocusField(VmDetailField.Memory);
                     break;
-                case TemplateEditorViewModel.VmValidationField.CpuCount:
+                case VmValidationField.CpuCount:
                     page.FocusField(VmDetailField.Cpu);
                     break;
-                case TemplateEditorViewModel.VmValidationField.SwitchName:
+                case VmValidationField.SwitchName:
                     page.FocusField(VmDetailField.Switch);
                     break;
-                case TemplateEditorViewModel.VmValidationField.Vhdx:
+                case VmValidationField.Vhdx:
                     page.FocusField(VmDetailField.Vhdx);
                     break;
             }
@@ -335,16 +335,16 @@ namespace LabAssistant.Views
 
     public sealed class VmValidationDisplayItem
     {
-        public VmValidationDisplayItem(TemplateEditorViewModel.VmValidationIssue issue)
+        public VmValidationDisplayItem(VmValidationIssue issue)
         {
             Issue = issue;
         }
 
-        public TemplateEditorViewModel.VmValidationIssue Issue { get; }
+        public VmValidationIssue Issue { get; }
 
         public VmTemplate Vm => Issue.Vm;
 
-        public TemplateEditorViewModel.VmValidationField Field => Issue.Field;
+        public VmValidationField Field => Issue.Field;
 
         public string DisplayText
             => $"{(string.IsNullOrWhiteSpace(Issue.Vm.Name) ? "<unnamed VM>" : Issue.Vm.Name)}: {Issue.Message}";

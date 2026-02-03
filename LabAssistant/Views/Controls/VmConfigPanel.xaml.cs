@@ -357,7 +357,7 @@ namespace LabAssistant.Views.Controls
             control.BorderThickness = new Thickness(1.5);
         }
 
-        private static void FocusTextBox(TextBox textBox)
+        private static void FocusTextBox(System.Windows.Controls.TextBox textBox)
         {
             textBox.Focus();
             textBox.SelectAll();
