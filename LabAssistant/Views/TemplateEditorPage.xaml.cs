@@ -257,7 +257,7 @@ namespace LabAssistant.Views
 
         private void ValidationItem_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button button || button.Tag is not VmValidationDisplayItem item)
+            if (sender is not System.Windows.Controls.Button button || button.Tag is not VmValidationDisplayItem item)
             {
                 return;
             }
