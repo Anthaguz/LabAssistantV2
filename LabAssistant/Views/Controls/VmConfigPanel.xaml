@@ -57,7 +57,7 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <Button Content="Select VHDX" Width="110" Margin="0,0,8,0" Click="SelectVhdx_Click"/>
-                        <Button Content="Add VHDX" Width="90" Click="AddVhdx_Click"/>
+                        <Button Content="Import VHDX" Width="100" Click="AddVhdx_Click"/>
                     </StackPanel>
                 </StackPanel>
             </Expander>

@@ -74,6 +74,27 @@ namespace LabAssistant.Views.Controls
             }
 
             LoadCatalog(showErrors: false);
+            var duplicatePath = FindDuplicatePath(dialog.Item.Path);
+            if (duplicatePath != null)
+            {
+                var choice = System.Windows.MessageBox.Show(
+                    $"A catalog entry already exists for this path:{Environment.NewLine}{duplicatePath.Path}{Environment.NewLine}{Environment.NewLine}Use the existing entry instead?",
+                    "Duplicate VHDX Path",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (choice == MessageBoxResult.Yes)
+                {
+                    ApplyCatalogSelection(duplicatePath);
+                    return;
+                }
+
+                if (choice != MessageBoxResult.No)
+                {
+                    return;
+                }
+            }
+
             if (HasDuplicateId(dialog.Item.Id))
             {
                 System.Windows.MessageBox.Show(
@@ -141,6 +162,17 @@ namespace LabAssistant.Views.Controls
         private bool HasDuplicateId(string id)
         {
             return _catalogItems.Any(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private VhdxCatalogItem? FindDuplicatePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            return _catalogItems.FirstOrDefault(item =>
+                string.Equals(item.Path, path, StringComparison.OrdinalIgnoreCase));
         }
 
         private void UpdateSelectedVhdxDisplay()
