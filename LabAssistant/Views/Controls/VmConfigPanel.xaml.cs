@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using MediaBrush = System.Windows.Media.Brush;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
@@ -18,7 +19,7 @@ namespace LabAssistant.Views.Controls
         private readonly IAppSettingsStore _settingsStore;
         private List<VhdxCatalogItem> _catalogItems = new();
         private INotifyPropertyChanged? _contextNotifier;
-        private readonly Dictionary<Control, (Brush brush, Thickness thickness)> _borderDefaults = new();
+        private readonly Dictionary<System.Windows.Controls.Control, (MediaBrush brush, Thickness thickness)> _borderDefaults = new();
 
         public VmConfigPanel()
         {
@@ -305,13 +306,13 @@ namespace LabAssistant.Views.Controls
             target.Visibility = Visibility.Visible;
         }
 
-        private void SetWarning(Control control, TextBlock target, string message, bool isError)
+        private void SetWarning(System.Windows.Controls.Control control, TextBlock target, string message, bool isError)
         {
             SetWarning(target, message, isError);
             SetControlBorder(control, !string.IsNullOrWhiteSpace(message), isError ? Brushes.IndianRed : Brushes.DarkOrange);
         }
 
-        private void SetControlBorder(Control control, bool highlight, Brush brush)
+        private void SetControlBorder(System.Windows.Controls.Control control, bool highlight, MediaBrush brush)
         {
             if (!_borderDefaults.TryGetValue(control, out var defaults))
             {
