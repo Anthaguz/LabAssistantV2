@@ -227,6 +227,7 @@ namespace LabAssistant.Views
 
         private void ResolveMissingVhdxReferences()
         {
+            _viewModel.AutoResolveMissingVhdxBySignature();
             var missing = _viewModel.GetMissingVhdxReferences();
             if (missing.Count == 0)
             {

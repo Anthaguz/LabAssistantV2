@@ -33,6 +33,10 @@ public class VhdxCatalogStore : IVhdxCatalogStore
             }
 
             var catalogItems = items?.ToList() ?? new List<VhdxCatalogItem>();
+            foreach (var item in catalogItems)
+            {
+                item.Signature = VhdxSignature.Build(item);
+            }
             var validation = VhdxCatalogValidator.Validate(catalogItems);
             if (!validation.IsValid)
             {

@@ -100,6 +100,19 @@ namespace LabAssistant.ViewModels
             }
         }
 
+        public string? VhdxSignature
+        {
+            get => _context.VhdxSignature;
+            set
+            {
+                if (_context.VhdxSignature != value)
+                {
+                    _context.VhdxSignature = value;
+                    OnPropertyChanged(nameof(VhdxSignature));
+                }
+            }
+        }
+
         public ObservableCollection<string> AvailableSwitches => _deploymentViewModel.AvailableSwitches;
 
         public bool HasSwitches => AvailableSwitches.Count > 0;
