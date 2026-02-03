@@ -17,6 +17,7 @@ namespace LabAssistant.Views
         private readonly IAppSettingsStore _settingsStore;
         private readonly IAppPaths _appPaths;
         private readonly IVhdxCatalogStore _catalogStore;
+        private VmValidationField? _pendingFieldFocus;
 
         public TemplateEditorPage()
         {
@@ -66,7 +67,15 @@ namespace LabAssistant.Views
 
             VmListPanel.Visibility = Visibility.Collapsed;
             VmDetailFrame.Visibility = Visibility.Visible;
-            VmDetailFrame.Navigate(new TemplateVmDetailPage(_viewModel, selectedVm, ShowVmList));
+            VmDetailFrame.Navigate(new TemplateVmDetailPage(_viewModel, selectedVm, ShowVmList, () =>
+            {
+                var focus = _pendingFieldFocus;
+                _pendingFieldFocus = null;
+                if (focus.HasValue)
+                {
+                    FocusField(focus.Value);
+                }
+            }));
         }
 
         private void ShowVmList()
@@ -185,6 +194,12 @@ namespace LabAssistant.Views
 
         private bool ValidateBeforeSave()
         {
+            UpdateValidationPanel();
+            if (ValidationPanel.Visibility == Visibility.Visible)
+            {
+                return false;
+            }
+
             var missing = _viewModel.GetMissingVhdxReferences();
             if (missing.Count > 0)
             {
@@ -225,6 +240,62 @@ namespace LabAssistant.Views
             return true;
         }
 
+        private void UpdateValidationPanel()
+        {
+            var issues = _viewModel.BuildVmValidationIssues();
+            if (issues.Count == 0)
+            {
+                ValidationPanel.Visibility = Visibility.Collapsed;
+                ValidationItemsControl.ItemsSource = null;
+                return;
+            }
+
+            var displayItems = issues.Select(issue => new VmValidationDisplayItem(issue)).ToList();
+            ValidationItemsControl.ItemsSource = displayItems;
+            ValidationPanel.Visibility = Visibility.Visible;
+        }
+
+        private void ValidationItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.Button button || button.Tag is not VmValidationDisplayItem item)
+            {
+                return;
+            }
+
+            _pendingFieldFocus = item.Field;
+
+            VmListPanel.Visibility = Visibility.Collapsed;
+            VmDetailFrame.Visibility = Visibility.Visible;
+            VmDetailFrame.Navigate(new TemplateVmDetailPage(_viewModel, item.Vm, ShowVmList, () => FocusField(item.Field)));
+        }
+
+        private void FocusField(VmValidationField field)
+        {
+            if (VmDetailFrame.Content is not TemplateVmDetailPage page)
+            {
+                return;
+            }
+
+            switch (field)
+            {
+                case VmValidationField.Name:
+                    page.FocusField(VmDetailField.Name);
+                    break;
+                case VmValidationField.MemoryMb:
+                    page.FocusField(VmDetailField.Memory);
+                    break;
+                case VmValidationField.CpuCount:
+                    page.FocusField(VmDetailField.Cpu);
+                    break;
+                case VmValidationField.SwitchName:
+                    page.FocusField(VmDetailField.Switch);
+                    break;
+                case VmValidationField.Vhdx:
+                    page.FocusField(VmDetailField.Vhdx);
+                    break;
+            }
+        }
+
         private void ResolveMissingVhdxReferences()
         {
             _viewModel.AutoResolveMissingVhdxBySignature();
@@ -260,5 +331,22 @@ namespace LabAssistant.Views
                 item.Reference.Vm.VhdPath = item.SelectedOption.Item.Path;
             }
         }
+    }
+
+    public sealed class VmValidationDisplayItem
+    {
+        public VmValidationDisplayItem(VmValidationIssue issue)
+        {
+            Issue = issue;
+        }
+
+        public VmValidationIssue Issue { get; }
+
+        public VmTemplate Vm => Issue.Vm;
+
+        public VmValidationField Field => Issue.Field;
+
+        public string DisplayText
+            => $"{(string.IsNullOrWhiteSpace(Issue.Vm.Name) ? "<unnamed VM>" : Issue.Vm.Name)}: {Issue.Message}";
     }
 }

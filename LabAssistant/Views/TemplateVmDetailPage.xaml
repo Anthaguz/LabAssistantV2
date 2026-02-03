@@ -25,6 +25,6 @@
             </StackPanel>
         </StackPanel>
 
-        <controls:VmConfigPanel Grid.Row="1"/>
+        <controls:VmConfigPanel x:Name="VmConfigPanel" Grid.Row="1"/>
     </Grid>
 </Page>

@@ -36,6 +36,31 @@ namespace LabAssistant.Views.Controls
             };
         }
 
+        public void FocusNameField()
+        {
+            FocusTextBox(NameBox);
+        }
+
+        public void FocusMemoryField()
+        {
+            FocusTextBox(MemoryBox);
+        }
+
+        public void FocusCpuField()
+        {
+            FocusTextBox(CpuBox);
+        }
+
+        public void FocusSwitchField()
+        {
+            SwitchBox.Focus();
+        }
+
+        public void FocusVhdxField()
+        {
+            SelectVhdxButton.Focus();
+        }
+
         private IVmConfigContext? Context => DataContext as IVmConfigContext;
 
         private void SelectVhdx_Click(object sender, RoutedEventArgs e)
@@ -330,6 +355,12 @@ namespace LabAssistant.Views.Controls
 
             control.BorderBrush = brush;
             control.BorderThickness = new Thickness(1.5);
+        }
+
+        private static void FocusTextBox(System.Windows.Controls.TextBox textBox)
+        {
+            textBox.Focus();
+            textBox.SelectAll();
         }
     }
 }

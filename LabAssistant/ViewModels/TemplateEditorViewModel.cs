@@ -256,6 +256,51 @@ namespace LabAssistant.ViewModels
             return new TemplateValidationSummary(errors, warnings);
         }
 
+        public List<VmValidationIssue> BuildVmValidationIssues()
+        {
+            SyncVmTemplates();
+            var issues = new List<VmValidationIssue>();
+
+            var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
+            var catalogIds = new HashSet<string>(
+                catalogResult.Items.Select(item => item.Id),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var vm in Template.VmTemplates)
+            {
+                if (string.IsNullOrWhiteSpace(vm.Name))
+                {
+                    issues.Add(new VmValidationIssue(vm, "VM name is required.", VmValidationField.Name));
+                }
+
+                if (vm.MemoryMb <= 0)
+                {
+                    issues.Add(new VmValidationIssue(vm, "Memory must be a positive number.", VmValidationField.MemoryMb));
+                }
+
+                if (vm.CpuCount <= 0)
+                {
+                    issues.Add(new VmValidationIssue(vm, "CPU count must be a positive number.", VmValidationField.CpuCount));
+                }
+
+                if (string.IsNullOrWhiteSpace(vm.SwitchName) && AvailableSwitches.Count > 0)
+                {
+                    issues.Add(new VmValidationIssue(vm, "Select a virtual switch.", VmValidationField.SwitchName));
+                }
+
+                if (string.IsNullOrWhiteSpace(vm.VhdxId) && string.IsNullOrWhiteSpace(vm.VhdPath))
+                {
+                    issues.Add(new VmValidationIssue(vm, "Select a base VHDX.", VmValidationField.Vhdx));
+                }
+                else if (!string.IsNullOrWhiteSpace(vm.VhdxId) && !catalogIds.Contains(vm.VhdxId))
+                {
+                    issues.Add(new VmValidationIssue(vm, "Selected VHDX is not in the local catalog.", VmValidationField.Vhdx));
+                }
+            }
+
+            return issues;
+        }
+
         private void VmTemplates_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             SyncVmTemplates();
@@ -325,5 +370,30 @@ namespace LabAssistant.ViewModels
         public List<string> Errors { get; }
 
         public List<string> Warnings { get; }
+    }
+
+    public sealed class VmValidationIssue
+    {
+        public VmValidationIssue(VmTemplate vm, string message, VmValidationField field)
+        {
+            Vm = vm;
+            Message = message;
+            Field = field;
+        }
+
+        public VmTemplate Vm { get; }
+
+        public string Message { get; }
+
+        public VmValidationField Field { get; }
+    }
+
+    public enum VmValidationField
+    {
+        Name,
+        MemoryMb,
+        CpuCount,
+        SwitchName,
+        Vhdx
     }
 }

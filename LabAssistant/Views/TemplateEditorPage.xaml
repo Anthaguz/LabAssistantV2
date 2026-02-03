@@ -74,7 +74,45 @@
         </Border>
 
         <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border x:Name="ValidationPanel"
+                    Grid.Row="0"
+                    BorderBrush="#FFFFB6B6"
+                    Background="#FFFFEFEF"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10"
+                    Margin="0,0,0,12"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Fix the following issues before saving:"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <ItemsControl x:Name="ValidationItemsControl">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Click="ValidationItem_Click"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="4"
+                                        HorizontalContentAlignment="Left"
+                                        Tag="{Binding}">
+                                    <TextBlock Text="{Binding DisplayText}"
+                                               Foreground="#FFB00020"
+                                               TextWrapping="Wrap"/>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
             <Border x:Name="VmListPanel"
+                    Grid.Row="1"
                     BorderBrush="#FFDDDDDD"
                     BorderThickness="1"
                     CornerRadius="4"
@@ -156,6 +194,7 @@
             </Border>
 
             <Frame x:Name="VmDetailFrame"
+                   Grid.Row="1"
                    NavigationUIVisibility="Hidden"
                    Visibility="Collapsed"/>
         </Grid>
