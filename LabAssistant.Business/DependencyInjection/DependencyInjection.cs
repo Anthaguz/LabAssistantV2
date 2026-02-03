@@ -96,6 +96,7 @@ public static class BusinessServiceCollectionExtensions
 
     public static IServiceCollection AddPersistenceServices(this IServiceCollection services)
     {
+        services.AddSingleton<IAppPaths, AppPaths>();
         services.AddSingleton<IAppSettingsStore, AppSettingsStore>();
         services.AddSingleton<IVhdxCatalogStore, VhdxCatalogStore>();
         services.AddSingleton<ILabTemplateStore, LabTemplateStore>();

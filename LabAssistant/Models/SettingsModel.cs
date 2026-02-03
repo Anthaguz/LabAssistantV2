@@ -1,16 +1,11 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
 
 namespace LabAssistant.Models
 {
     public class SettingsModel
     {
-        public List<string> TemplatePaths { get; set; } = new List<string>
-        {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "LabAssistant", "Templates")
-        };
+        public List<string> TemplatePaths { get; set; } = new();
 
-        public string LogsPath { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "LabAssistant", "Logs");
+        public string LogsPath { get; set; } = string.Empty;
     }
 }

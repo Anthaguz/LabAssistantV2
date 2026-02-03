@@ -11,7 +11,7 @@ public class AppSettingsStoreTests
     public void LoadOrCreate_CreatesDefaultsAndFile()
     {
         var appRoot = BuildTempRoot();
-        var store = new AppSettingsStore(appRoot);
+        var store = new AppSettingsStore(new AppPaths(appRoot));
 
         store.LoadOrCreate();
 
@@ -27,13 +27,13 @@ public class AppSettingsStoreTests
     public void Save_RoundTripsSettings()
     {
         var appRoot = BuildTempRoot();
-        var store = new AppSettingsStore(appRoot);
+        var store = new AppSettingsStore(new AppPaths(appRoot));
         store.LoadOrCreate();
 
         store.Settings.TemplateFolder = Path.Combine(appRoot, "CustomTemplates");
         store.Save();
 
-        var reloaded = new AppSettingsStore(appRoot);
+        var reloaded = new AppSettingsStore(new AppPaths(appRoot));
         reloaded.LoadOrCreate();
 
         Assert.Equal(Path.Combine(appRoot, "CustomTemplates"), reloaded.Settings.TemplateFolder);
@@ -43,11 +43,11 @@ public class AppSettingsStoreTests
     public void LoadOrCreate_WhenInvalidJson_FallsBackToDefaults()
     {
         var appRoot = BuildTempRoot();
-        var store = new AppSettingsStore(appRoot);
+        var store = new AppSettingsStore(new AppPaths(appRoot));
         store.LoadOrCreate();
         File.WriteAllText(store.SettingsPath, "{ this is not valid json");
 
-        var reloaded = new AppSettingsStore(appRoot);
+        var reloaded = new AppSettingsStore(new AppPaths(appRoot));
         reloaded.LoadOrCreate();
 
         Assert.Equal(Path.Combine(appRoot, "Templates"), reloaded.Settings.TemplateFolder);

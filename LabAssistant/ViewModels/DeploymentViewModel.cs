@@ -21,6 +21,7 @@ public partial class DeploymentViewModel : ObservableObject
     private readonly MultiVmDeploymentCoordinator _coordinator;
     private readonly IAppSettingsStore _settingsStore;
     private readonly ILabTemplateStore _templateStore;
+    private readonly IAppPaths _appPaths;
     public Action<string>? LogHandler { get; set; }
 
     public ObservableCollection<string> AvailableSwitches { get; } = new();
@@ -40,7 +41,8 @@ public partial class DeploymentViewModel : ObservableObject
         MultiVmDeploymentCoordinator coordinator,
         VirtualSwitchProvider switchProvider,
         IAppSettingsStore settingsStore,
-        ILabTemplateStore templateStore)
+        ILabTemplateStore templateStore,
+        IAppPaths appPaths)
     {
         LogHandler = message =>
         {
@@ -54,6 +56,7 @@ public partial class DeploymentViewModel : ObservableObject
         _coordinator = coordinator;
         _settingsStore = settingsStore;
         _templateStore = templateStore;
+        _appPaths = appPaths;
         VmEntries = new ObservableCollection<VmEntryViewModel>();
         _ = LoadAvailableSwitches();
 
@@ -121,7 +124,7 @@ public partial class DeploymentViewModel : ObservableObject
             VmId = VmId,
             VmName = vmName,
             IsVhdDifferencing = true,
-            VhdDifferencingParentPath = "C:\\training\\BaseVHDX\\En_Win_Server_2022 .vhdx",
+            VhdDifferencingParentPath = string.Empty,
             VirtualSwitchName = AvailableSwitches.FirstOrDefault() ?? "",
             MemoryMb = 2048,
             CpuCount = 2,
@@ -211,10 +214,7 @@ public partial class DeploymentViewModel : ObservableObject
         var templateFolder = _settingsStore.Settings.TemplateFolder;
         if (string.IsNullOrWhiteSpace(templateFolder))
         {
-            templateFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "LabAssistant",
-                "Templates");
+            templateFolder = _appPaths.TemplatesFolder;
         }
 
         var filePath = _templateStore.SaveToFolder(templateFolder, template.Name, template);
