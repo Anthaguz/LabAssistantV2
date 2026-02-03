@@ -6,19 +6,18 @@ namespace LabAssistant.Data.Configuration;
 
 public sealed class AppSettingsStore : IAppSettingsStore
 {
+    private readonly IAppPaths _paths;
     private readonly string _appRoot;
     private readonly string _appConfigFolder;
     private readonly string _catalogFolder;
     private readonly string _settingsFilePath;
 
-    public AppSettingsStore(string? appRoot = null)
+    public AppSettingsStore(IAppPaths? paths = null)
     {
-        var baseFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        _appRoot = string.IsNullOrWhiteSpace(appRoot)
-            ? Path.Combine(baseFolder, "LabAssistant")
-            : appRoot;
-        _appConfigFolder = Path.Combine(_appRoot, "Config");
-        _catalogFolder = Path.Combine(_appRoot, "Catalog");
+        _paths = paths ?? new AppPaths();
+        _appRoot = _paths.AppRoot;
+        _appConfigFolder = _paths.ConfigFolder;
+        _catalogFolder = _paths.CatalogFolder;
         _settingsFilePath = Path.Combine(_appConfigFolder, "settings.json");
     }
 
@@ -109,11 +108,11 @@ public sealed class AppSettingsStore : IAppSettingsStore
     {
         return new AppSettings
         {
-            TemplateFolder = Path.Combine(_appRoot, "Templates"),
-            LogFolder = Path.Combine(_appRoot, "Logs"),
-            VmBasePath = Path.Combine(_appRoot, "VMs"),
-            DifferencingDiskBasePath = Path.Combine(_appRoot, "Disks"),
-            CatalogPath = Path.Combine(_catalogFolder, "vhdx-catalog.json"),
+            TemplateFolder = _paths.TemplatesFolder,
+            LogFolder = _paths.LogsFolder,
+            VmBasePath = _paths.VmBasePath,
+            DifferencingDiskBasePath = _paths.DifferencingDiskBasePath,
+            CatalogPath = _paths.CatalogPath,
             DefaultVmMemoryMb = 2048,
             DefaultCpuCount = 2
         };

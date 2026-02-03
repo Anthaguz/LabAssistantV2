@@ -14,12 +14,14 @@ namespace LabAssistant.Views
     {
         private readonly TemplateEditorViewModel _viewModel;
         private readonly IAppSettingsStore _settingsStore;
+        private readonly IAppPaths _appPaths;
 
         public TemplateEditorPage()
         {
             InitializeComponent();
             _viewModel = App.Services.GetRequiredService<TemplateEditorViewModel>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
+            _appPaths = App.Services.GetRequiredService<IAppPaths>();
             DataContext = _viewModel;
         }
 
@@ -158,7 +160,7 @@ namespace LabAssistant.Views
         {
             var folder = _settingsStore.Settings.TemplateFolder;
             return string.IsNullOrWhiteSpace(folder)
-                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                ? _appPaths.TemplatesFolder
                 : folder;
         }
 

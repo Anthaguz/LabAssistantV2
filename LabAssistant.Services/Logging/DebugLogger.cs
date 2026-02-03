@@ -13,10 +13,12 @@ namespace LabAssistant.Services.Logging
         {
             get
             {
-                var folder = string.IsNullOrWhiteSpace(_logFolder)
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LabAssistant", "Logs")
-                    : _logFolder;
-                return Path.Combine(folder, "log.txt");
+                if (string.IsNullOrWhiteSpace(_logFolder))
+                {
+                    throw new InvalidOperationException("DebugLogger log folder not configured.");
+                }
+
+                return Path.Combine(_logFolder, "log.txt");
             }
         }
 
