@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -19,4 +19,4 @@ jobs:
       - name: Build
         run: dotnet build LabAssistant.sln -c Release
       - name: Test
-        run: dotnet test -c Release
+        run: dotnet test LabAssistant.sln -c Release
