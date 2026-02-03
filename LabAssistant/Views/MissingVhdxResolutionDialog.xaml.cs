@@ -76,7 +76,7 @@ namespace LabAssistant.Views
             LoadCatalog(showErrors: false);
             if (HasDuplicateId(dialog.Item.Id))
             {
-                MessageBox.Show(
+                System.Windows.MessageBox.Show(
                     "Catalog id must be unique.",
                     "VHDX Catalog",
                     MessageBoxButton.OK,
@@ -107,7 +107,7 @@ namespace LabAssistant.Views
 
             if (showErrors && result.Errors.Count > 0)
             {
-                MessageBox.Show(
+                System.Windows.MessageBox.Show(
                     string.Join(Environment.NewLine, result.Errors),
                     "Catalog Errors",
                     MessageBoxButton.OK,
@@ -140,7 +140,7 @@ namespace LabAssistant.Views
             var result = _catalogStore.Save(_settingsStore.Settings.CatalogPath, _catalogItems);
             if (!result.IsValid)
             {
-                MessageBox.Show(
+                System.Windows.MessageBox.Show(
                     string.Join(Environment.NewLine, result.Errors),
                     "Catalog Save Errors",
                     MessageBoxButton.OK,
