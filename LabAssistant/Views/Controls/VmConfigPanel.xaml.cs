@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MediaBrush = System.Windows.Media.Brush;
+using MediaBrushes = System.Windows.Media.Brushes;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
@@ -302,14 +303,14 @@ namespace LabAssistant.Views.Controls
             }
 
             target.Text = message;
-            target.Foreground = isError ? Brushes.IndianRed : Brushes.DarkOrange;
+            target.Foreground = isError ? MediaBrushes.IndianRed : MediaBrushes.DarkOrange;
             target.Visibility = Visibility.Visible;
         }
 
         private void SetWarning(System.Windows.Controls.Control control, TextBlock target, string message, bool isError)
         {
             SetWarning(target, message, isError);
-            SetControlBorder(control, !string.IsNullOrWhiteSpace(message), isError ? Brushes.IndianRed : Brushes.DarkOrange);
+            SetControlBorder(control, !string.IsNullOrWhiteSpace(message), isError ? MediaBrushes.IndianRed : MediaBrushes.DarkOrange);
         }
 
         private void SetControlBorder(System.Windows.Controls.Control control, bool highlight, MediaBrush brush)
