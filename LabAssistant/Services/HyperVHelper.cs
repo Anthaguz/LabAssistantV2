@@ -17,16 +17,16 @@ namespace LabAssistant.Services
                     CreateNoWindow = true
                 };
 
-                using (var process = Process.Start(psi))
+                using var process = Process.Start(psi);
+                if (process == null)
                 {
-                    string output = process.StandardOutput.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (output.Contains("Enabled", StringComparison.OrdinalIgnoreCase))
-                        return true;
-                    else
-                        return false;
+                    return false;
                 }
+
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+
+                return output.Contains("Enabled", StringComparison.OrdinalIgnoreCase);
             }
             catch
             {
