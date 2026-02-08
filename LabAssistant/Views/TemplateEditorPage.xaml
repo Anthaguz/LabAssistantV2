@@ -74,6 +74,20 @@
         </Border>
 
         <Grid Grid.Row="2">
+            <Grid.Resources>
+                <Storyboard x:Key="FadeIn">
+                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                     From="0"
+                                     To="1"
+                                     Duration="0:0:0.15"/>
+                </Storyboard>
+                <Storyboard x:Key="FadeOut">
+                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                     From="1"
+                                     To="0"
+                                     Duration="0:0:0.15"/>
+                </Storyboard>
+            </Grid.Resources>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -143,7 +157,7 @@
                         <Button Content="Add VM" Width="90" Click="AddVm_Click" DockPanel.Dock="Right"/>
                     </DockPanel>
 
-                    <ScrollViewer Height="260" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer x:Name="VmListScrollViewer" Height="260" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding VmTemplates}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

@@ -20,6 +20,7 @@ namespace LabAssistant.Views
         private VmValidationField? _pendingFieldFocus;
         private List<VmValidationDisplayItem> _validationItems = new();
         private bool _isValidationCollapsed;
+        private double _vmListScrollOffset;
 
         public TemplateEditorPage()
         {
@@ -67,8 +68,10 @@ namespace LabAssistant.Views
                 return;
             }
 
+            _vmListScrollOffset = VmListScrollViewer.VerticalOffset;
             VmListPanel.Visibility = Visibility.Collapsed;
             VmDetailFrame.Visibility = Visibility.Visible;
+            BeginPanelFade(VmDetailFrame, fadeIn: true);
             VmDetailFrame.Navigate(new TemplateVmDetailPage(_viewModel, selectedVm, ShowVmList, () =>
             {
                 var focus = _pendingFieldFocus;
@@ -82,9 +85,15 @@ namespace LabAssistant.Views
 
         private void ShowVmList()
         {
+            _vmListScrollOffset = VmListScrollViewer.VerticalOffset;
             VmDetailFrame.Content = null;
             VmDetailFrame.Visibility = Visibility.Collapsed;
             VmListPanel.Visibility = Visibility.Visible;
+            BeginPanelFade(VmListPanel, fadeIn: true);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                VmListScrollViewer.ScrollToVerticalOffset(_vmListScrollOffset);
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void OpenTemplate_Click(object sender, RoutedEventArgs e)
@@ -268,9 +277,25 @@ namespace LabAssistant.Views
 
             _pendingFieldFocus = item.Field;
 
+            _vmListScrollOffset = VmListScrollViewer.VerticalOffset;
             VmListPanel.Visibility = Visibility.Collapsed;
             VmDetailFrame.Visibility = Visibility.Visible;
+            BeginPanelFade(VmDetailFrame, fadeIn: true);
             VmDetailFrame.Navigate(new TemplateVmDetailPage(_viewModel, item.Vm, ShowVmList, () => FocusField(item.Field)));
+        }
+
+        private void BeginPanelFade(UIElement element, bool fadeIn)
+        {
+            if (element == null)
+            {
+                return;
+            }
+
+            var storyboard = (System.Windows.Media.Animation.Storyboard)Resources[fadeIn ? "FadeIn" : "FadeOut"];
+            if (element is FrameworkElement frameworkElement)
+            {
+                frameworkElement.BeginStoryboard(storyboard);
+            }
         }
 
         private void ValidationToggle_Click(object sender, RoutedEventArgs e)
