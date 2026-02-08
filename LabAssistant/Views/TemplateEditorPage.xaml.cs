@@ -68,6 +68,7 @@ namespace LabAssistant.Views
                 return;
             }
 
+            UpdateValidationPanel();
             _vmListScrollOffset = VmListScrollViewer.VerticalOffset;
             VmListPanel.Visibility = Visibility.Collapsed;
             VmDetailFrame.Visibility = Visibility.Visible;
@@ -85,6 +86,7 @@ namespace LabAssistant.Views
 
         private void ShowVmList()
         {
+            UpdateValidationPanel();
             _vmListScrollOffset = VmListScrollViewer.VerticalOffset;
             VmDetailFrame.Content = null;
             VmDetailFrame.Visibility = Visibility.Collapsed;
@@ -275,6 +277,7 @@ namespace LabAssistant.Views
                 return;
             }
 
+            UpdateValidationPanel();
             _pendingFieldFocus = item.Field;
 
             _vmListScrollOffset = VmListScrollViewer.VerticalOffset;
