@@ -15,3 +15,4 @@ Use these commands from the repo root.
 Notes:
 - Tests are designed to run without elevated permissions.
 - UI wiring tests target net8.0-windows and run on Windows agents.
+- NETSDK1206 is suppressed for projects that reference System.Management.Automation (transitive Microsoft.Management.Infrastructure.Runtime.Win).
