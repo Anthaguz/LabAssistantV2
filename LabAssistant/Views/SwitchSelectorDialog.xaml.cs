@@ -5,7 +5,7 @@ namespace LabAssistant.Views
 {
     public partial class SwitchSelectorDialog : Window
     {
-        public string SelectedSwitch { get; private set; }
+        public string SelectedSwitch { get; private set; } = string.Empty;
 
         public SwitchSelectorDialog(List<string> switches)
         {
@@ -20,7 +20,7 @@ namespace LabAssistant.Views
         {
             if (SwitchesComboBox.SelectedItem != null)
             {
-                SelectedSwitch = SwitchesComboBox.SelectedItem.ToString();
+                SelectedSwitch = SwitchesComboBox.SelectedItem.ToString() ?? string.Empty;
                 this.DialogResult = true;
                 this.Close();
             }
