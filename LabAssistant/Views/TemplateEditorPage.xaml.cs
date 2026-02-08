@@ -292,7 +292,10 @@ namespace LabAssistant.Views
             }
 
             var storyboard = (System.Windows.Media.Animation.Storyboard)Resources[fadeIn ? "FadeIn" : "FadeOut"];
-            element.BeginStoryboard(storyboard);
+            if (element is FrameworkElement frameworkElement)
+            {
+                frameworkElement.BeginStoryboard(storyboard);
+            }
         }
 
         private void ValidationToggle_Click(object sender, RoutedEventArgs e)
