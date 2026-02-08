@@ -1,6 +1,6 @@
 # LabAssistant Product Context (Verbose)
 
-Last updated: 2026-01-25
+Last updated: 2026-02-08
 
 ## Purpose and Vision
 LabAssistant is a Windows desktop app for building and managing lab environments based on reusable templates. The core idea is:
@@ -97,6 +97,11 @@ Milestone D delivered a complete VHDX catalog + template mapping workflow:
   - UI depends on Business/Services/Models.
   - Business depends on Data/Services/Models.
   - Services and Data depend only on Models.
+
+## UI Models vs. Domain Models
+- **Domain models live in `LabAssistant.Models`** and must be UI-agnostic (shared across WPF/WinUI/CLI).
+- **UI-only models live in `LabAssistant`** (e.g., under `ViewModels` or `UiModels`) and are safe to replace if the UI changes.
+- If a type exists only to shape UI state (grouping, selection, formatting), keep it in the UI project.
 
 ## What Is Complete vs. What Is Next
 
