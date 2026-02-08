@@ -20,6 +20,13 @@ public class StartVmStep : DeploymentStep
         context.LogCallback?.Invoke($"Starting VM '{context.VmName}'...");
         DebugLogger.Log($"Starting VM: {context.VmName}");
 
+        if (context.PowerShellHandle == null)
+        {
+            context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
+            context.IsSuccess = false;
+            return;
+        }
+
         var session = _resolver.Resolve(context.PowerShellHandle);
         var hyperV = _hyperVFactory(session);
 

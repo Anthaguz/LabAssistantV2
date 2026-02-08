@@ -25,6 +25,13 @@ namespace LabAssistant.Business.Deployment
             context.LogCallback?.Invoke($"Disabling VM checkpoints for VM '{context.VmName}'...");
             DebugLogger.Log($"Disabling VM: {context.VmName}");
 
+            if (context.PowerShellHandle == null)
+            {
+                context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
+                context.IsSuccess = false;
+                return;
+            }
+
             var session = _resolver.Resolve(context.PowerShellHandle);
             var hyperV = _hyperVFactory(session);
 
