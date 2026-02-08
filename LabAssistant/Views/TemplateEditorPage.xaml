@@ -89,25 +89,42 @@
                     Margin="0,0,0,12"
                     Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock Text="Fix the following issues before saving:"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,6"/>
-                    <ItemsControl x:Name="ValidationItemsControl">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Click="ValidationItem_Click"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Padding="4"
-                                        HorizontalContentAlignment="Left"
-                                        Tag="{Binding}">
-                                    <TextBlock Text="{Binding DisplayText}"
-                                               Foreground="#FFB00020"
-                                               TextWrapping="Wrap"/>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <DockPanel Margin="0,0,0,6">
+                        <TextBlock Text="Fix the following issues before saving:"
+                                   FontWeight="SemiBold"
+                                   DockPanel.Dock="Left"/>
+                        <Button x:Name="ValidationToggleButton"
+                                Content="Collapse"
+                                Width="90"
+                                DockPanel.Dock="Right"
+                                Click="ValidationToggle_Click"/>
+                    </DockPanel>
+
+                    <StackPanel x:Name="ValidationContentPanel">
+                        <TextBlock Text="Filter by VM name" Foreground="#FF666666" Margin="0,0,0,4"/>
+                        <TextBox x:Name="ValidationFilterBox"
+                                 MinHeight="28"
+                                 Margin="0,0,0,8"
+                                 Padding="6,3"
+                                 VerticalContentAlignment="Center"
+                                 TextChanged="ValidationFilter_TextChanged"/>
+                        <ItemsControl x:Name="ValidationItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Click="ValidationItem_Click"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="4"
+                                            HorizontalContentAlignment="Left"
+                                            Tag="{Binding}">
+                                        <TextBlock Text="{Binding DisplayText}"
+                                                   Foreground="#FFB00020"
+                                                   TextWrapping="Wrap"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

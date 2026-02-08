@@ -18,6 +18,8 @@ namespace LabAssistant.Views
         private readonly IAppPaths _appPaths;
         private readonly IVhdxCatalogStore _catalogStore;
         private VmValidationField? _pendingFieldFocus;
+        private List<VmValidationDisplayItem> _validationItems = new();
+        private bool _isValidationCollapsed;
 
         public TemplateEditorPage()
         {
@@ -250,9 +252,11 @@ namespace LabAssistant.Views
                 return;
             }
 
-            var displayItems = issues.Select(issue => new VmValidationDisplayItem(issue)).ToList();
-            ValidationItemsControl.ItemsSource = displayItems;
+            _validationItems = issues.Select(issue => new VmValidationDisplayItem(issue)).ToList();
+            ApplyValidationFilter();
             ValidationPanel.Visibility = Visibility.Visible;
+            ValidationContentPanel.Visibility = _isValidationCollapsed ? Visibility.Collapsed : Visibility.Visible;
+            ValidationToggleButton.Content = _isValidationCollapsed ? "Expand" : "Collapse";
         }
 
         private void ValidationItem_Click(object sender, RoutedEventArgs e)
@@ -267,6 +271,39 @@ namespace LabAssistant.Views
             VmListPanel.Visibility = Visibility.Collapsed;
             VmDetailFrame.Visibility = Visibility.Visible;
             VmDetailFrame.Navigate(new TemplateVmDetailPage(_viewModel, item.Vm, ShowVmList, () => FocusField(item.Field)));
+        }
+
+        private void ValidationToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _isValidationCollapsed = !_isValidationCollapsed;
+            ValidationContentPanel.Visibility = _isValidationCollapsed ? Visibility.Collapsed : Visibility.Visible;
+            ValidationToggleButton.Content = _isValidationCollapsed ? "Expand" : "Collapse";
+        }
+
+        private void ValidationFilter_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplyValidationFilter();
+        }
+
+        private void ApplyValidationFilter()
+        {
+            if (_validationItems.Count == 0)
+            {
+                ValidationItemsControl.ItemsSource = null;
+                return;
+            }
+
+            var filter = ValidationFilterBox.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(filter))
+            {
+                ValidationItemsControl.ItemsSource = _validationItems;
+                return;
+            }
+
+            var filtered = _validationItems
+                .Where(item => item.VmName.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            ValidationItemsControl.ItemsSource = filtered;
         }
 
         private void FocusField(VmValidationField field)
@@ -346,7 +383,8 @@ namespace LabAssistant.Views
 
         public VmValidationField Field => Issue.Field;
 
-        public string DisplayText
-            => $"{(string.IsNullOrWhiteSpace(Issue.Vm.Name) ? "<unnamed VM>" : Issue.Vm.Name)}: {Issue.Message}";
+        public string VmName => string.IsNullOrWhiteSpace(Issue.Vm.Name) ? "<unnamed VM>" : Issue.Vm.Name;
+
+        public string DisplayText => $"{VmName}: {Issue.Message}";
     }
 }
