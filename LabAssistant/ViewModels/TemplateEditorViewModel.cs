@@ -25,6 +25,7 @@ namespace LabAssistant.ViewModels
         private bool _hasSwitches;
         private string _switchWarning = string.Empty;
         private string? _defaultSwitchName;
+        private Dictionary<string, int> _vmIssueCounts = new(StringComparer.OrdinalIgnoreCase);
 
         public TemplateEditorViewModel(
             VirtualSwitchProvider? switchProvider,
@@ -91,6 +92,16 @@ namespace LabAssistant.ViewModels
         }
 
         public ObservableCollection<string> AvailableSwitches { get; } = new();
+
+        public IReadOnlyDictionary<string, int> VmIssueCounts
+        {
+            get => _vmIssueCounts;
+            private set
+            {
+                _vmIssueCounts = new Dictionary<string, int>(value, StringComparer.OrdinalIgnoreCase);
+                OnPropertyChanged(nameof(VmIssueCounts));
+            }
+        }
 
         public bool HasSwitches
         {
@@ -260,6 +271,7 @@ namespace LabAssistant.ViewModels
         {
             SyncVmTemplates();
             var issues = new List<VmValidationIssue>();
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
             var catalogIds = new HashSet<string>(
@@ -268,36 +280,45 @@ namespace LabAssistant.ViewModels
 
             foreach (var vm in Template.VmTemplates)
             {
+                var vmKey = vm.Name ?? string.Empty;
+
                 if (string.IsNullOrWhiteSpace(vm.Name))
                 {
                     issues.Add(new VmValidationIssue(vm, "VM name is required.", VmValidationField.Name));
+                    IncrementCount(counts, vmKey);
                 }
 
                 if (vm.MemoryMb <= 0)
                 {
                     issues.Add(new VmValidationIssue(vm, "Memory must be a positive number.", VmValidationField.MemoryMb));
+                    IncrementCount(counts, vmKey);
                 }
 
                 if (vm.CpuCount <= 0)
                 {
                     issues.Add(new VmValidationIssue(vm, "CPU count must be a positive number.", VmValidationField.CpuCount));
+                    IncrementCount(counts, vmKey);
                 }
 
                 if (string.IsNullOrWhiteSpace(vm.SwitchName) && AvailableSwitches.Count > 0)
                 {
                     issues.Add(new VmValidationIssue(vm, "Select a virtual switch.", VmValidationField.SwitchName));
+                    IncrementCount(counts, vmKey);
                 }
 
                 if (string.IsNullOrWhiteSpace(vm.VhdxId) && string.IsNullOrWhiteSpace(vm.VhdPath))
                 {
                     issues.Add(new VmValidationIssue(vm, "Select a base VHDX.", VmValidationField.Vhdx));
+                    IncrementCount(counts, vmKey);
                 }
                 else if (!string.IsNullOrWhiteSpace(vm.VhdxId) && !catalogIds.Contains(vm.VhdxId))
                 {
                     issues.Add(new VmValidationIssue(vm, "Selected VHDX is not in the local catalog.", VmValidationField.Vhdx));
+                    IncrementCount(counts, vmKey);
                 }
             }
 
+            VmIssueCounts = counts;
             return issues;
         }
 
@@ -356,6 +377,17 @@ namespace LabAssistant.ViewModels
         private void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private static void IncrementCount(IDictionary<string, int> counts, string key)
+        {
+            if (counts.TryGetValue(key, out var current))
+            {
+                counts[key] = current + 1;
+                return;
+            }
+
+            counts[key] = 1;
         }
     }
 
