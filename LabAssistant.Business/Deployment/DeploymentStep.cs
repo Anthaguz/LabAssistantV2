@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 public abstract class DeploymentStep
 {
-    protected DeploymentStep _next;
+    protected DeploymentStep? _next;
 
     public DeploymentStep SetNext(DeploymentStep next)
     {

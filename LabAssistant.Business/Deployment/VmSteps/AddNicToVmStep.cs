@@ -21,6 +21,13 @@ public class AddNicToVmStep : DeploymentStep
         context.LogCallback?.Invoke($"Adding network adapter to '{context.VmName}'...");
         DebugLogger.Log($"Adding network adapter to VM: {context.VmName}");
 
+        if (context.PowerShellHandle == null)
+        {
+            context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
+            context.IsSuccess = false;
+            return;
+        }
+
         var session = _resolver.Resolve(context.PowerShellHandle);
         var hyperV = _hyperVFactory(session);
 
