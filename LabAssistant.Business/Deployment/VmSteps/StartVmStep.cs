@@ -23,7 +23,7 @@ public class StartVmStep : DeploymentStep
         if (context.PowerShellHandle == null)
         {
             context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
-            context.IsSuccess = false;
+            context.MarkFailure(DeploymentStepKeys.StartVm, "Missing PowerShell handle.");
             return;
         }
 
@@ -41,6 +41,7 @@ public class StartVmStep : DeploymentStep
         {
             context.LogCallback?.Invoke($"❌ Failed to start VM '{context.VmName}'.");
             DebugLogger.Log($"Error: Failed to start VM: {context.VmName}");
+            context.MarkFailure(DeploymentStepKeys.StartVm, $"Failed to start VM '{context.VmName}'.");
         }
     }
 }

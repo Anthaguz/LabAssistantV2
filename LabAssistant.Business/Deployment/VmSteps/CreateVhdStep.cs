@@ -20,7 +20,7 @@ public class CreateVhdStep : DeploymentStep
         if (context.PowerShellHandle == null)
         {
             context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
-            context.IsSuccess = false;
+            context.MarkFailure(DeploymentStepKeys.CreateVhd, "Missing PowerShell handle.");
             return;
         }
 
@@ -48,6 +48,7 @@ public class CreateVhdStep : DeploymentStep
         {
             context.LogCallback?.Invoke($"❌ Failed to create VHD for '{context.VmName}'.");
             DebugLogger.Log($"Error: Failed to create VHD for VM: {context.VmName}");
+            context.MarkFailure(DeploymentStepKeys.CreateVhd, $"Failed to create VHD for '{context.VmName}'.");
         }
     }
 }

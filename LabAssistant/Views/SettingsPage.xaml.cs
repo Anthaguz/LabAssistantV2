@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Models.Configuration;
+using LabAssistant.Models.Deployment;
 using LabAssistant.Services.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,10 +11,6 @@ namespace LabAssistant.Views
     public partial class SettingsPage : Page
     {
         private readonly IAppSettingsStore _settingsStore;
-        private const string StepSetTimeZone = "SetTimeZone";
-        private const string StepInstallSoftware = "InstallSoftware";
-        private const string StepInstallRole = "InstallRole";
-        private const string StepConfigureNetwork = "ConfigureNetworkInformation";
 
         public SettingsPage()
         {
@@ -30,10 +27,10 @@ namespace LabAssistant.Views
             StopAllOnAnyVmFailureBox.IsChecked = _settingsStore.Settings.StopAllOnAnyVmFailure;
 
             var nonBlocking = _settingsStore.Settings.NonBlockingOptionalSteps ?? new List<string>();
-            OptionalSetTimeZoneBox.IsChecked = nonBlocking.Contains(StepSetTimeZone);
-            OptionalInstallSoftwareBox.IsChecked = nonBlocking.Contains(StepInstallSoftware);
-            OptionalInstallRoleBox.IsChecked = nonBlocking.Contains(StepInstallRole);
-            OptionalConfigureNetworkBox.IsChecked = nonBlocking.Contains(StepConfigureNetwork);
+            OptionalSetTimeZoneBox.IsChecked = nonBlocking.Contains(DeploymentStepKeys.SetTimeZone);
+            OptionalInstallSoftwareBox.IsChecked = nonBlocking.Contains(DeploymentStepKeys.InstallSoftware);
+            OptionalInstallRoleBox.IsChecked = nonBlocking.Contains(DeploymentStepKeys.InstallRole);
+            OptionalConfigureNetworkBox.IsChecked = nonBlocking.Contains(DeploymentStepKeys.ConfigureNetworkInformation);
         }
 
         private void ChangeTemplateFolder_Click(object sender, RoutedEventArgs e)
@@ -63,10 +60,10 @@ namespace LabAssistant.Views
             _settingsStore.Settings.StopAllOnAnyVmFailure = StopAllOnAnyVmFailureBox.IsChecked == true;
 
             var nonBlocking = new List<string>();
-            if (OptionalSetTimeZoneBox.IsChecked == true) nonBlocking.Add(StepSetTimeZone);
-            if (OptionalInstallSoftwareBox.IsChecked == true) nonBlocking.Add(StepInstallSoftware);
-            if (OptionalInstallRoleBox.IsChecked == true) nonBlocking.Add(StepInstallRole);
-            if (OptionalConfigureNetworkBox.IsChecked == true) nonBlocking.Add(StepConfigureNetwork);
+            if (OptionalSetTimeZoneBox.IsChecked == true) nonBlocking.Add(DeploymentStepKeys.SetTimeZone);
+            if (OptionalInstallSoftwareBox.IsChecked == true) nonBlocking.Add(DeploymentStepKeys.InstallSoftware);
+            if (OptionalInstallRoleBox.IsChecked == true) nonBlocking.Add(DeploymentStepKeys.InstallRole);
+            if (OptionalConfigureNetworkBox.IsChecked == true) nonBlocking.Add(DeploymentStepKeys.ConfigureNetworkInformation);
             _settingsStore.Settings.NonBlockingOptionalSteps = nonBlocking;
 
             _settingsStore.Save();

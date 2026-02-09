@@ -24,7 +24,7 @@ public class CreateVmStep : DeploymentStep
         if (context.PowerShellHandle == null)
         {
             context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
-            context.IsSuccess = false;
+            context.MarkFailure(DeploymentStepKeys.CreateVm, "Missing PowerShell handle.");
             return;
         }
 
@@ -47,6 +47,7 @@ public class CreateVmStep : DeploymentStep
         {
             context.LogCallback?.Invoke($"❌ Failed to create VM '{context.VmName}'.");
             DebugLogger.Log($"Error: Failed to create VM: {context.VmName}");
+            context.MarkFailure(DeploymentStepKeys.CreateVm, $"Failed to create VM '{context.VmName}'.");
         }
     }
 }

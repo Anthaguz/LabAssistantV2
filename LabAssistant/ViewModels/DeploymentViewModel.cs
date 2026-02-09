@@ -6,6 +6,7 @@ using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.Services.Logging;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -93,6 +94,13 @@ public partial class DeploymentViewModel : ObservableObject
         });
     }
 
+    private void ApplyDeploymentPolicy(VmDeploymentContext context)
+    {
+        var settings = _settingsStore.Settings;
+        context.PerVmFailFast = settings.PerVmFailFast;
+        context.NonBlockingOptionalSteps = new List<string>(settings.NonBlockingOptionalSteps ?? new List<string>());
+    }
+
     [RelayCommand]
     private void DeleteVm(VmEntryViewModel vmEntry)
     {
@@ -132,6 +140,7 @@ public partial class DeploymentViewModel : ObservableObject
             VhdPath = $"{_settingsStore.Settings.VmBasePath}\\{vmName}\\{vmName}.vhdx",
             LogCallback = msg => AddLog(VmId, vmName, msg)
         };
+        ApplyDeploymentPolicy(context);
         var vmEntry = new VmEntryViewModel(context, this, _settingsStore);
         VmEntries.Add(vmEntry);
         vmEntry.PropertyChanged += (_, e) =>
@@ -235,9 +244,15 @@ public partial class DeploymentViewModel : ObservableObject
         Logs.Clear();
         Logs.Add("Starting VM deployments...");
 
+        foreach (var entry in VmEntries)
+        {
+            ApplyDeploymentPolicy(entry.DeploymentContext);
+        }
+
         var multiContext = new MultiVmDeploymentContext
         {
-            VmContexts = VmEntries.Select(vm => vm.DeploymentContext).ToList()
+            VmContexts = VmEntries.Select(vm => vm.DeploymentContext).ToList(),
+            StopAllOnAnyVmFailure = _settingsStore.Settings.StopAllOnAnyVmFailure
         };
 
         await _coordinator.DeployAllAsync(multiContext);

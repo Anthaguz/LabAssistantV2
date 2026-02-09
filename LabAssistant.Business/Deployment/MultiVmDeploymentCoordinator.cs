@@ -3,6 +3,7 @@ using LabAssistant.Models.Deployment;
 using LabAssistant.Models.PowerShell;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace LabAssistant.Business;
@@ -22,6 +23,9 @@ public class MultiVmDeploymentCoordinator
 
     public async Task DeployAllAsync(MultiVmDeploymentContext multiContext)
     {
+        var cancelOnFailure = multiContext.StopAllOnAnyVmFailure;
+        using var cancelSource = cancelOnFailure ? new CancellationTokenSource() : null;
+
         var tasks = multiContext.VmContexts.Select(context => Task.Run(async () =>
         {
             DebugLogger.Log($"Deploying VM: {context.VmName}");
@@ -34,6 +38,17 @@ public class MultiVmDeploymentCoordinator
 
             _sessionResolver.RegisterSession(handle, session);
             context.PowerShellHandle = handle;
+            if (cancelOnFailure && cancelSource != null)
+            {
+                context.OnBlockingFailure = () =>
+                {
+                    if (!cancelSource.IsCancellationRequested)
+                    {
+                        cancelSource.Cancel();
+                    }
+                };
+                context.ShouldAbort = () => cancelSource.IsCancellationRequested;
+            }
 
             var pipeline = _pipelineBuilder.Build(context);
 
