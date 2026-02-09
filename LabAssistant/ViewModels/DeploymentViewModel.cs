@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business;
+using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
@@ -23,6 +24,7 @@ public partial class DeploymentViewModel : ObservableObject
     private readonly IAppSettingsStore _settingsStore;
     private readonly ILabTemplateStore _templateStore;
     private readonly IAppPaths _appPaths;
+    private readonly IVhdxCatalogStore _catalogStore;
     public Action<string>? LogHandler { get; set; }
 
     public ObservableCollection<string> AvailableSwitches { get; } = new();
@@ -43,7 +45,8 @@ public partial class DeploymentViewModel : ObservableObject
         VirtualSwitchProvider switchProvider,
         IAppSettingsStore settingsStore,
         ILabTemplateStore templateStore,
-        IAppPaths appPaths)
+        IAppPaths appPaths,
+        IVhdxCatalogStore catalogStore)
     {
         LogHandler = message =>
         {
@@ -58,6 +61,7 @@ public partial class DeploymentViewModel : ObservableObject
         _settingsStore = settingsStore;
         _templateStore = templateStore;
         _appPaths = appPaths;
+        _catalogStore = catalogStore;
         VmEntries = new ObservableCollection<VmEntryViewModel>();
         _ = LoadAvailableSwitches();
 
@@ -99,6 +103,59 @@ public partial class DeploymentViewModel : ObservableObject
         var settings = _settingsStore.Settings;
         context.PerVmFailFast = settings.PerVmFailFast;
         context.NonBlockingOptionalSteps = new List<string>(settings.NonBlockingOptionalSteps ?? new List<string>());
+    }
+
+    private bool ValidateVhdxSelections(string actionLabel)
+    {
+        var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
+        if (catalogResult.Errors.Count > 0)
+        {
+            var message = "Catalog errors prevent validation:" + Environment.NewLine
+                          + string.Join(Environment.NewLine, catalogResult.Errors.Select(error => $"- {error}"));
+            System.Windows.MessageBox.Show(
+                message,
+                actionLabel,
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+            return false;
+        }
+
+        var catalogIds = new HashSet<string>(
+            catalogResult.Items.Select(item => item.Id),
+            StringComparer.OrdinalIgnoreCase);
+
+        var missing = new List<string>();
+        foreach (var entry in VmEntries)
+        {
+            var context = entry.DeploymentContext;
+            var hasBase = !string.IsNullOrWhiteSpace(context.VhdDifferencingParentPath);
+            var hasId = !string.IsNullOrWhiteSpace(context.VhdxId);
+
+            if (!hasBase && !hasId)
+            {
+                missing.Add($"{context.VmName}: no base VHDX selected");
+                continue;
+            }
+
+            if (hasId && !catalogIds.Contains(context.VhdxId!))
+            {
+                missing.Add($"{context.VmName}: missing VHDX id '{context.VhdxId}'");
+            }
+        }
+
+        if (missing.Count == 0)
+        {
+            return true;
+        }
+
+        var missingMessage = "Resolve missing VHDX selections before continuing:" + Environment.NewLine
+                             + string.Join(Environment.NewLine, missing.Select(item => $"- {item}"));
+        System.Windows.MessageBox.Show(
+            missingMessage,
+            actionLabel,
+            System.Windows.MessageBoxButton.OK,
+            System.Windows.MessageBoxImage.Warning);
+        return false;
     }
 
     [RelayCommand]
@@ -168,6 +225,11 @@ public partial class DeploymentViewModel : ObservableObject
             return;
         }
 
+        if (!ValidateVhdxSelections("Save as Template"))
+        {
+            return;
+        }
+
         var owner = (MainWindow)System.Windows.Application.Current.MainWindow;
         var detailsDialog = new TemplateSaveDetailsDialog(null, null, "v0")
         {
@@ -203,7 +265,8 @@ public partial class DeploymentViewModel : ObservableObject
                     CpuCount = context.CpuCount,
                     SwitchName = context.VirtualSwitchName,
                     VhdxId = context.VhdxId,
-                    VhdPath = baseVhdPath
+                    VhdPath = baseVhdPath,
+                    VhdxSignature = context.VhdxSignature
                 };
             }).ToList()
         };
@@ -239,6 +302,11 @@ public partial class DeploymentViewModel : ObservableObject
     private async Task DeployAllAsync()
     {
         DebugLogger.Log("Starting deployment.");
+        if (!ValidateVhdxSelections("Deploy"))
+        {
+            return;
+        }
+
         IsDeploying = true;
         Logs.Clear();
         Logs.Add("Starting VM deployments...");
