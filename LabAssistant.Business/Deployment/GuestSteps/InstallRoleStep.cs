@@ -15,12 +15,5 @@ namespace LabAssistant.Business.Deployment
             context.Logs.Add("Roles installed in Guest OS.");
             DebugLogger.Log("✅ [InstallRoleStep] simulated installation of roles.");
         }
-
-        protected override async Task HandleAsync(VmDeploymentContext context)
-        {
-            context.Logs.Add("✅ [CreateVhdStep] simulated creation.");
-            await Task.CompletedTask;
-        }
-
     }
 }

@@ -15,13 +15,5 @@ namespace LabAssistant.Business.Deployment
             context.Logs.Add("Software installed in Guest OS.");
             DebugLogger.Log("✅ [InstallSoftwareStep] simulated installation of software.");
         }
-
-        protected override async Task HandleAsync(VmDeploymentContext context)
-        {
-            context.Logs.Add("✅ [CreateVhdStep] simulated creation.");
-            await Task.CompletedTask;
-        }
-
-
     }
 }
