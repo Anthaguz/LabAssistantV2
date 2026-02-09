@@ -28,7 +28,7 @@ namespace LabAssistant.Business.Deployment
             if (context.PowerShellHandle == null)
             {
                 context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
-                context.IsSuccess = false;
+                context.MarkFailure(DeploymentStepKeys.DisableVmCheckpoints, "Missing PowerShell handle.");
                 return;
             }
 
@@ -46,6 +46,7 @@ namespace LabAssistant.Business.Deployment
             {
                 context.LogCallback?.Invoke($"❌ Failed to disable VM checkpoints for VM '{context.VmName}'.");
                 DebugLogger.Log($"Error: Failed to disable VM checkpoints for VM: {context.VmName}");
+                context.MarkFailure(DeploymentStepKeys.DisableVmCheckpoints, $"Failed to disable VM checkpoints for VM '{context.VmName}'.");
             }
         }
     }

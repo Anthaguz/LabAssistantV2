@@ -24,7 +24,7 @@ public class AddNicToVmStep : DeploymentStep
         if (context.PowerShellHandle == null)
         {
             context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
-            context.IsSuccess = false;
+            context.MarkFailure(DeploymentStepKeys.AddNicToVm, "Missing PowerShell handle.");
             return;
         }
 
@@ -44,6 +44,7 @@ public class AddNicToVmStep : DeploymentStep
         {
             context.LogCallback?.Invoke($"❌ Failed to add {context.VirtualSwitchName} to '{context.VmName}'.");
             DebugLogger.Log($"Error: Failed to add {context.VirtualSwitchName} to VM: {context.VmName}");
+            context.MarkFailure(DeploymentStepKeys.AddNicToVm, $"Failed to add {context.VirtualSwitchName} to '{context.VmName}'.");
         }
     }
 }

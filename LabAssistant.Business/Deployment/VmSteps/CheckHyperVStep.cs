@@ -11,9 +11,8 @@ public class CheckHyperVStep : DeploymentStep
         bool isEnabled = true; // Replace with actual service call
         if (!isEnabled)
         {
-            context.IsSuccess = false;
+            context.MarkFailure(DeploymentStepKeys.CheckHyperV, "Hyper-V is not enabled.");
             //DebugLogger.Log("Hyper-V check failed.");
-            //context.Logs.Add("Hyper-V is not enabled.");
             return;
         }
 

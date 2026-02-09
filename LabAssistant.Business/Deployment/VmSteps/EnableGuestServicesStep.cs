@@ -24,7 +24,7 @@ namespace LabAssistant.Business.Deployment
             if (context.PowerShellHandle == null)
             {
                 context.LogCallback?.Invoke("❌ Missing PowerShell handle.");
-                context.IsSuccess = false;
+                context.MarkFailure(DeploymentStepKeys.EnableGuestServices, "Missing PowerShell handle.");
                 return;
             }
 
@@ -42,6 +42,7 @@ namespace LabAssistant.Business.Deployment
             {
                 context.LogCallback?.Invoke($"❌ Failed to enable VM guest services on VM '{context.VmName}'.");
                 DebugLogger.Log($"Error: Failed to enable VM guest services on VM: {context.VmName}");
+                context.MarkFailure(DeploymentStepKeys.EnableGuestServices, $"Failed to enable VM guest services on VM '{context.VmName}'.");
             }
         }
     }
