@@ -86,6 +86,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<DisableVmCheckpoints>();
         services.AddTransient<SetTimeZoneStep>();
         services.AddTransient<InstallSoftwareStep>();
+        services.AddTransient<InstallRoleStep>();
+        services.AddTransient<ConfigureNetworkInformationStep>();
         services.AddTransient<CheckHyperVStep>();
         services.AddSingleton<MissingVhdxResolutionService>();
 

@@ -16,6 +16,8 @@ public class DeploymentPipelineBuilder
     private readonly DisableVmCheckpoints _disableVmCheckpoints;
     private readonly SetTimeZoneStep _setTimeZoneStep;
     private readonly InstallSoftwareStep _installSoftwareStep;
+    private readonly InstallRoleStep _installRoleStep;
+    private readonly ConfigureNetworkInformationStep _configureNetworkInformationStep;
 
     public DeploymentPipelineBuilder(
         CreateVmFolderStep createVmFolderStep,
@@ -27,7 +29,9 @@ public class DeploymentPipelineBuilder
         EnableGuestServicesStep enableGuestServicesStep,
         DisableVmCheckpoints disableVmCheckpoints,
         SetTimeZoneStep setTimeZoneStep,
-        InstallSoftwareStep installSoftwareStep)
+        InstallSoftwareStep installSoftwareStep,
+        InstallRoleStep installRoleStep,
+        ConfigureNetworkInformationStep configureNetworkInformationStep)
     {
         _createVhd = createVhd;
         _createVmFolderStep = createVmFolderStep;
@@ -39,6 +43,8 @@ public class DeploymentPipelineBuilder
         _disableVmCheckpoints = disableVmCheckpoints;
         _setTimeZoneStep = setTimeZoneStep;
         _installSoftwareStep = installSoftwareStep;
+        _installRoleStep = installRoleStep;
+        _configureNetworkInformationStep = configureNetworkInformationStep;
 
     }
 
@@ -62,6 +68,12 @@ public class DeploymentPipelineBuilder
 
         if (context.InstallSoftware)
             current = current.SetNext(_installSoftwareStep);
+
+        if (context.InstallRole)
+            current = current.SetNext(_installRoleStep);
+
+        if (context.ConfigureNetworkInformation)
+            current = current.SetNext(_configureNetworkInformationStep);
 
         return check;
     }

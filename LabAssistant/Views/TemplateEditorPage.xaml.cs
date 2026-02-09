@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
@@ -17,6 +18,7 @@ namespace LabAssistant.Views
         private readonly IAppSettingsStore _settingsStore;
         private readonly IAppPaths _appPaths;
         private readonly IVhdxCatalogStore _catalogStore;
+        private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
         private VmValidationField? _pendingFieldFocus;
         private List<VmValidationDisplayItem> _validationItems = new();
         private bool _isValidationCollapsed;
@@ -29,6 +31,7 @@ namespace LabAssistant.Views
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             _appPaths = App.Services.GetRequiredService<IAppPaths>();
             _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+            _missingVhdxResolutionService = App.Services.GetRequiredService<MissingVhdxResolutionService>();
             DataContext = _viewModel;
         }
 
@@ -363,12 +366,25 @@ namespace LabAssistant.Views
 
         private void ResolveMissingVhdxReferences()
         {
-            _viewModel.AutoResolveMissingVhdxBySignature();
-            var missing = _viewModel.GetMissingVhdxReferences();
-            if (missing.Count == 0)
+            var resolution = _missingVhdxResolutionService.ResolveMissingVhdx(_viewModel.Template);
+            if (resolution.MissingVms.Count == 0)
             {
                 return;
             }
+
+            if (resolution.CatalogErrors.Count > 0)
+            {
+                System.Windows.MessageBox.Show(
+                    string.Join(Environment.NewLine, resolution.CatalogErrors),
+                    "Catalog Errors",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            var missing = resolution.MissingVms
+                .Where(vm => !string.IsNullOrWhiteSpace(vm.VhdxId))
+                .Select(vm => new MissingVhdxReference(vm, vm.VhdxId!))
+                .ToList();
 
             var dialog = new MissingVhdxResolutionDialog(missing, _catalogStore, _settingsStore)
             {
@@ -394,6 +410,7 @@ namespace LabAssistant.Views
 
                 item.Reference.Vm.VhdxId = item.SelectedOption.Item.Id;
                 item.Reference.Vm.VhdPath = item.SelectedOption.Item.Path;
+                item.Reference.Vm.VhdxSignature = VhdxSignature.Build(item.SelectedOption.Item);
             }
         }
     }
