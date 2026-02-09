@@ -16,4 +16,8 @@ public class AppSettings
     public string CatalogPath { get; set; } = string.Empty;
 
     public List<TemplateVhdxSelection> TemplateSelections { get; set; } = new();
+
+    public bool PerVmFailFast { get; set; } = true;
+    public bool StopAllOnAnyVmFailure { get; set; } = false;
+    public List<string> NonBlockingOptionalSteps { get; set; } = new();
 }

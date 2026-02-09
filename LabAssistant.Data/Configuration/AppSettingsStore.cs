@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using LabAssistant.Data.Catalog;
 using LabAssistant.Models.Configuration;
@@ -114,7 +115,10 @@ public sealed class AppSettingsStore : IAppSettingsStore
             DifferencingDiskBasePath = _paths.DifferencingDiskBasePath,
             CatalogPath = _paths.CatalogPath,
             DefaultVmMemoryMb = 2048,
-            DefaultCpuCount = 2
+            DefaultCpuCount = 2,
+            PerVmFailFast = true,
+            StopAllOnAnyVmFailure = false,
+            NonBlockingOptionalSteps = new List<string>()
         };
     }
 
@@ -178,6 +182,11 @@ public sealed class AppSettingsStore : IAppSettingsStore
         if (string.IsNullOrWhiteSpace(Settings.CatalogPath))
         {
             Settings.CatalogPath = defaults.CatalogPath;
+        }
+
+        if (Settings.NonBlockingOptionalSteps == null)
+        {
+            Settings.NonBlockingOptionalSteps = new List<string>();
         }
     }
 }
