@@ -120,6 +120,10 @@ namespace LabAssistant.Views
             _catalogItems = result.Items.ToList();
             RefreshCatalogOptions();
 
+            EmptyCatalogHint.Visibility = _catalogItems.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
             if (showErrors && result.Errors.Count > 0)
             {
                 System.Windows.MessageBox.Show(

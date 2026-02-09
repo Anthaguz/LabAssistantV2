@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Business.Compatibility;
+using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
+using LabAssistant.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views;
@@ -18,6 +19,7 @@ public partial class TemplateDetailsPage : Page
     private readonly string _templateKey;
     private readonly IAppSettingsStore _settingsStore;
     private readonly IVhdxCatalogStore _catalogStore;
+    private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
     private readonly Dictionary<string, string> _requiredVhdxIdsByVmName = new(StringComparer.OrdinalIgnoreCase);
 
     public TemplateDetailsPage(LabTemplate template)
@@ -26,6 +28,7 @@ public partial class TemplateDetailsPage : Page
         _templateKey = string.IsNullOrWhiteSpace(_template.Id) ? _template.Name : _template.Id;
         _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
         _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+        _missingVhdxResolutionService = App.Services.GetRequiredService<MissingVhdxResolutionService>();
         CaptureRequiredVhdxIds();
         InitializeComponent();
         TemplateNameText.Text = _template.Name;
@@ -187,38 +190,52 @@ public partial class TemplateDetailsPage : Page
 
     private void ResolveMissingVhdxSelections()
     {
-        var catalogItems = LoadCatalogItems();
-        if (catalogItems.Count == 0)
+        var resolution = _missingVhdxResolutionService.ResolveMissingVhdx(_template);
+        if (resolution.MissingVms.Count == 0)
         {
             return;
         }
 
-        foreach (var vm in _template.VmTemplates)
+        if (resolution.CatalogErrors.Count > 0)
         {
-            if (!string.IsNullOrWhiteSpace(vm.VhdPath) && File.Exists(vm.VhdPath))
+            System.Windows.MessageBox.Show(
+                string.Join(Environment.NewLine, resolution.CatalogErrors),
+                "Catalog Errors",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+        }
+
+        var missing = resolution.MissingVms
+            .Where(vm => !string.IsNullOrWhiteSpace(vm.VhdxId))
+            .Select(vm => new MissingVhdxReference(vm, vm.VhdxId!))
+            .ToList();
+
+        var dialog = new MissingVhdxResolutionDialog(missing, _catalogStore, _settingsStore)
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            System.Windows.MessageBox.Show(
+                "Missing VHDX mappings were not resolved. You can import new catalog entries and try again.",
+                "Missing VHDX",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
+        foreach (var item in dialog.Items)
+        {
+            if (item.SelectedOption == null)
             {
                 continue;
             }
 
-            var message = $"VHDX for VM '{vm.Name}' is missing. Select a replacement from the catalog?";
-            var promptResult = System.Windows.MessageBox.Show(message, "Missing VHDX", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
-            if (promptResult != MessageBoxResult.Yes)
-            {
-                System.Windows.MessageBox.Show($"Missing VHDX for VM '{vm.Name}' was not resolved.", "Missing VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-                continue;
-            }
-
-            var dialog = new VhdxSelectorDialog(catalogItems);
-            if (dialog.ShowDialog() == true && dialog.SelectedItem != null)
-            {
-                vm.VhdxId = dialog.SelectedItem.Id;
-                vm.VhdPath = dialog.SelectedItem.Path;
-                SaveSelection(vm);
-            }
-            else
-            {
-                System.Windows.MessageBox.Show($"Missing VHDX for VM '{vm.Name}' was not resolved.", "Missing VHDX", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-            }
+            item.Reference.Vm.VhdxId = item.SelectedOption.Item.Id;
+            item.Reference.Vm.VhdPath = item.SelectedOption.Item.Path;
+            item.Reference.Vm.VhdxSignature = VhdxSignature.Build(item.SelectedOption.Item);
+            SaveSelection(item.Reference.Vm);
         }
     }
 }

@@ -10,8 +10,15 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Some VMs reference VHDX entries not found in your catalog. Select replacements or import new VHDX files."
-                   TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <StackPanel Margin="0,0,0,12">
+            <TextBlock Text="Some VMs reference VHDX entries not found in your catalog. Select replacements or import new VHDX files."
+                       TextWrapping="Wrap"/>
+            <TextBlock x:Name="EmptyCatalogHint"
+                       Text="Your catalog is empty. Click Import VHDX to add entries."
+                       Foreground="#FFC00000"
+                       Margin="0,6,0,0"
+                       Visibility="Collapsed"/>
+        </StackPanel>
 
         <DataGrid Grid.Row="1" ItemsSource="{Binding Items}" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="False">
             <DataGrid.Columns>
