@@ -27,6 +27,8 @@ namespace LabAssistant.Models.Deployment
         public bool GuestServicesEnabled { get; set; } = false;
         public bool ConfigureTimeZone { get; set; } = false;
         public bool InstallSoftware { get; set; } = false;
+        public bool InstallRole { get; set; } = false;
+        public bool ConfigureNetworkInformation { get; set; } = false;
         public List<string> NonBlockingOptionalSteps { get; set; } = new();
 
         // Logging and PowerShell

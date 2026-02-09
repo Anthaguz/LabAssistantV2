@@ -8,7 +8,7 @@ namespace LabAssistant.Business.Deployment
     {
         protected override void ExecuteGuestStep(VmDeploymentContext context)
         {
-            if (!context.InstallSoftware) return;
+            if (!context.ConfigureNetworkInformation) return;
 
             DebugLogger.Log("Configuring network information in the Guest OS...");
             DebugLogger.Log($"VM Name: {context.VmName}");

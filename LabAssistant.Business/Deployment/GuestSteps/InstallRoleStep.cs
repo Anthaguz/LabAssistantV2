@@ -8,7 +8,7 @@ namespace LabAssistant.Business.Deployment
     {
         protected override void ExecuteGuestStep(VmDeploymentContext context)
         {
-            if (!context.InstallSoftware) return;
+            if (!context.InstallRole) return;
 
             DebugLogger.Log("Installing roles in the Guest OS...");
             DebugLogger.Log($"VM Name: {context.VmName}");
