@@ -60,6 +60,7 @@
 //}
 
 using LabAssistant.Business.Deployment;
+using LabAssistant.Business.Templates;
 using LabAssistant.Data.Catalog;
 using LabAssistant.Data.Configuration;
 using LabAssistant.Data.Templates;
@@ -86,6 +87,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<SetTimeZoneStep>();
         services.AddTransient<InstallSoftwareStep>();
         services.AddTransient<CheckHyperVStep>();
+        services.AddSingleton<MissingVhdxResolutionService>();
 
         services.AddTransient<VirtualSwitchProvider>();
         services.AddTransient<DeploymentPipelineBuilder>();
