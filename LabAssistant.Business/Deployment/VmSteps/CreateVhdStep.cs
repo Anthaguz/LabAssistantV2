@@ -26,19 +26,11 @@ public class CreateVhdStep : DeploymentStep
 
         var session = _resolver.Resolve(context.PowerShellHandle);
         var hyperV = _hyperVFactory(session);
-        bool success = false;
+        var success = false;
 
-        if (context.IsVhdDifferencing)
-        {
-            context.LogCallback?.Invoke($"Creating differencing VHD for {context.VmName}");
-            DebugLogger.Log($"Creating differencing VHD for VM: {context.VmName}");
-            success = await hyperV.CreateVhdDifferencingAsync(context.VhdDifferencingParentPath, context.VhdPath);
-        }
-        else
-        {
-            context.LogCallback?.Invoke($"Creating fixed-size VHD for {context.VmName}");
-            DebugLogger.Log($"Creating fixed-size VHD for VM: {context.VmName}");
-        }
+        context.LogCallback?.Invoke($"Creating differencing VHD for {context.VmName}");
+        DebugLogger.Log($"Creating differencing VHD for VM: {context.VmName}");
+        success = await hyperV.CreateVhdDifferencingAsync(context.VhdDifferencingParentPath, context.VhdPath);
         if (success)
         {
             context.LogCallback?.Invoke($"✅ Created VHD for '{context.VmName}'.");

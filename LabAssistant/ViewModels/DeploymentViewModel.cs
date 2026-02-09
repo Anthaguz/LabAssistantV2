@@ -131,7 +131,6 @@ public partial class DeploymentViewModel : ObservableObject
         {
             VmId = VmId,
             VmName = vmName,
-            IsVhdDifferencing = true,
             VhdDifferencingParentPath = string.Empty,
             VirtualSwitchName = AvailableSwitches.FirstOrDefault() ?? "",
             MemoryMb = 2048,
