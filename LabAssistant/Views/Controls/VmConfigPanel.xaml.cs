@@ -9,6 +9,7 @@ using MediaBrush = System.Windows.Media.Brush;
 using MediaBrushes = System.Windows.Media.Brushes;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
+using LabAssistant.Models.Deployment;
 using LabAssistant.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,18 +22,43 @@ namespace LabAssistant.Views.Controls
         private List<VhdxCatalogItem> _catalogItems = new();
         private INotifyPropertyChanged? _contextNotifier;
         private readonly Dictionary<System.Windows.Controls.Control, (MediaBrush brush, Thickness thickness)> _borderDefaults = new();
+        private static readonly string[] MandatorySteps =
+        [
+            "Check Hyper-V",
+            "Create VM Folder",
+            "Create Differencing Disk",
+            "Create VM",
+            "Add NIC",
+            "Configure VM",
+            "Enable Guest Services",
+            "Disable Checkpoints",
+            "Start VM"
+        ];
+
+        private static readonly Dictionary<string, string> OptionalSteps = new()
+        {
+            [DeploymentStepKeys.SetTimeZone] = "Set Time Zone",
+            [DeploymentStepKeys.InstallSoftware] = "Install Software",
+            [DeploymentStepKeys.InstallRole] = "Install Role",
+            [DeploymentStepKeys.ConfigureNetworkInformation] = "Configure Network Information"
+        };
 
         public VmConfigPanel()
         {
             InitializeComponent();
             _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
-            Loaded += (_, _) => UpdateSelectedVhdxDisplay();
+            Loaded += (_, _) =>
+            {
+                UpdateSelectedVhdxDisplay();
+                UpdateDeploymentStepsDisplay();
+            };
             DataContextChanged += (_, _) =>
             {
                 AttachContextHandlers();
                 UpdateSelectedVhdxDisplay();
                 UpdateValidationIndicators();
+                UpdateDeploymentStepsDisplay();
             };
         }
 
@@ -240,6 +266,18 @@ namespace LabAssistant.Views.Controls
             SelectedVhdxText.Text = "No VHDX selected";
             SelectedVhdxPathText.Text = string.Empty;
             UpdateValidationIndicators();
+        }
+
+        private void UpdateDeploymentStepsDisplay()
+        {
+            MandatoryStepsList.ItemsSource = MandatorySteps;
+            var nonBlocking = _settingsStore.Settings.NonBlockingOptionalSteps ?? new List<string>();
+            OptionalStepsList.ItemsSource = OptionalSteps
+                .Select(kvp =>
+                    nonBlocking.Contains(kvp.Key)
+                        ? $"{kvp.Value} (non-blocking)"
+                        : $"{kvp.Value} (blocking)")
+                .ToList();
         }
 
         private void AttachContextHandlers()
