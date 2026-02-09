@@ -15,10 +15,5 @@ namespace LabAssistant.Business.Deployment
             context.Logs.Add("Time zone configured in Guest OS.");
             DebugLogger.Log("✅ [SetTimeZoneStep] simulated time zone configuration.");
         }
-        protected override async Task HandleAsync(VmDeploymentContext context)
-        {
-            context.Logs.Add("✅ [CreateVhdStep] simulated creation.");
-            await Task.CompletedTask;
-        }
     }
 }
