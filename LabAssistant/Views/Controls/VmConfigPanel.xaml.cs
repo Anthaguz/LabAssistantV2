@@ -7,9 +7,10 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MediaBrush = System.Windows.Media.Brush;
 using MediaBrushes = System.Windows.Media.Brushes;
+using LabAssistant.Business.Catalog;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,7 +18,7 @@ namespace LabAssistant.Views.Controls
 {
     public partial class VmConfigPanel : System.Windows.Controls.UserControl
     {
-        private readonly IVhdxCatalogStore _catalogStore;
+        private readonly CatalogService _catalogService;
         private readonly IAppSettingsStore _settingsStore;
         private List<VhdxCatalogItem> _catalogItems = new();
         private INotifyPropertyChanged? _contextNotifier;
@@ -46,7 +47,7 @@ namespace LabAssistant.Views.Controls
         public VmConfigPanel()
         {
             InitializeComponent();
-            _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+            _catalogService = App.Services.GetRequiredService<CatalogService>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             Loaded += (_, _) =>
             {
@@ -192,7 +193,7 @@ namespace LabAssistant.Views.Controls
 
         private void LoadCatalog(bool showErrors)
         {
-            var result = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
+            var result = _catalogService.LoadCatalog();
             _catalogItems = result.Items.ToList();
 
             if (showErrors && result.Errors.Count > 0)
@@ -207,7 +208,7 @@ namespace LabAssistant.Views.Controls
 
         private bool SaveCatalog()
         {
-            var result = _catalogStore.Save(_settingsStore.Settings.CatalogPath, _catalogItems);
+            var result = _catalogService.SaveCatalog(_catalogItems);
             if (!result.IsValid)
             {
                 System.Windows.MessageBox.Show(

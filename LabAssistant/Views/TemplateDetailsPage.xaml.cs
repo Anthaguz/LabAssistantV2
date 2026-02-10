@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Compatibility;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
@@ -19,6 +20,7 @@ public partial class TemplateDetailsPage : Page
     private readonly string _templateKey;
     private readonly IAppSettingsStore _settingsStore;
     private readonly IVhdxCatalogStore _catalogStore;
+    private readonly CatalogService _catalogService;
     private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
     private readonly Dictionary<string, string> _requiredVhdxIdsByVmName = new(StringComparer.OrdinalIgnoreCase);
 
@@ -28,6 +30,7 @@ public partial class TemplateDetailsPage : Page
         _templateKey = string.IsNullOrWhiteSpace(_template.Id) ? _template.Name : _template.Id;
         _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
         _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+        _catalogService = App.Services.GetRequiredService<CatalogService>();
         _missingVhdxResolutionService = App.Services.GetRequiredService<MissingVhdxResolutionService>();
         CaptureRequiredVhdxIds();
         InitializeComponent();
@@ -66,7 +69,7 @@ public partial class TemplateDetailsPage : Page
 
     private List<VhdxCatalogItem> LoadCatalogItems(bool silent = false)
     {
-        var catalogPath = _settingsStore.Settings.CatalogPath;
+        var catalogPath = _catalogService.CatalogPath;
         if (string.IsNullOrWhiteSpace(catalogPath))
         {
             if (!silent)
@@ -76,7 +79,7 @@ public partial class TemplateDetailsPage : Page
             return new List<VhdxCatalogItem>();
         }
 
-        var result = _catalogStore.Load(catalogPath);
+        var result = _catalogService.LoadCatalog();
         if (result.Errors.Count > 0)
         {
             if (!silent)
