@@ -1,4 +1,4 @@
-﻿using LabAssistant.Services.Logging;
+using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
 using System.Diagnostics;
 using System.Text;
@@ -67,26 +67,10 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
 
         await Task.WhenAll(outputTask, errorTask);
 
-        string cleanedOutput = CleanLines(output.ToString());
-        string cleanedError = CleanLines(error.ToString());
+        string cleanedOutput = PowerShellOutputCleaner.Clean(output.ToString());
+        string cleanedError = PowerShellOutputCleaner.Clean(error.ToString());
         return (cleanedOutput, cleanedError);
     }
-
-    private static string CleanLines(string raw)
-    {
-        return raw
-            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            .Where(line =>
-                !line.StartsWith("PS ", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Windows", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Microsoft", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Copyright", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Install the latest", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("PS C:", StringComparison.OrdinalIgnoreCase))
-            .Select(line => line.Trim())
-            .Aggregate(new StringBuilder(), (sb, line) => sb.AppendLine(line), sb => sb.ToString().Trim());
-    }
-
 
     public void Dispose()
     {
