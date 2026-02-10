@@ -7,7 +7,6 @@ using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Compatibility;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
 using LabAssistant.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,32 +17,24 @@ public partial class TemplateDetailsPage : Page
 {
     private readonly LabTemplate _template;
     private readonly string _templateKey;
-    private readonly IAppSettingsStore _settingsStore;
-    private readonly IVhdxCatalogStore _catalogStore;
     private readonly CatalogService _catalogService;
     private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
     private readonly TemplateSelectionService _templateSelectionService;
-    private readonly TemplateValidationService _templateValidationService;
     private readonly Dictionary<string, string> _requiredVhdxIdsByVmName = new(StringComparer.OrdinalIgnoreCase);
 
     public TemplateDetailsPage(LabTemplate template)
     {
         _template = template;
         _templateKey = string.IsNullOrWhiteSpace(_template.Id) ? _template.Name : _template.Id;
-        _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
-        _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
         _catalogService = App.Services.GetRequiredService<CatalogService>();
         _missingVhdxResolutionService = App.Services.GetRequiredService<MissingVhdxResolutionService>();
         _templateSelectionService = App.Services.GetRequiredService<TemplateSelectionService>();
-        _templateValidationService = App.Services.GetRequiredService<TemplateValidationService>();
         CaptureRequiredVhdxIds();
         InitializeComponent();
         TemplateNameText.Text = _template.Name;
         TemplateDescriptionText.Text = _template.Description ?? string.Empty;
         ApplyPersistedSelections();
         ResolveMissingVhdxSelections();
-        ShowCompatibilityWarnings();
-        ShowValidationSummary();
         VmListView.ItemsSource = _template.VmTemplates;
     }
 
@@ -69,7 +60,6 @@ public partial class TemplateDetailsPage : Page
             selectedVm.VhdPath = dialog.SelectedItem.Path;
             _templateSelectionService.SaveSelection(_templateKey, selectedVm);
             VmListView.Items.Refresh();
-            ShowValidationSummary();
         }
     }
 
@@ -175,7 +165,7 @@ public partial class TemplateDetailsPage : Page
             .Select(vm => new MissingVhdxReference(vm, vm.VhdxId!))
             .ToList();
 
-        var dialog = new MissingVhdxResolutionDialog(missing, _catalogStore, _settingsStore)
+        var dialog = new MissingVhdxResolutionDialog(missing, _catalogService)
         {
             Owner = Window.GetWindow(this)
         };
@@ -201,35 +191,6 @@ public partial class TemplateDetailsPage : Page
             item.Reference.Vm.VhdPath = item.SelectedOption.Item.Path;
             item.Reference.Vm.VhdxSignature = VhdxSignature.Build(item.SelectedOption.Item);
             _templateSelectionService.SaveSelection(_templateKey, item.Reference.Vm);
-        }
-
-        ShowValidationSummary();
-    }
-
-    private void ShowValidationSummary()
-    {
-        var summary = _templateValidationService.ValidateForSave(_template);
-        if (summary.Errors.Count > 0)
-        {
-            var message = "Fix the following before saving:" + Environment.NewLine
-                          + string.Join(Environment.NewLine, summary.Errors.Select(error => $"- {error}"));
-            System.Windows.MessageBox.Show(
-                message,
-                "Validation Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-            return;
-        }
-
-        if (summary.Warnings.Count > 0)
-        {
-            var message = "Warnings:" + Environment.NewLine
-                          + string.Join(Environment.NewLine, summary.Warnings.Select(warning => $"- {warning}"));
-            System.Windows.MessageBox.Show(
-                message,
-                "Validation Warning",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
         }
     }
 }

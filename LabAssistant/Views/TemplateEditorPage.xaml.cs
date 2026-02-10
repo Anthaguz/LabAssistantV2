@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
@@ -17,7 +18,7 @@ namespace LabAssistant.Views
         private readonly TemplateEditorViewModel _viewModel;
         private readonly IAppSettingsStore _settingsStore;
         private readonly IAppPaths _appPaths;
-        private readonly IVhdxCatalogStore _catalogStore;
+        private readonly CatalogService _catalogService;
         private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
         private VmValidationField? _pendingFieldFocus;
         private List<VmValidationDisplayItem> _validationItems = new();
@@ -30,7 +31,7 @@ namespace LabAssistant.Views
             _viewModel = App.Services.GetRequiredService<TemplateEditorViewModel>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             _appPaths = App.Services.GetRequiredService<IAppPaths>();
-            _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+            _catalogService = App.Services.GetRequiredService<CatalogService>();
             _missingVhdxResolutionService = App.Services.GetRequiredService<MissingVhdxResolutionService>();
             DataContext = _viewModel;
         }
@@ -386,7 +387,7 @@ namespace LabAssistant.Views
                 .Select(vm => new MissingVhdxReference(vm, vm.VhdxId!))
                 .ToList();
 
-            var dialog = new MissingVhdxResolutionDialog(missing, _catalogStore, _settingsStore)
+            var dialog = new MissingVhdxResolutionDialog(missing, _catalogService)
             {
                 Owner = Window.GetWindow(this)
             };
