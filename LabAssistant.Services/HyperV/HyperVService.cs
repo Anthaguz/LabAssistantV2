@@ -76,20 +76,14 @@ public class HyperVService : IHyperVService
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
 
-        output = output.Replace("PSOutput: ", "");
-        output = output.Replace("PSError: ", "");
+        output = PowerShellOutputCleaner.Clean(output);
 
         var switches = output
             .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Trim())
             .Where(line =>
                 !string.IsNullOrWhiteSpace(line) &&
-                !line.StartsWith("Microsoft", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Install the latest", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("PS ", StringComparison.OrdinalIgnoreCase) &&
                 !line.StartsWith("Get-VMSwitch", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Windows", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Copyright", StringComparison.OrdinalIgnoreCase) &&
                 !line.Contains(":\\") // eliminate file paths like 'C:\...'
             )
             .ToList();

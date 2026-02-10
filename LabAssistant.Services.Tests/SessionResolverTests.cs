@@ -41,4 +41,17 @@ public class SessionResolverTests
 
         Assert.Throws<KeyNotFoundException>(() => resolver.Resolve(handle));
     }
+
+    [Fact]
+    public void RemoveSession_RemovesRegisteredSession()
+    {
+        var resolver = new SessionResolver();
+        var handle = new PowerShellHandle();
+        var session = new FakeSession();
+
+        resolver.RegisterSession(handle, session);
+        resolver.RemoveSession(handle);
+
+        Assert.Throws<KeyNotFoundException>(() => resolver.Resolve(handle));
+    }
 }

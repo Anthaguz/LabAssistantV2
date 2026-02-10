@@ -8,4 +8,5 @@ public interface ISessionResolver
 {
     IPersistentPowerShellSession Resolve(PowerShellHandle handle);
     void RegisterSession(PowerShellHandle handle, IPersistentPowerShellSession session);
+    void RemoveSession(PowerShellHandle handle);
 }
