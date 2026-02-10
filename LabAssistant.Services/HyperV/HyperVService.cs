@@ -16,7 +16,7 @@ public class HyperVService : IHyperVService
 
     public async Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount)
     {
-        var script = $"New-VM -Name '{vmName}' -MemoryStartupBytes {memoryMb}MB -Generation 2 -BootDevice VHD -VHDPath '{vhdPath}' -Path {vmPath}";
+        var script = $"New-VM -Name '{vmName}' -MemoryStartupBytes {memoryMb}MB -Generation 2 -BootDevice VHD -VHDPath '{vhdPath}' -Path '{vmPath}'";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return string.IsNullOrWhiteSpace(error);

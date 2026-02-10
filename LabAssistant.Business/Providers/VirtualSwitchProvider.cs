@@ -22,7 +22,7 @@ namespace LabAssistant.Business
             try
             {
                 DebugLogger.Log("Fetching virtual switches...");
-                var session = _sessionFactory();
+                using var session = _sessionFactory();
                 var hyperv = _hyperVFactory(session);
                 var switches = await hyperv.GetVirtualSwitchNamesAsync();
                 DebugLogger.Log($"Found {switches.Count} virtual switch(es): {string.Join(", ", switches)}");
