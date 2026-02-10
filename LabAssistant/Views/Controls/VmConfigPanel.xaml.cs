@@ -10,6 +10,7 @@ using MediaBrushes = System.Windows.Media.Brushes;
 using LabAssistant.Business.Catalog;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +19,7 @@ namespace LabAssistant.Views.Controls
     public partial class VmConfigPanel : System.Windows.Controls.UserControl
     {
         private readonly CatalogService _catalogService;
+        private readonly IAppSettingsStore _settingsStore;
         private List<VhdxCatalogItem> _catalogItems = new();
         private INotifyPropertyChanged? _contextNotifier;
         private readonly Dictionary<System.Windows.Controls.Control, (MediaBrush brush, Thickness thickness)> _borderDefaults = new();
@@ -46,6 +48,7 @@ namespace LabAssistant.Views.Controls
         {
             InitializeComponent();
             _catalogService = App.Services.GetRequiredService<CatalogService>();
+            _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             Loaded += (_, _) =>
             {
                 UpdateSelectedVhdxDisplay();
