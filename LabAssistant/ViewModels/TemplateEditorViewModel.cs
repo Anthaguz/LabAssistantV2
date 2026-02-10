@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using LabAssistant.Business;
+using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
@@ -19,6 +20,7 @@ namespace LabAssistant.ViewModels
         private readonly IAppSettingsStore _settingsStore;
         private readonly IVhdxCatalogStore _catalogStore;
         private readonly ILabTemplateStore _templateStore;
+        private readonly TemplateValidationService _validationService;
         private LabTemplate _template;
         private ObservableCollection<VmTemplate> _vmTemplates;
         private string? _currentTemplatePath;
@@ -31,12 +33,14 @@ namespace LabAssistant.ViewModels
             VirtualSwitchProvider? switchProvider,
             IAppSettingsStore settingsStore,
             IVhdxCatalogStore catalogStore,
-            ILabTemplateStore templateStore)
+            ILabTemplateStore templateStore,
+            TemplateValidationService validationService)
         {
             _switchProvider = switchProvider;
             _settingsStore = settingsStore;
             _catalogStore = catalogStore;
             _templateStore = templateStore;
+            _validationService = validationService;
             _template = new LabTemplate { Version = "v0" };
             _vmTemplates = new ObservableCollection<VmTemplate>();
             _vmTemplates.CollectionChanged += VmTemplates_CollectionChanged;
@@ -234,37 +238,7 @@ namespace LabAssistant.ViewModels
         public TemplateValidationSummary ValidateForSave()
         {
             SyncVmTemplates();
-            var warnings = new List<string>();
-            var errors = new List<string>();
-
-            var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
-            if (catalogResult.Errors.Count > 0)
-            {
-                warnings.AddRange(catalogResult.Errors.Select(error => $"Catalog: {error}"));
-            }
-
-            var validation = LabTemplateValidator.Validate(Template, catalogResult.Items);
-            errors.AddRange(validation.Errors);
-
-            var catalogIds = new HashSet<string>(
-                catalogResult.Items.Select(item => item.Id),
-                StringComparer.OrdinalIgnoreCase);
-
-            foreach (var vm in Template.VmTemplates)
-            {
-                if (string.IsNullOrWhiteSpace(vm.VhdxId))
-                {
-                    continue;
-                }
-
-                if (!catalogIds.Contains(vm.VhdxId))
-                {
-                    var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name;
-                    errors.Add($"VM '{vmName}' references missing VHDX id '{vm.VhdxId}'.");
-                }
-            }
-
-            return new TemplateValidationSummary(errors, warnings);
+            return _validationService.ValidateForSave(Template);
         }
 
         public List<VmValidationIssue> BuildVmValidationIssues()
@@ -389,19 +363,6 @@ namespace LabAssistant.ViewModels
 
             counts[key] = 1;
         }
-    }
-
-    public class TemplateValidationSummary
-    {
-        public TemplateValidationSummary(IEnumerable<string> errors, IEnumerable<string> warnings)
-        {
-            Errors = errors.ToList();
-            Warnings = warnings.ToList();
-        }
-
-        public List<string> Errors { get; }
-
-        public List<string> Warnings { get; }
     }
 
     public sealed class VmValidationIssue
