@@ -62,7 +62,6 @@
 using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Templates;
-using LabAssistant.Business.Templates;
 using LabAssistant.Data.Catalog;
 using LabAssistant.Data.Configuration;
 using LabAssistant.Data.Templates;
