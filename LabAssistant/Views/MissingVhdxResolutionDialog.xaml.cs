@@ -4,26 +4,23 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
+using LabAssistant.Business.Catalog;
 using LabAssistant.Models.Catalog;
-using LabAssistant.Models.Configuration;
 using LabAssistant.ViewModels;
 
 namespace LabAssistant.Views
 {
     public partial class MissingVhdxResolutionDialog : Window
     {
-        private readonly IVhdxCatalogStore _catalogStore;
-        private readonly IAppSettingsStore _settingsStore;
+        private readonly CatalogService _catalogService;
         private List<VhdxCatalogItem> _catalogItems = new();
 
         public MissingVhdxResolutionDialog(
             IEnumerable<MissingVhdxReference> missingReferences,
-            IVhdxCatalogStore catalogStore,
-            IAppSettingsStore settingsStore)
+            CatalogService catalogService)
         {
             InitializeComponent();
-            _catalogStore = catalogStore;
-            _settingsStore = settingsStore;
+            _catalogService = catalogService;
 
             Items = new ObservableCollection<MissingVhdxResolutionItem>(
                 missingReferences.Select(reference => new MissingVhdxResolutionItem(reference)));
@@ -116,7 +113,7 @@ namespace LabAssistant.Views
 
         private void LoadCatalog(bool showErrors)
         {
-            var result = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
+            var result = _catalogService.LoadCatalog();
             _catalogItems = result.Items.ToList();
             RefreshCatalogOptions();
 
@@ -156,7 +153,7 @@ namespace LabAssistant.Views
 
         private bool SaveCatalog()
         {
-            var result = _catalogStore.Save(_settingsStore.Settings.CatalogPath, _catalogItems);
+            var result = _catalogService.SaveCatalog(_catalogItems);
             if (!result.IsValid)
             {
                 System.Windows.MessageBox.Show(
