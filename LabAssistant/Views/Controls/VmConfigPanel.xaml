@@ -109,6 +109,20 @@
                 <StackPanel Margin="0,10,0,0">
                     <TextBlock Text="Role configurations will appear here."
                                Foreground="#FF666666"/>
+                    <CheckBox Content="Install Role (coming soon)"
+                              IsEnabled="False"
+                              ToolTip="Not available yet"
+                              Margin="0,10,0,0"/>
+                    <TextBlock Text="Not available yet"
+                               Foreground="#FF666666"
+                               Margin="24,2,0,0"/>
+                    <CheckBox Content="Configure Network Information (coming soon)"
+                              IsEnabled="False"
+                              ToolTip="Not available yet"
+                              Margin="0,10,0,0"/>
+                    <TextBlock Text="Not available yet"
+                               Foreground="#FF666666"
+                               Margin="24,2,0,0"/>
                 </StackPanel>
             </Expander>
         </StackPanel>
