@@ -59,6 +59,7 @@
 //    }
 //}
 
+using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Templates;
 using LabAssistant.Data.Catalog;
@@ -89,6 +90,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<InstallRoleStep>();
         services.AddTransient<ConfigureNetworkInformationStep>();
         services.AddTransient<CheckHyperVStep>();
+        services.AddSingleton<CatalogService>();
         services.AddSingleton<MissingVhdxResolutionService>();
 
         services.AddTransient<VirtualSwitchProvider>();
