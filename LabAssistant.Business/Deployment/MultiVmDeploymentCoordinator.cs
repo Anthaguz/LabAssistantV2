@@ -59,6 +59,7 @@ public class MultiVmDeploymentCoordinator
             finally
             {
                 session.Dispose(); // Ensure cleanup
+                _sessionResolver.RemoveSession(handle);
                 DebugLogger.Log($"Disposed session for VM: {context.VmName}");
             }
         }));
