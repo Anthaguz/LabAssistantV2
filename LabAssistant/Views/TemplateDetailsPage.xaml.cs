@@ -22,6 +22,7 @@ public partial class TemplateDetailsPage : Page
     private readonly IVhdxCatalogStore _catalogStore;
     private readonly CatalogService _catalogService;
     private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
+    private readonly TemplateSelectionService _templateSelectionService;
     private readonly Dictionary<string, string> _requiredVhdxIdsByVmName = new(StringComparer.OrdinalIgnoreCase);
 
     public TemplateDetailsPage(LabTemplate template)
@@ -32,6 +33,7 @@ public partial class TemplateDetailsPage : Page
         _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
         _catalogService = App.Services.GetRequiredService<CatalogService>();
         _missingVhdxResolutionService = App.Services.GetRequiredService<MissingVhdxResolutionService>();
+        _templateSelectionService = App.Services.GetRequiredService<TemplateSelectionService>();
         CaptureRequiredVhdxIds();
         InitializeComponent();
         TemplateNameText.Text = _template.Name;
@@ -62,7 +64,7 @@ public partial class TemplateDetailsPage : Page
         {
             selectedVm.VhdxId = dialog.SelectedItem.Id;
             selectedVm.VhdPath = dialog.SelectedItem.Path;
-            SaveSelection(selectedVm);
+            _templateSelectionService.SaveSelection(_templateKey, selectedVm);
             VmListView.Items.Refresh();
         }
     }
@@ -93,52 +95,8 @@ public partial class TemplateDetailsPage : Page
 
     private void ApplyPersistedSelections()
     {
-        var selections = _settingsStore.Settings.TemplateSelections;
-        if (selections.Count == 0)
-        {
-            return;
-        }
-
         var catalogItems = LoadCatalogItems(silent: true);
-        var catalogById = catalogItems.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var vm in _template.VmTemplates)
-        {
-            var selection = selections.FirstOrDefault(item =>
-                string.Equals(item.TemplateId, _templateKey, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.VmName, vm.Name, StringComparison.OrdinalIgnoreCase));
-
-            if (selection != null)
-            {
-                vm.VhdxId = selection.VhdxId;
-                if (!string.IsNullOrWhiteSpace(selection.VhdxId) && catalogById.TryGetValue(selection.VhdxId, out var catalogItem))
-                {
-                    vm.VhdPath = catalogItem.Path;
-                }
-                else
-                {
-                    vm.VhdPath = selection.VhdPath;
-                }
-            }
-        }
-    }
-
-    private void SaveSelection(VmTemplate vm)
-    {
-        var selections = _settingsStore.Settings.TemplateSelections;
-        selections.RemoveAll(item =>
-            string.Equals(item.TemplateId, _templateKey, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(item.VmName, vm.Name, StringComparison.OrdinalIgnoreCase));
-
-        selections.Add(new TemplateVhdxSelection
-        {
-            TemplateId = _templateKey,
-            VmName = vm.Name,
-            VhdxId = vm.VhdxId ?? string.Empty,
-            VhdPath = vm.VhdPath ?? string.Empty
-        });
-
-        _settingsStore.Save();
+        _templateSelectionService.ApplySelections(_templateKey, _template, catalogItems);
     }
 
     private void CaptureRequiredVhdxIds()
@@ -238,7 +196,7 @@ public partial class TemplateDetailsPage : Page
             item.Reference.Vm.VhdxId = item.SelectedOption.Item.Id;
             item.Reference.Vm.VhdPath = item.SelectedOption.Item.Path;
             item.Reference.Vm.VhdxSignature = VhdxSignature.Build(item.SelectedOption.Item);
-            SaveSelection(item.Reference.Vm);
+            _templateSelectionService.SaveSelection(_templateKey, item.Reference.Vm);
         }
     }
 }

@@ -62,6 +62,7 @@
 using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Templates;
+using LabAssistant.Business.Templates;
 using LabAssistant.Data.Catalog;
 using LabAssistant.Data.Configuration;
 using LabAssistant.Data.Templates;
@@ -92,6 +93,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<CheckHyperVStep>();
         services.AddSingleton<CatalogService>();
         services.AddSingleton<MissingVhdxResolutionService>();
+        services.AddSingleton<TemplateSelectionService>();
 
         services.AddTransient<VirtualSwitchProvider>();
         services.AddTransient<DeploymentPipelineBuilder>();
