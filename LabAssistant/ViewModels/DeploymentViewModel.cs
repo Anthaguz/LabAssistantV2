@@ -128,7 +128,7 @@ public partial class DeploymentViewModel : ObservableObject
         foreach (var entry in VmEntries)
         {
             var context = entry.DeploymentContext;
-            var hasBase = !string.IsNullOrWhiteSpace(context.VhdDifferencingParentPath);
+            var hasBase = !string.IsNullOrWhiteSpace(context.BaseVhdPath);
             var hasId = !string.IsNullOrWhiteSpace(context.VhdxId);
 
             if (!hasBase && !hasId)
@@ -188,7 +188,7 @@ public partial class DeploymentViewModel : ObservableObject
         {
             VmId = VmId,
             VmName = vmName,
-            VhdDifferencingParentPath = string.Empty,
+            BaseVhdPath = string.Empty,
             VirtualSwitchName = AvailableSwitches.FirstOrDefault() ?? "",
             MemoryMb = 2048,
             CpuCount = 2,
@@ -254,8 +254,8 @@ public partial class DeploymentViewModel : ObservableObject
             VmTemplates = VmEntries.Select(entry =>
             {
                 var context = entry.DeploymentContext;
-                var baseVhdPath = !string.IsNullOrWhiteSpace(context.VhdDifferencingParentPath)
-                    ? context.VhdDifferencingParentPath
+                var baseVhdPath = !string.IsNullOrWhiteSpace(context.BaseVhdPath)
+                    ? context.BaseVhdPath
                     : context.VhdPath;
 
                 return new VmTemplate

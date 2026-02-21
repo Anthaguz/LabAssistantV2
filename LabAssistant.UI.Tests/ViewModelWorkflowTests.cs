@@ -4,6 +4,7 @@ using System.Linq;
 using LabAssistant.Business.Catalog;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
+using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.ViewModels;
 using Xunit;
@@ -60,6 +61,51 @@ public class ViewModelWorkflowTests
         Assert.False(result.IsSuccess);
         Assert.Contains(result.Errors, e => e.Contains("already exists", StringComparison.OrdinalIgnoreCase));
         Assert.Single(viewModel.CatalogOptions);
+    }
+
+    [Fact]
+    public void DeployVmConfigContext_BaseVhdPath_MapsToDeploymentContextBasePath()
+    {
+        var settings = new FakeAppSettingsStore
+        {
+            Settings = new AppSettings
+            {
+                VmBasePath = @"C:\vm-base"
+            }
+        };
+        var deploymentContext = new VmDeploymentContext();
+        var context = new DeployVmConfigContext(null!, deploymentContext, settings);
+
+        context.Name = "VM-A";
+        context.BaseVhdPath = @"C:\catalog\base-a.vhdx";
+
+        Assert.Equal(@"C:\vm-base\VM-A", deploymentContext.VmPath);
+        Assert.Equal(@"C:\vm-base\VM-A\VM-A.vhdx", deploymentContext.VhdPath);
+        Assert.Equal(@"C:\catalog\base-a.vhdx", deploymentContext.BaseVhdPath);
+        Assert.Equal(deploymentContext.BaseVhdPath, deploymentContext.VhdDifferencingParentPath);
+    }
+
+    [Fact]
+    public void TemplateVmConfigContext_BaseVhdPath_MapsToTemplateVhdPath()
+    {
+        var vm = new VmTemplate { Name = "VM-T" };
+        var editor = new TemplateEditorViewModel(
+            switchProvider: null,
+            settingsStore: new FakeAppSettingsStore(),
+            catalogStore: new FakeCatalogStore(Array.Empty<VhdxCatalogItem>()),
+            templateStore: new FakeTemplateStore(),
+            validationService: new LabAssistant.Business.Templates.TemplateValidationService(
+                new FakeCatalogStore(Array.Empty<VhdxCatalogItem>()),
+                new FakeAppSettingsStore()),
+            missingVhdxResolutionService: new LabAssistant.Business.Templates.MissingVhdxResolutionService(
+                new FakeCatalogStore(Array.Empty<VhdxCatalogItem>()),
+                new FakeAppSettingsStore()));
+
+        var context = new TemplateVmConfigContext(editor, vm);
+        context.BaseVhdPath = @"C:\catalog\base-template.vhdx";
+
+        Assert.Equal(@"C:\catalog\base-template.vhdx", vm.VhdPath);
+        Assert.Equal(@"C:\catalog\base-template.vhdx", context.BaseVhdPath);
     }
 
     private static CatalogService CreateCatalogService(FakeCatalogStore store)
@@ -157,6 +203,23 @@ public class ViewModelWorkflowTests
         public void SetDifferencingDiskBasePath(string path)
         {
             Settings.DifferencingDiskBasePath = path;
+        }
+    }
+
+    private sealed class FakeTemplateStore : ILabTemplateStore
+    {
+        public LabTemplate LoadFromFile(string filePath)
+        {
+            return new LabTemplate();
+        }
+
+        public void SaveToFile(string filePath, LabTemplate template)
+        {
+        }
+
+        public string SaveToFolder(string folderPath, string templateName, LabTemplate template)
+        {
+            return System.IO.Path.Combine(folderPath, $"{templateName}.json");
         }
     }
 }

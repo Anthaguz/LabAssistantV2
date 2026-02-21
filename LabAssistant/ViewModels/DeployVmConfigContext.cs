@@ -87,15 +87,15 @@ namespace LabAssistant.ViewModels
             }
         }
 
-        public string? VhdPath
+        public string? BaseVhdPath
         {
-            get => _context.VhdDifferencingParentPath;
+            get => _context.BaseVhdPath;
             set
             {
-                if (_context.VhdDifferencingParentPath != value)
+                if (_context.BaseVhdPath != value)
                 {
-                    _context.VhdDifferencingParentPath = value ?? string.Empty;
-                    OnPropertyChanged(nameof(VhdPath));
+                    _context.BaseVhdPath = value ?? string.Empty;
+                    OnPropertyChanged(nameof(BaseVhdPath));
                 }
             }
         }

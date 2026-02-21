@@ -186,7 +186,7 @@ namespace LabAssistant.Views.Controls
             }
 
             Context.VhdxId = item.Id;
-            Context.VhdPath = item.Path;
+            Context.BaseVhdPath = item.Path;
             Context.VhdxSignature = VhdxSignature.Build(item);
             UpdateSelectedVhdxDisplay();
         }
@@ -257,10 +257,10 @@ namespace LabAssistant.Views.Controls
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(Context.VhdPath))
+            if (!string.IsNullOrWhiteSpace(Context.BaseVhdPath))
             {
                 SelectedVhdxText.Text = "Custom VHDX path";
-                SelectedVhdxPathText.Text = Context.VhdPath!;
+                SelectedVhdxPathText.Text = Context.BaseVhdPath!;
                 return;
             }
 
@@ -303,7 +303,7 @@ namespace LabAssistant.Views.Controls
                 or nameof(IVmConfigContext.CpuCount)
                 or nameof(IVmConfigContext.SwitchName)
                 or nameof(IVmConfigContext.VhdxId)
-                or nameof(IVmConfigContext.VhdPath))
+                or nameof(IVmConfigContext.BaseVhdPath))
             {
                 UpdateValidationIndicators();
             }
@@ -339,7 +339,7 @@ namespace LabAssistant.Views.Controls
             SetWarning(SwitchBox, SwitchWarningText, switchWarning, isError: false);
 
             var vhdxWarning = string.Empty;
-            if (string.IsNullOrWhiteSpace(Context.VhdxId) && string.IsNullOrWhiteSpace(Context.VhdPath))
+            if (string.IsNullOrWhiteSpace(Context.VhdxId) && string.IsNullOrWhiteSpace(Context.BaseVhdPath))
             {
                 vhdxWarning = "Select a base VHDX before deployment.";
             }
