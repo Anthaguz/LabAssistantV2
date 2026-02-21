@@ -58,7 +58,7 @@ namespace LabAssistant
 
         private void SnackViewDetails_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button button || button.CommandParameter is not ErrorFeedItem item)
+            if (sender is not System.Windows.Controls.Button button || button.CommandParameter is not ErrorFeedItem item)
             {
                 return;
             }
@@ -68,7 +68,7 @@ namespace LabAssistant
 
         private void SnackDismiss_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button button || button.CommandParameter is not ErrorFeedItem item)
+            if (sender is not System.Windows.Controls.Button button || button.CommandParameter is not ErrorFeedItem item)
             {
                 return;
             }
