@@ -208,6 +208,11 @@ public class ViewModelWorkflowTests
 
     private sealed class FakeTemplateStore : ILabTemplateStore
     {
+        public LabTemplateLoadResult LoadFromFolder(string templatesFolder, IEnumerable<VhdxCatalogItem> catalogItems)
+        {
+            return new LabTemplateLoadResult();
+        }
+
         public LabTemplate LoadFromFile(string filePath)
         {
             return new LabTemplate();
