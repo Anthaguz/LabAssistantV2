@@ -88,18 +88,25 @@ public class ViewModelWorkflowTests
     [Fact]
     public void TemplateVmConfigContext_BaseVhdPath_MapsToTemplateVhdPath()
     {
+        var settingsStore = new FakeAppSettingsStore
+        {
+            Settings = new AppSettings
+            {
+                CatalogPath = @"C:\catalog\vhdx-catalog.json"
+            }
+        };
+        var catalogStore = new FakeCatalogStore(Array.Empty<VhdxCatalogItem>());
+        var catalogService = new CatalogService(catalogStore, settingsStore);
         var vm = new VmTemplate { Name = "VM-T" };
         var editor = new TemplateEditorViewModel(
             switchProvider: null,
-            settingsStore: new FakeAppSettingsStore(),
-            catalogStore: new FakeCatalogStore(Array.Empty<VhdxCatalogItem>()),
+            settingsStore: settingsStore,
+            catalogStore: catalogStore,
             templateStore: new FakeTemplateStore(),
-            validationService: new LabAssistant.Business.Templates.TemplateValidationService(
-                new FakeCatalogStore(Array.Empty<VhdxCatalogItem>()),
-                new FakeAppSettingsStore()),
+            validationService: new LabAssistant.Business.Templates.TemplateValidationService(catalogService),
             missingVhdxResolutionService: new LabAssistant.Business.Templates.MissingVhdxResolutionService(
-                new FakeCatalogStore(Array.Empty<VhdxCatalogItem>()),
-                new FakeAppSettingsStore()));
+                catalogStore,
+                settingsStore));
 
         var context = new TemplateVmConfigContext(editor, vm);
         context.BaseVhdPath = @"C:\catalog\base-template.vhdx";
