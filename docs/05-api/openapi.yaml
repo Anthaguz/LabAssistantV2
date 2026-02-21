@@ -1,0 +1,10 @@
+openapi: 3.0.0
+info:
+  title: LabAssistantV2 API
+  version: "0.0.0"
+  description: >
+    If this project does not expose an HTTP API, you can delete this file and
+    replace with a CLI/Powershell contract doc instead.
+servers: []
+paths: {}
+components: {}
