@@ -86,13 +86,15 @@ public class ViewModelWorkflowTests
 
         public VhdxCatalogLoadResult Load(string catalogPath)
         {
-            return new VhdxCatalogLoadResult(_items.Select(Clone).ToList(), new List<string>());
+            var result = new VhdxCatalogLoadResult();
+            result.Items.AddRange(_items.Select(Clone));
+            return result;
         }
 
         public VhdxCatalogSaveResult Save(string catalogPath, IEnumerable<VhdxCatalogItem> items)
         {
             _items = items.Select(Clone).ToList();
-            return new VhdxCatalogSaveResult(true, new List<string>());
+            return new VhdxCatalogSaveResult();
         }
 
         public void EnsureCatalogFileExists(string catalogPath)
