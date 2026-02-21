@@ -14,8 +14,15 @@ namespace LabAssistant.Models.Deployment
         public int CpuCount { get; set; } = 2; // Default to 2 CPUs
 
         // VHD Information
+        // VhdPath is the differencing disk path attached to the VM.
         public string VhdPath { get; set; } = string.Empty;
-        public string VhdDifferencingParentPath { get; set; } = string.Empty;
+        // BaseVhdPath is the parent/base VHD path used to create the differencing disk.
+        public string BaseVhdPath { get; set; } = string.Empty;
+        public string VhdDifferencingParentPath
+        {
+            get => BaseVhdPath;
+            set => BaseVhdPath = value;
+        }
         public string? VhdxId { get; set; }
         public string? VhdxSignature { get; set; }
 

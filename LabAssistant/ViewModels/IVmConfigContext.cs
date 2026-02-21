@@ -7,7 +7,7 @@ namespace LabAssistant.ViewModels
         int CpuCount { get; set; }
         string? SwitchName { get; set; }
         string? VhdxId { get; set; }
-        string? VhdPath { get; set; }
+        string? BaseVhdPath { get; set; }
         string? VhdxSignature { get; set; }
         System.Collections.ObjectModel.ObservableCollection<string> AvailableSwitches { get; }
         bool HasSwitches { get; }

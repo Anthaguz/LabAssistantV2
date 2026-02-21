@@ -83,7 +83,7 @@ namespace LabAssistant.ViewModels
             }
         }
 
-        public string? VhdPath
+        public string? BaseVhdPath
         {
             get => _vmTemplate.VhdPath;
             set
@@ -91,7 +91,7 @@ namespace LabAssistant.ViewModels
                 if (_vmTemplate.VhdPath != value)
                 {
                     _vmTemplate.VhdPath = value;
-                    OnPropertyChanged(nameof(VhdPath));
+                    OnPropertyChanged(nameof(BaseVhdPath));
                 }
             }
         }
