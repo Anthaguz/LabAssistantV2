@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using LabAssistant.Business;
+using LabAssistant.Business.Deployment;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.PowerShell;
 using Xunit;
