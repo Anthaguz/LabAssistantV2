@@ -10,6 +10,8 @@ public static class ViewModelRegistration
         //services.AddSingleton<MainViewModel>();
         services.AddSingleton<DeploymentViewModel>();
         services.AddTransient<TemplateEditorViewModel>();
+        services.AddTransient<TemplateDetailsViewModel>();
+        services.AddTransient<VhdxCatalogPageViewModel>();
         // Add more view models here
         return services;
     }

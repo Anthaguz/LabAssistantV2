@@ -21,6 +21,7 @@ namespace LabAssistant.ViewModels
         private readonly IVhdxCatalogStore _catalogStore;
         private readonly ILabTemplateStore _templateStore;
         private readonly TemplateValidationService _validationService;
+        private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
         private LabTemplate _template;
         private ObservableCollection<VmTemplate> _vmTemplates;
         private string? _currentTemplatePath;
@@ -34,13 +35,15 @@ namespace LabAssistant.ViewModels
             IAppSettingsStore settingsStore,
             IVhdxCatalogStore catalogStore,
             ILabTemplateStore templateStore,
-            TemplateValidationService validationService)
+            TemplateValidationService validationService,
+            MissingVhdxResolutionService missingVhdxResolutionService)
         {
             _switchProvider = switchProvider;
             _settingsStore = settingsStore;
             _catalogStore = catalogStore;
             _templateStore = templateStore;
             _validationService = validationService;
+            _missingVhdxResolutionService = missingVhdxResolutionService;
             _template = new LabTemplate { Version = "v0" };
             _vmTemplates = new ObservableCollection<VmTemplate>();
             _vmTemplates.CollectionChanged += VmTemplates_CollectionChanged;
@@ -241,6 +244,39 @@ namespace LabAssistant.ViewModels
             return _validationService.ValidateForSave(Template);
         }
 
+        public MissingVhdxDialogState ResolveMissingVhdxForDialog()
+        {
+            SyncVmTemplates();
+            var resolution = _missingVhdxResolutionService.ResolveMissingVhdx(Template);
+            var missing = resolution.MissingVms
+                .Where(vm => !string.IsNullOrWhiteSpace(vm.VhdxId))
+                .Select(vm => new MissingVhdxReference(vm, vm.VhdxId!))
+                .ToList();
+
+            return new MissingVhdxDialogState(
+                resolution.CatalogErrors,
+                missing);
+        }
+
+        public SaveValidationState BuildSaveValidationState()
+        {
+            var vmIssues = BuildVmValidationIssues();
+            var missing = GetMissingVhdxReferences();
+            var summary = ValidateForSave();
+
+            return new SaveValidationState(vmIssues, missing, summary);
+        }
+
+        public void ApplyResolvedMissingVhdx(IEnumerable<ResolvedVhdxSelection> selections)
+        {
+            foreach (var selection in selections)
+            {
+                selection.Vm.VhdxId = selection.Item.Id;
+                selection.Vm.VhdPath = selection.Item.Path;
+                selection.Vm.VhdxSignature = VhdxSignature.Build(selection.Item);
+            }
+        }
+
         public List<VmValidationIssue> BuildVmValidationIssues()
         {
             SyncVmTemplates();
@@ -294,6 +330,27 @@ namespace LabAssistant.ViewModels
 
             VmIssueCounts = counts;
             return issues;
+        }
+
+        public List<VmValidationDisplayItem> BuildVmValidationDisplayItems()
+        {
+            return BuildVmValidationIssues()
+                .Select(issue => new VmValidationDisplayItem(issue))
+                .ToList();
+        }
+
+        public List<VmValidationDisplayItem> FilterVmValidationDisplayItems(
+            IReadOnlyCollection<VmValidationDisplayItem> items,
+            string? filter)
+        {
+            if (string.IsNullOrWhiteSpace(filter))
+            {
+                return items.ToList();
+            }
+
+            return items
+                .Where(item => item.VmName.Contains(filter.Trim(), StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
 
         private void VmTemplates_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -389,4 +446,42 @@ namespace LabAssistant.ViewModels
         SwitchName,
         Vhdx
     }
+
+    public sealed class VmValidationDisplayItem
+    {
+        public VmValidationDisplayItem(VmValidationIssue issue)
+        {
+            Issue = issue;
+        }
+
+        public VmValidationIssue Issue { get; }
+
+        public VmTemplate Vm => Issue.Vm;
+
+        public VmValidationField Field => Issue.Field;
+
+        public string VmName => string.IsNullOrWhiteSpace(Issue.Vm.Name) ? "<unnamed VM>" : Issue.Vm.Name;
+
+        public string DisplayText => $"{VmName}: {Issue.Message}";
+    }
+
+    public sealed class SaveValidationState
+    {
+        public SaveValidationState(
+            IReadOnlyList<VmValidationIssue> vmIssues,
+            IReadOnlyList<MissingVhdxReference> missingReferences,
+            TemplateValidationSummary summary)
+        {
+            VmIssues = vmIssues;
+            MissingReferences = missingReferences;
+            Summary = summary;
+        }
+
+        public IReadOnlyList<VmValidationIssue> VmIssues { get; }
+
+        public IReadOnlyList<MissingVhdxReference> MissingReferences { get; }
+
+        public TemplateValidationSummary Summary { get; }
+    }
+
 }

@@ -4,8 +4,6 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using LabAssistant.Business.Catalog;
-using LabAssistant.Business.Templates;
-using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
 using LabAssistant.ViewModels;
@@ -18,8 +16,6 @@ namespace LabAssistant.Views
         private readonly TemplateEditorViewModel _viewModel;
         private readonly IAppSettingsStore _settingsStore;
         private readonly IAppPaths _appPaths;
-        private readonly CatalogService _catalogService;
-        private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
         private VmValidationField? _pendingFieldFocus;
         private List<VmValidationDisplayItem> _validationItems = new();
         private bool _isValidationCollapsed;
@@ -31,8 +27,6 @@ namespace LabAssistant.Views
             _viewModel = App.Services.GetRequiredService<TemplateEditorViewModel>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             _appPaths = App.Services.GetRequiredService<IAppPaths>();
-            _catalogService = App.Services.GetRequiredService<CatalogService>();
-            _missingVhdxResolutionService = App.Services.GetRequiredService<MissingVhdxResolutionService>();
             DataContext = _viewModel;
         }
 
@@ -211,17 +205,17 @@ namespace LabAssistant.Views
 
         private bool ValidateBeforeSave()
         {
-            UpdateValidationPanel();
-            if (ValidationPanel.Visibility == Visibility.Visible)
+            var state = _viewModel.BuildSaveValidationState();
+            if (state.VmIssues.Count > 0)
             {
+                UpdateValidationPanel();
                 return false;
             }
 
-            var missing = _viewModel.GetMissingVhdxReferences();
-            if (missing.Count > 0)
+            if (state.MissingReferences.Count > 0)
             {
                 var message = "Resolve missing VHDX mappings before saving:" + Environment.NewLine
-                              + string.Join(Environment.NewLine, missing.Select(item => $"- {item.VmName} missing '{item.MissingId}'"));
+                              + string.Join(Environment.NewLine, state.MissingReferences.Select(item => $"- {item.VmName} missing '{item.MissingId}'"));
                 System.Windows.MessageBox.Show(
                     message,
                     "Missing VHDX",
@@ -230,11 +224,10 @@ namespace LabAssistant.Views
                 return false;
             }
 
-            var summary = _viewModel.ValidateForSave();
-            if (summary.Errors.Count > 0)
+            if (state.Summary.Errors.Count > 0)
             {
                 var message = "Fix the following before saving:" + Environment.NewLine
-                              + string.Join(Environment.NewLine, summary.Errors.Select(error => $"- {error}"));
+                              + string.Join(Environment.NewLine, state.Summary.Errors.Select(error => $"- {error}"));
                 System.Windows.MessageBox.Show(
                     message,
                     "Validation Failed",
@@ -243,10 +236,10 @@ namespace LabAssistant.Views
                 return false;
             }
 
-            if (summary.Warnings.Count > 0)
+            if (state.Summary.Warnings.Count > 0)
             {
                 var message = "Warnings:" + Environment.NewLine
-                              + string.Join(Environment.NewLine, summary.Warnings.Select(warning => $"- {warning}"));
+                              + string.Join(Environment.NewLine, state.Summary.Warnings.Select(warning => $"- {warning}"));
                 System.Windows.MessageBox.Show(
                     message,
                     "Validation Warning",
@@ -259,7 +252,7 @@ namespace LabAssistant.Views
 
         private void UpdateValidationPanel()
         {
-            var issues = _viewModel.BuildVmValidationIssues();
+            var issues = _viewModel.BuildVmValidationDisplayItems();
             if (issues.Count == 0)
             {
                 ValidationPanel.Visibility = Visibility.Collapsed;
@@ -267,7 +260,7 @@ namespace LabAssistant.Views
                 return;
             }
 
-            _validationItems = issues.Select(issue => new VmValidationDisplayItem(issue)).ToList();
+            _validationItems = issues;
             ApplyValidationFilter();
             ValidationPanel.Visibility = Visibility.Visible;
             ValidationContentPanel.Visibility = _isValidationCollapsed ? Visibility.Collapsed : Visibility.Visible;
@@ -325,16 +318,9 @@ namespace LabAssistant.Views
                 return;
             }
 
-            var filter = ValidationFilterBox.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(filter))
-            {
-                ValidationItemsControl.ItemsSource = _validationItems;
-                return;
-            }
-
-            var filtered = _validationItems
-                .Where(item => item.VmName.Contains(filter, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var filtered = _viewModel.FilterVmValidationDisplayItems(
+                _validationItems,
+                ValidationFilterBox.Text);
             ValidationItemsControl.ItemsSource = filtered;
         }
 
@@ -367,8 +353,8 @@ namespace LabAssistant.Views
 
         private void ResolveMissingVhdxReferences()
         {
-            var resolution = _missingVhdxResolutionService.ResolveMissingVhdx(_viewModel.Template);
-            if (resolution.MissingVms.Count == 0)
+            var resolution = _viewModel.ResolveMissingVhdxForDialog();
+            if (resolution.MissingReferences.Count == 0)
             {
                 return;
             }
@@ -382,12 +368,9 @@ namespace LabAssistant.Views
                     MessageBoxImage.Warning);
             }
 
-            var missing = resolution.MissingVms
-                .Where(vm => !string.IsNullOrWhiteSpace(vm.VhdxId))
-                .Select(vm => new MissingVhdxReference(vm, vm.VhdxId!))
-                .ToList();
-
-            var dialog = new MissingVhdxResolutionDialog(missing, _catalogService)
+            var dialog = new MissingVhdxResolutionDialog(
+                resolution.MissingReferences,
+                App.Services.GetRequiredService<CatalogService>())
             {
                 Owner = Window.GetWindow(this)
             };
@@ -402,35 +385,8 @@ namespace LabAssistant.Views
                 return;
             }
 
-            foreach (var item in dialog.Items)
-            {
-                if (item.SelectedOption == null)
-                {
-                    continue;
-                }
-
-                item.Reference.Vm.VhdxId = item.SelectedOption.Item.Id;
-                item.Reference.Vm.VhdPath = item.SelectedOption.Item.Path;
-                item.Reference.Vm.VhdxSignature = VhdxSignature.Build(item.SelectedOption.Item);
-            }
+            _viewModel.ApplyResolvedMissingVhdx(dialog.GetResolvedSelections());
         }
     }
 
-    public sealed class VmValidationDisplayItem
-    {
-        public VmValidationDisplayItem(VmValidationIssue issue)
-        {
-            Issue = issue;
-        }
-
-        public VmValidationIssue Issue { get; }
-
-        public VmTemplate Vm => Issue.Vm;
-
-        public VmValidationField Field => Issue.Field;
-
-        public string VmName => string.IsNullOrWhiteSpace(Issue.Vm.Name) ? "<unnamed VM>" : Issue.Vm.Name;
-
-        public string DisplayText => $"{VmName}: {Issue.Message}";
-    }
 }
