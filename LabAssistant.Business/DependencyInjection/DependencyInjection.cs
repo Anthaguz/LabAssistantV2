@@ -1,4 +1,4 @@
-﻿//using LabAssistant.Business;
+//using LabAssistant.Business;
 //using LabAssistant.Business.Deployment;
 //using LabAssistant.Models.PowerShell;
 //using LabAssistant.Services.Configuration;
@@ -84,7 +84,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<StartVmStep>();
         services.AddTransient<ConfigureVmStep>();
         services.AddTransient<EnableGuestServicesStep>();
-        services.AddTransient<DisableVmCheckpoints>();
+        services.AddTransient<DisableVmCheckpointsStep>();
         services.AddTransient<SetTimeZoneStep>();
         services.AddTransient<InstallSoftwareStep>();
         services.AddTransient<InstallRoleStep>();

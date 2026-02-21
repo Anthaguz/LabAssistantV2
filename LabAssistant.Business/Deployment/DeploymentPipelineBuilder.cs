@@ -1,4 +1,4 @@
-﻿using LabAssistant.Business.Deployment;
+using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Services.Logging;
 using System;
@@ -13,7 +13,7 @@ public class DeploymentPipelineBuilder
     private readonly ConfigureVmStep _configureVmStep;
     private readonly StartVmStep _startVmStep;
     private readonly EnableGuestServicesStep _enableGuestServicesStep;
-    private readonly DisableVmCheckpoints _disableVmCheckpoints;
+    private readonly DisableVmCheckpointsStep _disableVmCheckpoints;
     private readonly SetTimeZoneStep _setTimeZoneStep;
     private readonly InstallSoftwareStep _installSoftwareStep;
     private readonly InstallRoleStep _installRoleStep;
@@ -27,7 +27,7 @@ public class DeploymentPipelineBuilder
         ConfigureVmStep configureVmStep,
         StartVmStep startVmStep,
         EnableGuestServicesStep enableGuestServicesStep,
-        DisableVmCheckpoints disableVmCheckpoints,
+        DisableVmCheckpointsStep disableVmCheckpoints,
         SetTimeZoneStep setTimeZoneStep,
         InstallSoftwareStep installSoftwareStep,
         InstallRoleStep installRoleStep,

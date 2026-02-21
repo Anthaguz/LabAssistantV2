@@ -14,7 +14,7 @@ public class DeploymentPlanBuilder
         "AddNic",
         "ConfigureVm",
         "EnableGuestServices",
-        "DisableVmCheckpoints",
+        "DisableVmCheckpointsStep",
         "StartVm"
     };
 
