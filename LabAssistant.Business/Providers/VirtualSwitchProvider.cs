@@ -2,7 +2,7 @@
 using LabAssistant.Services.PowerShell;
 using LabAssistant.Services.Logging;
 
-namespace LabAssistant.Business
+namespace LabAssistant.Business.Deployment
 {
     public class VirtualSwitchProvider
     {

@@ -6,7 +6,7 @@ using LabAssistant.Services.PowerShell;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace LabAssistant.Business;
+namespace LabAssistant.Business.Deployment;
 
 public class MultiVmDeploymentCoordinator
 {
