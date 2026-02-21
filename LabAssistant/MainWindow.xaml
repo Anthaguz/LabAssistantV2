@@ -25,22 +25,81 @@
         <!-- Main Content Frame -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border x:Name="ErrorBanner"
-                    Grid.Row="0"
-                    Background="#FFFFE1"
-                    BorderBrush="#FFCC00"
-                    BorderThickness="1"
-                    Padding="8"
-                    Margin="10"
-                    Visibility="Collapsed">
-                <TextBlock x:Name="ErrorBannerText" Foreground="Black"/>
-            </Border>
+            <Frame x:Name="MainFrame" Grid.Row="0" NavigationUIVisibility="Hidden"/>
 
-            <Frame x:Name="MainFrame" Grid.Row="1" NavigationUIVisibility="Hidden"/>
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,16,16"
+                        Width="360">
+                <Border Background="#F6FFF6F6"
+                        BorderBrush="#FFE0E0E0"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10"
+                        Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="{Binding TotalErrorCount, StringFormat=Global Errors: {0}}"
+                                   FontWeight="SemiBold"/>
+                        <ItemsControl ItemsSource="{Binding RecentItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Foreground="#FF666666"
+                                               FontSize="11"
+                                               TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding TimestampLocal, StringFormat={}{0:HH:mm:ss}}"/>
+                                        <Run Text=" "/>
+                                        <Run Text="{Binding VmName}"/>
+                                        <Run Text=" "/>
+                                        <Run Text="{Binding Title}"/>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <ItemsControl ItemsSource="{Binding ActiveItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#FFFDF2F2"
+                                    BorderBrush="#FFE5B4B4"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,8"
+                                    MouseEnter="SnackCard_MouseEnter"
+                                    MouseLeave="SnackCard_MouseLeave">
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold">
+                                        <Run Text="{Binding VmName}"/>
+                                        <Run Text=" - "/>
+                                        <Run Text="{Binding Title}"/>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Message}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding TimestampLocal, StringFormat={}{0:HH:mm:ss}}"
+                                               Foreground="#FF666666"
+                                               FontSize="11"
+                                               Margin="0,4,0,0"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Button Content="View details"
+                                                Click="SnackViewDetails_Click"
+                                                CommandParameter="{Binding}"
+                                                Margin="0,0,8,0"/>
+                                        <Button Content="Dismiss"
+                                                Click="SnackDismiss_Click"
+                                                CommandParameter="{Binding}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

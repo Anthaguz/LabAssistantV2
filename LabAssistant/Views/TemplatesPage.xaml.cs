@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
+using LabAssistant.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Views
@@ -14,6 +15,7 @@ namespace LabAssistant.Views
         private readonly ILabTemplateStore _templateStore;
         private readonly IVhdxCatalogStore _catalogStore;
         private readonly IAppSettingsStore _settingsStore;
+        private readonly IErrorFeedService _errorFeed;
         private readonly List<LabTemplate> _templates = new List<LabTemplate>();
 
         public TemplatesPage()
@@ -22,6 +24,7 @@ namespace LabAssistant.Views
             _templateStore = App.Services.GetRequiredService<ILabTemplateStore>();
             _catalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
+            _errorFeed = App.Services.GetRequiredService<IErrorFeedService>();
             LoadTemplates();
         }
 
@@ -48,7 +51,10 @@ namespace LabAssistant.Views
 
                 if (errors.Count > 0)
                 {
-                    MainWindow.CurrentInstance?.ShowError(string.Join(Environment.NewLine, errors));
+                    _errorFeed.Publish(
+                        null,
+                        "Template load errors",
+                        string.Join(Environment.NewLine, errors));
                 }
             }
 

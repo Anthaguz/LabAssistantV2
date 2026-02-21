@@ -8,6 +8,7 @@ public static class ViewModelRegistration
     public static IServiceCollection AddLabAssistantViewModels(this IServiceCollection services)
     {
         //services.AddSingleton<MainViewModel>();
+        services.AddSingleton<IErrorFeedService, ErrorFeedService>();
         services.AddSingleton<DeploymentViewModel>();
         services.AddTransient<TemplateEditorViewModel>();
         services.AddTransient<TemplateDetailsViewModel>();

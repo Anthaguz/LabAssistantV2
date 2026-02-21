@@ -9,10 +9,8 @@ using LabAssistant.Services.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using LabAssistant;
 using LabAssistant.Views;
 
 namespace LabAssistant.ViewModels;
@@ -25,6 +23,7 @@ public partial class DeploymentViewModel : ObservableObject
     private readonly ILabTemplateStore _templateStore;
     private readonly IAppPaths _appPaths;
     private readonly IVhdxCatalogStore _catalogStore;
+    private readonly IErrorFeedService _errorFeed;
     public Action<string>? LogHandler { get; set; }
 
     public ObservableCollection<string> AvailableSwitches { get; } = new();
@@ -46,7 +45,8 @@ public partial class DeploymentViewModel : ObservableObject
         IAppSettingsStore settingsStore,
         ILabTemplateStore templateStore,
         IAppPaths appPaths,
-        IVhdxCatalogStore catalogStore)
+        IVhdxCatalogStore catalogStore,
+        IErrorFeedService errorFeed)
     {
         LogHandler = message =>
         {
@@ -62,6 +62,7 @@ public partial class DeploymentViewModel : ObservableObject
         _templateStore = templateStore;
         _appPaths = appPaths;
         _catalogStore = catalogStore;
+        _errorFeed = errorFeed;
         VmEntries = new ObservableCollection<VmEntryViewModel>();
         _ = LoadAvailableSwitches();
 
@@ -95,7 +96,24 @@ public partial class DeploymentViewModel : ObservableObject
             }
 
             group.Entries.Add(message);
+
+            if (IsRuntimeErrorMessage(message))
+            {
+                var entry = VmEntries.FirstOrDefault(vm => vm.DeploymentContext.VmId == vmId);
+                _errorFeed.Publish(
+                    vmName,
+                    "Deployment error",
+                    message,
+                    entry != null ? () => OpenVmDetail(entry) : null);
+            }
         });
+    }
+
+    private static bool IsRuntimeErrorMessage(string message)
+    {
+        return message.Contains("❌", StringComparison.Ordinal)
+               || message.Contains("error", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("failed", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ApplyDeploymentPolicy(VmDeploymentContext context)
@@ -322,7 +340,21 @@ public partial class DeploymentViewModel : ObservableObject
             StopAllOnAnyVmFailure = _settingsStore.Settings.StopAllOnAnyVmFailure
         };
 
-        await _coordinator.DeployAllAsync(multiContext);
+        var deploymentFailed = false;
+        try
+        {
+            await _coordinator.DeployAllAsync(multiContext);
+        }
+        catch (Exception ex)
+        {
+            deploymentFailed = true;
+            _errorFeed.Publish(null, "Deployment failed", ex.Message);
+            Logs.Add($"Deployment failed: {ex.Message}");
+        }
+        finally
+        {
+            IsDeploying = false;
+        }
 
         foreach (var ctx in multiContext.VmContexts)
         {
@@ -332,9 +364,11 @@ public partial class DeploymentViewModel : ObservableObject
             }
         }
 
-        DebugLogger.Log("All deployments completed.");
-        Logs.Add("All deployments completed.");
-        IsDeploying = false;
+        if (!deploymentFailed)
+        {
+            DebugLogger.Log("All deployments completed.");
+            Logs.Add("All deployments completed.");
+        }
     }
 
     [RelayCommand]
