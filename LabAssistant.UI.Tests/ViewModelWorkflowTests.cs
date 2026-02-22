@@ -215,6 +215,8 @@ public class ViewModelWorkflowTests
 
     private sealed class FakeTemplateStore : ILabTemplateStore
     {
+        public IReadOnlyList<string> LastLoadWarnings => Array.Empty<string>();
+
         public LabTemplateLoadResult LoadFromFolder(string templatesFolder, IEnumerable<VhdxCatalogItem> catalogItems)
         {
             return new LabTemplateLoadResult();

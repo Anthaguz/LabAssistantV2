@@ -49,6 +49,11 @@ namespace LabAssistant.Views
                     errors.AddRange(loadResult.Errors);
                 }
 
+                foreach (var warning in loadResult.Warnings)
+                {
+                    _errorFeed.Publish(null, "Template compatibility warning", warning);
+                }
+
                 if (errors.Count > 0)
                 {
                     _errorFeed.Publish(
