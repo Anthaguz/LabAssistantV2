@@ -22,7 +22,7 @@ public class DryRunDeploymentPipelineTests
     {
         var logger = new TestLogger();
         var pipeline = new DryRunDeploymentPipeline(new DeploymentPlanBuilder(), logger);
-        var template = new LabTemplate { Id = "lab", Name = "Lab", Version = "v0" };
+        var template = new LabTemplate { Id = "lab", Name = "Lab", Version = "1.0.0" };
 
         var result = pipeline.Run(template);
 
@@ -39,7 +39,7 @@ public class DryRunDeploymentPipelineTests
         {
             Id = "lab",
             Name = "Lab",
-            Version = "v0",
+            Version = "1.0.0",
             VmTemplates =
             {
                 new VmTemplate { Name = "vm1", MemoryMb = 1024, CpuCount = 1, VhdPath = "C:/base.vhdx" }

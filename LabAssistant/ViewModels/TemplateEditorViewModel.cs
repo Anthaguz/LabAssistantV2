@@ -44,9 +44,10 @@ namespace LabAssistant.ViewModels
             _templateStore = templateStore;
             _validationService = validationService;
             _missingVhdxResolutionService = missingVhdxResolutionService;
-            _template = new LabTemplate { Version = "v0" };
+            _template = new LabTemplate();
             _vmTemplates = new ObservableCollection<VmTemplate>();
             _vmTemplates.CollectionChanged += VmTemplates_CollectionChanged;
+            EnsureCanonicalTemplateDefaults(_template);
             SyncVmTemplates();
 
             if (_switchProvider != null)
@@ -161,6 +162,7 @@ namespace LabAssistant.ViewModels
         public void LoadFromFile(string filePath)
         {
             var template = _templateStore.LoadFromFile(filePath);
+            EnsureCanonicalTemplateDefaults(template);
             Template = template;
             VmTemplates = new ObservableCollection<VmTemplate>(template.VmTemplates ?? new());
             SyncVmTemplates();
@@ -170,6 +172,7 @@ namespace LabAssistant.ViewModels
 
         public void SaveToFile(string filePath)
         {
+            EnsureCanonicalTemplateDefaults(Template);
             SyncVmTemplates();
             _templateStore.SaveToFile(filePath, Template);
             CurrentTemplatePath = filePath;
@@ -360,7 +363,62 @@ namespace LabAssistant.ViewModels
 
         private void SyncVmTemplates()
         {
+            foreach (var vm in VmTemplates.Where(vm => string.IsNullOrWhiteSpace(vm.VmId)).ToList())
+            {
+                // Keep vmId immutable in normal editing; only backfill when missing.
+                var index = VmTemplates.IndexOf(vm);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                VmTemplates[index] = CloneWithVmId(vm, Guid.NewGuid().ToString("N"));
+            }
+
             Template.VmTemplates = VmTemplates.ToList();
+        }
+
+        private static void EnsureCanonicalTemplateDefaults(LabTemplate template)
+        {
+            if (string.IsNullOrWhiteSpace(template.SchemaVersion))
+            {
+                template.SchemaVersion = LabTemplate.CurrentSchemaVersion;
+            }
+
+            if (template.TemplateRevision <= 0)
+            {
+                template.TemplateRevision = 1;
+            }
+
+            if (string.IsNullOrWhiteSpace(template.CreatedWithAppVersion))
+            {
+                template.CreatedWithAppVersion = GetAppVersion();
+            }
+
+            if (string.IsNullOrWhiteSpace(template.TemplateType))
+            {
+                template.TemplateType = LabTemplate.SupportedTemplateType;
+            }
+        }
+
+        private static VmTemplate CloneWithVmId(VmTemplate source, string vmId)
+        {
+            return new VmTemplate
+            {
+                VmId = vmId,
+                Name = source.Name,
+                MemoryMb = source.MemoryMb,
+                CpuCount = source.CpuCount,
+                VhdxId = source.VhdxId,
+                VhdPath = source.VhdPath,
+                VhdxSignature = source.VhdxSignature,
+                SwitchName = source.SwitchName
+            };
+        }
+
+        private static string GetAppVersion()
+        {
+            return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
         }
 
         private async Task LoadAvailableSwitchesAsync()

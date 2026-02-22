@@ -14,7 +14,7 @@ public class DeploymentPlanBuilderTests
         {
             Id = "lab",
             Name = "Lab",
-            Version = "v0",
+            Version = "1.0.0",
             VmTemplates =
             {
                 new VmTemplate { Name = "vm1", MemoryMb = 1024, CpuCount = 1, VhdPath = "C:/a.vhdx" },

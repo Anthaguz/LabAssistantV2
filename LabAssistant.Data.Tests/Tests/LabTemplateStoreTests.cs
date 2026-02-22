@@ -19,7 +19,10 @@ public class LabTemplateStoreTests
         {
             Id = "lab-1",
             Name = "Test Lab",
-            Version = "v0",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
             VmTemplates =
             {
                 new VmTemplate { Name = "vm1", MemoryMb = 1024, CpuCount = 1, VhdPath = "C:/base.vhdx" }
@@ -56,7 +59,10 @@ public class LabTemplateStoreTests
         {
             Id = "lab-1",
             Name = "Test Lab",
-            Version = "v0",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
             VmTemplates = { new VmTemplate { Name = "vm1", MemoryMb = 1024, CpuCount = 1, VhdPath = "C:/base.vhdx" } }
         };
 

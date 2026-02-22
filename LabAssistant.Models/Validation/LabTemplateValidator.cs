@@ -1,3 +1,4 @@
+using System;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
 
@@ -13,9 +14,13 @@ public static class LabTemplateValidator
         var result = new LabTemplateValidationResult();
         var catalogIds = new HashSet<string>(catalogItems.Select(item => item.Id), StringComparer.OrdinalIgnoreCase);
 
-        if (string.IsNullOrWhiteSpace(template.Version))
+        if (string.IsNullOrWhiteSpace(template.SchemaVersion))
         {
-            result.Errors.Add("Template version is required.");
+            result.Errors.Add("Template schemaVersion is required.");
+        }
+        else if (!Version.TryParse(template.SchemaVersion, out _))
+        {
+            result.Errors.Add("Template schemaVersion must be a valid semantic version (e.g. 1.0.0).");
         }
 
         if (string.IsNullOrWhiteSpace(template.Id))
@@ -28,6 +33,25 @@ public static class LabTemplateValidator
             result.Errors.Add("Template name is required.");
         }
 
+        if (template.TemplateRevision <= 0)
+        {
+            result.Errors.Add("Template templateRevision must be greater than zero.");
+        }
+
+        if (string.IsNullOrWhiteSpace(template.CreatedWithAppVersion))
+        {
+            result.Errors.Add("Template createdWithAppVersion is required.");
+        }
+        else if (!Version.TryParse(template.CreatedWithAppVersion, out _))
+        {
+            result.Errors.Add("Template createdWithAppVersion must be a valid semantic version (e.g. 1.0.0).");
+        }
+
+        if (!string.Equals(template.TemplateType, LabTemplate.SupportedTemplateType, StringComparison.OrdinalIgnoreCase))
+        {
+            result.Errors.Add($"Template templateType must be '{LabTemplate.SupportedTemplateType}'.");
+        }
+
         if (template.VmTemplates.Count == 0)
         {
             result.Errors.Add("At least one VM template is required.");
@@ -36,6 +60,13 @@ public static class LabTemplateValidator
         var vmNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var vm in template.VmTemplates)
         {
+            var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name;
+
+            if (string.IsNullOrWhiteSpace(vm.VmId))
+            {
+                result.Errors.Add($"VM '{vmName}' vmId is required.");
+            }
+
             if (string.IsNullOrWhiteSpace(vm.Name))
             {
                 result.Errors.Add("VM name is required.");
@@ -47,19 +78,19 @@ public static class LabTemplateValidator
 
             if (vm.MemoryMb <= 0)
             {
-                result.Errors.Add($"VM '{vm.Name}' memory must be positive.");
+                result.Errors.Add($"VM '{vmName}' memory must be positive.");
             }
 
             if (vm.CpuCount <= 0)
             {
-                result.Errors.Add($"VM '{vm.Name}' CPU count must be positive.");
+                result.Errors.Add($"VM '{vmName}' CPU count must be positive.");
             }
 
             var hasVhdxId = !string.IsNullOrWhiteSpace(vm.VhdxId);
             var hasVhdPath = !string.IsNullOrWhiteSpace(vm.VhdPath);
             if (!hasVhdxId && !hasVhdPath)
             {
-                result.Errors.Add($"VM '{vm.Name}' must specify vhdxId or vhdPath.");
+                result.Errors.Add($"VM '{vmName}' must specify vhdxId or vhdPath.");
             }
 
             if (hasVhdxId && !catalogIds.Contains(vm.VhdxId!))
