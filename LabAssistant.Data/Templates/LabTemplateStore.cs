@@ -178,34 +178,28 @@ public class LabTemplateStore : ILabTemplateStore
     {
         warnings = new List<string>();
         error = string.Empty;
-        normalized = NormalizeForSave(template);
+        var compatibility = TemplateSchemaCompatibilityGate.Evaluate(
+            template.SchemaVersion,
+            CurrentSchemaVersion,
+            isLegacyV0);
 
-        if (isLegacyV0 || string.Equals(normalized.SchemaVersion, "v0", StringComparison.OrdinalIgnoreCase))
+        if (compatibility.IsBlocked)
         {
-            normalized.SchemaVersion = LabTemplate.CurrentSchemaVersion;
-            warnings.Add("Legacy template format 'v0' was migrated in memory to canonical schema version 1.0.0.");
-            return true;
-        }
-
-        if (!Version.TryParse(normalized.SchemaVersion, out var parsedVersion))
-        {
-            error = $"Template schemaVersion '{normalized.SchemaVersion}' is invalid. Use semantic version format like '1.0.0'.";
+            error = compatibility.Error ?? "Template schemaVersion is not supported.";
+            normalized = template;
             return false;
         }
 
-        if (parsedVersion.Major != CurrentSchemaVersion.Major)
+        if (!string.IsNullOrWhiteSpace(compatibility.Warning))
         {
-            error =
-                $"Template schemaVersion '{normalized.SchemaVersion}' is not supported. Supported major version is '{CurrentSchemaVersion.Major}.x.x'.";
-            return false;
+            warnings.Add(compatibility.Warning);
         }
 
-        if (parsedVersion > CurrentSchemaVersion)
-        {
-            warnings.Add(
-                $"Template schemaVersion '{normalized.SchemaVersion}' is newer than supported '{LabTemplate.CurrentSchemaVersion}'. Continuing with compatible fields only.");
-        }
+        normalized = compatibility.Status == TemplateSchemaCompatibilityStatus.AllowWithUpcast
+            ? UpcastToCurrent(template)
+            : template;
 
+        normalized = NormalizeForSave(normalized);
         return true;
     }
 
@@ -213,10 +207,8 @@ public class LabTemplateStore : ILabTemplateStore
     {
         var normalized = source;
 
-        if (string.IsNullOrWhiteSpace(normalized.SchemaVersion) || string.Equals(normalized.SchemaVersion, "v0", StringComparison.OrdinalIgnoreCase))
-        {
-            normalized.SchemaVersion = LabTemplate.CurrentSchemaVersion;
-        }
+        // Save/export always emits the current canonical schema major (N).
+        normalized.SchemaVersion = LabTemplate.CurrentSchemaVersion;
 
         if (normalized.TemplateRevision <= 0)
         {
@@ -255,6 +247,13 @@ public class LabTemplateStore : ILabTemplateStore
         }
 
         return normalized;
+    }
+
+    private static LabTemplate UpcastToCurrent(LabTemplate source)
+    {
+        // Deterministic N-1 -> N upcaster (single explicit hop for current support window).
+        source.SchemaVersion = LabTemplate.CurrentSchemaVersion;
+        return source;
     }
 
     private static bool IsLegacyV0Json(string json)
