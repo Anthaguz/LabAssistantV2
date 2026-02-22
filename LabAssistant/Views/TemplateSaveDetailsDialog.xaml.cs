@@ -1,3 +1,4 @@
+using LabAssistant.Models.Templates;
 using System.Windows;
 
 namespace LabAssistant.Views
@@ -9,7 +10,7 @@ namespace LabAssistant.Views
             InitializeComponent();
             NameBox.Text = defaultName ?? string.Empty;
             DescriptionBox.Text = defaultDescription ?? string.Empty;
-            VersionBox.Text = string.IsNullOrWhiteSpace(defaultVersion) ? "v0" : defaultVersion;
+            VersionBox.Text = string.IsNullOrWhiteSpace(defaultVersion) ? LabTemplate.CurrentSchemaVersion : defaultVersion;
         }
 
         public string TemplateName => NameBox.Text.Trim();

@@ -1,3 +1,5 @@
+using System;
+
 namespace LabAssistant.Models.Templates;
 
 /// <summary>
@@ -5,6 +7,11 @@ namespace LabAssistant.Models.Templates;
 /// </summary>
 public class VmTemplate
 {
+    /// <summary>
+    /// Immutable VM entry identifier for traceability (required).
+    /// </summary>
+    public string VmId { get; init; } = Guid.NewGuid().ToString("N");
+
     /// <summary>
     /// VM name (required).
     /// </summary>

@@ -249,7 +249,7 @@ public partial class DeploymentViewModel : ObservableObject
         }
 
         var owner = (MainWindow)System.Windows.Application.Current.MainWindow;
-        var detailsDialog = new TemplateSaveDetailsDialog(null, null, "v0")
+        var detailsDialog = new TemplateSaveDetailsDialog(null, null, LabTemplate.CurrentSchemaVersion)
         {
             Owner = owner
         };
@@ -268,7 +268,10 @@ public partial class DeploymentViewModel : ObservableObject
             Id = templateId,
             Name = templateName,
             Description = string.IsNullOrWhiteSpace(templateDescription) ? null : templateDescription,
-            Version = templateVersion,
+            SchemaVersion = templateVersion,
+            TemplateRevision = 1,
+            CreatedWithAppVersion = GetAppVersion(),
+            TemplateType = LabTemplate.SupportedTemplateType,
             VmTemplates = VmEntries.Select(entry =>
             {
                 var context = entry.DeploymentContext;
@@ -278,6 +281,7 @@ public partial class DeploymentViewModel : ObservableObject
 
                 return new VmTemplate
                 {
+                    VmId = context.VmId.ToString("N"),
                     Name = context.VmName,
                     MemoryMb = context.MemoryMb,
                     CpuCount = context.CpuCount,
@@ -313,6 +317,11 @@ public partial class DeploymentViewModel : ObservableObject
             "Save as Template",
             System.Windows.MessageBoxButton.OK,
             System.Windows.MessageBoxImage.Information);
+    }
+
+    private static string GetAppVersion()
+    {
+        return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
     }
 
 

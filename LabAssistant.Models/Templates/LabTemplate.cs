@@ -1,3 +1,5 @@
+using System;
+
 namespace LabAssistant.Models.Templates;
 
 /// <summary>
@@ -5,10 +7,13 @@ namespace LabAssistant.Models.Templates;
 /// </summary>
 public class LabTemplate
 {
+    public const string CurrentSchemaVersion = "1.0.0";
+    public const string SupportedTemplateType = "lab-template";
+
     /// <summary>
     /// Stable identifier for the template (required).
     /// </summary>
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
     /// <summary>
     /// Display name for the template (required).
@@ -21,6 +26,26 @@ public class LabTemplate
     public string? Description { get; set; }
 
     /// <summary>
+    /// Canonical schema version for compatibility checks (required).
+    /// </summary>
+    public string SchemaVersion { get; set; } = CurrentSchemaVersion;
+
+    /// <summary>
+    /// User-controlled revision number for template content (required).
+    /// </summary>
+    public int TemplateRevision { get; set; } = 1;
+
+    /// <summary>
+    /// App version used to create the template (required).
+    /// </summary>
+    public string CreatedWithAppVersion { get; set; } = "0.0.0";
+
+    /// <summary>
+    /// Canonical template type (required).
+    /// </summary>
+    public string TemplateType { get; set; } = SupportedTemplateType;
+
+    /// <summary>
     /// VM definitions included in the template (required).
     /// </summary>
     public List<VmTemplate> VmTemplates { get; set; } = new();
@@ -31,7 +56,11 @@ public class LabTemplate
     public NetworkConfig? NetworkConfig { get; set; }
 
     /// <summary>
-    /// Schema version for the template (required).
+    /// Legacy alias kept for UI compatibility. Maps to <see cref="SchemaVersion"/>.
     /// </summary>
-    public string Version { get; set; } = "v0";
+    public string Version
+    {
+        get => SchemaVersion;
+        set => SchemaVersion = value;
+    }
 }

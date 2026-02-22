@@ -15,16 +15,22 @@ public class LabTemplateValidatorTests
         {
             Id = "",
             Name = "",
-            Version = "",
+            SchemaVersion = "",
+            CreatedWithAppVersion = "",
+            TemplateType = "",
+            TemplateRevision = 0,
             VmTemplates = new List<VmTemplate>()
         };
 
         var result = LabTemplateValidator.Validate(template, new List<VhdxCatalogItem>());
 
         Assert.False(result.IsValid);
-        Assert.Contains("Template version is required.", result.Errors);
+        Assert.Contains("Template schemaVersion is required.", result.Errors);
         Assert.Contains("Template id is required.", result.Errors);
         Assert.Contains("Template name is required.", result.Errors);
+        Assert.Contains("Template templateRevision must be greater than zero.", result.Errors);
+        Assert.Contains("Template createdWithAppVersion is required.", result.Errors);
+        Assert.Contains("Template templateType must be 'lab-template'.", result.Errors);
         Assert.Contains("At least one VM template is required.", result.Errors);
     }
 
@@ -35,11 +41,15 @@ public class LabTemplateValidatorTests
         {
             Id = "lab",
             Name = "Lab",
-            Version = "v0",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
             VmTemplates = new List<VmTemplate>
             {
                 new()
                 {
+                    VmId = "vm-1",
                     Name = "vm1",
                     MemoryMb = 1024,
                     CpuCount = 1,
@@ -73,11 +83,15 @@ public class LabTemplateValidatorTests
         {
             Id = "lab",
             Name = "Lab",
-            Version = "v0",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
             VmTemplates = new List<VmTemplate>
             {
                 new()
                 {
+                    VmId = "vm-1",
                     Name = "vm1",
                     MemoryMb = 1024,
                     CpuCount = 1
@@ -89,5 +103,37 @@ public class LabTemplateValidatorTests
 
         Assert.Contains("VM 'vm1' must specify vhdxId or vhdPath.", result.Errors);
         Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_RequiresVmId_AndCanonicalTemplateType()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "vm-template",
+            TemplateRevision = 1,
+            VmTemplates = new List<VmTemplate>
+            {
+                new()
+                {
+                    VmId = "",
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchName = "Default Switch"
+                }
+            }
+        };
+
+        var result = LabTemplateValidator.Validate(template, new List<VhdxCatalogItem>());
+
+        Assert.False(result.IsValid);
+        Assert.Contains("VM 'vm1' vmId is required.", result.Errors);
+        Assert.Contains("Template templateType must be 'lab-template'.", result.Errors);
     }
 }
