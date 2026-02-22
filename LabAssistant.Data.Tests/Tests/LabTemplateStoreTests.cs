@@ -171,7 +171,7 @@ public class LabTemplateStoreTests
 
         var store = new LabTemplateStore();
         var ex = Assert.Throws<InvalidOperationException>(() => store.LoadFromFile(filePath));
-        Assert.Contains("Supported major version", ex.Message);
+        Assert.Contains("Please update LabAssistant", ex.Message);
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public class LabTemplateStoreTests
 
         Assert.Empty(result.Errors);
         Assert.Single(result.Templates);
-        Assert.Contains(result.Warnings, warning => warning.Contains("newer than supported", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Warnings, warning => warning.Contains("newer minor/patch than supported", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string BuildTempRoot()
