@@ -16,6 +16,7 @@ namespace LabAssistant.Views
         private readonly TemplateEditorViewModel _viewModel;
         private readonly IAppSettingsStore _settingsStore;
         private readonly IAppPaths _appPaths;
+        private readonly IErrorFeedService _errorFeed;
         private VmValidationField? _pendingFieldFocus;
         private List<VmValidationDisplayItem> _validationItems = new();
         private bool _isValidationCollapsed;
@@ -27,6 +28,7 @@ namespace LabAssistant.Views
             _viewModel = App.Services.GetRequiredService<TemplateEditorViewModel>();
             _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
             _appPaths = App.Services.GetRequiredService<IAppPaths>();
+            _errorFeed = App.Services.GetRequiredService<IErrorFeedService>();
             DataContext = _viewModel;
         }
 
@@ -109,6 +111,10 @@ namespace LabAssistant.Views
                 try
                 {
                     _viewModel.LoadFromFile(dialog.FileName);
+                    foreach (var warning in _viewModel.LastLoadWarnings)
+                    {
+                        _errorFeed.Publish(null, "Template compatibility warning", warning);
+                    }
                     ResolveMissingVhdxReferences();
                 }
                 catch (Exception ex)

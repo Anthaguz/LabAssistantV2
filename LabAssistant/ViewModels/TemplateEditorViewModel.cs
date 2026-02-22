@@ -29,6 +29,7 @@ namespace LabAssistant.ViewModels
         private string _switchWarning = string.Empty;
         private string? _defaultSwitchName;
         private Dictionary<string, int> _vmIssueCounts = new(StringComparer.OrdinalIgnoreCase);
+        private IReadOnlyList<string> _lastLoadWarnings = Array.Empty<string>();
 
         public TemplateEditorViewModel(
             VirtualSwitchProvider? switchProvider,
@@ -127,6 +128,16 @@ namespace LabAssistant.ViewModels
 
         public bool ShowSwitchWarning => !HasSwitches;
 
+        public IReadOnlyList<string> LastLoadWarnings
+        {
+            get => _lastLoadWarnings;
+            private set
+            {
+                _lastLoadWarnings = value;
+                OnPropertyChanged(nameof(LastLoadWarnings));
+            }
+        }
+
         public string SwitchWarning
         {
             get => _switchWarning;
@@ -163,6 +174,7 @@ namespace LabAssistant.ViewModels
         {
             var template = _templateStore.LoadFromFile(filePath);
             EnsureCanonicalTemplateDefaults(template);
+            LastLoadWarnings = _templateStore.LastLoadWarnings.ToList();
             Template = template;
             VmTemplates = new ObservableCollection<VmTemplate>(template.VmTemplates ?? new());
             SyncVmTemplates();

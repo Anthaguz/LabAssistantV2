@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace LabAssistant.Models.Templates;
 
@@ -58,9 +59,26 @@ public class LabTemplate
     /// <summary>
     /// Legacy alias kept for UI compatibility. Maps to <see cref="SchemaVersion"/>.
     /// </summary>
+    [JsonIgnore]
     public string Version
     {
         get => SchemaVersion;
         set => SchemaVersion = value;
+    }
+
+    /// <summary>
+    /// Legacy JSON compatibility hook. Reads legacy "version" values without writing them back.
+    /// </summary>
+    [JsonPropertyName("version")]
+    public string? LegacyVersion
+    {
+        get => null;
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                SchemaVersion = value;
+            }
+        }
     }
 }
