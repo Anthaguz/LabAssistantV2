@@ -38,6 +38,13 @@ namespace LabAssistant.Models.Deployment
         public bool ConfigureNetworkInformation { get; set; } = false;
         public List<string> NonBlockingOptionalSteps { get; set; } = new();
 
+        // Resource tracking for cleanup orchestration
+        public bool VmFolderCreated { get; set; }
+        public bool DifferencingDiskCreated { get; set; }
+        public bool VmRegistered { get; set; }
+        public bool VmStarted { get; set; }
+        public VmCleanupResult? CleanupResult { get; set; }
+
         // Logging and PowerShell
         public List<string> Logs { get; } = new();
         public PowerShellHandle? PowerShellHandle { get; set; }

@@ -40,6 +40,7 @@ public class CreateVmStep : DeploymentStep
 
         if (success)
         {
+            context.VmRegistered = true;
             context.LogCallback?.Invoke($"✅ Created VM '{context.VmName}'.");
             DebugLogger.Log($"Success: Created VM: {context.VmName}");
         }

@@ -6,6 +6,9 @@ public interface IHyperVService
     Task<bool> EnableGuestServicesAsync(string vmName);
     Task<bool> StartVmAsync(string vmName);
     Task<bool> StopVmAsync(string vmName);
+    Task<bool> VmExistsAsync(string vmName);
+    Task<bool> IsVmRunningAsync(string vmName);
+    Task<bool> RemoveVmAsync(string vmName);
     Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath);
     Task<bool> CreateVhdFixedSizeAsync(string vhdPath, long sizeBytes);
     Task<bool> DisableVmCheckpointsAsync(string vmName);

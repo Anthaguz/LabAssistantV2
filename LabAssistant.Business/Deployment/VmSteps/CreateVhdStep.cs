@@ -33,6 +33,7 @@ public class CreateVhdStep : DeploymentStep
         success = await hyperV.CreateVhdDifferencingAsync(context.BaseVhdPath, context.VhdPath);
         if (success)
         {
+            context.DifferencingDiskCreated = true;
             context.LogCallback?.Invoke($"✅ Created VHD for '{context.VmName}'.");
             DebugLogger.Log($"Success: Created VHD for VM: {context.VmName}");
         }
