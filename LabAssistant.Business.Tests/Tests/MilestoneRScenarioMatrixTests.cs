@@ -210,9 +210,12 @@ public class MilestoneRScenarioMatrixTests
         Assert.Equal(DeploymentOperationState.Failed, summary.OperationState);
         Assert.Equal(1, summary.FailedVmCount);
         Assert.Equal(1, summary.CancelledVmCount);
-        Assert.Equal(2, summary.CleanupVmCount);
+        Assert.Equal(1, summary.CleanupVmCount);
 
-        Assert.Contains(summary.VmOutcomes, o => o.VmName == "vm1" && o.Status == VmDeploymentOutcomeStatus.Failed);
+        Assert.Contains(summary.VmOutcomes, o =>
+            o.VmName == "vm1"
+            && o.Status == VmDeploymentOutcomeStatus.Failed
+            && o.Cleanup.CleanupRan);
         Assert.Contains(summary.VmOutcomes, o => o.VmName == "vm2" && o.Status == VmDeploymentOutcomeStatus.Cancelled);
     }
 
