@@ -50,25 +50,14 @@
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="0" Grid.Row="0" Margin="0,0,12,12">
-                    <TextBlock Text="Template Id" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox Text="{Binding Template.Id, UpdateSourceTrigger=PropertyChanged}"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1" Grid.Row="0" Margin="0,0,0,12">
-                    <TextBlock Text="Version" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBox Text="{Binding Template.Version, UpdateSourceTrigger=PropertyChanged}"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,0,12,0">
+                <StackPanel Grid.Column="0" Grid.Row="0" Margin="0,0,12,0">
                     <TextBlock Text="Name" FontWeight="SemiBold" Margin="0,0,0,4"/>
                     <TextBox Text="{Binding Template.Name, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Grid.Row="1">
+                <StackPanel Grid.Column="1" Grid.Row="0">
                     <TextBlock Text="Description" FontWeight="SemiBold" Margin="0,0,0,4"/>
                     <TextBox Text="{Binding Template.Description, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
