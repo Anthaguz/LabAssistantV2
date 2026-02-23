@@ -37,7 +37,11 @@ public partial class DeploymentViewModel : ObservableObject
     [ObservableProperty]
     public ObservableCollection<VmLogGroup> logGroups = new();
 
+    [ObservableProperty]
+    private DeploymentOperationState operationState = DeploymentOperationState.Idle;
+
     public ObservableCollection<VmEntryViewModel> VmEntries { get; }
+    private MultiVmDeploymentContext? _activeDeploymentContext;
 
     public DeploymentViewModel(
         MultiVmDeploymentCoordinator coordinator,
@@ -348,6 +352,9 @@ public partial class DeploymentViewModel : ObservableObject
             VmContexts = VmEntries.Select(vm => vm.DeploymentContext).ToList(),
             StopAllOnAnyVmFailure = _settingsStore.Settings.StopAllOnAnyVmFailure
         };
+        _activeDeploymentContext = multiContext;
+        OperationState = multiContext.OperationState;
+        multiContext.OperationStateChanged += HandleOperationStateChanged;
 
         var deploymentFailed = false;
         try
@@ -362,6 +369,9 @@ public partial class DeploymentViewModel : ObservableObject
         }
         finally
         {
+            multiContext.OperationStateChanged -= HandleOperationStateChanged;
+            OperationState = multiContext.OperationState;
+            _activeDeploymentContext = null;
             IsDeploying = false;
         }
 
@@ -381,10 +391,31 @@ public partial class DeploymentViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void CancelDeployment()
+    {
+        if (_activeDeploymentContext == null || !_activeDeploymentContext.IsCancellationRequested && !IsDeploying)
+        {
+            return;
+        }
+
+        _activeDeploymentContext.RequestUserCancellation();
+        OperationState = _activeDeploymentContext.OperationState;
+        Logs.Add("Cancellation requested. Waiting for a safe boundary...");
+    }
+
+    [RelayCommand]
     private void OpenVmDetail(VmEntryViewModel selectedVm)
     {
         selectedVm.StartEditing();
         var mainWindow = (MainWindow)System.Windows.Application.Current.MainWindow;
         mainWindow.MainContentFrame.Navigate(new VmDetailPage(this, selectedVm, () => mainWindow.MainContentFrame.Navigate(new Views.DeployPage())));
+    }
+
+    private void HandleOperationStateChanged(object? sender, DeploymentOperationStateChangedEventArgs e)
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            OperationState = e.State;
+        });
     }
 }

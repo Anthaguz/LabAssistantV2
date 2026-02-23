@@ -4,7 +4,7 @@ using LabAssistant.Services.Logging;
 using System;
 using System.Xml.Linq;
 
-public class DeploymentPipelineBuilder
+public class DeploymentPipelineBuilder : IDeploymentPipelineBuilder
 {
     private readonly CreateVmFolderStep _createVmFolderStep;
     private readonly CreateVhdStep _createVhd;
