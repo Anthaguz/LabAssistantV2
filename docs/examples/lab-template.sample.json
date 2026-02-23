@@ -1,17 +1,23 @@
 {
-  "version": "v0",
-  "id": "lab-web-tier",
+  "id": "1d62127b176547b8b37a1d84842e47bf",
   "name": "Web Tier Lab",
   "description": "Two web servers and one utility VM",
+  "schemaVersion": "1.0.0",
+  "templateRevision": 3,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
   "vmTemplates": [
     {
+      "vmId": "7eb637f580f14f0a878df9974ea8d1fa",
       "name": "web-01",
       "memoryMb": 4096,
       "cpuCount": 2,
       "vhdxId": "win-server-2022-gen2",
+      "vhdxSignature": "win-server-2022|2022|gen2",
       "switchName": "LabSwitch"
     },
     {
+      "vmId": "f6a89bc20c6246b8be4a35c969ea4330",
       "name": "web-02",
       "memoryMb": 4096,
       "cpuCount": 2,
@@ -19,10 +25,11 @@
       "switchName": "LabSwitch"
     },
     {
+      "vmId": "2f35670e2ebf4341bcae1f5ce89a55e1",
       "name": "utils-01",
       "memoryMb": 2048,
       "cpuCount": 2,
-      "vhdPath": "C:/Lab/VHDX/Ubuntu2204.vhdx",
+      "vhdPath": "C:\\Lab\\VHDX\\Ubuntu2204.vhdx",
       "switchName": "LabSwitch"
     }
   ],

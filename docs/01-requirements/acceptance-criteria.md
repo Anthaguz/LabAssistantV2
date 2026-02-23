@@ -269,7 +269,9 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - User imports
 
 **Then**
-- Import is blocked OR imported with warning depending on policy (TBD)
+- If template major version is newer than supported by the app, import is blocked and user is told to update LabAssistant
+- If template major version is older than support window (`N-1`), import is blocked with actionable migration guidance
+- If template is within support window (`N` or `N-1`), import proceeds (with warning for compatible newer minor/patch when fields are understood)
 - User is clearly informed
 - Event logged
 
@@ -454,5 +456,4 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
-- Policy for unsupported template schema versions (block vs warn)
 - Whether to store deployment history records locally
