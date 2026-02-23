@@ -1,28 +1,30 @@
-# Lab Template Schema (v0)
+# Lab Template Schema (Legacy v0 Reference)
 
-File name: lab-template.json
+File name: `lab-template.json`
 
-Purpose: Define a lab template that references VHDX catalog items and provides VM/network defaults.
+Purpose: Historical reference for the early v0 template shape.
 
-## Top-level shape
-- version (string, required): Schema version, e.g., "v0".
-- id (string, required): Stable identifier for the template (unique).
-- name (string, required): Display name for the template.
-- description (string, optional): Short summary of the lab.
-- vmTemplates (array, required): List of VM definitions.
-- networkConfig (object, optional): Network defaults (switch name, optional IP hints).
+## Status
 
-## VmTemplate fields
-- name (string, required): VM name.
-- memoryMb (integer, required): Memory in MB.
-- cpuCount (integer, required): CPU count.
-- vhdxId (string, optional): Reference to VHDX catalog item id.
-- vhdPath (string, optional): Fallback VHDX path if catalog id is missing or not resolved.
-- switchName (string, optional): Override for virtual switch name.
+- Deprecated as the active schema reference.
+- Kept only to document legacy templates that may still be migrated by the app.
+- Canonical source of truth is now:
+  - `docs/01-requirements/template-schema.md`
 
-Notes:
-- Either vhdxId or vhdPath must be present; vhdxId is preferred when available.
-- If vhdxId is provided but not found in the catalog, the template requires user selection.
+## Legacy v0 notes (high level)
+
+- Used top-level `version` (for example `v0`) instead of canonical `schemaVersion`.
+- Did not require canonical metadata fields such as:
+  - `templateRevision`
+  - `createdWithAppVersion`
+  - `templateType`
+- VM entries did not require `vmId`.
+
+## Migration Guidance
+
+- Legacy templates should be loaded through the app import/load pipeline and saved again.
+- Current app saves templates in canonical schema format only.
 
 ## Example
-See: docs/examples/lab-template.sample.json
+
+- Current canonical example: `docs/examples/lab-template.sample.json`

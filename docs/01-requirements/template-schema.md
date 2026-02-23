@@ -35,6 +35,23 @@ Rationale:
 - Newer minor/patch version: import may proceed with warning if fields are understood.
 - Migration path must be explicit: user can save in current schema when supported.
 
+### Support Window Policy
+
+To keep templates user-friendly across upgrades while avoiding unsafe parsing behavior:
+
+- App supports loading templates for:
+  - current major schema version `N`
+  - previous major schema version `N-1`
+- Templates older than `N-1` must be blocked with actionable guidance.
+- Templates from newer major version (`N+1` or higher) must be blocked with:
+  - clear message that the template was created with a newer schema
+  - recommendation to update LabAssistant
+
+Save/export rule:
+
+- Any template saved/exported by the current app must be written in current schema major `N` with canonical fields.
+- The app must not emit legacy-only shape on save.
+
 ## Canonical Fields
 
 Common fields (both template types):
