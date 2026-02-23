@@ -99,6 +99,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<VirtualSwitchProvider>();
         services.AddTransient<DeploymentPipelineBuilder>();
         services.AddTransient<IDeploymentPipelineBuilder>(provider => provider.GetRequiredService<DeploymentPipelineBuilder>());
+        services.AddSingleton<IDeploymentOutcomeSummaryBuilder, DeploymentOutcomeSummaryBuilder>();
         services.AddSingleton<IVmCleanupOrchestrator, VmCleanupOrchestrator>();
         services.AddSingleton<MultiVmDeploymentCoordinator>();
 

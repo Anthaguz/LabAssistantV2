@@ -17,10 +17,18 @@ public abstract class DeploymentStep
 
     public async Task ExecuteAsync(VmDeploymentContext context)
     {
-        if (context.ShouldAbort?.Invoke() == true) return;
+        if (context.ShouldAbort?.Invoke() == true)
+        {
+            context.MarkCancelled();
+            return;
+        }
         if (!context.IsSuccess && context.PerVmFailFast) return;
         await HandleAsync(context);
-        if (context.ShouldAbort?.Invoke() == true) return;
+        if (context.ShouldAbort?.Invoke() == true)
+        {
+            context.MarkCancelled();
+            return;
+        }
         if (_next != null)
         {
             await _next.ExecuteAsync(context);

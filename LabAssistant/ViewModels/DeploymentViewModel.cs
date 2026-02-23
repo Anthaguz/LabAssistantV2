@@ -24,6 +24,7 @@ public partial class DeploymentViewModel : ObservableObject
     private readonly IAppPaths _appPaths;
     private readonly IVhdxCatalogStore _catalogStore;
     private readonly IErrorFeedService _errorFeed;
+    private readonly IDeploymentOutcomeSummaryBuilder _outcomeSummaryBuilder;
     public Action<string>? LogHandler { get; set; }
 
     public ObservableCollection<string> AvailableSwitches { get; } = new();
@@ -40,6 +41,11 @@ public partial class DeploymentViewModel : ObservableObject
     [ObservableProperty]
     private DeploymentOperationState operationState = DeploymentOperationState.Idle;
 
+    [ObservableProperty]
+    private DeploymentOutcomeSummary? deploymentSummary;
+
+    public bool HasDeploymentSummary => DeploymentSummary != null;
+
     public ObservableCollection<VmEntryViewModel> VmEntries { get; }
     private MultiVmDeploymentContext? _activeDeploymentContext;
 
@@ -50,7 +56,8 @@ public partial class DeploymentViewModel : ObservableObject
         ILabTemplateStore templateStore,
         IAppPaths appPaths,
         IVhdxCatalogStore catalogStore,
-        IErrorFeedService errorFeed)
+        IErrorFeedService errorFeed,
+        IDeploymentOutcomeSummaryBuilder outcomeSummaryBuilder)
     {
         LogHandler = message =>
         {
@@ -67,6 +74,7 @@ public partial class DeploymentViewModel : ObservableObject
         _appPaths = appPaths;
         _catalogStore = catalogStore;
         _errorFeed = errorFeed;
+        _outcomeSummaryBuilder = outcomeSummaryBuilder;
         VmEntries = new ObservableCollection<VmEntryViewModel>();
         _ = LoadAvailableSwitches();
 
@@ -339,6 +347,7 @@ public partial class DeploymentViewModel : ObservableObject
         }
 
         IsDeploying = true;
+        DeploymentSummary = null;
         Logs.Clear();
         Logs.Add("Starting VM deployments...");
 
@@ -371,6 +380,7 @@ public partial class DeploymentViewModel : ObservableObject
         {
             multiContext.OperationStateChanged -= HandleOperationStateChanged;
             OperationState = multiContext.OperationState;
+            DeploymentSummary = _outcomeSummaryBuilder.Build(multiContext);
             _activeDeploymentContext = null;
             IsDeploying = false;
         }
@@ -393,7 +403,7 @@ public partial class DeploymentViewModel : ObservableObject
     [RelayCommand]
     private void CancelDeployment()
     {
-        if (_activeDeploymentContext == null || !_activeDeploymentContext.IsCancellationRequested && !IsDeploying)
+        if (_activeDeploymentContext == null || !IsDeploying)
         {
             return;
         }
@@ -411,11 +421,26 @@ public partial class DeploymentViewModel : ObservableObject
         mainWindow.MainContentFrame.Navigate(new VmDetailPage(this, selectedVm, () => mainWindow.MainContentFrame.Navigate(new Views.DeployPage())));
     }
 
+    [RelayCommand]
+    private void OpenVmOutcomeDetail(VmDeploymentOutcomeSummary outcome)
+    {
+        var entry = VmEntries.FirstOrDefault(vm => vm.DeploymentContext.VmId == outcome.VmId);
+        if (entry != null)
+        {
+            OpenVmDetail(entry);
+        }
+    }
+
     private void HandleOperationStateChanged(object? sender, DeploymentOperationStateChangedEventArgs e)
     {
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             OperationState = e.State;
         });
+    }
+
+    partial void OnDeploymentSummaryChanged(DeploymentOutcomeSummary? value)
+    {
+        OnPropertyChanged(nameof(HasDeploymentSummary));
     }
 }

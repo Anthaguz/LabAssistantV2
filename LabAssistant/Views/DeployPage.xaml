@@ -8,6 +8,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -34,8 +35,96 @@
                        Foreground="{StaticResource SystemBaseHighColor}"/>
         </StackPanel>
 
+        <Border Grid.Row="2" Grid.ColumnSpan="2"
+                BorderBrush="#FFDDDDDD"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12"
+                Margin="0,0,0,12">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasDeploymentSummary}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <TextBlock Text="Deployment Outcome Summary" FontSize="16" FontWeight="SemiBold"/>
+                <WrapPanel Margin="0,8,0,8">
+                    <TextBlock Text="{Binding DeploymentSummary.OperationState, StringFormat=State: {0}}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding DeploymentSummary.TotalVmCount, StringFormat=Total: {0}}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding DeploymentSummary.SucceededVmCount, StringFormat=Succeeded: {0}}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding DeploymentSummary.FailedVmCount, StringFormat=Failed: {0}}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding DeploymentSummary.CancelledVmCount, StringFormat=Cancelled: {0}}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding DeploymentSummary.CleanupVmCount, StringFormat=Cleanup: {0}}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding DeploymentSummary.ResidualVmCount, StringFormat=Residual VMs: {0}}"/>
+                </WrapPanel>
+
+                <ItemsControl ItemsSource="{Binding DeploymentSummary.VmOutcomes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#FFE5E5E5" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock FontWeight="SemiBold" DockPanel.Dock="Left">
+                                            <Run Text="{Binding VmName}"/>
+                                            <Run Text=" - "/>
+                                            <Run Text="{Binding Status}"/>
+                                        </TextBlock>
+                                        <Button Content="Open VM"
+                                                DockPanel.Dock="Right"
+                                                Command="{Binding DataContext.OpenVmOutcomeDetailCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                CommandParameter="{Binding}"/>
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding Cleanup.Status, StringFormat=Cleanup: {0}}"
+                                               Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding Cleanup.ResidualCount, StringFormat=Residuals: {0}}"/>
+                                    <TextBlock Text="{Binding Reason, StringFormat=Reason: {0}}"
+                                               TextWrapping="Wrap"
+                                               Foreground="#FFB00020"/>
+                                    <ItemsControl ItemsSource="{Binding Residuals}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Margin="0,2,0,0" Foreground="#FFB00020" TextWrapping="Wrap">
+                                                    <Run Text="Residual: "/>
+                                                    <Run Text="{Binding ResourceType}"/>
+                                                    <Run Text=" - "/>
+                                                    <Run Text="{Binding Identifier}"/>
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Expander Header="{Binding DeploymentSummary.Residuals.Count, StringFormat=Aggregated Residuals ({0})}"
+                          IsExpanded="False"
+                          Margin="0,6,0,0">
+                    <ItemsControl ItemsSource="{Binding DeploymentSummary.Residuals}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock TextWrapping="Wrap" Margin="0,2,0,0">
+                                    <Run Text="{Binding VmName}"/>
+                                    <Run Text=": "/>
+                                    <Run Text="{Binding ResourceType}"/>
+                                    <Run Text=" - "/>
+                                    <Run Text="{Binding Identifier}"/>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+            </StackPanel>
+        </Border>
+
         <!-- VM Cards + Logs -->
-        <Grid Grid.Row="2" Grid.ColumnSpan="2">
+        <Grid Grid.Row="3" Grid.ColumnSpan="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="2*"/>
