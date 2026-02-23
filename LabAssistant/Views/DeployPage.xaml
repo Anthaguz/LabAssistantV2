@@ -3,6 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="DeployPage"
       Background="{StaticResource SystemPageBackgroundBrush}">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    </Page.Resources>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -26,10 +29,16 @@
 
         <!-- Controls -->
         <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,20">
-            <Button Style="{StaticResource FluentButtonStyle}" Content="Add VM" Command="{Binding AddVmCommand}" Margin="0,0,10,0" Width="100"/>
-            <Button Style="{StaticResource FluentButtonStyle}" Content="Save as Template" Command="{Binding SaveAsTemplateCommand}" Margin="0,0,10,0" Width="150"/>
-            <Button Style="{StaticResource FluentButtonStyle}" Content="Deploy" Command="{Binding DeployAllCommand}" Width="100"/>
-            <Button Style="{StaticResource FluentButtonStyle}" Content="Cancel" Command="{Binding CancelDeploymentCommand}" Width="100" Margin="10,0,0,0"/>
+            <Button Style="{StaticResource FluentButtonStyle}" Content="Add VM" Command="{Binding AddVmCommand}" IsEnabled="{Binding IsConfigurationEditingEnabled}" Margin="0,0,10,0" Width="100"/>
+            <Button Style="{StaticResource FluentButtonStyle}" Content="Save as Template" Command="{Binding SaveAsTemplateCommand}" IsEnabled="{Binding IsConfigurationEditingEnabled}" Margin="0,0,10,0" Width="150"/>
+            <Button Style="{StaticResource FluentButtonStyle}" Content="Deploy" Command="{Binding DeployAllCommand}" IsEnabled="{Binding CanStartDeploymentOperation}" Width="100"/>
+            <Button Style="{StaticResource FluentButtonStyle}"
+                    Content="Cancel"
+                    Command="{Binding CancelDeploymentCommand}"
+                    IsEnabled="{Binding CanCancelDeploymentOperation}"
+                    Visibility="{Binding ShowCancelDeploymentAction, Converter={StaticResource BoolToVisibilityConverter}}"
+                    Width="100"
+                    Margin="10,0,0,0"/>
             <ProgressBar Width="100" Height="20" IsIndeterminate="{Binding IsDeploying}" Margin="10,0,0,0"/>
             <TextBlock Text="{Binding OperationState}" Margin="10,0,0,0" VerticalAlignment="Center"
                        Foreground="{StaticResource SystemBaseHighColor}"/>
@@ -131,7 +140,10 @@
             </Grid.ColumnDefinitions>
 
             <!-- VM Cards -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,10,0">
+            <ScrollViewer Grid.Column="0"
+                          VerticalScrollBarVisibility="Auto"
+                          Margin="0,0,10,0"
+                          IsEnabled="{Binding IsConfigurationEditingEnabled}">
                 <ItemsControl ItemsSource="{Binding VmEntries}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>

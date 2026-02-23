@@ -85,5 +85,21 @@ namespace LabAssistant.Models.Deployment
         {
             WasCancelled = true;
         }
+
+        public void ResetForNewOperation()
+        {
+            IsSuccess = true;
+            GuestServicesEnabled = false;
+            VmFolderCreated = false;
+            DifferencingDiskCreated = false;
+            VmRegistered = false;
+            VmStarted = false;
+            WasCancelled = false;
+            FailureStepKey = null;
+            FailureMessage = null;
+            CleanupResult = null;
+            Logs.Clear();
+            PowerShellHandle = null;
+        }
     }
 }

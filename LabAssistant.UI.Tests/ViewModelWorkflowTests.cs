@@ -242,6 +242,31 @@ public class ViewModelWorkflowTests
         Assert.Equal(new[] { secondId, firstId }, saved.VmTemplates.Select(vm => vm.VmId).ToArray());
     }
 
+    [Theory]
+    [InlineData(false, false, DeploymentOperationState.Idle, false, true, false)]
+    [InlineData(true, true, DeploymentOperationState.Running, true, false, true)]
+    [InlineData(true, true, DeploymentOperationState.Cancelling, true, false, true)]
+    [InlineData(true, true, DeploymentOperationState.CleanupInProgress, true, false, true)]
+    [InlineData(false, false, DeploymentOperationState.Failed, false, true, false)]
+    [InlineData(false, false, DeploymentOperationState.FailedWithResiduals, false, true, false)]
+    [InlineData(false, false, DeploymentOperationState.Cancelled, false, true, false)]
+    [InlineData(false, false, DeploymentOperationState.CancelledWithResiduals, false, true, false)]
+    [InlineData(false, false, DeploymentOperationState.Completed, false, true, false)]
+    public void DeploymentUiInteractivity_MapsTerminalAndActiveStatesCorrectly(
+        bool isDeploying,
+        bool hasActiveContext,
+        DeploymentOperationState state,
+        bool expectedHasActiveOperation,
+        bool expectedCanEditConfig,
+        bool expectedCanCancel)
+    {
+        var hasActiveOperation = DeploymentUiInteractivity.HasActiveOperation(isDeploying, hasActiveContext, state);
+
+        Assert.Equal(expectedHasActiveOperation, hasActiveOperation);
+        Assert.Equal(expectedCanEditConfig, !hasActiveOperation);
+        Assert.Equal(expectedCanCancel, hasActiveOperation);
+    }
+
     private static CatalogService CreateCatalogService(FakeCatalogStore store)
     {
         var settingsStore = new FakeAppSettingsStore

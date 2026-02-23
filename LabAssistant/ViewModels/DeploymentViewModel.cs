@@ -12,6 +12,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using LabAssistant.Views;
+using System.Collections.Specialized;
 
 namespace LabAssistant.ViewModels;
 
@@ -48,6 +49,11 @@ public partial class DeploymentViewModel : ObservableObject
 
     public ObservableCollection<VmEntryViewModel> VmEntries { get; }
     private MultiVmDeploymentContext? _activeDeploymentContext;
+    private bool HasActiveOperationContext => _activeDeploymentContext != null;
+    public bool IsConfigurationEditingEnabled => !DeploymentUiInteractivity.HasActiveOperation(IsDeploying, HasActiveOperationContext, OperationState);
+    public bool CanCancelDeploymentOperation => DeploymentUiInteractivity.HasActiveOperation(IsDeploying, HasActiveOperationContext, OperationState);
+    public bool ShowCancelDeploymentAction => CanCancelDeploymentOperation;
+    public bool CanStartDeploymentOperation => !CanCancelDeploymentOperation;
 
     public DeploymentViewModel(
         MultiVmDeploymentCoordinator coordinator,
@@ -76,6 +82,7 @@ public partial class DeploymentViewModel : ObservableObject
         _errorFeed = errorFeed;
         _outcomeSummaryBuilder = outcomeSummaryBuilder;
         VmEntries = new ObservableCollection<VmEntryViewModel>();
+        VmEntries.CollectionChanged += HandleVmEntriesCollectionChanged;
         _ = LoadAvailableSwitches();
 
         DebugLogger.Log("DeploymentViewModel initialized with default VM entry.");
@@ -188,7 +195,7 @@ public partial class DeploymentViewModel : ObservableObject
         return false;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsConfigurationEditingEnabled))]
     private void DeleteVm(VmEntryViewModel vmEntry)
     {
         RemoveVm(vmEntry);
@@ -208,7 +215,7 @@ public partial class DeploymentViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsConfigurationEditingEnabled))]
     private void AddVm()
     {
         string vmName = $"VM{VmEntries.Count + 1}";
@@ -242,7 +249,7 @@ public partial class DeploymentViewModel : ObservableObject
         };
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsConfigurationEditingEnabled))]
     private void SaveAsTemplate()
     {
         if (VmEntries.Count == 0)
@@ -337,7 +344,7 @@ public partial class DeploymentViewModel : ObservableObject
     }
 
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanStartDeploymentOperation))]
     private async Task DeployAllAsync()
     {
         DebugLogger.Log("Starting deployment.");
@@ -354,6 +361,7 @@ public partial class DeploymentViewModel : ObservableObject
         foreach (var entry in VmEntries)
         {
             ApplyDeploymentPolicy(entry.DeploymentContext);
+            entry.DeploymentContext.ResetForNewOperation();
         }
 
         var multiContext = new MultiVmDeploymentContext
@@ -362,6 +370,7 @@ public partial class DeploymentViewModel : ObservableObject
             StopAllOnAnyVmFailure = _settingsStore.Settings.StopAllOnAnyVmFailure
         };
         _activeDeploymentContext = multiContext;
+        RefreshOperationUiState();
         OperationState = multiContext.OperationState;
         multiContext.OperationStateChanged += HandleOperationStateChanged;
 
@@ -382,6 +391,7 @@ public partial class DeploymentViewModel : ObservableObject
             OperationState = multiContext.OperationState;
             DeploymentSummary = _outcomeSummaryBuilder.Build(multiContext);
             _activeDeploymentContext = null;
+            RefreshOperationUiState();
             IsDeploying = false;
         }
 
@@ -400,7 +410,7 @@ public partial class DeploymentViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanCancelDeploymentOperation))]
     private void CancelDeployment()
     {
         if (_activeDeploymentContext == null || !IsDeploying)
@@ -437,6 +447,35 @@ public partial class DeploymentViewModel : ObservableObject
         {
             OperationState = e.State;
         });
+    }
+
+    partial void OnIsDeployingChanged(bool value)
+    {
+        RefreshOperationUiState();
+    }
+
+    partial void OnOperationStateChanged(DeploymentOperationState value)
+    {
+        RefreshOperationUiState();
+    }
+
+    private void RefreshOperationUiState()
+    {
+        OnPropertyChanged(nameof(IsConfigurationEditingEnabled));
+        OnPropertyChanged(nameof(CanCancelDeploymentOperation));
+        OnPropertyChanged(nameof(ShowCancelDeploymentAction));
+        OnPropertyChanged(nameof(CanStartDeploymentOperation));
+
+        AddVmCommand.NotifyCanExecuteChanged();
+        SaveAsTemplateCommand.NotifyCanExecuteChanged();
+        DeployAllCommand.NotifyCanExecuteChanged();
+        CancelDeploymentCommand.NotifyCanExecuteChanged();
+        DeleteVmCommand.NotifyCanExecuteChanged();
+    }
+
+    private void HandleVmEntriesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        DeleteVmCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnDeploymentSummaryChanged(DeploymentOutcomeSummary? value)
