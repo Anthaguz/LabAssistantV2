@@ -37,6 +37,9 @@ public class VirtualSwitchProviderTests
         public Task<bool> EnableGuestServicesAsync(string vmName) => Task.FromResult(true);
         public Task<bool> StartVmAsync(string vmName) => Task.FromResult(true);
         public Task<bool> StopVmAsync(string vmName) => Task.FromResult(true);
+        public Task<bool> VmExistsAsync(string vmName) => Task.FromResult(false);
+        public Task<bool> IsVmRunningAsync(string vmName) => Task.FromResult(false);
+        public Task<bool> RemoveVmAsync(string vmName) => Task.FromResult(true);
         public Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath) => Task.FromResult(true);
         public Task<bool> CreateVhdFixedSizeAsync(string vhdPath, long sizeBytes) => Task.FromResult(true);
         public Task<bool> DisableVmCheckpointsAsync(string vmName) => Task.FromResult(true);

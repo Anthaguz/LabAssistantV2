@@ -68,6 +68,7 @@ using LabAssistant.Data.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.FileSystem;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LabAssistant.Business;
@@ -97,6 +98,7 @@ public static class BusinessServiceCollectionExtensions
 
         services.AddTransient<VirtualSwitchProvider>();
         services.AddTransient<DeploymentPipelineBuilder>();
+        services.AddSingleton<IVmCleanupOrchestrator, VmCleanupOrchestrator>();
         services.AddSingleton<MultiVmDeploymentCoordinator>();
 
         return services;

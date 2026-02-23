@@ -15,5 +15,7 @@ public class CreateVmFolderStep : DeploymentStep
 
         if (!Directory.Exists(context.VmPath))
             Directory.CreateDirectory(context.VmPath);
+
+        context.VmFolderCreated = true;
     }
 }

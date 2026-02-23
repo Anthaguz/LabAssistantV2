@@ -46,6 +46,44 @@ public class HyperVService : IHyperVService
         return string.IsNullOrWhiteSpace(error);
     }
 
+    public async Task<bool> VmExistsAsync(string vmName)
+    {
+        var script = $"if (Get-VM -Name '{vmName}' -ErrorAction SilentlyContinue) {{ 'True' }} else {{ 'False' }}";
+        var (output, error) = await _session.ExecuteAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            return false;
+        }
+
+        return PowerShellOutputCleaner.Clean(output)
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Any(line => string.Equals(line.Trim(), "True", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public async Task<bool> IsVmRunningAsync(string vmName)
+    {
+        var script = $"$vm = Get-VM -Name '{vmName}' -ErrorAction SilentlyContinue; if ($null -eq $vm) {{ 'Missing' }} else {{ $vm.State.ToString() }}";
+        var (output, error) = await _session.ExecuteAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            return false;
+        }
+
+        var cleaned = PowerShellOutputCleaner.Clean(output);
+        return cleaned.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Any(line => string.Equals(line.Trim(), "Running", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public async Task<bool> RemoveVmAsync(string vmName)
+    {
+        var script = $"Remove-VM -Name '{vmName}' -Force";
+        var (output, error) = await _session.ExecuteAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        return string.IsNullOrWhiteSpace(error);
+    }
+
     public async Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath)
     {
         var script = $"New-VHD -ParentPath '{parentDiskPath}' -Path '{vhdPath}' -Differencing";

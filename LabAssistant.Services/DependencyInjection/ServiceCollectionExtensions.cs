@@ -1,4 +1,5 @@
 using LabAssistant.Models.PowerShell;
+using LabAssistant.Services.FileSystem;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.PowerShell;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Func<IPersistentPowerShellSession, IHyperVService>>(
             _ => session => new HyperVService(session)
         );
+        services.AddSingleton<IDeploymentFileSystem, DeploymentFileSystem>();
 
         return services;
     }

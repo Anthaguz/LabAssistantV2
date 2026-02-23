@@ -34,6 +34,7 @@ public class StartVmStep : DeploymentStep
 
         if (success)
         {
+            context.VmStarted = true;
             context.LogCallback?.Invoke($"✅ Started VM '{context.VmName}'.");
             DebugLogger.Log($"Success: Started VM: {context.VmName}");
         }
