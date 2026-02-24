@@ -25,7 +25,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 
 ## GR-03 — Observability Required
 - Every major operation must log: start, key steps, completion/failure.
-- Logs must be structured and include a correlation identifier per operation.
+- Logs must be structured and include an operation identifier (`operationId`) per operation.
 - Canonical logging contract reference: `docs/01-requirements/logging-contract.md`.
 
 ## GR-04 — UX Feedback
@@ -121,7 +121,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - `DeployLabCompleted` / `DeployLabFailed`
 
 **Required fields (minimum)**
-- correlationId
+- operationId (canonical structured field; legacy `correlationId` may appear in transitional text logs)
 - templateId/templateName
 - vmName
 - baseDiskId (and substituted baseDiskId if mapping occurs)
@@ -139,7 +139,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - [ ] All scenarios above pass
 - [ ] Progress UI updates reliably for multi-VM
 - [ ] Failure behavior conforms to GR-02
-- [ ] Logs conform to GR-03 with correlationId
+- [ ] Logs conform to GR-03 with operationId
 - [ ] Tests exist for validation + deployment orchestration (mocks acceptable for Hyper-V)
 - [ ] No orphaned resources without either rollback or explicit cleanup guidance
 
@@ -214,7 +214,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - `TemplateEditStarted` / `TemplateUpdated`
 - `TemplateDeleteStarted` / `TemplateDeleted`
 - `TemplateValidationFailed`
-- Fields: correlationId, templateId/name, templateType, schemaVersion, result, error details
+- Fields: operationId, templateId/name, templateType, schemaVersion, result, error details
 
 ## Expected Artifacts / Side Effects
 - Template JSON file created/updated/deleted (or record in local store)
@@ -295,7 +295,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 ## Expected Logs
 - `TemplateImportStarted` / `TemplateImported` / `TemplateImportFailed`
 - `TemplateExportStarted` / `TemplateExported` / `TemplateExportFailed`
-- Fields: correlationId, templateId/name, schemaVersion, filePath (optional), result, error details
+- Fields: operationId, templateId/name, schemaVersion, filePath (optional), result, error details
 
 ## Expected Artifacts / Side Effects
 - Imported template persisted locally
@@ -376,7 +376,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - `BaseDiskRemoved`
 - `BaseDiskMissingDetected`
 - `BaseDiskMappedSubstitutionApplied` / `BaseDiskMappingFailed`
-- Fields: correlationId, baseDiskId, filePath (optional), osClassification, result, error details
+- Fields: operationId, baseDiskId, filePath (optional), osClassification, result, error details
 
 ## Expected Artifacts / Side Effects
 - Base disk registry updated (local configuration/store)
@@ -441,7 +441,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - `SwitchCreateStarted` / `SwitchCreated` / `SwitchCreateFailed`
 - `SwitchUpdateStarted` / `SwitchUpdated` / `SwitchUpdateFailed`
 - `SwitchDeleteStarted` / `SwitchDeleted` / `SwitchDeleteFailed`
-- Fields: correlationId, switchName, switchType, result, error details
+- Fields: operationId, switchName, switchType, result, error details
 
 ## Expected Artifacts / Side Effects
 - Hyper-V virtual switch created/updated/deleted

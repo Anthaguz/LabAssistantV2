@@ -7,6 +7,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Logging;
 using LabAssistant.ViewModels;
 using Xunit;
 
@@ -242,6 +243,48 @@ public class ViewModelWorkflowTests
         Assert.Equal(new[] { secondId, firstId }, saved.VmTemplates.Select(vm => vm.VmId).ToArray());
     }
 
+    [Fact]
+    public void TemplateEditorViewModel_LoadAndSave_EmitStructuredTemplateEvents()
+    {
+        var templateStore = new FakeTemplateStore
+        {
+            TemplateToLoad = new LabTemplate
+            {
+                Id = "template-1",
+                Name = "Template One",
+                VmTemplates =
+                {
+                    new VmTemplate { VmId = "vm-1", Name = "VM1", MemoryMb = 1024, CpuCount = 1, VhdPath = @"C:\base\a.vhdx", SwitchName = "Default Switch" }
+                }
+            }
+        };
+        var logger = new RecordingStructuredLogger();
+        var viewModel = CreateTemplateEditorViewModel(templateStore, logger);
+
+        viewModel.LoadFromFile(@"C:\templates\template-1.json");
+        viewModel.SaveToFile(@"C:\templates\template-1.json");
+
+        Assert.Contains(logger.Events, e => e.Event == "TemplateImported" && e.Result is "success" or "success_with_warnings");
+        Assert.Contains(logger.Events, e => e.Event == "TemplateSaved" && e.Result == "success");
+
+        var imported = logger.Events.First(e => e.Event == "TemplateImported");
+        var saved = logger.Events.First(e => e.Event == "TemplateSaved");
+        Assert.False(string.IsNullOrWhiteSpace(imported.OperationId));
+        Assert.False(string.IsNullOrWhiteSpace(saved.OperationId));
+        Assert.True(DateTimeOffset.TryParse(imported.Ts, out var importedTs));
+        Assert.True(DateTimeOffset.TryParse(saved.Ts, out var savedTs));
+        Assert.Equal(TimeSpan.Zero, importedTs.Offset);
+        Assert.Equal(TimeSpan.Zero, savedTs.Offset);
+        Assert.Contains(imported.Level, new[] { "debug", "info", "warn", "error" });
+        Assert.Contains(saved.Level, new[] { "debug", "info", "warn", "error" });
+        Assert.Contains(imported.Event, new[] { "TemplateImported", "TemplateSaved" });
+        Assert.Contains(saved.Event, new[] { "TemplateImported", "TemplateSaved" });
+        Assert.Equal("template-1", imported.Context?["templateId"]?.ToString());
+        Assert.Equal("Template One", saved.Context?["templateName"]?.ToString());
+        AssertNoSensitiveContextKeys(imported);
+        AssertNoSensitiveContextKeys(saved);
+    }
+
     [Theory]
     [InlineData(false, false, DeploymentOperationState.Idle, false, true, false)]
     [InlineData(true, true, DeploymentOperationState.Running, true, false, true)]
@@ -280,7 +323,7 @@ public class ViewModelWorkflowTests
         return new CatalogService(store, settingsStore);
     }
 
-    private static TemplateEditorViewModel CreateTemplateEditorViewModel(FakeTemplateStore templateStore)
+    private static TemplateEditorViewModel CreateTemplateEditorViewModel(FakeTemplateStore templateStore, IStructuredLogger? structuredLogger = null)
     {
         var settingsStore = new FakeAppSettingsStore
         {
@@ -298,7 +341,8 @@ public class ViewModelWorkflowTests
             catalogStore: catalogStore,
             templateStore: templateStore,
             validationService: new TemplateValidationService(catalogService),
-            missingVhdxResolutionService: new MissingVhdxResolutionService(catalogStore, settingsStore));
+            missingVhdxResolutionService: new MissingVhdxResolutionService(catalogStore, settingsStore),
+            structuredLogger: structuredLogger);
     }
 
     private sealed class FakeCatalogStore : IVhdxCatalogStore
@@ -440,6 +484,36 @@ public class ViewModelWorkflowTests
                 .ToList();
 
             return clone;
+        }
+    }
+
+    private sealed class RecordingStructuredLogger : IStructuredLogger
+    {
+        public List<StructuredLogEvent> Events { get; } = new();
+
+        public void Log(StructuredLogEvent logEvent)
+        {
+            Events.Add(logEvent);
+        }
+
+        public void Log(StructuredLogLevel level, string eventName, string operationId, string? result = null, IReadOnlyDictionary<string, object?>? context = null)
+        {
+            Events.Add(StructuredLogEvent.Create(level, eventName, operationId, result, context));
+        }
+    }
+
+    private static void AssertNoSensitiveContextKeys(StructuredLogEvent logEvent)
+    {
+        if (logEvent.Context == null)
+        {
+            return;
+        }
+
+        foreach (var key in logEvent.Context.Keys)
+        {
+            Assert.DoesNotContain("password", key, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("token", key, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("secret", key, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

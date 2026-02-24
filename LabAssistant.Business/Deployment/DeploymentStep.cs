@@ -17,13 +17,34 @@ public abstract class DeploymentStep
 
     public async Task ExecuteAsync(VmDeploymentContext context)
     {
+        var stepKey = GetType().Name;
         if (context.ShouldAbort?.Invoke() == true)
         {
             context.MarkCancelled();
             return;
         }
         if (!context.IsSuccess && context.PerVmFailFast) return;
-        await HandleAsync(context);
+        EmitStepEvent(context, "StepStarted", "info", null, stepKey);
+        try
+        {
+            await HandleAsync(context);
+        }
+        catch (Exception ex)
+        {
+            EmitStepEvent(
+                context,
+                "StepFailed",
+                "error",
+                "exception",
+                stepKey,
+                new Dictionary<string, object?>
+                {
+                    ["errorMessage"] = ex.Message,
+                    ["exceptionType"] = ex.GetType().Name
+                });
+            throw;
+        }
+        EmitStepEvent(context, "StepCompleted", "info", context.IsSuccess ? "success" : "failed", stepKey);
         if (context.ShouldAbort?.Invoke() == true)
         {
             context.MarkCancelled();
@@ -36,4 +57,33 @@ public abstract class DeploymentStep
     }
 
     protected abstract Task HandleAsync(VmDeploymentContext context);
+
+    private static void EmitStepEvent(
+        VmDeploymentContext context,
+        string eventName,
+        string level,
+        string? result,
+        string stepKey,
+        IReadOnlyDictionary<string, object?>? extraContext = null)
+    {
+        if (context.StructuredEventEmitter == null)
+        {
+            return;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["stepKey"] = stepKey
+        };
+
+        if (extraContext != null)
+        {
+            foreach (var pair in extraContext)
+            {
+                payload[pair.Key] = pair.Value;
+            }
+        }
+
+        context.StructuredEventEmitter.Invoke(eventName, level, result, payload);
+    }
 }

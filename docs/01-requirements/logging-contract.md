@@ -11,20 +11,21 @@
 
 ## Canonical Format
 
-Target canonical format: JSON Lines (`.jsonl`), one JSON object per line.
+Canonical format: JSON Lines (`.jsonl`), one JSON object per line.
 
-Example:
+Current v1 structured event shape:
 
 ```json
-{"ts":"2026-02-10T03:12:01Z","level":"info","event":"DeployLabStarted","operationId":"a1","templateId":"t1"}
-{"ts":"2026-02-10T03:12:04Z","level":"info","event":"VmCreated","operationId":"a1","vmName":"VM1","result":"success"}
-{"ts":"2026-02-10T03:12:09Z","level":"error","event":"DeployLabFailed","operationId":"a1","result":"failed_with_residuals"}
+{"ts":"2026-02-10T03:12:01.0000000Z","level":"info","event":"DeployLabStarted","operationId":"a1","result":"started","context":{"vmCount":2}}
+{"ts":"2026-02-10T03:12:04.0000000Z","level":"info","event":"StepCompleted","operationId":"a1","result":"success","context":{"vmId":"vm1","vmName":"VM1","stepKey":"CreateVm"}}
+{"ts":"2026-02-10T03:12:09.0000000Z","level":"error","event":"DeployLabFailed","operationId":"a1","result":"failed_with_residuals","context":{"cleanupVmCount":1,"residualVmCount":1}}
 ```
 
 Transition note:
 
-- Current logger implementation may differ.
-- Migration to full JSONL should be incremental, but emitted events and fields must converge to this contract.
+- Structured JSONL is the canonical diagnostics path moving forward.
+- Legacy `DebugLogger` text logs remain available as supplemental/transitional diagnostics.
+- Migration to broader coverage is incremental, but emitted event names/fields must converge to this contract.
 
 ## Identifier Model
 
@@ -32,17 +33,17 @@ Required identifier:
 
 - `operationId`: unique id per deploy/import/export/action execution.
 
-Optional additional identifier:
+Transitional note:
 
-- `correlationId` may be retained if existing code already uses it.
+- `correlationId` may appear in older documentation or legacy logs, but `operationId` is the canonical field for structured events.
 
 Rule:
 
-- At least one stable per-operation id is mandatory on all related events.
+- A stable `operationId` is mandatory on all related structured events.
 
 ## Required Common Fields
 
-All events must include:
+All structured events must include:
 
 - `ts` (UTC timestamp, ISO-8601)
 - `level` (`debug` | `info` | `warn` | `error`)
@@ -50,7 +51,11 @@ All events must include:
 - `operationId`
 - `result` where applicable
 
-Context fields by scenario:
+Optional event payload:
+
+- `context` (object/map for scenario-specific fields)
+
+Context fields by scenario (inside `context`):
 
 - `templateId`, `templateName`
 - `vmId`, `vmName`
@@ -61,7 +66,7 @@ Context fields by scenario:
 
 ## Required Event Families
 
-Deployment:
+Deployment (v1 emitted):
 
 - `DeployLabStarted`
 - `DeployLabCompleted`
@@ -71,13 +76,13 @@ Deployment:
 - `VmDeployCompleted`
 - `VmDeployFailed`
 
-Step execution:
+Step execution (v1 emitted):
 
 - `StepStarted`
 - `StepCompleted`
 - `StepFailed`
 
-Cleanup:
+Cleanup (v1 emitted):
 
 - `CleanupStarted`
 - `CleanupStepCompleted`
@@ -85,14 +90,17 @@ Cleanup:
 - `CleanupCompleted`
 - `CleanupResidualsDetected`
 
-Template/catalog operations:
+Template/catalog operations (v1 emitted):
 
-- `TemplateValidationFailed`
-- `TemplateSaved`
 - `TemplateImported`
-- `TemplateExported`
+- `TemplateSaved`
 - `CatalogLoaded`
 - `CatalogSaved`
+
+Template/catalog operations (planned / incremental):
+
+- `TemplateValidationFailed`
+- `TemplateExported`
 
 ## Severity Rules
 
@@ -118,19 +126,24 @@ If future policy changes, add field-level masking rules here.
 
 ## Diagnostics Bundle Policy
 
-Default diagnostics export includes:
+Diagnostics export bundle v1 is a ZIP package and includes:
 
-- Operation logs
-- Runtime metadata
-- Template ids/names and operation context metadata
+- `bundle/manifest.json`
+- `metadata/runtime-metadata.json`
+- `metadata/operation-context.json`
+- `logs/structured-events.jsonl`
 
 Optional user-controlled inclusion:
 
-- Full template definition files used in deployment
+- `artifacts/template-definition.json` (full template definition file)
 
-User-facing labels should be plain language, not internal technical terms.
+Rules:
+
+- `logs/structured-events.jsonl` must remain valid JSONL (one parseable JSON object per line).
+- If an `operationId` filter is supplied to export, only matching structured events are included.
+- User-facing labels should be plain language, not internal technical terms.
 
 ## Open Questions / TBDs
 
-- Whether to enforce strict schema validation for each log event at runtime.
+- Whether to enforce strict schema validation for each structured event at runtime.
 - Retention and rotation policy for high-volume logs.

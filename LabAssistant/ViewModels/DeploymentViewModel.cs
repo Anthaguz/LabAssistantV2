@@ -26,6 +26,7 @@ public partial class DeploymentViewModel : ObservableObject
     private readonly IVhdxCatalogStore _catalogStore;
     private readonly IErrorFeedService _errorFeed;
     private readonly IDeploymentOutcomeSummaryBuilder _outcomeSummaryBuilder;
+    private readonly IStructuredLogger _structuredLogger;
     public Action<string>? LogHandler { get; set; }
 
     public ObservableCollection<string> AvailableSwitches { get; } = new();
@@ -63,7 +64,8 @@ public partial class DeploymentViewModel : ObservableObject
         IAppPaths appPaths,
         IVhdxCatalogStore catalogStore,
         IErrorFeedService errorFeed,
-        IDeploymentOutcomeSummaryBuilder outcomeSummaryBuilder)
+        IDeploymentOutcomeSummaryBuilder outcomeSummaryBuilder,
+        IStructuredLogger? structuredLogger = null)
     {
         LogHandler = message =>
         {
@@ -81,6 +83,7 @@ public partial class DeploymentViewModel : ObservableObject
         _catalogStore = catalogStore;
         _errorFeed = errorFeed;
         _outcomeSummaryBuilder = outcomeSummaryBuilder;
+        _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
         VmEntries = new ObservableCollection<VmEntryViewModel>();
         VmEntries.CollectionChanged += HandleVmEntriesCollectionChanged;
         _ = LoadAvailableSwitches();
@@ -282,6 +285,7 @@ public partial class DeploymentViewModel : ObservableObject
         var templateVersion = detailsDialog.TemplateVersion;
         var templateId = Guid.NewGuid().ToString("N");
 
+        var operationId = Guid.NewGuid().ToString("N");
         var template = new LabTemplate
         {
             Id = templateId,
@@ -329,13 +333,44 @@ public partial class DeploymentViewModel : ObservableObject
             templateFolder = _appPaths.TemplatesFolder;
         }
 
-        var filePath = _templateStore.SaveToFolder(templateFolder, template.Name, template);
+        try
+        {
+            var filePath = _templateStore.SaveToFolder(templateFolder, template.Name, template);
+            _structuredLogger.Log(
+                StructuredLogLevel.Info,
+                "TemplateSaved",
+                operationId,
+                "success",
+                new Dictionary<string, object?>
+                {
+                    ["templateId"] = template.Id,
+                    ["templateName"] = template.Name,
+                    ["templateVmCount"] = template.VmTemplates.Count,
+                    ["resourcePath"] = filePath
+                });
 
-        System.Windows.MessageBox.Show(
-            $"Template saved to {filePath}",
-            "Save as Template",
-            System.Windows.MessageBoxButton.OK,
-            System.Windows.MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(
+                $"Template saved to {filePath}",
+                "Save as Template",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            _structuredLogger.Log(
+                StructuredLogLevel.Error,
+                "TemplateSaved",
+                operationId,
+                "failed",
+                new Dictionary<string, object?>
+                {
+                    ["templateId"] = template.Id,
+                    ["templateName"] = template.Name,
+                    ["exceptionType"] = ex.GetType().Name,
+                    ["errorMessage"] = ex.Message
+                });
+            throw;
+        }
     }
 
     private static string GetAppVersion()
@@ -366,6 +401,7 @@ public partial class DeploymentViewModel : ObservableObject
 
         var multiContext = new MultiVmDeploymentContext
         {
+            OperationId = Guid.NewGuid().ToString("N"),
             VmContexts = VmEntries.Select(vm => vm.DeploymentContext).ToList(),
             StopAllOnAnyVmFailure = _settingsStore.Settings.StopAllOnAnyVmFailure
         };

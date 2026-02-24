@@ -1,8 +1,12 @@
 using LabAssistant.Models.PowerShell;
+using LabAssistant.Models.Configuration;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.FileSystem;
 using LabAssistant.Services.HyperV;
+using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
 using Microsoft.Extensions.DependencyInjection;
+using System.IO;
 
 namespace LabAssistant.Services;
 
@@ -23,6 +27,19 @@ public static class ServiceCollectionExtensions
             _ => session => new HyperVService(session)
         );
         services.AddSingleton<IDeploymentFileSystem, DeploymentFileSystem>();
+        services.AddSingleton<ILogEventSink>(provider =>
+        {
+            var settingsStore = provider.GetRequiredService<IAppSettingsStore>();
+            var appPaths = provider.GetRequiredService<IAppPaths>();
+            var logFolder = string.IsNullOrWhiteSpace(settingsStore.Settings.LogFolder)
+                ? appPaths.LogsFolder
+                : settingsStore.Settings.LogFolder;
+            var filePath = Path.Combine(logFolder, StructuredLoggingDefaults.StructuredEventsFileName);
+            return new JsonLinesLogEventSink(filePath);
+        });
+        services.AddSingleton<IStructuredLogger>(provider =>
+            new StructuredLogger(provider.GetServices<ILogEventSink>()));
+        services.AddSingleton<IDiagnosticsExportService, DiagnosticsExportService>();
 
         return services;
     }

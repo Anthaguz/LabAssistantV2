@@ -7,6 +7,7 @@ public class MultiVmDeploymentContext
 {
     private readonly CancellationTokenSource _operationCancellation = new();
 
+    public string OperationId { get; set; } = Guid.NewGuid().ToString("N");
     public List<VmDeploymentContext> VmContexts { get; set; } = new();
     public bool StopAllOnAnyVmFailure { get; set; }
     public List<VmCleanupResult> CleanupResults { get; } = new();

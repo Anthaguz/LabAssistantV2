@@ -52,6 +52,7 @@ namespace LabAssistant.Models.Deployment
         public List<string> Logs { get; } = new();
         public PowerShellHandle? PowerShellHandle { get; set; }
         public Action<string>? LogCallback { get; set; }
+        public Action<string, string, string?, IReadOnlyDictionary<string, object?>?>? StructuredEventEmitter { get; set; }
         public Action? OnBlockingFailure { get; set; }
         public Func<bool>? ShouldAbort { get; set; }
 
@@ -68,6 +69,15 @@ namespace LabAssistant.Models.Deployment
                 {
                     Logs.Add(message);
                 }
+                StructuredEventEmitter?.Invoke(
+                    "StepFailed",
+                    "warn",
+                    "non_blocking_failed",
+                    new Dictionary<string, object?>
+                    {
+                        ["stepKey"] = stepKey,
+                        ["errorMessage"] = message
+                    });
                 return;
             }
 
@@ -78,6 +88,15 @@ namespace LabAssistant.Models.Deployment
             {
                 Logs.Add(message);
             }
+            StructuredEventEmitter?.Invoke(
+                "StepFailed",
+                "error",
+                "failed",
+                new Dictionary<string, object?>
+                {
+                    ["stepKey"] = stepKey,
+                    ["errorMessage"] = message
+                });
             OnBlockingFailure?.Invoke();
         }
 
@@ -100,6 +119,7 @@ namespace LabAssistant.Models.Deployment
             CleanupResult = null;
             Logs.Clear();
             PowerShellHandle = null;
+            StructuredEventEmitter = null;
         }
     }
 }
