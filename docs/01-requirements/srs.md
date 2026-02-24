@@ -137,6 +137,22 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 - **FR-029:** If a user deploys a VM or multi-VM configuration on-the-fly, the system shall allow saving that configuration as a template.
   - **Priority:** P1
 
+- **FR-043:** The system shall perform a deployment readiness (preflight) evaluation before starting Hyper-V deployment actions.
+  - **Acceptance details:** The full preflight must complete before any VM/disk/network creation starts, and any blocking failures shall prevent deployment start.
+  - **Priority:** P0
+
+- **FR-044:** The system shall support two preflight modes for deployment readiness:
+  - **Quick preflight** (automatic on relevant Deploy-page configuration changes; may run partial/cheap checks for fast feedback)
+  - **Full preflight** (authoritative deploy gating check on Deploy click)
+  - **Priority:** P1
+
+- **FR-045:** The system shall classify deployment readiness check results as `Pass`, `Warn`, or `Fail`, and shall include a machine-readable code plus actionable user guidance for non-pass results.
+  - **Acceptance details:** Warnings must not block deployment by themselves; failures must block deployment.
+  - **Priority:** P0
+
+- **FR-046:** The system shall present deployment readiness results in the Deploy UI with actionable summaries and likely cause/path hints, while detailed technical stderr remains primarily in diagnostics/debug logs.
+  - **Priority:** P1
+
 ---
 
 ### 3.3 Networking
@@ -226,7 +242,7 @@ The system shall:
 - Validate configured paths for:
   - Existence
   - Required permissions
-  - Basic storage feasibility (TBD: free space validation level).
+  - Basic storage feasibility (v1 policy: low/unknown free space warns only and does not block deployment by itself).
 - Use configured paths **consistently across all operations**.
 
 Detailed schema contract:
@@ -246,6 +262,8 @@ Detailed schema contract:
 ### Behavior
 - Users shall receive **clear, actionable error messages**.  
 - Detailed technical information shall be written to **logs**.  
+- Preflight/readiness UI shall prioritize summarized actionable messages and likely cause/path hints before deployment starts.  
+- Raw PowerShell stderr may remain primarily in diagnostics/debug logs rather than the primary readiness UI.  
 - Failed deployments shall not leave **untracked or orphaned resources** where possible.
 
 Detailed runtime policy:

@@ -28,6 +28,7 @@
 - **Target:** UI remains responsive during long operations:
   - progress updates visible
   - no "application not responding"
+  - automatic quick preflight/readiness feedback does not block normal Deploy-page editing interactions
 - **Verify:** Manual test + optional automated UI test later
 
 ### P-04 Cancellation responsiveness (if supported)
@@ -88,6 +89,7 @@
   - what failed
   - why it failed (likely cause)
   - what to do next (fix steps)
+  - for deploy readiness/preflight, whether the issue is blocking or warning-only
 - **Verify:** Trigger top 5 failure modes and review messaging
 
 ---
