@@ -11,6 +11,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
 using LabAssistant.Models.Validation;
+using LabAssistant.Services.Logging;
 
 namespace LabAssistant.ViewModels
 {
@@ -22,6 +23,7 @@ namespace LabAssistant.ViewModels
         private readonly ILabTemplateStore _templateStore;
         private readonly TemplateValidationService _validationService;
         private readonly MissingVhdxResolutionService _missingVhdxResolutionService;
+        private readonly IStructuredLogger _structuredLogger;
         private LabTemplate _template;
         private ObservableCollection<VmTemplate> _vmTemplates;
         private string? _currentTemplatePath;
@@ -37,7 +39,8 @@ namespace LabAssistant.ViewModels
             IVhdxCatalogStore catalogStore,
             ILabTemplateStore templateStore,
             TemplateValidationService validationService,
-            MissingVhdxResolutionService missingVhdxResolutionService)
+            MissingVhdxResolutionService missingVhdxResolutionService,
+            IStructuredLogger? structuredLogger = null)
         {
             _switchProvider = switchProvider;
             _settingsStore = settingsStore;
@@ -45,6 +48,7 @@ namespace LabAssistant.ViewModels
             _templateStore = templateStore;
             _validationService = validationService;
             _missingVhdxResolutionService = missingVhdxResolutionService;
+            _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
             _template = new LabTemplate();
             _vmTemplates = new ObservableCollection<VmTemplate>();
             _vmTemplates.CollectionChanged += VmTemplates_CollectionChanged;
@@ -172,22 +176,89 @@ namespace LabAssistant.ViewModels
 
         public void LoadFromFile(string filePath)
         {
-            var template = _templateStore.LoadFromFile(filePath);
-            EnsureCanonicalTemplateDefaults(template);
-            LastLoadWarnings = _templateStore.LastLoadWarnings.ToList();
-            Template = template;
-            VmTemplates = new ObservableCollection<VmTemplate>(template.VmTemplates ?? new());
-            SyncVmTemplates();
-            ApplyDefaultSwitchToTemplates();
-            CurrentTemplatePath = filePath;
+            var operationId = Guid.NewGuid().ToString("N");
+            try
+            {
+                var template = _templateStore.LoadFromFile(filePath);
+                EnsureCanonicalTemplateDefaults(template);
+                LastLoadWarnings = _templateStore.LastLoadWarnings.ToList();
+                Template = template;
+                VmTemplates = new ObservableCollection<VmTemplate>(template.VmTemplates ?? new());
+                SyncVmTemplates();
+                ApplyDefaultSwitchToTemplates();
+                CurrentTemplatePath = filePath;
+
+                _structuredLogger.Log(
+                    _lastLoadWarnings.Count > 0 ? StructuredLogLevel.Warn : StructuredLogLevel.Info,
+                    "TemplateImported",
+                    operationId,
+                    _lastLoadWarnings.Count > 0 ? "success_with_warnings" : "success",
+                    new Dictionary<string, object?>
+                    {
+                        ["templateId"] = Template.Id,
+                        ["templateName"] = Template.Name,
+                        ["templateVmCount"] = Template.VmTemplates.Count,
+                        ["resourcePath"] = filePath,
+                        ["warningCount"] = _lastLoadWarnings.Count
+                    });
+            }
+            catch (Exception ex)
+            {
+                _structuredLogger.Log(
+                    StructuredLogLevel.Error,
+                    "TemplateImported",
+                    operationId,
+                    "failed",
+                    new Dictionary<string, object?>
+                    {
+                        ["resourcePath"] = filePath,
+                        ["exceptionType"] = ex.GetType().Name,
+                        ["errorMessage"] = ex.Message
+                    });
+                throw;
+            }
         }
 
         public void SaveToFile(string filePath)
         {
-            EnsureCanonicalTemplateDefaults(Template);
-            SyncVmTemplates();
-            _templateStore.SaveToFile(filePath, Template);
-            CurrentTemplatePath = filePath;
+            var operationId = Guid.NewGuid().ToString("N");
+            try
+            {
+                EnsureCanonicalTemplateDefaults(Template);
+                SyncVmTemplates();
+                _templateStore.SaveToFile(filePath, Template);
+                CurrentTemplatePath = filePath;
+
+                _structuredLogger.Log(
+                    StructuredLogLevel.Info,
+                    "TemplateSaved",
+                    operationId,
+                    "success",
+                    new Dictionary<string, object?>
+                    {
+                        ["templateId"] = Template.Id,
+                        ["templateName"] = Template.Name,
+                        ["templateVmCount"] = Template.VmTemplates.Count,
+                        ["resourcePath"] = filePath
+                    });
+            }
+            catch (Exception ex)
+            {
+                _structuredLogger.Log(
+                    StructuredLogLevel.Error,
+                    "TemplateSaved",
+                    operationId,
+                    "failed",
+                    new Dictionary<string, object?>
+                    {
+                        ["templateId"] = Template.Id,
+                        ["templateName"] = Template.Name,
+                        ["resourcePath"] = filePath,
+                        ["exceptionType"] = ex.GetType().Name,
+                        ["errorMessage"] = ex.Message
+                    });
+                throw;
+            }
         }
 
         public int AutoResolveMissingVhdxBySignature()
