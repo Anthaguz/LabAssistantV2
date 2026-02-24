@@ -43,6 +43,9 @@ namespace LabAssistant.Models.Deployment
         public bool DifferencingDiskCreated { get; set; }
         public bool VmRegistered { get; set; }
         public bool VmStarted { get; set; }
+        public bool WasCancelled { get; set; }
+        public string? FailureStepKey { get; private set; }
+        public string? FailureMessage { get; private set; }
         public VmCleanupResult? CleanupResult { get; set; }
 
         // Logging and PowerShell
@@ -69,11 +72,34 @@ namespace LabAssistant.Models.Deployment
             }
 
             IsSuccess = false;
+            FailureStepKey = stepKey;
+            FailureMessage = message;
             if (!string.IsNullOrWhiteSpace(message))
             {
                 Logs.Add(message);
             }
             OnBlockingFailure?.Invoke();
+        }
+
+        public void MarkCancelled()
+        {
+            WasCancelled = true;
+        }
+
+        public void ResetForNewOperation()
+        {
+            IsSuccess = true;
+            GuestServicesEnabled = false;
+            VmFolderCreated = false;
+            DifferencingDiskCreated = false;
+            VmRegistered = false;
+            VmStarted = false;
+            WasCancelled = false;
+            FailureStepKey = null;
+            FailureMessage = null;
+            CleanupResult = null;
+            Logs.Clear();
+            PowerShellHandle = null;
         }
     }
 }
