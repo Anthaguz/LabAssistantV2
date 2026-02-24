@@ -36,7 +36,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 
 # AC-001 — Deploy Lab From Template (Multi-VM)
 
-**Related FRs:** FR-022, FR-023, FR-024, FR-025, FR-026, FR-028, FR-040, FR-041
+**Related FRs:** FR-022, FR-023, FR-024, FR-025, FR-026, FR-028, FR-031, FR-043, FR-044, FR-045, FR-046, FR-053, FR-040, FR-041
 
 ## Scenarios
 
@@ -96,8 +96,37 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - UI shows recovery guidance
 - Logs include per-VM failure details and overall failure summary
 
+### 5) Preflight Failure - Blocking Readiness Issues
+**Given**
+- The Deploy page configuration contains one or more blocking readiness failures (for example: missing required switch, invalid/corrupt base VHDX, or invalid/unwritable destination path)
+
+**When**
+- The user clicks **Deploy Lab**
+
+**Then**
+- A **full preflight** runs before any Hyper-V actions start
+- Deployment is blocked (no Hyper-V resources are created)
+- The Deploy page shows a readiness report that identifies blocking failures and affected VM(s) when applicable
+- Messages include actionable guidance and likely cause/path hints
+- Structured logs record the preflight outcome
+
+### 6) Preflight Warning - Deploy Allowed With Warnings
+**Given**
+- The Deploy page configuration contains warnings only (for example: low or unknown free space in v1)
+
+**When**
+- The user clicks **Deploy Lab**
+
+**Then**
+- A **full preflight** runs before any Hyper-V actions start
+- The readiness report shows warnings distinctly from blocking failures
+- Deployment is allowed to proceed
+- Structured logs record the warning outcome and deployment start
+
 ## Expected UI
 - Template selection UI + Deploy action
+- Readiness/preflight report that distinguishes blocking failures vs warnings
+- Quick readiness feedback updates on relevant Deploy-page configuration changes
 - Deployment progress UI:
   - overall status
   - per-VM status (Creating disk / Creating VM / Attaching network / Done)
@@ -109,6 +138,63 @@ It defines required behavior, failure handling, logs, and side effects in a way 
   - validation report
   - environment/prerequisite failures
   - runtime failure with recovery steps
+
+## Deploy Readiness / Preflight Contract (Milestone U)
+
+### Readiness result semantics (contract-level)
+Each readiness result shall include, at minimum:
+
+- `status`: `Pass` | `Warn` | `Fail`
+- `category`: check category
+- `code`: machine-readable identifier suitable for logic/tests/logging
+- `message`: user-facing summary
+- `actionableGuidance`: what to do next
+- `affectedVmNames` (optional): one or more impacted VM names when VM-specific
+- `resourcePath` or `resourceName` (optional): path/resource hint when relevant
+
+### Required readiness check categories (minimum v1)
+- Environment
+- Template/config
+- VHDX/base disk
+- Network/switch
+- Destination path/storage
+
+### Blocking vs warning policy (v1)
+**Blocking (`Fail`) - deployment must not start**
+- Missing/invalid base VHDX reference with no valid substitute
+- Invalid/corrupt/unreadable base VHDX during deploy preflight
+- Missing required virtual switch
+- Invalid/unwritable destination path (VM path, differencing disk path, or other required output path)
+- Any prerequisite failure that prevents safe Hyper-V actions
+
+**Warning (`Warn`) - deployment may proceed**
+- Low free space (estimated risk)
+- Unknown/unverifiable free space
+- Other non-blocking readiness concerns where deployment can still proceed safely in v1
+
+**Policy note (v1)**
+- Free-space readiness is warn-only in v1 (never a deploy blocker by itself), because differencing disk growth is time-dependent and exact required space cannot be predicted reliably.
+
+### Quick vs full preflight behavior
+**Quick preflight (automatic on relevant Deploy-page configuration changes)**
+- Purpose: fast feedback while the user edits deployment configuration
+- Runs automatically when relevant inputs change
+- May run cheap/partial checks only
+- Is not the authoritative deploy gate
+
+**Full preflight (on Deploy click)**
+- Runs when the user initiates deployment and completes before any Hyper-V actions begin
+- Produces the authoritative readiness gating decision
+- Deployment must not begin if any `Fail` results exist
+- Deployment may proceed if results are only `Pass`/`Warn`
+
+### User-facing readiness report behavior (contract)
+- Deploy page shall show readiness/preflight results
+- Blocking failures and warnings shall be clearly distinguished
+- Deploy action shall be prevented when full preflight returns any blocking failures
+- Deploy action shall remain available when results are warnings only
+- Messages shall be actionable and include likely cause/path hints
+- Raw PowerShell stderr is not required in the primary readiness UI and remains primarily in diagnostics/debug logs
 
 ## Expected Logs
 **Minimum events**
@@ -137,6 +223,11 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 
 ## Definition of Done
 - [ ] All scenarios above pass
+- [ ] Quick preflight runs automatically on relevant Deploy-page configuration changes
+- [ ] Full preflight runs on Deploy click before any Hyper-V actions start
+- [ ] Blocking readiness failures prevent deployment start
+- [ ] Warning-only readiness results do not block deployment
+- [ ] Readiness report distinguishes failures vs warnings with actionable messages
 - [ ] Progress UI updates reliably for multi-VM
 - [ ] Failure behavior conforms to GR-02
 - [ ] Logs conform to GR-03 with operationId
