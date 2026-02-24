@@ -1,5 +1,6 @@
 using LabAssistant.Models.PowerShell;
 using LabAssistant.Models.Configuration;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.FileSystem;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
@@ -33,11 +34,12 @@ public static class ServiceCollectionExtensions
             var logFolder = string.IsNullOrWhiteSpace(settingsStore.Settings.LogFolder)
                 ? appPaths.LogsFolder
                 : settingsStore.Settings.LogFolder;
-            var filePath = Path.Combine(logFolder, "structured-events.jsonl");
+            var filePath = Path.Combine(logFolder, StructuredLoggingDefaults.StructuredEventsFileName);
             return new JsonLinesLogEventSink(filePath);
         });
         services.AddSingleton<IStructuredLogger>(provider =>
             new StructuredLogger(provider.GetServices<ILogEventSink>()));
+        services.AddSingleton<IDiagnosticsExportService, DiagnosticsExportService>();
 
         return services;
     }
