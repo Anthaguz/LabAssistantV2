@@ -133,8 +133,13 @@ public class DiagnosticsExportServiceTests
         });
 
         using var archive = ZipFile.OpenRead(fixture.BundlePath);
-        var runtimeJsonText = ReadZipText(archive, "metadata/runtime-metadata.json");
-        Assert.DoesNotContain("PATH", runtimeJsonText, StringComparison.OrdinalIgnoreCase);
+        using var runtime = ReadZipJson(archive, "metadata/runtime-metadata.json");
+        var root = runtime.RootElement;
+
+        Assert.False(root.TryGetProperty("environmentVariables", out _));
+        Assert.False(root.TryGetProperty("env", out _));
+
+        var runtimeJsonText = root.GetRawText();
         Assert.DoesNotContain("token", runtimeJsonText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", runtimeJsonText, StringComparison.OrdinalIgnoreCase);
     }
