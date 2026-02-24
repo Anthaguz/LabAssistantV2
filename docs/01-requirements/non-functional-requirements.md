@@ -3,9 +3,9 @@
 **Purpose:** Define quality attributes so improvements are measurable and regressions are caught early.
 
 **How this is used:**
-- Release gates: a feature is not “done” if it breaks an NFR.
+- Release gates: a feature is not "done" if it breaks an NFR.
 - Test expectations: NFRs should have at least one verification method (manual or automated).
-- Agent guardrails: prevents scope drift and “random improvements” that harm stability.
+- Agent guardrails: prevents scope drift and random improvements that harm stability.
 
 ---
 
@@ -14,20 +14,20 @@
 ### P-01 Single VM deployment speed
 - **Target:** Deploy a single VM in **<= 2 minutes** on baseline hardware.
 - **Baseline:** TBD (measure current)
-- **Verify:** Manual timing test + log timestamps (DeployVmStarted → DeployVmCompleted)
+- **Verify:** Manual timing test + log timestamps (`VmDeployStarted` -> `VmDeployCompleted`)
 
-> This aligns with product KPIs. (See Product Vision) 
+> This aligns with product KPIs. (See Product Vision)
 
 ### P-02 Lab deployment speed
 - **Target:** Deploy a lab with **N VMs** in **<= TBD minutes** on baseline hardware
-  OR improve by **>= 80%** vs a measured “manual baseline”.
+  OR improve by **>= 80%** vs a measured manual baseline.
 - **N:** TBD (pick a representative number like 3, 5, 10)
 - **Verify:** Manual timing test + deployment summary
 
 ### P-03 UI responsiveness
 - **Target:** UI remains responsive during long operations:
   - progress updates visible
-  - no “application not responding”
+  - no "application not responding"
 - **Verify:** Manual test + optional automated UI test later
 
 ### P-04 Cancellation responsiveness (if supported)
@@ -39,11 +39,11 @@
 ## Reliability / Resilience
 
 ### R-01 Partial failure behavior is consistent
-- **Target:** If a deployment fails mid-way, the tool shall automatically cleanup any resources it created (rollback/cleanup mode).
+- **Target:** If a deployment fails mid-way, the tool shall automatically cleanup any resources it created (cleanup mode).
 - **Policy:** Cleanup (selected)
-- **Verify:** Failure injection test (e.g., missing switch / denied permission mid-way) and confirm no orphaned VMs/disks remain.
+- **Verify:** Failure injection test (for example missing switch / denied permission mid-way) and confirm no orphaned VMs/disks remain, or residuals are explicitly reported.
 
-### R-02 No “unknown state”
+### R-02 No "unknown state"
 - **Target:** After any operation completes/fails/cancels, the user can see:
   - final status
   - what was created
@@ -52,7 +52,7 @@
 
 ### R-03 Idempotency / retry safety
 - **Target:** Retrying an operation must not silently corrupt state:
-  - name collisions handled predictably (block, prompt, or auto-suffix) — TBD policy
+  - name collisions handled predictably (block, prompt, or auto-suffix) - TBD policy
 - **Verify:** Attempt two deployments with same template/name
 
 ---
@@ -72,7 +72,7 @@
 ### S-03 Least-privilege clarity
 - **Target:** If admin privileges are required, the tool must clearly communicate:
   - what needs elevation
-  - why it’s needed
+  - why it is needed
 - **Verify:** Run without admin and confirm message clarity
 
 ---
@@ -81,7 +81,7 @@
 
 ### U-01 First-time user success
 - **Target:** A new user can complete their first lab deployment in **<= TBD minutes**.
-- **Verify:** “fresh machine” dry run checklist
+- **Verify:** Fresh machine dry run checklist
 
 ### U-02 Actionable errors
 - **Target:** Error messages provide:
@@ -94,20 +94,21 @@
 
 ## Observability
 
-### O-01 Structured logs with correlation id
+### O-01 Structured logs with operation id
 - **Target:** Every major operation emits structured logs:
-  - start → steps → completion/failure
-  - includes **correlationId** per operation
-- **Verify:** Inspect logs for required fields
+  - start -> steps -> completion/failure
+  - includes **operationId** per operation (canonical structured field)
+- **Verify:** Inspect `structured-events.jsonl` for required fields and event families
 
-> This matches the Acceptance Criteria logging expectations. 
+> This matches the Acceptance Criteria logging expectations and the canonical logging contract.
 
 ### O-02 Diagnostic bundle export
 - **Target:** Tool can export a diagnostics bundle containing at minimum:
-  - recent logs
-  - active configuration (paths/settings)
+  - structured logs (`logs/structured-events.jsonl`)
+  - runtime metadata
+  - operation context metadata
   - relevant template metadata (not secrets)
-- **Verify:** Manual export and inspect contents
+- **Verify:** Manual export and inspect ZIP contents and JSONL parseability
 
 ---
 
@@ -120,12 +121,12 @@
 
 ### C-02 Runtime + dependencies
 - **Target:** .NET runtime requirement documented and validated at startup.
-- **Version:** TBD
+- **Version:** .NET 8 desktop runtime (Windows)
 - **Verify:** Run on a machine missing runtime and confirm helpful guidance
 
 ---
 
-## Maintainability (optional but recommended for “next level”)
+## Maintainability (optional but recommended for next level)
 
 ### M-01 Logging and error standards
 - **Target:** All operations use consistent logging and error handling patterns
@@ -148,8 +149,7 @@ Define once so timing numbers mean something.
 ---
 
 ## Open Questions / TBDs
-- Choose rollback policy (cleanup vs report)
-- Pick N for “lab performance” test case
-- Decide naming collision strategy (prompt vs auto-suffix vs block)
-- Decide retention policy for logs and diagnostic bundles
+- Pick N for the lab performance test case.
+- Decide naming collision strategy (prompt vs auto-suffix vs block).
+- Decide retention policy for logs and diagnostic bundles.
 - TBDs will be resolved by measuring current behavior on a representative workstation once per milestone.
