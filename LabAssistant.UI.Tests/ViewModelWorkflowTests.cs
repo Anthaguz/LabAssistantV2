@@ -271,8 +271,18 @@ public class ViewModelWorkflowTests
         var saved = logger.Events.First(e => e.Event == "TemplateSaved");
         Assert.False(string.IsNullOrWhiteSpace(imported.OperationId));
         Assert.False(string.IsNullOrWhiteSpace(saved.OperationId));
+        Assert.True(DateTimeOffset.TryParse(imported.Ts, out var importedTs));
+        Assert.True(DateTimeOffset.TryParse(saved.Ts, out var savedTs));
+        Assert.Equal(TimeSpan.Zero, importedTs.Offset);
+        Assert.Equal(TimeSpan.Zero, savedTs.Offset);
+        Assert.Contains(imported.Level, new[] { "debug", "info", "warn", "error" });
+        Assert.Contains(saved.Level, new[] { "debug", "info", "warn", "error" });
+        Assert.Contains(imported.Event, new[] { "TemplateImported", "TemplateSaved" });
+        Assert.Contains(saved.Event, new[] { "TemplateImported", "TemplateSaved" });
         Assert.Equal("template-1", imported.Context?["templateId"]?.ToString());
         Assert.Equal("Template One", saved.Context?["templateName"]?.ToString());
+        AssertNoSensitiveContextKeys(imported);
+        AssertNoSensitiveContextKeys(saved);
     }
 
     [Theory]
@@ -489,6 +499,21 @@ public class ViewModelWorkflowTests
         public void Log(StructuredLogLevel level, string eventName, string operationId, string? result = null, IReadOnlyDictionary<string, object?>? context = null)
         {
             Events.Add(StructuredLogEvent.Create(level, eventName, operationId, result, context));
+        }
+    }
+
+    private static void AssertNoSensitiveContextKeys(StructuredLogEvent logEvent)
+    {
+        if (logEvent.Context == null)
+        {
+            return;
+        }
+
+        foreach (var key in logEvent.Context.Keys)
+        {
+            Assert.DoesNotContain("password", key, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("token", key, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("secret", key, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

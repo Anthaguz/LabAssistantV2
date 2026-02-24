@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.PowerShell;
@@ -32,6 +33,7 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         Assert.Contains(logger.Events, e => e.Event == "DeployLabCompleted" && e.OperationId == "op-deploy-success");
 
         Assert.All(logger.Events, e => Assert.Equal("op-deploy-success", e.OperationId));
+        Assert.All(logger.Events, AssertHasRequiredFields);
         var stepStarted = logger.Events.First(e => e.Event == "StepStarted");
         Assert.Equal("vm1", stepStarted.Context?["vmName"]?.ToString());
         Assert.False(string.IsNullOrWhiteSpace(stepStarted.Context?["stepKey"]?.ToString()));
@@ -120,6 +122,108 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         Assert.Contains(logger.Events, e => e.Event == "CleanupResidualsDetected" && e.OperationId == "op-deploy-cancel");
         Assert.Contains(logger.Events, e => e.Event == "DeployLabCancelled" && e.OperationId == "op-deploy-cancel" && e.Result == "cancelled_with_residuals");
     }
+
+    [Fact]
+    public async Task DeployAll_WithJsonLinesSink_WritesParseableCanonicalJsonl()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), $"labassistant-structured-{Guid.NewGuid():N}.jsonl");
+        try
+        {
+            var sink = new JsonLinesLogEventSink(logPath);
+            var logger = new StructuredLogger(new[] { sink });
+            var coordinator = CreateCoordinator(new FakePipelineBuilder(_ => new FailingStep()), new FakeCleanupOrchestrator(), logger);
+            var multi = new MultiVmDeploymentContext
+            {
+                OperationId = "op-jsonl",
+                VmContexts = { new VmDeploymentContext { VmId = Guid.NewGuid(), VmName = "vm1", VmPath = @"C:\vm\vm1" } }
+            };
+
+            await coordinator.DeployAllAsync(multi);
+
+            var lines = File.ReadAllLines(logPath);
+            Assert.NotEmpty(lines);
+
+            foreach (var line in lines)
+            {
+                using var doc = JsonDocument.Parse(line);
+                var root = doc.RootElement;
+                Assert.True(root.TryGetProperty("ts", out _));
+                Assert.True(root.TryGetProperty("level", out _));
+                Assert.True(root.TryGetProperty("event", out _));
+                Assert.True(root.TryGetProperty("operationId", out var op));
+                Assert.Equal("op-jsonl", op.GetString());
+            }
+        }
+        finally
+        {
+            if (File.Exists(logPath))
+            {
+                File.Delete(logPath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DeployAll_EmittedContexts_DoNotContainSecretFieldNames()
+    {
+        var logger = new RecordingStructuredLogger();
+        var coordinator = CreateCoordinator(new FakePipelineBuilder(_ => new NoOpStep()), new FakeCleanupOrchestrator(), logger);
+        var multi = new MultiVmDeploymentContext
+        {
+            OperationId = "op-redaction",
+            VmContexts = { new VmDeploymentContext { VmId = Guid.NewGuid(), VmName = "vm1" } }
+        };
+
+        await coordinator.DeployAllAsync(multi);
+
+        foreach (var logEvent in logger.Events)
+        {
+            if (logEvent.Context == null)
+            {
+                continue;
+            }
+
+            foreach (var pair in logEvent.Context)
+            {
+                Assert.DoesNotContain("password", pair.Key, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("token", pair.Key, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("secret", pair.Key, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    private static void AssertHasRequiredFields(StructuredLogEvent logEvent)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.Ts));
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.Level));
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.Event));
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.OperationId));
+
+        var parsedTs = DateTimeOffset.Parse(logEvent.Ts);
+        Assert.Equal(TimeSpan.Zero, parsedTs.Offset);
+
+        Assert.Contains(logEvent.Level, new[] { "debug", "info", "warn", "error" });
+        Assert.Contains(logEvent.Event, CanonicalEventNames);
+    }
+
+    private static readonly HashSet<string> CanonicalEventNames =
+    [
+        "DeployLabStarted",
+        "DeployLabCompleted",
+        "DeployLabFailed",
+        "DeployLabCancelled",
+        "VmDeployStarted",
+        "VmDeployCompleted",
+        "VmDeployFailed",
+        "StepStarted",
+        "StepCompleted",
+        "StepFailed",
+        "CleanupStarted",
+        "CleanupStepCompleted",
+        "CleanupStepFailed",
+        "CleanupCompleted",
+        "CleanupResidualsDetected"
+    ];
 
     private static MultiVmDeploymentCoordinator CreateCoordinator(
         IDeploymentPipelineBuilder pipelineBuilder,

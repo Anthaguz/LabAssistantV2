@@ -8,6 +8,12 @@ namespace LabAssistant.Business.Tests;
 
 public class CatalogServiceStructuredLoggingTests
 {
+    private static readonly HashSet<string> CanonicalCatalogEvents =
+    [
+        "CatalogLoaded",
+        "CatalogSaved"
+    ];
+
     [Fact]
     public void LoadCatalog_EmitsCatalogLoaded_WithContext()
     {
@@ -24,9 +30,14 @@ public class CatalogServiceStructuredLoggingTests
         Assert.Equal("success", logEvent.Result);
         Assert.False(string.IsNullOrWhiteSpace(logEvent.OperationId));
         Assert.Equal("info", logEvent.Level);
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.Ts));
+        Assert.True(DateTimeOffset.TryParse(logEvent.Ts, out var parsedTs));
+        Assert.Equal(TimeSpan.Zero, parsedTs.Offset);
+        Assert.Contains(logEvent.Event, CanonicalCatalogEvents);
         Assert.Equal(1, GetInt(logEvent, "itemCount"));
         Assert.Equal(0, GetInt(logEvent, "errorCount"));
         Assert.Equal(@"C:\catalog\vhdx-catalog.json", GetString(logEvent, "resourcePath"));
+        AssertContextKeysAreNonSensitive(logEvent);
     }
 
     [Fact]
@@ -44,8 +55,27 @@ public class CatalogServiceStructuredLoggingTests
         Assert.Equal("CatalogSaved", logEvent.Event);
         Assert.Equal("failed", logEvent.Result);
         Assert.Equal("warn", logEvent.Level);
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.OperationId));
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.Ts));
+        Assert.Contains(logEvent.Event, CanonicalCatalogEvents);
         Assert.Equal(1, GetInt(logEvent, "itemCount"));
         Assert.Equal(1, GetInt(logEvent, "errorCount"));
+        AssertContextKeysAreNonSensitive(logEvent);
+    }
+
+    private static void AssertContextKeysAreNonSensitive(StructuredLogEvent logEvent)
+    {
+        if (logEvent.Context == null)
+        {
+            return;
+        }
+
+        foreach (var key in logEvent.Context.Keys)
+        {
+            Assert.DoesNotContain("password", key, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("token", key, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("secret", key, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private static string? GetString(StructuredLogEvent logEvent, string key)
