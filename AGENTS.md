@@ -100,7 +100,8 @@ Layering rules (behavioral):
 
 ### 5.1 Logging & Diagnostics
 - All external operations must emit **structured logs**.
-- Every user-initiated operation must have a **correlationId** propagated through the workflow.
+- Every user-initiated operation must have an **operationId** propagated through the workflow.
+- Legacy/transitional text logs may still mention `correlationId`, but structured events use `operationId` as the canonical field.
 - Logs must include enough context to diagnose failures (operation, vmName(s), templateId, baseDiskId, switchName, result, error details).
 
 ### 5.2 Error Handling
@@ -159,7 +160,7 @@ Update rules:
 - Ensure AC scenarios are satisfied (happy path + failures + cleanup behavior)
 - Add/update tests
 - Update docs if behavior/architecture changed
-- Ensure logs are emitted at key steps with correlationId
+- Ensure logs are emitted at key steps with operationId (canonical structured field)
 
 ---
 
@@ -168,7 +169,7 @@ Update rules:
 - [ ] Matches Acceptance Criteria exactly
 - [ ] No new scope added
 - [ ] Cleanup policy preserved (no orphaned VMs/disks after failure/cancel)
-- [ ] Logs added/updated with correlationId and required context
+- [ ] Logs added/updated with operationId (canonical structured field) and required context
 - [ ] Tests added/updated (unit tests for logic, mocks for Hyper-V if needed)
 - [ ] Docs updated if behavior or architecture changed
 

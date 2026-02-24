@@ -202,7 +202,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - Base disk references  
   - Network configuration  
 - Logs shall be stored locally in a structured, readable format.  
-- A versioning strategy for template schema shall be defined (TBD).
+- Template schema versioning and compatibility policy shall follow the canonical contract in `docs/01-requirements/template-schema.md` and migration rules in `docs/04-data/migrations.md`.
 - Base disk registry shall store:
   - file path reference (or stable id)
   - OS classification metadata (TBD: how to classify)
@@ -284,14 +284,14 @@ Each functional requirement shall map to:
 
 Traceability must be maintained across:
 
-**FR → AC → Test Case**
+**FR -> AC -> Test Case**
 
 ---
 
 ## Open Questions / TBDs
 
-- Exact **template schema structure and versioning model**  
+- Field-level template schema compatibility rules for future minor/patch evolution (see `docs/01-requirements/template-schema.md`)  
 - Whether **post-deployment automation scripts** will be supported  
-- Strategy for **rollback vs resume** after failed deployment  
+- Strategy for **resume/retry UX** after failed deployment beyond current cleanup-and-report policy  
 - Long-term extensibility toward **multiple hypervisors**  
 - Telemetry or usage metrics collection approach  
