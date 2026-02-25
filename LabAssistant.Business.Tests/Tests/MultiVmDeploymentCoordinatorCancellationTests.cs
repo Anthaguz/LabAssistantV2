@@ -36,15 +36,18 @@ public class MultiVmDeploymentCoordinatorCancellationTests
     [Fact]
     public async Task Cancel_RunsCleanup_WhenResourcesExist()
     {
-        var builder = new FakePipelineBuilder(_ => new ResourceCreatingWaitStep());
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var builder = new FakePipelineBuilder(_ => new ResourceCreatingWaitStep(entered, release));
         var cleanup = new FakeCleanupOrchestrator();
         var coordinator = CreateCoordinator(builder, cleanup);
         var vm = new VmDeploymentContext { VmName = "vm1" };
         var context = new MultiVmDeploymentContext { VmContexts = { vm } };
 
         var deployTask = coordinator.DeployAllAsync(context);
-        await Task.Delay(20);
+        await entered.Task;
         context.RequestUserCancellation();
+        release.SetResult(true);
         await deployTask;
 
         Assert.Equal(1, cleanup.CallCount);
@@ -54,7 +57,9 @@ public class MultiVmDeploymentCoordinatorCancellationTests
     [Fact]
     public async Task Cancel_WithCleanupResiduals_SetsCancelledWithResiduals()
     {
-        var builder = new FakePipelineBuilder(_ => new ResourceCreatingWaitStep());
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var builder = new FakePipelineBuilder(_ => new ResourceCreatingWaitStep(entered, release));
         var cleanup = new FakeCleanupOrchestrator
         {
             ResultFactory = vm => new VmCleanupResult
@@ -70,8 +75,9 @@ public class MultiVmDeploymentCoordinatorCancellationTests
         };
 
         var deployTask = coordinator.DeployAllAsync(context);
-        await Task.Delay(20);
+        await entered.Task;
         context.RequestUserCancellation();
+        release.SetResult(true);
         await deployTask;
 
         Assert.Equal(DeploymentOperationState.CancelledWithResiduals, context.OperationState);
@@ -140,9 +146,30 @@ public class MultiVmDeploymentCoordinatorCancellationTests
 
     private sealed class ResourceCreatingWaitStep : DeploymentStep
     {
+        private readonly TaskCompletionSource<bool>? _entered;
+        private readonly TaskCompletionSource<bool>? _release;
+
+        public ResourceCreatingWaitStep()
+        {
+        }
+
+        public ResourceCreatingWaitStep(TaskCompletionSource<bool> entered, TaskCompletionSource<bool> release)
+        {
+            _entered = entered;
+            _release = release;
+        }
+
         protected override async Task HandleAsync(VmDeploymentContext context)
         {
             context.VmFolderCreated = true;
+            _entered?.TrySetResult(true);
+
+            if (_release != null)
+            {
+                await _release.Task;
+                return;
+            }
+
             await Task.Delay(50);
         }
     }
