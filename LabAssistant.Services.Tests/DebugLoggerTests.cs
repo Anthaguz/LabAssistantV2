@@ -4,6 +4,12 @@ using Xunit;
 
 namespace LabAssistant.Services.Tests;
 
+[CollectionDefinition("DebugLogger tests", DisableParallelization = true)]
+public sealed class DebugLoggerTestsCollectionDefinition
+{
+}
+
+[Collection("DebugLogger tests")]
 public class DebugLoggerTests
 {
     private static readonly object DebugLoggerTestLock = new();
@@ -19,9 +25,9 @@ public class DebugLoggerTests
             try
             {
                 DebugLogger.SetLogFolder(directory);
-                InvokeRotationHook("ConfigureRotationForTests", 220L, 2);
+                InvokeRotationHook("ConfigureRotationForTests", 1L, 2);
 
-                for (var i = 0; i < 12; i++)
+                for (var i = 0; i < 5; i++)
                 {
                     DebugLogger.Log(new string((char)('a' + (i % 26)), 80));
                 }
