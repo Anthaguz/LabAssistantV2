@@ -28,6 +28,7 @@ public class PersistentPowerShellSessionTests
         using var session = new PersistentPowerShellSession(host);
 
         host.Stderr.Enqueue("native-error-line");
+        await host.Stderr.WaitForDequeuedLineCountAsync(1, TimeSpan.FromSeconds(2));
         host.Stdout.Enqueue("__END_OF_OUTPUT__");
 
         var result = await session.ExecuteAsync("Write-Output 'ok'");
@@ -192,7 +193,9 @@ public class PersistentPowerShellSessionTests
     {
         private readonly ConcurrentQueue<string?> _queue = new();
         private readonly SemaphoreSlim _signal = new(0);
+        private readonly SemaphoreSlim _dequeueSignal = new(0);
         private bool _completed;
+        private int _dequeuedLineCount;
 
         public void Enqueue(string line)
         {
@@ -216,7 +219,18 @@ public class PersistentPowerShellSessionTests
         {
             await _signal.WaitAsync();
             _queue.TryDequeue(out var line);
+            Interlocked.Increment(ref _dequeuedLineCount);
+            _dequeueSignal.Release();
             return line;
+        }
+
+        public async Task WaitForDequeuedLineCountAsync(int count, TimeSpan timeout)
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            while (Volatile.Read(ref _dequeuedLineCount) < count)
+            {
+                await _dequeueSignal.WaitAsync(cts.Token);
+            }
         }
     }
 }
