@@ -46,9 +46,17 @@ public class CreateVmStep : DeploymentStep
         }
         else
         {
-            context.LogCallback?.Invoke($"❌ Failed to create VM '{context.VmName}'.");
+            var userMessage = $"Failed to create VM '{context.VmName}' at '{context.VmPath}' using disk '{context.VhdPath}'.";
+            context.LogCallback?.Invoke($"❌ {userMessage}");
             DebugLogger.Log($"Error: Failed to create VM: {context.VmName}");
-            context.MarkFailure(DeploymentStepKeys.CreateVm, $"Failed to create VM '{context.VmName}'.");
+            context.MarkFailure(
+                DeploymentStepKeys.CreateVm,
+                userMessage,
+                new Dictionary<string, object?>
+                {
+                    ["vmPath"] = context.VmPath,
+                    ["targetVhdPath"] = context.VhdPath
+                });
         }
     }
 }
