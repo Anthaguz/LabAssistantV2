@@ -85,6 +85,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 ## TC-007: Milestone U Readiness + Diagnostics Manual Hyper-V Verification
 - **Related AC:** `AC-001` (readiness/preflight additions), `GR-03`, `GR-04`
 - **Type:** Manual (Hyper-V host) + automated coverage
+- **Related stabilization note:** Includes regression observations captured after `#219` (PersistentPowerShellSession + catalog validation path stabilization)
 - **Steps:**
   1. Run the Milestone U checklist in `docs/07-testing/milestone-u-hyperv-verification-checklist.md`.
   2. Verify catalog-time VHDX validation (good + invalid VHDX).
@@ -96,6 +97,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Runtime failure diagnostics include likely artifact/path context in UI summaries and structured logs.
   - Raw PowerShell diagnostics remain available in debug/supplemental logs.
   - No GUI hang/regression in VHDX validation paths and app shutdown sanity remains intact.
+  - Catalog add/edit validation remains scoped to affected item(s) (no unrelated invalid catalog entries blocking single-item save/edit flows).
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.

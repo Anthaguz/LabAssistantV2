@@ -93,8 +93,8 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 **Then**
 - Operation stops with failure state
 - Resource handling follows GR-02 (rollback OR cleanup report)
-- UI shows recovery guidance
-- Logs include per-VM failure details and overall failure summary
+- UI shows recovery guidance and concise likely artifact/path hints when known (for example base VHDX path, target VHD path, VM path)
+- Logs include per-VM failure details and overall failure summary, including structured artifact/path context when known
 
 ### 5) Preflight Failure - Blocking Readiness Issues
 **Given**
@@ -214,6 +214,8 @@ Each readiness result shall include, at minimum:
 - switchName(s)
 - result (success/failure)
 - errorCode/errorMessage/exceptionType (when failed)
+- failureStepKey (when failed and available)
+- known artifact/path context when available (for example `parentVhdPath`, `targetVhdPath`, `vmPath`)
 
 ## Expected Artifacts / Side Effects
 - Differencing disk files created per VM
