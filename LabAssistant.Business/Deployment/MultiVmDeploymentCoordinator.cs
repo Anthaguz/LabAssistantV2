@@ -225,13 +225,22 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             multiContext,
             vmContext,
             result,
-            new Dictionary<string, object?>
+            BuildVmTerminalContext(vmContext)
+            );
+    }
+
+    private static IReadOnlyDictionary<string, object?> BuildVmTerminalContext(VmDeploymentContext vmContext)
+    {
+        var payload = new Dictionary<string, object?>
             {
                 ["failureStepKey"] = vmContext.FailureStepKey,
                 ["errorMessage"] = vmContext.FailureMessage,
                 ["cleanupRan"] = vmContext.CleanupResult != null,
                 ["residualCount"] = vmContext.CleanupResult?.Residuals.Count ?? 0
-            });
+            };
+
+        MergeNormalizedErrorMetadata(payload, vmContext.FailureMetadata);
+        return payload;
     }
 
     private void EmitCleanupStepEvents(MultiVmDeploymentContext multiContext, VmDeploymentContext vmContext, VmCleanupResult cleanupResult)
@@ -296,6 +305,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             context["vmPath"] = firstFailedVm.VmPath;
             context["targetVhdPath"] = firstFailedVm.VhdPath;
             context["parentVhdPath"] = firstFailedVm.BaseVhdPath;
+            MergeNormalizedErrorMetadata(context, firstFailedVm.FailureMetadata);
         }
 
         return context;
@@ -311,5 +321,23 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             "error" => StructuredLogLevel.Error,
             _ => StructuredLogLevel.Info
         };
+    }
+
+    private static void MergeNormalizedErrorMetadata(
+        Dictionary<string, object?> target,
+        IReadOnlyDictionary<string, object?>? failureMetadata)
+    {
+        if (failureMetadata == null)
+        {
+            return;
+        }
+
+        foreach (var key in new[] { "exceptionType", "hresult", "errorCode" })
+        {
+            if (failureMetadata.TryGetValue(key, out var value))
+            {
+                target[key] = value;
+            }
+        }
     }
 }

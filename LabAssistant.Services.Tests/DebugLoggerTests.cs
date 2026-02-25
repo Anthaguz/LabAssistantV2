@@ -26,6 +26,8 @@ public class DebugLoggerTests
                     DebugLogger.Log(new string((char)('a' + (i % 26)), 80));
                 }
 
+                DebugLogger.SetLogFolder(Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-sink-{Guid.NewGuid():N}"));
+
                 var active = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
                 var rotated1 = Path.Combine(directory, "log.1.txt");
                 var rotated2 = Path.Combine(directory, "log.2.txt");
@@ -62,11 +64,12 @@ public class DebugLoggerTests
             try
             {
                 DebugLogger.SetLogFolder(directory);
-                InvokeRotationHook("ConfigureRotationForTests", 180L, 1);
+                InvokeRotationHook("ConfigureRotationForTests", 1L, 1);
 
-                DebugLogger.Log(new string('x', 90));
-                DebugLogger.Log(new string('y', 90));
+                DebugLogger.Log(new string('x', 10));
                 DebugLogger.Log("marker-after-rotation");
+
+                DebugLogger.SetLogFolder(Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-sink-{Guid.NewGuid():N}"));
 
                 var active = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
                 var rotated1 = Path.Combine(directory, "log.1.txt");

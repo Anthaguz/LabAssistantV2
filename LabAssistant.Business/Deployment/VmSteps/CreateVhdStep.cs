@@ -42,14 +42,32 @@ public class CreateVhdStep : DeploymentStep
             var userMessage = $"Failed to create differencing disk for '{context.VmName}'. Base VHDX may be invalid or unreadable: {context.BaseVhdPath}";
             context.LogCallback?.Invoke($"❌ {userMessage}");
             DebugLogger.Log($"Error: Failed to create VHD for VM: {context.VmName}");
+            var failureMetadata = (hyperV as IHyperVFailureDiagnosticsProvider)?.LastFailureMetadata;
             context.MarkFailure(
                 DeploymentStepKeys.CreateVhd,
                 userMessage,
-                new Dictionary<string, object?>
-                {
-                    ["parentVhdPath"] = context.BaseVhdPath,
-                    ["targetVhdPath"] = context.VhdPath
-                });
+                MergeFailureMetadata(context, failureMetadata));
         }
+    }
+
+    private static IReadOnlyDictionary<string, object?> MergeFailureMetadata(
+        VmDeploymentContext context,
+        IReadOnlyDictionary<string, object?>? failureMetadata)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["parentVhdPath"] = context.BaseVhdPath,
+            ["targetVhdPath"] = context.VhdPath
+        };
+
+        if (failureMetadata != null)
+        {
+            foreach (var pair in failureMetadata)
+            {
+                payload[pair.Key] = pair.Value;
+            }
+        }
+
+        return payload;
     }
 }

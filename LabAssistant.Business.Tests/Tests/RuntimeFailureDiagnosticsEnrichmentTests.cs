@@ -16,6 +16,7 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
         var session = new FakeSession();
         var resolver = new FakeSessionResolver(handle, session);
         var hyperv = new FakeHyperVService { CreateVhdDifferencingResult = false };
+        hyperv.LastFailureMetadata = new Dictionary<string, object?> { ["exceptionType"] = "RuntimeException", ["hresult"] = "0x80070005", ["errorCode"] = "OperationFailed" };
         var events = new List<RecordedStructuredEvent>();
 
         var step = new CreateVhdStep(resolver, _ => hyperv);
@@ -44,6 +45,9 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
         Assert.Equal(DeploymentStepKeys.CreateVhd, stepFailed.Extra?["stepKey"]?.ToString());
         Assert.Equal(context.BaseVhdPath, stepFailed.Extra?["parentVhdPath"]?.ToString());
         Assert.Equal(context.VhdPath, stepFailed.Extra?["targetVhdPath"]?.ToString());
+        Assert.Equal("RuntimeException", stepFailed.Extra?["exceptionType"]?.ToString());
+        Assert.Equal("0x80070005", stepFailed.Extra?["hresult"]?.ToString());
+        Assert.Equal("OperationFailed", stepFailed.Extra?["errorCode"]?.ToString());
     }
 
     [Fact]
@@ -53,6 +57,7 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
         var session = new FakeSession();
         var resolver = new FakeSessionResolver(handle, session);
         var hyperv = new FakeHyperVService { CreateVmResult = false };
+        hyperv.LastFailureMetadata = new Dictionary<string, object?> { ["exceptionType"] = "VirtualizationException", ["hresult"] = "0x80070570" };
         var events = new List<RecordedStructuredEvent>();
 
         var step = new CreateVmStep(resolver, _ => hyperv);
@@ -81,6 +86,8 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
         var stepFailed = Assert.Single(events.Where(e => e.EventName == "StepFailed"));
         Assert.Equal(context.VmPath, stepFailed.Extra?["vmPath"]?.ToString());
         Assert.Equal(context.VhdPath, stepFailed.Extra?["targetVhdPath"]?.ToString());
+        Assert.Equal("VirtualizationException", stepFailed.Extra?["exceptionType"]?.ToString());
+        Assert.Equal("0x80070570", stepFailed.Extra?["hresult"]?.ToString());
     }
 
     private sealed record RecordedStructuredEvent(
@@ -109,10 +116,12 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
         public void Dispose() { }
     }
 
-    private sealed class FakeHyperVService : IHyperVService
+    private sealed class FakeHyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     {
         public bool CreateVmResult { get; set; } = true;
         public bool CreateVhdDifferencingResult { get; set; } = true;
+        public IReadOnlyDictionary<string, object?>? LastFailureMetadata { get; set; }
+        public void ClearLastFailureMetadata() => LastFailureMetadata = null;
 
         public Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName) => Task.FromResult(true);
         public Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath) => Task.FromResult(CreateVhdDifferencingResult);
