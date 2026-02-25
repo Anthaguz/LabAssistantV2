@@ -40,7 +40,7 @@ public sealed class VhdxCatalogPageViewModel
         }
 
         Items.Add(item);
-        var save = SaveCatalog();
+        var save = SaveCatalog([item]);
         if (!save.IsSuccess)
         {
             Items.Remove(item);
@@ -64,7 +64,7 @@ public sealed class VhdxCatalogPageViewModel
         selected.Generation = updated.Generation;
         selected.Notes = updated.Notes;
 
-        var save = SaveCatalog();
+        var save = SaveCatalog([selected]);
         if (!save.IsSuccess)
         {
             selected.Id = original.Id;
@@ -81,7 +81,7 @@ public sealed class VhdxCatalogPageViewModel
     public CatalogOperationResult DeleteItem(VhdxCatalogItem selected)
     {
         Items.Remove(selected);
-        var save = SaveCatalog();
+        var save = SaveCatalog([]);
         if (!save.IsSuccess)
         {
             Items.Add(selected);
@@ -90,9 +90,9 @@ public sealed class VhdxCatalogPageViewModel
         return save;
     }
 
-    private CatalogOperationResult SaveCatalog()
+    private CatalogOperationResult SaveCatalog(IEnumerable<VhdxCatalogItem> itemsToValidate)
     {
-        var result = _catalogService.SaveCatalog(Items);
+        var result = _catalogService.SaveCatalog(Items, itemsToValidate);
         return new CatalogOperationResult(result.Errors);
     }
 

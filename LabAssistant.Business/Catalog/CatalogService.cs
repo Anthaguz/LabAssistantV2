@@ -64,13 +64,13 @@ public sealed class CatalogService
         }
     }
 
-    public VhdxCatalogSaveResult SaveCatalog(IEnumerable<VhdxCatalogItem> items)
+    public VhdxCatalogSaveResult SaveCatalog(IEnumerable<VhdxCatalogItem> items, IEnumerable<VhdxCatalogItem>? itemsToValidate = null)
     {
         var operationId = Guid.NewGuid().ToString("N");
         var itemList = items?.ToList() ?? new List<VhdxCatalogItem>();
         try
         {
-            var integrityErrors = ValidateCatalogVhdxIntegrity(itemList);
+            var integrityErrors = ValidateCatalogVhdxIntegrity(itemsToValidate ?? itemList);
             if (integrityErrors.Count > 0)
             {
                 var failed = new VhdxCatalogSaveResult();
@@ -116,7 +116,7 @@ public sealed class CatalogService
             });
     }
 
-    private List<string> ValidateCatalogVhdxIntegrity(IReadOnlyCollection<VhdxCatalogItem> itemList)
+    private List<string> ValidateCatalogVhdxIntegrity(IEnumerable<VhdxCatalogItem> itemsToValidate)
     {
         var errors = new List<string>();
         if (_vhdxIntegrityValidator == null)
@@ -124,7 +124,7 @@ public sealed class CatalogService
             return errors;
         }
 
-        foreach (var item in itemList)
+        foreach (var item in itemsToValidate)
         {
             if (string.IsNullOrWhiteSpace(item.Path))
             {

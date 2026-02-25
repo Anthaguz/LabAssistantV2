@@ -61,7 +61,7 @@ public sealed class MissingVhdxResolutionDialogViewModel
         }
 
         _catalogItems.Add(item);
-        var save = SaveCatalog();
+        var save = SaveCatalog([item]);
         if (!save.IsSuccess)
         {
             _catalogItems.Remove(item);
@@ -99,9 +99,9 @@ public sealed class MissingVhdxResolutionDialogViewModel
         }
     }
 
-    private CatalogOperationResult SaveCatalog()
+    private CatalogOperationResult SaveCatalog(IEnumerable<VhdxCatalogItem> itemsToValidate)
     {
-        var result = _catalogService.SaveCatalog(_catalogItems);
+        var result = _catalogService.SaveCatalog(_catalogItems, itemsToValidate);
         return new CatalogOperationResult(result.Errors);
     }
 
