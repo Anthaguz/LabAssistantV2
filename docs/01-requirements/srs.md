@@ -180,9 +180,11 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 ### 3.4 Observability (Logs and Status)
 
 - **FR-040:** The system shall generate structured logs for template operations, VM creation, disk operations, and networking.  
+  - **Acceptance details:** Failure events should include known artifact/path context (for example base VHD path, target VHD path, VM path) when available to improve diagnosis speed.  
   - **Priority:** P0  
 
 - **FR-041:** The system shall present user-friendly status and error messages during operations.  
+  - **Acceptance details:** For readiness and runtime failures, the primary UI should favor concise actionable summaries with likely cause/path hints; raw technical stderr may remain in diagnostics/debug logs.  
   - **Priority:** P0  
 
 - **FR-042:** The system shall allow exporting diagnostic information for troubleshooting.  
@@ -263,12 +265,14 @@ Detailed schema contract:
 - Users shall receive **clear, actionable error messages**.  
 - Detailed technical information shall be written to **logs**.  
 - Preflight/readiness UI shall prioritize summarized actionable messages and likely cause/path hints before deployment starts.  
+- Runtime failure summaries should include likely artifact/path hints when the operation inputs are known (for example parent base VHDX, target differencing VHD path, VM path).  
 - Raw PowerShell stderr may remain primarily in diagnostics/debug logs rather than the primary readiness UI.  
 - Failed deployments shall not leave **untracked or orphaned resources** where possible.
 
 Detailed runtime policy:
 
 - See `docs/01-requirements/cleanup-cancellation-policy.md` for cleanup order, cancellation boundaries, residual status rules, and expected terminal outcomes.
+- Real-host regression observations for the persistent PowerShell wrapper and VHDX validation path are captured in `docs/07-testing/milestone-u-hyperv-verification-checklist.md` (post-`#219` stabilization).
 
 ---
 

@@ -6,6 +6,7 @@
 - Canonical local diagnostics log: `<LogFolder>\\structured-events.jsonl`
 - Format: JSON Lines (one JSON object per line, UTF-8), canonical contract in `docs/01-requirements/logging-contract.md`
 - Common fields: `ts`, `level`, `event`, `operationId`, optional `result`, optional `context`
+- For deployment failures, structured events may include known artifact/path context (for example `parentVhdPath`, `targetVhdPath`, `vmPath`) to speed troubleshooting.
 - Legacy debug text logs (`DebugLogger`) may still exist as supplemental/transitional diagnostics
 
 ## Metrics (optional)
@@ -16,5 +17,5 @@
 - What triggers alerts: TBD
 
 ## Open Questions / TBDs
-- Retention/rotation policy for local structured logs
+- Retention/rotation policy for local structured logs and legacy debug logs (planned Milestone V)
 - Whether to add local alerting/health summaries beyond diagnostics export

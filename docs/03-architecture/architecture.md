@@ -41,13 +41,14 @@ Behavioral boundaries:
 
 ## 4. Key Workflows (end-to-end)
 ### Workflow: Deploy Lab (on-the-fly or template-based)
-1. UI/ViewModel validates deploy prerequisites (selected VHDX, switch, settings).
-2. UI creates `MultiVmDeploymentContext` and starts business coordinator.
-3. Business coordinator runs per-VM deployment pipelines using Hyper-V/PowerShell services.
-4. Runtime emits progress/log events and updates operation state (`Running`, `Cancelling`, etc.).
-5. On blocking failure or user cancellation, cleanup orchestration runs for affected VMs.
-6. Business builds structured outcome summary (per-VM + global + residuals).
-7. UI displays final summary and re-enables configuration after terminal state.
+1. UI/ViewModel maintains a deployment readiness report and triggers **quick preflight** on relevant configuration changes (debounced).
+2. On Deploy click, UI/ViewModel runs **full preflight** and blocks deployment start if any blocking readiness failures exist.
+3. UI creates `MultiVmDeploymentContext` and starts business coordinator only after full preflight passes (warnings-only is allowed).
+4. Business coordinator runs per-VM deployment pipelines using Hyper-V/PowerShell services.
+5. Runtime emits progress/log events and updates operation state (`Running`, `Cancelling`, etc.).
+6. On blocking failure or user cancellation, cleanup orchestration runs for affected VMs.
+7. Business builds structured outcome summary (per-VM + global + residuals) and emits structured failure context (paths/artifacts) when available.
+8. UI displays readiness/failure summaries, final outcome summary, and re-enables configuration after terminal state.
 
 ### Workflow: Template Import / Load / Save
 1. UI/ViewModel requests template load/save via Data layer stores and Business validation services.
@@ -65,6 +66,7 @@ Behavioral boundaries:
 - **Logging**
   - Structured JSONL logging (`structured-events.jsonl`) is the canonical diagnostics path.
   - Legacy `DebugLogger` text logs remain supplemental/transitional.
+  - Runtime failure events now include known artifact/path context when available (for example `parentVhdPath`, `targetVhdPath`, `vmPath`) to speed diagnosis.
 - **Configuration**
   - App settings and storage paths are persisted locally and used by UI/Business/Data/Services.
   - Log folder, templates folder, VM storage paths, and catalog paths are configurable.
@@ -75,7 +77,18 @@ Behavioral boundaries:
 - **Testability**
   - Hyper-V, PowerShell, filesystem, and diagnostics/logging sinks are abstracted behind interfaces where practical.
   - Core decision/orchestration logic is covered by Business/Data/Services/UI tests.
+  - Preflight/readiness behavior is covered at Business/UI levels (engine, checks, deploy gating).
+  - Some PowerShell wrapper/process-lifecycle regressions remain intentionally validated via manual Hyper-V checklist observations (post-`#219`) rather than fragile process-timing tests.
+
+## 6. Implementation Notes (Current Reality)
+- **Persistent PowerShell session wrapper (`PersistentPowerShellSession`)**
+  - Commands are executed in an automation-safe PowerShell host (`-NoProfile -NonInteractive -NoLogo`).
+  - Command execution is serialized (`SemaphoreSlim`) per session instance.
+  - Command completion is currently driven by a PowerShell stdout marker; native stderr is drained in the background and appended as supplemental diagnostics.
+  - Session disposal uses bounded waits and may kill the process tree to avoid shutdown hangs (`powershell.exe` / `conhost.exe`) if the child process does not exit promptly.
+  - These behaviors were stabilized during Milestone U follow-up hotfix `#219` and should be preserved unless intentionally redesigned/tested.
 
 ## Open Questions / TBDs
 - Sequence diagrams for deploy/cancel/cleanup and diagnostics export (`docs/03-architecture/sequence-diagrams.md`).
+- Whether to formalize PowerShell wrapper protocol/lifecycle details in a dedicated architecture/supportability doc beyond the summary above (planned in Milestone V).
 - Whether future switch management and guest configuration features should introduce new business workflow coordinators or extend current deployment pipeline abstractions.

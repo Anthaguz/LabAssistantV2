@@ -20,8 +20,19 @@
 
 ### Deployment Operation Context
 - Runtime-only state for an active multi-VM deployment (`MultiVmDeploymentContext` + `VmDeploymentContext`).
-- Tracks operation state, cancellation requests, per-VM progress/failures, cleanup results, and summary inputs.
+- Tracks operation state, cancellation requests, per-VM progress/failures, cleanup results, summary inputs, and failure context (including known artifact/path context when available).
 - Not the same as persisted templates.
+
+### Deployment Readiness Report / Check Results
+- Runtime-only preflight/readiness output used by Deploy UI and deploy-start gating.
+- `DeploymentReadinessReport` contains mode (`Quick`/`Full`), ordered results, and aggregate helpers (`HasBlockingFailures`, `HasWarnings`, `CanDeploy`, `IsAuthoritative`).
+- `DeploymentReadinessCheckResult` captures status/category/code/message/guidance and optional VM/resource attribution.
+- Produced by the preflight engine and consumed by UI; not persisted as template data.
+
+### VHDX Integrity Validation Result
+- Shared runtime validation result used by catalog-time validation and deploy preflight for base disk checks.
+- Distinguishes states such as valid, missing, unreadable/inaccessible, and invalid/corrupt.
+- Supports both quick/cheap checks and full Hyper-V-readable validation paths.
 
 ### Cleanup / Outcome Results
 - Structured runtime results for cleanup and deployment summaries:
@@ -37,6 +48,7 @@
 - `LabTemplate` -> contains -> `VmTemplate` entries (`vmTemplates[]`)
 - Deployment operation -> uses -> `LabTemplate` or on-the-fly VM configuration
 - `VmTemplate` -> references -> VHDX catalog items (`vhdxId`) or fallback base VHD path (`vhdPath`)
+- Deployment operation -> produces -> `DeploymentReadinessReport` (quick/full preflight) before runtime execution
 - Deployment operation -> produces -> cleanup results and deployment outcome summary
 - Diagnostics export -> packages -> structured logs + runtime/operation metadata (+ optional template artifact)
 
