@@ -80,7 +80,22 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Expected:**
   - Structured logs contain parseable JSONL entries with `ts`, `level`, `event`, `operationId`.
   - Diagnostics bundle includes manifest, runtime metadata, operation context metadata, and structured logs.
-  - Optional template artifact is included/excluded based on selected option.
+- Optional template artifact is included/excluded based on selected option.
+
+## TC-007: Milestone U Readiness + Diagnostics Manual Hyper-V Verification
+- **Related AC:** `AC-001` (readiness/preflight additions), `GR-03`, `GR-04`
+- **Type:** Manual (Hyper-V host) + automated coverage
+- **Steps:**
+  1. Run the Milestone U checklist in `docs/07-testing/milestone-u-hyperv-verification-checklist.md`.
+  2. Verify catalog-time VHDX validation (good + invalid VHDX).
+  3. Verify quick/full preflight behavior and deploy gating on the Deploy page.
+  4. Trigger a runtime deployment failure and inspect UI summary, structured logs, and debug logs.
+- **Expected:**
+  - Blocking readiness failures prevent deploy before Hyper-V actions begin.
+  - Warning-only readiness results do not block deploy.
+  - Runtime failure diagnostics include likely artifact/path context in UI summaries and structured logs.
+  - Raw PowerShell diagnostics remain available in debug/supplemental logs.
+  - No GUI hang/regression in VHDX validation paths and app shutdown sanity remains intact.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.

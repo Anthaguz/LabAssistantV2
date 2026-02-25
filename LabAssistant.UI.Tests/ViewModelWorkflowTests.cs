@@ -430,6 +430,59 @@ public class ViewModelWorkflowTests
         Assert.False(viewModel.IsDeployBlockedByReadiness);
     }
 
+    [Fact]
+    public async Task DeploymentViewModel_FullPreflightCanBlockAfterQuickReportWasClean()
+    {
+        var preflight = new RecordingPreflightService
+        {
+            ResultFactory = (_, mode) => new DeploymentReadinessReport
+            {
+                Mode = mode,
+                Results = mode == DeploymentPreflightMode.Full
+                    ?
+                    [
+                        new DeploymentReadinessCheckResult
+                        {
+                            Status = DeploymentReadinessStatus.Fail,
+                            Category = DeploymentReadinessCategory.DestinationPathStorage,
+                            Code = "DST.VM_PATH.UNWRITABLE",
+                            Message = "VM path is not writable",
+                            ActionableGuidance = "Choose a writable path",
+                            AffectedVmNames = ["VM1"],
+                            ResourcePath = @"D:\Labs\VM1"
+                        }
+                    ]
+                    :
+                    [
+                        new DeploymentReadinessCheckResult
+                        {
+                            Status = DeploymentReadinessStatus.Pass,
+                            Category = DeploymentReadinessCategory.TemplateConfig,
+                            Code = "CFG.OK",
+                            Message = "Quick check passed",
+                            ActionableGuidance = "None"
+                        }
+                    ]
+            }
+        };
+        var coordinator = new RecordingDeploymentCoordinator();
+        var viewModel = CreateDeploymentViewModel(preflight, coordinator, quickPreflightDebounce: TimeSpan.FromMilliseconds(5));
+        viewModel.AddVmCommand.Execute(null);
+        var vm = viewModel.VmEntries.Single().DeploymentContext;
+        vm.BaseVhdPath = @"C:\base\good.vhdx";
+
+        await WaitUntilAsync(() => viewModel.ReadinessReport?.Mode == DeploymentPreflightMode.Quick, TimeSpan.FromSeconds(2));
+        Assert.False(viewModel.IsDeployBlockedByReadiness);
+
+        await viewModel.DeployAllCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, coordinator.CallCount);
+        Assert.True(viewModel.IsDeployBlockedByReadiness);
+        Assert.Equal(DeploymentPreflightMode.Full, viewModel.ReadinessReport?.Mode);
+        Assert.Contains(preflight.Calls, c => c.Mode == DeploymentPreflightMode.Quick);
+        Assert.Contains(preflight.Calls, c => c.Mode == DeploymentPreflightMode.Full);
+    }
+
     private static CatalogService CreateCatalogService(FakeCatalogStore store)
     {
         var settingsStore = new FakeAppSettingsStore
