@@ -8,6 +8,19 @@
 - Common fields: `ts`, `level`, `event`, `operationId`, optional `result`, optional `context`
 - For deployment failures, structured events may include known artifact/path context (for example `parentVhdPath`, `targetVhdPath`, `vmPath`) to speed troubleshooting.
 - Legacy debug text logs (`DebugLogger`) may still exist as supplemental/transitional diagnostics
+- Local rotation/retention (v1, size-based):
+  - Structured logs:
+    - Active file remains `structured-events.jsonl`
+    - Rotate to `structured-events.1.jsonl`, `structured-events.2.jsonl`, ... (index-based)
+    - Default active-file threshold: 5 MB
+    - Default retained history files: 5
+  - Debug logs:
+    - Active file remains `log.txt`
+    - Rotate to `log.1.txt`, `log.2.txt`, ... (index-based)
+    - Default active-file threshold: 2 MB
+    - Default retained history files: 5
+- Rotation occurs before appending a new record, so structured log lines are not split across files (rotated files remain valid JSONL)
+- Diagnostics export currently remains compatible with the existing behavior and exports the active structured log file (`structured-events.jsonl`)
 
 ## Metrics (optional)
 - Deploy duration: TBD
@@ -17,5 +30,4 @@
 - What triggers alerts: TBD
 
 ## Open Questions / TBDs
-- Retention/rotation policy for local structured logs and legacy debug logs (planned Milestone V)
 - Whether to add local alerting/health summaries beyond diagnostics export

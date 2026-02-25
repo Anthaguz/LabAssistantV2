@@ -12,8 +12,13 @@ public sealed class JsonLinesLogEventSink : ILogEventSink
 
     private readonly object _writeLock = new();
     private readonly string _filePath;
+    private readonly long _maxActiveFileBytes;
+    private readonly int _retainedHistoryFiles;
 
-    public JsonLinesLogEventSink(string filePath)
+    public JsonLinesLogEventSink(
+        string filePath,
+        long maxActiveFileBytes = StructuredLoggingDefaults.MaxActiveFileBytes,
+        int retainedHistoryFiles = StructuredLoggingDefaults.RetainedHistoryFiles)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -21,6 +26,8 @@ public sealed class JsonLinesLogEventSink : ILogEventSink
         }
 
         _filePath = filePath;
+        _maxActiveFileBytes = maxActiveFileBytes;
+        _retainedHistoryFiles = retainedHistoryFiles;
     }
 
     public void Write(StructuredLogEvent logEvent)
@@ -36,9 +43,11 @@ public sealed class JsonLinesLogEventSink : ILogEventSink
             }
 
             var json = JsonSerializer.Serialize(logEvent, SerializerOptions);
+            var bytesToAppend = Encoding.UTF8.GetByteCount(json + Environment.NewLine);
 
             lock (_writeLock)
             {
+                FileLogRotation.RotateIfNeeded(_filePath, bytesToAppend, _maxActiveFileBytes, _retainedHistoryFiles);
                 using var stream = new FileStream(_filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
                 using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
                 writer.WriteLine(json);
