@@ -30,6 +30,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHyperVVhdxProbe, PowerShellHyperVVhdxProbe>();
         services.AddSingleton<IVhdxIntegrityValidator, VhdxIntegrityValidator>();
         services.AddSingleton<IDeploymentFileSystem, DeploymentFileSystem>();
+        services.AddSingleton<IDestinationPathFeasibilityProbe, DestinationPathFeasibilityProbe>();
+        services.AddSingleton<IFreeSpaceInfoProvider, FreeSpaceInfoProvider>();
         services.AddSingleton<ILogEventSink>(provider =>
         {
             var settingsStore = provider.GetRequiredService<IAppSettingsStore>();

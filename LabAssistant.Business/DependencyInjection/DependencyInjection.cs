@@ -100,6 +100,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<DeploymentPipelineBuilder>();
         services.AddTransient<IDeploymentPipelineBuilder>(provider => provider.GetRequiredService<DeploymentPipelineBuilder>());
         services.AddSingleton<IDeploymentPreflightCheck, BaseVhdxIntegrityPreflightCheck>();
+        services.AddSingleton<IDeploymentPreflightCheck, DestinationPathStoragePreflightCheck>();
         services.AddSingleton<IDeploymentPreflightService, DeploymentPreflightService>();
         services.AddSingleton<IDeploymentOutcomeSummaryBuilder, DeploymentOutcomeSummaryBuilder>();
         services.AddSingleton<IVmCleanupOrchestrator, VmCleanupOrchestrator>();
