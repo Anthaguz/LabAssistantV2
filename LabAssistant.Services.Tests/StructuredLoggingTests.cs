@@ -123,6 +123,77 @@ public class StructuredLoggingTests
     }
 
     [Fact]
+    public void JsonLinesLogEventSink_Write_RotatesAtSizeThreshold_AndKeepsActiveFileStable()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"labassistant-jsonl-rotate-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var filePath = Path.Combine(directory, StructuredLoggingDefaults.StructuredEventsFileName);
+
+        try
+        {
+            var sink = new JsonLinesLogEventSink(filePath, maxActiveFileBytes: 220, retainedHistoryFiles: 2);
+
+            sink.Write(StructuredLogEvent.Create(StructuredLogLevel.Info, "EventA", "op-1", context: new Dictionary<string, object?> { ["message"] = new string('a', 80) }));
+            sink.Write(StructuredLogEvent.Create(StructuredLogLevel.Info, "EventB", "op-1", context: new Dictionary<string, object?> { ["message"] = new string('b', 80) }));
+            sink.Write(StructuredLogEvent.Create(StructuredLogLevel.Info, "EventC", "op-1", context: new Dictionary<string, object?> { ["message"] = new string('c', 80) }));
+
+            Assert.True(File.Exists(filePath));
+            var rotated1 = Rotated(filePath, 1);
+            Assert.True(File.Exists(rotated1));
+
+            var activeLines = File.ReadAllLines(filePath);
+            var rotatedLines = File.ReadAllLines(rotated1);
+            Assert.NotEmpty(activeLines);
+            Assert.NotEmpty(rotatedLines);
+            Assert.All(activeLines, line => JsonDocument.Parse(line).Dispose());
+            Assert.All(rotatedLines, line => JsonDocument.Parse(line).Dispose());
+
+            using var activeLast = JsonDocument.Parse(activeLines.Last());
+            Assert.Equal("EventC", activeLast.RootElement.GetProperty("event").GetString());
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonLinesLogEventSink_Write_AppliesRetentionCleanup_ToOldestRotatedFiles()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"labassistant-jsonl-retain-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var filePath = Path.Combine(directory, StructuredLoggingDefaults.StructuredEventsFileName);
+
+        try
+        {
+            var sink = new JsonLinesLogEventSink(filePath, maxActiveFileBytes: 200, retainedHistoryFiles: 2);
+            for (var i = 0; i < 6; i++)
+            {
+                sink.Write(StructuredLogEvent.Create(
+                    StructuredLogLevel.Info,
+                    $"Event{i}",
+                    "op-1",
+                    context: new Dictionary<string, object?> { ["message"] = new string((char)('a' + i), 70) }));
+            }
+
+            Assert.True(File.Exists(filePath));
+            Assert.True(File.Exists(Rotated(filePath, 1)));
+            Assert.True(File.Exists(Rotated(filePath, 2)));
+            Assert.False(File.Exists(Rotated(filePath, 3)));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void StructuredLogger_Log_WritesToAllConfiguredSinks()
     {
         var sinkA = new FakeSink();
@@ -145,5 +216,13 @@ public class StructuredLoggingTests
         {
             Events.Add(logEvent);
         }
+    }
+
+    private static string Rotated(string activeFilePath, int index)
+    {
+        var directory = Path.GetDirectoryName(activeFilePath) ?? string.Empty;
+        var extension = Path.GetExtension(activeFilePath);
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(activeFilePath);
+        return Path.Combine(directory, $"{fileNameWithoutExtension}.{index}{extension}");
     }
 }

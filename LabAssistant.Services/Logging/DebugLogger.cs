@@ -8,6 +8,8 @@ namespace LabAssistant.Services.Logging
     {
         private static readonly object _lock = new();
         private static string? _logFolder;
+        private static long _maxActiveFileBytes = DebugLoggingDefaults.MaxActiveFileBytes;
+        private static int _retainedHistoryFiles = DebugLoggingDefaults.RetainedHistoryFiles;
 
         private static string LogFilePath
         {
@@ -18,7 +20,7 @@ namespace LabAssistant.Services.Logging
                     throw new InvalidOperationException("DebugLogger log folder not configured.");
                 }
 
-                return Path.Combine(_logFolder, "log.txt");
+                return Path.Combine(_logFolder, DebugLoggingDefaults.DebugLogFileName);
             }
         }
 
@@ -45,6 +47,8 @@ namespace LabAssistant.Services.Logging
 
                 lock (_lock)
                 {
+                    var bytesToAppend = System.Text.Encoding.UTF8.GetByteCount(logLine + Environment.NewLine);
+                    FileLogRotation.RotateIfNeeded(LogFilePath, bytesToAppend, _maxActiveFileBytes, _retainedHistoryFiles);
                     File.AppendAllText(LogFilePath, logLine + Environment.NewLine);
                 }
             }
@@ -64,6 +68,24 @@ namespace LabAssistant.Services.Logging
             if (!string.IsNullOrEmpty(error))
             {
                 Log($"PowerShell Error for '{command}': \n{error}");
+            }
+        }
+
+        internal static void ConfigureRotationForTests(long maxActiveFileBytes, int retainedHistoryFiles)
+        {
+            lock (_lock)
+            {
+                _maxActiveFileBytes = maxActiveFileBytes;
+                _retainedHistoryFiles = retainedHistoryFiles;
+            }
+        }
+
+        internal static void ResetRotationForTests()
+        {
+            lock (_lock)
+            {
+                _maxActiveFileBytes = DebugLoggingDefaults.MaxActiveFileBytes;
+                _retainedHistoryFiles = DebugLoggingDefaults.RetainedHistoryFiles;
             }
         }
     }
