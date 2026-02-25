@@ -27,11 +27,14 @@ public class PersistentPowerShellSessionTests
         var host = new FakeHost();
         using var session = new PersistentPowerShellSession(host);
 
+        var executeTask = session.ExecuteAsync("Write-Output 'ok'");
+        await host.Input.WaitForLineContainingAsync("$__laErrStart = $Error.Count", 1, TimeSpan.FromSeconds(2));
+
         host.Stderr.Enqueue("native-error-line");
         await host.Stderr.WaitForDequeuedLineCountAsync(1, TimeSpan.FromSeconds(2));
         host.Stdout.Enqueue("__END_OF_OUTPUT__");
 
-        var result = await session.ExecuteAsync("Write-Output 'ok'");
+        var result = await executeTask;
 
         Assert.Contains("native-error-line", result.Error);
     }
