@@ -54,7 +54,7 @@ public sealed class VhdxIntegrityValidator : IVhdxIntegrityValidator
             };
         }
 
-        var hypervProbe = await _hyperVVhdxProbe.ProbeAsync(path, cancellationToken);
+        var hypervProbe = await _hyperVVhdxProbe.ProbeAsync(path, cancellationToken).ConfigureAwait(false);
         return hypervProbe.Status switch
         {
             HyperVVhdxProbeStatus.Valid => new VhdxIntegrityValidationResult

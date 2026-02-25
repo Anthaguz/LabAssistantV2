@@ -29,7 +29,7 @@ public sealed class PowerShellHyperVVhdxProbe : IHyperVVhdxProbe
             "}");
 
         using var session = _sessionFactory();
-        var (output, error) = await session.ExecuteAsync(script);
+        var (output, error) = await session.ExecuteAsync(script).ConfigureAwait(false);
         DebugLogger.LogPowerShellOutput(script, output, error);
 
         var lines = PowerShellOutputCleaner.Clean(output)
@@ -38,8 +38,15 @@ public sealed class PowerShellHyperVVhdxProbe : IHyperVVhdxProbe
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .ToList();
 
-        var marker = lines.FirstOrDefault();
-        var detail = lines.Skip(1).FirstOrDefault();
+        var markerIndex = lines.FindIndex(line =>
+            string.Equals(line, "VALID", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(line, "UNREADABLE", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(line, "INVALID", StringComparison.OrdinalIgnoreCase));
+
+        var marker = markerIndex >= 0 ? lines[markerIndex] : null;
+        var detail = markerIndex >= 0
+            ? lines.Skip(markerIndex + 1).FirstOrDefault(line => !line.StartsWith("__PS_ERROR_LINE__", StringComparison.Ordinal))
+            : lines.FirstOrDefault();
 
         if (string.Equals(marker, "VALID", StringComparison.OrdinalIgnoreCase))
         {

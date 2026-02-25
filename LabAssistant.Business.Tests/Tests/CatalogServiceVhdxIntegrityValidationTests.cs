@@ -105,6 +105,50 @@ public class CatalogServiceVhdxIntegrityValidationTests
         Assert.Equal(1, store.SaveCalls);
     }
 
+    [Fact]
+    public void SaveCatalog_WhenValidationSubsetProvided_ValidatesOnlySubset()
+    {
+        var store = new RecordingCatalogStore();
+        var validator = new RecordingVhdxIntegrityValidator();
+        var service = new CatalogService(store, new FakeSettingsStore(), new NullStructuredLoggerForTests(), validator);
+
+        var existingBad = new VhdxCatalogItem
+        {
+            Id = "existing-bad",
+            Path = @"C:\base\existing-bad.vhdx",
+            OsName = "Windows",
+            OsVersion = "10",
+            Generation = 2
+        };
+        var editedGood = new VhdxCatalogItem
+        {
+            Id = "edited-good",
+            Path = @"C:\base\edited-good.vhdx",
+            OsName = "Windows",
+            OsVersion = "11",
+            Generation = 2
+        };
+
+        validator.ResultsByPath[existingBad.Path] = new VhdxIntegrityValidationResult
+        {
+            Status = VhdxIntegrityStatus.Invalid,
+            Path = existingBad.Path,
+            Message = "Invalid"
+        };
+        validator.ResultsByPath[editedGood.Path] = new VhdxIntegrityValidationResult
+        {
+            Status = VhdxIntegrityStatus.Valid,
+            Path = editedGood.Path,
+            Message = "Valid"
+        };
+
+        var result = service.SaveCatalog([existingBad, editedGood], [editedGood]);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(1, store.SaveCalls);
+        Assert.Equal([editedGood.Path], validator.Calls.Select(c => c.Path).ToArray());
+    }
+
     private sealed class RecordingCatalogStore : IVhdxCatalogStore
     {
         public int SaveCalls { get; private set; }
@@ -151,6 +195,28 @@ public class CatalogServiceVhdxIntegrityValidationTests
                 Message = Result.Message,
                 Detail = Result.Detail
             };
+    }
+
+    private sealed class RecordingVhdxIntegrityValidator : IVhdxIntegrityValidator
+    {
+        public Dictionary<string, VhdxIntegrityValidationResult> ResultsByPath { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<(string Path, VhdxIntegrityValidationDepth Depth)> Calls { get; } = [];
+
+        public Task<VhdxIntegrityValidationResult> ValidateAsync(string path, VhdxIntegrityValidationDepth depth = VhdxIntegrityValidationDepth.Full, CancellationToken cancellationToken = default)
+        {
+            Calls.Add((path, depth));
+            if (ResultsByPath.TryGetValue(path, out var result))
+            {
+                return Task.FromResult(result);
+            }
+
+            return Task.FromResult(new VhdxIntegrityValidationResult
+            {
+                Status = VhdxIntegrityStatus.Valid,
+                Path = path,
+                Message = "Valid"
+            });
+        }
     }
 
     private sealed class NullStructuredLoggerForTests : IStructuredLogger

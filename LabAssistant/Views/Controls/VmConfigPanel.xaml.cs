@@ -169,7 +169,7 @@ namespace LabAssistant.Views.Controls
             }
 
             _catalogItems.Add(dialog.Item);
-            if (!SaveCatalog())
+            if (!SaveCatalog([dialog.Item]))
             {
                 _catalogItems.Remove(dialog.Item);
                 return;
@@ -206,9 +206,9 @@ namespace LabAssistant.Views.Controls
             }
         }
 
-        private bool SaveCatalog()
+        private bool SaveCatalog(IEnumerable<VhdxCatalogItem> itemsToValidate)
         {
-            var result = _catalogService.SaveCatalog(_catalogItems);
+            var result = _catalogService.SaveCatalog(_catalogItems, itemsToValidate);
             if (!result.IsValid)
             {
                 System.Windows.MessageBox.Show(
