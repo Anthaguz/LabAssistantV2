@@ -4,26 +4,28 @@ using System.Diagnostics;
 using System.Text;
 using System.Collections.Concurrent;
 
-public class PersistentPowerShellSession : IPersistentPowerShellSession
+internal interface IPersistentPowerShellHost : IDisposable
 {
-    private const string OutputMarker = "__END_OF_OUTPUT__";
-    private const string ErrorLineMarker = "__PS_ERROR_LINE__";
+    TextWriter Input { get; }
+    TextReader Output { get; }
+    TextReader Error { get; }
+    bool HasExited { get; }
+    bool WaitForExit(int milliseconds);
+    void Kill(bool entireProcessTree);
+}
 
+internal sealed class ProcessPersistentPowerShellHost : IPersistentPowerShellHost
+{
     private readonly Process _process;
-    private readonly StreamWriter _input;
-    private readonly StreamReader _output;
-    private readonly StreamReader _error;
-    private readonly ConcurrentQueue<string> _nativeErrorLines = new();
-    private readonly Task _nativeErrorPumpTask;
-    private readonly SemaphoreSlim _executeLock = new(1, 1);
 
-    public PersistentPowerShellSession()
+    public ProcessPersistentPowerShellHost()
     {
         _process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
+                // Keep the shell automation-safe and deterministic (no profile noise/PSReadLine host behavior).
                 Arguments = "-NoProfile -NonInteractive -NoLogo",
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
@@ -34,11 +36,45 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
         };
 
         _process.Start();
-        _input = _process.StandardInput;
-        _output = _process.StandardOutput;
-        _error = _process.StandardError;
+    }
+
+    public TextWriter Input => _process.StandardInput;
+    public TextReader Output => _process.StandardOutput;
+    public TextReader Error => _process.StandardError;
+    public bool HasExited => _process.HasExited;
+    public bool WaitForExit(int milliseconds) => _process.WaitForExit(milliseconds);
+    public void Kill(bool entireProcessTree) => _process.Kill(entireProcessTree);
+    public void Dispose() => _process.Dispose();
+}
+
+public class PersistentPowerShellSession : IPersistentPowerShellSession
+{
+    private const string OutputMarker = "__END_OF_OUTPUT__";
+    private const string ErrorLineMarker = "__PS_ERROR_LINE__";
+    private const int DisposeExitWaitMs = 1500;
+    private const int DisposePostKillWaitMs = 2000;
+
+    private readonly IPersistentPowerShellHost _host;
+    private readonly TextWriter _input;
+    private readonly TextReader _output;
+    private readonly TextReader _error;
+    private readonly ConcurrentQueue<string> _nativeErrorLines = new();
+    private readonly Task _nativeErrorPumpTask;
+    private readonly SemaphoreSlim _executeLock = new(1, 1);
+
+    public PersistentPowerShellSession() : this(new ProcessPersistentPowerShellHost())
+    {
+    }
+
+    internal PersistentPowerShellSession(IPersistentPowerShellHost host)
+    {
+        _host = host;
+        _input = _host.Input;
+        _output = _host.Output;
+        _error = _host.Error;
 
         // Keep native stderr drained so the child process cannot block on a full error pipe.
+        // Command completion is driven by the PowerShell envelope stdout marker, not by native stderr.
         _nativeErrorPumpTask = Task.Run(async () =>
         {
             try
@@ -55,6 +91,9 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             catch (InvalidOperationException)
             {
             }
+            catch (IOException)
+            {
+            }
         });
     }
 
@@ -69,6 +108,10 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
 
             var commandBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(command ?? string.Empty));
 
+            // Serialize execution per session and run commands through a PowerShell-side envelope:
+            // - command is base64-encoded to avoid interactive multiline parsing/continuation issues
+            // - PowerShell error records are emitted to stdout with a tagged prefix for deterministic capture
+            // - stdout marker is the authoritative completion signal
             DebugLogger.Log("Persistent PowerShell ExecuteAsync: writing command to stdin.");
             await _input.WriteLineAsync("$__laErrStart = $Error.Count").ConfigureAwait(false);
             await _input.WriteLineAsync($"$__laCmd = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{commandBase64}'))").ConfigureAwait(false);
@@ -122,7 +165,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
         try
         {
             DebugLogger.Log("Persistent PowerShell Dispose: begin.");
-            if (!_process.HasExited)
+            if (!_host.HasExited)
             {
                 try
                 {
@@ -139,20 +182,20 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
                     DebugLogger.Log("Persistent PowerShell Dispose: process/input invalid while sending exit.");
                 }
 
-                DebugLogger.Log("Persistent PowerShell Dispose: waiting for process exit (1500ms).");
-                if (!_process.WaitForExit(1500))
+                DebugLogger.Log($"Persistent PowerShell Dispose: waiting for process exit ({DisposeExitWaitMs}ms).");
+                if (!_host.WaitForExit(DisposeExitWaitMs))
                 {
                     DebugLogger.Log("Persistent PowerShell Dispose: process did not exit in time; killing process tree.");
                     try
                     {
-                        _process.Kill(entireProcessTree: true);
+                        _host.Kill(entireProcessTree: true);
                     }
                     catch (InvalidOperationException)
                     {
                         DebugLogger.Log("Persistent PowerShell Dispose: process already exited before kill.");
                     }
 
-                    _process.WaitForExit(2000);
+                    _host.WaitForExit(DisposePostKillWaitMs);
                     DebugLogger.Log("Persistent PowerShell Dispose: wait after kill completed.");
                 }
                 else
@@ -164,7 +207,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
         finally
         {
             DebugLogger.Log("Persistent PowerShell Dispose: disposing process object.");
-            _process.Dispose();
+            _host.Dispose();
         }
     }
 }
