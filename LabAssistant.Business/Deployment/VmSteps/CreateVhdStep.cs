@@ -39,9 +39,17 @@ public class CreateVhdStep : DeploymentStep
         }
         else
         {
-            context.LogCallback?.Invoke($"❌ Failed to create VHD for '{context.VmName}'.");
+            var userMessage = $"Failed to create differencing disk for '{context.VmName}'. Base VHDX may be invalid or unreadable: {context.BaseVhdPath}";
+            context.LogCallback?.Invoke($"❌ {userMessage}");
             DebugLogger.Log($"Error: Failed to create VHD for VM: {context.VmName}");
-            context.MarkFailure(DeploymentStepKeys.CreateVhd, $"Failed to create VHD for '{context.VmName}'.");
+            context.MarkFailure(
+                DeploymentStepKeys.CreateVhd,
+                userMessage,
+                new Dictionary<string, object?>
+                {
+                    ["parentVhdPath"] = context.BaseVhdPath,
+                    ["targetVhdPath"] = context.VhdPath
+                });
         }
     }
 }

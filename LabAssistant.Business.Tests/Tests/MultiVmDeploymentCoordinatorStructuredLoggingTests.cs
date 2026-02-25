@@ -62,7 +62,17 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         var multi = new MultiVmDeploymentContext
         {
             OperationId = "op-deploy-fail",
-            VmContexts = { new VmDeploymentContext { VmId = Guid.NewGuid(), VmName = "vm1", VmPath = @"C:\vm\vm1" } }
+            VmContexts =
+            {
+                new VmDeploymentContext
+                {
+                    VmId = Guid.NewGuid(),
+                    VmName = "vm1",
+                    VmPath = @"C:\vm\vm1",
+                    VhdPath = @"C:\vm\vm1\vm1.vhdx",
+                    BaseVhdPath = @"D:\base\parent.vhdx"
+                }
+            }
         };
 
         await coordinator.DeployAllAsync(multi);
@@ -72,6 +82,22 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         Assert.Contains(logger.Events, e => e.Event == "CleanupStepCompleted" && e.OperationId == "op-deploy-fail");
         Assert.Contains(logger.Events, e => e.Event == "CleanupCompleted" && e.OperationId == "op-deploy-fail");
         Assert.Contains(logger.Events, e => e.Event == "DeployLabFailed" && e.OperationId == "op-deploy-fail");
+
+        var stepFailed = logger.Events.First(e => e.Event == "StepFailed");
+        Assert.Equal(@"C:\vm\vm1", stepFailed.Context?["vmPath"]?.ToString());
+        Assert.Equal(@"C:\vm\vm1\vm1.vhdx", stepFailed.Context?["targetVhdPath"]?.ToString());
+        Assert.Equal(@"D:\base\parent.vhdx", stepFailed.Context?["parentVhdPath"]?.ToString());
+
+        var vmFailed = logger.Events.First(e => e.Event == "VmDeployFailed");
+        Assert.Equal(@"C:\vm\vm1", vmFailed.Context?["vmPath"]?.ToString());
+        Assert.Equal(@"C:\vm\vm1\vm1.vhdx", vmFailed.Context?["targetVhdPath"]?.ToString());
+        Assert.Equal(@"D:\base\parent.vhdx", vmFailed.Context?["parentVhdPath"]?.ToString());
+
+        var deployFailed = logger.Events.First(e => e.Event == "DeployLabFailed");
+        Assert.Equal("vm1", deployFailed.Context?["failedVmName"]?.ToString());
+        Assert.Equal(@"C:\vm\vm1", deployFailed.Context?["vmPath"]?.ToString());
+        Assert.Equal(@"C:\vm\vm1\vm1.vhdx", deployFailed.Context?["targetVhdPath"]?.ToString());
+        Assert.Equal(@"D:\base\parent.vhdx", deployFailed.Context?["parentVhdPath"]?.ToString());
     }
 
     [Fact]

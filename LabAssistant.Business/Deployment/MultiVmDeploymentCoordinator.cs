@@ -188,12 +188,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             multiContext,
             result,
             multiContext.OperationState is DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals or DeploymentOperationState.CancelledWithResiduals ? "error" : "info",
-            new Dictionary<string, object?>
-            {
-                ["operationState"] = multiContext.OperationState.ToString(),
-                ["cleanupVmCount"] = multiContext.CleanupResults.Count,
-                ["residualVmCount"] = multiContext.CleanupResults.Count(r => r.HasResiduals)
-            });
+            BuildDeployTerminalContext(multiContext));
     }
 
     private void EmitVmScopedEvent(
@@ -275,8 +270,35 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
         return new Dictionary<string, object?>
         {
             ["vmId"] = vmContext.VmId.ToString("N"),
-            ["vmName"] = vmContext.VmName
+            ["vmName"] = vmContext.VmName,
+            ["vmPath"] = vmContext.VmPath,
+            ["targetVhdPath"] = vmContext.VhdPath,
+            ["parentVhdPath"] = vmContext.BaseVhdPath
         };
+    }
+
+    private static IReadOnlyDictionary<string, object?> BuildDeployTerminalContext(MultiVmDeploymentContext multiContext)
+    {
+        var context = new Dictionary<string, object?>
+        {
+            ["operationState"] = multiContext.OperationState.ToString(),
+            ["cleanupVmCount"] = multiContext.CleanupResults.Count,
+            ["residualVmCount"] = multiContext.CleanupResults.Count(r => r.HasResiduals)
+        };
+
+        var firstFailedVm = multiContext.VmContexts.FirstOrDefault(vm => !vm.IsSuccess && !vm.WasCancelled);
+        if (firstFailedVm != null)
+        {
+            context["failedVmName"] = firstFailedVm.VmName;
+            context["failedVmId"] = firstFailedVm.VmId.ToString("N");
+            context["failureStepKey"] = firstFailedVm.FailureStepKey;
+            context["errorMessage"] = firstFailedVm.FailureMessage;
+            context["vmPath"] = firstFailedVm.VmPath;
+            context["targetVhdPath"] = firstFailedVm.VhdPath;
+            context["parentVhdPath"] = firstFailedVm.BaseVhdPath;
+        }
+
+        return context;
     }
 
     private static StructuredLogLevel ParseLevel(string level)

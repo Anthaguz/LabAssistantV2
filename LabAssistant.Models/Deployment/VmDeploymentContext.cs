@@ -61,7 +61,10 @@ namespace LabAssistant.Models.Deployment
             return NonBlockingOptionalSteps != null && NonBlockingOptionalSteps.Contains(stepKey);
         }
 
-        public void MarkFailure(string stepKey, string? message = null)
+        public void MarkFailure(
+            string stepKey,
+            string? message = null,
+            IReadOnlyDictionary<string, object?>? extraContext = null)
         {
             if (IsStepNonBlocking(stepKey))
             {
@@ -73,11 +76,7 @@ namespace LabAssistant.Models.Deployment
                     "StepFailed",
                     "warn",
                     "non_blocking_failed",
-                    new Dictionary<string, object?>
-                    {
-                        ["stepKey"] = stepKey,
-                        ["errorMessage"] = message
-                    });
+                    BuildStepFailedContext(stepKey, message, extraContext));
                 return;
             }
 
@@ -92,12 +91,30 @@ namespace LabAssistant.Models.Deployment
                 "StepFailed",
                 "error",
                 "failed",
-                new Dictionary<string, object?>
-                {
-                    ["stepKey"] = stepKey,
-                    ["errorMessage"] = message
-                });
+                BuildStepFailedContext(stepKey, message, extraContext));
             OnBlockingFailure?.Invoke();
+        }
+
+        private static IReadOnlyDictionary<string, object?> BuildStepFailedContext(
+            string stepKey,
+            string? message,
+            IReadOnlyDictionary<string, object?>? extraContext)
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["stepKey"] = stepKey,
+                ["errorMessage"] = message
+            };
+
+            if (extraContext != null)
+            {
+                foreach (var pair in extraContext)
+                {
+                    payload[pair.Key] = pair.Value;
+                }
+            }
+
+            return payload;
         }
 
         public void MarkCancelled()
