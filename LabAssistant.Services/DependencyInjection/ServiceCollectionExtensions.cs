@@ -26,6 +26,9 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Func<IPersistentPowerShellSession, IHyperVService>>(
             _ => session => new HyperVService(session)
         );
+        services.AddSingleton<IVhdxFileAccessProbe, VhdxFileAccessProbe>();
+        services.AddSingleton<IHyperVVhdxProbe, PowerShellHyperVVhdxProbe>();
+        services.AddSingleton<IVhdxIntegrityValidator, VhdxIntegrityValidator>();
         services.AddSingleton<IDeploymentFileSystem, DeploymentFileSystem>();
         services.AddSingleton<ILogEventSink>(provider =>
         {
