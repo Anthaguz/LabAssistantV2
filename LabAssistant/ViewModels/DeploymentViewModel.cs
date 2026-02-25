@@ -11,15 +11,18 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using LabAssistant.Views;
 using System.Collections.Specialized;
+using System.ComponentModel;
 
 namespace LabAssistant.ViewModels;
 
 public partial class DeploymentViewModel : ObservableObject
 {
     private readonly VirtualSwitchProvider _switchProvider;
-    private readonly MultiVmDeploymentCoordinator _coordinator;
+    private readonly IDeploymentCoordinator _coordinator;
+    private readonly IDeploymentPreflightService _preflightService;
     private readonly IAppSettingsStore _settingsStore;
     private readonly ILabTemplateStore _templateStore;
     private readonly IAppPaths _appPaths;
@@ -27,6 +30,10 @@ public partial class DeploymentViewModel : ObservableObject
     private readonly IErrorFeedService _errorFeed;
     private readonly IDeploymentOutcomeSummaryBuilder _outcomeSummaryBuilder;
     private readonly IStructuredLogger _structuredLogger;
+    private readonly TimeSpan _quickPreflightDebounce;
+    private CancellationTokenSource? _quickPreflightDebounceCts;
+    private int _preflightRequestVersion;
+    private bool _deployStartPreflightInProgress;
     public Action<string>? LogHandler { get; set; }
 
     public ObservableCollection<string> AvailableSwitches { get; } = new();
@@ -48,24 +55,43 @@ public partial class DeploymentViewModel : ObservableObject
 
     public bool HasDeploymentSummary => DeploymentSummary != null;
 
+    [ObservableProperty]
+    private DeploymentReadinessReport? readinessReport;
+
+    [ObservableProperty]
+    private bool isReadinessCheckInProgress;
+
+    [ObservableProperty]
+    private string? readinessStatusMessage;
+
+    public bool HasReadinessReport => ReadinessReport != null;
+    public bool IsReadinessQuickReport => ReadinessReport?.Mode == DeploymentPreflightMode.Quick;
+    public bool IsReadinessFullReport => ReadinessReport?.Mode == DeploymentPreflightMode.Full;
+    public bool IsDeployBlockedByReadiness => ReadinessReport?.HasBlockingFailures == true;
+    public int ReadinessPassCount => ReadinessReport?.Results.Count(r => r.Status == DeploymentReadinessStatus.Pass) ?? 0;
+    public int ReadinessWarnCount => ReadinessReport?.Results.Count(r => r.Status == DeploymentReadinessStatus.Warn) ?? 0;
+    public int ReadinessFailCount => ReadinessReport?.Results.Count(r => r.Status == DeploymentReadinessStatus.Fail) ?? 0;
+
     public ObservableCollection<VmEntryViewModel> VmEntries { get; }
     private MultiVmDeploymentContext? _activeDeploymentContext;
     private bool HasActiveOperationContext => _activeDeploymentContext != null;
     public bool IsConfigurationEditingEnabled => !DeploymentUiInteractivity.HasActiveOperation(IsDeploying, HasActiveOperationContext, OperationState);
     public bool CanCancelDeploymentOperation => DeploymentUiInteractivity.HasActiveOperation(IsDeploying, HasActiveOperationContext, OperationState);
     public bool ShowCancelDeploymentAction => CanCancelDeploymentOperation;
-    public bool CanStartDeploymentOperation => !CanCancelDeploymentOperation;
+    public bool CanStartDeploymentOperation => !CanCancelDeploymentOperation && !_deployStartPreflightInProgress && !IsDeployBlockedByReadiness;
 
     public DeploymentViewModel(
-        MultiVmDeploymentCoordinator coordinator,
+        IDeploymentCoordinator coordinator,
         VirtualSwitchProvider switchProvider,
+        IDeploymentPreflightService preflightService,
         IAppSettingsStore settingsStore,
         ILabTemplateStore templateStore,
         IAppPaths appPaths,
         IVhdxCatalogStore catalogStore,
         IErrorFeedService errorFeed,
         IDeploymentOutcomeSummaryBuilder outcomeSummaryBuilder,
-        IStructuredLogger? structuredLogger = null)
+        IStructuredLogger? structuredLogger = null,
+        TimeSpan? quickPreflightDebounce = null)
     {
         LogHandler = message =>
         {
@@ -77,6 +103,7 @@ public partial class DeploymentViewModel : ObservableObject
 
         _switchProvider = switchProvider;
         _coordinator = coordinator;
+        _preflightService = preflightService;
         _settingsStore = settingsStore;
         _templateStore = templateStore;
         _appPaths = appPaths;
@@ -84,6 +111,7 @@ public partial class DeploymentViewModel : ObservableObject
         _errorFeed = errorFeed;
         _outcomeSummaryBuilder = outcomeSummaryBuilder;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
+        _quickPreflightDebounce = quickPreflightDebounce ?? TimeSpan.FromMilliseconds(350);
         VmEntries = new ObservableCollection<VmEntryViewModel>();
         VmEntries.CollectionChanged += HandleVmEntriesCollectionChanged;
         _ = LoadAvailableSwitches();
@@ -99,6 +127,8 @@ public partial class DeploymentViewModel : ObservableObject
         {
             AvailableSwitches.Add(s);
         }
+
+        RequestQuickPreflightRefresh();
     }
 
     public void AddLog(Guid vmId, string vmName, string message)
@@ -216,6 +246,8 @@ public partial class DeploymentViewModel : ObservableObject
         {
             LogGroups.Remove(logGroup);
         }
+
+        RequestQuickPreflightRefresh();
     }
 
     [RelayCommand(CanExecute = nameof(IsConfigurationEditingEnabled))]
@@ -250,6 +282,8 @@ public partial class DeploymentViewModel : ObservableObject
                 }
             }
         };
+
+        RequestQuickPreflightRefresh();
     }
 
     [RelayCommand(CanExecute = nameof(IsConfigurationEditingEnabled))]
@@ -388,6 +422,20 @@ public partial class DeploymentViewModel : ObservableObject
             return;
         }
 
+        CancelPendingQuickPreflight();
+        _deployStartPreflightInProgress = true;
+        RefreshOperationUiState();
+        var fullPreflight = await RunPreflightAsync(DeploymentPreflightMode.Full, CancellationToken.None);
+        _deployStartPreflightInProgress = false;
+        RefreshOperationUiState();
+
+        if (fullPreflight.HasBlockingFailures)
+        {
+            ReadinessStatusMessage = "Deployment blocked by readiness failures. Review the readiness report and fix blocking issues.";
+            Logs.Add("Deployment blocked by readiness failures.");
+            return;
+        }
+
         IsDeploying = true;
         DeploymentSummary = null;
         Logs.Clear();
@@ -501,6 +549,7 @@ public partial class DeploymentViewModel : ObservableObject
         OnPropertyChanged(nameof(CanCancelDeploymentOperation));
         OnPropertyChanged(nameof(ShowCancelDeploymentAction));
         OnPropertyChanged(nameof(CanStartDeploymentOperation));
+        OnPropertyChanged(nameof(IsDeployBlockedByReadiness));
 
         AddVmCommand.NotifyCanExecuteChanged();
         SaveAsTemplateCommand.NotifyCanExecuteChanged();
@@ -511,11 +560,172 @@ public partial class DeploymentViewModel : ObservableObject
 
     private void HandleVmEntriesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (e.OldItems != null)
+        {
+            foreach (var oldItem in e.OldItems.OfType<VmEntryViewModel>())
+            {
+                oldItem.PropertyChanged -= HandleVmEntryPropertyChanged;
+            }
+        }
+
+        if (e.NewItems != null)
+        {
+            foreach (var newItem in e.NewItems.OfType<VmEntryViewModel>())
+            {
+                newItem.PropertyChanged += HandleVmEntryPropertyChanged;
+            }
+        }
+
         DeleteVmCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnDeploymentSummaryChanged(DeploymentOutcomeSummary? value)
     {
         OnPropertyChanged(nameof(HasDeploymentSummary));
+    }
+
+    partial void OnReadinessReportChanged(DeploymentReadinessReport? value)
+    {
+        OnPropertyChanged(nameof(HasReadinessReport));
+        OnPropertyChanged(nameof(IsReadinessQuickReport));
+        OnPropertyChanged(nameof(IsReadinessFullReport));
+        OnPropertyChanged(nameof(IsDeployBlockedByReadiness));
+        OnPropertyChanged(nameof(ReadinessPassCount));
+        OnPropertyChanged(nameof(ReadinessWarnCount));
+        OnPropertyChanged(nameof(ReadinessFailCount));
+        RefreshOperationUiState();
+    }
+
+    public void RequestQuickPreflightRefresh()
+    {
+        if (IsDeploying || _deployStartPreflightInProgress)
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _quickPreflightDebounceCts, cts);
+        previous?.Cancel();
+        previous?.Dispose();
+        var requestVersion = Interlocked.Increment(ref _preflightRequestVersion);
+
+        _ = RunQuickPreflightDebouncedAsync(requestVersion, cts.Token);
+    }
+
+    private async Task RunQuickPreflightDebouncedAsync(int requestVersion, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(_quickPreflightDebounce, cancellationToken).ConfigureAwait(false);
+            var report = await RunPreflightAsync(DeploymentPreflightMode.Quick, cancellationToken, updateUiState: false).ConfigureAwait(false);
+
+            if (requestVersion != _preflightRequestVersion || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            RunOnUiThread(() =>
+            {
+                ReadinessReport = report;
+                ReadinessStatusMessage = report.Results.Count == 0
+                    ? "Quick readiness check completed (no issues detected)."
+                    : "Quick readiness check updated.";
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            RunOnUiThread(() => ReadinessStatusMessage = $"Quick readiness check failed: {ex.Message}");
+        }
+    }
+
+    private async Task<DeploymentReadinessReport> RunPreflightAsync(DeploymentPreflightMode mode, CancellationToken cancellationToken)
+        => await RunPreflightAsync(mode, cancellationToken, updateUiState: true).ConfigureAwait(false);
+
+    private async Task<DeploymentReadinessReport> RunPreflightAsync(
+        DeploymentPreflightMode mode,
+        CancellationToken cancellationToken,
+        bool updateUiState)
+    {
+        if (updateUiState)
+        {
+            RunOnUiThread(() =>
+            {
+                IsReadinessCheckInProgress = true;
+                ReadinessStatusMessage = mode == DeploymentPreflightMode.Full
+                    ? "Running full readiness check..."
+                    : "Running quick readiness check...";
+            });
+        }
+
+        try
+        {
+            var context = new MultiVmDeploymentContext
+            {
+                VmContexts = VmEntries.Select(vm => vm.DeploymentContext).ToList(),
+                StopAllOnAnyVmFailure = _settingsStore.Settings.StopAllOnAnyVmFailure
+            };
+
+            var report = await _preflightService.RunAsync(context, mode, cancellationToken).ConfigureAwait(false);
+
+            if (updateUiState)
+            {
+                RunOnUiThread(() =>
+                {
+                    ReadinessReport = report;
+                    ReadinessStatusMessage = report.HasBlockingFailures
+                        ? $"{mode} readiness check found blocking failures."
+                        : report.HasWarnings
+                            ? $"{mode} readiness check found warnings."
+                            : $"{mode} readiness check passed.";
+                });
+            }
+
+            return report;
+        }
+        finally
+        {
+            if (updateUiState)
+            {
+                RunOnUiThread(() => IsReadinessCheckInProgress = false);
+            }
+        }
+    }
+
+    private void CancelPendingQuickPreflight()
+    {
+        var previous = Interlocked.Exchange(ref _quickPreflightDebounceCts, null);
+        if (previous == null)
+        {
+            return;
+        }
+
+        previous.Cancel();
+        previous.Dispose();
+        Interlocked.Increment(ref _preflightRequestVersion);
+    }
+
+    private void HandleVmEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(VmEntryViewModel.VmName)
+            or nameof(VmEntryViewModel.VhdPath)
+            or nameof(VmEntryViewModel.SelectedSwitchName))
+        {
+            RequestQuickPreflightRefresh();
+        }
+    }
+
+    private static void RunOnUiThread(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        dispatcher.Invoke(action);
     }
 }

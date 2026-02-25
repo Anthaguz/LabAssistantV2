@@ -12,6 +12,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -45,6 +46,66 @@
         </StackPanel>
 
         <Border Grid.Row="2" Grid.ColumnSpan="2"
+                BorderBrush="#FFDDDDDD"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12"
+                Margin="0,0,0,12">
+            <StackPanel>
+                <DockPanel LastChildFill="True">
+                    <TextBlock Text="Deployment Readiness"
+                               FontSize="16"
+                               FontWeight="SemiBold"/>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                        <TextBlock Text="{Binding IsReadinessCheckInProgress, StringFormat=Checking: {0}}" Margin="0,0,12,0"/>
+                        <TextBlock Text="{Binding ReadinessReport.Mode, StringFormat=Mode: {0}}"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <WrapPanel Margin="0,8,0,6">
+                    <TextBlock Text="{Binding ReadinessPassCount, StringFormat=Pass: {0}}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding ReadinessWarnCount, StringFormat=Warn: {0}}" Margin="0,0,16,0" Foreground="#FF8A5A00"/>
+                    <TextBlock Text="{Binding ReadinessFailCount, StringFormat=Fail: {0}}" Margin="0,0,16,0" Foreground="#FFB00020"/>
+                    <TextBlock Text="{Binding IsDeployBlockedByReadiness, StringFormat=Deploy Blocked: {0}}" Foreground="#FFB00020"/>
+                </WrapPanel>
+
+                <TextBlock Text="{Binding ReadinessStatusMessage}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,6"
+                           Foreground="{StaticResource SystemBaseHighColor}"/>
+
+                <ItemsControl ItemsSource="{Binding ReadinessReport.Results}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#FFE5E5E5" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" TextWrapping="Wrap">
+                                        <Run Text="{Binding Status}"/>
+                                        <Run Text=" | "/>
+                                        <Run Text="{Binding Category}"/>
+                                        <Run Text=" | "/>
+                                        <Run Text="{Binding Code}"/>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding ActionableGuidance}" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="#FF0A5A9C"/>
+                                    <TextBlock Text="{Binding ResourcePath, StringFormat=Path: {0}}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding ResourceName, StringFormat=Resource: {0}}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                    <ItemsControl ItemsSource="{Binding AffectedVmNames}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding StringFormat=VM: {0}}" Margin="0,2,0,0"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="3" Grid.ColumnSpan="2"
                 BorderBrush="#FFDDDDDD"
                 BorderThickness="1"
                 CornerRadius="6"
@@ -133,7 +194,7 @@
         </Border>
 
         <!-- VM Cards + Logs -->
-        <Grid Grid.Row="3" Grid.ColumnSpan="2">
+        <Grid Grid.Row="4" Grid.ColumnSpan="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="2*"/>

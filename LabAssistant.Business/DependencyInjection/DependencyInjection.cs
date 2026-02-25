@@ -105,6 +105,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IDeploymentOutcomeSummaryBuilder, DeploymentOutcomeSummaryBuilder>();
         services.AddSingleton<IVmCleanupOrchestrator, VmCleanupOrchestrator>();
         services.AddSingleton<MultiVmDeploymentCoordinator>();
+        services.AddSingleton<IDeploymentCoordinator>(provider => provider.GetRequiredService<MultiVmDeploymentCoordinator>());
 
         return services;
     }

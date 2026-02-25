@@ -1,13 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using LabAssistant.Business.Catalog;
+using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.Services.Logging;
+using LabAssistant.Services.HyperV;
+using LabAssistant.Services.PowerShell;
 using LabAssistant.ViewModels;
 using Xunit;
 
@@ -310,6 +316,120 @@ public class ViewModelWorkflowTests
         Assert.Equal(expectedCanCancel, hasActiveOperation);
     }
 
+    [Fact]
+    public async Task DeploymentViewModel_RelevantVmConfigChange_TriggersQuickPreflightAndUpdatesReadinessReport()
+    {
+        var preflight = new RecordingPreflightService
+        {
+            ResultFactory = (_, mode) => new DeploymentReadinessReport
+            {
+                Mode = mode,
+                Results =
+                [
+                    new DeploymentReadinessCheckResult
+                    {
+                        Status = DeploymentReadinessStatus.Pass,
+                        Category = DeploymentReadinessCategory.DestinationPathStorage,
+                        Code = mode == DeploymentPreflightMode.Quick ? "DST.QUICK.OK" : "DST.FULL.OK",
+                        Message = "ok",
+                        ActionableGuidance = "none"
+                    }
+                ]
+            }
+        };
+
+        var viewModel = CreateDeploymentViewModel(preflight, new RecordingDeploymentCoordinator(), quickPreflightDebounce: TimeSpan.FromMilliseconds(10));
+        viewModel.AddVmCommand.Execute(null);
+        var vm = viewModel.VmEntries.Single();
+
+        await WaitUntilAsync(() => preflight.Calls.Count > 0, TimeSpan.FromSeconds(2));
+        var baselineCalls = preflight.Calls.Count;
+
+        vm.VhdPath = @"D:\Labs\vm1\vm1.vhdx";
+
+        await WaitUntilAsync(() => preflight.Calls.Count > baselineCalls, TimeSpan.FromSeconds(2));
+        Assert.Equal(DeploymentPreflightMode.Quick, preflight.Calls.Last().Mode);
+        Assert.NotNull(viewModel.ReadinessReport);
+        Assert.Equal(DeploymentPreflightMode.Quick, viewModel.ReadinessReport!.Mode);
+    }
+
+    [Fact]
+    public async Task DeploymentViewModel_DeployAll_RunsFullPreflightAndBlocksOnFailures()
+    {
+        var preflight = new RecordingPreflightService
+        {
+            ResultFactory = (_, mode) => new DeploymentReadinessReport
+            {
+                Mode = mode,
+                Results = mode == DeploymentPreflightMode.Full
+                    ?
+                    [
+                        new DeploymentReadinessCheckResult
+                        {
+                            Status = DeploymentReadinessStatus.Fail,
+                            Category = DeploymentReadinessCategory.VhdxBaseDisk,
+                            Code = "VHDX.INVALID",
+                            Message = "Invalid VHDX",
+                            ActionableGuidance = "Fix it",
+                            AffectedVmNames = ["VM1"]
+                        }
+                    ]
+                    : []
+            }
+        };
+        var coordinator = new RecordingDeploymentCoordinator();
+        var viewModel = CreateDeploymentViewModel(preflight, coordinator, quickPreflightDebounce: TimeSpan.FromMilliseconds(5));
+        viewModel.AddVmCommand.Execute(null);
+        var vm = viewModel.VmEntries.Single().DeploymentContext;
+        vm.BaseVhdPath = @"C:\base\good.vhdx";
+
+        await viewModel.DeployAllCommand.ExecuteAsync(null);
+
+        Assert.Contains(preflight.Calls, c => c.Mode == DeploymentPreflightMode.Full);
+        Assert.Equal(0, coordinator.CallCount);
+        Assert.True(viewModel.IsDeployBlockedByReadiness);
+        Assert.NotNull(viewModel.ReadinessReport);
+        Assert.Equal(DeploymentPreflightMode.Full, viewModel.ReadinessReport!.Mode);
+    }
+
+    [Fact]
+    public async Task DeploymentViewModel_DeployAll_AllowsWarningsOnlyAndStartsDeployment()
+    {
+        var preflight = new RecordingPreflightService
+        {
+            ResultFactory = (_, mode) => new DeploymentReadinessReport
+            {
+                Mode = mode,
+                Results = mode == DeploymentPreflightMode.Full
+                    ?
+                    [
+                        new DeploymentReadinessCheckResult
+                        {
+                            Status = DeploymentReadinessStatus.Warn,
+                            Category = DeploymentReadinessCategory.DestinationPathStorage,
+                            Code = "DST.STORAGE.LOW_FREE_SPACE",
+                            Message = "Low free space",
+                            ActionableGuidance = "Proceed with caution",
+                            AffectedVmNames = ["VM1"],
+                            ResourcePath = @"C:\"
+                        }
+                    ]
+                    : []
+            }
+        };
+        var coordinator = new RecordingDeploymentCoordinator();
+        var viewModel = CreateDeploymentViewModel(preflight, coordinator, quickPreflightDebounce: TimeSpan.FromMilliseconds(5));
+        viewModel.AddVmCommand.Execute(null);
+        var vm = viewModel.VmEntries.Single().DeploymentContext;
+        vm.BaseVhdPath = @"C:\base\good.vhdx";
+
+        await viewModel.DeployAllCommand.ExecuteAsync(null);
+
+        Assert.Contains(preflight.Calls, c => c.Mode == DeploymentPreflightMode.Full);
+        Assert.Equal(1, coordinator.CallCount);
+        Assert.False(viewModel.IsDeployBlockedByReadiness);
+    }
+
     private static CatalogService CreateCatalogService(FakeCatalogStore store)
     {
         var settingsStore = new FakeAppSettingsStore
@@ -515,5 +635,176 @@ public class ViewModelWorkflowTests
             Assert.DoesNotContain("token", key, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("secret", key, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    private static DeploymentViewModel CreateDeploymentViewModel(
+        RecordingPreflightService preflightService,
+        RecordingDeploymentCoordinator coordinator,
+        TimeSpan? quickPreflightDebounce = null)
+    {
+        var switchProvider = new VirtualSwitchProvider(
+            () => new FakePersistentPowerShellSession(),
+            _ => new FakeHyperVService());
+
+        var settingsStore = new FakeAppSettingsStore
+        {
+            Settings = new AppSettings
+            {
+                CatalogPath = @"C:\catalog\vhdx-catalog.json",
+                VmBasePath = @"C:\labs",
+                StopAllOnAnyVmFailure = true
+            }
+        };
+
+        var catalogStore = new FakeCatalogStore(Array.Empty<VhdxCatalogItem>());
+        var templateStore = new FakeTemplateStore();
+        var appPaths = new FakeAppPaths();
+        var errorFeed = new RecordingErrorFeedService();
+        var outcomeBuilder = new StubOutcomeSummaryBuilder();
+
+        return new DeploymentViewModel(
+            coordinator,
+            switchProvider,
+            preflightService,
+            settingsStore,
+            templateStore,
+            appPaths,
+            catalogStore,
+            errorFeed,
+            outcomeBuilder,
+            structuredLogger: new RecordingStructuredLogger(),
+            quickPreflightDebounce: quickPreflightDebounce ?? TimeSpan.FromMilliseconds(10));
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var start = DateTime.UtcNow;
+        while (!condition())
+        {
+            if (DateTime.UtcNow - start > timeout)
+            {
+                throw new TimeoutException("Condition was not met within the timeout.");
+            }
+
+            await Task.Delay(20);
+        }
+    }
+
+    private sealed class RecordingPreflightService : IDeploymentPreflightService
+    {
+        public List<(string OperationId, DeploymentPreflightMode Mode, int VmCount)> Calls { get; } = [];
+        public Func<MultiVmDeploymentContext, DeploymentPreflightMode, DeploymentReadinessReport> ResultFactory { get; set; } =
+            (_, mode) => new DeploymentReadinessReport { Mode = mode };
+
+        public Task<DeploymentReadinessReport> RunAsync(MultiVmDeploymentContext deploymentContext, DeploymentPreflightMode mode, CancellationToken cancellationToken = default)
+        {
+            Calls.Add((deploymentContext.OperationId, mode, deploymentContext.VmContexts.Count));
+            return Task.FromResult(ResultFactory(deploymentContext, mode));
+        }
+    }
+
+    private sealed class RecordingDeploymentCoordinator : IDeploymentCoordinator
+    {
+        public int CallCount { get; private set; }
+
+        public Task DeployAllAsync(MultiVmDeploymentContext multiContext)
+        {
+            CallCount++;
+            multiContext.MarkRunning();
+            multiContext.CompleteTerminalState(hasFailures: false, hasCleanupResiduals: false);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakePersistentPowerShellSession : IPersistentPowerShellSession
+    {
+        public Task<(string Output, string Error)> ExecuteAsync(string command)
+            => Task.FromResult<(string Output, string Error)>((string.Empty, string.Empty));
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class FakeHyperVService : IHyperVService
+    {
+        public Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName) => Task.FromResult(true);
+        public Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath) => Task.FromResult(true);
+        public Task<bool> CreateVhdFixedSizeAsync(string vhdPath, long sizeBytes) => Task.FromResult(true);
+        public Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount) => Task.FromResult(true);
+        public Task<bool> DisableVmCheckpointsAsync(string vmName) => Task.FromResult(true);
+        public Task<bool> EnableGuestServicesAsync(string vmName) => Task.FromResult(true);
+        public Task<List<string>> GetVirtualSwitchNamesAsync() => Task.FromResult(new List<string> { "Default Switch" });
+        public Task<bool> IsVmRunningAsync(string vmName) => Task.FromResult(false);
+        public Task<bool> RemoveVmAsync(string vmName) => Task.FromResult(true);
+        public Task<bool> StartVmAsync(string vmName) => Task.FromResult(true);
+        public Task<bool> StopVmAsync(string vmName) => Task.FromResult(true);
+        public Task<bool> VmExistsAsync(string vmName) => Task.FromResult(false);
+    }
+
+    private sealed class RecordingErrorFeedService : IErrorFeedService
+    {
+        public ObservableCollection<ErrorFeedItem> ActiveItems { get; } = [];
+        public ObservableCollection<ErrorFeedItem> RecentItems { get; } = [];
+        public int TotalErrorCount { get; private set; }
+        public event Action? StateChanged;
+
+        public void Publish(string? vmName, string title, string message, Action? viewDetailsAction = null)
+        {
+            var item = new ErrorFeedItem
+            {
+                VmName = vmName,
+                Title = title,
+                Message = message,
+                ViewDetailsAction = viewDetailsAction
+            };
+            ActiveItems.Add(item);
+            RecentItems.Add(item);
+            TotalErrorCount++;
+            StateChanged?.Invoke();
+        }
+
+        public void Dismiss(Guid id)
+        {
+        }
+    }
+
+    private sealed class StubOutcomeSummaryBuilder : IDeploymentOutcomeSummaryBuilder
+    {
+        public DeploymentOutcomeSummary Build(MultiVmDeploymentContext multiVmContext)
+        {
+            return new DeploymentOutcomeSummary
+            {
+                OperationState = multiVmContext.OperationState,
+                TotalVmCount = multiVmContext.VmContexts.Count,
+                VmOutcomes = multiVmContext.VmContexts.Select(vm => new VmDeploymentOutcomeSummary
+                {
+                    VmId = vm.VmId,
+                    VmName = vm.VmName,
+                    Status = vm.IsSuccess ? VmDeploymentOutcomeStatus.Succeeded : (vm.WasCancelled ? VmDeploymentOutcomeStatus.Cancelled : VmDeploymentOutcomeStatus.Failed),
+                    Cleanup = new VmCleanupOutcomeSummary
+                    {
+                        Status = VmCleanupOutcomeStatus.NotNeeded,
+                        ResidualCount = 0
+                    },
+                    Residuals = []
+                }).ToList()
+            };
+        }
+    }
+
+    private sealed class FakeAppPaths : IAppPaths
+    {
+        public string AppRoot => @"C:\appdata\LabAssistant";
+        public string ConfigFolder => @"C:\appdata\LabAssistant\Config";
+        public string RootAppDataFolder => @"C:\appdata\LabAssistant";
+        public string TemplatesFolder => @"C:\appdata\LabAssistant\Templates";
+        public string LogsFolder => @"C:\appdata\LabAssistant\Logs";
+        public string CatalogFolder => @"C:\appdata\LabAssistant\Catalog";
+        public string VmBasePath => @"C:\labs";
+        public string DifferencingDiskBasePath => @"C:\labs\diff";
+        public string CatalogPath => @"C:\appdata\LabAssistant\Catalog\vhdx-catalog.json";
+        public string SettingsFolder => @"C:\appdata\LabAssistant\Settings";
+        public string SettingsFilePath => @"C:\appdata\LabAssistant\Settings\appsettings.json";
     }
 }
