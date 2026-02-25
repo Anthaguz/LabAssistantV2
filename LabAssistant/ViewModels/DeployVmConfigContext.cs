@@ -7,11 +7,11 @@ namespace LabAssistant.ViewModels
 {
     public class DeployVmConfigContext : INotifyPropertyChanged, IVmConfigContext
     {
-        private readonly DeploymentViewModel _deploymentViewModel;
+        private readonly DeploymentViewModel? _deploymentViewModel;
         private readonly IAppSettingsStore _settingsStore;
         private readonly VmDeploymentContext _context;
 
-        public DeployVmConfigContext(DeploymentViewModel deploymentViewModel, VmDeploymentContext context, IAppSettingsStore settingsStore)
+        public DeployVmConfigContext(DeploymentViewModel? deploymentViewModel, VmDeploymentContext context, IAppSettingsStore settingsStore)
         {
             _deploymentViewModel = deploymentViewModel;
             _context = context;
@@ -113,7 +113,7 @@ namespace LabAssistant.ViewModels
             }
         }
 
-        public ObservableCollection<string> AvailableSwitches => _deploymentViewModel.AvailableSwitches;
+        public ObservableCollection<string> AvailableSwitches => _deploymentViewModel?.AvailableSwitches ?? new ObservableCollection<string>();
 
         public bool HasSwitches => AvailableSwitches.Count > 0;
 
@@ -124,6 +124,13 @@ namespace LabAssistant.ViewModels
         private void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (propertyName is nameof(Name)
+                or nameof(SwitchName)
+                or nameof(VhdxId)
+                or nameof(BaseVhdPath))
+            {
+                _deploymentViewModel?.RequestQuickPreflightRefresh();
+            }
         }
     }
 }

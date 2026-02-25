@@ -6,7 +6,7 @@ using LabAssistant.Services.PowerShell;
 
 namespace LabAssistant.Business.Deployment;
 
-public class MultiVmDeploymentCoordinator
+public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
 {
     private readonly ISessionResolver _sessionResolver;
     private readonly IDeploymentPipelineBuilder _pipelineBuilder;
