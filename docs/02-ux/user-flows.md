@@ -5,6 +5,7 @@
 **Related planning docs (UI migration prep):**
 - `docs/02-ux/capability-taxonomy.md`
 - `docs/02-ux/navigation-ia-draft.md`
+- `docs/02-ux/current-ui-capability-audit.md`
 
 ## How to fill this
 For each flow:

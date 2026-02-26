@@ -5,6 +5,9 @@
 **Status:** Draft for migration planning (not an implementation spec).
 
 **Related:** `docs/02-ux/capability-taxonomy.md`
+ 
+**See also:**
+- `docs/02-ux/current-ui-capability-audit.md`
 
 ---
 
