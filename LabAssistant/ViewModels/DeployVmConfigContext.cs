@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Models.Templates;
 
 namespace LabAssistant.ViewModels
 {
@@ -115,12 +116,14 @@ namespace LabAssistant.ViewModels
 
         public bool ConfigureTimeZoneEnabled
         {
-            get => _context.ConfigureTimeZone;
+            get => _context.ConfigureTimeZone || (_context.TimeZoneConfig?.Enabled ?? false);
             set
             {
-                if (_context.ConfigureTimeZone != value)
+                if (ConfigureTimeZoneEnabled != value)
                 {
                     _context.ConfigureTimeZone = value;
+                    _context.TimeZoneConfig ??= new TimeZoneStepConfig();
+                    _context.TimeZoneConfig.Enabled = value;
                     OnPropertyChanged(nameof(ConfigureTimeZoneEnabled));
                 }
             }
@@ -128,12 +131,14 @@ namespace LabAssistant.ViewModels
 
         public bool InstallSoftwareEnabled
         {
-            get => _context.InstallSoftware;
+            get => _context.InstallSoftware || (_context.SoftwareConfig?.Enabled ?? false);
             set
             {
-                if (_context.InstallSoftware != value)
+                if (InstallSoftwareEnabled != value)
                 {
                     _context.InstallSoftware = value;
+                    _context.SoftwareConfig ??= new SoftwareStepConfig();
+                    _context.SoftwareConfig.Enabled = value;
                     OnPropertyChanged(nameof(InstallSoftwareEnabled));
                 }
             }
@@ -141,12 +146,14 @@ namespace LabAssistant.ViewModels
 
         public bool InstallRoleEnabled
         {
-            get => _context.InstallRole;
+            get => _context.InstallRole || (_context.RoleConfig?.Enabled ?? false);
             set
             {
-                if (_context.InstallRole != value)
+                if (InstallRoleEnabled != value)
                 {
                     _context.InstallRole = value;
+                    _context.RoleConfig ??= new RoleStepConfig();
+                    _context.RoleConfig.Enabled = value;
                     OnPropertyChanged(nameof(InstallRoleEnabled));
                 }
             }
@@ -166,7 +173,10 @@ namespace LabAssistant.ViewModels
             if (propertyName is nameof(Name)
                 or nameof(SwitchName)
                 or nameof(VhdxId)
-                or nameof(BaseVhdPath))
+                or nameof(BaseVhdPath)
+                or nameof(ConfigureTimeZoneEnabled)
+                or nameof(InstallSoftwareEnabled)
+                or nameof(InstallRoleEnabled))
             {
                 _deploymentViewModel?.RequestQuickPreflightRefresh();
             }
