@@ -9,6 +9,7 @@
 **See also:**
 - `docs/02-ux/current-ui-capability-audit.md`
 - `docs/02-ux/migration-preservation-matrix.md`
+- `docs/02-ux/ui-migration-execution-plan.md`
 
 ---
 

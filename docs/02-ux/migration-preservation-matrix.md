@@ -10,6 +10,7 @@
 - `docs/02-ux/capability-taxonomy.md`
 - `docs/02-ux/navigation-ia-draft.md`
 - `docs/02-ux/current-ui-capability-audit.md`
+- `docs/02-ux/ui-migration-execution-plan.md`
 - `docs/03-architecture/gui-action-map.deploy.md`
 - `docs/03-architecture/gui-action-map.templates.md`
 - `docs/03-architecture/gui-action-map.assets.md`

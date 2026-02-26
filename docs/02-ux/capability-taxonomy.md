@@ -6,6 +6,7 @@
 
 **Related:**
 - `docs/02-ux/navigation-ia-draft.md`
+- `docs/02-ux/ui-migration-execution-plan.md`
 - `docs/02-ux/ui-inventory.md`
 - `docs/02-ux/user-flows.md`
 
