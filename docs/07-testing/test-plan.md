@@ -99,6 +99,23 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - No GUI hang/regression in VHDX validation paths and app shutdown sanity remains intact.
   - Catalog add/edit validation remains scoped to affected item(s) (no unrelated invalid catalog entries blocking single-item save/edit flows).
 
+## TC-008: Milestone V Operational Hardening Verification (Wrapper + Logs + Diagnostics)
+- **Related AC:** `GR-03`, `AC-001` (runtime diagnostics supportability aspects)
+- **Type:** Manual (real machine) + automated coverage
+- **Related milestone:** Milestone V (`#225`-`#229`)
+- **Steps:**
+  1. Run the Milestone V checklist in `docs/07-testing/milestone-v-operational-hardening-checklist.md`.
+  2. Verify wrapper trace toggle off/on behavior (`LABASSISTANT_POWERSHELL_WRAPPER_TRACE`).
+  3. Spot-check PowerShell-backed actions for no-hang/shutdown regressions.
+  4. Verify structured/debug log rotation and retention behavior.
+  5. Trigger a runtime failure and inspect structured + debug diagnostics metadata.
+- **Expected:**
+  - Wrapper trace protocol logs are low-noise by default and visible only when explicitly enabled.
+  - PowerShell-backed flows remain functional and shutdown sanity is preserved.
+  - Structured/debug logs rotate with stable active filenames and bounded retained history.
+  - Failure structured logs include normalized error metadata (when available) and path-context enrichment.
+  - Raw PowerShell stderr remains available in debug logs as supplemental diagnostics.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.
