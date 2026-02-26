@@ -45,7 +45,8 @@ public sealed class DeploymentOutcomeSummaryBuilder : IDeploymentOutcomeSummaryB
                 Reason = vm.FailureMessage,
                 FailureStepKey = vm.FailureStepKey,
                 Cleanup = cleanupSummary,
-                Residuals = cleanupResult?.Residuals.ToList() ?? []
+                Residuals = cleanupResult?.Residuals.ToList() ?? [],
+                GuestStepOutcomes = vm.GuestStepOutcomes.ToList()
             });
         }
 

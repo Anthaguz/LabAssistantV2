@@ -48,6 +48,7 @@ namespace LabAssistant.Models.Deployment
         public string? FailureMessage { get; private set; }
         public IReadOnlyDictionary<string, object?>? FailureMetadata { get; private set; }
         public VmCleanupResult? CleanupResult { get; set; }
+        public List<GuestStepExecutionOutcome> GuestStepOutcomes { get; } = new();
 
         // Logging and PowerShell
         public List<string> Logs { get; } = new();
@@ -124,6 +125,23 @@ namespace LabAssistant.Models.Deployment
             WasCancelled = true;
         }
 
+        public void RecordGuestStepOutcome(
+            string stepKey,
+            string displayName,
+            string result,
+            string? skipReason = null,
+            string? message = null)
+        {
+            GuestStepOutcomes.Add(new GuestStepExecutionOutcome
+            {
+                StepKey = stepKey,
+                DisplayName = displayName,
+                Result = result,
+                SkipReason = skipReason,
+                Message = message
+            });
+        }
+
         public void ResetForNewOperation()
         {
             IsSuccess = true;
@@ -137,6 +155,7 @@ namespace LabAssistant.Models.Deployment
             FailureMessage = null;
             FailureMetadata = null;
             CleanupResult = null;
+            GuestStepOutcomes.Clear();
             Logs.Clear();
             PowerShellHandle = null;
             StructuredEventEmitter = null;

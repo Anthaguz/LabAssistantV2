@@ -6,10 +6,12 @@ namespace LabAssistant.Business.Deployment
 {
     public class SetTimeZoneStep : GuestOsConfigurationStep
     {
+        protected override string GuestStepKey => DeploymentStepKeys.SetTimeZone;
+        protected override string GuestStepDisplayName => "Set Time Zone";
+        protected override bool IsSelected(VmDeploymentContext context) => context.ConfigureTimeZone;
+
         protected override void ExecuteGuestStep(VmDeploymentContext context)
         {
-            if (!context.ConfigureTimeZone) return;
-
             DebugLogger.Log("Setting time zone inside the Guest OS...");
             DebugLogger.Log($"VM Name: {context.VmName}");
             context.Logs.Add("Time zone configured in Guest OS.");

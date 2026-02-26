@@ -167,6 +167,19 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+                                    <ItemsControl ItemsSource="{Binding GuestStepOutcomes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Margin="0,2,0,0" Foreground="#FF666666" TextWrapping="Wrap">
+                                                    <Run Text="Guest Step: "/>
+                                                    <Run Text="{Binding DisplayName}"/>
+                                                    <Run Text=" - "/>
+                                                    <Run Text="{Binding Result}"/>
+                                                    <Run Text="{Binding SkipReason, StringFormat= ({0})}"/>
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

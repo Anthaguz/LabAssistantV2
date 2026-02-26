@@ -63,17 +63,12 @@ public class DeploymentPipelineBuilder : IDeploymentPipelineBuilder
             .SetNext(_disableVmCheckpoints)
             .SetNext(_startVmStep);
 
-        if (context.ConfigureTimeZone)
-            current = current.SetNext(_setTimeZoneStep);
-
-        if (context.InstallSoftware)
-            current = current.SetNext(_installSoftwareStep);
-
-        if (context.InstallRole)
-            current = current.SetNext(_installRoleStep);
-
-        if (context.ConfigureNetworkInformation)
-            current = current.SetNext(_configureNetworkInformationStep);
+        // Guest steps are always included so selection-driven skips and placeholder skips
+        // are explicit in per-VM logs/summary details and structured events.
+        current = current.SetNext(_setTimeZoneStep);
+        current = current.SetNext(_installSoftwareStep);
+        current = current.SetNext(_installRoleStep);
+        current = current.SetNext(_configureNetworkInformationStep);
 
         return check;
     }
