@@ -98,4 +98,6 @@ Behavioral boundaries:
   - `docs/03-architecture/gui-action-map.templates.md`
   - `docs/03-architecture/gui-action-map.assets.md`
   - `docs/03-architecture/gui-action-map.settings-diagnostics-shell.md`
+- Code-path reading index (migration/onboarding aid):
+  - `docs/03-architecture/code-path-index.md`
 - Future action maps should be added for new capability surfaces (especially `Machines`) as those workflows are designed/implemented.
