@@ -34,6 +34,7 @@ public sealed class VmDeploymentOutcomeSummary
     public string? FailureStepKey { get; init; }
     public VmCleanupOutcomeSummary Cleanup { get; init; } = new();
     public IReadOnlyList<CleanupResidual> Residuals { get; init; } = [];
+    public IReadOnlyList<GuestStepExecutionOutcome> GuestStepOutcomes { get; init; } = [];
 }
 
 public sealed class DeploymentResidualSummaryItem

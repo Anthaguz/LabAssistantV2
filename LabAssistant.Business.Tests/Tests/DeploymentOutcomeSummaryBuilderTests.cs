@@ -113,4 +113,22 @@ public class DeploymentOutcomeSummaryBuilderTests
         Assert.Equal(1, summary.CancelledVmCount);
         Assert.Equal(1, summary.ResidualVmCount);
     }
+
+    [Fact]
+    public void Build_MapsGuestStepOutcomesIntoPerVmSummary()
+    {
+        var vm = new VmDeploymentContext { VmId = Guid.NewGuid(), VmName = "vm1", IsSuccess = true };
+        vm.RecordGuestStepOutcome(DeploymentStepKeys.SetTimeZone, "Set Time Zone", GuestStepOutcomeResults.Executed, message: "done");
+        vm.RecordGuestStepOutcome(DeploymentStepKeys.ConfigureNetworkInformation, "Configure Network Information", GuestStepOutcomeResults.Skipped, GuestStepSkipReasons.NotImplemented, "not implemented");
+
+        var multi = new MultiVmDeploymentContext { VmContexts = { vm } };
+        multi.CompleteTerminalState(hasFailures: false, hasCleanupResiduals: false);
+
+        var summary = _builder.Build(multi);
+        var vmSummary = Assert.Single(summary.VmOutcomes);
+
+        Assert.Equal(2, vmSummary.GuestStepOutcomes.Count);
+        Assert.Contains(vmSummary.GuestStepOutcomes, o => o.StepKey == DeploymentStepKeys.SetTimeZone && o.Result == GuestStepOutcomeResults.Executed);
+        Assert.Contains(vmSummary.GuestStepOutcomes, o => o.StepKey == DeploymentStepKeys.ConfigureNetworkInformation && o.Result == GuestStepOutcomeResults.Skipped && o.SkipReason == GuestStepSkipReasons.NotImplemented);
+    }
 }

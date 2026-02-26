@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 public abstract class DeploymentStep
 {
     protected DeploymentStep? _next;
+    protected virtual string StepKey => GetType().Name;
 
     public DeploymentStep SetNext(DeploymentStep next)
     {
@@ -18,7 +19,7 @@ public abstract class DeploymentStep
 
     public async Task ExecuteAsync(VmDeploymentContext context)
     {
-        var stepKey = GetType().Name;
+        var stepKey = StepKey;
         if (context.ShouldAbort?.Invoke() == true)
         {
             context.MarkCancelled();
@@ -57,7 +58,7 @@ public abstract class DeploymentStep
 
     protected abstract Task HandleAsync(VmDeploymentContext context);
 
-    private static void EmitStepEvent(
+    protected static void EmitStepEvent(
         VmDeploymentContext context,
         string eventName,
         string level,
