@@ -13,7 +13,9 @@ public class MultiVmDeploymentCoordinatorCancellationTests
     [Fact]
     public async Task Cancel_TransitionsToCancelling_ThenCancelled()
     {
-        var builder = new FakePipelineBuilder(_ => new NoOpWaitStep());
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var builder = new FakePipelineBuilder(_ => new NoOpWaitStep(entered, release));
         var cleanup = new FakeCleanupOrchestrator();
         var coordinator = CreateCoordinator(builder, cleanup);
         var context = new MultiVmDeploymentContext
@@ -24,8 +26,9 @@ public class MultiVmDeploymentCoordinatorCancellationTests
         context.OperationStateChanged += (_, e) => states.Add(e.State);
 
         var deployTask = coordinator.DeployAllAsync(context);
-        await Task.Delay(20);
+        await entered.Task;
         context.RequestUserCancellation();
+        release.SetResult(true);
         await deployTask;
 
         Assert.Contains(DeploymentOperationState.Cancelling, states);
@@ -138,8 +141,28 @@ public class MultiVmDeploymentCoordinatorCancellationTests
 
     private sealed class NoOpWaitStep : DeploymentStep
     {
+        private readonly TaskCompletionSource<bool>? _entered;
+        private readonly TaskCompletionSource<bool>? _release;
+
+        public NoOpWaitStep()
+        {
+        }
+
+        public NoOpWaitStep(TaskCompletionSource<bool> entered, TaskCompletionSource<bool> release)
+        {
+            _entered = entered;
+            _release = release;
+        }
+
         protected override async Task HandleAsync(VmDeploymentContext context)
         {
+            _entered?.TrySetResult(true);
+            if (_release != null)
+            {
+                await _release.Task;
+                return;
+            }
+
             await Task.Delay(50);
         }
     }
