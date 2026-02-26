@@ -228,6 +228,7 @@ public class LabTemplateStore : ILabTemplateStore
         for (var i = 0; i < normalized.VmTemplates.Count; i++)
         {
             var vm = normalized.VmTemplates[i];
+            vm.GuestNetworkConfig = NormalizeGuestNetworkPlaceholder(vm.GuestNetworkConfig);
             if (!string.IsNullOrWhiteSpace(vm.VmId))
             {
                 continue;
@@ -242,7 +243,11 @@ public class LabTemplateStore : ILabTemplateStore
                 VhdxId = vm.VhdxId,
                 VhdPath = vm.VhdPath,
                 VhdxSignature = vm.VhdxSignature,
-                SwitchName = vm.SwitchName
+                SwitchName = vm.SwitchName,
+                TimeZoneConfig = Clone(vm.TimeZoneConfig),
+                SoftwareConfig = Clone(vm.SoftwareConfig),
+                RoleConfig = Clone(vm.RoleConfig),
+                GuestNetworkConfig = Clone(vm.GuestNetworkConfig)
             };
         }
 
@@ -274,5 +279,83 @@ public class LabTemplateStore : ILabTemplateStore
         {
             return false;
         }
+    }
+
+    private static GuestNetworkStepConfig? NormalizeGuestNetworkPlaceholder(GuestNetworkStepConfig? config)
+    {
+        if (config == null)
+        {
+            return null;
+        }
+
+        var hasPayload =
+            !string.IsNullOrWhiteSpace(config.IpAddress) ||
+            !string.IsNullOrWhiteSpace(config.DefaultGateway) ||
+            (config.DnsServers != null && config.DnsServers.Any(server => !string.IsNullOrWhiteSpace(server)));
+
+        if (!config.Enabled && !hasPayload)
+        {
+            return null;
+        }
+
+        return config;
+    }
+
+    private static TimeZoneStepConfig? Clone(TimeZoneStepConfig? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new TimeZoneStepConfig
+        {
+            Enabled = source.Enabled,
+            TimeZoneId = source.TimeZoneId
+        };
+    }
+
+    private static SoftwareStepConfig? Clone(SoftwareStepConfig? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new SoftwareStepConfig
+        {
+            Enabled = source.Enabled,
+            Packages = source.Packages?.ToList()
+        };
+    }
+
+    private static RoleStepConfig? Clone(RoleStepConfig? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new RoleStepConfig
+        {
+            Enabled = source.Enabled,
+            Roles = source.Roles?.ToList()
+        };
+    }
+
+    private static GuestNetworkStepConfig? Clone(GuestNetworkStepConfig? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new GuestNetworkStepConfig
+        {
+            Enabled = source.Enabled,
+            IpAddress = source.IpAddress,
+            DefaultGateway = source.DefaultGateway,
+            DnsServers = source.DnsServers?.ToList()
+        };
     }
 }

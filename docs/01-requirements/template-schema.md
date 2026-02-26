@@ -99,6 +99,7 @@ This is guest configuration intent, not Hyper-V topology control.
 
 The schema includes optional sections now for forward compatibility:
 
+- `timeZoneConfig` (optional): `enabled` + optional `timeZoneId`.
 - `roleConfig` (optional): `enabled` + role-specific settings.
 - `softwareConfig` (optional): `enabled` + package/install settings.
 - `guestNetworkConfig` (optional): `enabled` + guest IP settings.

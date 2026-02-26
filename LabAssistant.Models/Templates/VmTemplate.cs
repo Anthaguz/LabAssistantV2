@@ -46,4 +46,24 @@ public class VmTemplate
     /// Virtual switch name override (optional).
     /// </summary>
     public string? SwitchName { get; set; }
+
+    /// <summary>
+    /// Optional persisted settings for the implemented time zone guest step.
+    /// </summary>
+    public TimeZoneStepConfig? TimeZoneConfig { get; set; }
+
+    /// <summary>
+    /// Optional persisted settings for the implemented software guest step.
+    /// </summary>
+    public SoftwareStepConfig? SoftwareConfig { get; set; }
+
+    /// <summary>
+    /// Optional persisted settings for the implemented role guest step.
+    /// </summary>
+    public RoleStepConfig? RoleConfig { get; set; }
+
+    /// <summary>
+    /// Optional future guest network payload. Placeholder-safe and omitted by default.
+    /// </summary>
+    public GuestNetworkStepConfig? GuestNetworkConfig { get; set; }
 }
