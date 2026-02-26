@@ -12,6 +12,7 @@
 - One VM entry inside a lab template (`vmTemplates[]`).
 - Stores hardware settings and deployment references (VHDX catalog id/path, switch name, optional signature).
 - Includes immutable `vmId` for traceability across edits and deployments.
+- Future guest-step execution selections/configuration may be persisted for implemented guest-step capabilities; placeholder-only UI affordances do not require persisted payloads by themselves.
 
 ### VHDX Catalog / VhdxCatalogItem
 - Local registry of base disks available for deployments.

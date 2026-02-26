@@ -36,7 +36,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 
 # AC-001 — Deploy Lab From Template (Multi-VM)
 
-**Related FRs:** FR-022, FR-023, FR-024, FR-025, FR-026, FR-028, FR-031, FR-043, FR-044, FR-045, FR-046, FR-053, FR-040, FR-041
+**Related FRs:** FR-022, FR-023, FR-024, FR-025, FR-026, FR-028, FR-031, FR-043, FR-044, FR-045, FR-046, FR-053, FR-055, FR-056, FR-057, FR-058, FR-059, FR-040, FR-041
 
 ## Scenarios
 
@@ -196,6 +196,47 @@ Each readiness result shall include, at minimum:
 - Messages shall be actionable and include likely cause/path hints
 - Raw PowerShell stderr is not required in the primary readiness UI and remains primarily in diagnostics/debug logs
 
+## Guest-Step Execution Controls Contract (Milestone W)
+
+### Guest-step taxonomy (contract)
+- **Mandatory implemented steps**
+  - Required by the current deployment pipeline behavior and executed when the runtime flow reaches them.
+- **Optional implemented steps**
+  - Executed only when the user enables them **and** required configuration is present/valid.
+- **Visible placeholders (not implemented)**
+  - Shown in the UI to communicate future capability.
+  - Must be clearly labeled as not implemented.
+  - Must not execute at runtime.
+
+### Placeholder behavior (current contract)
+- Placeholder visibility must not block deployment by itself.
+- Placeholder steps may appear in mandatory or optional UI sections for future planning/consistency.
+- Current deployment behavior shall allow placeholder steps to be skipped.
+
+### Optional-step enablement and configuration completeness
+- If an optional implemented step is **not enabled**, it shall be skipped.
+- If an optional implemented step is enabled and required configuration is present/valid, it shall run.
+- If an optional implemented step is enabled but required configuration is missing/incomplete, deployment shall be blocked before runtime execution with actionable configuration guidance.
+
+### Network settings grouping (UI behavior contract)
+- Hyper-V network attachment settings (for example switch selection / NIC attachment) and guest OS network configuration settings (for example IP, default gateway, DNS servers) shall remain in the same conceptual **Network** area of the UI.
+- Milestone W does **not** change current v1 Hyper-V switch/NIC deployment requirements unless explicitly updated in a separate contract change.
+- Guest OS network configuration may be shown as optional/placeholder until implemented.
+
+### Execution result visibility (contract)
+- Skipped guest-step outcomes shall be visible in the **per-VM deployment summary**.
+- Skipped guest-step outcomes shall also be emitted in **structured logs**.
+- Structured log entries for skipped placeholder steps shall use:
+  - `result = skipped`
+  - `skipReason = not_implemented` (when applicable)
+- Global summary skipped counts are optional unless explicitly introduced by a later feature contract.
+
+### Runtime semantics (future implementation expectation)
+- Mandatory implemented steps execute according to pipeline order and current deployment semantics.
+- Optional implemented steps execute only when enabled and configured.
+- Placeholder steps are skipped with explicit status and must not silently attempt execution.
+- These rules must remain compatible with GR-02 (resource safety) and GR-04 (clear user feedback).
+
 ## Expected Logs
 **Minimum events**
 - `DeployLabStarted`
@@ -240,7 +281,7 @@ Each readiness result shall include, at minimum:
 
 # AC-002 — Create/Edit/Delete Templates
 
-**Related FRs:** FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-018
+**Related FRs:** FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-018, FR-019
 
 ## Scenarios
 
@@ -312,6 +353,8 @@ Each readiness result shall include, at minimum:
 ## Expected Artifacts / Side Effects
 - Template JSON file created/updated/deleted (or record in local store)
 - Template schema version included in artifact
+- Implemented guest-step execution selections/configuration may be persisted when supported.
+- Placeholder-only guest-step UI affordances (visible but not implemented) do not require persisted template payloads by themselves.
 
 ## Definition of Done
 - [ ] CRUD works for VM templates and Lab templates
