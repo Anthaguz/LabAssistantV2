@@ -2,11 +2,13 @@
 
 **Purpose:** Provide a practical "where to read first" index for understanding what code paths are taken by key GUI actions and automatic behaviors. This is a migration/onboarding aid, not a replacement for the detailed GUI action maps.
 
-**Status:** Draft (Phase 5A of UI migration prep).
+**Status:** Draft (Phase 5B of UI migration prep).
 
 **Scope (current draft):**
 - Deploy workflows (highest-risk behavior surface)
 - Templates workflows (currently fragmented across multiple pages)
+- Assets workflows (catalog + embedded asset actions)
+- Settings / Diagnostics / Shell behaviors (including global error feed and transitional `LogsPage`)
 
 **Related:**
 - `docs/03-architecture/gui-action-map.deploy.md`
@@ -308,7 +310,195 @@ Migration note:
 
 ---
 
-## 4. Reading Order by Question (Quick Lookup)
+## 4. Assets Code Path Index
+
+### 4.1 Start Here (Assets / VHDX catalog + embedded asset actions)
+
+Primary files to read first:
+- `LabAssistant/Views/VhdxCatalogPage.xaml`
+- `LabAssistant/Views/VhdxCatalogPage.xaml.cs`
+- `LabAssistant/ViewModels/VhdxCatalogPageViewModel.cs`
+
+Then read supporting asset dialogs and embedded flows:
+- `LabAssistant/Views/VhdxCatalogEditDialog.xaml.cs`
+- `LabAssistant/Views/VhdxSelectorDialog.xaml.cs`
+- `LabAssistant/Views/MissingVhdxResolutionDialog.xaml.cs`
+- `LabAssistant/ViewModels/MissingVhdxResolutionDialogViewModel.cs`
+- `LabAssistant/Views/Controls/VmConfigPanel.xaml.cs` (embedded import/select shortcuts used from Deploy/Templates)
+
+Core catalog/business/data path:
+- `LabAssistant.Business/Catalog/CatalogService.cs`
+- `LabAssistant.Data/Catalog/VhdxCatalogStore.cs`
+- `LabAssistant.Models/Catalog/*`
+
+Placeholder surface to note:
+- `LabAssistant/Views/SwitchesPage.xaml(.cs)` (current placeholder, IA-only significance)
+
+---
+
+### 4.2 Assets: VHDX catalog add/edit/delete/reload
+
+Read in order:
+1. `LabAssistant/Views/VhdxCatalogPage.xaml`
+2. `LabAssistant/Views/VhdxCatalogPage.xaml.cs`
+3. `LabAssistant/ViewModels/VhdxCatalogPageViewModel.cs`
+   - add/edit/delete commands
+   - reload command
+   - rollback-on-save-failure behavior
+4. `LabAssistant.Business/Catalog/CatalogService.cs`
+   - catalog save orchestration
+   - VHDX integrity validation integration
+5. `LabAssistant.Data/Catalog/VhdxCatalogStore.cs`
+
+Why this matters:
+- Catalog CRUD is already a real asset-management workflow and should be preserved behaviorally when moved under `Assets`.
+
+---
+
+### 4.3 Assets: catalog item edit dialog (local validation + metadata enrichment)
+
+Read in order:
+1. `LabAssistant/Views/VhdxCatalogEditDialog.xaml`
+2. `LabAssistant/Views/VhdxCatalogEditDialog.xaml.cs`
+3. Any helper/service calls triggered from dialog code-behind (metadata probing, file inspection, path handling)
+
+Focus on:
+- local field validation before returning a dialog result
+- path selection / metadata fill behaviors
+- what the dialog returns vs what `VhdxCatalogPageViewModel` persists
+
+---
+
+### 4.4 Assets: missing VHDX resolution (used by Templates and editor flows)
+
+Read in order:
+1. `LabAssistant/Views/MissingVhdxResolutionDialog.xaml`
+2. `LabAssistant/Views/MissingVhdxResolutionDialog.xaml.cs`
+3. `LabAssistant/ViewModels/MissingVhdxResolutionDialogViewModel.cs`
+4. `LabAssistant.Business/Templates/MissingVhdxResolutionService.cs`
+5. Catalog paths used during repair:
+   - `CatalogService`
+   - `VhdxCatalogStore`
+
+Cross-capability note:
+- This dialog is an asset-management action embedded inside template workflows.
+- Migration must preserve in-flow repair, not force users to manually leave the workflow and open `Assets`.
+
+---
+
+### 4.5 Assets: embedded VHDX actions inside VM config panel
+
+Read in order:
+1. `LabAssistant/Views/Controls/VmConfigPanel.xaml`
+2. `LabAssistant/Views/Controls/VmConfigPanel.xaml.cs`
+3. Context interfaces/implementations used by the panel:
+   - `LabAssistant/ViewModels/IVmConfigContext.cs`
+   - `DeployVmConfigContext`
+   - `TemplateVmConfigContext`
+4. Asset dialogs launched from the panel:
+   - `VhdxSelectorDialog`
+   - `VhdxCatalogEditDialog`
+
+Why this matters:
+- These are high-value shortcuts that reduce workflow friction.
+- A centralized `Assets` area should not remove them.
+
+---
+
+## 5. Settings / Diagnostics / Shell Code Path Index
+
+### 5.1 Start Here (shell navigation + global error feed)
+
+Primary files to read first:
+- `LabAssistant/MainWindow.xaml`
+- `LabAssistant/MainWindow.xaml.cs`
+- `LabAssistant/ViewModels/IErrorFeedService.cs`
+- `LabAssistant/ViewModels/ErrorFeedService.cs`
+- `LabAssistant/ViewModels/ErrorFeedItem.cs`
+
+Why start here:
+- shell navigation and snack/error feed behavior are global and affect all pages
+- `View details` and `Dismiss` behavior live in shell code, not page code
+
+---
+
+### 5.2 Settings: path changes, policy flags, save/reload semantics
+
+Read in order:
+1. `LabAssistant/Views/SettingsPage.xaml`
+2. `LabAssistant/Views/SettingsPage.xaml.cs`
+3. `LabAssistant.Models/Configuration/IAppSettingsStore.cs`
+4. `LabAssistant.Data/Configuration/AppSettingsStore.cs`
+5. `LabAssistant.Models/Configuration/AppSettings.cs`
+
+Focus areas:
+- Save vs Reload semantics
+- path edits vs persisted save timing
+- `DebugLogger.SetLogFolder(...)` immediate side effect on logs-path change
+- deployment policy flags and `NonBlockingOptionalSteps` persistence
+
+Why this matters:
+- Future Settings UX can change layout entirely, but these side effects/semantics must remain explicit and testable.
+
+---
+
+### 5.3 Shell error feed: publish -> snack -> deep-link/dismiss
+
+Read in order:
+1. `LabAssistant/ViewModels/ErrorFeedService.cs`
+   - publish, recent/active collections, expiry timer
+2. `LabAssistant/MainWindow.xaml`
+   - binding templates for summary + active snack cards
+3. `LabAssistant/MainWindow.xaml.cs`
+   - `SnackViewDetails_Click`
+   - `SnackDismiss_Click`
+   - hover state handlers
+4. Common publishers (examples)
+   - `LabAssistant/ViewModels/DeploymentViewModel.cs`
+   - `LabAssistant/Views/TemplatesPage.xaml.cs`
+   - `LabAssistant/Views/TemplateEditorPage.xaml.cs`
+
+Why this matters:
+- This is a shell behavior layer, not just "notification visuals."
+- Migration needs to preserve callback-based deep-link behavior or consciously replace it.
+
+---
+
+### 5.4 Logs page (transitional deployment-debug surface)
+
+Read in order:
+1. `LabAssistant/Views/LogsPage.xaml`
+2. `LabAssistant/Views/LogsPage.xaml.cs`
+3. `LabAssistant/ViewModels/DeploymentViewModel.cs` (shared singleton state with `DeployPage`)
+
+Key point:
+- `LogsPage` is not the canonical Diagnostics UI.
+- It is a deployment-centric alternate/debug surface over `DeploymentViewModel`.
+
+Migration implication:
+- Treat it as transitional; do not confuse it with the future `Diagnostics` capability design.
+
+---
+
+### 5.5 Diagnostics export (implemented service, no dedicated current GUI route)
+
+Read in order:
+1. `LabAssistant.Services/Diagnostics/IDiagnosticsExportService.cs`
+2. `LabAssistant.Services/Diagnostics/DiagnosticsExportService.cs`
+3. `LabAssistant.Services/Diagnostics/DiagnosticsExportModels.cs`
+4. `LabAssistant.Services/Diagnostics/DiagnosticsExportOptions.cs`
+5. Structured log source assumptions:
+   - `LabAssistant.Services/Logging/JsonLinesLogEventSink.cs`
+   - `LabAssistant.Services/Logging/StructuredLoggingDefaults.cs`
+
+What to understand:
+- export request/options model
+- artifact composition (manifest, runtime metadata, operation metadata, `logs/structured-events.jsonl`, optional template file)
+- current limitation: service exists, but no dedicated shell entry point in current UI
+
+---
+
+## 6. Reading Order by Question (Quick Lookup)
 
 ### "Why did Deploy get blocked before starting?"
 Read:
@@ -336,11 +526,36 @@ Read:
 
 ---
 
-## 5. Next Planned Expansions (Phase 5B+)
+### "Where do settings changes actually persist and what side effects happen immediately?"
+Read:
+1. `LabAssistant/Views/SettingsPage.xaml.cs`
+2. `LabAssistant.Data/Configuration/AppSettingsStore.cs`
+3. `LabAssistant.Models/Configuration/AppSettings.cs`
+
+### "Why do template/catalog warnings show up as shell snack cards?"
+Read:
+1. `LabAssistant/ViewModels/ErrorFeedService.cs`
+2. `LabAssistant/MainWindow.xaml.cs`
+3. `LabAssistant/Views/TemplatesPage.xaml.cs` and `LabAssistant/Views/TemplateEditorPage.xaml.cs`
+
+### "Where is diagnostics export implemented if there is no Diagnostics page yet?"
+Read:
+1. `LabAssistant.Services/Diagnostics/DiagnosticsExportService.cs`
+2. `LabAssistant.Services/Diagnostics/*`
+3. `docs/03-architecture/gui-action-map.settings-diagnostics-shell.md`
+
+### "Why is Logs page not the same thing as Diagnostics?"
+Read:
+1. `LabAssistant/Views/LogsPage.xaml.cs`
+2. `LabAssistant/ViewModels/DeploymentViewModel.cs`
+3. `docs/02-ux/current-ui-capability-audit.md` (Diagnostics section)
+
+---
+
+## 7. Next Planned Expansions (Phase 5C+)
 
 Add code-path index sections for:
-- Assets (`VHDX Catalog`, missing VHDX resolution, embedded asset actions)
-- Settings / Diagnostics / Shell (settings side effects, error feed, transitional `LogsPage`)
 - Future `Machines` capability (once contract + implementation exists)
+- Any new post-migration capability surfaces introduced during the UI rewrite
 
 These should align with the existing GUI action maps so migration planning stays behavior-first and navigable.
