@@ -106,6 +106,7 @@ The schema includes optional sections now for forward compatibility:
 Rule:
 
 - Presence in template does not guarantee runtime execution unless implemented and enabled by current app behavior.
+- Current app behavior may omit unimplemented placeholder sections when saving templates; UI visibility of a placeholder control does not require persisting a placeholder payload.
 
 ## Example (lab-template)
 

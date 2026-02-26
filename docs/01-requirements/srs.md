@@ -99,6 +99,10 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 - **FR-018:** The system shall include a template schema version identifier in each template to track format changes over time.
   - **Priority:** P0
 
+- **FR-019:** The system shall persist only **implemented** guest-step execution settings/configuration in templates until the corresponding runtime behavior is supported.
+  - **Acceptance details:** Placeholder-only UI affordances (visible but not implemented guest steps) must not force template schema churn or persisted placeholder payloads by themselves.
+  - **Priority:** P1
+
 ---
 
 ### 3.2 Deployment
@@ -151,6 +155,29 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P0
 
 - **FR-046:** The system shall present deployment readiness results in the Deploy UI with actionable summaries and likely cause/path hints, while detailed technical stderr remains primarily in diagnostics/debug logs.
+  - **Priority:** P1
+
+- **FR-055:** The system shall classify deployment guest-step execution options into:
+  - mandatory implemented steps,
+  - optional implemented steps,
+  - and visible placeholders (not implemented yet).
+  - **Acceptance details:** Placeholder visibility must not imply runtime execution support.
+  - **Priority:** P1
+
+- **FR-056:** The system shall run an optional implemented guest step only when the user has enabled it **and** the required step configuration is present/valid.
+  - **Acceptance details:** If an optional implemented step is enabled but required configuration is missing, deployment shall be blocked with actionable configuration guidance before runtime execution.
+  - **Priority:** P1
+
+- **FR-057:** The system shall keep placeholder guest steps visible in the Deploy UI with clear not-implemented labeling, and shall not execute them.
+  - **Acceptance details:** Placeholder steps may appear in mandatory or optional UI sections, but current runtime behavior must allow deployment to proceed with placeholders skipped.
+  - **Priority:** P1
+
+- **FR-058:** The system shall record skipped guest-step outcomes in per-VM deployment summaries and structured logs, including a machine-readable skip reason (for example `not_implemented`).
+  - **Acceptance details:** Per-VM visibility and structured logging are required; global skipped-step counts are optional unless introduced explicitly.
+  - **Priority:** P1
+
+- **FR-059:** The system shall keep Hyper-V network attachment settings and guest OS network configuration settings in the same network configuration area in the UI, while preserving current v1 deployment behavior for Hyper-V switch attachment.
+  - **Acceptance details:** Milestone W must not silently change current deploy/runtime requirements for Hyper-V switch/NIC attachment; guest OS IP/DNS/gateway settings may remain optional/not implemented placeholders until supported.
   - **Priority:** P1
 
 ---
