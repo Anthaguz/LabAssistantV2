@@ -113,8 +113,25 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Wrapper trace protocol logs are low-noise by default and visible only when explicitly enabled.
   - PowerShell-backed flows remain functional and shutdown sanity is preserved.
   - Structured/debug logs rotate with stable active filenames and bounded retained history.
-  - Failure structured logs include normalized error metadata (when available) and path-context enrichment.
-  - Raw PowerShell stderr remains available in debug logs as supplemental diagnostics.
+- Failure structured logs include normalized error metadata (when available) and path-context enrichment.
+- Raw PowerShell stderr remains available in debug logs as supplemental diagnostics.
+
+## TC-009: Milestone W Workflow Completion Verification (Guest Steps + Readiness)
+- **Related AC:** `AC-001` (Milestone W guest-step execution controls contract + readiness behavior), `AC-002` (template persistence expectations)
+- **Type:** Manual (real app/Hyper-V host where deploy runtime checks are exercised) + automated coverage
+- **Related milestone:** Milestone W (`#230`-`#235`)
+- **Steps:**
+  1. Run the Milestone W checklist in `docs/07-testing/milestone-w-workflow-completion-checklist.md`.
+  2. Verify guest-step controls UI grouping, placeholder visibility/labeling, and network grouping in `VmConfigPanel`.
+  3. Verify template save/load JSON round-trip for implemented guest-step configs and placeholder-only guest network omission.
+  4. Verify runtime guest-step skip/execution outcomes in per-VM summary and `structured-events.jsonl`.
+  5. Verify guest-step completeness readiness failures block deploy until the step is disabled (or configured in future UI work).
+- **Expected:**
+  - Guest-step UI reflects mandatory/optional/placeholder contract without implying unsupported runtime behavior.
+  - Implemented guest-step toggles persist through template save/load where applicable.
+  - Guest-step runtime outcomes are explicit and observable (`executed` / `skipped` with machine-readable skip reasons).
+  - Enabled optional steps with missing config produce blocking readiness failures and prevent deploy before Hyper-V actions.
+  - Placeholder visibility alone (especially guest network placeholder) does not block deploy by itself.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
