@@ -2,6 +2,10 @@
 
 **Purpose:** Describe how users move through the app for key tasks.
 
+Related planning docs (UI migration prep):
+- `docs/02-ux/capability-taxonomy.md`
+- `docs/02-ux/navigation-ia-draft.md`
+
 ## How to fill this
 For each flow:
 - Goal
