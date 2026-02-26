@@ -2,6 +2,7 @@
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
+using LabAssistant.Services.Diagnostics;
 using System.IO;
 
 namespace LabAssistant.Business.Deployment;
@@ -28,12 +29,9 @@ public class CreateVmFolderStep : DeploymentStep
             context.MarkFailure(
                 DeploymentStepKeys.CreateVmFolder,
                 userMessage,
-                new Dictionary<string, object?>
-                {
-                    ["vmPath"] = context.VmPath,
-                    ["exceptionType"] = ex.GetType().Name,
-                    ["hresult"] = $"0x{ex.HResult:X8}"
-                });
+                RuntimeErrorMetadataNormalizer.Merge(
+                    new Dictionary<string, object?> { ["vmPath"] = context.VmPath },
+                    RuntimeErrorMetadataNormalizer.FromException(ex)));
             return;
         }
 

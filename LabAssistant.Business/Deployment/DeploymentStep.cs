@@ -2,6 +2,7 @@
 namespace LabAssistant.Business.Deployment;
 
 using LabAssistant.Models.Deployment;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using System.Threading.Tasks;
 
@@ -37,11 +38,9 @@ public abstract class DeploymentStep
                 "error",
                 "exception",
                 stepKey,
-                new Dictionary<string, object?>
-                {
-                    ["errorMessage"] = ex.Message,
-                    ["exceptionType"] = ex.GetType().Name
-                });
+                RuntimeErrorMetadataNormalizer.Merge(
+                    new Dictionary<string, object?> { ["errorMessage"] = ex.Message },
+                    RuntimeErrorMetadataNormalizer.FromException(ex)));
             throw;
         }
         EmitStepEvent(context, "StepCompleted", "info", context.IsSuccess ? "success" : "failed", stepKey);

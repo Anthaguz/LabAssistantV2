@@ -49,14 +49,32 @@ public class CreateVmStep : DeploymentStep
             var userMessage = $"Failed to create VM '{context.VmName}' at '{context.VmPath}' using disk '{context.VhdPath}'.";
             context.LogCallback?.Invoke($"❌ {userMessage}");
             DebugLogger.Log($"Error: Failed to create VM: {context.VmName}");
+            var failureMetadata = (hyperV as IHyperVFailureDiagnosticsProvider)?.LastFailureMetadata;
             context.MarkFailure(
                 DeploymentStepKeys.CreateVm,
                 userMessage,
-                new Dictionary<string, object?>
-                {
-                    ["vmPath"] = context.VmPath,
-                    ["targetVhdPath"] = context.VhdPath
-                });
+                MergeFailureMetadata(context, failureMetadata));
         }
+    }
+
+    private static IReadOnlyDictionary<string, object?> MergeFailureMetadata(
+        VmDeploymentContext context,
+        IReadOnlyDictionary<string, object?>? failureMetadata)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["vmPath"] = context.VmPath,
+            ["targetVhdPath"] = context.VhdPath
+        };
+
+        if (failureMetadata != null)
+        {
+            foreach (var pair in failureMetadata)
+            {
+                payload[pair.Key] = pair.Value;
+            }
+        }
+
+        return payload;
     }
 }

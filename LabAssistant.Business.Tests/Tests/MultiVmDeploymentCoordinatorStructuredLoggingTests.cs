@@ -87,17 +87,26 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         Assert.Equal(@"C:\vm\vm1", stepFailed.Context?["vmPath"]?.ToString());
         Assert.Equal(@"C:\vm\vm1\vm1.vhdx", stepFailed.Context?["targetVhdPath"]?.ToString());
         Assert.Equal(@"D:\base\parent.vhdx", stepFailed.Context?["parentVhdPath"]?.ToString());
+        Assert.Equal("VirtualizationException", stepFailed.Context?["exceptionType"]?.ToString());
+        Assert.Equal("0x80070005", stepFailed.Context?["hresult"]?.ToString());
+        Assert.Equal("OperationFailed", stepFailed.Context?["errorCode"]?.ToString());
 
         var vmFailed = logger.Events.First(e => e.Event == "VmDeployFailed");
         Assert.Equal(@"C:\vm\vm1", vmFailed.Context?["vmPath"]?.ToString());
         Assert.Equal(@"C:\vm\vm1\vm1.vhdx", vmFailed.Context?["targetVhdPath"]?.ToString());
         Assert.Equal(@"D:\base\parent.vhdx", vmFailed.Context?["parentVhdPath"]?.ToString());
+        Assert.Equal("VirtualizationException", vmFailed.Context?["exceptionType"]?.ToString());
+        Assert.Equal("0x80070005", vmFailed.Context?["hresult"]?.ToString());
+        Assert.Equal("OperationFailed", vmFailed.Context?["errorCode"]?.ToString());
 
         var deployFailed = logger.Events.First(e => e.Event == "DeployLabFailed");
         Assert.Equal("vm1", deployFailed.Context?["failedVmName"]?.ToString());
         Assert.Equal(@"C:\vm\vm1", deployFailed.Context?["vmPath"]?.ToString());
         Assert.Equal(@"C:\vm\vm1\vm1.vhdx", deployFailed.Context?["targetVhdPath"]?.ToString());
         Assert.Equal(@"D:\base\parent.vhdx", deployFailed.Context?["parentVhdPath"]?.ToString());
+        Assert.Equal("VirtualizationException", deployFailed.Context?["exceptionType"]?.ToString());
+        Assert.Equal("0x80070005", deployFailed.Context?["hresult"]?.ToString());
+        Assert.Equal("OperationFailed", deployFailed.Context?["errorCode"]?.ToString());
     }
 
     [Fact]
@@ -284,7 +293,12 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         protected override Task HandleAsync(VmDeploymentContext context)
         {
             context.VmFolderCreated = true;
-            context.MarkFailure("CreateVm", "simulated failure");
+            context.MarkFailure("CreateVm", "simulated failure", new Dictionary<string, object?>
+            {
+                ["exceptionType"] = "VirtualizationException",
+                ["hresult"] = "0x80070005",
+                ["errorCode"] = "OperationFailed"
+            });
             return Task.CompletedTask;
         }
     }

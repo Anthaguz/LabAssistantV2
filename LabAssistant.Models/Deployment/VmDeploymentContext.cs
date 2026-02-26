@@ -46,6 +46,7 @@ namespace LabAssistant.Models.Deployment
         public bool WasCancelled { get; set; }
         public string? FailureStepKey { get; private set; }
         public string? FailureMessage { get; private set; }
+        public IReadOnlyDictionary<string, object?>? FailureMetadata { get; private set; }
         public VmCleanupResult? CleanupResult { get; set; }
 
         // Logging and PowerShell
@@ -83,6 +84,7 @@ namespace LabAssistant.Models.Deployment
             IsSuccess = false;
             FailureStepKey = stepKey;
             FailureMessage = message;
+            FailureMetadata = BuildStepFailedContext(stepKey, message, extraContext);
             if (!string.IsNullOrWhiteSpace(message))
             {
                 Logs.Add(message);
@@ -91,7 +93,7 @@ namespace LabAssistant.Models.Deployment
                 "StepFailed",
                 "error",
                 "failed",
-                BuildStepFailedContext(stepKey, message, extraContext));
+                FailureMetadata);
             OnBlockingFailure?.Invoke();
         }
 
@@ -133,6 +135,7 @@ namespace LabAssistant.Models.Deployment
             WasCancelled = false;
             FailureStepKey = null;
             FailureMessage = null;
+            FailureMetadata = null;
             CleanupResult = null;
             Logs.Clear();
             PowerShellHandle = null;

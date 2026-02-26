@@ -1,11 +1,10 @@
-﻿using LabAssistant.Services.Logging;
+using LabAssistant.Services.Diagnostics;
+using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
-using System.Diagnostics;
-using System.Text;
 
 namespace LabAssistant.Services.HyperV;
 
-public class HyperVService : IHyperVService
+public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
 {
     private readonly IPersistentPowerShellSession _session; // Persistent session per VM
 
@@ -14,12 +13,14 @@ public class HyperVService : IHyperVService
         _session = session;
     }
 
+    public IReadOnlyDictionary<string, object?>? LastFailureMetadata { get; private set; }
+
     public async Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount)
     {
         var script = $"New-VM -Name '{vmName}' -MemoryStartupBytes {memoryMb}MB -Generation 2 -BootDevice VHD -VHDPath '{vhdPath}' -Path '{vmPath}'";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<bool> EnableGuestServicesAsync(string vmName)
@@ -27,7 +28,7 @@ public class HyperVService : IHyperVService
         var script = $"Enable-VMIntegrationService -VMName '{vmName}' -Name 'Guest Service Interface'";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<bool> StartVmAsync(string vmName)
@@ -35,7 +36,7 @@ public class HyperVService : IHyperVService
         var script = $"Start-VM -Name '{vmName}'";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<bool> StopVmAsync(string vmName)
@@ -43,7 +44,7 @@ public class HyperVService : IHyperVService
         var script = $"Stop-VM -Name '{vmName}' -Force";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<bool> VmExistsAsync(string vmName)
@@ -53,9 +54,11 @@ public class HyperVService : IHyperVService
         DebugLogger.LogPowerShellOutput(script, output, error);
         if (!string.IsNullOrWhiteSpace(error))
         {
+            CaptureFailureMetadataAndReturnSuccess(error);
             return false;
         }
 
+        ClearLastFailureMetadata();
         return PowerShellOutputCleaner.Clean(output)
             .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Any(line => string.Equals(line.Trim(), "True", StringComparison.OrdinalIgnoreCase));
@@ -68,9 +71,11 @@ public class HyperVService : IHyperVService
         DebugLogger.LogPowerShellOutput(script, output, error);
         if (!string.IsNullOrWhiteSpace(error))
         {
+            CaptureFailureMetadataAndReturnSuccess(error);
             return false;
         }
 
+        ClearLastFailureMetadata();
         var cleaned = PowerShellOutputCleaner.Clean(output);
         return cleaned.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Any(line => string.Equals(line.Trim(), "Running", StringComparison.OrdinalIgnoreCase));
@@ -81,7 +86,7 @@ public class HyperVService : IHyperVService
         var script = $"Remove-VM -Name '{vmName}' -Force";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath)
@@ -89,7 +94,7 @@ public class HyperVService : IHyperVService
         var script = $"New-VHD -ParentPath '{parentDiskPath}' -Path '{vhdPath}' -Differencing";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<bool> CreateVhdFixedSizeAsync(string vhdPath, long sizeBytes)
@@ -97,7 +102,7 @@ public class HyperVService : IHyperVService
         var script = $"New-VHD -Path '{vhdPath}' -SizeBytes {sizeBytes} -Fixed";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<bool> DisableVmCheckpointsAsync(string vmName)
@@ -105,7 +110,7 @@ public class HyperVService : IHyperVService
         var script = $"Set-VM -Name '{vmName}' -CheckpointType Disabled";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
     public async Task<List<string>> GetVirtualSwitchNamesAsync()
@@ -122,20 +127,34 @@ public class HyperVService : IHyperVService
             .Where(line =>
                 !string.IsNullOrWhiteSpace(line) &&
                 !line.StartsWith("Get-VMSwitch", StringComparison.OrdinalIgnoreCase) &&
-                !line.Contains(":\\") // eliminate file paths like 'C:\...'
-            )
+                !line.Contains(":\\")) // eliminate file paths like 'C:\...'
             .ToList();
-
 
         return switches;
     }
-    //add virtual switch to vm
+
     public async Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName)
     {
         var script = $"Connect-VMNetworkAdapter -VMName '{vmName}' -SwitchName '{switchName}'";
         var (output, error) = await _session.ExecuteAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
-        return string.IsNullOrWhiteSpace(error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
+    public void ClearLastFailureMetadata()
+    {
+        LastFailureMetadata = null;
+    }
+
+    private bool CaptureFailureMetadataAndReturnSuccess(string error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            ClearLastFailureMetadata();
+            return true;
+        }
+
+        LastFailureMetadata = RuntimeErrorMetadataNormalizer.FromPowerShellErrorText(error);
+        return false;
+    }
 }

@@ -4,6 +4,12 @@ using Xunit;
 
 namespace LabAssistant.Services.Tests;
 
+[CollectionDefinition("DebugLogger tests", DisableParallelization = true)]
+public sealed class DebugLoggerTestsCollectionDefinition
+{
+}
+
+[Collection("DebugLogger tests")]
 public class DebugLoggerTests
 {
     private static readonly object DebugLoggerTestLock = new();
@@ -19,12 +25,14 @@ public class DebugLoggerTests
             try
             {
                 DebugLogger.SetLogFolder(directory);
-                InvokeRotationHook("ConfigureRotationForTests", 220L, 2);
+                InvokeRotationHook("ConfigureRotationForTests", 1L, 2);
 
-                for (var i = 0; i < 12; i++)
+                for (var i = 0; i < 5; i++)
                 {
                     DebugLogger.Log(new string((char)('a' + (i % 26)), 80));
                 }
+
+                DebugLogger.SetLogFolder(Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-sink-{Guid.NewGuid():N}"));
 
                 var active = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
                 var rotated1 = Path.Combine(directory, "log.1.txt");
@@ -62,11 +70,12 @@ public class DebugLoggerTests
             try
             {
                 DebugLogger.SetLogFolder(directory);
-                InvokeRotationHook("ConfigureRotationForTests", 180L, 1);
+                InvokeRotationHook("ConfigureRotationForTests", 1L, 1);
 
-                DebugLogger.Log(new string('x', 90));
-                DebugLogger.Log(new string('y', 90));
+                DebugLogger.Log(new string('x', 10));
                 DebugLogger.Log("marker-after-rotation");
+
+                DebugLogger.SetLogFolder(Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-sink-{Guid.NewGuid():N}"));
 
                 var active = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
                 var rotated1 = Path.Combine(directory, "log.1.txt");
