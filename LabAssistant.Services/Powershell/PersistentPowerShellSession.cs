@@ -112,7 +112,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             // - command is base64-encoded to avoid interactive multiline parsing/continuation issues
             // - PowerShell error records are emitted to stdout with a tagged prefix for deterministic capture
             // - stdout marker is the authoritative completion signal
-            DebugLogger.Log("Persistent PowerShell ExecuteAsync: writing command to stdin.");
+            PersistentPowerShellSessionTrace.Log("ExecuteAsync: writing command to stdin.");
             await _input.WriteLineAsync("$__laErrStart = $Error.Count").ConfigureAwait(false);
             await _input.WriteLineAsync($"$__laCmd = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{commandBase64}'))").ConfigureAwait(false);
             await _input.WriteLineAsync("Invoke-Expression $__laCmd").ConfigureAwait(false);
@@ -120,7 +120,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             await _input.WriteLineAsync("if ($__laErrDelta -gt 0) { $Error | Select-Object -First $__laErrDelta | ForEach-Object { [System.Console]::Out.WriteLine('" + ErrorLineMarker + "' + ($_.ToString())) } }").ConfigureAwait(false);
             await _input.WriteLineAsync($"[System.Console]::Out.WriteLine('{OutputMarker}'); [System.Console]::Out.Flush()").ConfigureAwait(false);
             await _input.FlushAsync().ConfigureAwait(false);
-            DebugLogger.Log("Persistent PowerShell ExecuteAsync: stdin flushed, starting stdout reader (stdout marker authoritative; native stderr pumped in background).");
+            PersistentPowerShellSessionTrace.Log("ExecuteAsync: stdin flushed, starting stdout reader (stdout marker authoritative; native stderr pumped in background).");
 
             var output = new StringBuilder();
             var error = new StringBuilder();
@@ -130,7 +130,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             {
                 if (line.Contains(OutputMarker))
                 {
-                    DebugLogger.Log("Persistent PowerShell ExecuteAsync: output marker received.");
+                    PersistentPowerShellSessionTrace.Log("ExecuteAsync: output marker received.");
                     break;
                 }
 
@@ -148,7 +148,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
                 error.AppendLine(nativeErrorLine);
             }
 
-            DebugLogger.Log("Persistent PowerShell ExecuteAsync: stdout reader completed; returning collected output + error.");
+            PersistentPowerShellSessionTrace.Log("ExecuteAsync: stdout reader completed; returning collected output + error.");
 
             string cleanedOutput = PowerShellOutputCleaner.Clean(output.ToString());
             string cleanedError = PowerShellOutputCleaner.Clean(error.ToString());
@@ -164,49 +164,49 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
     {
         try
         {
-            DebugLogger.Log("Persistent PowerShell Dispose: begin.");
+            PersistentPowerShellSessionTrace.Log("Dispose: begin.");
             if (!_host.HasExited)
             {
                 try
                 {
                     _input.WriteLine("exit");
                     _input.Flush();
-                    DebugLogger.Log("Persistent PowerShell Dispose: sent exit command.");
+                    PersistentPowerShellSessionTrace.Log("Dispose: sent exit command.");
                 }
                 catch (ObjectDisposedException)
                 {
-                    DebugLogger.Log("Persistent PowerShell Dispose: input already disposed while sending exit.");
+                    PersistentPowerShellSessionTrace.Log("Dispose: input already disposed while sending exit.");
                 }
                 catch (InvalidOperationException)
                 {
-                    DebugLogger.Log("Persistent PowerShell Dispose: process/input invalid while sending exit.");
+                    PersistentPowerShellSessionTrace.Log("Dispose: process/input invalid while sending exit.");
                 }
 
-                DebugLogger.Log($"Persistent PowerShell Dispose: waiting for process exit ({DisposeExitWaitMs}ms).");
+                PersistentPowerShellSessionTrace.Log($"Dispose: waiting for process exit ({DisposeExitWaitMs}ms).");
                 if (!_host.WaitForExit(DisposeExitWaitMs))
                 {
-                    DebugLogger.Log("Persistent PowerShell Dispose: process did not exit in time; killing process tree.");
+                    PersistentPowerShellSessionTrace.Log("Dispose: process did not exit in time; killing process tree.");
                     try
                     {
                         _host.Kill(entireProcessTree: true);
                     }
                     catch (InvalidOperationException)
                     {
-                        DebugLogger.Log("Persistent PowerShell Dispose: process already exited before kill.");
+                        PersistentPowerShellSessionTrace.Log("Dispose: process already exited before kill.");
                     }
 
                     _host.WaitForExit(DisposePostKillWaitMs);
-                    DebugLogger.Log("Persistent PowerShell Dispose: wait after kill completed.");
+                    PersistentPowerShellSessionTrace.Log("Dispose: wait after kill completed.");
                 }
                 else
                 {
-                    DebugLogger.Log("Persistent PowerShell Dispose: process exited cleanly.");
+                    PersistentPowerShellSessionTrace.Log("Dispose: process exited cleanly.");
                 }
             }
         }
         finally
         {
-            DebugLogger.Log("Persistent PowerShell Dispose: disposing process object.");
+            PersistentPowerShellSessionTrace.Log("Dispose: disposing process object.");
             _host.Dispose();
         }
     }
