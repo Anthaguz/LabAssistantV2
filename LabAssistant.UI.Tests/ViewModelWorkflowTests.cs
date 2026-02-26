@@ -604,6 +604,105 @@ public class ViewModelWorkflowTests
         Assert.Contains("software package", failure.ActionableGuidance, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task MilestoneW_GuestStepToggle_EnableThenDisable_UpdatesQuickReadinessAndFullPreflightGating()
+    {
+        var preflight = new RecordingPreflightService
+        {
+            ResultFactory = (context, mode) =>
+            {
+                var vm = context.VmContexts.Single();
+                var softwareEnabled = vm.InstallSoftware || vm.SoftwareConfig?.Enabled == true;
+                var hasPackages = vm.SoftwareConfig?.Packages?.Any(p => !string.IsNullOrWhiteSpace(p)) == true;
+
+                if (!softwareEnabled)
+                {
+                    return new DeploymentReadinessReport { Mode = mode, Results = [] };
+                }
+
+                if (!hasPackages)
+                {
+                    return new DeploymentReadinessReport
+                    {
+                        Mode = mode,
+                        Results =
+                        [
+                            new DeploymentReadinessCheckResult
+                            {
+                                Status = DeploymentReadinessStatus.Fail,
+                                Category = DeploymentReadinessCategory.TemplateConfig,
+                                Code = "GST.SOFTWARE.EMPTY_PACKAGE_LIST",
+                                Message = "Software install step is enabled but no packages are configured.",
+                                ActionableGuidance = "Add at least one software package or disable the software step.",
+                                AffectedVmNames = [vm.VmName],
+                                ResourceName = "software install"
+                            }
+                        ]
+                    };
+                }
+
+                return new DeploymentReadinessReport
+                {
+                    Mode = mode,
+                    Results =
+                    [
+                        new DeploymentReadinessCheckResult
+                        {
+                            Status = DeploymentReadinessStatus.Pass,
+                            Category = DeploymentReadinessCategory.TemplateConfig,
+                            Code = "GST.SOFTWARE.CONFIG_OK",
+                            Message = "ok",
+                            ActionableGuidance = "none",
+                            AffectedVmNames = [vm.VmName],
+                            ResourceName = "software install"
+                        }
+                    ]
+                };
+            }
+        };
+
+        var coordinator = new RecordingDeploymentCoordinator();
+        var viewModel = CreateDeploymentViewModel(preflight, coordinator, quickPreflightDebounce: TimeSpan.FromMilliseconds(10));
+        viewModel.AddVmCommand.Execute(null);
+        var vmEntry = viewModel.VmEntries.Single();
+        vmEntry.DeploymentContext.BaseVhdPath = @"C:\base\good.vhdx";
+        var configContext = new DeployVmConfigContext(viewModel, vmEntry.DeploymentContext, new FakeAppSettingsStore
+        {
+            Settings = new AppSettings { VmBasePath = @"C:\vm-base" }
+        });
+
+        await WaitUntilAsync(() => preflight.Calls.Count > 0, TimeSpan.FromSeconds(2));
+        var baselineCalls = preflight.Calls.Count;
+
+        configContext.InstallSoftwareEnabled = true;
+
+        await WaitUntilAsync(() => preflight.Calls.Count > baselineCalls, TimeSpan.FromSeconds(2));
+        await WaitUntilAsync(() =>
+            viewModel.ReadinessReport?.Results.Any(r => r.Code == "GST.SOFTWARE.EMPTY_PACKAGE_LIST") == true,
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(viewModel.IsDeployBlockedByReadiness);
+        Assert.Equal(DeploymentPreflightMode.Quick, viewModel.ReadinessReport?.Mode);
+
+        await viewModel.DeployAllCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, coordinator.CallCount);
+        Assert.Contains(preflight.Calls, c => c.Mode == DeploymentPreflightMode.Full);
+
+        configContext.InstallSoftwareEnabled = false;
+
+        await WaitUntilAsync(() =>
+            viewModel.ReadinessReport?.Mode == DeploymentPreflightMode.Quick &&
+            (viewModel.ReadinessReport.Results.Count == 0 || viewModel.ReadinessReport.Results.All(r => r.Status != DeploymentReadinessStatus.Fail)),
+            TimeSpan.FromSeconds(2));
+
+        Assert.False(viewModel.IsDeployBlockedByReadiness);
+
+        await viewModel.DeployAllCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, coordinator.CallCount);
+    }
+
     private static CatalogService CreateCatalogService(FakeCatalogStore store)
     {
         var settingsStore = new FakeAppSettingsStore
