@@ -11,6 +11,7 @@
 - `docs/02-ux/navigation-ia-draft.md`
 - `docs/02-ux/current-ui-capability-audit.md`
 - `docs/02-ux/migration-preservation-matrix.md`
+- `docs/02-ux/ui-framework-decision-rubric.md`
 - `docs/03-architecture/gui-action-map.deploy.md`
 - `docs/03-architecture/gui-action-map.templates.md`
 - `docs/03-architecture/gui-action-map.assets.md`
@@ -107,28 +108,24 @@ This project should support a modern Windows 11 user experience, and **WinUI 3 i
   - prototype the shell/navigation model
   - evaluate migration cost vs UX gain
 
-## 4.2 Framework Decision Criteria (proposed)
+## 4.2 Framework Decision Criteria / Spike Scope / Decision Output Contract
 
-Evaluate at minimum:
-- Windows 11 visual fidelity and control ecosystem
-- MVVM support and testability (command/state-heavy workflows)
-- ability to host dense workflow surfaces (Deploy page complexity)
-- navigation + shell composition ergonomics
-- maturity/risk for your team’s likely implementation pace
-- compatibility with existing .NET 8 code and service/business layers
-- effort to preserve current WPF behaviors during transition
+Use the dedicated decision rubric/contract:
+- `docs/02-ux/ui-framework-decision-rubric.md`
 
-## 4.3 Decision Gate Output (required before large migration implementation)
+It defines:
+- explicit rubric criteria and scoring expectations for `WPF modernized` vs `WinUI 3`
+- required Y2 prototype spike scope (shell foundation only)
+- required Y3 decision record outputs
+- sufficiency/rework conditions for the Milestone Y decision path
 
-Produce a short decision record:
-- Chosen stack (`WPF modernized` or `WinUI 3`)
-- Why
-- Known tradeoffs
-- Migration strategy (incremental vs parallel app shell vs branch strategy)
-- Top 3 technical risks and mitigations
+## 4.3 Milestone Y decision track (Y1 -> Y3)
 
-**Open Question / TBD**
-- Whether the team wants an explicit UI framework spike milestone before migration implementation begins.
+- **Y1 (`#251`)**: define rubric + spike scope + decision-record contract (docs only)
+- **Y2 (`#252`)**: run shell foundation prototypes and collect evidence mapped to the rubric
+- **Y3 (`#253`)**: finalize framework decision record with rationale, tradeoffs, risks, and first-slice recommendation
+
+Framework choice should not be finalized until Y2 evidence covers shell composition ergonomics and Y3 addresses behavior-preservation risks explicitly.
 
 ---
 
@@ -432,8 +429,10 @@ Those should be decided in dedicated issues/milestones with the behavior-preserv
 1. **Review and approve this execution strategy**
    - confirm migration order and risk posture
 
-2. **Create a framework decision issue / spike (optional but recommended)**
-   - compare WPF modernization vs WinUI 3 against the shell + Deploy workflow needs
+2. **Run Milestone Y framework decision track**
+   - `#251` rubric/criteria contract
+   - `#252` shell foundation prototypes
+   - `#253` decision record
 
 3. **Draft a migration shell contract**
    - capability scope vs context scope
@@ -450,7 +449,7 @@ Those should be decided in dedicated issues/milestones with the behavior-preserv
 
 ## Open Questions / TBDs
 
-- `TBD:` Do you want an explicit framework decision spike milestone before any migration implementation starts?
+- `TBD:` Should Y2 prototypes be built in-repo (spike branches) or in a separate spike repo/workspace?
 - `TBD:` Should the first implementation slice be shell foundation only, or shell foundation + Deploy in the same milestone?
 - `TBD:` Should the transitional `LogsPage` be kept temporarily as a hidden developer/debug route during Diagnostics migration?
 - `TBD:` When `Machines` is introduced, should console/RDP actions also appear as contextual quick actions in Deploy outcomes from day one or later?
