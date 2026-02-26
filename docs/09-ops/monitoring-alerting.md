@@ -21,6 +21,7 @@
     - Default retained history files: 5
 - Rotation occurs before appending a new record, so structured log lines are not split across files (rotated files remain valid JSONL)
 - Diagnostics export currently remains compatible with the existing behavior and exports the active structured log file (`structured-events.jsonl`)
+- PowerShell wrapper protocol/lifecycle traces (for troubleshooting) are off by default and can be enabled with environment variable `LABASSISTANT_POWERSHELL_WRAPPER_TRACE=1`; traces are written to the debug log path (`log.txt` + rotated files)
 
 ## Metrics (optional)
 - Deploy duration: TBD

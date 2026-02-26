@@ -86,6 +86,7 @@ Behavioral boundaries:
   - Command execution is serialized (`SemaphoreSlim`) per session instance.
   - Command completion is currently driven by a PowerShell stdout marker; native stderr is drained in the background and appended as supplemental diagnostics.
   - Session disposal uses bounded waits and may kill the process tree to avoid shutdown hangs (`powershell.exe` / `conhost.exe`) if the child process does not exit promptly.
+  - Wrapper protocol/lifecycle trace logging is disabled by default and can be enabled for troubleshooting with environment variable `LABASSISTANT_POWERSHELL_WRAPPER_TRACE` (writes to debug log path).
   - These behaviors were stabilized during Milestone U follow-up hotfix `#219` and should be preserved unless intentionally redesigned/tested.
 
 ## Open Questions / TBDs
