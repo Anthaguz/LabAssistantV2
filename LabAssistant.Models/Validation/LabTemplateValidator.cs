@@ -97,8 +97,30 @@ public static class LabTemplateValidator
             {
                 result.MissingVhdxIds.Add(vm.VhdxId!);
             }
+
+            ValidateGuestStepConfig(vm, result);
         }
 
         return result;
+    }
+
+    private static void ValidateGuestStepConfig(VmTemplate vm, LabTemplateValidationResult result)
+    {
+        var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name;
+
+        if (vm.SoftwareConfig?.Packages != null && vm.SoftwareConfig.Packages.Any(string.IsNullOrWhiteSpace))
+        {
+            result.Errors.Add($"VM '{vmName}' softwareConfig.packages must not contain empty values.");
+        }
+
+        if (vm.RoleConfig?.Roles != null && vm.RoleConfig.Roles.Any(string.IsNullOrWhiteSpace))
+        {
+            result.Errors.Add($"VM '{vmName}' roleConfig.roles must not contain empty values.");
+        }
+
+        if (vm.GuestNetworkConfig?.DnsServers != null && vm.GuestNetworkConfig.DnsServers.Any(string.IsNullOrWhiteSpace))
+        {
+            result.Errors.Add($"VM '{vmName}' guestNetworkConfig.dnsServers must not contain empty values.");
+        }
     }
 }

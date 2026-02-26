@@ -495,7 +495,37 @@ namespace LabAssistant.ViewModels
                 VhdxId = source.VhdxId,
                 VhdPath = source.VhdPath,
                 VhdxSignature = source.VhdxSignature,
-                SwitchName = source.SwitchName
+                SwitchName = source.SwitchName,
+                TimeZoneConfig = source.TimeZoneConfig == null
+                    ? null
+                    : new TimeZoneStepConfig
+                    {
+                        Enabled = source.TimeZoneConfig.Enabled,
+                        TimeZoneId = source.TimeZoneConfig.TimeZoneId
+                    },
+                SoftwareConfig = source.SoftwareConfig == null
+                    ? null
+                    : new SoftwareStepConfig
+                    {
+                        Enabled = source.SoftwareConfig.Enabled,
+                        Packages = source.SoftwareConfig.Packages?.ToList()
+                    },
+                RoleConfig = source.RoleConfig == null
+                    ? null
+                    : new RoleStepConfig
+                    {
+                        Enabled = source.RoleConfig.Enabled,
+                        Roles = source.RoleConfig.Roles?.ToList()
+                    },
+                GuestNetworkConfig = source.GuestNetworkConfig == null
+                    ? null
+                    : new GuestNetworkStepConfig
+                    {
+                        Enabled = source.GuestNetworkConfig.Enabled,
+                        IpAddress = source.GuestNetworkConfig.IpAddress,
+                        DefaultGateway = source.GuestNetworkConfig.DefaultGateway,
+                        DnsServers = source.GuestNetworkConfig.DnsServers?.ToList()
+                    }
             };
         }
 

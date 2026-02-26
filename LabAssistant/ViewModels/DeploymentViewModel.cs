@@ -345,7 +345,10 @@ public partial class DeploymentViewModel : ObservableObject
                     SwitchName = context.VirtualSwitchName,
                     VhdxId = context.VhdxId,
                     VhdPath = baseVhdPath,
-                    VhdxSignature = context.VhdxSignature
+                    VhdxSignature = context.VhdxSignature,
+                    TimeZoneConfig = context.ConfigureTimeZone ? new TimeZoneStepConfig { Enabled = true } : null,
+                    SoftwareConfig = context.InstallSoftware ? new SoftwareStepConfig { Enabled = true } : null,
+                    RoleConfig = context.InstallRole ? new RoleStepConfig { Enabled = true } : null
                 };
             }).ToList()
         };

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
@@ -135,5 +136,75 @@ public class LabTemplateValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains("VM 'vm1' vmId is required.", result.Errors);
         Assert.Contains("Template templateType must be 'lab-template'.", result.Errors);
+    }
+
+    [Fact]
+    public void Validate_AllowsAbsentPlaceholderGuestPayloads()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchName = "Default Switch",
+                    TimeZoneConfig = new TimeZoneStepConfig { Enabled = true },
+                    SoftwareConfig = new SoftwareStepConfig { Enabled = false },
+                    RoleConfig = null,
+                    GuestNetworkConfig = null
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, []);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_RejectsMalformedGuestStepPayloadValues()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchName = "Default Switch",
+                    GuestNetworkConfig = new GuestNetworkStepConfig
+                    {
+                        Enabled = true,
+                        DnsServers = ["8.8.8.8", ""]
+                    }
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, []);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("guestNetworkConfig.dnsServers must not contain empty values.", StringComparison.Ordinal));
     }
 }

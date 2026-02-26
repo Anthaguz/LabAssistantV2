@@ -25,7 +25,23 @@ public class LabTemplateStoreTests
             TemplateRevision = 1,
             VmTemplates =
             {
-                new VmTemplate { Name = "vm1", MemoryMb = 1024, CpuCount = 1, VhdPath = "C:/base.vhdx" }
+                new VmTemplate
+                {
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    TimeZoneConfig = new TimeZoneStepConfig { Enabled = true, TimeZoneId = "UTC" },
+                    SoftwareConfig = new SoftwareStepConfig { Enabled = true, Packages = new() { "7zip" } },
+                    RoleConfig = new RoleStepConfig { Enabled = false },
+                    GuestNetworkConfig = new GuestNetworkStepConfig
+                    {
+                        Enabled = false,
+                        IpAddress = "192.168.1.10",
+                        DefaultGateway = "192.168.1.1",
+                        DnsServers = new() { "1.1.1.1", "8.8.8.8" }
+                    }
+                }
             }
         };
 
@@ -36,6 +52,81 @@ public class LabTemplateStoreTests
         Assert.Equal(template.Name, loaded.Name);
         Assert.Single(loaded.VmTemplates);
         Assert.Equal("vm1", loaded.VmTemplates[0].Name);
+        Assert.True(loaded.VmTemplates[0].TimeZoneConfig?.Enabled);
+        Assert.Equal("UTC", loaded.VmTemplates[0].TimeZoneConfig?.TimeZoneId);
+        Assert.Equal(["7zip"], loaded.VmTemplates[0].SoftwareConfig?.Packages);
+        Assert.False(loaded.VmTemplates[0].RoleConfig?.Enabled);
+        Assert.Equal("192.168.1.10", loaded.VmTemplates[0].GuestNetworkConfig?.IpAddress);
+    }
+
+    [Fact]
+    public void SaveToFile_DoesNotPersistPlaceholderGuestPayloads_WhenAbsent()
+    {
+        var folder = BuildTempRoot();
+        var path = Path.Combine(folder, "template.json");
+        var store = new LabTemplateStore();
+        var template = new LabTemplate
+        {
+            Id = "lab-1",
+            Name = "No Placeholder Payloads",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            {
+                new VmTemplate
+                {
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchName = "Default Switch"
+                }
+            }
+        };
+
+        store.SaveToFile(path, template);
+        var json = File.ReadAllText(path);
+
+        Assert.DoesNotContain("\"guestNetworkConfig\"", json);
+        Assert.DoesNotContain("\"roleConfig\"", json);
+        Assert.DoesNotContain("\"softwareConfig\"", json);
+        Assert.DoesNotContain("\"timeZoneConfig\"", json);
+    }
+
+    [Fact]
+    public void SaveToFile_OmitsDisabledEmptyGuestNetworkPlaceholderPayload()
+    {
+        var folder = BuildTempRoot();
+        var path = Path.Combine(folder, "template.json");
+        var store = new LabTemplateStore();
+        var template = new LabTemplate
+        {
+            Id = "lab-1",
+            Name = "Placeholder Guest Network",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            {
+                new VmTemplate
+                {
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchName = "Default Switch",
+                    GuestNetworkConfig = new GuestNetworkStepConfig { Enabled = false }
+                }
+            }
+        };
+
+        store.SaveToFile(path, template);
+        var json = File.ReadAllText(path);
+
+        Assert.DoesNotContain("\"guestNetworkConfig\"", json);
     }
 
     [Fact]
