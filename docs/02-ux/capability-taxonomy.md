@@ -106,6 +106,9 @@ This is required for safe UI migration without behavior loss.
 - Global/per-VM outcome summaries
 - Guest-step selection/execution controls
 
+**Important UX note (agreed intent)**
+- Single-VM and multi-VM deploy should remain one **Deploy workspace/workflow** (same GUI), not separate top-level features.
+
 **Current implementation status**
 - Strong and mature (Milestones R/U/W)
 
@@ -128,6 +131,10 @@ This is required for safe UI migration without behavior loss.
 - Missing VHDX resolution
 - Template details/review
 - VM-level template configuration
+
+**Template model reality (current code)**
+- Canonical templates are **Lab Templates** (`LabTemplate`) that contain one or more **VM Templates** (`VmTemplate`) in `vmTemplates`.
+- The future Templates UX should expose both levels coherently (lab-level + per-VM editing) inside one workflow.
 
 **Current implementation status**
 - Capability exists in parts
@@ -240,6 +247,8 @@ This groups concrete user operations into the future taxonomy.
 - Inspect VM state/details
 - Edit basic VM configuration
 - Start/Stop VMs
+- Open VM console (Hyper-V console/session) on request
+- Open RDP session on request (when guest networking/connectivity supports it)
 - Delete VM (VM only / VM + disks)
 - Attach additional disks (future)
 - Attach additional NICs/switches (future)
@@ -254,6 +263,7 @@ This groups concrete user operations into the future taxonomy.
 - Configure guest-step execution selections
 - Review readiness failures/warnings
 - Cancel deployment
+- Open VM console / RDP for deployed VMs (post-deploy quick actions, where available)
 
 ### Templates
 - CRUD templates

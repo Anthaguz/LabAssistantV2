@@ -108,6 +108,8 @@ Examples:
 - Actions
   - Start / Stop
   - Delete (with cleanup options)
+  - Open Hyper-V console for selected VM
+  - Open RDP session (when reachable / configured)
   - Open advanced settings (if MMC/shell integration is feasible)
 
 ### Context panel ideas
@@ -128,6 +130,9 @@ Examples:
   - deploy from template
   - readiness report
   - progress/outcomes
+- Post-deploy quick actions (future refinement)
+  - open VM console
+  - open RDP (when available)
 - Recent Deployments / History (future, if implemented)
 
 ### Context panel ideas
@@ -139,6 +144,7 @@ Examples:
 ### Important boundary
 - `Deploy` is not a substitute for `Machines`
 - `Deploy` should focus on provisioning workflows, not general Hyper-V VM administration
+- Single-VM and multi-VM deployment should remain the same Deploy workspace (same GUI), not separate top-level modes
 
 ---
 
@@ -159,6 +165,10 @@ should become one coherent Templates workflow.
 - Template Editor (integrated, not isolated)
 - Import / Export
 - Validation + missing-reference resolution
+
+### Model note (current reality)
+- Templates are lab-level (`LabTemplate`) and contain per-VM definitions (`VmTemplate`).
+- The Templates UX should expose both levels in one area (library + lab details + per-VM editing).
 
 ### Context panel ideas
 - template list
