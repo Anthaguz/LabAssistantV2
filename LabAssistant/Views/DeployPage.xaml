@@ -74,34 +74,42 @@
                            Margin="0,0,0,6"
                            Foreground="{StaticResource SystemBaseHighColor}"/>
 
-                <ItemsControl ItemsSource="{Binding ReadinessReport.Results}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border BorderBrush="#FFE5E5E5" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
-                                <StackPanel>
-                                    <TextBlock FontWeight="SemiBold" TextWrapping="Wrap">
-                                        <Run Text="{Binding Status}"/>
-                                        <Run Text=" | "/>
-                                        <Run Text="{Binding Category}"/>
-                                        <Run Text=" | "/>
-                                        <Run Text="{Binding Code}"/>
-                                    </TextBlock>
-                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                    <TextBlock Text="{Binding ActionableGuidance}" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="#FF0A5A9C"/>
-                                    <TextBlock Text="{Binding ResourcePath, StringFormat=Path: {0}}" Margin="0,2,0,0" TextWrapping="Wrap"/>
-                                    <TextBlock Text="{Binding ResourceName, StringFormat=Resource: {0}}" Margin="0,2,0,0" TextWrapping="Wrap"/>
-                                    <ItemsControl ItemsSource="{Binding AffectedVmNames}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding StringFormat=VM: {0}}" Margin="0,2,0,0"/>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <Expander Header="{Binding ReadinessReport.Results.Count, StringFormat=Readiness Details ({0})}"
+                          IsExpanded="False"
+                          Margin="0,2,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  MaxHeight="240">
+                        <ItemsControl ItemsSource="{Binding ReadinessReport.Results}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#FFE5E5E5" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap">
+                                                <Run Text="{Binding Status}"/>
+                                                <Run Text=" | "/>
+                                                <Run Text="{Binding Category}"/>
+                                                <Run Text=" | "/>
+                                                <Run Text="{Binding Code}"/>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding ActionableGuidance}" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="#FF0A5A9C"/>
+                                            <TextBlock Text="{Binding ResourcePath, StringFormat=Path: {0}}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding ResourceName, StringFormat=Resource: {0}}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <ItemsControl ItemsSource="{Binding AffectedVmNames}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding StringFormat=VM: {0}}" Margin="0,2,0,0"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Expander>
             </StackPanel>
         </Border>
 
