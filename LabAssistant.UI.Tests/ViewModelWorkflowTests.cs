@@ -137,9 +137,13 @@ public class ViewModelWorkflowTests
         Assert.True(deploymentContext.ConfigureTimeZone);
         Assert.True(deploymentContext.InstallSoftware);
         Assert.True(deploymentContext.InstallRole);
+        Assert.True(deploymentContext.TimeZoneConfig?.Enabled);
+        Assert.True(deploymentContext.SoftwareConfig?.Enabled);
+        Assert.True(deploymentContext.RoleConfig?.Enabled);
 
         context.InstallRoleEnabled = false;
         Assert.False(deploymentContext.InstallRole);
+        Assert.False(deploymentContext.RoleConfig?.Enabled);
     }
 
     [Fact]
@@ -403,6 +407,31 @@ public class ViewModelWorkflowTests
     }
 
     [Fact]
+    public async Task DeployVmConfigContext_GuestStepToggle_TriggersQuickPreflight()
+    {
+        var preflight = new RecordingPreflightService
+        {
+            ResultFactory = (_, mode) => new DeploymentReadinessReport { Mode = mode }
+        };
+
+        var viewModel = CreateDeploymentViewModel(preflight, new RecordingDeploymentCoordinator(), quickPreflightDebounce: TimeSpan.FromMilliseconds(10));
+        viewModel.AddVmCommand.Execute(null);
+        var vm = viewModel.VmEntries.Single();
+        var configContext = new DeployVmConfigContext(viewModel, vm.DeploymentContext, new FakeAppSettingsStore
+        {
+            Settings = new AppSettings { VmBasePath = @"C:\vm-base" }
+        });
+
+        await WaitUntilAsync(() => preflight.Calls.Count > 0, TimeSpan.FromSeconds(2));
+        var baselineCalls = preflight.Calls.Count;
+
+        configContext.InstallSoftwareEnabled = true;
+
+        await WaitUntilAsync(() => preflight.Calls.Count > baselineCalls, TimeSpan.FromSeconds(2));
+        Assert.Equal(DeploymentPreflightMode.Quick, preflight.Calls.Last().Mode);
+    }
+
+    [Fact]
     public async Task DeploymentViewModel_DeployAll_RunsFullPreflightAndBlocksOnFailures()
     {
         var preflight = new RecordingPreflightService
@@ -530,6 +559,49 @@ public class ViewModelWorkflowTests
         Assert.Equal(DeploymentPreflightMode.Full, viewModel.ReadinessReport?.Mode);
         Assert.Contains(preflight.Calls, c => c.Mode == DeploymentPreflightMode.Quick);
         Assert.Contains(preflight.Calls, c => c.Mode == DeploymentPreflightMode.Full);
+    }
+
+    [Fact]
+    public async Task DeploymentViewModel_GuestStepCompletenessFailure_BlocksDeployAndSurfacesTemplateConfigIssue()
+    {
+        var preflight = new RecordingPreflightService
+        {
+            ResultFactory = (_, mode) => new DeploymentReadinessReport
+            {
+                Mode = mode,
+                Results = mode == DeploymentPreflightMode.Full
+                    ?
+                    [
+                        new DeploymentReadinessCheckResult
+                        {
+                            Status = DeploymentReadinessStatus.Fail,
+                            Category = DeploymentReadinessCategory.TemplateConfig,
+                            Code = "GST.SOFTWARE.EMPTY_PACKAGE_LIST",
+                            Message = "VM 'VM1': Software install step is enabled but no packages are configured.",
+                            ActionableGuidance = "Add at least one software package for this VM or disable the software step before deploying.",
+                            AffectedVmNames = ["VM1"],
+                            ResourceName = "software install"
+                        }
+                    ]
+                    : []
+            }
+        };
+        var coordinator = new RecordingDeploymentCoordinator();
+        var viewModel = CreateDeploymentViewModel(preflight, coordinator, quickPreflightDebounce: TimeSpan.FromMilliseconds(5));
+        viewModel.AddVmCommand.Execute(null);
+        var vm = viewModel.VmEntries.Single().DeploymentContext;
+        vm.BaseVhdPath = @"C:\base\good.vhdx";
+        vm.InstallSoftware = true;
+
+        await viewModel.DeployAllCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, coordinator.CallCount);
+        Assert.True(viewModel.IsDeployBlockedByReadiness);
+        Assert.Equal(DeploymentPreflightMode.Full, viewModel.ReadinessReport?.Mode);
+        var failure = Assert.Single(viewModel.ReadinessReport!.Results);
+        Assert.Equal("GST.SOFTWARE.EMPTY_PACKAGE_LIST", failure.Code);
+        Assert.Equal(DeploymentReadinessCategory.TemplateConfig, failure.Category);
+        Assert.Contains("software package", failure.ActionableGuidance, StringComparison.OrdinalIgnoreCase);
     }
 
     private static CatalogService CreateCatalogService(FakeCatalogStore store)

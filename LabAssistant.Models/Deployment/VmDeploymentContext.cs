@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using LabAssistant.Models.PowerShell;
+using LabAssistant.Models.Templates;
 
 namespace LabAssistant.Models.Deployment
 {
@@ -36,6 +37,10 @@ namespace LabAssistant.Models.Deployment
         public bool InstallSoftware { get; set; } = false;
         public bool InstallRole { get; set; } = false;
         public bool ConfigureNetworkInformation { get; set; } = false;
+        public TimeZoneStepConfig? TimeZoneConfig { get; set; }
+        public SoftwareStepConfig? SoftwareConfig { get; set; }
+        public RoleStepConfig? RoleConfig { get; set; }
+        public GuestNetworkStepConfig? GuestNetworkConfig { get; set; }
         public List<string> NonBlockingOptionalSteps { get; set; } = new();
 
         // Resource tracking for cleanup orchestration
