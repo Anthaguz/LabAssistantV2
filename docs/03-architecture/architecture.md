@@ -93,4 +93,9 @@ Behavioral boundaries:
 - Sequence diagrams for deploy/cancel/cleanup and diagnostics export (`docs/03-architecture/sequence-diagrams.md`).
 - Whether to formalize PowerShell wrapper protocol/lifecycle details in a dedicated architecture/supportability doc beyond the summary above (planned in Milestone V).
 - Whether future switch management and guest configuration features should introduce new business workflow coordinators or extend current deployment pipeline abstractions.
-- Additional GUI action maps (Assets, Settings, Diagnostics) should be added after `docs/03-architecture/gui-action-map.deploy.md`, `docs/03-architecture/gui-action-map.templates.md`, and `docs/03-architecture/gui-action-map.assets.md` to support UI migration behavior preservation.
+- GUI action maps currently available for migration behavior preservation:
+  - `docs/03-architecture/gui-action-map.deploy.md`
+  - `docs/03-architecture/gui-action-map.templates.md`
+  - `docs/03-architecture/gui-action-map.assets.md`
+  - `docs/03-architecture/gui-action-map.settings-diagnostics-shell.md`
+- Future action maps should be added for new capability surfaces (especially `Machines`) as those workflows are designed/implemented.
