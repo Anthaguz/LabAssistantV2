@@ -1,47 +1,53 @@
 # Capability Taxonomy (Draft)
 
-**Purpose:** Define the application's feature/capability map from a user and product perspective (not from current implementation pages). This is the foundation for future navigation redesign and UI migration.
+**Purpose:** Define the product capability map from a user/product perspective (not the current page layout). This is the foundation for the future UI migration and navigation redesign.
 
-**Status:** Draft for UI migration planning (post-Milestones U, V, W).
+**Status:** Draft for migration planning (post-Milestones U, V, W).
+
+**Related:**
+- `docs/02-ux/navigation-ia-draft.md`
+- `docs/02-ux/ui-inventory.md`
+- `docs/02-ux/user-flows.md`
 
 ---
 
 ## 1. Why This Exists
 
-LabAssistant has grown beyond a single deploy utility. Features now span:
+LabAssistant now spans multiple capability domains:
 - deployment orchestration
 - template authoring and validation
-- base disk asset management
-- operational diagnostics
-- Hyper-V administration (planned expansion)
+- reusable asset management (base disks, switches)
+- diagnostics and support workflows
+- guest-step configuration and execution controls
+- planned Hyper-V VM administration (Machines page)
 
-The current UI exposes many of these capabilities, but they are split, duplicated, or miscategorized (for example, template list and template editor are separate and incomplete workflows).
-
-This taxonomy defines the **product capability model** first, so future UI migration (including potential WinUI 3 migration) preserves behavior while improving navigation and usability.
+The current UI exposes many of these capabilities, but several are split, duplicated, or miscategorized (for example, template list vs template editor). This taxonomy defines the intended product model first so the UI migration can preserve behavior while improving usability and discoverability.
 
 ---
 
 ## 2. Taxonomy Principles
 
-### 2.1 Top-Level Navigation Style
-- **Top-level navigation should be entity-based** (user-friendly).
-- **Actions/tasks live inside each entity area** (task-oriented subviews/actions).
+### 2.1 Navigation Style (Product-Level)
+- Top-level navigation should be **entity-based** (user-friendly and stable).
+- Actions/tasks should live **inside** each entity area (task-oriented subviews/actions).
 
 This is a hybrid IA strategy:
 - stable top-level categories users can learn
-- task efficiency inside each category
+- efficient workflows within each category
 
-### 2.2 Capability vs UI
+### 2.2 Capability vs Current Screens
 - This taxonomy describes **what the product can do**.
-- It does **not** assume the current UI page structure is correct.
-- Current page layout/navigation is treated as an implementation detail that may be replaced.
+- It does not assume the current pages are the correct long-term structure.
+- Current page layout is implementation history, not the target IA.
 
-### 2.3 Migration Safety
-- Each capability should later map to:
-  - user-facing entry points
-  - code paths / workflows
-  - side effects (Hyper-V, filesystem, logs)
-- This supports safe UI migration without functional regressions.
+### 2.3 Migration Safety Requirement
+Each capability should later map to:
+- user entry points
+- code/workflow paths
+- automatic/background behaviors
+- side effects (Hyper-V, filesystem, logs, diagnostics)
+
+This is required for safe UI migration without behavior loss.
 
 ---
 
@@ -49,69 +55,68 @@ This is a hybrid IA strategy:
 
 ## 3.1 Machines (Primary Hyper-V VM Management)
 
-**Intent:** Main operational page for managing Hyper-V virtual machines on the host.
+**Intent:** Main operational area for managing Hyper-V VMs on the host.
 
-**Scope direction (v1, agreed):**
-- List all Hyper-V VMs on host (not only LabAssistant-created VMs)
-- Basic VM operations and editing
-- Delete with configurable disk cleanup behavior
+**Agreed direction (v1 scope B)**
+- Manage **all Hyper-V VMs on the host** (not only LabAssistant-created VMs)
+- Provide basic VM operations and edits
+- Provide delete flows with configurable disk cleanup behavior
 
-**Planned v1 operations (Machines page scope B)**
+**Planned v1 operations**
 - List VMs on host
-- Inspect VM details / state
-- Start / stop VMs (as supported by existing services)
+- Inspect VM details and state
+- Start/Stop VMs (where supported by current services)
 - Delete VM registration
 - Delete VM with optional disk/file cleanup
 - Edit basic VM settings:
   - CPU
   - memory
   - switch attachment
-  - basic Hyper-V VM properties (custom UI where practical)
+  - basic Hyper-V properties (custom UI where practical)
 
 **Delete behavior (agreed)**
-- Default UX should offer delete options (VM-only vs VM+disk cleanup)
-- App setting may allow users to configure **always delete disks**
+- Default UX offers delete options (VM only vs VM + disk cleanup)
+- App setting may allow "always delete disks"
 
-**Important future distinction**
-- VM origin/status labels should be supported (for example):
+**Future UX requirement**
+- VM origin/status labels should be supported:
   - LabAssistant-created
   - External/host VM
   - Unknown/untracked
 
 **Current implementation status**
-- Not implemented as a unified page yet
-- Some overlapping capabilities exist inside Deploy flow and Hyper-V services
+- No unified Machines page yet
+- Some overlapping capabilities exist in services and deploy flows
 
 ---
 
-## 3.2 Deploy (Provisioning / Execution)
+## 3.2 Deploy (Provisioning and Execution)
 
-**Intent:** Configure and run deployments (on-the-fly or from templates), with readiness checks, progress, cleanup, and outcomes.
+**Intent:** Configure and run provisioning workflows (single VM or lab), with readiness checks, execution tracking, cancellation, cleanup, and outcomes.
 
 **Capabilities**
 - Configure on-the-fly VM deployment
 - Configure on-the-fly multi-VM/lab deployment
 - Deploy from template
-- Save current deploy configuration as template
+- Save current deployment config as template
 - Readiness/preflight checks (quick/full)
-- Deploy progress + per-VM status
+- Deployment progress and per-VM status
 - Cancellation
 - Cleanup and residual reporting
-- Final outcome summaries (global + per-VM)
-- Guest-step selection/execution controls (Milestone W)
+- Global/per-VM outcome summaries
+- Guest-step selection/execution controls
 
 **Current implementation status**
-- Implemented and mature (Milestones R/U/W)
-- Main deploy workflow is a core strength of the current app
+- Strong and mature (Milestones R/U/W)
 
-**Known UI concern**
-- Readiness panel usability issue addressed by `#242` (interim fix, not redesign)
+**Known UX concern**
+- Readiness panel usability issue was mitigated by `#242` (interim containment fix, not redesign)
 
 ---
 
-## 3.3 Templates (Template Authoring + Management)
+## 3.3 Templates (Template Authoring and Management)
 
-**Intent:** Unified workflow for template lifecycle management.
+**Intent:** Unified workflow for the template lifecycle (author, validate, manage, import/export).
 
 **Capabilities**
 - List templates
@@ -122,20 +127,23 @@ This is a hybrid IA strategy:
 - Schema validation and compatibility handling
 - Missing VHDX resolution
 - Template details/review
-- VM-level configuration within templates
+- VM-level template configuration
 
 **Current implementation status**
-- Capability exists in parts, but current UI is fragmented:
-  - template list page and template editor are separate/incomplete workflows
+- Capability exists in parts
+- Current UI is fragmented (template list and template editor are separate/incomplete workflows)
 
 **Migration objective**
-- Consolidate list + editor + details into one coherent Templates area
+- Consolidate list + details + editor into one Templates area
 
 ---
 
 ## 3.4 Assets (Shared Deployment Resources / Hyper-V Assets)
 
 **Intent:** Manage reusable/shared resources used by deployments and templates.
+
+**Naming (agreed)**
+- Top-level label: **Assets**
 
 **Capabilities (current + planned)**
 - Base Disk Catalog (VHDX) CRUD
@@ -145,57 +153,53 @@ This is a hybrid IA strategy:
   - integrity validation
 - Virtual Switch management (planned expansion)
   - list
-  - create/edit/delete (future)
+  - create/edit/delete
 - Asset validation/health status (future)
-- Resource mappings / substitution support (template compatibility workflows)
-
-**Naming (agreed)**
-- Top-level label: **Assets**
+- Resource mappings/substitutions for compatibility workflows (future)
 
 **Current implementation status**
-- VHDX Catalog is implemented
+- VHDX Catalog implemented
 - Switches page exists (partial/limited)
-- Full Hyper-V asset management not yet consolidated
+- Not yet consolidated into one coherent Assets area
 
 ---
 
 ## 3.5 Diagnostics
 
-**Intent:** Troubleshooting and operational observability for support users.
+**Intent:** Troubleshooting and support workflows.
 
 **Capabilities**
 - Diagnostics export bundle
 - Structured JSONL logs (canonical diagnostics path)
-- Debug logs (supplemental)
-- (Future) In-app structured log viewer (`#215`)
+- Debug logs (supplemental path)
+- Future in-app structured log viewer (`#215`)
 
 **Current implementation status**
-- Diagnostics export implemented
-- Structured logging and operational hardening implemented (Milestones S/V)
-- Logs page exists but is not the future target UX for structured diagnostics
+- Diagnostics export and structured logging implemented (Milestones S/V)
+- UI access is transitional and not yet product-grade
 
 ---
 
 ## 3.6 Settings
 
-**Intent:** Application-wide behavior and environment configuration.
+**Intent:** App-wide behavior and environment configuration.
 
 **Capabilities**
 - Storage/log paths
-- Deployment failure policy settings (app-wide)
-- Optional/non-blocking step policy settings (legacy/current)
-- Future operational defaults (for example delete-with-disk behavior on Machines page)
-- Trace/debug settings (where appropriate)
+- Deployment policies
+- Logging/diagnostics defaults
+- Future operational defaults (for example, Machines page delete-with-disk preference)
+- Trace/debug toggles (where exposed)
 
 **Current implementation status**
-- Implemented page with app settings
-- Some settings still represent transitional behavior that may evolve as guest-step model matures
+- Implemented page exists
+- Some settings represent transitional behavior and may evolve
 
 ---
 
 ## 4. Cross-Cutting Capability Areas (Not Top-Level by Default)
 
-These are important capabilities but should generally appear **within** top-level categories instead of as standalone top-level nav entries.
+These are important capabilities, but they should usually appear inside entity areas rather than as top-level navigation entries.
 
 ### 4.1 Validation / Readiness
 - Deploy readiness preflight (quick/full)
@@ -203,57 +207,59 @@ These are important capabilities but should generally appear **within** top-leve
 - Catalog VHDX integrity validation
 - Guest-step configuration completeness validation
 
-Recommended placement:
-- **Deploy** (deployment readiness)
-- **Templates** (template validation)
-- **Assets** (catalog validation)
+**Recommended placement**
+- `Deploy` for deploy readiness
+- `Templates` for template validation
+- `Assets` for catalog/asset validation
 
 ### 4.2 Execution Outcomes / Error Reporting
 - Per-VM outcomes
 - Cleanup/residual reporting
 - Structured runtime diagnostics
 
-Recommended placement:
-- Primary visibility in **Deploy**
-- Deep troubleshooting under **Diagnostics**
+**Recommended placement**
+- Primary visibility in `Deploy`
+- Deep troubleshooting in `Diagnostics`
 
 ### 4.3 Import / Export
 - Template import/export
 - Diagnostics export
-- (Future) asset import/export patterns
+- Future asset import/export
 
-Recommended placement:
-- In the relevant entity section, not a top-level “Import/Export” page
+**Recommended placement**
+- In the relevant entity area, not a top-level "Import/Export" page
 
 ---
 
 ## 5. Capability-to-User Operation Inventory (High-Level)
 
-This section groups the user operations you called out (and adjacent ones) into the taxonomy.
+This groups concrete user operations into the future taxonomy.
 
 ### Machines
 - List Hyper-V VMs on host
-- Edit VM basic configuration
+- Inspect VM state/details
+- Edit basic VM configuration
+- Start/Stop VMs
 - Delete VM (VM only / VM + disks)
-- Attach additional disks (future within Machines)
-- Attach additional switches/NICs (future within Machines)
-- Open advanced Hyper-V config UI (MMC integration) if feasible
+- Attach additional disks (future)
+- Attach additional NICs/switches (future)
+- Open advanced Hyper-V configuration UI (if feasible)
 
 ### Deploy
 - Deploy VM on-the-fly
 - Deploy multi-VM lab on-the-fly
 - Deploy VM from template
 - Deploy lab from template
-- Save current deployment config as template
+- Save deployment config as template
 - Configure guest-step execution selections
-- Review readiness failures/warnings before deploy
+- Review readiness failures/warnings
 - Cancel deployment
 
 ### Templates
 - CRUD templates
-- Import/export templates
-- List templates
+- List/search templates
 - Edit template VM configurations
+- Import/export templates
 - Resolve missing VHDX references
 
 ### Assets
@@ -264,57 +270,56 @@ This section groups the user operations you called out (and adjacent ones) into 
 
 ### Diagnostics
 - Export diagnostics bundle
-- Inspect structured logs (future Logs UI)
-- Access raw logs (power-user path)
+- Access logs (raw files today, in-app viewer later)
+- Review structured operation traces (future UI)
 
 ### Settings
-- App-wide deployment policies
-- Storage paths
-- Logging paths
-- Future default delete behavior for Machines page
+- Configure app-wide deployment policies
+- Configure storage and logging paths
+- Configure operational defaults (future Machines delete preference)
 
 ---
 
 ## 6. Current UI Mismatch Themes (Preliminary)
 
-This is not the full UI audit yet (that is a later phase), but these are already known taxonomy/navigation mismatches:
+This is a preview of the later UI audit, not the full audit.
 
-### 6.1 Templates are split across multiple disconnected surfaces
+### 6.1 Templates are split across disconnected surfaces
 - Template list and template editing are not a coherent workflow
-- Users may need filesystem access to complete tasks that should be in-app
+- Users may need filesystem access for tasks that should be in-app
 
-### 6.2 Deploy page carries too much mixed responsibility
-- Deploy configuration, readiness, execution, outcomes, and guest-step visibility all coexist (functional but dense)
-- The page is behavior-rich and migration-risky (needs detailed action map)
+### 6.2 Deploy page carries dense mixed responsibilities
+- Configuration, readiness, execution, outcomes, and guest-step visibility all coexist
+- Functional but dense and migration-risky
 
-### 6.3 Assets are not fully consolidated
-- VHDX Catalog and Switches exist separately, but the product direction suggests a unified Assets area
+### 6.3 Assets are not consolidated yet
+- VHDX Catalog and Switches are separate surfaces, but the product direction suggests a unified Assets area
 
 ### 6.4 Diagnostics UX is transitional
-- Logging/diagnostics infrastructure is strong, but UI access and navigation are not yet product-grade
+- Logging/diagnostics internals are strong, but navigation and UI presentation are not yet aligned to a polished product UX
 
-### 6.5 Future Machines capability has no primary home yet
-- Hyper-V VM administration operations exist in services/pipeline behavior but not as a user-facing entity-centric workflow
+### 6.5 Machines capability has no primary home yet
+- Hyper-V administration behavior exists in services and deploy paths, but not as a user-facing entity workflow
 
 ---
 
-## 7. Future Navigation Implications (Summary)
+## 7. Navigation Implications (Summary)
 
 This taxonomy implies:
-- A future **Machines** page should become the primary landing page (or at least a primary top-level destination), not just Deploy.
-- **Deploy** should focus on provisioning workflows, not general VM administration.
-- **Templates** should unify list/editor/details/import/export into one workflow area.
-- **Assets** should unify VHDX catalog and future switch management.
-- **Diagnostics** should become a user-meaningful troubleshooting area (with Logs UI later).
+- `Machines` should become a primary top-level destination in the future UI
+- `Deploy` should focus on provisioning workflows, not general VM administration
+- `Templates` should unify list/editor/details/import/export into one area
+- `Assets` should unify base disks and future switch management
+- `Diagnostics` should become a user-meaningful troubleshooting area (with `#215` later)
 
 Detailed navigation behavior is defined in `docs/02-ux/navigation-ia-draft.md`.
 
 ---
 
-## 8. Open Questions / TBDs (for later phases)
+## 8. Open Questions / TBDs
 
-- Exact Machines page v1 operation list (which basic edit actions are in custom UI vs delegated to Hyper-V UI/MMC)
-- Whether Machines becomes the default landing page immediately or after the new UI migration
+- Exact Machines page v1 action list (what is native LabAssistant UI vs delegated to Hyper-V UI/MMC)
+- Whether `Machines` becomes the default landing page immediately or after UI migration stabilizes
 - How to represent VM origin/trust labels in UX (LabAssistant-managed vs external)
-- Whether Diagnostics should include a lightweight “Recent Issues” dashboard or remain mostly export/log access in v1
-- Whether Assets should later split into subcategories (Base Disks, Switches, ISOs, etc.) as scope grows
+- Whether Diagnostics should include a lightweight "Recent Issues" dashboard/history in v1
+- Whether Assets later splits into subcategories in top navigation as scope grows (Base Disks, Switches, ISOs, etc.)

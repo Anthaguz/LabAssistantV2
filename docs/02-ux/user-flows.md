@@ -2,7 +2,7 @@
 
 **Purpose:** Describe how users move through the app for key tasks.
 
-Related planning docs (UI migration prep):
+**Related planning docs (UI migration prep):**
 - `docs/02-ux/capability-taxonomy.md`
 - `docs/02-ux/navigation-ia-draft.md`
 
@@ -23,7 +23,7 @@ For each flow:
   1. TBD
   2. TBD
 - **Decision points:**
-  - If validation fails → TBD
+  - If validation fails -> TBD
 - **Result:** TBD
 
 ## Flow: Deploy Lab

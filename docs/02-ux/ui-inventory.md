@@ -2,7 +2,7 @@
 
 **Purpose:** One place listing every screen/dialog with rules and behavior.
 
-Related planning docs (UI migration prep):
+**Related planning docs (UI migration prep):**
 - `docs/02-ux/capability-taxonomy.md`
 - `docs/02-ux/navigation-ia-draft.md`
 
@@ -22,7 +22,7 @@ For each UI surface:
   - Field: TBD (required? validation?)
 - **Outputs:** TBD
 - **Actions:**
-  - Button: TBD → effect TBD
+  - Button: TBD -> effect TBD
 - **Errors:** TBD
 
 ## Open Questions / TBDs
