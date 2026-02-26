@@ -113,6 +113,45 @@ namespace LabAssistant.ViewModels
             }
         }
 
+        public bool ConfigureTimeZoneEnabled
+        {
+            get => _context.ConfigureTimeZone;
+            set
+            {
+                if (_context.ConfigureTimeZone != value)
+                {
+                    _context.ConfigureTimeZone = value;
+                    OnPropertyChanged(nameof(ConfigureTimeZoneEnabled));
+                }
+            }
+        }
+
+        public bool InstallSoftwareEnabled
+        {
+            get => _context.InstallSoftware;
+            set
+            {
+                if (_context.InstallSoftware != value)
+                {
+                    _context.InstallSoftware = value;
+                    OnPropertyChanged(nameof(InstallSoftwareEnabled));
+                }
+            }
+        }
+
+        public bool InstallRoleEnabled
+        {
+            get => _context.InstallRole;
+            set
+            {
+                if (_context.InstallRole != value)
+                {
+                    _context.InstallRole = value;
+                    OnPropertyChanged(nameof(InstallRoleEnabled));
+                }
+            }
+        }
+
         public ObservableCollection<string> AvailableSwitches => _deploymentViewModel?.AvailableSwitches ?? new ObservableCollection<string>();
 
         public bool HasSwitches => AvailableSwitches.Count > 0;

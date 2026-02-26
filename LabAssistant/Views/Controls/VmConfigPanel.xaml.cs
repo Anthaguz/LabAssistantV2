@@ -36,14 +36,6 @@ namespace LabAssistant.Views.Controls
             "Start VM"
         ];
 
-        private static readonly Dictionary<string, string> OptionalSteps = new()
-        {
-            [DeploymentStepKeys.SetTimeZone] = "Set Time Zone",
-            [DeploymentStepKeys.InstallSoftware] = "Install Software",
-            [DeploymentStepKeys.InstallRole] = "Install Role",
-            [DeploymentStepKeys.ConfigureNetworkInformation] = "Configure Network Information"
-        };
-
         public VmConfigPanel()
         {
             InitializeComponent();
@@ -272,13 +264,6 @@ namespace LabAssistant.Views.Controls
         private void UpdateDeploymentStepsDisplay()
         {
             MandatoryStepsList.ItemsSource = MandatorySteps;
-            var nonBlocking = _settingsStore.Settings.NonBlockingOptionalSteps ?? new List<string>();
-            OptionalStepsList.ItemsSource = OptionalSteps
-                .Select(kvp =>
-                    nonBlocking.Contains(kvp.Key)
-                        ? $"{kvp.Value} (non-blocking)"
-                        : $"{kvp.Value} (blocking)")
-                .ToList();
         }
 
         private void AttachContextHandlers()

@@ -109,6 +109,54 @@ namespace LabAssistant.ViewModels
             }
         }
 
+        public bool ConfigureTimeZoneEnabled
+        {
+            get => _vmTemplate.TimeZoneConfig?.Enabled ?? false;
+            set
+            {
+                if ((_vmTemplate.TimeZoneConfig?.Enabled ?? false) == value)
+                {
+                    return;
+                }
+
+                _vmTemplate.TimeZoneConfig ??= new TimeZoneStepConfig();
+                _vmTemplate.TimeZoneConfig.Enabled = value;
+                OnPropertyChanged(nameof(ConfigureTimeZoneEnabled));
+            }
+        }
+
+        public bool InstallSoftwareEnabled
+        {
+            get => _vmTemplate.SoftwareConfig?.Enabled ?? false;
+            set
+            {
+                if ((_vmTemplate.SoftwareConfig?.Enabled ?? false) == value)
+                {
+                    return;
+                }
+
+                _vmTemplate.SoftwareConfig ??= new SoftwareStepConfig();
+                _vmTemplate.SoftwareConfig.Enabled = value;
+                OnPropertyChanged(nameof(InstallSoftwareEnabled));
+            }
+        }
+
+        public bool InstallRoleEnabled
+        {
+            get => _vmTemplate.RoleConfig?.Enabled ?? false;
+            set
+            {
+                if ((_vmTemplate.RoleConfig?.Enabled ?? false) == value)
+                {
+                    return;
+                }
+
+                _vmTemplate.RoleConfig ??= new RoleStepConfig();
+                _vmTemplate.RoleConfig.Enabled = value;
+                OnPropertyChanged(nameof(InstallRoleEnabled));
+            }
+        }
+
         public ObservableCollection<string> AvailableSwitches => _editorViewModel.AvailableSwitches;
 
         public bool HasSwitches => _editorViewModel.HasSwitches;

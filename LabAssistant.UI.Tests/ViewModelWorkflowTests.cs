@@ -124,6 +124,55 @@ public class ViewModelWorkflowTests
     }
 
     [Fact]
+    public void DeployVmConfigContext_GuestStepToggles_MapToDeploymentContext()
+    {
+        var settings = new FakeAppSettingsStore { Settings = new AppSettings { VmBasePath = @"C:\vm-base" } };
+        var deploymentContext = new VmDeploymentContext();
+        var context = new DeployVmConfigContext(null, deploymentContext, settings);
+
+        context.ConfigureTimeZoneEnabled = true;
+        context.InstallSoftwareEnabled = true;
+        context.InstallRoleEnabled = true;
+
+        Assert.True(deploymentContext.ConfigureTimeZone);
+        Assert.True(deploymentContext.InstallSoftware);
+        Assert.True(deploymentContext.InstallRole);
+
+        context.InstallRoleEnabled = false;
+        Assert.False(deploymentContext.InstallRole);
+    }
+
+    [Fact]
+    public void TemplateVmConfigContext_GuestStepToggles_CreateAndUpdatePersistedConfigs()
+    {
+        var editor = CreateTemplateEditorViewModel(new FakeTemplateStore());
+        var vm = new VmTemplate
+        {
+            VmId = "vm-1",
+            Name = "vm1",
+            MemoryMb = 1024,
+            CpuCount = 1,
+            VhdPath = @"C:\base\disk.vhdx",
+            SwitchName = "Default Switch"
+        };
+
+        var context = new TemplateVmConfigContext(editor, vm);
+        context.ConfigureTimeZoneEnabled = true;
+        context.InstallSoftwareEnabled = true;
+        context.InstallRoleEnabled = true;
+
+        Assert.NotNull(vm.TimeZoneConfig);
+        Assert.True(vm.TimeZoneConfig!.Enabled);
+        Assert.NotNull(vm.SoftwareConfig);
+        Assert.True(vm.SoftwareConfig!.Enabled);
+        Assert.NotNull(vm.RoleConfig);
+        Assert.True(vm.RoleConfig!.Enabled);
+
+        context.InstallSoftwareEnabled = false;
+        Assert.False(vm.SoftwareConfig.Enabled);
+    }
+
+    [Fact]
     public void TemplateEditorViewModel_AddVm_GeneratesVmId_AndRemoveDoesNotRegenerateOthers()
     {
         var templateStore = new FakeTemplateStore();
