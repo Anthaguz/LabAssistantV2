@@ -589,7 +589,139 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-006 — Machines (Hyper-V VM Administration, v1)
+
+**Related FRs:** FR-060, FR-061, FR-062, FR-063, FR-064, FR-065, FR-066, FR-040, FR-041
+
+## Scenarios
+
+### 1) Inventory — List All Host VMs
+**Given**
+- Hyper-V is enabled on the host
+
+**When**
+- User opens `Machines`
+
+**Then**
+- All Hyper-V VMs on the host are listed (including non-LabAssistant-created VMs)
+- The list supports selecting a VM for operations
+- Structured logs capture inventory load result
+
+### 2) Basic Actions — Start/Stop VM
+**Given**
+- A VM is selected in `Machines`
+
+**When**
+- User clicks `Start` or `Stop`
+
+**Then**
+- Action is executed, or blocked with a concise actionable error
+- UI reflects updated VM state or error state
+- Structured logs include operationId, vm identity, action, and result
+
+### 3) Basic Edit — CPU/Memory/Switch
+**Given**
+- A VM is selected in `Machines`
+
+**When**
+- User updates supported v1 settings (CPU, memory, switch) and applies
+
+**Then**
+- Requested edits are applied or rejected with explicit feedback
+- No silent partial update is reported as success
+- Structured logs capture attempted edits and result
+
+### 4) Connection Actions — Console and RDP
+**Given**
+- A VM is selected in `Machines`
+
+**When**
+- User views available connection actions
+
+**Then**
+- `Open Hyper-V Console` is available as a dedicated action
+- `Open RDP` is a separate dedicated action
+- `Open RDP` is disabled (grayed out) when readiness is unknown/unmet
+- Disabled RDP state includes user-facing reason text/guidance
+- Action attempts and results are logged
+
+### 5) Delete VM — Scope Selection and Confirmation
+**Given**
+- A VM is selected in `Machines`
+
+**When**
+- User initiates delete
+
+**Then**
+- UI offers delete scope options:
+  - VM registration only
+  - VM + associated disks/files
+- Destructive action requires explicit confirmation
+- Result is clearly reported
+- Structured logs include selected delete scope and result
+
+### 6) Delete Default Policy — Always Delete Disks Setting
+**Given**
+- User enables app setting to always default to delete-with-disks
+
+**When**
+- User initiates delete in `Machines`
+
+**Then**
+- Default delete scope reflects setting behavior
+- User remains aware of selected delete scope before confirmation
+- Setting behavior is consistent across Machines delete flows
+
+### 7) Failure Handling — Actionable, Non-Silent
+**Given**
+- A Machines operation fails (permission/state/runtime/dependency)
+
+**When**
+- Operation completes
+
+**Then**
+- UI shows concise actionable error
+- UI does not report false success
+- Structured logs include operationId and failure context
+
+## Expected UI
+- `Machines` capability entry and VM inventory/list
+- Selection model for VM operations
+- Dedicated actions:
+  - Start/Stop
+  - Apply basic edits (CPU/memory/switch)
+  - Open Hyper-V Console
+  - Open RDP
+  - Delete
+- Explicit delete scope selection and confirmation
+- Explicit disabled RDP state with reason text
+
+## Expected Logs
+- `MachineInventoryLoadStarted` / `MachineInventoryLoadCompleted`
+- `MachineActionStarted` / `MachineActionCompleted` / `MachineActionFailed`
+- `MachineDeleteStarted` / `MachineDeleteCompleted` / `MachineDeleteFailed`
+- `MachineConnectionActionStarted` / `MachineConnectionActionCompleted` / `MachineConnectionActionFailed`
+- Required fields:
+  - operationId
+  - vmId/vmName (when VM-scoped)
+  - action name
+  - selected delete scope (for delete actions)
+  - result and error details on failure
+
+## Definition of Done
+- [ ] Machines inventory lists all host Hyper-V VMs
+- [ ] Start/Stop operations are actionable and logged
+- [ ] Basic edit operations (CPU/memory/switch) are actionable and logged
+- [ ] Console and RDP are separate actions; RDP disabled-state behavior is explicit when unavailable
+- [ ] Delete flow supports VM-only vs VM+disks scopes with confirmation
+- [ ] Always-delete-disks setting behavior is defined and testable
+- [ ] Failure behavior is actionable and non-silent
+- [ ] Structured logging includes operationId and action context for Machines actions
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
 - Whether to store deployment history records locally
+- RDP readiness detection criteria for enabling `Open RDP` in Machines
