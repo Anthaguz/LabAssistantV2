@@ -239,6 +239,49 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 
 ---
 
+### 3.6 Machines (Hyper-V VM Administration, v1)
+
+- **FR-060:** The system shall provide a primary `Machines` capability area for host VM administration workflows.
+  - **Acceptance details:** `Machines` is a first-class capability distinct from `Deploy`; `Deploy` remains provisioning-focused.
+  - **Priority:** P1
+
+- **FR-061:** The system shall list and manage all Hyper-V VMs on the current host, including VMs not created by LabAssistant.
+  - **Acceptance details:** VM origin/status labeling strategy may be limited in v1 but must not hide external VMs.
+  - **Priority:** P1
+
+- **FR-062:** The system shall support v1 basic VM operations from `Machines`, including at minimum:
+  - start VM
+  - stop VM
+  - delete VM (with safety prompts/options)
+  - **Priority:** P1
+
+- **FR-063:** The system shall support v1 basic VM edit operations from `Machines`, including at minimum:
+  - memory
+  - CPU
+  - switch attachment
+  - **Priority:** P1
+
+- **FR-064:** The system shall expose separate connection actions from `Machines`:
+  - **Open Hyper-V Console**
+  - **Open RDP**
+  - **Acceptance details:** `Open RDP` shall be disabled (grayed out) when RDP readiness is unknown/unmet.
+  - **Priority:** P1
+
+- **FR-065:** The system shall support VM deletion options:
+  - delete VM registration only
+  - delete VM and associated disk/files
+  - **Acceptance details:** v1 shall support an app setting to always choose delete-with-disks as default behavior when enabled by the user.
+  - **Priority:** P1
+
+- **FR-066:** All user-initiated `Machines` operations shall emit structured logs with operationId and action context (vmId/vmName/action/result/error details).
+  - **Acceptance details:** Destructive operations (delete with or without disks) must log explicit action intent and result.
+  - **Priority:** P1
+
+Detailed capability contract:
+- See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
+
+---
+
 ## 4. Data Requirements
 
 - Templates shall be stored as **structured local files** (JSON).  
@@ -344,3 +387,4 @@ Traceability must be maintained across:
 - Strategy for **resume/retry UX** after failed deployment beyond current cleanup-and-report policy  
 - Long-term extensibility toward **multiple hypervisors**  
 - Telemetry or usage metrics collection approach  
+- **TBD:** RDP readiness detection contract for `Machines` (`Open RDP` enablement criteria and fallback messaging) before implementation.
