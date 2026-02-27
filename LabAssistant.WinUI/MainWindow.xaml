@@ -2,19 +2,197 @@
     x:Class="LabAssistant.WinUI.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Background="#FFF4F6FA">
+    <Grid x:Name="RootLayout" Background="{StaticResource ShellBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
         <Border
-            Margin="24"
-            Padding="20"
-            Background="White"
-            BorderBrush="#FFE5E7EB"
-            BorderThickness="1"
-            CornerRadius="8">
-            <StackPanel Spacing="10">
-                <TextBlock FontSize="22" FontWeight="SemiBold" Text="LabAssistant WinUI" />
+            Grid.Row="0"
+            Background="{StaticResource ShellTopBarBackgroundBrush}"
+            BorderBrush="{StaticResource ShellBorderBrush}"
+            BorderThickness="0,0,0,1">
+            <Grid Padding="12,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button
+                    x:Name="HamburgerButton"
+                    Grid.Column="0"
+                    Width="36"
+                    Height="32"
+                    Click="HamburgerButton_Click"
+                    Content=" "
+                    FontFamily="Segoe MDL2 Assets"
+                    Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                    ToolTipService.ToolTip="Open capabilities" />
+
                 <TextBlock
-                    Foreground="#FF4B5563"
-                    Text="Parallel WinUI host wiring is ready. Shell migration behavior is intentionally out of scope for #265." />
+                    x:Name="BreadcrumbTextBlock"
+                    Grid.Column="1"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                    Text="Capability / Machines" />
+
+                <Button
+                    x:Name="ThemeToggleButton"
+                    Grid.Column="3"
+                    Margin="8,0,0,0"
+                    Click="ThemeToggleButton_Click"
+                    Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                    Content="Switch to dark">
+                    <Button.Resources>
+                        <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{ThemeResource ShellTopBarForegroundColor}" />
+                        <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{ThemeResource ShellTopBarForegroundColor}" />
+                    </Button.Resources>
+                </Button>
+
+                <Grid Grid.Column="4" Margin="8,0,0,0">
+                    <Button
+                        x:Name="InsightsToggleButton"
+                        Width="44"
+                        Height="32"
+                        Click="InsightsButton_Click"
+                        Content=" "
+                        FontFamily="Segoe MDL2 Assets"
+                        Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                        ToolTipService.ToolTip="Toggle insights panel" />
+                    <Border
+                        x:Name="IssueBadge"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        MinWidth="18"
+                        Height="18"
+                        Background="{StaticResource ShellCriticalBrush}"
+                        CornerRadius="9"
+                        Visibility="Visible">
+                        <TextBlock
+                            x:Name="IssueBadgeTextBlock"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                            FontSize="11"
+                            Text="3" />
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="64" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="320" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Grid.Column="0"
+                Background="{StaticResource ShellRailBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="0,0,1,0">
+                <StackPanel Margin="0,8,0,0" Spacing="4">
+                    <Button x:Name="MachinesRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Machines" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Machines" />
+                    <Button x:Name="DeployRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Deploy" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Deploy" />
+                    <Button x:Name="TemplatesRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Templates" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Templates" />
+                    <Button x:Name="AssetsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Assets" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Assets" />
+                    <Button x:Name="DiagnosticsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Diagnostics" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Diagnostics" />
+                    <Button x:Name="SettingsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Settings" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Settings" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Margin="16"
+                Padding="20"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock
+                        x:Name="ContentTitleTextBlock"
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontSize="24"
+                        FontWeight="SemiBold"
+                        Text="Machines Shell Host" />
+                    <TextBlock
+                        x:Name="ContentDescriptionTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Machines feature content is intentionally out of scope for #266."
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        FontStyle="Italic"
+                        Text="AA2 shell foundation only: capability/context shell behavior is implemented; feature pages come in follow-up issues." />
+                </StackPanel>
+            </Border>
+
+            <Border
+                x:Name="InsightsPanel"
+                Grid.Column="2"
+                Margin="0,16,16,16"
+                Padding="16"
+                Background="{StaticResource ShellInsightsBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Visibility="Collapsed">
+                <StackPanel Spacing="10">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontSize="18"
+                        FontWeight="SemiBold"
+                        Text="Insights" />
+                    <Border Padding="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
+                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Readiness has 2 blocking items." TextWrapping="Wrap" />
+                    </Border>
+                    <Border Padding="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
+                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Diagnostics export completed with warnings." TextWrapping="Wrap" />
+                    </Border>
+                    <Border Padding="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
+                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="One VM has pending guest-step configuration." TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border
+            x:Name="DrawerScrim"
+            Grid.RowSpan="2"
+            Background="{StaticResource ShellScrimBrush}"
+            Tapped="DrawerScrim_Tapped"
+            Visibility="Collapsed" />
+
+        <Border
+            x:Name="CapabilityDrawer"
+            Grid.RowSpan="2"
+            Width="280"
+            HorizontalAlignment="Left"
+            Padding="16"
+            Background="{StaticResource ShellDrawerBackgroundBrush}"
+            BorderBrush="{StaticResource ShellBorderBrush}"
+            BorderThickness="0,0,1,0"
+            Visibility="Collapsed">
+            <Border.Transitions>
+                <TransitionCollection>
+                    <PaneThemeTransition Edge="Left" />
+                </TransitionCollection>
+            </Border.Transitions>
+            <StackPanel Spacing="6">
+                <TextBlock Foreground="{StaticResource ShellTopBarForegroundBrush}" FontSize="18" FontWeight="SemiBold" Text="Capabilities" />
+                <Button x:Name="MachinesDrawerButton" Click="CapabilityButton_Click" Content="Machines" Tag="Machines" />
+                <Button x:Name="DeployDrawerButton" Click="CapabilityButton_Click" Content="Deploy" Tag="Deploy" />
+                <Button x:Name="TemplatesDrawerButton" Click="CapabilityButton_Click" Content="Templates" Tag="Templates" />
+                <Button x:Name="AssetsDrawerButton" Click="CapabilityButton_Click" Content="Assets" Tag="Assets" />
+                <Button x:Name="DiagnosticsDrawerButton" Click="CapabilityButton_Click" Content="Diagnostics" Tag="Diagnostics" />
+                <Button x:Name="SettingsDrawerButton" Click="CapabilityButton_Click" Content="Settings" Tag="Settings" />
             </StackPanel>
         </Border>
     </Grid>
