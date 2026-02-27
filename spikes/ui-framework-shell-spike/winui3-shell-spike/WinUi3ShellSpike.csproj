@@ -4,12 +4,29 @@
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <!-- Unpackaged spike: skip PRI generation/tasks that require Visual Studio Appx tooling. -->
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
+    <AppxGetPackagePropertiesEnabled>false</AppxGetPackagePropertiesEnabled>
+    <AppxPackage>false</AppxPackage>
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableMsixTooling>false</EnableMsixTooling>
+    <!-- Unpackaged desktop app: bootstrap the installed Windows App Runtime. -->
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <WindowsAppSdkBootstrapInitialize>true</WindowsAppSdkBootstrapInitialize>
+    <!-- Windows App SDK still brings legacy win10-* RIDs; opt into legacy RID graph on newer SDKs. -->
+    <UseRidGraph>true</UseRidGraph>
+    <!-- Spike-only desktop run target; constrain to local dev RID to avoid unavailable legacy runtime packs. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Prevent WindowsAppSDK/MrtCore targets from injecting unsupported default legacy RID matrix on .NET 9 SDK. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- Use managed XAML compiler task on newer SDKs to avoid net472 XamlCompiler.exe compatibility issues. -->
+    <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240802000" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.*" />
   </ItemGroup>
 </Project>

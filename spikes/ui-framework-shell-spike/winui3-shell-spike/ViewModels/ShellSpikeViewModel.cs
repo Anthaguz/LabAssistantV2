@@ -98,6 +98,7 @@ public sealed class ShellSpikeViewModel : INotifyPropertyChanged
                 RebuildContentFixture();
                 OnPropertyChanged(nameof(LeftPaneDescription));
                 OnPropertyChanged(nameof(ContentHeader));
+                OnPropertyChanged(nameof(ActiveCapabilityLabel));
             }
         }
     }
@@ -130,18 +131,23 @@ public sealed class ShellSpikeViewModel : INotifyPropertyChanged
     public string LeftPaneTitle => IsCapabilityScope ? "Capability Scope" : "Context Scope";
     public string LeftPaneDescription => IsCapabilityScope ? "Select a top-level capability" : $"{ActiveCapability} contextual items";
     public string ContentHeader => $"{ActiveCapability} Shell Foundation Spike";
+    public string ActiveCapabilityLabel => $"| Active: {ActiveCapability}";
     public string DenseModeLabel => DenseMode ? "Dense Fixture: ON" : "Dense Fixture: OFF";
     public string ReadinessDetailsButtonLabel => ShowReadinessDetails
         ? $"Hide Readiness Details ({ReadinessDetails.Count})"
         : $"Show Readiness Details ({ReadinessDetails.Count})";
     public int ActiveIssueCount => ActiveIssues.Count;
+    public string ActiveIssuesLabel => $"Issues: {ActiveIssueCount}";
 
     public Visibility CapabilityPaneVisibility => IsCapabilityScope ? Visibility.Visible : Visibility.Collapsed;
     public Visibility ContextPaneVisibility => IsCapabilityScope ? Visibility.Collapsed : Visibility.Visible;
     public Visibility ReadinessDetailsVisibility => ShowReadinessDetails ? Visibility.Visible : Visibility.Collapsed;
 
     private void OnActiveIssuesChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        => OnPropertyChanged(nameof(ActiveIssueCount));
+    {
+        OnPropertyChanged(nameof(ActiveIssueCount));
+        OnPropertyChanged(nameof(ActiveIssuesLabel));
+    }
 
     private void RebuildContextItems()
     {
