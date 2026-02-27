@@ -26,6 +26,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabAssistant.Services.Tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabAssistant.UI.Tests", "LabAssistant.UI.Tests\LabAssistant.UI.Tests.csproj", "{59BBE231-AB29-45C4-8FE7-C5890AF180EE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabAssistant.WinUI", "LabAssistant.WinUI\LabAssistant.WinUI.csproj", "{B7312B57-761A-4AD9-86E3-799C3B43007B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,6 +70,10 @@ Global
 		{59BBE231-AB29-45C4-8FE7-C5890AF180EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{59BBE231-AB29-45C4-8FE7-C5890AF180EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{59BBE231-AB29-45C4-8FE7-C5890AF180EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7312B57-761A-4AD9-86E3-799C3B43007B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7312B57-761A-4AD9-86E3-799C3B43007B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7312B57-761A-4AD9-86E3-799C3B43007B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7312B57-761A-4AD9-86E3-799C3B43007B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
