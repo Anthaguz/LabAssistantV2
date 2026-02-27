@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Animation;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
 using WinRT.Interop;
@@ -9,6 +10,9 @@ namespace LabAssistant.WinUI;
 
 public sealed partial class MainWindow : Window
 {
+    private const double DrawerWidth = 280;
+    private const int DrawerAnimationDurationMs = 180;
+
     private readonly ShellViewModel _shellViewModel = new();
     private string _activeCapability = "Machines";
     private bool _isDrawerOpen;
@@ -20,6 +24,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         ConfigureShellIcons();
+        InitializeDrawer();
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
         RootLayout.KeyDown += RootLayout_KeyDown;
@@ -77,15 +82,68 @@ public sealed partial class MainWindow : Window
         };
     }
 
+    private void InitializeDrawer()
+    {
+        DrawerTranslateTransform.X = -DrawerWidth;
+        CapabilityDrawer.Visibility = Visibility.Collapsed;
+        DrawerScrim.Visibility = Visibility.Collapsed;
+    }
+
+    private void SetDrawerOpen(bool isOpen)
+    {
+        if (_isDrawerOpen == isOpen)
+        {
+            return;
+        }
+
+        _isDrawerOpen = isOpen;
+
+        if (isOpen)
+        {
+            DrawerScrim.Visibility = Visibility.Visible;
+            CapabilityDrawer.Visibility = Visibility.Visible;
+            AnimateDrawer(-DrawerWidth, 0, onCompleted: null);
+            return;
+        }
+
+        AnimateDrawer(DrawerTranslateTransform.X, -DrawerWidth, () =>
+        {
+            CapabilityDrawer.Visibility = Visibility.Collapsed;
+            DrawerScrim.Visibility = Visibility.Collapsed;
+        });
+    }
+
+    private void AnimateDrawer(double from, double to, Action? onCompleted)
+    {
+        var storyboard = new Storyboard();
+        var animation = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = TimeSpan.FromMilliseconds(DrawerAnimationDurationMs),
+            EnableDependentAnimation = true,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        Storyboard.SetTarget(animation, DrawerTranslateTransform);
+        Storyboard.SetTargetProperty(animation, nameof(DrawerTranslateTransform.X));
+        storyboard.Children.Add(animation);
+
+        if (onCompleted is not null)
+        {
+            storyboard.Completed += (_, _) => onCompleted();
+        }
+
+        storyboard.Begin();
+    }
+
     private void ApplyState()
     {
-        BreadcrumbTextBlock.Text = $"Capability / {_activeCapability}";
+        BreadcrumbTextBlock.Text = _activeCapability;
         ContentTitleTextBlock.Text = $"{_activeCapability} Shell Host";
         ContentDescriptionTextBlock.Text = $"{_activeCapability} feature content is intentionally out of scope for #266.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
-        CapabilityDrawer.Visibility = _isDrawerOpen ? Visibility.Visible : Visibility.Collapsed;
-        DrawerScrim.Visibility = _isDrawerOpen ? Visibility.Visible : Visibility.Collapsed;
         InsightsPanel.Visibility = _isInsightsOpen ? Visibility.Visible : Visibility.Collapsed;
         IssueBadge.Visibility = _issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         IssueBadgeTextBlock.Text = _issueCount.ToString();
@@ -93,7 +151,7 @@ public sealed partial class MainWindow : Window
 
     private void HamburgerButton_Click(object sender, RoutedEventArgs e)
     {
-        _isDrawerOpen = !_isDrawerOpen;
+        SetDrawerOpen(!_isDrawerOpen);
         ApplyState();
     }
 
@@ -103,7 +161,7 @@ public sealed partial class MainWindow : Window
             _shellViewModel.Capabilities.Any(entry => string.Equals(entry.DisplayName, capability, StringComparison.Ordinal)))
         {
             _activeCapability = capability;
-            _isDrawerOpen = false;
+            SetDrawerOpen(false);
             ApplyState();
         }
     }
@@ -122,7 +180,7 @@ public sealed partial class MainWindow : Window
 
     private void DrawerScrim_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        _isDrawerOpen = false;
+        SetDrawerOpen(false);
         ApplyState();
     }
 
@@ -130,7 +188,7 @@ public sealed partial class MainWindow : Window
     {
         if (e.Key == Windows.System.VirtualKey.Escape && _isDrawerOpen)
         {
-            _isDrawerOpen = false;
+            SetDrawerOpen(false);
             ApplyState();
             e.Handled = true;
         }
@@ -140,7 +198,7 @@ public sealed partial class MainWindow : Window
     {
         if (_isDrawerOpen)
         {
-            _isDrawerOpen = false;
+            SetDrawerOpen(false);
             ApplyState();
             args.Handled = true;
         }
