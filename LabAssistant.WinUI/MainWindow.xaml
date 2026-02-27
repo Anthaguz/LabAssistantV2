@@ -122,15 +122,57 @@
                         FontSize="24"
                         FontWeight="SemiBold"
                         Text="Machines Shell Host" />
+                    <Border
+                        Padding="12"
+                        Background="{StaticResource ShellBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <StackPanel Spacing="8">
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Text="Local navigation" />
+                            <StackPanel
+                                x:Name="SubviewSelectorPanel"
+                                Orientation="Horizontal"
+                                Spacing="8" />
+                        </StackPanel>
+                    </Border>
+                    <Border
+                        Padding="12"
+                        Background="{StaticResource ShellBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <StackPanel Spacing="8">
+                            <TextBlock
+                                x:Name="ToolbarLabelTextBlock"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Text="Subview actions" />
+                            <StackPanel
+                                x:Name="SubviewToolbarPanel"
+                                Orientation="Horizontal"
+                                Spacing="8" />
+                        </StackPanel>
+                    </Border>
                     <TextBlock
                         x:Name="ContentDescriptionTextBlock"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                         Text="Machines feature content is intentionally out of scope for #266."
                         TextWrapping="Wrap" />
                     <TextBlock
+                        x:Name="SubviewPlaceholderTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Subview placeholder"
+                        TextWrapping="Wrap" />
+                    <TextBlock
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                         FontStyle="Italic"
-                        Text="AA2 shell foundation only: capability/context shell behavior is implemented; feature pages come in follow-up issues." />
+                        Text="AA2b scaffold-only: capability-local navigation, toolbar placeholders, and routing context. Feature operations remain out of scope." />
                 </StackPanel>
             </Border>
 

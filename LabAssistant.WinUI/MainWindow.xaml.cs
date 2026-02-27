@@ -14,7 +14,8 @@ public sealed partial class MainWindow : Window
     private const int DrawerAnimationDurationMs = 180;
 
     private readonly ShellViewModel _shellViewModel = new();
-    private string _activeCapability = "Machines";
+    private ShellCapability _activeCapability;
+    private ShellSubview _activeSubview;
     private bool _isDrawerOpen;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
@@ -23,6 +24,8 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _activeCapability = _shellViewModel.GetCapability("Machines");
+        _activeSubview = _activeCapability.DefaultSubview;
         ConfigureShellIcons();
         InitializeDrawer();
         Title = "LabAssistant.WinUI";
@@ -139,14 +142,61 @@ public sealed partial class MainWindow : Window
 
     private void ApplyState()
     {
-        BreadcrumbTextBlock.Text = _activeCapability;
-        ContentTitleTextBlock.Text = $"{_activeCapability} Shell Host";
-        ContentDescriptionTextBlock.Text = $"{_activeCapability} feature content is intentionally out of scope for #266.";
+        BreadcrumbTextBlock.Text = $"{_activeCapability.DisplayName} > {_activeSubview.DisplayName}";
+        ContentTitleTextBlock.Text = $"{_activeCapability.DisplayName} > {_activeSubview.DisplayName}";
+        ContentDescriptionTextBlock.Text = $"{_activeCapability.DisplayName} subview scaffold is active. Feature behavior remains out of scope in AA2b.";
+        SubviewPlaceholderTextBlock.Text = $"Placeholder content: {_activeCapability.DisplayName} / {_activeSubview.DisplayName}.";
+        ToolbarLabelTextBlock.Text = $"{_activeSubview.DisplayName} actions";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
         InsightsPanel.Visibility = _isInsightsOpen ? Visibility.Visible : Visibility.Collapsed;
         IssueBadge.Visibility = _issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         IssueBadgeTextBlock.Text = _issueCount.ToString();
+        RenderSubviewSelector();
+        RenderSubviewToolbar();
+    }
+
+    private void RenderSubviewSelector()
+    {
+        SubviewSelectorPanel.Children.Clear();
+
+        foreach (var subview in _activeCapability.Subviews)
+        {
+            var button = new Button
+            {
+                Content = subview.DisplayName,
+                Tag = subview.Key,
+                Padding = new Thickness(12, 6, 12, 6),
+                BorderThickness = new Thickness(1),
+                BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellBorderBrush"],
+                Foreground = subview.Key == _activeSubview.Key
+                    ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTopBarForegroundBrush"]
+                    : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextPrimaryBrush"],
+                Background = subview.Key == _activeSubview.Key
+                    ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellAccentBrush"]
+                    : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellContentBackgroundBrush"]
+            };
+
+            button.Click += SubviewButton_Click;
+            SubviewSelectorPanel.Children.Add(button);
+        }
+    }
+
+    private void RenderSubviewToolbar()
+    {
+        SubviewToolbarPanel.Children.Clear();
+
+        foreach (var action in _activeSubview.ToolbarActions)
+        {
+            var button = new Button
+            {
+                Content = action,
+                IsEnabled = false,
+                Padding = new Thickness(10, 6, 10, 6)
+            };
+
+            SubviewToolbarPanel.Children.Add(button);
+        }
     }
 
     private void HamburgerButton_Click(object sender, RoutedEventArgs e)
@@ -160,10 +210,30 @@ public sealed partial class MainWindow : Window
         if (sender is Button { Tag: string capability } &&
             _shellViewModel.Capabilities.Any(entry => string.Equals(entry.DisplayName, capability, StringComparison.Ordinal)))
         {
-            _activeCapability = capability;
+            _activeCapability = _shellViewModel.GetCapability(capability);
+            _activeSubview = _activeCapability.DefaultSubview;
             SetDrawerOpen(false);
             ApplyState();
         }
+    }
+
+    private void SubviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string subviewKey })
+        {
+            return;
+        }
+
+        var selectedSubview = _activeCapability.Subviews.FirstOrDefault(
+            subview => string.Equals(subview.Key, subviewKey, StringComparison.Ordinal));
+
+        if (selectedSubview is null)
+        {
+            return;
+        }
+
+        _activeSubview = selectedSubview;
+        ApplyState();
     }
 
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
