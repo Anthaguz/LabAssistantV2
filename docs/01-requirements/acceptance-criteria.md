@@ -720,8 +720,113 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-007 â€” WinUI Parallel Shell Foundation (Milestone AA)
+
+**Related FRs:** FR-067, FR-068, FR-069, FR-070, FR-071, FR-072
+
+## Scenarios
+
+### 1) Parallel UI Projects â€” Build and Launch
+**Given**
+- The solution includes WPF and WinUI UI projects
+
+**When**
+- User/developer builds and launches each UI project independently
+
+**Then**
+- Both UIs launch successfully
+- WPF remains available for production usage
+- WinUI shell startup is functional without requiring feature-parity migration
+
+### 2) Shell Navigation â€” Icon Rail + Hamburger Drawer
+**Given**
+- WinUI shell is running
+
+**When**
+- User interacts with left navigation
+
+**Then**
+- Top-level capability icons are visible in icon rail
+- Hamburger opens a slide-out capability drawer from left
+- Drawer shows scrim over remaining app content
+- Drawer closes on outside click and on `Esc`
+- Capability navigation does not rely on hover-only full-menu behavior
+
+### 3) Startup Route and Persistence Policy
+**Given**
+- WinUI app starts from a fresh launch
+
+**When**
+- App initialization completes
+
+**Then**
+- Default landing capability is `Machines`
+- Last selected capability is not restored from previous session
+
+### 4) Shell Issue Insights Panel
+**Given**
+- WinUI shell is running
+
+**When**
+- User views shell chrome
+
+**Then**
+- Insights panel is collapsed by default
+- Warning/issue trigger can open insights panel
+- Trigger shows visible count/badge when issues exist
+
+### 5) Machines Details Navigation Pattern
+**Given**
+- User selects a VM in WinUI Machines page
+
+**When**
+- User navigates details sections
+
+**Then**
+- Details are organized by sections (for example Hardware, Storage, Network)
+- CPU and Memory are grouped under Hardware-oriented context
+- Breadcrumb reflects details-pane context (`Machines > VM > Section`)
+
+### 6) Theme Foundation
+**Given**
+- WinUI shell is running
+
+**When**
+- User toggles light/dark theme
+
+**Then**
+- Theme switches through centralized semantic token dictionaries
+- Core shell surfaces do not rely on hardcoded page-level foreground/background color values
+
+## Expected UI
+- WinUI shell with:
+  - top app bar
+  - left icon rail
+  - hamburger drawer + scrim behavior
+  - main content host
+  - right insights panel (collapsed by default)
+- `Machines` as initial capability route
+- section-based details surface for Machines
+- breadcrumb reflecting selected VM details context
+
+## Expected Logs
+- Startup and navigation interactions continue to honor canonical structured logging conventions where events exist
+- Machines actions continue emitting operation-scoped structured events per AC-006/FR-066
+
+## Definition of Done
+- [ ] Parallel WPF + WinUI projects are present and launchable
+- [ ] Icon-rail + hamburger drawer behavior matches contract (including scrim and dismiss interactions)
+- [ ] WinUI defaults to Machines and does not persist last selected capability
+- [ ] Insights panel is collapsed by default and warning trigger/badge behavior is present
+- [ ] Machines details UX uses section navigation with breadcrumb context
+- [ ] Theme token foundation (light/dark + semantic brushes) is implemented
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
 - Whether to store deployment history records locally
 - RDP readiness detection criteria for enabling `Open RDP` in Machines
+- Templates capability inner layout contract in WinUI (`TBD`)
+- Assets capability inner layout contract in WinUI (`TBD`)

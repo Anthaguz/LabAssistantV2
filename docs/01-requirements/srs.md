@@ -277,8 +277,38 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** Destructive operations (delete with or without disks) must log explicit action intent and result.
   - **Priority:** P1
 
+- **FR-067:** The product shall support a parallel UI execution model during WinUI migration:
+  - `LabAssistant` (WPF) remains available as production baseline
+  - `LabAssistant.WinUI` is introduced as a separate application project
+  - **Acceptance details:** both UI projects build in solution and are independently launchable.
+  - **Priority:** P1
+
+- **FR-068:** WinUI shell navigation shall use icon-rail + hamburger drawer interaction:
+  - icon rail is always visible for top-level capabilities
+  - hamburger opens a slide-out capability drawer with scrim
+  - drawer dismisses on outside click or `Esc`
+  - **Acceptance details:** full-menu navigation must not depend on hover-only behavior.
+  - **Priority:** P1
+
+- **FR-069:** WinUI shall default to `Machines` on startup and shall not persist last selected capability across restarts.
+  - **Acceptance details:** app startup route is deterministic (`Machines`) unless explicitly changed by future approved requirements.
+  - **Priority:** P1
+
+- **FR-070:** WinUI shell shall include a right-side insights panel that is collapsed by default and opened via a warning/issue trigger.
+  - **Acceptance details:** shell shows issue indicator/badge when issues exist; panel presence does not block normal workspace interaction when collapsed.
+  - **Priority:** P1
+
+- **FR-071:** Machines editor UX in WinUI shall use section-based details navigation (for example, Hardware grouping CPU + Memory) instead of legacy collapsible stacks.
+  - **Acceptance details:** breadcrumb trail reflects details-pane context (`Machines > VM > Section`) and supports returning to parent context.
+  - **Priority:** P1
+
+- **FR-072:** WinUI foundation shall centralize semantic theme tokens with light/dark dictionaries and runtime switching support.
+  - **Acceptance details:** page-level hardcoded foreground/background colors are disallowed for core shell surfaces.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
+- See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
 
 ---
 
