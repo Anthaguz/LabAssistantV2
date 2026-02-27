@@ -10,6 +10,7 @@
 - `docs/02-ux/current-ui-capability-audit.md`
 - `docs/02-ux/migration-preservation-matrix.md`
 - `docs/02-ux/ui-migration-execution-plan.md`
+- `docs/02-ux/ui-framework-decision-record-y3.md`
 
 ---
 
@@ -315,4 +316,4 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?
-- Exact capability-scope dismissal interactions (click-outside, pinned mode, keyboard shortcuts) depend on framework choice (WPF refresh vs WinUI 3)
+- Exact capability-scope dismissal interactions (click-outside, pinned mode, keyboard shortcuts) need to be finalized in the WinUI shell implementation contract
