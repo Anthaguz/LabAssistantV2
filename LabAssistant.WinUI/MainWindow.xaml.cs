@@ -143,10 +143,8 @@ public sealed partial class MainWindow : Window
     private void ApplyState()
     {
         BreadcrumbTextBlock.Text = $"{_activeCapability.DisplayName} > {_activeSubview.DisplayName}";
-        ContentTitleTextBlock.Text = $"{_activeCapability.DisplayName} > {_activeSubview.DisplayName}";
-        ContentDescriptionTextBlock.Text = $"{_activeCapability.DisplayName} subview scaffold is active. Feature behavior remains out of scope in AA2b.";
-        SubviewPlaceholderTextBlock.Text = $"Placeholder content: {_activeCapability.DisplayName} / {_activeSubview.DisplayName}.";
-        ToolbarLabelTextBlock.Text = $"{_activeSubview.DisplayName} actions";
+        ContentTitleTextBlock.Text = _activeCapability.DisplayName;
+        ContentDescriptionTextBlock.Text = $"Subview: {_activeSubview.DisplayName}. This is scaffold-only placeholder content for AA2b.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
         InsightsPanel.Visibility = _isInsightsOpen ? Visibility.Visible : Visibility.Collapsed;
@@ -166,7 +164,9 @@ public sealed partial class MainWindow : Window
             {
                 Content = subview.DisplayName,
                 Tag = subview.Key,
-                Padding = new Thickness(12, 6, 12, 6),
+                Height = 32,
+                Padding = new Thickness(12, 0, 12, 0),
+                CornerRadius = new CornerRadius(8),
                 BorderThickness = new Thickness(1),
                 BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellBorderBrush"],
                 Foreground = subview.Key == _activeSubview.Key
@@ -192,7 +192,8 @@ public sealed partial class MainWindow : Window
             {
                 Content = action,
                 IsEnabled = false,
-                Padding = new Thickness(10, 6, 10, 6)
+                Height = 32,
+                Padding = new Thickness(10, 0, 10, 0)
             };
 
             SubviewToolbarPanel.Children.Add(button);
