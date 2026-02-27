@@ -1,13 +1,15 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Controls;
+using LabAssistant.WinUI.Theming;
+using LabAssistant.WinUI.ViewModels;
 using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
 public sealed partial class MainWindow : Window
 {
-    private readonly string[] _capabilities = ["Machines", "Deploy", "Templates", "Assets", "Diagnostics", "Settings"];
+    private readonly ShellViewModel _shellViewModel = new();
     private string _activeCapability = "Machines";
     private bool _isDrawerOpen;
     private bool _isInsightsOpen;
@@ -17,6 +19,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ConfigureShellIcons();
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
         RootLayout.KeyDown += RootLayout_KeyDown;
@@ -30,6 +33,48 @@ public sealed partial class MainWindow : Window
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
         appWindow?.Resize(new Windows.Graphics.SizeInt32(width, height));
+    }
+
+    private void ConfigureShellIcons()
+    {
+        HamburgerButton.Content = CreateIconGlyph(ShellIconToken.Menu);
+        InsightsToggleButton.Content = CreateIconGlyph(ShellIconToken.Insights);
+
+        MachinesRailButton.Content = CreateIconGlyph(ShellIconToken.Machines);
+        DeployRailButton.Content = CreateIconGlyph(ShellIconToken.Deploy);
+        TemplatesRailButton.Content = CreateIconGlyph(ShellIconToken.Templates);
+        AssetsRailButton.Content = CreateIconGlyph(ShellIconToken.Assets);
+        DiagnosticsRailButton.Content = CreateIconGlyph(ShellIconToken.Diagnostics);
+        SettingsRailButton.Content = CreateIconGlyph(ShellIconToken.Settings);
+
+        MachinesDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Machines, "Machines");
+        DeployDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Deploy, "Deploy");
+        TemplatesDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Templates, "Templates");
+        AssetsDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Assets, "Assets");
+        DiagnosticsDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Diagnostics, "Diagnostics");
+        SettingsDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Settings, "Settings");
+    }
+
+    private object CreateDrawerButtonContent(string token, string label)
+    {
+        var container = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        container.Children.Add(CreateIconGlyph(token));
+        container.Children.Add(new TextBlock
+        {
+            Text = label,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTopBarForegroundBrush"]
+        });
+        return container;
+    }
+
+    private TextBlock CreateIconGlyph(string token)
+    {
+        return new TextBlock
+        {
+            Text = ShellIconCatalog.GetGlyph(token),
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets"),
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTopBarForegroundBrush"]
+        };
     }
 
     private void ApplyState()
@@ -54,7 +99,8 @@ public sealed partial class MainWindow : Window
 
     private void CapabilityButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: string capability } && _capabilities.Contains(capability, StringComparer.Ordinal))
+        if (sender is Button { Tag: string capability } &&
+            _shellViewModel.Capabilities.Any(entry => string.Equals(entry.DisplayName, capability, StringComparison.Ordinal)))
         {
             _activeCapability = capability;
             _isDrawerOpen = false;

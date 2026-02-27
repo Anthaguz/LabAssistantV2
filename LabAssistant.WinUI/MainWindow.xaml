@@ -23,12 +23,14 @@
                 </Grid.ColumnDefinitions>
 
                 <Button
+                    x:Name="HamburgerButton"
                     Grid.Column="0"
                     Width="36"
                     Height="32"
                     Click="HamburgerButton_Click"
-                    Content="&#xE700;"
+                    Content=" "
                     FontFamily="Segoe MDL2 Assets"
+                    Foreground="{StaticResource ShellTopBarForegroundBrush}"
                     ToolTipService.ToolTip="Open capabilities" />
 
                 <TextBlock
@@ -44,15 +46,23 @@
                     Grid.Column="3"
                     Margin="8,0,0,0"
                     Click="ThemeToggleButton_Click"
-                    Content="Switch to dark" />
+                    Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                    Content="Switch to dark">
+                    <Button.Resources>
+                        <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{ThemeResource ShellTopBarForegroundColor}" />
+                        <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{ThemeResource ShellTopBarForegroundColor}" />
+                    </Button.Resources>
+                </Button>
 
                 <Grid Grid.Column="4" Margin="8,0,0,0">
                     <Button
+                        x:Name="InsightsToggleButton"
                         Width="44"
                         Height="32"
                         Click="InsightsButton_Click"
-                        Content="&#xE7BA;"
+                        Content=" "
                         FontFamily="Segoe MDL2 Assets"
+                        Foreground="{StaticResource ShellTopBarForegroundBrush}"
                         ToolTipService.ToolTip="Toggle insights panel" />
                     <Border
                         x:Name="IssueBadge"
@@ -88,12 +98,12 @@
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="0,0,1,0">
                 <StackPanel Margin="0,8,0,0" Spacing="4">
-                    <Button Click="CapabilityButton_Click" Content="&#xE8A7;" FontFamily="Segoe MDL2 Assets" Tag="Machines" ToolTipService.ToolTip="Machines" />
-                    <Button Click="CapabilityButton_Click" Content="&#xE80F;" FontFamily="Segoe MDL2 Assets" Tag="Deploy" ToolTipService.ToolTip="Deploy" />
-                    <Button Click="CapabilityButton_Click" Content="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Tag="Templates" ToolTipService.ToolTip="Templates" />
-                    <Button Click="CapabilityButton_Click" Content="&#xED43;" FontFamily="Segoe MDL2 Assets" Tag="Assets" ToolTipService.ToolTip="Assets" />
-                    <Button Click="CapabilityButton_Click" Content="&#xE9D9;" FontFamily="Segoe MDL2 Assets" Tag="Diagnostics" ToolTipService.ToolTip="Diagnostics" />
-                    <Button Click="CapabilityButton_Click" Content="&#xE713;" FontFamily="Segoe MDL2 Assets" Tag="Settings" ToolTipService.ToolTip="Settings" />
+                    <Button x:Name="MachinesRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Machines" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Machines" />
+                    <Button x:Name="DeployRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Deploy" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Deploy" />
+                    <Button x:Name="TemplatesRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Templates" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Templates" />
+                    <Button x:Name="AssetsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Assets" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Assets" />
+                    <Button x:Name="DiagnosticsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Diagnostics" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Diagnostics" />
+                    <Button x:Name="SettingsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Settings" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Settings" />
                 </StackPanel>
             </Border>
 
@@ -177,12 +187,12 @@
             </Border.Transitions>
             <StackPanel Spacing="6">
                 <TextBlock Foreground="{StaticResource ShellTopBarForegroundBrush}" FontSize="18" FontWeight="SemiBold" Text="Capabilities" />
-                <Button Click="CapabilityButton_Click" Content="Machines" Tag="Machines" />
-                <Button Click="CapabilityButton_Click" Content="Deploy" Tag="Deploy" />
-                <Button Click="CapabilityButton_Click" Content="Templates" Tag="Templates" />
-                <Button Click="CapabilityButton_Click" Content="Assets" Tag="Assets" />
-                <Button Click="CapabilityButton_Click" Content="Diagnostics" Tag="Diagnostics" />
-                <Button Click="CapabilityButton_Click" Content="Settings" Tag="Settings" />
+                <Button x:Name="MachinesDrawerButton" Click="CapabilityButton_Click" Content="Machines" Tag="Machines" />
+                <Button x:Name="DeployDrawerButton" Click="CapabilityButton_Click" Content="Deploy" Tag="Deploy" />
+                <Button x:Name="TemplatesDrawerButton" Click="CapabilityButton_Click" Content="Templates" Tag="Templates" />
+                <Button x:Name="AssetsDrawerButton" Click="CapabilityButton_Click" Content="Assets" Tag="Assets" />
+                <Button x:Name="DiagnosticsDrawerButton" Click="CapabilityButton_Click" Content="Diagnostics" Tag="Diagnostics" />
+                <Button x:Name="SettingsDrawerButton" Click="CapabilityButton_Click" Content="Settings" Tag="Settings" />
             </StackPanel>
         </Border>
     </Grid>
