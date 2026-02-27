@@ -33,7 +33,7 @@ public sealed class PowerShellHyperVVhdxProbe : IHyperVVhdxProbe
         DebugLogger.LogPowerShellOutput(script, output, error);
 
         var lines = PowerShellOutputCleaner.Clean(output)
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Trim())
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .ToList();
