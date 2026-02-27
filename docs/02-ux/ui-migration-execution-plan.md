@@ -13,6 +13,7 @@
 - `docs/02-ux/migration-preservation-matrix.md`
 - `docs/02-ux/ui-framework-decision-rubric.md`
 - `docs/02-ux/ui-framework-decision-record-y3.md`
+- `docs/02-ux/winui-shell-contract-aa.md`
 - `docs/03-architecture/gui-action-map.deploy.md`
 - `docs/03-architecture/gui-action-map.templates.md`
 - `docs/03-architecture/gui-action-map.assets.md`
@@ -110,7 +111,10 @@ The rubric and Y2 evidence remain the traceability basis:
 
 Decision implications:
 - proceed with a shell-foundation-first implementation slice
-- keep behavior-preservation constraints as hard gates before expanding to Deploy/Templates/Assets migration
+- use a parallel UI execution model during migration:
+  - `LabAssistant` (WPF) remains production baseline and bugfix-only
+  - `LabAssistant.WinUI` is implemented incrementally
+- keep behavior-preservation constraints as hard gates before expanding to broader capability migration
 
 ---
 
@@ -128,74 +132,88 @@ Use a staged migration plan, not a big-bang rewrite.
   - shell error feed placement/behavior
 - define page/surface ownership and navigation transitions
 
-### Stage B — Highest-Risk Behavior Surface First: Deploy
-- migrate/rebuild `Deploy` workspace first (or prototype it first)
+### Stage B — Machines v1 (first real page after shell)
+- implement `Machines` capability first against Milestone Z contract
+- preserve operation safety rules, diagnostics semantics, and structured logging requirements
+- include visible but disabled RDP action until readiness detection policy is implemented
+
+### Stage C — Highest-Risk Migration Surface: Deploy
+- migrate/rebuild `Deploy` workspace after shell and Machines v1 are stable
 - preserve:
   - readiness behaviors
   - deploy/cancel/cleanup semantics
   - outcome summaries and guest-step outcomes
 - verify with existing Milestones R/U/W tests + targeted migration manual checklist
 
-### Stage C — Templates Consolidation
+### Stage D — Templates Consolidation
 - unify list/details/editor into one Templates area
 - preserve schema/validation/missing-VHDX behavior
 - remove file-system-hunting as the primary edit path
 
-### Stage D — Assets Consolidation
+### Stage E — Assets Consolidation
 - move VHDX catalog and future switch management under `Assets`
 - preserve embedded asset shortcuts from Deploy/Templates
 - preserve catalog validation and subset-validation semantics
 
-### Stage E — Settings + Diagnostics Rehome
+### Stage F — Settings + Diagnostics Rehome
 - introduce `Diagnostics` as a real top-level area
 - decide transitional fate of `LogsPage`
 - expose diagnostics export in user-facing UI
 - preserve shell error feed behavior (or intentionally redesign with equivalent functionality)
 
-### Stage F — Machines Capability (new)
-- implement as its own feature/milestone(s), not as a migration side effect
-- use new shell/IA and diagnostics patterns
+### Stage G — Remaining Capability Completion
+- continue capability migrations after Stage F based on prioritized contract issues
 
-This order minimizes behavior risk and addresses the most complex surface early.
+This order minimizes behavior risk and establishes shell + Machines UX patterns before migrating the highest-risk Deploy surface.
 
 ---
 
 ## 6. Capability-by-Capability Migration Plan (Detailed)
 
-## 6.1 Deploy (first migration implementation target)
+## 6.1 Machines (first migration implementation target)
 
 **Why first**
-- Most behavior-rich surface
-- Highest migration risk
-- Core user value path
+- Default landing capability and primary operations surface for non-developer users
+- Aligns with Milestone Z contract and newly approved shell interaction model
+- Gives high-value validation of list/details + breadcrumb workflow model
 
 **Must preserve from current implementation**
-- All items listed in `docs/02-ux/migration-preservation-matrix.md` for `Deploy`
-- `#242` usability outcome (readiness details no longer hide the VM list)
+- Milestone Z safety and action policy constraints
+- operation logging + diagnostics semantics for user-initiated actions
+- RDP action visibility as disabled until readiness policy is implemented
 
 **Allowed improvements**
 - modern Windows 11 visual layout
-- better density management
-- clearer grouping of:
-  - VM list
-  - readiness
-  - outcomes
-  - runtime logs
-  - guest-step controls
+- section-based details editor pattern (no legacy collapsible stacks)
+- clear grouping of VM inventory, details, and action surfaces
 
 **Migration risk hotspots**
-- quick preflight race/debounce behavior
-- command enable/disable state transitions
-- cancellation/terminal recovery interactivity
-- summary + guest-step outcome visibility
-- error feed / deep-link behavior
+- list/details synchronization and selection state ownership
+- VM action safety gates and confirmation UX
+- breadcrumb context accuracy across details sections
+- host refresh and stale-state handling
+
+**Verification baseline**
+- Milestone Z contract validation suite
+- Machines-specific manual checklist
+- structured-log operation verification for VM actions
+
+## 6.2 Deploy (second migration implementation target)
+
+**Goal**
+- migrate/rebuild Deploy workspace after shell + Machines baseline is stable
+
+**Must preserve**
+- readiness quick/full semantics
+- deploy/cancel/cleanup behavior
+- outcome summaries and guest-step outcomes
 
 **Verification baseline**
 - Milestones R/U/W automated tests
 - manual U/W checklists
-- targeted Deploy migration checklist (new)
+- targeted Deploy migration checklist
 
-## 6.2 Templates (second migration implementation target)
+## 6.3 Templates (third migration implementation target)
 
 **Goal**
 - unify currently split template workflows into a coherent Templates area
@@ -216,7 +234,7 @@ This order minimizes behavior risk and addresses the most complex surface early.
 - template schema compatibility tests
 - manual template workflow checks (new migration checklist section)
 
-## 6.3 Assets (third migration implementation target)
+## 6.4 Assets (fourth migration implementation target)
 
 **Goal**
 - centralize asset management while preserving in-flow shortcuts
@@ -235,7 +253,7 @@ This order minimizes behavior risk and addresses the most complex surface early.
 - missing VHDX resolution tests/checks
 - manual asset workflow checks
 
-## 6.4 Settings + Diagnostics (fourth migration implementation target)
+## 6.5 Settings + Diagnostics (fifth migration implementation target)
 
 **Goal**
 - align user-facing IA with actual diagnostics capability
@@ -249,22 +267,6 @@ This order minimizes behavior risk and addresses the most complex surface early.
 
 **Decision required during this stage**
 - whether `LogsPage` remains temporarily as a "Deploy Debug" subview or is retired after Diagnostics UI is introduced
-
-## 6.5 Machines (new capability after shell/IA foundation)
-
-**Goal**
-- introduce Hyper-V VM administration as a first-class capability
-
-**v1 scope (agreed)**
-- all-host VM inventory
-- basic edits
-- start/stop
-- delete with cleanup options
-- console + RDP launch actions
-
-**Why later**
-- not a migration of an existing page
-- depends on stable shell IA and preserved diagnostics/error patterns
 
 ---
 
@@ -385,12 +387,12 @@ Use small, reviewable milestones/issues. Avoid "UI rewrite" as a single task.
 - Repeat
 
 ### Example future migration milestone sequence (illustrative)
-- M1: Shell + navigation scope foundation (capability vs context scope)
-- M2: Deploy workspace migration (behavior-preserving)
-- M3: Templates consolidation migration
-- M4: Assets consolidation migration
-- M5: Diagnostics + Settings rehome
-- M6: Machines capability v1 (new)
+- M1: Parallel WinUI project + shell foundation
+- M2: Machines capability v1
+- M3: Deploy workspace migration (behavior-preserving)
+- M4: Templates consolidation migration
+- M5: Assets consolidation migration
+- M6: Diagnostics + Settings rehome
 
 This is illustrative, not a committed roadmap yet.
 
@@ -419,15 +421,18 @@ Those should be decided in dedicated issues/milestones with the behavior-preserv
    - navigation state ownership
 
 3. **Prepare the first migration implementation milestone**
-   - likely shell foundation + Deploy migration planning slice
+   - shell foundation only, then Machines v1
 
-4. **Create a future milestone for `Machines`**
-   - contract-first, separate from UI migration mechanics
+4. **Apply the WinUI shell contract**
+   - implement `docs/02-ux/winui-shell-contract-aa.md` as the execution baseline
 
 ---
 
 ## Open Questions / TBDs
 
-- `TBD:` Should the first implementation slice be shell foundation only, or shell foundation + Deploy in the same milestone?
 - `TBD:` Should the transitional `LogsPage` be kept temporarily as a hidden developer/debug route during Diagnostics migration?
 - `TBD:` When `Machines` is introduced, should console/RDP actions also appear as contextual quick actions in Deploy outcomes from day one or later?
+
+
+
+

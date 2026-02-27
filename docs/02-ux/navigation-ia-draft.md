@@ -11,6 +11,7 @@
 - `docs/02-ux/migration-preservation-matrix.md`
 - `docs/02-ux/ui-migration-execution-plan.md`
 - `docs/02-ux/ui-framework-decision-record-y3.md`
+- `docs/02-ux/winui-shell-contract-aa.md`
 
 ---
 
@@ -62,9 +63,9 @@ Shows what the application can do:
 
 This is the mode the user described for the hamburger menu.
 
-### B. Context Scope (Normal left panel mode)
-Shows what the user is currently working on inside the selected capability:
-- current deploy VM list
+### B. Context Scope (Capability workspace mode)
+Shows what the user is currently working on inside the selected capability workspace:
+- current deploy VM list + selection context
 - template list / selected template sections
 - asset list / asset categories
 - diagnostics filters/history
@@ -77,27 +78,30 @@ Without this separation, a single left panel becomes overloaded with:
 - workflow status
 - contextual actions
 
-The "hamburger temporarily replaces left panel" pattern is a good way to implement this scope switch.
+The shell should keep capability selection in the left rail/drawer and render context scope in the capability workspace rather than overloading navigation chrome.
 
 ---
 
 ## 3. Proposed Interaction Pattern (Hamburger + Left Panel)
 
 ## 3.1 Hamburger behavior (future)
-- Clicking the hamburger switches the left panel from **Context Scope** to **Capability Scope**
-- Capability list is shown (top-level entities)
+- Clicking the hamburger opens a **slide-out capability drawer** from the left
+- Drawer shows top-level capability labels/actions while icon rail remains the default navigation surface
+- Hover should be tooltip-only, not the primary full-menu interaction path
 - Exiting capability mode happens by:
   - selecting a capability, or
-  - clicking outside / dismissing the panel (framework-specific behavior TBD)
+  - clicking outside the drawer, or
+  - pressing `Esc`
+- When drawer is open, shell shows a scrim over the remaining content
 
 ## 3.2 After capability selection
 - Main content navigates to the selected top-level area
-- Left panel returns to **Context Scope** for that area
+- Capability workspace shows **Context Scope** for that area
 
 Examples:
-- Select `Templates` -> left panel shows template list/filters/sections
-- Select `Assets` -> left panel shows asset categories and current asset list
-- Select `Deploy` -> left panel shows deployment VM entries and deploy context items
+- Select `Templates` -> workspace shows template list/filters/sections
+- Select `Assets` -> workspace shows asset categories and current asset list
+- Select `Deploy` -> workspace shows deployment VM entries and deploy context items
 
 ---
 
@@ -118,11 +122,16 @@ Examples:
   - Open RDP session (when reachable / configured)
   - Open advanced settings (if MMC/shell integration is feasible)
 
-### Context panel ideas
+### Workspace context ideas
 - VM list (search/filter)
 - status indicators
 - origin labels (LabAssistant / external / unknown)
 - quick actions for selected VM
+
+### Layout decision (AA contract)
+- default `Machines` layout uses side-by-side list + details
+- details pane uses section-based editing (for example: Overview, Hardware, Storage, Network, Guest OS)
+- CPU/Memory should be grouped under a Hardware-oriented section rather than split into sparse standalone panes
 
 ---
 
@@ -141,7 +150,7 @@ Examples:
   - open RDP (when available)
 - Recent Deployments / History (future, if implemented)
 
-### Context panel ideas
+### Workspace context ideas
 - current VM entries in deployment
 - selected VM context
 - compact readiness summary
@@ -176,7 +185,7 @@ should become one coherent Templates workflow.
 - Templates are lab-level (`LabTemplate`) and contain per-VM definitions (`VmTemplate`).
 - The Templates UX should expose both levels in one area (library + lab details + per-VM editing).
 
-### Context panel ideas
+### Workspace context ideas
 - template list
 - selected template metadata
 - VM list inside selected template
@@ -196,7 +205,7 @@ should become one coherent Templates workflow.
   - list / create / edit / delete
 - Asset Health / Validation (future)
 
-### Context panel ideas
+### Workspace context ideas
 - asset type selector (Base Disks / Switches)
 - asset list
 - selected asset details / actions
@@ -215,7 +224,7 @@ should become one coherent Templates workflow.
 - Logs (future `#215` Phase 1 read-only viewer)
 - Recent Issues / error history (optional future)
 
-### Context panel ideas
+### Workspace context ideas
 - operation filters
 - recent operations/failures
 - export options/presets (future)
@@ -233,7 +242,7 @@ should become one coherent Templates workflow.
 - Logging/diagnostics settings
 - Future defaults (for example, VM delete disk cleanup preference)
 
-### Context panel ideas
+### Workspace context ideas
 - settings categories
 - unsaved changes indicator
 
@@ -312,8 +321,8 @@ This is why the next deliverable after IA should be the GUI Action Map.
 
 ## 8. Open Questions / TBDs
 
-- Should `Machines` become the default landing page immediately in the new UI, or remain `Deploy` initially?
+- Resolved: default landing capability is `Machines` for WinUI shell implementation.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?
-- Exact capability-scope dismissal interactions (click-outside, pinned mode, keyboard shortcuts) need to be finalized in the WinUI shell implementation contract
+- `TBD:` Capability-specific inner layouts for Templates/Assets/Diagnostics in WinUI (beyond shell contract)
