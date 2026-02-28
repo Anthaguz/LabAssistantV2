@@ -151,6 +151,116 @@
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                         Text="Machines feature content is intentionally out of scope for #266."
                         TextWrapping="Wrap" />
+                    <Grid x:Name="MachinesOverviewPanel" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="3*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border
+                            Grid.Column="0"
+                            Padding="8"
+                            Background="{StaticResource ShellBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        FontSize="16"
+                                        FontWeight="SemiBold"
+                                        Text="Host VMs" />
+                                    <Button
+                                        x:Name="RefreshMachinesButton"
+                                        Margin="12,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Click="RefreshMachinesButton_Click"
+                                        Content="Refresh" />
+                                </StackPanel>
+                                <ListView
+                                    x:Name="MachinesListView"
+                                    Height="360"
+                                    SelectionChanged="MachinesListView_SelectionChanged">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Padding="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="2*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    Grid.Column="0"
+                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                    Text="{Binding VmName}" />
+                                                <TextBlock
+                                                    Grid.Column="1"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="{Binding State}" />
+                                                <TextBlock
+                                                    Grid.Column="2"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="{Binding OriginLabel}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Grid.Column="2"
+                            Padding="12"
+                            Background="{StaticResource ShellBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                            <StackPanel Spacing="10">
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Text="VM Details" />
+                                <TextBlock x:Name="SelectedVmNameTextBlock" Foreground="{StaticResource ShellTextPrimaryBrush}" Text="Name: (none)" />
+                                <TextBlock x:Name="SelectedVmStateTextBlock" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="State: -" />
+                                <TextBlock x:Name="SelectedVmOriginTextBlock" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Origin: -" />
+                                <TextBlock x:Name="SelectedVmIdTextBlock" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VM Id: -" TextWrapping="Wrap" />
+                                <TextBlock x:Name="SelectedVmPathTextBlock" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Path: -" TextWrapping="Wrap" />
+
+                                <TextBlock
+                                    Margin="0,8,0,0"
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    FontWeight="SemiBold"
+                                    Text="Actions" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="StartVmButton" Click="StartVmButton_Click" Content="Start VM" />
+                                    <Button x:Name="StopVmButton" Click="StopVmButton_Click" Content="Stop VM" />
+                                    <Button x:Name="RestartVmButton" Click="RestartVmButton_Click" Content="Restart VM" />
+                                    <Button x:Name="OpenConsoleButton" Click="OpenConsoleButton_Click" Content="Open Console" />
+                                    <Button x:Name="DeleteVmButton" Click="DeleteVmButton_Click" Content="Delete VM" />
+                                    <Button x:Name="OpenRdpButton" IsEnabled="False" Content="Open RDP" />
+                                </StackPanel>
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    FontStyle="Italic"
+                                    Text="RDP is disabled in this version. Readiness policy integration is planned in a later issue."
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Name="MachinesStatusTextBlock"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="Select a VM to run actions."
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock
+                        x:Name="NonMachinesPlaceholderTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Subview placeholder content."
+                        TextWrapping="Wrap" />
                     <TextBlock
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                         FontStyle="Italic"

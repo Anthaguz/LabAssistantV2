@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Func<IPersistentPowerShellSession, IHyperVService>>(
             _ => session => new HyperVService(session)
         );
+        services.AddTransient<IHyperVMachineAdminService, HyperVMachineAdminService>();
         services.AddSingleton<IVhdxFileAccessProbe, VhdxFileAccessProbe>();
         services.AddSingleton<IHyperVVhdxProbe, PowerShellHyperVVhdxProbe>();
         services.AddSingleton<IVhdxIntegrityValidator, VhdxIntegrityValidator>();

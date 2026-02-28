@@ -1,3 +1,6 @@
+using System.Collections.ObjectModel;
+using LabAssistant.Business.Machines;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Controls;
@@ -14,8 +17,12 @@ public sealed partial class MainWindow : Window
     private const int DrawerAnimationDurationMs = 180;
 
     private readonly ShellViewModel _shellViewModel = new();
+    private readonly IMachinesCapabilityService _machinesCapabilityService;
+    private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
     private ShellCapability _activeCapability;
     private ShellSubview _activeSubview;
+    private MachineInventoryItem? _selectedMachine;
+    private bool _isMachineActionRunning;
     private bool _isDrawerOpen;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
@@ -24,14 +31,20 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _machinesCapabilityService = App.Services.GetRequiredService<IMachinesCapabilityService>();
         _activeCapability = _shellViewModel.GetCapability("Machines");
         _activeSubview = _activeCapability.DefaultSubview;
+        MachinesListView.ItemsSource = _machineInventory;
         ConfigureShellIcons();
         InitializeDrawer();
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
         RootLayout.KeyDown += RootLayout_KeyDown;
-        RootLayout.Loaded += (_, _) => RootLayout.Focus(FocusState.Programmatic);
+        RootLayout.Loaded += async (_, _) =>
+        {
+            RootLayout.Focus(FocusState.Programmatic);
+            await EnsureMachinesInventoryAsync(forceRefresh: true);
+        };
         ApplyState();
     }
 
@@ -144,14 +157,19 @@ public sealed partial class MainWindow : Window
     {
         BreadcrumbTextBlock.Text = $"{_activeCapability.DisplayName} > {_activeSubview.DisplayName}";
         ContentTitleTextBlock.Text = _activeCapability.DisplayName;
-        ContentDescriptionTextBlock.Text = $"Subview: {_activeSubview.DisplayName}. This is scaffold-only placeholder content for AA2b.";
+        ContentDescriptionTextBlock.Text = IsMachinesOverviewActive
+            ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
+            : $"Subview: {_activeSubview.DisplayName}. This is scaffold-only placeholder content for AA2b.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
         InsightsPanel.Visibility = _isInsightsOpen ? Visibility.Visible : Visibility.Collapsed;
         IssueBadge.Visibility = _issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         IssueBadgeTextBlock.Text = _issueCount.ToString();
+        MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
+        NonMachinesPlaceholderTextBlock.Visibility = IsMachinesOverviewActive ? Visibility.Collapsed : Visibility.Visible;
         RenderSubviewSelector();
         RenderSubviewToolbar();
+        UpdateMachineActionButtons();
     }
 
     private void RenderSubviewSelector()
@@ -215,6 +233,10 @@ public sealed partial class MainWindow : Window
             _activeSubview = _activeCapability.DefaultSubview;
             SetDrawerOpen(false);
             ApplyState();
+            if (IsMachinesOverviewActive)
+            {
+                _ = EnsureMachinesInventoryAsync(forceRefresh: false);
+            }
         }
     }
 
@@ -235,6 +257,10 @@ public sealed partial class MainWindow : Window
 
         _activeSubview = selectedSubview;
         ApplyState();
+        if (IsMachinesOverviewActive)
+        {
+            _ = EnsureMachinesInventoryAsync(forceRefresh: false);
+        }
     }
 
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
@@ -273,5 +299,257 @@ public sealed partial class MainWindow : Window
             ApplyState();
             args.Handled = true;
         }
+    }
+
+    private bool IsMachinesOverviewActive =>
+        string.Equals(_activeCapability.DisplayName, "Machines", StringComparison.Ordinal) &&
+        string.Equals(_activeSubview.Key, "overview", StringComparison.Ordinal);
+
+    private async Task EnsureMachinesInventoryAsync(bool forceRefresh)
+    {
+        if (!IsMachinesOverviewActive)
+        {
+            return;
+        }
+
+        if (!forceRefresh && _machineInventory.Count > 0)
+        {
+            return;
+        }
+
+        RefreshMachinesButton.IsEnabled = false;
+        MachinesStatusTextBlock.Text = "Loading host VM inventory...";
+
+        try
+        {
+            var inventory = await _machinesCapabilityService.LoadInventoryAsync();
+            var selectedVmName = _selectedMachine?.VmName;
+
+            _machineInventory.Clear();
+            foreach (var vm in inventory.OrderBy(vm => vm.VmName, StringComparer.OrdinalIgnoreCase))
+            {
+                _machineInventory.Add(vm);
+            }
+
+            _selectedMachine = _machineInventory.FirstOrDefault(vm =>
+                string.Equals(vm.VmName, selectedVmName, StringComparison.Ordinal));
+            MachinesListView.SelectedItem = _selectedMachine;
+
+            if (_machineInventory.Count == 0)
+            {
+                MachinesStatusTextBlock.Text = "No Hyper-V VMs found on this host.";
+            }
+            else
+            {
+                MachinesStatusTextBlock.Text = $"Loaded {_machineInventory.Count} VM(s).";
+            }
+        }
+        catch (Exception ex)
+        {
+            MachinesStatusTextBlock.Text = $"Failed to load VM inventory. {ex.Message}";
+        }
+        finally
+        {
+            RefreshMachinesButton.IsEnabled = true;
+            UpdateMachineDetails();
+            UpdateMachineActionButtons();
+        }
+    }
+
+    private void MachinesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedMachine = MachinesListView.SelectedItem as MachineInventoryItem;
+        UpdateMachineDetails();
+        UpdateMachineActionButtons();
+    }
+
+    private void UpdateMachineDetails()
+    {
+        if (_selectedMachine is null)
+        {
+            SelectedVmNameTextBlock.Text = "Name: (none)";
+            SelectedVmStateTextBlock.Text = "State: -";
+            SelectedVmOriginTextBlock.Text = "Origin: -";
+            SelectedVmIdTextBlock.Text = "VM Id: -";
+            SelectedVmPathTextBlock.Text = "Path: -";
+            return;
+        }
+
+        SelectedVmNameTextBlock.Text = $"Name: {_selectedMachine.VmName}";
+        SelectedVmStateTextBlock.Text = $"State: {_selectedMachine.State}";
+        SelectedVmOriginTextBlock.Text = $"Origin: {_selectedMachine.OriginLabel}";
+        SelectedVmIdTextBlock.Text = $"VM Id: {_selectedMachine.VmId}";
+        SelectedVmPathTextBlock.Text = $"Path: {(_selectedMachine.VmPath ?? "-")}";
+    }
+
+    private void UpdateMachineActionButtons()
+    {
+        var hasSelection = _selectedMachine is not null;
+        var canRunActions = hasSelection && !_isMachineActionRunning;
+        StartVmButton.IsEnabled = canRunActions;
+        StopVmButton.IsEnabled = canRunActions;
+        RestartVmButton.IsEnabled = canRunActions;
+        OpenConsoleButton.IsEnabled = canRunActions;
+        DeleteVmButton.IsEnabled = canRunActions;
+        OpenRdpButton.IsEnabled = false;
+    }
+
+    private async void RefreshMachinesButton_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureMachinesInventoryAsync(forceRefresh: true);
+    }
+
+    private async void StartVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunMachineOperationAsync(
+            "Starting VM...",
+            vm => _machinesCapabilityService.StartVmAsync(vm),
+            refreshInventory: true);
+    }
+
+    private async void StopVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunMachineOperationAsync(
+            "Stopping VM...",
+            vm => _machinesCapabilityService.StopVmAsync(vm),
+            refreshInventory: true);
+    }
+
+    private async void RestartVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunMachineOperationAsync(
+            "Restarting VM...",
+            vm => _machinesCapabilityService.RestartVmAsync(vm),
+            refreshInventory: true);
+    }
+
+    private async void OpenConsoleButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunMachineOperationAsync(
+            "Opening Hyper-V Console...",
+            vm => _machinesCapabilityService.OpenConsoleAsync(vm),
+            refreshInventory: false);
+    }
+
+    private async void DeleteVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMachine is null)
+        {
+            MachinesStatusTextBlock.Text = "Select a VM before running actions.";
+            return;
+        }
+
+        var selectedScope = await ShowDeleteScopeDialogAsync(_selectedMachine);
+        if (selectedScope is null)
+        {
+            MachinesStatusTextBlock.Text = "Delete cancelled.";
+            return;
+        }
+
+        await RunMachineOperationAsync(
+            "Deleting VM...",
+            vm => _machinesCapabilityService.DeleteVmAsync(vm, selectedScope.Value),
+            refreshInventory: true,
+            clearSelectionOnSuccess: true);
+    }
+
+    private async Task RunMachineOperationAsync(
+        string pendingMessage,
+        Func<MachineInventoryItem, Task<MachineOperationResult>> operation,
+        bool refreshInventory,
+        bool clearSelectionOnSuccess = false)
+    {
+        if (_selectedMachine is null)
+        {
+            MachinesStatusTextBlock.Text = "Select a VM before running actions.";
+            return;
+        }
+
+        _isMachineActionRunning = true;
+        UpdateMachineActionButtons();
+        MachinesStatusTextBlock.Text = pendingMessage;
+
+        var vm = _selectedMachine;
+        try
+        {
+            var result = await operation(vm);
+            MachinesStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+
+            if (result.Success && clearSelectionOnSuccess)
+            {
+                _selectedMachine = null;
+                MachinesListView.SelectedItem = null;
+            }
+
+            if (refreshInventory)
+            {
+                await EnsureMachinesInventoryAsync(forceRefresh: true);
+            }
+            else
+            {
+                UpdateMachineDetails();
+            }
+        }
+        finally
+        {
+            _isMachineActionRunning = false;
+            UpdateMachineActionButtons();
+        }
+    }
+
+    private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm)
+    {
+        var vmOnlyRadio = new RadioButton
+        {
+            Content = "VM registration only",
+            IsChecked = true
+        };
+        var vmAndStorageRadio = new RadioButton
+        {
+            Content = "VM + associated disks/files"
+        };
+        var confirmationCheck = new CheckBox
+        {
+            Content = $"I confirm I want to delete '{vm.VmName}'."
+        };
+
+        var content = new StackPanel { Spacing = 10 };
+        content.Children.Add(new TextBlock
+        {
+            Text = "Choose delete scope. This action is destructive.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        content.Children.Add(vmOnlyRadio);
+        content.Children.Add(vmAndStorageRadio);
+        content.Children.Add(new TextBlock
+        {
+            Text = "If deleting with storage, associated disks/files will be removed where possible.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        content.Children.Add(confirmationCheck);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete VM",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            IsPrimaryButtonEnabled = false,
+            XamlRoot = RootLayout.XamlRoot,
+            Content = content
+        };
+
+        confirmationCheck.Checked += (_, _) => dialog.IsPrimaryButtonEnabled = true;
+        confirmationCheck.Unchecked += (_, _) => dialog.IsPrimaryButtonEnabled = false;
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return null;
+        }
+
+        return vmAndStorageRadio.IsChecked == true
+            ? MachineDeleteScope.VmAndStorage
+            : MachineDeleteScope.VmRegistrationOnly;
     }
 }
