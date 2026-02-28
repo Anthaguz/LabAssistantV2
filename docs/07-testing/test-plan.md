@@ -130,8 +130,25 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Guest-step UI reflects mandatory/optional/placeholder contract without implying unsupported runtime behavior.
   - Implemented guest-step toggles persist through template save/load where applicable.
   - Guest-step runtime outcomes are explicit and observable (`executed` / `skipped` with machine-readable skip reasons).
-  - Enabled optional steps with missing config produce blocking readiness failures and prevent deploy before Hyper-V actions.
-  - Placeholder visibility alone (especially guest network placeholder) does not block deploy by itself.
+- Enabled optional steps with missing config produce blocking readiness failures and prevent deploy before Hyper-V actions.
+- Placeholder visibility alone (especially guest network placeholder) does not block deploy by itself.
+
+## TC-010: Milestone AA WinUI Shell + Machines Verification
+- **Related AC:** `AC-006` (Machines v1), `AC-007` (WinUI shell foundation)
+- **Type:** Manual (real Windows machine / Hyper-V host) + automated coverage
+- **Related milestone:** Milestone AA (`#265`, `#266`, `#274`, `#267`, `#269`)
+- **Steps:**
+  1. Run the Milestone AA checklist in `docs/07-testing/milestone-aa-winui-shell-machines-checklist.md`.
+  2. Verify shell behavior (drawer motion/dismiss, top-bar visibility, theme readability, insights collapsed default).
+  3. Verify capability-local navigation behavior (capability defaults, subview switching, breadcrumb/context updates).
+  4. Verify Machines v1 behavior (inventory/selection, start-stop-restart-console, delete scope + confirmation, RDP disabled with reason).
+  5. Verify structured machine-action logs include operation context and delete scope metadata.
+- **Expected:**
+  - WinUI shell behavior remains stable and contract-aligned.
+  - Global capability navigation and local workspace subview navigation remain clearly separated.
+  - Machines v1 actions are explicit, safe, and policy-gated where required.
+  - RDP action remains visible but disabled until readiness policy work is delivered.
+  - Structured logs include machine action operation context and delete scope fields.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
