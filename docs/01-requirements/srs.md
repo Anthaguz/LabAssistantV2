@@ -265,6 +265,11 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Open Hyper-V Console**
   - **Open RDP**
   - **Acceptance details:** `Open RDP` shall be disabled (grayed out) when RDP readiness is unknown/unmet.
+  - **RDP readiness v1 criteria:**
+    - VM is running
+    - VM has at least one IPv4 address observable from host-side Hyper-V data
+    - Host can reach guest TCP port 3389 within a short probe timeout (4000ms target)
+  - **Execution details:** readiness checks must run asynchronously/background and must not block Machines UI interactions.
   - **Priority:** P1
 
 - **FR-065:** The system shall support VM deletion options:
@@ -417,4 +422,4 @@ Traceability must be maintained across:
 - Strategy for **resume/retry UX** after failed deployment beyond current cleanup-and-report policy  
 - Long-term extensibility toward **multiple hypervisors**  
 - Telemetry or usage metrics collection approach  
-- **TBD:** RDP readiness detection contract for `Machines` (`Open RDP` enablement criteria and fallback messaging) before implementation.
+- RDP readiness detection policy beyond v1 host-observable checks (for example guest policy/NLA/firewall introspection).

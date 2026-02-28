@@ -241,12 +241,13 @@
                                     <Button x:Name="RestartVmButton" Click="RestartVmButton_Click" Content="Restart VM" />
                                     <Button x:Name="OpenConsoleButton" Click="OpenConsoleButton_Click" Content="Open Console" />
                                     <Button x:Name="DeleteVmButton" Click="DeleteVmButton_Click" Content="Delete VM" />
-                                    <Button x:Name="OpenRdpButton" IsEnabled="False" Content="Open RDP" />
+                                    <Button x:Name="OpenRdpButton" Click="OpenRdpButton_Click" IsEnabled="False" Content="Open RDP" />
                                 </StackPanel>
                                 <TextBlock
+                                    x:Name="RdpReadinessTextBlock"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     FontStyle="Italic"
-                                    Text="RDP is disabled in this version. Readiness policy integration is planned in a later issue."
+                                    Text="RDP readiness unknown."
                                     TextWrapping="Wrap" />
                                 <TextBlock
                                     x:Name="MachinesStatusTextBlock"

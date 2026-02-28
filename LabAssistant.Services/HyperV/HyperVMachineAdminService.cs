@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
@@ -149,6 +150,67 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             ErrorMessage = cleanedError,
             FailureMetadata = RuntimeErrorMetadataNormalizer.FromPowerShellErrorText(cleanedError)
         };
+    }
+
+    public async Task<IReadOnlyList<string>> GetVmIpAddressesAsync(string vmName)
+    {
+        var script = $$"""
+            Get-VMNetworkAdapter -VMName {{Quote(vmName)}} -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty IPAddresses |
+            ConvertTo-Json -Compress
+            """;
+
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+        }
+
+        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(cleanedOutput))
+        {
+            return Array.Empty<string>();
+        }
+
+        using var document = JsonDocument.Parse(cleanedOutput);
+        var values = document.RootElement.ValueKind switch
+        {
+            JsonValueKind.Array => document.RootElement.EnumerateArray()
+                .Select(element => element.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!)
+                .ToList(),
+            JsonValueKind.String when !string.IsNullOrWhiteSpace(document.RootElement.GetString()) => [document.RootElement.GetString()!],
+            _ => []
+        };
+
+        return values
+            .Where(ipText => IPAddress.TryParse(ipText, out _))
+            .ToList();
+    }
+
+    public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("mstsc.exe", $"/v:{targetIpv4}")
+            {
+                UseShellExecute = true
+            };
+
+            Process.Start(psi);
+            return Task.FromResult(new HyperVMachineActionResult { Success = true });
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new HyperVMachineActionResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message,
+                FailureMetadata = RuntimeErrorMetadataNormalizer.FromException(ex)
+            });
+        }
     }
 
     private async Task<(string Output, string Error)> ExecuteWithFreshSessionAsync(string script)

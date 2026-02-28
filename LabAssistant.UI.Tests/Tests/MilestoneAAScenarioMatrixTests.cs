@@ -52,9 +52,8 @@ public sealed class MilestoneAAScenarioMatrixTests
         var rdpButton = FindByName(xaml, "OpenRdpButton");
 
         Assert.Equal("False", rdpButton.Attribute("IsEnabled")?.Value);
-        Assert.Contains(
-            xaml.Descendants().Where(e => e.Name.LocalName == "TextBlock"),
-            text => (text.Attribute("Text")?.Value ?? string.Empty).Contains("RDP is disabled", StringComparison.OrdinalIgnoreCase));
+        var readinessText = FindByName(xaml, "RdpReadinessTextBlock");
+        Assert.Contains("RDP readiness", readinessText.Attribute("Text")?.Value ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -219,6 +218,7 @@ public sealed class MilestoneAAScenarioMatrixTests
         public HyperVMachineActionResult RestartResult { get; set; } = new() { Success = true };
 
         public HyperVMachineActionResult OpenConsoleResult { get; set; } = new() { Success = true };
+        public HyperVMachineActionResult OpenRdpResult { get; set; } = new() { Success = true };
 
         public HyperVMachineActionResult DeleteResult { get; set; } = new() { Success = true };
 
@@ -245,6 +245,16 @@ public sealed class MilestoneAAScenarioMatrixTests
         public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName)
         {
             return Task.FromResult(OpenConsoleResult);
+        }
+
+        public Task<IReadOnlyList<string>> GetVmIpAddressesAsync(string vmName)
+        {
+            return Task.FromResult<IReadOnlyList<string>>(["192.168.1.50"]);
+        }
+
+        public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4)
+        {
+            return Task.FromResult(OpenRdpResult);
         }
 
         public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage)
