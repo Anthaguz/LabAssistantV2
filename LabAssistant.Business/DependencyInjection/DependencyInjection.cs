@@ -61,6 +61,7 @@
 
 using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Deployment;
+using LabAssistant.Business.Machines;
 using LabAssistant.Business.Templates;
 using LabAssistant.Data.Catalog;
 using LabAssistant.Data.Configuration;
@@ -107,6 +108,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IVmCleanupOrchestrator, VmCleanupOrchestrator>();
         services.AddSingleton<MultiVmDeploymentCoordinator>();
         services.AddSingleton<IDeploymentCoordinator>(provider => provider.GetRequiredService<MultiVmDeploymentCoordinator>());
+        services.AddSingleton<IMachinesCapabilityService, MachinesCapabilityService>();
 
         return services;
     }
