@@ -8,11 +8,11 @@ namespace LabAssistant.Services.HyperV;
 
 public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 {
-    private readonly IPersistentPowerShellSession _session;
+    private readonly Func<IPersistentPowerShellSession> _sessionFactory;
 
-    public HyperVMachineAdminService(IPersistentPowerShellSession session)
+    public HyperVMachineAdminService(Func<IPersistentPowerShellSession> sessionFactory)
     {
-        _session = session;
+        _sessionFactory = sessionFactory;
     }
 
     public async Task<IReadOnlyList<HyperVHostMachineVmInfo>> ListHostVmsAsync()
@@ -31,7 +31,7 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             $items | ConvertTo-Json -Compress -Depth 4
             """;
 
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
 
         if (!string.IsNullOrWhiteSpace(error))
@@ -134,7 +134,7 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 
     private async Task<HyperVMachineActionResult> ExecuteCommandAsync(string script)
     {
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
         DebugLogger.LogPowerShellOutput(script, output, error);
 
         if (string.IsNullOrWhiteSpace(error))
@@ -149,6 +149,12 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             ErrorMessage = cleanedError,
             FailureMetadata = RuntimeErrorMetadataNormalizer.FromPowerShellErrorText(cleanedError)
         };
+    }
+
+    private async Task<(string Output, string Error)> ExecuteWithFreshSessionAsync(string script)
+    {
+        using var session = _sessionFactory();
+        return await session.ExecuteAsync(script);
     }
 
     private static HyperVHostMachineVmInfo ParseVmInfo(JsonElement vmElement)

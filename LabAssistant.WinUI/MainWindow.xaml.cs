@@ -305,16 +305,16 @@ public sealed partial class MainWindow : Window
         string.Equals(_activeCapability.DisplayName, "Machines", StringComparison.Ordinal) &&
         string.Equals(_activeSubview.Key, "overview", StringComparison.Ordinal);
 
-    private async Task EnsureMachinesInventoryAsync(bool forceRefresh)
+    private async Task<bool> EnsureMachinesInventoryAsync(bool forceRefresh)
     {
         if (!IsMachinesOverviewActive)
         {
-            return;
+            return false;
         }
 
         if (!forceRefresh && _machineInventory.Count > 0)
         {
-            return;
+            return true;
         }
 
         RefreshMachinesButton.IsEnabled = false;
@@ -324,9 +324,13 @@ public sealed partial class MainWindow : Window
         {
             var inventory = await _machinesCapabilityService.LoadInventoryAsync();
             var selectedVmName = _selectedMachine?.VmName;
+            var orderedInventory = inventory
+                .OrderBy(vm => vm.VmName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
+            // Keep the currently displayed list until a new fetch succeeds.
             _machineInventory.Clear();
-            foreach (var vm in inventory.OrderBy(vm => vm.VmName, StringComparer.OrdinalIgnoreCase))
+            foreach (var vm in orderedInventory)
             {
                 _machineInventory.Add(vm);
             }
@@ -343,10 +347,13 @@ public sealed partial class MainWindow : Window
             {
                 MachinesStatusTextBlock.Text = $"Loaded {_machineInventory.Count} VM(s).";
             }
+
+            return true;
         }
         catch (Exception ex)
         {
-            MachinesStatusTextBlock.Text = $"Failed to load VM inventory. {ex.Message}";
+            MachinesStatusTextBlock.Text = $"Failed to load VM inventory. Showing last known list. {ex.Message}";
+            return false;
         }
         finally
         {
@@ -483,7 +490,11 @@ public sealed partial class MainWindow : Window
 
             if (refreshInventory)
             {
-                await EnsureMachinesInventoryAsync(forceRefresh: true);
+                var refreshSucceeded = await EnsureMachinesInventoryAsync(forceRefresh: true);
+                if (!refreshSucceeded)
+                {
+                    MachinesStatusTextBlock.Text = $"{result.UserMessage} Inventory refresh failed; showing last known list.";
+                }
             }
             else
             {
