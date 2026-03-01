@@ -595,7 +595,21 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var selectedScope = await ShowDeleteScopeDialogAsync(_selectedMachine, preview);
+        MachineDeleteScope? selectedScope;
+        var policyCanAutoSelectScope = preview.PolicyMode != MachineDeletionPolicyMode.AskEveryTime &&
+            preview.DefaultScope == MachineDeleteScope.VmAndStorage &&
+            preview.SafeForAutomaticStorageDeletion;
+
+        if (policyCanAutoSelectScope)
+        {
+            var confirmed = await ShowDeleteConfirmationDialogAsync(_selectedMachine, preview, preview.DefaultScope);
+            selectedScope = confirmed ? preview.DefaultScope : null;
+        }
+        else
+        {
+            selectedScope = await ShowDeleteScopeDialogAsync(_selectedMachine, preview);
+        }
+
         if (selectedScope is null)
         {
             MachinesStatusTextBlock.Text = "Delete cancelled.";
@@ -1244,5 +1258,51 @@ public sealed partial class MainWindow : Window
         return vmAndStorageRadio.IsChecked == true
             ? MachineDeleteScope.VmAndStorage
             : MachineDeleteScope.VmRegistrationOnly;
+    }
+
+    private async Task<bool> ShowDeleteConfirmationDialogAsync(
+        MachineInventoryItem vm,
+        MachineDeletePreview preview,
+        MachineDeleteScope effectiveScope)
+    {
+        var scopeText = effectiveScope == MachineDeleteScope.VmAndStorage
+            ? "VM + associated disks/files"
+            : "VM registration only";
+        var confirmationCheck = new CheckBox
+        {
+            Content = $"I confirm I want to delete '{vm.VmName}'."
+        };
+
+        var content = new StackPanel { Spacing = 10 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"Effective delete scope: {scopeText}",
+            TextWrapping = TextWrapping.Wrap,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = $"Policy: {preview.PolicyMode} — {preview.PolicyMessage}",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
+        });
+        content.Children.Add(confirmationCheck);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete VM",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            IsPrimaryButtonEnabled = false,
+            XamlRoot = RootLayout.XamlRoot,
+            Content = content
+        };
+
+        confirmationCheck.Checked += (_, _) => dialog.IsPrimaryButtonEnabled = true;
+        confirmationCheck.Unchecked += (_, _) => dialog.IsPrimaryButtonEnabled = false;
+
+        var result = await dialog.ShowAsync();
+        return result == ContentDialogResult.Primary;
     }
 }
