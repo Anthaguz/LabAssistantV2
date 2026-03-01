@@ -873,6 +873,95 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-008 — Diagnostics Structured Log Viewer (Phase 1)
+
+**Related FRs:** FR-073
+
+## Scenarios
+
+### 1) Diagnostics > Logs subview exists (WinUI)
+**Given**
+- User is in WinUI shell
+
+**When**
+- User navigates to `Diagnostics > Logs`
+
+**Then**
+- A Logs subview is available
+- Viewer loads from canonical structured log source (`structured-events.jsonl`)
+
+### 2) Envelope columns + dynamic context rendering
+**Given**
+- Structured log entries are loaded
+
+**When**
+- User views the log list and selects an entry
+
+**Then**
+- Envelope columns render:
+  - Timestamp
+  - Level
+  - Event
+  - OperationId
+  - Result
+- Selected entry details render dynamic context as readable JSON/text
+- Mixed event schemas do not break viewer rendering
+
+### 3) Filtering/search
+**Given**
+- Viewer has loaded entries
+
+**When**
+- User applies filters/search
+
+**Then**
+- Viewer supports:
+  - operationId filter
+  - level filter
+  - event filter
+  - free-text search (envelope + serialized context)
+  - basic start/end time filters
+
+### 4) Malformed-line tolerance
+**Given**
+- Source JSONL contains malformed lines
+
+**When**
+- Viewer loads logs
+
+**Then**
+- Malformed lines are skipped
+- Valid lines still render
+- Parse error count/status is shown
+- Viewer does not crash/blank
+
+### 5) Power-user raw access
+**Given**
+- User needs direct file-level investigation
+
+**When**
+- User invokes `Open raw JSONL`
+
+**Then**
+- App opens file/folder for `structured-events.jsonl`
+- Viewer remains read-only
+
+## Out of Scope (Phase 1)
+- Advanced timelines/visual analytics
+- In-app log editing/deletion
+- Remote ingestion/upload
+- Unified legacy `log.txt` viewer
+
+## Definition of Done
+- [ ] Diagnostics Logs subview exists in WinUI
+- [ ] Envelope columns render from structured JSONL
+- [ ] Dynamic context inspection works for mixed schemas
+- [ ] Filters/search operate as specified
+- [ ] Malformed-line tolerance and parse-error reporting work
+- [ ] Open raw JSONL action is available
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
@@ -880,3 +969,4 @@ Each readiness result shall include, at minimum:
 - RDP readiness policy beyond v1 host-observable checks (for example guest policy/NLA/firewall introspection).
 - Templates capability inner layout contract in WinUI (`TBD`)
 - Assets capability inner layout contract in WinUI (`TBD`)
+- Include rotated structured logs in Phase 1 viewer (`structured-events.1.jsonl`, etc.) or defer.

@@ -1,5 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Text.Json;
 using LabAssistant.Business.Machines;
+using LabAssistant.Services.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
@@ -19,7 +22,9 @@ public sealed partial class MainWindow : Window
 
     private readonly ShellViewModel _shellViewModel = new();
     private readonly IMachinesCapabilityService _machinesCapabilityService;
+    private readonly IStructuredLogViewerService _structuredLogViewerService;
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
+    private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
@@ -28,12 +33,14 @@ public sealed partial class MainWindow : Window
     private MachineRdpReadinessResult _selectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
     private MachineEditSnapshot? _loadedEditSnapshot;
     private MachineEditDraft? _editDraft;
+    private StructuredLogViewerEntry? _selectedStructuredLogEntry;
     private bool _isMachineActionRunning;
     private bool _isRdpReadinessRefreshRunning;
     private bool _isMachineEditLoading;
     private bool _isMachineEditApplying;
     private bool _isUpdatingMachineEditControls;
     private bool _isSavingDeletionPolicy;
+    private bool _isStructuredLogsLoading;
     private bool _isDrawerOpen;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
@@ -46,9 +53,11 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         _machinesCapabilityService = App.Services.GetRequiredService<IMachinesCapabilityService>();
+        _structuredLogViewerService = App.Services.GetRequiredService<IStructuredLogViewerService>();
         _activeCapability = _shellViewModel.GetCapability("Machines");
         _activeSubview = _activeCapability.DefaultSubview;
         MachinesListView.ItemsSource = _machineInventory;
+        StructuredLogsListView.ItemsSource = _structuredLogEntries;
         ConfigureShellIcons();
         InitializeDrawer();
         Title = "LabAssistant.WinUI";
@@ -177,6 +186,8 @@ public sealed partial class MainWindow : Window
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
             : IsSettingsMachinesActive
                 ? "Configure Machines policy defaults."
+                : IsDiagnosticsLogsActive
+                    ? "Inspect canonical structured logs with envelope fields and dynamic context."
                 : $"Subview: {_activeSubview.DisplayName}. This is scaffold-only placeholder content for AA2b.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
@@ -185,7 +196,8 @@ public sealed partial class MainWindow : Window
         IssueBadgeTextBlock.Text = _issueCount.ToString();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsSettingsMachinesActive) ? Visibility.Collapsed : Visibility.Visible;
+        DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
         RenderSubviewSelector();
         RenderSubviewToolbar();
         UpdateReadinessPollingState();
@@ -194,6 +206,11 @@ public sealed partial class MainWindow : Window
         if (IsSettingsMachinesActive)
         {
             _ = LoadMachinesDeletionPolicyAsync();
+        }
+
+        if (IsDiagnosticsLogsActive)
+        {
+            _ = EnsureStructuredLogsLoadedAsync(forceReload: false);
         }
     }
 
@@ -364,6 +381,10 @@ public sealed partial class MainWindow : Window
         string.Equals(_activeCapability.DisplayName, "Settings", StringComparison.Ordinal) &&
         string.Equals(_activeSubview.Key, "machines", StringComparison.Ordinal);
 
+    private bool IsDiagnosticsLogsActive =>
+        string.Equals(_activeCapability.DisplayName, "Diagnostics", StringComparison.Ordinal) &&
+        string.Equals(_activeSubview.Key, "logs", StringComparison.Ordinal);
+
     private void InitializeRdpReadinessTimer()
     {
         _rdpReadinessTimer = DispatcherQueue.CreateTimer();
@@ -462,6 +483,133 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task EnsureStructuredLogsLoadedAsync(bool forceReload)
+    {
+        if (!IsDiagnosticsLogsActive || _isStructuredLogsLoading)
+        {
+            return;
+        }
+
+        if (!forceReload && _structuredLogEntries.Count > 0)
+        {
+            return;
+        }
+
+        _isStructuredLogsLoading = true;
+        ApplyLogFiltersButton.IsEnabled = false;
+        ClearLogFiltersButton.IsEnabled = false;
+        ReloadLogsButton.IsEnabled = false;
+        OpenRawJsonlButton.IsEnabled = false;
+        LogsStatusTextBlock.Text = "Loading structured logs...";
+
+        try
+        {
+            var filter = BuildStructuredLogFilter();
+            var result = await _structuredLogViewerService.LoadAsync(filter);
+
+            _structuredLogEntries.Clear();
+            foreach (var entry in result.Entries)
+            {
+                _structuredLogEntries.Add(entry);
+            }
+
+            StructuredLogsListView.SelectedItem = null;
+            _selectedStructuredLogEntry = null;
+            UpdateStructuredLogSelectionDetails();
+
+            var filePath = _structuredLogViewerService.GetStructuredLogFilePath();
+            var parseErrorSuffix = result.ParseErrorCount > 0
+                ? $" Skipped malformed lines: {result.ParseErrorCount}."
+                : string.Empty;
+            LogsStatusTextBlock.Text = File.Exists(filePath)
+                ? $"Loaded {_structuredLogEntries.Count} events from {result.TotalLineCount} lines.{parseErrorSuffix}"
+                : $"Structured log file not found yet: {filePath}";
+        }
+        catch (Exception ex)
+        {
+            LogsStatusTextBlock.Text = $"Failed to load structured logs. {ex.Message}";
+        }
+        finally
+        {
+            _isStructuredLogsLoading = false;
+            ApplyLogFiltersButton.IsEnabled = true;
+            ClearLogFiltersButton.IsEnabled = true;
+            ReloadLogsButton.IsEnabled = true;
+            OpenRawJsonlButton.IsEnabled = true;
+        }
+    }
+
+    private StructuredLogViewerFilter BuildStructuredLogFilter()
+    {
+        return new StructuredLogViewerFilter
+        {
+            OperationId = NormalizeFilterText(LogFilterOperationIdTextBox.Text),
+            Level = NormalizeFilterText(LogFilterLevelTextBox.Text),
+            Event = NormalizeFilterText(LogFilterEventTextBox.Text),
+            TextSearch = NormalizeFilterText(LogFilterTextSearchTextBox.Text),
+            StartUtc = LogFilterUseStartDateCheckBox.IsChecked == true
+                ? ToDateBoundaryUtc(LogFilterStartDatePicker.Date, isEndBoundary: false)
+                : null,
+            EndUtc = LogFilterUseEndDateCheckBox.IsChecked == true
+                ? ToDateBoundaryUtc(LogFilterEndDatePicker.Date, isEndBoundary: true)
+                : null
+        };
+    }
+
+    private void UpdateStructuredLogSelectionDetails()
+    {
+        if (_selectedStructuredLogEntry is null)
+        {
+            SelectedLogEnvelopeTextBlock.Text = "Select a log entry.";
+            SelectedLogContextTextBox.Text = string.Empty;
+            return;
+        }
+
+        SelectedLogEnvelopeTextBlock.Text =
+            $"ts={_selectedStructuredLogEntry.TimestampText} | level={_selectedStructuredLogEntry.Level} | event={_selectedStructuredLogEntry.Event} | operationId={_selectedStructuredLogEntry.OperationId} | result={_selectedStructuredLogEntry.Result}";
+        SelectedLogContextTextBox.Text = FormatJsonForDetails(_selectedStructuredLogEntry.ContextJson);
+    }
+
+    private static string NormalizeFilterText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Trim();
+    }
+
+    private static DateTimeOffset ToDateBoundaryUtc(DateTimeOffset date, bool isEndBoundary)
+    {
+        var selectedDate = date.Date;
+        var localBoundary = isEndBoundary
+            ? selectedDate.AddDays(1).AddTicks(-1)
+            : selectedDate;
+        return localBoundary.ToUniversalTime();
+    }
+
+    private static string FormatJsonForDetails(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "{}";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+
     private void MachinesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         DiscardMachineEditDraft();
@@ -514,6 +662,68 @@ public sealed partial class MainWindow : Window
     private async void RefreshMachinesButton_Click(object sender, RoutedEventArgs e)
     {
         await EnsureMachinesInventoryAsync(forceRefresh: true);
+    }
+
+    private async void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureStructuredLogsLoadedAsync(forceReload: true);
+    }
+
+    private async void ApplyLogFiltersButton_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureStructuredLogsLoadedAsync(forceReload: true);
+    }
+
+    private async void ClearLogFiltersButton_Click(object sender, RoutedEventArgs e)
+    {
+        LogFilterOperationIdTextBox.Text = string.Empty;
+        LogFilterLevelTextBox.Text = string.Empty;
+        LogFilterEventTextBox.Text = string.Empty;
+        LogFilterTextSearchTextBox.Text = string.Empty;
+        LogFilterUseStartDateCheckBox.IsChecked = false;
+        LogFilterUseEndDateCheckBox.IsChecked = false;
+        LogFilterStartDatePicker.Date = DateTimeOffset.Now;
+        LogFilterEndDatePicker.Date = DateTimeOffset.Now;
+        await EnsureStructuredLogsLoadedAsync(forceReload: true);
+    }
+
+    private void StructuredLogsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedStructuredLogEntry = StructuredLogsListView.SelectedItem as StructuredLogViewerEntry;
+        UpdateStructuredLogSelectionDetails();
+    }
+
+    private void OpenRawJsonlButton_Click(object sender, RoutedEventArgs e)
+    {
+        var filePath = _structuredLogViewerService.GetStructuredLogFilePath();
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"")
+                {
+                    UseShellExecute = true
+                });
+                return;
+            }
+
+            var folderPath = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+            {
+                Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folderPath}\"")
+                {
+                    UseShellExecute = true
+                });
+                LogsStatusTextBlock.Text = $"Active structured log file not found. Opened log folder: {folderPath}";
+                return;
+            }
+
+            LogsStatusTextBlock.Text = $"Structured log path does not exist yet: {filePath}";
+        }
+        catch (Exception ex)
+        {
+            LogsStatusTextBlock.Text = $"Failed to open structured log location. {ex.Message}";
+        }
     }
 
     private async void StartVmButton_Click(object sender, RoutedEventArgs e)
