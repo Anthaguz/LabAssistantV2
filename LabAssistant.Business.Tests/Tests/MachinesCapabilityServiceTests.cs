@@ -2,6 +2,7 @@ using LabAssistant.Business.Machines;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
+using System.Net.Sockets;
 using Xunit;
 
 namespace LabAssistant.Business.Tests;
@@ -82,9 +83,121 @@ public class MachinesCapabilityServiceTests
         Assert.Equal("0x80070005", failedEvent.Context?["hresult"]?.ToString());
     }
 
+    [Fact]
+    public async Task EvaluateRdpReadinessAsync_WhenVmNotRunning_ReturnsNotReady()
+    {
+        var adminService = new FakeMachineAdminService();
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"));
+
+        var readiness = await service.EvaluateRdpReadinessAsync(new MachineInventoryItem
+        {
+            VmId = "vm-1",
+            VmName = "Vm01",
+            State = "Off"
+        });
+
+        Assert.Equal(MachineRdpReadinessState.NotReady, readiness.State);
+        Assert.Equal(MachineRdpReadinessReasonCodes.VmNotRunning, readiness.ReasonCode);
+    }
+
+    [Fact]
+    public async Task EvaluateRdpReadinessAsync_WhenNoIpv4_ReturnsNotReady()
+    {
+        var adminService = new FakeMachineAdminService
+        {
+            IpAddresses = ["fe80::1"]
+        };
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"));
+
+        var readiness = await service.EvaluateRdpReadinessAsync(new MachineInventoryItem
+        {
+            VmId = "vm-1",
+            VmName = "Vm01",
+            State = "Running"
+        });
+
+        Assert.Equal(MachineRdpReadinessState.NotReady, readiness.State);
+        Assert.Equal(MachineRdpReadinessReasonCodes.NoIpv4, readiness.ReasonCode);
+    }
+
+    [Fact]
+    public async Task EvaluateRdpReadinessAsync_WhenPortReachable_ReturnsReadyWithIpv4()
+    {
+        var adminService = new FakeMachineAdminService
+        {
+            IpAddresses = ["192.168.10.15"]
+        };
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"),
+            tcpProbe: (_, _, _, _) => Task.FromResult(true));
+
+        var readiness = await service.EvaluateRdpReadinessAsync(new MachineInventoryItem
+        {
+            VmId = "vm-1",
+            VmName = "Vm01",
+            State = "Running"
+        });
+
+        Assert.Equal(MachineRdpReadinessState.Ready, readiness.State);
+        Assert.Equal(MachineRdpReadinessReasonCodes.Ready, readiness.ReasonCode);
+        Assert.Equal("192.168.10.15", readiness.TargetIpv4);
+    }
+
+    [Fact]
+    public async Task EvaluateRdpReadinessAsync_WhenProbeFails_ReturnsNotReady()
+    {
+        var adminService = new FakeMachineAdminService
+        {
+            IpAddresses = ["192.168.10.15"]
+        };
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"),
+            tcpProbe: (_, _, _, _) => Task.FromResult(false));
+
+        var readiness = await service.EvaluateRdpReadinessAsync(new MachineInventoryItem
+        {
+            VmId = "vm-1",
+            VmName = "Vm01",
+            State = "Running"
+        });
+
+        Assert.Equal(MachineRdpReadinessState.NotReady, readiness.State);
+        Assert.Equal(MachineRdpReadinessReasonCodes.Port3389Unreachable, readiness.ReasonCode);
+    }
+
+    [Fact]
+    public async Task EvaluateRdpReadinessAsync_WhenProbeThrows_ReturnsUnknown()
+    {
+        var adminService = new FakeMachineAdminService
+        {
+            IpAddresses = ["192.168.10.15"]
+        };
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"),
+            tcpProbe: (_, _, _, _) => throw new SocketException());
+
+        var readiness = await service.EvaluateRdpReadinessAsync(new MachineInventoryItem
+        {
+            VmId = "vm-1",
+            VmName = "Vm01",
+            State = "Running"
+        });
+
+        Assert.Equal(MachineRdpReadinessState.Unknown, readiness.State);
+        Assert.Equal(MachineRdpReadinessReasonCodes.CheckFailed, readiness.ReasonCode);
+    }
+
     private sealed class FakeMachineAdminService : IHyperVMachineAdminService
     {
         public IReadOnlyList<HyperVHostMachineVmInfo> Inventory { get; set; } = Array.Empty<HyperVHostMachineVmInfo>();
+        public IReadOnlyList<string> IpAddresses { get; set; } = Array.Empty<string>();
 
         public HyperVMachineActionResult ActionResult { get; set; } = new() { Success = true };
 
@@ -99,6 +212,10 @@ public class MachinesCapabilityServiceTests
         public Task<HyperVMachineActionResult> RestartVmAsync(string vmName) => Task.FromResult(ActionResult);
 
         public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName) => Task.FromResult(ActionResult);
+
+        public Task<IReadOnlyList<string>> GetVmIpAddressesAsync(string vmName) => Task.FromResult(IpAddresses);
+
+        public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4) => Task.FromResult(ActionResult);
 
         public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage) => Task.FromResult(DeleteResult);
     }

@@ -645,6 +645,23 @@ Each readiness result shall include, at minimum:
 - Disabled RDP state includes user-facing reason text/guidance
 - Action attempts and results are logged
 
+### 4a) RDP Readiness v1 — Host-Observable Checks and Recheck Behavior
+**Given**
+- A VM is selected in `Machines`
+
+**When**
+- RDP readiness evaluation runs (background poll and/or manual recheck)
+
+**Then**
+- Readiness state is represented as `Ready`, `NotReady`, `Unknown`, or `Checking`
+- `Ready` requires all v1 criteria:
+  - VM is running
+  - VM has IPv4
+- TCP 3389 is reachable from host
+- `Ready` => `Open RDP` enabled
+- `NotReady` or `Unknown` => `Open RDP` disabled with concise reason text/tool tip
+- A manual recheck action is available and does not block UI interaction
+
 ### 5) Delete VM — Scope Selection and Confirmation
 **Given**
 - A VM is selected in `Machines`
@@ -713,6 +730,8 @@ Each readiness result shall include, at minimum:
 - [ ] Start/Stop operations are actionable and logged
 - [ ] Basic edit operations (CPU/memory/switch) are actionable and logged
 - [ ] Console and RDP are separate actions; RDP disabled-state behavior is explicit when unavailable
+- [ ] RDP readiness v1 criteria (running + IPv4 + TCP 3389 reachability) gate button enablement
+- [ ] Readiness checks are asynchronous/non-blocking and support manual recheck
 - [ ] Delete flow supports VM-only vs VM+disks scopes with confirmation
 - [ ] Always-delete-disks setting behavior is defined and testable
 - [ ] Failure behavior is actionable and non-silent
@@ -827,6 +846,6 @@ Each readiness result shall include, at minimum:
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
 - Whether to store deployment history records locally
-- RDP readiness detection criteria for enabling `Open RDP` in Machines
+- RDP readiness policy beyond v1 host-observable checks (for example guest policy/NLA/firewall introspection).
 - Templates capability inner layout contract in WinUI (`TBD`)
 - Assets capability inner layout contract in WinUI (`TBD`)

@@ -69,6 +69,18 @@ v1 scope follows the agreed **scope B** direction:
 - RDP and Console actions are separate controls; one must not hide the other.
 - `Open RDP` shall be disabled (grayed out) when readiness is unknown/unmet.
 
+### 4.1 RDP readiness v1 policy (resolved)
+`Open RDP` enablement in v1 is based on fast host-observable checks only:
+- VM state is running
+- At least one VM IPv4 address is discoverable from Hyper-V host-side data
+- Host TCP probe to `<vm-ip>:3389` succeeds within short timeout (4000ms target)
+
+Readiness evaluation requirements:
+- asynchronous and non-blocking
+- background refresh while `Machines` view is active
+- manual recheck available
+- disabled state exposes concise reason text/guidance
+
 ---
 
 ## 5. Logging / Diagnostics Constraints
@@ -86,7 +98,14 @@ Destructive action logs should make action intent explicit.
 
 ## 6. Open Questions / TBDs
 
-- **TBD:** Exact RDP readiness detection criteria for enabling/disabling `Open RDP`.
 - **TBD:** VM origin/status labeling details (LabAssistant-created vs external vs unknown) for v1 UI presentation.
 - **TBD:** Whether advanced settings handoff to Hyper-V MMC is included in v1 or deferred.
+
+## 7. Explicit non-goals for #261
+- No guest OS mutation/automation for RDP readiness:
+  - no auto-enable Remote Desktop
+  - no auto-disable firewall
+  - no auto-toggle NLA
+  - no guest IP configuration changes
+- No Deploy/guest-step feature expansion in Machines.
 

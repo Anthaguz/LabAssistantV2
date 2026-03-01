@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
+using Microsoft.UI.Dispatching;
 using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
@@ -19,14 +20,20 @@ public sealed partial class MainWindow : Window
     private readonly ShellViewModel _shellViewModel = new();
     private readonly IMachinesCapabilityService _machinesCapabilityService;
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
+    private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
     private ShellCapability _activeCapability;
     private ShellSubview _activeSubview;
     private MachineInventoryItem? _selectedMachine;
+    private MachineRdpReadinessResult _selectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
     private bool _isMachineActionRunning;
+    private bool _isRdpReadinessRefreshRunning;
     private bool _isDrawerOpen;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
+    private DispatcherQueueTimer? _rdpReadinessTimer;
+    private DateTimeOffset _lastRdpReadinessRefreshUtc = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastOnDemandRdpRefreshUtc = DateTimeOffset.MinValue;
 
     public MainWindow()
     {
@@ -40,6 +47,7 @@ public sealed partial class MainWindow : Window
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
         RootLayout.KeyDown += RootLayout_KeyDown;
+        InitializeRdpReadinessTimer();
         RootLayout.Loaded += async (_, _) =>
         {
             RootLayout.Focus(FocusState.Programmatic);
@@ -169,6 +177,8 @@ public sealed partial class MainWindow : Window
         NonMachinesPlaceholderTextBlock.Visibility = IsMachinesOverviewActive ? Visibility.Collapsed : Visibility.Visible;
         RenderSubviewSelector();
         RenderSubviewToolbar();
+        UpdateReadinessPollingState();
+        UpdateRdpReadinessUi();
         UpdateMachineActionButtons();
     }
 
@@ -305,6 +315,43 @@ public sealed partial class MainWindow : Window
         string.Equals(_activeCapability.DisplayName, "Machines", StringComparison.Ordinal) &&
         string.Equals(_activeSubview.Key, "overview", StringComparison.Ordinal);
 
+    private void InitializeRdpReadinessTimer()
+    {
+        _rdpReadinessTimer = DispatcherQueue.CreateTimer();
+        _rdpReadinessTimer.Interval = TimeSpan.FromMinutes(5);
+        _rdpReadinessTimer.Tick += async (_, _) => await RefreshRdpReadinessAsync(selectedOnly: false);
+    }
+
+    private void UpdateReadinessPollingState()
+    {
+        if (_rdpReadinessTimer is null)
+        {
+            return;
+        }
+
+        if (IsMachinesOverviewActive && _machineInventory.Count > 0)
+        {
+            if (!_rdpReadinessTimer.IsRunning)
+            {
+                _rdpReadinessTimer.Start();
+
+                // Run one pass when Machines becomes active, then fall back to periodic checks.
+                if (DateTimeOffset.UtcNow - _lastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
+                {
+                    _ = RefreshRdpReadinessAsync(selectedOnly: false);
+                }
+            }
+
+            return;
+        }
+
+        if (_rdpReadinessTimer.IsRunning)
+        {
+            _rdpReadinessTimer.Stop();
+        }
+
+    }
+
     private async Task<bool> EnsureMachinesInventoryAsync(bool forceRefresh)
     {
         if (!IsMachinesOverviewActive)
@@ -348,6 +395,8 @@ public sealed partial class MainWindow : Window
                 MachinesStatusTextBlock.Text = $"Loaded {_machineInventory.Count} VM(s).";
             }
 
+            SyncRdpReadinessCache();
+
             return true;
         }
         catch (Exception ex)
@@ -366,7 +415,9 @@ public sealed partial class MainWindow : Window
     private void MachinesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedMachine = MachinesListView.SelectedItem as MachineInventoryItem;
+        UpdateSelectedRdpReadinessFromCache();
         UpdateMachineDetails();
+        UpdateRdpReadinessUi();
         UpdateMachineActionButtons();
     }
 
@@ -398,7 +449,8 @@ public sealed partial class MainWindow : Window
         RestartVmButton.IsEnabled = canRunActions;
         OpenConsoleButton.IsEnabled = canRunActions;
         DeleteVmButton.IsEnabled = canRunActions;
-        OpenRdpButton.IsEnabled = false;
+        OpenRdpButton.IsEnabled = canRunActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
+        ToolTipService.SetToolTip(OpenRdpButton, _selectedRdpReadiness.Message);
     }
 
     private async void RefreshMachinesButton_Click(object sender, RoutedEventArgs e)
@@ -435,6 +487,34 @@ public sealed partial class MainWindow : Window
         await RunMachineOperationAsync(
             "Opening Hyper-V Console...",
             vm => _machinesCapabilityService.OpenConsoleAsync(vm),
+            refreshInventory: false);
+    }
+
+    private async void OpenRdpButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMachine is null)
+        {
+            MachinesStatusTextBlock.Text = "Select a VM before running actions.";
+            return;
+        }
+
+        if (_selectedRdpReadiness.State != MachineRdpReadinessState.Ready ||
+            string.IsNullOrWhiteSpace(_selectedRdpReadiness.TargetIpv4))
+        {
+            MachinesStatusTextBlock.Text = $"RDP not ready. {_selectedRdpReadiness.Message}";
+            if (DateTimeOffset.UtcNow - _lastOnDemandRdpRefreshUtc >= TimeSpan.FromSeconds(2))
+            {
+                _lastOnDemandRdpRefreshUtc = DateTimeOffset.UtcNow;
+                await RefreshRdpReadinessAsync(selectedOnly: true);
+            }
+            return;
+        }
+
+        var targetIpv4 = _selectedRdpReadiness.TargetIpv4;
+
+        await RunMachineOperationAsync(
+            "Opening RDP...",
+            vm => _machinesCapabilityService.OpenRdpAsync(vm, targetIpv4!),
             refreshInventory: false);
     }
 
@@ -495,6 +575,10 @@ public sealed partial class MainWindow : Window
                 {
                     MachinesStatusTextBlock.Text = $"{result.UserMessage} Inventory refresh failed; showing last known list.";
                 }
+                else if (_selectedMachine is not null)
+                {
+                    await RefreshRdpReadinessAsync(selectedOnly: true);
+                }
             }
             else
             {
@@ -506,6 +590,135 @@ public sealed partial class MainWindow : Window
             _isMachineActionRunning = false;
             UpdateMachineActionButtons();
         }
+    }
+
+    private async Task RefreshRdpReadinessAsync(bool selectedOnly)
+    {
+        if (!IsMachinesOverviewActive || _machineInventory.Count == 0)
+        {
+            return;
+        }
+
+        if (_isRdpReadinessRefreshRunning)
+        {
+            return;
+        }
+
+        var candidates = selectedOnly && _selectedMachine is not null
+            ? [ _selectedMachine ]
+            : _machineInventory.ToList();
+
+        _isRdpReadinessRefreshRunning = true;
+        _lastRdpReadinessRefreshUtc = DateTimeOffset.UtcNow;
+
+        try
+        {
+            foreach (var vm in candidates)
+            {
+                SetRdpReadiness(vm, new MachineRdpReadinessResult
+                {
+                    State = MachineRdpReadinessState.Checking,
+                    ReasonCode = MachineRdpReadinessReasonCodes.CheckFailed,
+                    Message = "Checking RDP readiness..."
+                });
+            }
+
+            foreach (var vm in candidates)
+            {
+                var readiness = await _machinesCapabilityService.EvaluateRdpReadinessAsync(vm, CancellationToken.None);
+                SetRdpReadiness(vm, readiness);
+            }
+        }
+        finally
+        {
+            _isRdpReadinessRefreshRunning = false;
+        }
+    }
+
+    private void SyncRdpReadinessCache()
+    {
+        var activeVmKeys = _machineInventory.Select(GetVmReadinessKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var staleKeys = _rdpReadinessByVmKey.Keys.Where(vmKey => !activeVmKeys.Contains(vmKey)).ToList();
+        foreach (var vmKey in staleKeys)
+        {
+            _rdpReadinessByVmKey.Remove(vmKey);
+        }
+
+        foreach (var vm in _machineInventory)
+        {
+            var vmKey = GetVmReadinessKey(vm);
+            if (!_rdpReadinessByVmKey.ContainsKey(vmKey))
+            {
+                _rdpReadinessByVmKey[vmKey] = CreateUnknownReadiness("RDP readiness has not been checked yet.");
+            }
+        }
+
+        UpdateSelectedRdpReadinessFromCache();
+        UpdateRdpReadinessUi();
+        UpdateReadinessPollingState();
+    }
+
+    private void SetRdpReadiness(MachineInventoryItem vm, MachineRdpReadinessResult readiness)
+    {
+        var vmKey = GetVmReadinessKey(vm);
+        _rdpReadinessByVmKey[vmKey] = readiness;
+
+        if (_selectedMachine is not null &&
+            string.Equals(GetVmReadinessKey(_selectedMachine), vmKey, StringComparison.OrdinalIgnoreCase))
+        {
+            _selectedRdpReadiness = readiness;
+            UpdateRdpReadinessUi();
+            UpdateMachineActionButtons();
+        }
+    }
+
+    private void UpdateSelectedRdpReadinessFromCache()
+    {
+        if (_selectedMachine is null)
+        {
+            _selectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
+            return;
+        }
+
+        var selectedKey = GetVmReadinessKey(_selectedMachine);
+        if (_rdpReadinessByVmKey.TryGetValue(selectedKey, out var readiness))
+        {
+            _selectedRdpReadiness = readiness;
+            return;
+        }
+
+        _selectedRdpReadiness = CreateUnknownReadiness("RDP readiness has not been checked yet.");
+    }
+
+    private void UpdateRdpReadinessUi()
+    {
+        if (_selectedRdpReadiness.State == MachineRdpReadinessState.Ready)
+        {
+            RdpReadinessTextBlock.Text = _selectedRdpReadiness.Message;
+            return;
+        }
+
+        RdpReadinessTextBlock.Text = $"{_selectedRdpReadiness.Message} ({_selectedRdpReadiness.ReasonCode})";
+    }
+
+    private static MachineRdpReadinessResult CreateUnknownReadiness(string message)
+    {
+        return new MachineRdpReadinessResult
+        {
+            State = MachineRdpReadinessState.Unknown,
+            ReasonCode = MachineRdpReadinessReasonCodes.CheckFailed,
+            Message = message
+        };
+    }
+
+    private static string GetVmReadinessKey(MachineInventoryItem vm)
+    {
+        if (!string.IsNullOrWhiteSpace(vm.VmId))
+        {
+            return vm.VmId;
+        }
+
+        return vm.VmName;
     }
 
     private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm)

@@ -12,6 +12,10 @@ public interface IHyperVMachineAdminService
 
     Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName);
 
+    Task<IReadOnlyList<string>> GetVmIpAddressesAsync(string vmName);
+
+    Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4);
+
     Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage);
 }
 
