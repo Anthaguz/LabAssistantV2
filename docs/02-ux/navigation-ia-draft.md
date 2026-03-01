@@ -12,6 +12,7 @@
 - `docs/02-ux/ui-migration-execution-plan.md`
 - `docs/02-ux/ui-framework-decision-record-y3.md`
 - `docs/02-ux/winui-shell-contract-aa.md`
+- `docs/02-ux/winui-layout-constraints-contract.md`
 
 ---
 
@@ -322,7 +323,8 @@ This is why the next deliverable after IA should be the GUI Action Map.
 ## 8. Open Questions / TBDs
 
 - Resolved: default landing capability is `Machines` for WinUI shell implementation.
+- Resolved: layout constraints and scroll ownership are defined in `docs/02-ux/winui-layout-constraints-contract.md` and are mandatory for AB2+ implementation slices.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?
-- `TBD:` Capability-specific inner layouts for Templates/Assets/Diagnostics in WinUI (beyond shell contract)
+- `TBD:` Capability-specific inner layouts for Templates/Assets/Diagnostics in WinUI (within layout contract constraints)
