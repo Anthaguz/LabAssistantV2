@@ -252,6 +252,32 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
                 continue;
             }
 
+            // Some hosts/reporting paths may not return a stable VhdType string, but ParentPath is a
+            // reliable indicator that the disk is differencing-based.
+            if (!string.IsNullOrWhiteSpace(vhdInfo.ParentPath))
+            {
+                results.Add(new HyperVMachineDiskClassificationResult
+                {
+                    DiskPath = normalizedPath,
+                    Classification = HyperVMachineDiskSafetyClassification.DifferencingEligible,
+                    Reason = "parent_path_present"
+                });
+                continue;
+            }
+
+            // Fall back to path-based heuristic for known differencing root.
+            if (!string.IsNullOrWhiteSpace(differencingRoot) &&
+                normalizedPath.StartsWith(differencingRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                results.Add(new HyperVMachineDiskClassificationResult
+                {
+                    DiskPath = normalizedPath,
+                    Classification = HyperVMachineDiskSafetyClassification.DifferencingEligible,
+                    Reason = "path_under_differencing_root"
+                });
+                continue;
+            }
+
             if (string.Equals(vhdInfo.VhdType, "Dynamic", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(vhdInfo.VhdType, "Fixed", StringComparison.OrdinalIgnoreCase))
             {
