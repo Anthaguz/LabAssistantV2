@@ -171,6 +171,18 @@ public sealed class MilestoneAAScenarioMatrixTests
         Assert.Equal("VM-Delete", failed.Context?["vmName"]?.ToString());
     }
 
+    [Fact]
+    public void Machines_EditWorkflow_ShowsApplyWithoutResetButton()
+    {
+        var xaml = LoadMainWindowXaml();
+        var applyButton = FindByName(xaml, "ApplyMachineEditsButton");
+
+        Assert.Equal("Apply", applyButton.Attribute("Content")?.Value);
+        Assert.DoesNotContain(
+            xaml.Descendants().Where(e => e.Name.LocalName == "Button"),
+            button => string.Equals(button.Attribute("Content")?.Value, "Reset", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static MachinesCapabilityService CreateMachinesService(
         RecordingMachineAdminService machineAdmin,
         RecordingStructuredLogger? logger = null)
@@ -219,6 +231,7 @@ public sealed class MilestoneAAScenarioMatrixTests
 
         public HyperVMachineActionResult OpenConsoleResult { get; set; } = new() { Success = true };
         public HyperVMachineActionResult OpenRdpResult { get; set; } = new() { Success = true };
+        public HyperVMachineEditSnapshot? EditSnapshot { get; set; }
 
         public HyperVMachineActionResult DeleteResult { get; set; } = new() { Success = true };
 
@@ -255,6 +268,21 @@ public sealed class MilestoneAAScenarioMatrixTests
         public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4)
         {
             return Task.FromResult(OpenRdpResult);
+        }
+
+        public Task<HyperVMachineEditSnapshot?> GetVmEditSnapshotAsync(string vmName)
+        {
+            return Task.FromResult(EditSnapshot);
+        }
+
+        public Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync()
+        {
+            return Task.FromResult<IReadOnlyList<string>>(["Default Switch"]);
+        }
+
+        public Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request)
+        {
+            return Task.FromResult(new HyperVMachineActionResult { Success = true });
         }
 
         public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage)

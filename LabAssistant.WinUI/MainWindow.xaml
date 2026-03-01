@@ -234,6 +234,63 @@
                                     Margin="0,8,0,0"
                                     Foreground="{StaticResource ShellTextPrimaryBrush}"
                                     FontWeight="SemiBold"
+                                    Text="Basic Edit" />
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="CPU Count" />
+                                    <TextBox x:Name="CpuCountTextBox" Grid.Column="1" TextChanged="CpuCountTextBox_TextChanged" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Startup Memory (MB)" />
+                                    <TextBox x:Name="StartupMemoryTextBox" Grid.Column="1" TextChanged="StartupMemoryTextBox_TextChanged" />
+                                </Grid>
+
+                                <ToggleSwitch x:Name="DynamicMemoryToggle" Toggled="DynamicMemoryToggle_Toggled" Header="Dynamic Memory" />
+
+                                <Grid x:Name="DynamicMemoryPanel" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Min (MB)" />
+                                    <TextBox x:Name="MinimumMemoryTextBox" Grid.Row="0" Grid.Column="1" TextChanged="MinimumMemoryTextBox_TextChanged" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Max (MB)" />
+                                    <TextBox x:Name="MaximumMemoryTextBox" Grid.Row="1" Grid.Column="1" TextChanged="MaximumMemoryTextBox_TextChanged" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Buffer (%)" />
+                                    <TextBox x:Name="MemoryBufferTextBox" Grid.Row="2" Grid.Column="1" TextChanged="MemoryBufferTextBox_TextChanged" />
+                                </Grid>
+
+                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Network Adapters" />
+                                <StackPanel x:Name="NetworkAdapterEditorPanel" Spacing="6" />
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="ApplyMachineEditsButton" Click="ApplyMachineEditsButton_Click" Content="Apply" />
+                                    <TextBlock
+                                        x:Name="MachineEditDirtyTextBlock"
+                                        Foreground="{StaticResource ShellWarnBrush}"
+                                        VerticalAlignment="Center"
+                                        Text="Unsaved changes"
+                                        Visibility="Collapsed" />
+                                </StackPanel>
+
+                                <TextBlock
+                                    Margin="0,8,0,0"
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    FontWeight="SemiBold"
                                     Text="Actions" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button x:Name="StartVmButton" Click="StartVmButton_Click" Content="Start VM" />

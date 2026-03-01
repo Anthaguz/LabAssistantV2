@@ -630,6 +630,12 @@ Each readiness result shall include, at minimum:
 - Requested edits are applied or rejected with explicit feedback
 - No silent partial update is reported as success
 - Structured logs capture attempted edits and result
+- Edit workflow is draft-based:
+  - edits remain local until `Apply`
+  - unsaved-changes indicator is visible when draft differs from loaded host values
+  - no dedicated `Reset` button is required in v1
+  - navigating away (capability/subview/VM selection) discards unapplied draft state
+- Network switch editing is adapter-aware for VMs with multiple network adapters
 
 ### 4) Connection Actions — Console and RDP
 **Given**

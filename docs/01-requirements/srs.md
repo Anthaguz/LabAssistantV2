@@ -259,6 +259,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - memory
   - CPU
   - switch attachment
+  - **Acceptance details:** Edit workflow is draft-then-apply with unsaved-change visibility; unapplied drafts are discarded on navigation away.
   - **Priority:** P1
 
 - **FR-064:** The system shall expose separate connection actions from `Machines`:

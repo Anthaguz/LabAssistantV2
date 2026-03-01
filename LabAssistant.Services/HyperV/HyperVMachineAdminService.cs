@@ -98,6 +98,89 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         }
     }
 
+    public async Task<HyperVMachineEditSnapshot?> GetVmEditSnapshotAsync(string vmName)
+    {
+        var script = $$"""
+            $vm = Get-VM -Name {{Quote(vmName)}} -ErrorAction Stop
+            $memory = Get-VMMemory -VMName {{Quote(vmName)}} -ErrorAction Stop
+            $adapters = @(Get-VMNetworkAdapter -VMName {{Quote(vmName)}} -ErrorAction SilentlyContinue | ForEach-Object {
+                [PSCustomObject]@{
+                    AdapterName = $_.Name
+                    SwitchName = $_.SwitchName
+                }
+            })
+            [PSCustomObject]@{
+                ProcessorCount = [int]$vm.ProcessorCount
+                StartupMemoryBytes = [int64]$memory.Startup
+                DynamicMemoryEnabled = [bool]$memory.DynamicMemoryEnabled
+                MinimumMemoryBytes = [int64]$memory.Minimum
+                MaximumMemoryBytes = [int64]$memory.Maximum
+                MemoryBufferPercent = [int]$memory.Buffer
+                NetworkAdapters = $adapters
+            } | ConvertTo-Json -Compress -Depth 5
+            """;
+
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+        }
+
+        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(cleanedOutput))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(cleanedOutput);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return new HyperVMachineEditSnapshot
+        {
+            ProcessorCount = GetOptionalInt(document.RootElement, "ProcessorCount") ?? 1,
+            StartupMemoryBytes = GetOptionalLong(document.RootElement, "StartupMemoryBytes") ?? 0,
+            DynamicMemoryEnabled = GetOptionalBool(document.RootElement, "DynamicMemoryEnabled") ?? false,
+            MinimumMemoryBytes = GetOptionalLong(document.RootElement, "MinimumMemoryBytes") ?? 0,
+            MaximumMemoryBytes = GetOptionalLong(document.RootElement, "MaximumMemoryBytes") ?? 0,
+            MemoryBufferPercent = GetOptionalInt(document.RootElement, "MemoryBufferPercent") ?? 20,
+            NetworkAdapters = GetNetworkAdapters(document.RootElement)
+        };
+    }
+
+    public async Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync()
+    {
+        const string script = "Get-VMSwitch | Select-Object -ExpandProperty Name | ConvertTo-Json -Compress";
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+        }
+
+        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(cleanedOutput))
+        {
+            return Array.Empty<string>();
+        }
+
+        using var document = JsonDocument.Parse(cleanedOutput);
+        return document.RootElement.ValueKind switch
+        {
+            JsonValueKind.Array => document.RootElement.EnumerateArray()
+                .Select(element => element.GetString())
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name!)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            JsonValueKind.String when !string.IsNullOrWhiteSpace(document.RootElement.GetString()) => [document.RootElement.GetString()!],
+            _ => Array.Empty<string>()
+        };
+    }
+
     public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage)
     {
         if (!includeStorage)
@@ -213,6 +296,34 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         }
     }
 
+    public Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request)
+    {
+        var lines = new List<string>
+        {
+            $"Set-VMProcessor -VMName {Quote(vmName)} -Count {request.ProcessorCount} -ErrorAction Stop"
+        };
+
+        if (request.DynamicMemoryEnabled)
+        {
+            lines.Add(
+                $"Set-VMMemory -VMName {Quote(vmName)} -StartupBytes {request.StartupMemoryBytes} -DynamicMemoryEnabled $true -MinimumBytes {request.MinimumMemoryBytes} -MaximumBytes {request.MaximumMemoryBytes} -Buffer {request.MemoryBufferPercent} -ErrorAction Stop");
+        }
+        else
+        {
+            lines.Add(
+                $"Set-VMMemory -VMName {Quote(vmName)} -StartupBytes {request.StartupMemoryBytes} -DynamicMemoryEnabled $false -ErrorAction Stop");
+        }
+
+        foreach (var adapter in request.NetworkAdapterAssignments)
+        {
+            lines.Add(
+                $"Connect-VMNetworkAdapter -VMName {Quote(vmName)} -Name {Quote(adapter.AdapterName)} -SwitchName {Quote(adapter.SwitchName)} -ErrorAction Stop");
+        }
+
+        var script = string.Join(Environment.NewLine, lines);
+        return ExecuteCommandAsync(script);
+    }
+
     private async Task<(string Output, string Error)> ExecuteWithFreshSessionAsync(string script)
     {
         using var session = _sessionFactory();
@@ -268,6 +379,71 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             JsonValueKind.Number => valueElement.GetRawText(),
             _ => null
         };
+    }
+
+    private static long? GetOptionalLong(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var valueElement))
+        {
+            return null;
+        }
+
+        return valueElement.ValueKind switch
+        {
+            JsonValueKind.Number when valueElement.TryGetInt64(out var value) => value,
+            JsonValueKind.String when long.TryParse(valueElement.GetString(), out var value) => value,
+            _ => null
+        };
+    }
+
+    private static int? GetOptionalInt(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var valueElement))
+        {
+            return null;
+        }
+
+        return valueElement.ValueKind switch
+        {
+            JsonValueKind.Number when valueElement.TryGetInt32(out var value) => value,
+            JsonValueKind.String when int.TryParse(valueElement.GetString(), out var value) => value,
+            _ => null
+        };
+    }
+
+    private static bool? GetOptionalBool(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var valueElement))
+        {
+            return null;
+        }
+
+        return valueElement.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(valueElement.GetString(), out var value) => value,
+            _ => null
+        };
+    }
+
+    private static IReadOnlyList<HyperVMachineNetworkAdapterInfo> GetNetworkAdapters(JsonElement vmElement)
+    {
+        if (!vmElement.TryGetProperty("NetworkAdapters", out var adapterElement) ||
+            adapterElement.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<HyperVMachineNetworkAdapterInfo>();
+        }
+
+        return adapterElement.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.Object)
+            .Select(item => new HyperVMachineNetworkAdapterInfo
+            {
+                AdapterName = GetOptionalString(item, "AdapterName") ?? string.Empty,
+                SwitchName = GetOptionalString(item, "SwitchName")
+            })
+            .Where(adapter => !string.IsNullOrWhiteSpace(adapter.AdapterName))
+            .ToList();
     }
 
     private static string Quote(string value)

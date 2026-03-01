@@ -194,10 +194,87 @@ public class MachinesCapabilityServiceTests
         Assert.Equal(MachineRdpReadinessReasonCodes.CheckFailed, readiness.ReasonCode);
     }
 
+    [Fact]
+    public async Task ApplyEditsAsync_EmitsChangedFieldsAndCallsAdminService()
+    {
+        var adminService = new FakeMachineAdminService();
+        var logger = new RecordingStructuredLogger();
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"),
+            logger);
+        var vm = new MachineInventoryItem
+        {
+            VmId = "vm-1",
+            VmName = "Vm01",
+            State = "Running",
+            OriginLabel = "LabAssistant"
+        };
+        var draft = new MachineEditDraft
+        {
+            CpuCount = 4,
+            StartupMemoryMb = 4096,
+            DynamicMemoryEnabled = true,
+            MinimumMemoryMb = 2048,
+            MaximumMemoryMb = 8192,
+            MemoryBufferPercent = 30,
+            NetworkAdapters =
+            [
+                new MachineNetworkAdapterConfig { AdapterName = "Network Adapter", SwitchName = "Default Switch" }
+            ],
+            ChangedFieldKeys = ["cpuCount", "switch:Network Adapter"]
+        };
+
+        var result = await service.ApplyEditsAsync(vm, draft);
+
+        Assert.True(result.Success);
+        Assert.NotNull(adminService.LastEditRequest);
+        Assert.Equal(4, adminService.LastEditRequest!.ProcessorCount);
+        Assert.Single(adminService.LastEditRequest.NetworkAdapterAssignments);
+        var started = Assert.Single(logger.Events, e => e.Event == "MachineEditApplyStarted");
+        Assert.Contains("cpuCount", (object[]?)started.Context?["changedFields"] ?? Array.Empty<object>());
+    }
+
+    [Fact]
+    public async Task LoadEditSnapshotAsync_MapsNetworkAdapters()
+    {
+        var adminService = new FakeMachineAdminService
+        {
+            EditSnapshot = new HyperVMachineEditSnapshot
+            {
+                ProcessorCount = 2,
+                StartupMemoryBytes = 2L * 1024 * 1024 * 1024,
+                DynamicMemoryEnabled = true,
+                MinimumMemoryBytes = 1L * 1024 * 1024 * 1024,
+                MaximumMemoryBytes = 4L * 1024 * 1024 * 1024,
+                MemoryBufferPercent = 25,
+                NetworkAdapters =
+                [
+                    new HyperVMachineNetworkAdapterInfo { AdapterName = "Network Adapter", SwitchName = "Default Switch" }
+                ]
+            }
+        };
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"));
+        var vm = new MachineInventoryItem { VmId = "vm-1", VmName = "Vm01" };
+
+        var snapshot = await service.LoadEditSnapshotAsync(vm);
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(2, snapshot!.CpuCount);
+        Assert.Equal(2048, snapshot.StartupMemoryMb);
+        Assert.Single(snapshot.NetworkAdapters);
+        Assert.Equal("Default Switch", snapshot.NetworkAdapters[0].SwitchName);
+    }
+
     private sealed class FakeMachineAdminService : IHyperVMachineAdminService
     {
         public IReadOnlyList<HyperVHostMachineVmInfo> Inventory { get; set; } = Array.Empty<HyperVHostMachineVmInfo>();
         public IReadOnlyList<string> IpAddresses { get; set; } = Array.Empty<string>();
+        public IReadOnlyList<string> SwitchNames { get; set; } = ["Default Switch"];
+        public HyperVMachineEditSnapshot? EditSnapshot { get; set; }
+        public HyperVMachineEditRequest? LastEditRequest { get; private set; }
 
         public HyperVMachineActionResult ActionResult { get; set; } = new() { Success = true };
 
@@ -216,6 +293,16 @@ public class MachinesCapabilityServiceTests
         public Task<IReadOnlyList<string>> GetVmIpAddressesAsync(string vmName) => Task.FromResult(IpAddresses);
 
         public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4) => Task.FromResult(ActionResult);
+
+        public Task<HyperVMachineEditSnapshot?> GetVmEditSnapshotAsync(string vmName) => Task.FromResult(EditSnapshot);
+
+        public Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync() => Task.FromResult(SwitchNames);
+
+        public Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request)
+        {
+            LastEditRequest = request;
+            return Task.FromResult(ActionResult);
+        }
 
         public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage) => Task.FromResult(DeleteResult);
     }
