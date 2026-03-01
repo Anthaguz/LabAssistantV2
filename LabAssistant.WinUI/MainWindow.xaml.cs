@@ -54,7 +54,7 @@ public sealed partial class MainWindow : Window
     private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
 
-    private Grid MachinesOverviewPanel => MachinesOverviewView.MachinesOverviewPanel;
+    private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
     private ListView MachinesListView => MachinesOverviewView.MachinesListView;
     private TextBlock SelectedVmNameTextBlock => MachinesOverviewView.SelectedVmNameTextBlock;
@@ -81,7 +81,7 @@ public sealed partial class MainWindow : Window
     private TextBlock RdpReadinessTextBlock => MachinesOverviewView.RdpReadinessTextBlock;
     private TextBlock MachinesStatusTextBlock => MachinesOverviewView.MachinesStatusTextBlock;
 
-    private Border DiagnosticsLogsPanel => DiagnosticsLogsView.DiagnosticsLogsPanel;
+    private FrameworkElement DiagnosticsLogsPanel => DiagnosticsLogsViewHost;
     private TextBox LogFilterOperationIdTextBox => DiagnosticsLogsView.LogFilterOperationIdTextBox;
     private TextBox LogFilterLevelTextBox => DiagnosticsLogsView.LogFilterLevelTextBox;
     private TextBox LogFilterEventTextBox => DiagnosticsLogsView.LogFilterEventTextBox;
