@@ -1,4 +1,5 @@
 using LabAssistant.Business.Machines;
+using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
@@ -35,6 +36,7 @@ public class MachinesCapabilityServiceTests
         var logger = new RecordingStructuredLogger();
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"),
             logger);
 
@@ -63,6 +65,7 @@ public class MachinesCapabilityServiceTests
         var logger = new RecordingStructuredLogger();
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"),
             logger);
         var vm = new MachineInventoryItem
@@ -89,6 +92,7 @@ public class MachinesCapabilityServiceTests
         var adminService = new FakeMachineAdminService();
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"));
 
         var readiness = await service.EvaluateRdpReadinessAsync(new MachineInventoryItem
@@ -111,6 +115,7 @@ public class MachinesCapabilityServiceTests
         };
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"));
 
         var readiness = await service.EvaluateRdpReadinessAsync(new MachineInventoryItem
@@ -133,6 +138,7 @@ public class MachinesCapabilityServiceTests
         };
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"),
             tcpProbe: (_, _, _, _) => Task.FromResult(true));
 
@@ -157,6 +163,7 @@ public class MachinesCapabilityServiceTests
         };
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"),
             tcpProbe: (_, _, _, _) => Task.FromResult(false));
 
@@ -180,6 +187,7 @@ public class MachinesCapabilityServiceTests
         };
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"),
             tcpProbe: (_, _, _, _) => throw new SocketException());
 
@@ -201,6 +209,7 @@ public class MachinesCapabilityServiceTests
         var logger = new RecordingStructuredLogger();
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"),
             logger);
         var vm = new MachineInventoryItem
@@ -256,6 +265,7 @@ public class MachinesCapabilityServiceTests
         };
         var service = new MachinesCapabilityService(
             adminService,
+            new FakeCatalogStore(),
             new FakeSettingsStore(@"D:\LabAssistant\VMs"));
         var vm = new MachineInventoryItem { VmId = "vm-1", VmName = "Vm01" };
 
@@ -268,11 +278,59 @@ public class MachinesCapabilityServiceTests
         Assert.Equal("Default Switch", snapshot.NetworkAdapters[0].SwitchName);
     }
 
+    [Fact]
+    public async Task GetDeletePreviewAsync_WhenPolicyAlwaysDeleteAndUncertainDisk_FallsBackToVmOnly()
+    {
+        var adminService = new FakeMachineAdminService
+        {
+            DiskClassifications =
+            [
+                new HyperVMachineDiskClassificationResult
+                {
+                    DiskPath = @"D:\Labs\Vm01\disk.vhdx",
+                    Classification = HyperVMachineDiskSafetyClassification.PotentialBaseOrUncertain,
+                    Reason = "vhd_probe_failed"
+                }
+            ]
+        };
+        var settings = new FakeSettingsStore(@"D:\LabAssistant\VMs");
+        settings.Settings.MachineDeletionPolicy = MachineDeletionPolicyMode.AlwaysDeleteDisks.ToString();
+
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeCatalogStore(),
+            settings);
+        var vm = new MachineInventoryItem { VmId = "vm-1", VmName = "Vm01", OriginLabel = "LabAssistant" };
+
+        var preview = await service.GetDeletePreviewAsync(vm);
+
+        Assert.Equal(MachineDeleteScope.VmRegistrationOnly, preview.DefaultScope);
+        Assert.False(preview.SafeForAutomaticStorageDeletion);
+    }
+
+    [Fact]
+    public async Task SetDeletionPolicyAsync_PersistsAndReturnsConfiguredMode()
+    {
+        var adminService = new FakeMachineAdminService();
+        var settings = new FakeSettingsStore(@"D:\LabAssistant\VMs");
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeCatalogStore(),
+            settings);
+
+        await service.SetDeletionPolicyAsync(MachineDeletionPolicyMode.AlwaysDeleteDisksForDifferencingOnly);
+        var configured = await service.GetDeletionPolicyAsync();
+
+        Assert.Equal(MachineDeletionPolicyMode.AlwaysDeleteDisksForDifferencingOnly, configured);
+        Assert.Equal(MachineDeletionPolicyMode.AlwaysDeleteDisksForDifferencingOnly.ToString(), settings.Settings.MachineDeletionPolicy);
+    }
+
     private sealed class FakeMachineAdminService : IHyperVMachineAdminService
     {
         public IReadOnlyList<HyperVHostMachineVmInfo> Inventory { get; set; } = Array.Empty<HyperVHostMachineVmInfo>();
         public IReadOnlyList<string> IpAddresses { get; set; } = Array.Empty<string>();
         public IReadOnlyList<string> SwitchNames { get; set; } = ["Default Switch"];
+        public IReadOnlyList<HyperVMachineDiskClassificationResult> DiskClassifications { get; set; } = [];
         public HyperVMachineEditSnapshot? EditSnapshot { get; set; }
         public HyperVMachineEditRequest? LastEditRequest { get; private set; }
 
@@ -304,7 +362,24 @@ public class MachinesCapabilityServiceTests
             return Task.FromResult(ActionResult);
         }
 
+        public Task<IReadOnlyList<HyperVMachineDiskClassificationResult>> ClassifyVmDisksAsync(
+            string vmName,
+            IReadOnlyCollection<string> knownBaseDiskPaths,
+            string? differencingDiskBasePath)
+        {
+            return Task.FromResult(DiskClassifications);
+        }
+
         public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage) => Task.FromResult(DeleteResult);
+    }
+
+    private sealed class FakeCatalogStore : IVhdxCatalogStore
+    {
+        public VhdxCatalogLoadResult Load(string catalogPath) => new();
+
+        public VhdxCatalogSaveResult Save(string catalogPath, IEnumerable<VhdxCatalogItem> items) => new();
+
+        public void EnsureCatalogFileExists(string catalogPath) { }
     }
 
     private sealed class RecordingStructuredLogger : IStructuredLogger

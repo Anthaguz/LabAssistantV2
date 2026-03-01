@@ -43,7 +43,10 @@ public sealed class ShellViewModel
             new ShellCapability(
                 ShellIconToken.Settings,
                 "Settings",
-                [new ShellSubview("general", "General", ["Apply", "Reset"])])
+                [
+                    new ShellSubview("general", "General", ["Apply", "Reset"]),
+                    new ShellSubview("machines", "Machines", ["Save Policy"])
+                ])
         ];
 
         _capabilityLookup = Capabilities.ToDictionary(

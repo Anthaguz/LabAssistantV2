@@ -188,5 +188,10 @@ public sealed class AppSettingsStore : IAppSettingsStore
         {
             Settings.NonBlockingOptionalSteps = new List<string>();
         }
+
+        if (string.IsNullOrWhiteSpace(Settings.MachineDeletionPolicy))
+        {
+            Settings.MachineDeletionPolicy = defaults.MachineDeletionPolicy;
+        }
     }
 }

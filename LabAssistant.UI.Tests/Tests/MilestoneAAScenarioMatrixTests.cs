@@ -1,4 +1,5 @@
 using LabAssistant.Business.Machines;
+using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
@@ -168,6 +169,7 @@ public sealed class MilestoneAAScenarioMatrixTests
         Assert.False(result.Success);
         var failed = Assert.Single(logger.Events, e => e.Event == "MachineDeleteFailed");
         Assert.Equal("vm_and_storage", failed.Context?["deleteScope"]?.ToString());
+        Assert.Equal("AskEveryTime", failed.Context?["policyMode"]?.ToString());
         Assert.Equal("VM-Delete", failed.Context?["vmName"]?.ToString());
     }
 
@@ -189,6 +191,7 @@ public sealed class MilestoneAAScenarioMatrixTests
     {
         return new MachinesCapabilityService(
             machineAdmin,
+            new FakeCatalogStore(),
             new FakeAppSettingsStore
             {
                 Settings = new AppSettings
@@ -285,11 +288,28 @@ public sealed class MilestoneAAScenarioMatrixTests
             return Task.FromResult(new HyperVMachineActionResult { Success = true });
         }
 
+        public Task<IReadOnlyList<HyperVMachineDiskClassificationResult>> ClassifyVmDisksAsync(
+            string vmName,
+            IReadOnlyCollection<string> knownBaseDiskPaths,
+            string? differencingDiskBasePath)
+        {
+            return Task.FromResult<IReadOnlyList<HyperVMachineDiskClassificationResult>>([]);
+        }
+
         public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage)
         {
             DeleteCalls.Add((vmName, includeStorage));
             return Task.FromResult(DeleteResult);
         }
+    }
+
+    private sealed class FakeCatalogStore : IVhdxCatalogStore
+    {
+        public VhdxCatalogLoadResult Load(string catalogPath) => new();
+
+        public VhdxCatalogSaveResult Save(string catalogPath, IEnumerable<VhdxCatalogItem> items) => new();
+
+        public void EnsureCatalogFileExists(string catalogPath) { }
     }
 
     private sealed class RecordingStructuredLogger : IStructuredLogger

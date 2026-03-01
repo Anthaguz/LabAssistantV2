@@ -20,6 +20,11 @@ public interface IHyperVMachineAdminService
 
     Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4);
 
+    Task<IReadOnlyList<HyperVMachineDiskClassificationResult>> ClassifyVmDisksAsync(
+        string vmName,
+        IReadOnlyCollection<string> knownBaseDiskPaths,
+        string? differencingDiskBasePath);
+
     Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request);
 
     Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage);
@@ -93,4 +98,20 @@ public sealed class HyperVMachineNetworkAdapterAssignment
     public string AdapterName { get; init; } = string.Empty;
 
     public string SwitchName { get; init; } = string.Empty;
+}
+
+public enum HyperVMachineDiskSafetyClassification
+{
+    DifferencingEligible,
+    KnownBaseOrFull,
+    PotentialBaseOrUncertain
+}
+
+public sealed class HyperVMachineDiskClassificationResult
+{
+    public string DiskPath { get; init; } = string.Empty;
+
+    public HyperVMachineDiskSafetyClassification Classification { get; init; } = HyperVMachineDiskSafetyClassification.PotentialBaseOrUncertain;
+
+    public string Reason { get; init; } = string.Empty;
 }

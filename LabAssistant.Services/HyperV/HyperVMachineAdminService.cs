@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Net;
+using System.IO;
 using System.Text.Json;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
@@ -10,10 +12,14 @@ namespace LabAssistant.Services.HyperV;
 public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 {
     private readonly Func<IPersistentPowerShellSession> _sessionFactory;
+    private readonly IAppSettingsStore _settingsStore;
 
-    public HyperVMachineAdminService(Func<IPersistentPowerShellSession> sessionFactory)
+    public HyperVMachineAdminService(
+        Func<IPersistentPowerShellSession> sessionFactory,
+        IAppSettingsStore settingsStore)
     {
         _sessionFactory = sessionFactory;
+        _settingsStore = settingsStore;
     }
 
     public async Task<IReadOnlyList<HyperVHostMachineVmInfo>> ListHostVmsAsync()
@@ -181,6 +187,94 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         };
     }
 
+    public async Task<IReadOnlyList<HyperVMachineDiskClassificationResult>> ClassifyVmDisksAsync(
+        string vmName,
+        IReadOnlyCollection<string> knownBaseDiskPaths,
+        string? differencingDiskBasePath)
+    {
+        var vmInfo = await GetVmStorageInfoAsync(vmName);
+        if (vmInfo is null)
+        {
+            return Array.Empty<HyperVMachineDiskClassificationResult>();
+        }
+
+        var knownBaseSet = new HashSet<string>(
+            knownBaseDiskPaths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(NormalizePath),
+            StringComparer.OrdinalIgnoreCase);
+        var differencingRoot = NormalizeDirectoryPath(differencingDiskBasePath);
+
+        var results = new List<HyperVMachineDiskClassificationResult>();
+        foreach (var diskPath in vmInfo.DiskPaths)
+        {
+            var normalizedPath = NormalizePath(diskPath);
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                continue;
+            }
+
+            if (knownBaseSet.Contains(normalizedPath))
+            {
+                results.Add(new HyperVMachineDiskClassificationResult
+                {
+                    DiskPath = normalizedPath,
+                    Classification = HyperVMachineDiskSafetyClassification.KnownBaseOrFull,
+                    Reason = "path_matches_catalog_base_disk"
+                });
+                continue;
+            }
+
+            var vhdInfo = await ProbeVhdInfoAsync(normalizedPath);
+            if (vhdInfo is null)
+            {
+                results.Add(new HyperVMachineDiskClassificationResult
+                {
+                    DiskPath = normalizedPath,
+                    Classification = HyperVMachineDiskSafetyClassification.PotentialBaseOrUncertain,
+                    Reason = "vhd_probe_failed"
+                });
+                continue;
+            }
+
+            if (string.Equals(vhdInfo.VhdType, "Differencing", StringComparison.OrdinalIgnoreCase))
+            {
+                var inDifferencingRoot = !string.IsNullOrWhiteSpace(differencingRoot) &&
+                    normalizedPath.StartsWith(differencingRoot, StringComparison.OrdinalIgnoreCase);
+                results.Add(new HyperVMachineDiskClassificationResult
+                {
+                    DiskPath = normalizedPath,
+                    Classification = HyperVMachineDiskSafetyClassification.DifferencingEligible,
+                    Reason = inDifferencingRoot
+                        ? "vhd_type_differencing_under_differencing_root"
+                        : "vhd_type_differencing"
+                });
+                continue;
+            }
+
+            if (string.Equals(vhdInfo.VhdType, "Dynamic", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(vhdInfo.VhdType, "Fixed", StringComparison.OrdinalIgnoreCase))
+            {
+                results.Add(new HyperVMachineDiskClassificationResult
+                {
+                    DiskPath = normalizedPath,
+                    Classification = HyperVMachineDiskSafetyClassification.KnownBaseOrFull,
+                    Reason = $"vhd_type_{vhdInfo.VhdType?.ToLowerInvariant() ?? "unknown"}"
+                });
+                continue;
+            }
+
+            results.Add(new HyperVMachineDiskClassificationResult
+            {
+                DiskPath = normalizedPath,
+                Classification = HyperVMachineDiskSafetyClassification.PotentialBaseOrUncertain,
+                Reason = "unknown_vhd_type"
+            });
+        }
+
+        return results;
+    }
+
     public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage)
     {
         if (!includeStorage)
@@ -188,32 +282,7 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             var vmOnlyScript = $"Remove-VM -Name {Quote(vmName)} -Force -ErrorAction Stop";
             return ExecuteCommandAsync(vmOnlyScript);
         }
-
-        var deleteWithStorageScript = $$"""
-            $vm = Get-VM -Name {{Quote(vmName)}} -ErrorAction Stop
-            $targets = New-Object System.Collections.Generic.List[string]
-            if (-not [string]::IsNullOrWhiteSpace($vm.Path)) {
-                $targets.Add($vm.Path)
-            }
-            Get-VMHardDiskDrive -VMName {{Quote(vmName)}} -ErrorAction SilentlyContinue | ForEach-Object {
-                if (-not [string]::IsNullOrWhiteSpace($_.Path)) {
-                    $targets.Add($_.Path)
-                }
-            }
-            Remove-VM -Name {{Quote(vmName)}} -Force -ErrorAction Stop
-            $targets | Select-Object -Unique | ForEach-Object {
-                if (Test-Path -LiteralPath $_) {
-                    $item = Get-Item -LiteralPath $_ -ErrorAction SilentlyContinue
-                    if ($null -ne $item -and $item.PSIsContainer) {
-                        Remove-Item -LiteralPath $_ -Recurse -Force -ErrorAction SilentlyContinue
-                    } else {
-                        Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue
-                    }
-                }
-            }
-            """;
-
-        return ExecuteCommandAsync(deleteWithStorageScript);
+        return DeleteVmAndStorageAsync(vmName);
     }
 
     private async Task<HyperVMachineActionResult> ExecuteCommandAsync(string script)
@@ -322,6 +391,93 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 
         var script = string.Join(Environment.NewLine, lines);
         return ExecuteCommandAsync(script);
+    }
+
+    private async Task<HyperVMachineActionResult> DeleteVmAndStorageAsync(string vmName)
+    {
+        var vmStorage = await GetVmStorageInfoAsync(vmName);
+        var removeVmResult = await ExecuteCommandAsync($"Remove-VM -Name {Quote(vmName)} -Force -ErrorAction Stop");
+        if (!removeVmResult.Success)
+        {
+            return removeVmResult;
+        }
+
+        if (vmStorage is null)
+        {
+            return new HyperVMachineActionResult { Success = true };
+        }
+
+        var deletedDisks = new List<string>();
+        var diskDeleteFailures = new List<Dictionary<string, object?>>();
+        foreach (var diskPath in vmStorage.DiskPaths)
+        {
+            try
+            {
+                if (!File.Exists(diskPath))
+                {
+                    continue;
+                }
+
+                File.Delete(diskPath);
+                deletedDisks.Add(diskPath);
+            }
+            catch (Exception ex)
+            {
+                diskDeleteFailures.Add(new Dictionary<string, object?>
+                {
+                    ["path"] = diskPath,
+                    ["error"] = ex.Message
+                });
+            }
+        }
+
+        string? deletedVmFolderPath = null;
+        Dictionary<string, object?>? vmFolderDeleteFailure = null;
+        var vmFolderPath = vmStorage.VmPath;
+        if (IsOwnedVmFolder(vmFolderPath))
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(vmFolderPath) && Directory.Exists(vmFolderPath))
+                {
+                    Directory.Delete(vmFolderPath, recursive: true);
+                    deletedVmFolderPath = vmFolderPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                vmFolderDeleteFailure = new Dictionary<string, object?>
+                {
+                    ["path"] = vmFolderPath,
+                    ["error"] = ex.Message
+                };
+            }
+        }
+
+        var metadata = new Dictionary<string, object?>
+        {
+            ["deletedDiskPaths"] = deletedDisks.ToArray(),
+            ["diskDeleteFailures"] = diskDeleteFailures.ToArray(),
+            ["vmFolderPath"] = vmFolderPath,
+            ["deletedVmFolderPath"] = deletedVmFolderPath,
+            ["vmFolderDeleteFailure"] = vmFolderDeleteFailure
+        };
+
+        if (diskDeleteFailures.Count > 0 || vmFolderDeleteFailure is not null)
+        {
+            return new HyperVMachineActionResult
+            {
+                Success = false,
+                ErrorMessage = BuildCleanupFailureMessage(diskDeleteFailures, vmFolderDeleteFailure),
+                FailureMetadata = metadata
+            };
+        }
+
+        return new HyperVMachineActionResult
+        {
+            Success = true,
+            FailureMetadata = metadata
+        };
     }
 
     private async Task<(string Output, string Error)> ExecuteWithFreshSessionAsync(string script)
@@ -449,5 +605,158 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
     private static string Quote(string value)
     {
         return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
+    }
+
+    private async Task<HyperVMachineStorageInfo?> GetVmStorageInfoAsync(string vmName)
+    {
+        var script = $$"""
+            $vm = Get-VM -Name {{Quote(vmName)}} -ErrorAction Stop
+            $diskPaths = @(Get-VMHardDiskDrive -VMName {{Quote(vmName)}} -ErrorAction SilentlyContinue | ForEach-Object { $_.Path })
+            [PSCustomObject]@{
+                VmPath = $vm.Path
+                DiskPaths = $diskPaths
+            } | ConvertTo-Json -Compress -Depth 4
+            """;
+
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+        }
+
+        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(cleanedOutput))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(cleanedOutput);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return new HyperVMachineStorageInfo
+        {
+            VmPath = GetOptionalString(document.RootElement, "VmPath"),
+            DiskPaths = GetDiskPaths(document.RootElement)
+                .Select(NormalizePath)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToList()
+        };
+    }
+
+    private async Task<HyperVhdProbeInfo?> ProbeVhdInfoAsync(string diskPath)
+    {
+        var script = $$"""
+            Get-VHD -Path {{Quote(diskPath)}} -ErrorAction Stop |
+            Select-Object VhdType, ParentPath |
+            ConvertTo-Json -Compress
+            """;
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            return null;
+        }
+
+        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(cleanedOutput))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(cleanedOutput);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            return new HyperVhdProbeInfo
+            {
+                VhdType = GetOptionalString(document.RootElement, "VhdType"),
+                ParentPath = GetOptionalString(document.RootElement, "ParentPath")
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private bool IsOwnedVmFolder(string? vmPath)
+    {
+        if (string.IsNullOrWhiteSpace(vmPath))
+        {
+            return false;
+        }
+
+        var vmBasePath = NormalizeDirectoryPath(_settingsStore.Settings.VmBasePath);
+        if (string.IsNullOrWhiteSpace(vmBasePath))
+        {
+            return false;
+        }
+
+        var normalizedVmPath = NormalizeDirectoryPath(vmPath);
+        return normalizedVmPath.StartsWith(vmBasePath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        return Path.GetFullPath(path).Trim();
+    }
+
+    private static string NormalizeDirectoryPath(string? path)
+    {
+        var normalized = NormalizePath(path);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        return normalized.EndsWith(Path.DirectorySeparatorChar)
+            ? normalized
+            : normalized + Path.DirectorySeparatorChar;
+    }
+
+    private static string BuildCleanupFailureMessage(
+        IReadOnlyCollection<Dictionary<string, object?>> diskDeleteFailures,
+        Dictionary<string, object?>? vmFolderDeleteFailure)
+    {
+        var parts = new List<string> { "VM registration removed, but storage cleanup failed." };
+        if (diskDeleteFailures.Count > 0)
+        {
+            parts.Add($"{diskDeleteFailures.Count} disk cleanup failure(s).");
+        }
+
+        if (vmFolderDeleteFailure is not null)
+        {
+            var path = vmFolderDeleteFailure.TryGetValue("path", out var value) ? value?.ToString() : null;
+            parts.Add($"VM folder cleanup failed at '{path}'.");
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private sealed class HyperVMachineStorageInfo
+    {
+        public string? VmPath { get; init; }
+
+        public IReadOnlyList<string> DiskPaths { get; init; } = Array.Empty<string>();
+    }
+
+    private sealed class HyperVhdProbeInfo
+    {
+        public string? VhdType { get; init; }
+
+        public string? ParentPath { get; init; }
     }
 }

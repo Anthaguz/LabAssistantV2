@@ -1,9 +1,11 @@
 using LabAssistant.Models.Configuration;
+using LabAssistant.Models.Catalog;
 using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using System.Net;
 using System.Net.Sockets;
+using System.IO;
 
 namespace LabAssistant.Business.Machines;
 
@@ -12,17 +14,20 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
     private const int RdpProbeTimeoutMs = 4000;
 
     private readonly IHyperVMachineAdminService _machineAdminService;
+    private readonly IVhdxCatalogStore _catalogStore;
     private readonly IAppSettingsStore _settingsStore;
     private readonly IStructuredLogger _structuredLogger;
     private readonly Func<string, int, int, CancellationToken, Task<bool>> _tcpProbe;
 
     public MachinesCapabilityService(
         IHyperVMachineAdminService machineAdminService,
+        IVhdxCatalogStore catalogStore,
         IAppSettingsStore settingsStore,
         IStructuredLogger? structuredLogger = null,
         Func<string, int, int, CancellationToken, Task<bool>>? tcpProbe = null)
     {
         _machineAdminService = machineAdminService;
+        _catalogStore = catalogStore;
         _settingsStore = settingsStore;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
         _tcpProbe = tcpProbe ?? ProbeTcpAsync;
@@ -116,6 +121,82 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
     public async Task<IReadOnlyList<string>> LoadVirtualSwitchesAsync()
     {
         return await _machineAdminService.GetVirtualSwitchNamesAsync();
+    }
+
+    public Task<MachineDeletionPolicyMode> GetDeletionPolicyAsync()
+    {
+        return Task.FromResult(ParseDeletionPolicy(_settingsStore.Settings.MachineDeletionPolicy));
+    }
+
+    public Task SetDeletionPolicyAsync(MachineDeletionPolicyMode mode)
+    {
+        _settingsStore.Settings.MachineDeletionPolicy = mode.ToString();
+        _settingsStore.Save();
+        return Task.CompletedTask;
+    }
+
+    public async Task<MachineDeletePreview> GetDeletePreviewAsync(MachineInventoryItem vm)
+    {
+        var policyMode = ParseDeletionPolicy(_settingsStore.Settings.MachineDeletionPolicy);
+        var classifications = await ClassifyVmDisksAsync(vm);
+        var hasUnsafeDisk = classifications.Any(item =>
+            item.Classification != MachineDiskSafetyClassification.DifferencingEligible);
+        var hasAnyDifferencing = classifications.Any(item =>
+            item.Classification == MachineDiskSafetyClassification.DifferencingEligible);
+
+        var defaultScope = MachineDeleteScope.VmRegistrationOnly;
+        string policyMessage = "Choose delete scope before continuing.";
+
+        switch (policyMode)
+        {
+            case MachineDeletionPolicyMode.AlwaysDeleteDisks:
+                if (!hasUnsafeDisk && classifications.Count > 0)
+                {
+                    defaultScope = MachineDeleteScope.VmAndStorage;
+                    policyMessage = "Policy selected VM + storage as default scope.";
+                }
+                else
+                {
+                    policyMessage = "Policy requested VM + storage, but unsafe disk classification forced VM-only default.";
+                }
+                break;
+            case MachineDeletionPolicyMode.AlwaysDeleteDisksForLabAssistantProvisioned:
+                if (string.Equals(vm.OriginLabel, "LabAssistant", StringComparison.OrdinalIgnoreCase) &&
+                    !hasUnsafeDisk &&
+                    classifications.Count > 0)
+                {
+                    defaultScope = MachineDeleteScope.VmAndStorage;
+                    policyMessage = "LabAssistant VM detected; policy selected VM + storage as default scope.";
+                }
+                else
+                {
+                    policyMessage = "Policy conditions were not satisfied; VM-only default remains.";
+                }
+                break;
+            case MachineDeletionPolicyMode.AlwaysDeleteDisksForDifferencingOnly:
+                if (!hasUnsafeDisk && hasAnyDifferencing)
+                {
+                    defaultScope = MachineDeleteScope.VmAndStorage;
+                    policyMessage = "Differencing-only policy selected VM + storage as default scope.";
+                }
+                else
+                {
+                    policyMessage = "Differencing-only policy could not safely auto-select VM + storage.";
+                }
+                break;
+            default:
+                policyMessage = "Policy is set to ask every time.";
+                break;
+        }
+
+        return new MachineDeletePreview
+        {
+            PolicyMode = policyMode,
+            DefaultScope = defaultScope,
+            SafeForAutomaticStorageDeletion = !hasUnsafeDisk,
+            PolicyMessage = policyMessage,
+            DiskClassifications = classifications
+        };
     }
 
     public Task<MachineOperationResult> StartVmAsync(MachineInventoryItem vm)
@@ -352,8 +433,22 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         var operationId = Guid.NewGuid().ToString("N");
         var actionName = "delete";
         var deleteScope = scope == MachineDeleteScope.VmAndStorage ? "vm_and_storage" : "vm_registration_only";
+        var preview = await GetDeletePreviewAsync(vm);
         var context = BuildVmContext(vm, actionName);
         context["deleteScope"] = deleteScope;
+        context["policyMode"] = preview.PolicyMode.ToString();
+        context["policyMessage"] = preview.PolicyMessage;
+        context["safeForAutomaticStorageDeletion"] = preview.SafeForAutomaticStorageDeletion;
+        context["diskClassification"] = preview.DiskClassifications
+            .Select(item => new Dictionary<string, object?>
+            {
+                ["diskPath"] = item.DiskPath,
+                ["classification"] = item.Classification.ToString(),
+                ["reason"] = item.Reason
+            })
+            .ToArray();
+        context["vmPath"] = vm.VmPath;
+        context["diskPaths"] = vm.DiskPaths.ToArray();
 
         _structuredLogger.Log(
             StructuredLogLevel.Info,
@@ -396,7 +491,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         {
             Success = false,
             OperationId = operationId,
-            UserMessage = BuildActionFailureMessage("delete", vm.VmName, actionResult.ErrorMessage),
+            UserMessage = BuildDeleteFailureMessage(vm.VmName, actionResult.ErrorMessage, actionResult.FailureMetadata),
             ErrorContext = failureContext
         };
     }
@@ -550,6 +645,33 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         return $"{fallback} {details}";
     }
 
+    private static string BuildDeleteFailureMessage(
+        string vmName,
+        string? details,
+        IReadOnlyDictionary<string, object?>? failureMetadata)
+    {
+        var baseMessage = $"Failed to delete '{vmName}'.";
+        if (!string.IsNullOrWhiteSpace(details))
+        {
+            baseMessage = $"{baseMessage} {details}";
+        }
+
+        if (failureMetadata is null)
+        {
+            return baseMessage;
+        }
+
+        if (failureMetadata.TryGetValue("vmFolderDeleteFailure", out var vmFolderFailureRaw) &&
+            vmFolderFailureRaw is IReadOnlyDictionary<string, object?> vmFolderFailure &&
+            vmFolderFailure.TryGetValue("path", out var pathRaw) &&
+            pathRaw is not null)
+        {
+            return $"{baseMessage} VM folder cleanup failed at '{pathRaw}'.";
+        }
+
+        return baseMessage;
+    }
+
     private MachineRdpReadinessResult LogReadinessResult(
         string operationId,
         Dictionary<string, object?> context,
@@ -643,6 +765,56 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             .OrderBy(entry => entry.Score)
             .Select(entry => entry.Text)
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<MachineDiskClassificationResult>> ClassifyVmDisksAsync(MachineInventoryItem vm)
+    {
+        var knownBaseDiskPaths = LoadKnownCatalogBaseDiskPaths();
+        var serviceClassifications = await _machineAdminService.ClassifyVmDisksAsync(
+            vm.VmName,
+            knownBaseDiskPaths,
+            _settingsStore.Settings.DifferencingDiskBasePath);
+
+        return serviceClassifications
+            .Select(item => new MachineDiskClassificationResult
+            {
+                DiskPath = item.DiskPath,
+                Classification = item.Classification switch
+                {
+                    HyperVMachineDiskSafetyClassification.DifferencingEligible => MachineDiskSafetyClassification.DifferencingEligible,
+                    HyperVMachineDiskSafetyClassification.KnownBaseOrFull => MachineDiskSafetyClassification.KnownBaseOrFull,
+                    _ => MachineDiskSafetyClassification.PotentialBaseOrUncertain
+                },
+                Reason = item.Reason
+            })
+            .ToList();
+    }
+
+    private IReadOnlyList<string> LoadKnownCatalogBaseDiskPaths()
+    {
+        try
+        {
+            var catalogResult = _catalogStore.Load(_settingsStore.Settings.CatalogPath);
+            return catalogResult.Items
+                .Select(item => item.Path)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => Path.GetFullPath(path!))
+                .ToList();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static MachineDeletionPolicyMode ParseDeletionPolicy(string? value)
+    {
+        if (Enum.TryParse<MachineDeletionPolicyMode>(value, ignoreCase: true, out var parsed))
+        {
+            return parsed;
+        }
+
+        return MachineDeletionPolicyMode.AskEveryTime;
     }
 
     private static MachineEditSnapshot MapEditSnapshot(HyperVMachineEditSnapshot snapshot)
