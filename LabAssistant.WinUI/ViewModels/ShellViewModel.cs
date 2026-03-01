@@ -39,7 +39,10 @@ public sealed class ShellViewModel
             new ShellCapability(
                 ShellIconToken.Diagnostics,
                 "Diagnostics",
-                [new ShellSubview("overview", "Overview", ["Export Bundle", "Open Logs"])]),
+                [
+                    new ShellSubview("overview", "Overview", ["Export Bundle"]),
+                    new ShellSubview("logs", "Logs", ["Reload", "Open Raw JSONL"])
+                ]),
             new ShellCapability(
                 ShellIconToken.Settings,
                 "Settings",

@@ -318,6 +318,21 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** page-level hardcoded foreground/background colors are disallowed for core shell surfaces.
   - **Priority:** P1
 
+- **FR-073:** WinUI Diagnostics shall provide a read-only structured log viewer (Phase 1) using stable envelope fields with dynamic context inspection.
+  - **Envelope fields:** `ts`, `level`, `event`, `operationId`, `result`
+  - **Viewer behavior (Phase 1):**
+    - render envelope columns
+    - show selected entry dynamic context as raw/pretty JSON text
+    - support filtering by operationId, level, event, free-text, and basic time range
+    - read canonical `structured-events.jsonl` source
+    - tolerate malformed JSONL lines by skipping and reporting parse error count
+    - provide `Open raw JSONL` action for power users
+  - **Out of scope (Phase 1):**
+    - log editing/deletion
+    - remote ingestion/upload
+    - advanced visualizations/timelines
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.

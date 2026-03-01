@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<IStructuredLogger>(provider =>
             new StructuredLogger(provider.GetServices<ILogEventSink>()));
+        services.AddSingleton<IStructuredLogViewerService, StructuredLogViewerService>();
         services.AddSingleton<IDiagnosticsExportService, DiagnosticsExportService>();
 
         return services;
