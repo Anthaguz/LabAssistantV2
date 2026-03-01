@@ -434,23 +434,46 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         string? deletedVmFolderPath = null;
         Dictionary<string, object?>? vmFolderDeleteFailure = null;
         var vmFolderPath = vmStorage.VmPath;
-        if (IsOwnedVmFolder(vmFolderPath))
+        var folderCandidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(vmFolderPath))
         {
+            folderCandidates.Add(NormalizePath(vmFolderPath));
+        }
+
+        foreach (var diskPath in vmStorage.DiskPaths)
+        {
+            var parent = Path.GetDirectoryName(diskPath);
+            if (!string.IsNullOrWhiteSpace(parent))
+            {
+                folderCandidates.Add(NormalizePath(parent));
+            }
+        }
+
+        foreach (var folderPath in folderCandidates.OrderByDescending(path => path.Length))
+        {
+            if (!ShouldAttemptFolderCleanup(folderPath, vmName))
+            {
+                continue;
+            }
+
             try
             {
-                if (!string.IsNullOrWhiteSpace(vmFolderPath) && Directory.Exists(vmFolderPath))
+                if (!Directory.Exists(folderPath))
                 {
-                    Directory.Delete(vmFolderPath, recursive: true);
-                    deletedVmFolderPath = vmFolderPath;
+                    continue;
                 }
+
+                Directory.Delete(folderPath, recursive: true);
+                deletedVmFolderPath ??= folderPath;
             }
             catch (Exception ex)
             {
                 vmFolderDeleteFailure = new Dictionary<string, object?>
                 {
-                    ["path"] = vmFolderPath,
+                    ["path"] = folderPath,
                     ["error"] = ex.Message
                 };
+                break;
             }
         }
 
@@ -687,21 +710,47 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         }
     }
 
-    private bool IsOwnedVmFolder(string? vmPath)
+    private bool ShouldAttemptFolderCleanup(string? folderPath, string vmName)
     {
-        if (string.IsNullOrWhiteSpace(vmPath))
+        if (string.IsNullOrWhiteSpace(folderPath))
         {
             return false;
+        }
+
+        var normalizedPath = NormalizePath(folderPath);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return false;
+        }
+
+        // Never attempt to delete a drive root.
+        var root = Path.GetPathRoot(normalizedPath);
+        if (!string.IsNullOrWhiteSpace(root) &&
+            string.Equals(
+                normalizedPath.TrimEnd(Path.DirectorySeparatorChar),
+                root.TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var leafName = Path.GetFileName(normalizedPath.TrimEnd(Path.DirectorySeparatorChar));
+        if (string.Equals(leafName, vmName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
         }
 
         var vmBasePath = NormalizeDirectoryPath(_settingsStore.Settings.VmBasePath);
-        if (string.IsNullOrWhiteSpace(vmBasePath))
+        if (!string.IsNullOrWhiteSpace(vmBasePath))
         {
-            return false;
+            var normalizedFolderPath = NormalizeDirectoryPath(normalizedPath);
+            if (normalizedFolderPath.StartsWith(vmBasePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
         }
 
-        var normalizedVmPath = NormalizeDirectoryPath(vmPath);
-        return normalizedVmPath.StartsWith(vmBasePath, StringComparison.OrdinalIgnoreCase);
+        return false;
     }
 
     private static string NormalizePath(string? path)
