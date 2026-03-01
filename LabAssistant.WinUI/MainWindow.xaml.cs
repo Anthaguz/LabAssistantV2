@@ -10,6 +10,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
+using LabAssistant.WinUI.Views.Diagnostics;
+using LabAssistant.WinUI.Views.Machines;
 using Microsoft.UI.Dispatching;
 using WinRT.Interop;
 
@@ -49,6 +51,54 @@ public sealed partial class MainWindow : Window
     private DateTimeOffset _lastRdpReadinessRefreshUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _lastOnDemandRdpRefreshUtc = DateTimeOffset.MinValue;
 
+    private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
+    private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
+
+    private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
+    private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
+    private ListView MachinesListView => MachinesOverviewView.MachinesListView;
+    private TextBlock SelectedVmNameTextBlock => MachinesOverviewView.SelectedVmNameTextBlock;
+    private TextBlock SelectedVmStateTextBlock => MachinesOverviewView.SelectedVmStateTextBlock;
+    private TextBlock SelectedVmOriginTextBlock => MachinesOverviewView.SelectedVmOriginTextBlock;
+    private TextBlock SelectedVmIdTextBlock => MachinesOverviewView.SelectedVmIdTextBlock;
+    private TextBlock SelectedVmPathTextBlock => MachinesOverviewView.SelectedVmPathTextBlock;
+    private TextBox CpuCountTextBox => MachinesOverviewView.CpuCountTextBox;
+    private TextBox StartupMemoryTextBox => MachinesOverviewView.StartupMemoryTextBox;
+    private ToggleSwitch DynamicMemoryToggle => MachinesOverviewView.DynamicMemoryToggle;
+    private Grid DynamicMemoryPanel => MachinesOverviewView.DynamicMemoryPanel;
+    private TextBox MinimumMemoryTextBox => MachinesOverviewView.MinimumMemoryTextBox;
+    private TextBox MaximumMemoryTextBox => MachinesOverviewView.MaximumMemoryTextBox;
+    private TextBox MemoryBufferTextBox => MachinesOverviewView.MemoryBufferTextBox;
+    private StackPanel NetworkAdapterEditorPanel => MachinesOverviewView.NetworkAdapterEditorPanel;
+    private Button ApplyMachineEditsButton => MachinesOverviewView.ApplyMachineEditsButton;
+    private TextBlock MachineEditDirtyTextBlock => MachinesOverviewView.MachineEditDirtyTextBlock;
+    private Button StartVmButton => MachinesOverviewView.StartVmButton;
+    private Button StopVmButton => MachinesOverviewView.StopVmButton;
+    private Button RestartVmButton => MachinesOverviewView.RestartVmButton;
+    private Button OpenConsoleButton => MachinesOverviewView.OpenConsoleButton;
+    private Button DeleteVmButton => MachinesOverviewView.DeleteVmButton;
+    private Button OpenRdpButton => MachinesOverviewView.OpenRdpButton;
+    private TextBlock RdpReadinessTextBlock => MachinesOverviewView.RdpReadinessTextBlock;
+    private TextBlock MachinesStatusTextBlock => MachinesOverviewView.MachinesStatusTextBlock;
+
+    private FrameworkElement DiagnosticsLogsPanel => DiagnosticsLogsViewHost;
+    private TextBox LogFilterOperationIdTextBox => DiagnosticsLogsView.LogFilterOperationIdTextBox;
+    private TextBox LogFilterLevelTextBox => DiagnosticsLogsView.LogFilterLevelTextBox;
+    private TextBox LogFilterEventTextBox => DiagnosticsLogsView.LogFilterEventTextBox;
+    private TextBox LogFilterTextSearchTextBox => DiagnosticsLogsView.LogFilterTextSearchTextBox;
+    private CheckBox LogFilterUseStartDateCheckBox => DiagnosticsLogsView.LogFilterUseStartDateCheckBox;
+    private DatePicker LogFilterStartDatePicker => DiagnosticsLogsView.LogFilterStartDatePicker;
+    private CheckBox LogFilterUseEndDateCheckBox => DiagnosticsLogsView.LogFilterUseEndDateCheckBox;
+    private DatePicker LogFilterEndDatePicker => DiagnosticsLogsView.LogFilterEndDatePicker;
+    private Button ApplyLogFiltersButton => DiagnosticsLogsView.ApplyLogFiltersButton;
+    private Button ClearLogFiltersButton => DiagnosticsLogsView.ClearLogFiltersButton;
+    private Button ReloadLogsButton => DiagnosticsLogsView.ReloadLogsButton;
+    private Button OpenRawJsonlButton => DiagnosticsLogsView.OpenRawJsonlButton;
+    private TextBlock LogsStatusTextBlock => DiagnosticsLogsView.LogsStatusTextBlock;
+    private ListView StructuredLogsListView => DiagnosticsLogsView.StructuredLogsListView;
+    private TextBlock SelectedLogEnvelopeTextBlock => DiagnosticsLogsView.SelectedLogEnvelopeTextBlock;
+    private TextBox SelectedLogContextTextBox => DiagnosticsLogsView.SelectedLogContextTextBox;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -58,6 +108,8 @@ public sealed partial class MainWindow : Window
         _activeSubview = _activeCapability.DefaultSubview;
         MachinesListView.ItemsSource = _machineInventory;
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
+        WireMachinesHandlers();
+        WireDiagnosticsLogsHandlers();
         ConfigureShellIcons();
         InitializeDrawer();
         Title = "LabAssistant.WinUI";
@@ -79,6 +131,34 @@ public sealed partial class MainWindow : Window
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
         appWindow?.Resize(new Windows.Graphics.SizeInt32(width, height));
+    }
+
+    private void WireMachinesHandlers()
+    {
+        RefreshMachinesButton.Click += RefreshMachinesButton_Click;
+        MachinesListView.SelectionChanged += MachinesListView_SelectionChanged;
+        CpuCountTextBox.TextChanged += CpuCountTextBox_TextChanged;
+        StartupMemoryTextBox.TextChanged += StartupMemoryTextBox_TextChanged;
+        MinimumMemoryTextBox.TextChanged += MinimumMemoryTextBox_TextChanged;
+        MaximumMemoryTextBox.TextChanged += MaximumMemoryTextBox_TextChanged;
+        MemoryBufferTextBox.TextChanged += MemoryBufferTextBox_TextChanged;
+        DynamicMemoryToggle.Toggled += DynamicMemoryToggle_Toggled;
+        ApplyMachineEditsButton.Click += ApplyMachineEditsButton_Click;
+        StartVmButton.Click += StartVmButton_Click;
+        StopVmButton.Click += StopVmButton_Click;
+        RestartVmButton.Click += RestartVmButton_Click;
+        OpenConsoleButton.Click += OpenConsoleButton_Click;
+        DeleteVmButton.Click += DeleteVmButton_Click;
+        OpenRdpButton.Click += OpenRdpButton_Click;
+    }
+
+    private void WireDiagnosticsLogsHandlers()
+    {
+        ApplyLogFiltersButton.Click += ApplyLogFiltersButton_Click;
+        ClearLogFiltersButton.Click += ClearLogFiltersButton_Click;
+        ReloadLogsButton.Click += ReloadLogsButton_Click;
+        OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
+        StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
     }
 
     private void ConfigureShellIcons()

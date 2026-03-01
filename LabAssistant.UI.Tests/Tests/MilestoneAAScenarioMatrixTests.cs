@@ -49,7 +49,7 @@ public sealed class MilestoneAAScenarioMatrixTests
     [Fact]
     public void Machines_RdpAction_IsVisibleButDisabledWithReasonText()
     {
-        var xaml = LoadMainWindowXaml();
+        var xaml = LoadMachinesOverviewXaml();
         var rdpButton = FindByName(xaml, "OpenRdpButton");
 
         Assert.Equal("False", rdpButton.Attribute("IsEnabled")?.Value);
@@ -176,7 +176,7 @@ public sealed class MilestoneAAScenarioMatrixTests
     [Fact]
     public void Machines_EditWorkflow_ShowsApplyWithoutResetButton()
     {
-        var xaml = LoadMainWindowXaml();
+        var xaml = LoadMachinesOverviewXaml();
         var applyButton = FindByName(xaml, "ApplyMachineEditsButton");
 
         Assert.Equal("Apply", applyButton.Attribute("Content")?.Value);
@@ -205,6 +205,21 @@ public sealed class MilestoneAAScenarioMatrixTests
     private static XDocument LoadMainWindowXaml()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadMachinesOverviewXaml()
+    {
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "LabAssistant.WinUI",
+            "Views",
+            "Machines",
+            "MachinesOverviewView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
     }
 
