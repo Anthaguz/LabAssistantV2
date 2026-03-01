@@ -17,6 +17,7 @@
                     <Color x:Key="ShellTextPrimaryColor">#FF111827</Color>
                     <Color x:Key="ShellTextSecondaryColor">#FF4B5563</Color>
                     <Color x:Key="ShellAccentColor">#FF2563EB</Color>
+                    <Color x:Key="ShellWarnColor">#FFB45309</Color>
                     <Color x:Key="ShellScrimColor">#66000000</Color>
                     <Color x:Key="ShellCriticalColor">#FFB91C1C</Color>
                 </ResourceDictionary>
@@ -32,6 +33,7 @@
                     <Color x:Key="ShellTextPrimaryColor">#FFF8FAFC</Color>
                     <Color x:Key="ShellTextSecondaryColor">#FFCBD5E1</Color>
                     <Color x:Key="ShellAccentColor">#FF60A5FA</Color>
+                    <Color x:Key="ShellWarnColor">#FFFBBF24</Color>
                     <Color x:Key="ShellScrimColor">#99000000</Color>
                     <Color x:Key="ShellCriticalColor">#FFF87171</Color>
                 </ResourceDictionary>
@@ -48,6 +50,7 @@
             <SolidColorBrush x:Key="ShellTextPrimaryBrush" Color="{ThemeResource ShellTextPrimaryColor}" />
             <SolidColorBrush x:Key="ShellTextSecondaryBrush" Color="{ThemeResource ShellTextSecondaryColor}" />
             <SolidColorBrush x:Key="ShellAccentBrush" Color="{ThemeResource ShellAccentColor}" />
+            <SolidColorBrush x:Key="ShellWarnBrush" Color="{ThemeResource ShellWarnColor}" />
             <SolidColorBrush x:Key="ShellScrimBrush" Color="{ThemeResource ShellScrimColor}" />
             <SolidColorBrush x:Key="ShellCriticalBrush" Color="{ThemeResource ShellCriticalColor}" />
         </ResourceDictionary>
