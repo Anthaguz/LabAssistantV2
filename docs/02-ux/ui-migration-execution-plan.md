@@ -14,6 +14,7 @@
 - `docs/02-ux/ui-framework-decision-rubric.md`
 - `docs/02-ux/ui-framework-decision-record-y3.md`
 - `docs/02-ux/winui-shell-contract-aa.md`
+- `docs/02-ux/winui-layout-constraints-contract.md`
 - `docs/03-architecture/gui-action-map.deploy.md`
 - `docs/03-architecture/gui-action-map.templates.md`
 - `docs/03-architecture/gui-action-map.assets.md`
@@ -119,6 +120,17 @@ Decision implications:
 ---
 
 ## 5. Execution Strategy (Behavior-Preserving Rollout)
+
+## 5.0 Layout Hardening Gate (AB)
+
+Before additional capability migration beyond AA baseline, WinUI surfaces must follow:
+- `docs/02-ux/winui-layout-constraints-contract.md`
+
+This gate exists to prevent recurring regressions in:
+- hidden actionable controls from overflow
+- ambiguous scroll ownership
+- unbounded panel growth pushing core content off-screen
+- shell host bloat from monolithic page composition
 
 ## 5.1 Recommended Rollout Shape
 

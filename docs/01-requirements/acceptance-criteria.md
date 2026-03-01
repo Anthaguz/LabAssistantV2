@@ -962,6 +962,75 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-009 — WinUI Layout Constraints and Scroll Ownership (AB1)
+
+**Related FRs:** FR-074
+
+## Scenarios
+
+### 1) Contracted shell sizing model
+**Given**
+- WinUI shell is used as migration host
+
+**When**
+- A capability workspace is rendered
+
+**Then**
+- Top bar remains fixed/visible
+- Main workspace uses bounded (`*`) sizing
+- Drawer/rail/insights sizing follows documented fixed/explicit constraints
+- Content host does not rely on unbounded top-level layout containers for complex surfaces
+
+### 2) Explicit scroll ownership
+**Given**
+- A dense capability surface (for example Diagnostics Logs, Machines)
+
+**When**
+- Content exceeds visible space
+
+**Then**
+- One primary scroll owner is defined for the surface
+- Nested scrolling appears only in bounded secondary regions
+- Surface does not create ambiguous competing scroll regions
+
+### 3) Overflow-safe interaction controls
+**Given**
+- User resizes window to compact widths
+
+**When**
+- Filter/action controls are shown
+
+**Then**
+- Primary actions remain visible/reachable (no hidden off-screen controls)
+- Control rows wrap/collapse/scroll according to contract rules
+- Long payload content scrolls in-place instead of stretching parent panels off-screen
+
+### 4) First-class surface coverage
+**Given**
+- AB2 implementation planning is prepared
+
+**When**
+- Contract references are reviewed
+
+**Then**
+- Diagnostics Logs and Machines are explicitly covered as first-class layout examples
+- AB2 checklist includes decomposition order, overflow hardening criteria, and regression checks
+
+## Expected Artifacts
+- Dedicated contract doc:
+  - `docs/02-ux/winui-layout-constraints-contract.md`
+- Migration plan links and gating references updated
+- IA references updated for layout ownership and constraints
+
+## Definition of Done
+- [ ] WinUI layout constraints contract doc exists and is complete
+- [ ] Contract defines testable rules for region sizing, scroll ownership, overflow, and resize behavior
+- [ ] Diagnostics Logs and Machines are explicitly covered
+- [ ] Migration plan references layout contract as AB gate
+- [ ] AB2 can execute without ambiguous layout decisions
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules

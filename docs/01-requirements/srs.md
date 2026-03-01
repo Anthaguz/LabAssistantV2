@@ -319,6 +319,8 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-073:** WinUI Diagnostics shall provide a read-only structured log viewer (Phase 1) using stable envelope fields with dynamic context inspection.
+
+- **FR-074:** WinUI shell and migrated capability surfaces shall follow a documented layout constraints contract that defines bounded region sizing, explicit scroll ownership, overflow handling rules, and resize behavior expectations for compact/normal/wide widths.
   - **Envelope fields:** `ts`, `level`, `event`, `operationId`, `result`
   - **Viewer behavior (Phase 1):**
     - render envelope columns
