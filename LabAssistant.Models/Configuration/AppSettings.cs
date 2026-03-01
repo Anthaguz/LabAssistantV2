@@ -20,4 +20,6 @@ public class AppSettings
     public bool PerVmFailFast { get; set; } = true;
     public bool StopAllOnAnyVmFailure { get; set; } = false;
     public List<string> NonBlockingOptionalSteps { get; set; } = new();
+
+    public string MachineDeletionPolicy { get; set; } = "AskEveryTime";
 }

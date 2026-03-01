@@ -47,7 +47,11 @@ v1 scope follows the agreed **scope B** direction:
   - VM registration only
   - VM + associated disks/files
 - App setting support:
-  - default delete behavior can be configured to always default to delete-with-disks
+  - default delete behavior can be configured with policy modes:
+    - Ask every time (default)
+    - Always delete disks
+    - Always delete disks for LabAssistant-provisioned VMs
+    - Always delete disks for differencing disks only
 
 ---
 
@@ -64,7 +68,11 @@ v1 scope follows the agreed **scope B** direction:
 
 - Destructive actions require explicit confirmation.
 - Delete flow must keep scope visible and understandable at confirmation time.
-- If always-delete-disks setting is enabled, scope must still be visible to the user.
+- Policy defaults must be visible at confirmation time before destructive action.
+- Disk safety classification guardrails must prevent automatic delete-with-storage defaults when attached disks are:
+  - known base/full disks
+  - potential base/uncertain disks
+- Delete-with-storage should remove safe/owned VM folder artifacts when possible; failures must be explicit and actionable.
 - Failures must be actionable and non-silent.
 - RDP and Console actions are separate controls; one must not hide the other.
 - `Open RDP` shall be disabled (grayed out) when readiness is unknown/unmet.

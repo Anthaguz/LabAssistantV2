@@ -683,17 +683,40 @@ Each readiness result shall include, at minimum:
 - Result is clearly reported
 - Structured logs include selected delete scope and result
 
-### 6) Delete Default Policy — Always Delete Disks Setting
+### 6) Delete Default Policy — Machines Deletion Policy Modes + Safety Guards
 **Given**
-- User enables app setting to always default to delete-with-disks
+- User configures Machines deletion policy in `Settings > Machines`
 
 **When**
 - User initiates delete in `Machines`
 
 **Then**
-- Default delete scope reflects setting behavior
-- User remains aware of selected delete scope before confirmation
-- Setting behavior is consistent across Machines delete flows
+- Supported persisted modes are:
+  - Ask every time (default)
+  - Always delete disks
+  - Always delete disks for LabAssistant-provisioned VMs
+  - Always delete disks for differencing disks only
+- Default delete scope follows policy only when disk safety classification is safe
+- Safety guardrails apply before auto-selecting delete-with-storage:
+  - known base/full disks are never auto-selected for storage deletion
+  - potential base/uncertain classification is never auto-selected for storage deletion
+- Confirmation dialog still shows effective scope before destructive action
+
+### 6a) Delete Cleanup Completeness — VM Folder and Disk Cleanup
+**Given**
+- User confirms delete with storage scope
+
+**When**
+- Delete completes
+
+**Then**
+- VM registration is removed
+- Intended disk/file targets are removed where possible
+- VM folder artifacts are removed when path is safe/owned
+- Cleanup failures are not silent:
+  - UI shows actionable status
+  - failure context includes affected folder/disk paths
+  - structured logs include cleanup failure details
 
 ### 7) Failure Handling — Actionable, Non-Silent
 **Given**
@@ -728,6 +751,7 @@ Each readiness result shall include, at minimum:
   - operationId
   - vmId/vmName (when VM-scoped)
   - action name
+  - policy mode and disk classification context (for delete actions)
   - selected delete scope (for delete actions)
   - result and error details on failure
 
@@ -739,7 +763,8 @@ Each readiness result shall include, at minimum:
 - [ ] RDP readiness v1 criteria (running + IPv4 + TCP 3389 reachability) gate button enablement
 - [ ] Readiness checks are asynchronous/non-blocking and support manual recheck
 - [ ] Delete flow supports VM-only vs VM+disks scopes with confirmation
-- [ ] Always-delete-disks setting behavior is defined and testable
+- [ ] Machines deletion policy modes and safety guard behavior are defined and testable
+- [ ] Delete-with-storage cleanup removes safe/owned VM folder artifacts or reports explicit actionable failure
 - [ ] Failure behavior is actionable and non-silent
 - [ ] Structured logging includes operationId and action context for Machines actions
 

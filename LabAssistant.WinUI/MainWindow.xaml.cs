@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
     private bool _isMachineEditLoading;
     private bool _isMachineEditApplying;
     private bool _isUpdatingMachineEditControls;
+    private bool _isSavingDeletionPolicy;
     private bool _isDrawerOpen;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
@@ -58,6 +59,7 @@ public sealed partial class MainWindow : Window
         {
             RootLayout.Focus(FocusState.Programmatic);
             await EnsureMachinesInventoryAsync(forceRefresh: true);
+            await LoadMachinesDeletionPolicyAsync();
         };
         ApplyState();
     }
@@ -173,19 +175,26 @@ public sealed partial class MainWindow : Window
         ContentTitleTextBlock.Text = _activeCapability.DisplayName;
         ContentDescriptionTextBlock.Text = IsMachinesOverviewActive
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
-            : $"Subview: {_activeSubview.DisplayName}. This is scaffold-only placeholder content for AA2b.";
+            : IsSettingsMachinesActive
+                ? "Configure Machines policy defaults."
+                : $"Subview: {_activeSubview.DisplayName}. This is scaffold-only placeholder content for AA2b.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
         InsightsPanel.Visibility = _isInsightsOpen ? Visibility.Visible : Visibility.Collapsed;
         IssueBadge.Visibility = _issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         IssueBadgeTextBlock.Text = _issueCount.ToString();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = IsMachinesOverviewActive ? Visibility.Collapsed : Visibility.Visible;
+        SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsSettingsMachinesActive) ? Visibility.Collapsed : Visibility.Visible;
         RenderSubviewSelector();
         RenderSubviewToolbar();
         UpdateReadinessPollingState();
         UpdateRdpReadinessUi();
         UpdateMachineActionButtons();
+        if (IsSettingsMachinesActive)
+        {
+            _ = LoadMachinesDeletionPolicyAsync();
+        }
     }
 
     private void RenderSubviewSelector()
@@ -293,6 +302,34 @@ public sealed partial class MainWindow : Window
         ApplyState();
     }
 
+    private async void SaveMachinesDeletionPolicyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (MachinesDeletionPolicyComboBox.SelectedItem is not ComboBoxItem selectedItem ||
+            selectedItem.Tag is not string modeRaw ||
+            !Enum.TryParse<MachineDeletionPolicyMode>(modeRaw, ignoreCase: true, out var mode))
+        {
+            MachinesDeletionPolicyStatusTextBlock.Text = "Select a deletion policy mode first.";
+            return;
+        }
+
+        _isSavingDeletionPolicy = true;
+        SaveMachinesDeletionPolicyButton.IsEnabled = false;
+        try
+        {
+            await _machinesCapabilityService.SetDeletionPolicyAsync(mode);
+            MachinesDeletionPolicyStatusTextBlock.Text = $"Saved: {selectedItem.Content}";
+        }
+        catch (Exception ex)
+        {
+            MachinesDeletionPolicyStatusTextBlock.Text = $"Failed to save policy. {ex.Message}";
+        }
+        finally
+        {
+            _isSavingDeletionPolicy = false;
+            SaveMachinesDeletionPolicyButton.IsEnabled = true;
+        }
+    }
+
     private void DrawerScrim_Tapped(object sender, TappedRoutedEventArgs e)
     {
         SetDrawerOpen(false);
@@ -322,6 +359,10 @@ public sealed partial class MainWindow : Window
     private bool IsMachinesOverviewActive =>
         string.Equals(_activeCapability.DisplayName, "Machines", StringComparison.Ordinal) &&
         string.Equals(_activeSubview.Key, "overview", StringComparison.Ordinal);
+
+    private bool IsSettingsMachinesActive =>
+        string.Equals(_activeCapability.DisplayName, "Settings", StringComparison.Ordinal) &&
+        string.Equals(_activeSubview.Key, "machines", StringComparison.Ordinal);
 
     private void InitializeRdpReadinessTimer()
     {
@@ -543,7 +584,32 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var selectedScope = await ShowDeleteScopeDialogAsync(_selectedMachine);
+        MachineDeletePreview preview;
+        try
+        {
+            preview = await _machinesCapabilityService.GetDeletePreviewAsync(_selectedMachine);
+        }
+        catch (Exception ex)
+        {
+            MachinesStatusTextBlock.Text = $"Failed to evaluate delete policy/classification. {ex.Message}";
+            return;
+        }
+
+        MachineDeleteScope? selectedScope;
+        var policyCanAutoSelectScope = preview.PolicyMode != MachineDeletionPolicyMode.AskEveryTime &&
+            preview.DefaultScope == MachineDeleteScope.VmAndStorage &&
+            preview.SafeForAutomaticStorageDeletion;
+
+        if (policyCanAutoSelectScope)
+        {
+            var confirmed = await ShowDeleteConfirmationDialogAsync(_selectedMachine, preview, preview.DefaultScope);
+            selectedScope = confirmed ? preview.DefaultScope : null;
+        }
+        else
+        {
+            selectedScope = await ShowDeleteScopeDialogAsync(_selectedMachine, preview);
+        }
+
         if (selectedScope is null)
         {
             MachinesStatusTextBlock.Text = "Delete cancelled.";
@@ -1012,6 +1078,28 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task LoadMachinesDeletionPolicyAsync()
+    {
+        if (!IsSettingsMachinesActive || _isSavingDeletionPolicy)
+        {
+            return;
+        }
+
+        try
+        {
+            var mode = await _machinesCapabilityService.GetDeletionPolicyAsync();
+            var item = MachinesDeletionPolicyComboBox.Items
+                .OfType<ComboBoxItem>()
+                .FirstOrDefault(candidate => string.Equals(candidate.Tag?.ToString(), mode.ToString(), StringComparison.Ordinal));
+            MachinesDeletionPolicyComboBox.SelectedItem = item;
+            MachinesDeletionPolicyStatusTextBlock.Text = $"Current: {item?.Content ?? mode.ToString()}";
+        }
+        catch (Exception ex)
+        {
+            MachinesDeletionPolicyStatusTextBlock.Text = $"Failed to load policy. {ex.Message}";
+        }
+    }
+
     private void SyncRdpReadinessCache()
     {
         var activeVmKeys = _machineInventory.Select(GetVmReadinessKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -1098,15 +1186,16 @@ public sealed partial class MainWindow : Window
         return vm.VmName;
     }
 
-    private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm)
+    private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)
     {
         var vmOnlyRadio = new RadioButton
         {
             Content = "VM registration only",
-            IsChecked = true
+            IsChecked = preview.DefaultScope == MachineDeleteScope.VmRegistrationOnly
         };
         var vmAndStorageRadio = new RadioButton
         {
+            IsChecked = preview.DefaultScope == MachineDeleteScope.VmAndStorage,
             Content = "VM + associated disks/files"
         };
         var confirmationCheck = new CheckBox
@@ -1120,6 +1209,23 @@ public sealed partial class MainWindow : Window
             Text = "Choose delete scope. This action is destructive.",
             TextWrapping = TextWrapping.Wrap
         });
+        content.Children.Add(new TextBlock
+        {
+            Text = $"Policy: {preview.PolicyMode} — {preview.PolicyMessage}",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
+        });
+
+        foreach (var disk in preview.DiskClassifications)
+        {
+            content.Children.Add(new TextBlock
+            {
+                Text = $"Disk: {disk.DiskPath} | {disk.Classification} ({disk.Reason})",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
+            });
+        }
+
         content.Children.Add(vmOnlyRadio);
         content.Children.Add(vmAndStorageRadio);
         content.Children.Add(new TextBlock
@@ -1152,5 +1258,51 @@ public sealed partial class MainWindow : Window
         return vmAndStorageRadio.IsChecked == true
             ? MachineDeleteScope.VmAndStorage
             : MachineDeleteScope.VmRegistrationOnly;
+    }
+
+    private async Task<bool> ShowDeleteConfirmationDialogAsync(
+        MachineInventoryItem vm,
+        MachineDeletePreview preview,
+        MachineDeleteScope effectiveScope)
+    {
+        var scopeText = effectiveScope == MachineDeleteScope.VmAndStorage
+            ? "VM + associated disks/files"
+            : "VM registration only";
+        var confirmationCheck = new CheckBox
+        {
+            Content = $"I confirm I want to delete '{vm.VmName}'."
+        };
+
+        var content = new StackPanel { Spacing = 10 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"Effective delete scope: {scopeText}",
+            TextWrapping = TextWrapping.Wrap,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = $"Policy: {preview.PolicyMode} — {preview.PolicyMessage}",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
+        });
+        content.Children.Add(confirmationCheck);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete VM",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            IsPrimaryButtonEnabled = false,
+            XamlRoot = RootLayout.XamlRoot,
+            Content = content
+        };
+
+        confirmationCheck.Checked += (_, _) => dialog.IsPrimaryButtonEnabled = true;
+        confirmationCheck.Unchecked += (_, _) => dialog.IsPrimaryButtonEnabled = false;
+
+        var result = await dialog.ShowAsync();
+        return result == ContentDialogResult.Primary;
     }
 }

@@ -10,6 +10,12 @@ public interface IMachinesCapabilityService
 
     Task<IReadOnlyList<string>> LoadVirtualSwitchesAsync();
 
+    Task<MachineDeletionPolicyMode> GetDeletionPolicyAsync();
+
+    Task SetDeletionPolicyAsync(MachineDeletionPolicyMode mode);
+
+    Task<MachineDeletePreview> GetDeletePreviewAsync(MachineInventoryItem vm);
+
     Task<MachineOperationResult> StartVmAsync(MachineInventoryItem vm);
 
     Task<MachineOperationResult> StopVmAsync(MachineInventoryItem vm);
@@ -100,6 +106,43 @@ public enum MachineDeleteScope
 {
     VmRegistrationOnly,
     VmAndStorage
+}
+
+public enum MachineDeletionPolicyMode
+{
+    AskEveryTime,
+    AlwaysDeleteDisks,
+    AlwaysDeleteDisksForLabAssistantProvisioned,
+    AlwaysDeleteDisksForDifferencingOnly
+}
+
+public enum MachineDiskSafetyClassification
+{
+    DifferencingEligible,
+    KnownBaseOrFull,
+    PotentialBaseOrUncertain
+}
+
+public sealed class MachineDiskClassificationResult
+{
+    public string DiskPath { get; init; } = string.Empty;
+
+    public MachineDiskSafetyClassification Classification { get; init; } = MachineDiskSafetyClassification.PotentialBaseOrUncertain;
+
+    public string Reason { get; init; } = string.Empty;
+}
+
+public sealed class MachineDeletePreview
+{
+    public MachineDeletionPolicyMode PolicyMode { get; init; } = MachineDeletionPolicyMode.AskEveryTime;
+
+    public MachineDeleteScope DefaultScope { get; init; } = MachineDeleteScope.VmRegistrationOnly;
+
+    public bool SafeForAutomaticStorageDeletion { get; init; }
+
+    public string PolicyMessage { get; init; } = string.Empty;
+
+    public IReadOnlyList<MachineDiskClassificationResult> DiskClassifications { get; init; } = Array.Empty<MachineDiskClassificationResult>();
 }
 
 public enum MachineRdpReadinessState

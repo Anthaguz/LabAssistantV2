@@ -276,7 +276,13 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 - **FR-065:** The system shall support VM deletion options:
   - delete VM registration only
   - delete VM and associated disk/files
-  - **Acceptance details:** v1 shall support an app setting to always choose delete-with-disks as default behavior when enabled by the user.
+  - **Acceptance details:** v1 shall support persisted Machines deletion policy modes:
+    - Ask every time (default)
+    - Always delete disks
+    - Always delete disks for LabAssistant-provisioned VMs
+    - Always delete disks for differencing disks only
+  - **Safety details:** policy-driven defaulting to delete-with-storage must be blocked when disk classification is known base/full or potential base/uncertain.
+  - **Cleanup details:** delete-with-storage must attempt safe/owned VM folder cleanup and surface explicit actionable failure context when cleanup is partial.
   - **Priority:** P1
 
 - **FR-066:** All user-initiated `Machines` operations shall emit structured logs with operationId and action context (vmId/vmName/action/result/error details).
