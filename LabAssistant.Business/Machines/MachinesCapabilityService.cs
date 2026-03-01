@@ -67,6 +67,57 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         }
     }
 
+    public async Task<MachineEditSnapshot?> LoadEditSnapshotAsync(MachineInventoryItem vm)
+    {
+        var operationId = Guid.NewGuid().ToString("N");
+        var context = BuildVmContext(vm, "load_edit_snapshot");
+        _structuredLogger.Log(
+            StructuredLogLevel.Info,
+            "MachineEditLoadStarted",
+            operationId,
+            "started",
+            context);
+
+        try
+        {
+            var snapshot = await _machineAdminService.GetVmEditSnapshotAsync(vm.VmName);
+            if (snapshot is null)
+            {
+                _structuredLogger.Log(
+                    StructuredLogLevel.Warn,
+                    "MachineEditLoadCompleted",
+                    operationId,
+                    "not_found",
+                    context);
+                return null;
+            }
+
+            var mapped = MapEditSnapshot(snapshot);
+            _structuredLogger.Log(
+                StructuredLogLevel.Info,
+                "MachineEditLoadCompleted",
+                operationId,
+                "success",
+                context);
+            return mapped;
+        }
+        catch (Exception ex)
+        {
+            _structuredLogger.Log(
+                StructuredLogLevel.Error,
+                "MachineEditLoadFailed",
+                operationId,
+                "failed",
+                RuntimeErrorMetadataNormalizer.FromException(ex));
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> LoadVirtualSwitchesAsync()
+    {
+        return await _machineAdminService.GetVirtualSwitchNamesAsync();
+    }
+
     public Task<MachineOperationResult> StartVmAsync(MachineInventoryItem vm)
     {
         return ExecuteVmActionAsync(vm, "start", "MachineAction", _machineAdminService.StartVmAsync);
@@ -225,6 +276,73 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             Success = false,
             OperationId = operationId,
             UserMessage = BuildActionFailureMessage(actionName, vm.VmName, actionResult.ErrorMessage),
+            ErrorContext = failureContext
+        };
+    }
+
+    public async Task<MachineOperationResult> ApplyEditsAsync(MachineInventoryItem vm, MachineEditDraft draft)
+    {
+        var operationId = Guid.NewGuid().ToString("N");
+        var context = BuildVmContext(vm, "apply_edit");
+        context["changedFields"] = draft.ChangedFieldKeys.ToArray();
+        context["networkAdapterCount"] = draft.NetworkAdapters.Count;
+
+        _structuredLogger.Log(
+            StructuredLogLevel.Info,
+            "MachineEditApplyStarted",
+            operationId,
+            "started",
+            context);
+
+        var request = new HyperVMachineEditRequest
+        {
+            ProcessorCount = draft.CpuCount,
+            StartupMemoryBytes = MbToBytes(draft.StartupMemoryMb),
+            DynamicMemoryEnabled = draft.DynamicMemoryEnabled,
+            MinimumMemoryBytes = MbToBytes(draft.MinimumMemoryMb),
+            MaximumMemoryBytes = MbToBytes(draft.MaximumMemoryMb),
+            MemoryBufferPercent = draft.MemoryBufferPercent,
+            NetworkAdapterAssignments = draft.NetworkAdapters
+                .Where(adapter => !string.IsNullOrWhiteSpace(adapter.AdapterName) && !string.IsNullOrWhiteSpace(adapter.SwitchName))
+                .Select(adapter => new HyperVMachineNetworkAdapterAssignment
+                {
+                    AdapterName = adapter.AdapterName,
+                    SwitchName = adapter.SwitchName!
+                })
+                .ToList()
+        };
+
+        var result = await _machineAdminService.ApplyVmEditAsync(vm.VmName, request);
+        if (result.Success)
+        {
+            _structuredLogger.Log(
+                StructuredLogLevel.Info,
+                "MachineEditApplyCompleted",
+                operationId,
+                "success",
+                context);
+
+            return new MachineOperationResult
+            {
+                Success = true,
+                OperationId = operationId,
+                UserMessage = $"Applied edits to '{vm.VmName}'."
+            };
+        }
+
+        var failureContext = MergeFailureContext(context, result);
+        _structuredLogger.Log(
+            StructuredLogLevel.Error,
+            "MachineEditApplyFailed",
+            operationId,
+            "failed",
+            failureContext);
+
+        return new MachineOperationResult
+        {
+            Success = false,
+            OperationId = operationId,
+            UserMessage = BuildActionFailureMessage("apply_edit", vm.VmName, result.ErrorMessage),
             ErrorContext = failureContext
         };
     }
@@ -405,6 +523,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             "stop" => $"Stopped '{vmName}'.",
             "restart" => $"Restarted '{vmName}'.",
             "open_console" => $"Opened Hyper-V Console for '{vmName}'.",
+            "apply_edit" => $"Applied edits for '{vmName}'.",
             _ => $"Completed '{actionName}' for '{vmName}'."
         };
     }
@@ -418,6 +537,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             "restart" => $"Failed to restart '{vmName}'.",
             "open_console" => $"Failed to open Hyper-V Console for '{vmName}'.",
             "open_rdp" => $"Failed to open RDP for '{vmName}'.",
+            "apply_edit" => $"Failed to apply edits for '{vmName}'.",
             "delete" => $"Failed to delete '{vmName}'.",
             _ => $"Failed to run '{actionName}' for '{vmName}'."
         };
@@ -523,5 +643,35 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             .OrderBy(entry => entry.Score)
             .Select(entry => entry.Text)
             .ToList();
+    }
+
+    private static MachineEditSnapshot MapEditSnapshot(HyperVMachineEditSnapshot snapshot)
+    {
+        return new MachineEditSnapshot
+        {
+            CpuCount = snapshot.ProcessorCount,
+            StartupMemoryMb = BytesToMb(snapshot.StartupMemoryBytes),
+            DynamicMemoryEnabled = snapshot.DynamicMemoryEnabled,
+            MinimumMemoryMb = BytesToMb(snapshot.MinimumMemoryBytes),
+            MaximumMemoryMb = BytesToMb(snapshot.MaximumMemoryBytes),
+            MemoryBufferPercent = snapshot.MemoryBufferPercent,
+            NetworkAdapters = snapshot.NetworkAdapters
+                .Select(adapter => new MachineNetworkAdapterConfig
+                {
+                    AdapterName = adapter.AdapterName,
+                    SwitchName = adapter.SwitchName
+                })
+                .ToList()
+        };
+    }
+
+    private static long MbToBytes(long mb)
+    {
+        return mb * 1024L * 1024L;
+    }
+
+    private static long BytesToMb(long bytes)
+    {
+        return bytes / (1024L * 1024L);
     }
 }

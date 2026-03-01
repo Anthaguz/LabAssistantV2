@@ -39,7 +39,7 @@ v1 scope follows the agreed **scope B** direction:
 - Edit VM:
   - CPU
   - memory
-  - switch attachment
+  - switch attachment (per adapter when multiple NICs are present)
 - Connection actions:
   - Open Hyper-V Console
   - Open RDP (disabled when readiness unknown/unmet)
@@ -68,6 +68,23 @@ v1 scope follows the agreed **scope B** direction:
 - Failures must be actionable and non-silent.
 - RDP and Console actions are separate controls; one must not hide the other.
 - `Open RDP` shall be disabled (grayed out) when readiness is unknown/unmet.
+- Basic edit workflow is draft-based:
+  - edits are local until user clicks `Apply`
+  - unsaved state indicator appears when draft differs from loaded values
+  - no dedicated `Reset` button in v1
+  - navigating away (capability/subview/VM selection) discards unapplied draft state
+
+### 4.1 RDP readiness v1 policy (resolved)
+`Open RDP` enablement in v1 is based on fast host-observable checks only:
+- VM state is running
+- At least one VM IPv4 address is discoverable from Hyper-V host-side data
+- Host TCP probe to `<vm-ip>:3389` succeeds within short timeout (4000ms target)
+
+Readiness evaluation requirements:
+- asynchronous and non-blocking
+- background refresh while `Machines` view is active
+- manual recheck available
+- disabled state exposes concise reason text/guidance
 
 ### 4.1 RDP readiness v1 policy (resolved)
 `Open RDP` enablement in v1 is based on fast host-observable checks only:

@@ -6,6 +6,10 @@ public interface IMachinesCapabilityService
 {
     Task<IReadOnlyList<MachineInventoryItem>> LoadInventoryAsync();
 
+    Task<MachineEditSnapshot?> LoadEditSnapshotAsync(MachineInventoryItem vm);
+
+    Task<IReadOnlyList<string>> LoadVirtualSwitchesAsync();
+
     Task<MachineOperationResult> StartVmAsync(MachineInventoryItem vm);
 
     Task<MachineOperationResult> StopVmAsync(MachineInventoryItem vm);
@@ -17,6 +21,8 @@ public interface IMachinesCapabilityService
     Task<MachineRdpReadinessResult> EvaluateRdpReadinessAsync(MachineInventoryItem vm, CancellationToken cancellationToken = default);
 
     Task<MachineOperationResult> OpenRdpAsync(MachineInventoryItem vm, string targetIpv4);
+
+    Task<MachineOperationResult> ApplyEditsAsync(MachineInventoryItem vm, MachineEditDraft draft);
 
     Task<MachineOperationResult> DeleteVmAsync(MachineInventoryItem vm, MachineDeleteScope scope);
 }
@@ -45,6 +51,49 @@ public sealed class MachineOperationResult
     public string UserMessage { get; init; } = string.Empty;
 
     public IReadOnlyDictionary<string, object?>? ErrorContext { get; init; }
+}
+
+public sealed class MachineEditSnapshot
+{
+    public int CpuCount { get; init; }
+
+    public long StartupMemoryMb { get; init; }
+
+    public bool DynamicMemoryEnabled { get; init; }
+
+    public long MinimumMemoryMb { get; init; }
+
+    public long MaximumMemoryMb { get; init; }
+
+    public int MemoryBufferPercent { get; init; }
+
+    public IReadOnlyList<MachineNetworkAdapterConfig> NetworkAdapters { get; init; } = Array.Empty<MachineNetworkAdapterConfig>();
+}
+
+public sealed class MachineNetworkAdapterConfig
+{
+    public string AdapterName { get; init; } = string.Empty;
+
+    public string? SwitchName { get; init; }
+}
+
+public sealed class MachineEditDraft
+{
+    public int CpuCount { get; init; }
+
+    public long StartupMemoryMb { get; init; }
+
+    public bool DynamicMemoryEnabled { get; init; }
+
+    public long MinimumMemoryMb { get; init; }
+
+    public long MaximumMemoryMb { get; init; }
+
+    public int MemoryBufferPercent { get; init; }
+
+    public IReadOnlyList<MachineNetworkAdapterConfig> NetworkAdapters { get; init; } = Array.Empty<MachineNetworkAdapterConfig>();
+
+    public IReadOnlyList<string> ChangedFieldKeys { get; init; } = Array.Empty<string>();
 }
 
 public enum MachineDeleteScope

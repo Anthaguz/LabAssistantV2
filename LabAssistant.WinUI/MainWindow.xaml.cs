@@ -21,12 +21,18 @@ public sealed partial class MainWindow : Window
     private readonly IMachinesCapabilityService _machinesCapabilityService;
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
     private ShellSubview _activeSubview;
     private MachineInventoryItem? _selectedMachine;
     private MachineRdpReadinessResult _selectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
+    private MachineEditSnapshot? _loadedEditSnapshot;
+    private MachineEditDraft? _editDraft;
     private bool _isMachineActionRunning;
     private bool _isRdpReadinessRefreshRunning;
+    private bool _isMachineEditLoading;
+    private bool _isMachineEditApplying;
+    private bool _isUpdatingMachineEditControls;
     private bool _isDrawerOpen;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
@@ -239,6 +245,7 @@ public sealed partial class MainWindow : Window
         if (sender is Button { Tag: string capability } &&
             _shellViewModel.Capabilities.Any(entry => string.Equals(entry.DisplayName, capability, StringComparison.Ordinal)))
         {
+            DiscardMachineEditDraft();
             _activeCapability = _shellViewModel.GetCapability(capability);
             _activeSubview = _activeCapability.DefaultSubview;
             SetDrawerOpen(false);
@@ -265,6 +272,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        DiscardMachineEditDraft();
         _activeSubview = selectedSubview;
         ApplyState();
         if (IsMachinesOverviewActive)
@@ -396,6 +404,7 @@ public sealed partial class MainWindow : Window
             }
 
             SyncRdpReadinessCache();
+            _ = LoadMachineEditStateAsync();
 
             return true;
         }
@@ -414,11 +423,13 @@ public sealed partial class MainWindow : Window
 
     private void MachinesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        DiscardMachineEditDraft();
         _selectedMachine = MachinesListView.SelectedItem as MachineInventoryItem;
         UpdateSelectedRdpReadinessFromCache();
         UpdateMachineDetails();
         UpdateRdpReadinessUi();
         UpdateMachineActionButtons();
+        _ = LoadMachineEditStateAsync();
     }
 
     private void UpdateMachineDetails()
@@ -430,6 +441,7 @@ public sealed partial class MainWindow : Window
             SelectedVmOriginTextBlock.Text = "Origin: -";
             SelectedVmIdTextBlock.Text = "VM Id: -";
             SelectedVmPathTextBlock.Text = "Path: -";
+            ClearMachineEditControls();
             return;
         }
 
@@ -451,6 +463,11 @@ public sealed partial class MainWindow : Window
         DeleteVmButton.IsEnabled = canRunActions;
         OpenRdpButton.IsEnabled = canRunActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
         ToolTipService.SetToolTip(OpenRdpButton, _selectedRdpReadiness.Message);
+        ApplyMachineEditsButton.IsEnabled = _selectedMachine is not null &&
+            !_isMachineActionRunning &&
+            !_isMachineEditLoading &&
+            !_isMachineEditApplying &&
+            HasMachineEditChanges();
     }
 
     private async void RefreshMachinesButton_Click(object sender, RoutedEventArgs e)
@@ -590,6 +607,366 @@ public sealed partial class MainWindow : Window
             _isMachineActionRunning = false;
             UpdateMachineActionButtons();
         }
+    }
+
+    private async Task LoadMachineEditStateAsync()
+    {
+        if (!IsMachinesOverviewActive || _selectedMachine is null)
+        {
+            ClearMachineEditControls();
+            return;
+        }
+
+        _isMachineEditLoading = true;
+        UpdateMachineActionButtons();
+        try
+        {
+            var snapshot = await _machinesCapabilityService.LoadEditSnapshotAsync(_selectedMachine);
+            _availableSwitches = await _machinesCapabilityService.LoadVirtualSwitchesAsync();
+            _loadedEditSnapshot = snapshot;
+            if (snapshot is null)
+            {
+                _editDraft = null;
+                ClearMachineEditControls();
+                MachinesStatusTextBlock.Text = "Unable to load editable VM settings.";
+                return;
+            }
+
+            _editDraft = CreateDraft(snapshot, Array.Empty<string>());
+            ApplyMachineEditDraftToControls();
+        }
+        catch (Exception ex)
+        {
+            _editDraft = null;
+            _loadedEditSnapshot = null;
+            ClearMachineEditControls();
+            MachinesStatusTextBlock.Text = $"Failed to load VM edit state. {ex.Message}";
+        }
+        finally
+        {
+            _isMachineEditLoading = false;
+            UpdateMachineActionButtons();
+        }
+    }
+
+    private void DiscardMachineEditDraft()
+    {
+        _loadedEditSnapshot = null;
+        _editDraft = null;
+        _isUpdatingMachineEditControls = false;
+        UpdateMachineEditDirtyIndicator();
+    }
+
+    private void ClearMachineEditControls()
+    {
+        _isUpdatingMachineEditControls = true;
+        CpuCountTextBox.Text = string.Empty;
+        StartupMemoryTextBox.Text = string.Empty;
+        DynamicMemoryToggle.IsOn = false;
+        MinimumMemoryTextBox.Text = string.Empty;
+        MaximumMemoryTextBox.Text = string.Empty;
+        MemoryBufferTextBox.Text = string.Empty;
+        NetworkAdapterEditorPanel.Children.Clear();
+        DynamicMemoryPanel.IsHitTestVisible = false;
+        DynamicMemoryPanel.Opacity = 0.65;
+        _isUpdatingMachineEditControls = false;
+        UpdateMachineEditDirtyIndicator();
+    }
+
+    private void ApplyMachineEditDraftToControls()
+    {
+        if (_editDraft is null)
+        {
+            ClearMachineEditControls();
+            return;
+        }
+
+        _isUpdatingMachineEditControls = true;
+        CpuCountTextBox.Text = _editDraft.CpuCount.ToString();
+        StartupMemoryTextBox.Text = _editDraft.StartupMemoryMb.ToString();
+        DynamicMemoryToggle.IsOn = _editDraft.DynamicMemoryEnabled;
+        MinimumMemoryTextBox.Text = _editDraft.MinimumMemoryMb.ToString();
+        MaximumMemoryTextBox.Text = _editDraft.MaximumMemoryMb.ToString();
+        MemoryBufferTextBox.Text = _editDraft.MemoryBufferPercent.ToString();
+        DynamicMemoryPanel.IsHitTestVisible = _editDraft.DynamicMemoryEnabled;
+        DynamicMemoryPanel.Opacity = _editDraft.DynamicMemoryEnabled ? 1.0 : 0.65;
+        RenderNetworkAdapterEditors();
+        _isUpdatingMachineEditControls = false;
+        UpdateMachineEditDirtyIndicator();
+    }
+
+    private void RenderNetworkAdapterEditors()
+    {
+        NetworkAdapterEditorPanel.Children.Clear();
+        if (_editDraft is null)
+        {
+            return;
+        }
+
+        foreach (var adapter in _editDraft.NetworkAdapters)
+        {
+            var row = new Grid { ColumnSpacing = 8 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var name = new TextBlock
+            {
+                Text = adapter.AdapterName,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
+            };
+            Grid.SetColumn(name, 0);
+            row.Children.Add(name);
+
+            var combo = new ComboBox
+            {
+                Width = 200,
+                Tag = adapter.AdapterName
+            };
+            combo.Items.Add("(Disconnected)");
+            foreach (var switchName in _availableSwitches)
+            {
+                combo.Items.Add(switchName);
+            }
+
+            var selectedSwitch = string.IsNullOrWhiteSpace(adapter.SwitchName) ? "(Disconnected)" : adapter.SwitchName;
+            combo.SelectedItem = selectedSwitch;
+            combo.SelectionChanged += AdapterSwitchCombo_SelectionChanged;
+            Grid.SetColumn(combo, 1);
+            row.Children.Add(combo);
+
+            NetworkAdapterEditorPanel.Children.Add(row);
+        }
+    }
+
+    private void UpdateMachineEditDraftFromControls()
+    {
+        if (_isUpdatingMachineEditControls || _editDraft is null || _loadedEditSnapshot is null)
+        {
+            return;
+        }
+
+        if (!TryParseLong(CpuCountTextBox.Text, out var cpu) ||
+            !TryParseLong(StartupMemoryTextBox.Text, out var startupMb) ||
+            !TryParseLong(MinimumMemoryTextBox.Text, out var minMb) ||
+            !TryParseLong(MaximumMemoryTextBox.Text, out var maxMb) ||
+            !TryParseInt(MemoryBufferTextBox.Text, out var buffer))
+        {
+            UpdateMachineEditDirtyIndicator();
+            return;
+        }
+
+        var normalizedAdapters = _editDraft.NetworkAdapters
+            .Select(adapter => new MachineNetworkAdapterConfig
+            {
+                AdapterName = adapter.AdapterName,
+                SwitchName = adapter.SwitchName
+            })
+            .ToList();
+
+        var draft = new MachineEditDraft
+        {
+            CpuCount = (int)cpu,
+            StartupMemoryMb = startupMb,
+            DynamicMemoryEnabled = DynamicMemoryToggle.IsOn,
+            MinimumMemoryMb = minMb,
+            MaximumMemoryMb = maxMb,
+            MemoryBufferPercent = buffer,
+            NetworkAdapters = normalizedAdapters
+        };
+
+        _editDraft = CreateDraft(draft, ComputeChangedFields(_loadedEditSnapshot, draft));
+        UpdateMachineEditDirtyIndicator();
+    }
+
+    private static MachineEditDraft CreateDraft(MachineEditSnapshot snapshot, IReadOnlyList<string> changedFields)
+    {
+        return new MachineEditDraft
+        {
+            CpuCount = snapshot.CpuCount,
+            StartupMemoryMb = snapshot.StartupMemoryMb,
+            DynamicMemoryEnabled = snapshot.DynamicMemoryEnabled,
+            MinimumMemoryMb = snapshot.MinimumMemoryMb,
+            MaximumMemoryMb = snapshot.MaximumMemoryMb,
+            MemoryBufferPercent = snapshot.MemoryBufferPercent,
+            NetworkAdapters = snapshot.NetworkAdapters
+                .Select(adapter => new MachineNetworkAdapterConfig
+                {
+                    AdapterName = adapter.AdapterName,
+                    SwitchName = adapter.SwitchName
+                })
+                .ToList(),
+            ChangedFieldKeys = changedFields
+        };
+    }
+
+    private static MachineEditDraft CreateDraft(MachineEditDraft draft, IReadOnlyList<string> changedFields)
+    {
+        return new MachineEditDraft
+        {
+            CpuCount = draft.CpuCount,
+            StartupMemoryMb = draft.StartupMemoryMb,
+            DynamicMemoryEnabled = draft.DynamicMemoryEnabled,
+            MinimumMemoryMb = draft.MinimumMemoryMb,
+            MaximumMemoryMb = draft.MaximumMemoryMb,
+            MemoryBufferPercent = draft.MemoryBufferPercent,
+            NetworkAdapters = draft.NetworkAdapters,
+            ChangedFieldKeys = changedFields
+        };
+    }
+
+    private static IReadOnlyList<string> ComputeChangedFields(MachineEditSnapshot baseline, MachineEditDraft draft)
+    {
+        var changed = new List<string>();
+        if (baseline.CpuCount != draft.CpuCount)
+        {
+            changed.Add("cpuCount");
+        }
+
+        if (baseline.StartupMemoryMb != draft.StartupMemoryMb)
+        {
+            changed.Add("startupMemoryMb");
+        }
+
+        if (baseline.DynamicMemoryEnabled != draft.DynamicMemoryEnabled)
+        {
+            changed.Add("dynamicMemoryEnabled");
+        }
+
+        if (baseline.MinimumMemoryMb != draft.MinimumMemoryMb)
+        {
+            changed.Add("minimumMemoryMb");
+        }
+
+        if (baseline.MaximumMemoryMb != draft.MaximumMemoryMb)
+        {
+            changed.Add("maximumMemoryMb");
+        }
+
+        if (baseline.MemoryBufferPercent != draft.MemoryBufferPercent)
+        {
+            changed.Add("memoryBufferPercent");
+        }
+
+        foreach (var adapter in draft.NetworkAdapters)
+        {
+            var baselineAdapter = baseline.NetworkAdapters.FirstOrDefault(a =>
+                string.Equals(a.AdapterName, adapter.AdapterName, StringComparison.OrdinalIgnoreCase));
+            if (!string.Equals(baselineAdapter?.SwitchName ?? string.Empty, adapter.SwitchName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+            {
+                changed.Add($"switch:{adapter.AdapterName}");
+            }
+        }
+
+        return changed;
+    }
+
+    private bool HasMachineEditChanges()
+    {
+        return _editDraft is not null && _editDraft.ChangedFieldKeys.Count > 0;
+    }
+
+    private void UpdateMachineEditDirtyIndicator()
+    {
+        MachineEditDirtyTextBlock.Visibility = HasMachineEditChanges() ? Visibility.Visible : Visibility.Collapsed;
+        UpdateMachineActionButtons();
+    }
+
+    private async void ApplyMachineEditsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMachine is null || _editDraft is null || _loadedEditSnapshot is null)
+        {
+            MachinesStatusTextBlock.Text = "Select a VM and modify values before Apply.";
+            return;
+        }
+
+        if (!HasMachineEditChanges())
+        {
+            MachinesStatusTextBlock.Text = "No pending machine edits.";
+            return;
+        }
+
+        _isMachineEditApplying = true;
+        UpdateMachineActionButtons();
+        try
+        {
+            var result = await _machinesCapabilityService.ApplyEditsAsync(_selectedMachine, _editDraft);
+            MachinesStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            if (!result.Success)
+            {
+                return;
+            }
+
+            await LoadMachineEditStateAsync();
+            await EnsureMachinesInventoryAsync(forceRefresh: true);
+        }
+        finally
+        {
+            _isMachineEditApplying = false;
+            UpdateMachineActionButtons();
+        }
+    }
+
+    private void CpuCountTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
+    private void StartupMemoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
+    private void MinimumMemoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
+    private void MaximumMemoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
+    private void MemoryBufferTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
+
+    private void DynamicMemoryToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        DynamicMemoryPanel.IsHitTestVisible = DynamicMemoryToggle.IsOn;
+        DynamicMemoryPanel.Opacity = DynamicMemoryToggle.IsOn ? 1.0 : 0.65;
+        UpdateMachineEditDraftFromControls();
+    }
+
+    private void AdapterSwitchCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingMachineEditControls || _editDraft is null)
+        {
+            return;
+        }
+
+        if (sender is not ComboBox combo || combo.Tag is not string adapterName)
+        {
+            return;
+        }
+
+        var selectedSwitch = combo.SelectedItem?.ToString();
+        if (string.Equals(selectedSwitch, "(Disconnected)", StringComparison.Ordinal))
+        {
+            selectedSwitch = null;
+        }
+
+        var updatedAdapters = _editDraft.NetworkAdapters
+            .Select(adapter => string.Equals(adapter.AdapterName, adapterName, StringComparison.OrdinalIgnoreCase)
+                ? new MachineNetworkAdapterConfig { AdapterName = adapter.AdapterName, SwitchName = selectedSwitch }
+                : adapter)
+            .ToList();
+
+        var draft = CreateDraft(_editDraft, _editDraft.ChangedFieldKeys);
+        _editDraft = new MachineEditDraft
+        {
+            CpuCount = draft.CpuCount,
+            StartupMemoryMb = draft.StartupMemoryMb,
+            DynamicMemoryEnabled = draft.DynamicMemoryEnabled,
+            MinimumMemoryMb = draft.MinimumMemoryMb,
+            MaximumMemoryMb = draft.MaximumMemoryMb,
+            MemoryBufferPercent = draft.MemoryBufferPercent,
+            NetworkAdapters = updatedAdapters,
+            ChangedFieldKeys = draft.ChangedFieldKeys
+        };
+        UpdateMachineEditDraftFromControls();
+    }
+
+    private static bool TryParseLong(string? text, out long value)
+    {
+        return long.TryParse(text, out value);
+    }
+
+    private static bool TryParseInt(string? text, out int value)
+    {
+        return int.TryParse(text, out value);
     }
 
     private async Task RefreshRdpReadinessAsync(bool selectedOnly)
