@@ -42,6 +42,8 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
+    private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
+    private readonly ObservableCollection<DeployIssueRow> _deployIssueRows = [];
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
     private readonly List<DeployCompatibilityIssue> _deployCompatibilityIssues = [];
@@ -78,6 +80,9 @@ public sealed partial class MainWindow : Window
     private bool _isDeployLoadingTemplates;
     private bool _isDeployEvaluatingReadiness;
     private bool _isDeployStarting;
+    private string _deployLifecycleState = "Idle";
+    private int _deployProgressPercent;
+    private string _deployProgressSummary = "No deployment started.";
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -139,7 +144,14 @@ public sealed partial class MainWindow : Window
     private ComboBox DeployTemplateSelectorComboBox => DeployFromTemplateView.DeployTemplateSelectorComboBoxControl;
     private Button DeployReloadTemplatesButton => DeployFromTemplateView.DeployReloadTemplatesButtonControl;
     private Button DeployEvaluateReadinessButton => DeployFromTemplateView.DeployEvaluateReadinessButtonControl;
+    private TextBlock DeployOverallStateTextBlock => DeployFromTemplateView.DeployOverallStateTextBlockControl;
+    private ProgressBar DeployProgressBar => DeployFromTemplateView.DeployProgressBarControl;
+    private TextBlock DeployProgressSummaryTextBlock => DeployFromTemplateView.DeployProgressSummaryTextBlockControl;
+    private TextBlock DeployGlobalIssuesBadgeTextBlock => DeployFromTemplateView.DeployGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
+    private Expander DeployGlobalIssuesExpander => DeployFromTemplateView.DeployGlobalIssuesExpanderControl;
+    private ListView DeployGlobalIssuesListView => DeployFromTemplateView.DeployGlobalIssuesListViewControl;
+    private ListView DeployVmResultsListView => DeployFromTemplateView.DeployVmResultsListViewControl;
     private Button DeployResolveSuggestionsButton => DeployFromTemplateView.DeployResolveSuggestionsButtonControl;
     private Button DeployOpenTemplateEditorButton => DeployFromTemplateView.DeployOpenTemplateEditorButtonControl;
     private Button DeployStartButton => DeployFromTemplateView.DeployStartButtonControl;
@@ -293,6 +305,11 @@ public sealed partial class MainWindow : Window
         DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
         DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
         DeployTemplateSelectorComboBox.ItemsSource = _templateLibraryItems;
+        DeployVmResultsListView.ItemsSource = _deployVmResultRows;
+        DeployGlobalIssuesListView.ItemsSource = _deployIssueRows;
+        DeployGlobalIssuesExpander.IsExpanded = false;
+        UpdateDeployResultRows();
+        UpdateDeployIssueRows();
     }
 
     private void ConfigureShellIcons()
@@ -686,6 +703,9 @@ public sealed partial class MainWindow : Window
             _activeDeployTemplateDocument = null;
             _deployReadinessReport = null;
             _deployCompatibilityIssues.Clear();
+            _deployLifecycleState = "Idle";
+            _deployProgressPercent = 0;
+            _deployProgressSummary = "No template selected.";
             UpdateDeployUi();
             return;
         }
@@ -693,6 +713,9 @@ public sealed partial class MainWindow : Window
         try
         {
             _activeDeployTemplateDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedDeployTemplateLibraryItem.FilePath);
+            _deployLifecycleState = "Ready";
+            _deployProgressPercent = 0;
+            _deployProgressSummary = $"Template '{_selectedDeployTemplateLibraryItem.Name}' loaded.";
             DeployActionStatusTextBlock.Text = $"Loaded '{_selectedDeployTemplateLibraryItem.Name}' for deploy readiness.";
             await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
         }
@@ -701,6 +724,9 @@ public sealed partial class MainWindow : Window
             _activeDeployTemplateDocument = null;
             _deployReadinessReport = null;
             _deployCompatibilityIssues.Clear();
+            _deployLifecycleState = "Error";
+            _deployProgressPercent = 0;
+            _deployProgressSummary = "Template load failed.";
             DeployActionStatusTextBlock.Text = $"Failed to load selected template. {ex.Message}";
             UpdateDeployUi();
         }
@@ -767,6 +793,12 @@ public sealed partial class MainWindow : Window
         if (_activeDeployTemplateDocument is null)
         {
             DeployReadinessSummaryTextBlock.Text = "Select a template to evaluate readiness and run deploy.";
+            DeployOverallStateTextBlock.Text = _deployLifecycleState;
+            DeployProgressBar.Value = _deployProgressPercent;
+            DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
+            DeployGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployIssueRows.Count}";
+            UpdateDeployResultRows();
+            UpdateDeployIssueRows();
             return;
         }
 
@@ -779,6 +811,141 @@ public sealed partial class MainWindow : Window
         DeployReadinessSummaryTextBlock.Text =
             $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
             $"Template: {_activeDeployTemplateDocument.Template.Name} ({_activeDeployTemplateDocument.Template.VmTemplates.Count} VMs).";
+
+        DeployOverallStateTextBlock.Text = _deployLifecycleState;
+        DeployProgressBar.Value = _deployProgressPercent;
+        DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
+        DeployGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployIssueRows.Count}";
+
+        UpdateDeployResultRows();
+        UpdateDeployIssueRows();
+    }
+
+    private void UpdateDeployResultRows()
+    {
+        _deployVmResultRows.Clear();
+
+        if (_activeDeployTemplateDocument is null)
+        {
+            return;
+        }
+
+        var vmNames = _activeDeployTemplateDocument.Template.VmTemplates
+            .Select(vm => string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var compatibilityByVm = _deployCompatibilityIssues
+            .Where(issue => !string.IsNullOrWhiteSpace(issue.VmName))
+            .GroupBy(issue => issue.VmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var readinessByVm = (_deployReadinessReport?.Results ?? [])
+            .SelectMany(result => result.AffectedVmNames.Select(vmName => (vmName, result)))
+            .Where(tuple => !string.IsNullOrWhiteSpace(tuple.vmName))
+            .GroupBy(tuple => tuple.vmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.result).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var vmName in vmNames)
+        {
+            compatibilityByVm.TryGetValue(vmName, out var vmCompatibilityIssues);
+            readinessByVm.TryGetValue(vmName, out var vmReadinessResults);
+
+            vmCompatibilityIssues ??= [];
+            vmReadinessResults ??= [];
+
+            var hasBlocking = vmCompatibilityIssues.Any(issue => issue.IsBlocking) ||
+                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Fail);
+            var hasWarnings = vmCompatibilityIssues.Any(issue => !issue.IsBlocking) ||
+                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Warn);
+
+            var status = hasBlocking ? "Blocked" : hasWarnings ? "Warning" : "Ready";
+            var summary = vmCompatibilityIssues.Count + vmReadinessResults.Count == 0
+                ? "No issues"
+                : $"Issues: {vmCompatibilityIssues.Count + vmReadinessResults.Count}";
+
+            var detailLines = new List<string>();
+            detailLines.AddRange(vmCompatibilityIssues.Select(issue =>
+                $"{(issue.IsBlocking ? "BLOCK" : "WARN")}: {issue.Message} - {issue.Guidance}"));
+            detailLines.AddRange(vmReadinessResults.Select(result =>
+                $"{result.Status}: {result.Message} - {result.ActionableGuidance}"));
+            if (detailLines.Count == 0)
+            {
+                detailLines.Add("No detailed readiness findings for this VM.");
+            }
+
+            _deployVmResultRows.Add(new DeployVmResultRow(
+                VmName: vmName,
+                Status: status,
+                Summary: summary,
+                Details: string.Join(Environment.NewLine, detailLines)));
+        }
+    }
+
+    private void UpdateDeployIssueRows()
+    {
+        _deployIssueRows.Clear();
+
+        foreach (var issue in _deployCompatibilityIssues)
+        {
+            var scope = string.IsNullOrWhiteSpace(issue.VmName) ? "Global" : issue.VmName;
+            _deployIssueRows.Add(new DeployIssueRow(
+                Scope: scope,
+                Severity: issue.IsBlocking ? "Block" : "Warn",
+                Message: $"{issue.Message} {issue.Guidance}".Trim()));
+        }
+
+        if (_deployReadinessReport is not null)
+        {
+            foreach (var result in _deployReadinessReport.Results.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
+            {
+                var scope = result.AffectedVmNames.Count == 0 ? "Global" : string.Join(", ", result.AffectedVmNames);
+                _deployIssueRows.Add(new DeployIssueRow(
+                    Scope: scope,
+                    Severity: result.Status == DeploymentReadinessStatus.Fail ? "Block" : "Warn",
+                    Message: $"{result.Message} {result.ActionableGuidance}".Trim()));
+            }
+        }
+    }
+
+    private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)
+    {
+        _deployVmResultRows.Clear();
+
+        foreach (var vmOutcome in summary.VmOutcomes)
+        {
+            var cleanupSummary = vmOutcome.Cleanup.CleanupRan
+                ? $"Cleanup={vmOutcome.Cleanup.Status}, Residuals={vmOutcome.Cleanup.ResidualCount}"
+                : "Cleanup=NotNeeded";
+            var detailLines = new List<string>
+            {
+                $"Reason: {vmOutcome.Reason ?? "none"}",
+                $"Failure step: {vmOutcome.FailureStepKey ?? "none"}",
+                cleanupSummary
+            };
+
+            if (vmOutcome.GuestStepOutcomes.Count > 0)
+            {
+                detailLines.Add("Guest steps:");
+                detailLines.AddRange(vmOutcome.GuestStepOutcomes.Select(outcome =>
+                    $"- {outcome.DisplayName}: {outcome.Result}{(string.IsNullOrWhiteSpace(outcome.SkipReason) ? string.Empty : $" ({outcome.SkipReason})")}"));
+            }
+
+            _deployVmResultRows.Add(new DeployVmResultRow(
+                VmName: vmOutcome.VmName,
+                Status: vmOutcome.Status.ToString(),
+                Summary: vmOutcome.Cleanup.CleanupRan ? $"Cleanup {vmOutcome.Cleanup.Status}" : "No cleanup",
+                Details: string.Join(Environment.NewLine, detailLines)));
+        }
+
+        _deployIssueRows.Clear();
+        foreach (var residual in summary.Residuals)
+        {
+            _deployIssueRows.Add(new DeployIssueRow(
+                Scope: residual.VmName,
+                Severity: "Warn",
+                Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
+        }
     }
 
     private async Task EnsureDeployTemplatesLoadedAsync(bool forceRefresh)
@@ -791,6 +958,9 @@ public sealed partial class MainWindow : Window
         }
 
         _isDeployLoadingTemplates = true;
+        _deployLifecycleState = "Loading";
+        _deployProgressPercent = 0;
+        _deployProgressSummary = "Loading templates...";
         UpdateDeployUi();
         DeployActionStatusTextBlock.Text = "Loading templates for deploy...";
 
@@ -804,17 +974,26 @@ public sealed partial class MainWindow : Window
                 _activeDeployTemplateDocument = null;
                 _deployReadinessReport = null;
                 _deployCompatibilityIssues.Clear();
+                _deployLifecycleState = "Idle";
+                _deployProgressPercent = 0;
+                _deployProgressSummary = "No templates available.";
                 DeployActionStatusTextBlock.Text = "No templates available for deploy.";
             }
             else
             {
                 _selectedDeployTemplateLibraryItem ??= _templateLibraryItems[0];
                 DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
+                _deployLifecycleState = "Idle";
+                _deployProgressPercent = 0;
+                _deployProgressSummary = "Template list loaded.";
                 DeployActionStatusTextBlock.Text = $"Loaded {_templateLibraryItems.Count} template(s) for deploy.";
             }
         }
         catch (Exception ex)
         {
+            _deployLifecycleState = "Error";
+            _deployProgressPercent = 0;
+            _deployProgressSummary = "Template load failed.";
             DeployActionStatusTextBlock.Text = $"Failed to load deploy templates. {ex.Message}";
         }
         finally
@@ -834,6 +1013,11 @@ public sealed partial class MainWindow : Window
         }
 
         _isDeployEvaluatingReadiness = true;
+        _deployLifecycleState = "Evaluating";
+        _deployProgressPercent = 10;
+        _deployProgressSummary = mode == DeploymentPreflightMode.Full
+            ? "Running full readiness checks..."
+            : "Running quick readiness checks...";
         DeployActionStatusTextBlock.Text = mode == DeploymentPreflightMode.Full
             ? "Running full deploy readiness evaluation..."
             : "Running quick deploy readiness evaluation...";
@@ -851,6 +1035,13 @@ public sealed partial class MainWindow : Window
                                 _deployReadinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Fail);
             var warningCount = _deployCompatibilityIssues.Count(issue => !issue.IsBlocking) +
                                _deployReadinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn);
+            _deployProgressPercent = 35;
+            _deployLifecycleState = blockingCount > 0 ? "Blocked" : warningCount > 0 ? "Warning" : "Ready";
+            _deployProgressSummary = blockingCount > 0
+                ? $"Readiness blocked ({blockingCount} fail, {warningCount} warn)."
+                : warningCount > 0
+                    ? $"Readiness passed with warnings ({warningCount})."
+                    : "Readiness passed.";
             DeployActionStatusTextBlock.Text = blockingCount > 0
                 ? $"Readiness found {blockingCount} blocking issue(s) and {warningCount} warning(s)."
                 : warningCount > 0
@@ -861,6 +1052,9 @@ public sealed partial class MainWindow : Window
         {
             _deployReadinessReport = null;
             _deployCompatibilityIssues.Clear();
+            _deployLifecycleState = "Error";
+            _deployProgressPercent = 0;
+            _deployProgressSummary = "Readiness evaluation failed.";
             DeployActionStatusTextBlock.Text = $"Readiness evaluation failed. {ex.Message}";
         }
         finally
@@ -879,6 +1073,9 @@ public sealed partial class MainWindow : Window
         }
 
         _isDeployStarting = true;
+        _deployLifecycleState = "Running";
+        _deployProgressPercent = 45;
+        _deployProgressSummary = "Preparing deployment...";
         UpdateDeployUi();
         try
         {
@@ -887,21 +1084,40 @@ public sealed partial class MainWindow : Window
                                       (_deployReadinessReport?.HasBlockingFailures ?? false);
             if (hasBlockingFailures)
             {
+                _deployLifecycleState = "Blocked";
+                _deployProgressPercent = 35;
+                _deployProgressSummary = "Deployment blocked by readiness failures.";
                 DeployActionStatusTextBlock.Text = "Deploy blocked by readiness failures. Resolve blocking items first.";
                 return;
             }
 
             var deployContext = BuildDeployContext(_activeDeployTemplateDocument.Template);
+            _deployProgressPercent = 60;
+            _deployProgressSummary = $"Deploying {deployContext.MultiVmContext.VmContexts.Count} VM(s)...";
             DeployActionStatusTextBlock.Text = "Starting deployment...";
             await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);
 
             var summary = _deploymentOutcomeSummaryBuilder.Build(deployContext.MultiVmContext);
+            UpdateDeployRowsFromSummary(summary);
+            _deployLifecycleState = summary.OperationState switch
+            {
+                DeploymentOperationState.Completed => "Completed",
+                DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "Cancelled",
+                DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
+                _ => "Completed"
+            };
+            _deployProgressPercent = 100;
+            _deployProgressSummary =
+                $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.";
             DeployActionStatusTextBlock.Text =
                 $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, " +
                 $"Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Residuals={summary.ResidualVmCount}.";
         }
         catch (Exception ex)
         {
+            _deployLifecycleState = "Failed";
+            _deployProgressPercent = 100;
+            _deployProgressSummary = "Deployment failed.";
             DeployActionStatusTextBlock.Text = $"Deploy failed. {ex.Message}";
         }
         finally
@@ -3436,4 +3652,18 @@ public sealed partial class MainWindow : Window
     private sealed record DeployContextBuildResult(
         MultiVmDeploymentContext MultiVmContext,
         IReadOnlyList<DeployCompatibilityIssue> CompatibilityIssues);
+
+    private sealed record DeployVmResultRow(
+        string VmName,
+        string Status,
+        string Summary,
+        string Details);
+
+    private sealed record DeployIssueRow(
+        string Scope,
+        string Severity,
+        string Message)
+    {
+        public override string ToString() => $"{Severity} [{Scope}] {Message}";
+    }
 }

@@ -17,7 +17,21 @@ public sealed partial class DeployFromTemplateView : UserControl
 
     public Border DeployReadinessSummaryPanelControl => DeployReadinessSummaryPanel;
 
+    public TextBlock DeployOverallStateTextBlockControl => DeployOverallStateTextBlock;
+
+    public ProgressBar DeployProgressBarControl => DeployProgressBar;
+
+    public TextBlock DeployProgressSummaryTextBlockControl => DeployProgressSummaryTextBlock;
+
+    public TextBlock DeployGlobalIssuesBadgeTextBlockControl => DeployGlobalIssuesBadgeTextBlock;
+
     public TextBlock DeployReadinessSummaryTextBlockControl => DeployReadinessSummaryTextBlock;
+
+    public Expander DeployGlobalIssuesExpanderControl => DeployGlobalIssuesExpander;
+
+    public ListView DeployGlobalIssuesListViewControl => DeployGlobalIssuesListView;
+
+    public ListView DeployVmResultsListViewControl => DeployVmResultsListView;
 
     public Button DeployResolveSuggestionsButtonControl => DeployResolveSuggestionsButton;
 
