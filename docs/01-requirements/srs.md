@@ -360,6 +360,25 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** Import/export remain available from `Templates` capability surfaces while existing template schema validation and compatibility semantics remain unchanged.
   - **Priority:** P1
 
+- **FR-080:** WinUI `Templates` editor shall display and manage the template VM entry list (`vmTemplates`) inside editor context.
+  - **Acceptance details:** Users can view VM entries and select a VM entry for field editing without leaving `Templates` capability context.
+  - **Priority:** P1
+
+- **FR-081:** WinUI `Templates` editor shall support v1 VM-entry edit operations using existing schema/model fields only:
+  - add VM entry
+  - remove VM entry (with confirmation)
+  - edit supported VM configuration fields already defined in template schema/contracts
+  - **Acceptance details:** This requirement does not introduce new schema fields or new domain behavior.
+  - **Priority:** P1
+
+- **FR-082:** WinUI `Templates` VM-entry edits shall follow save/reload round-trip behavior through existing template persistence and validation semantics.
+  - **Acceptance details:** Saved VM-entry edits persist and reload accurately from storage; invalid edits are blocked with actionable validation feedback.
+  - **Priority:** P1
+
+- **FR-083:** WinUI `Templates` library/editor continuity shall be preserved after VM-entry edits.
+  - **Acceptance details:** After save/delete/add/edit operations, editor and library state remain coherent (selected template/context, counts, and reload behavior) without cross-capability navigation.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.

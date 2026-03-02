@@ -5,8 +5,8 @@
 **Status:** Approved contract for Milestone AD planning/implementation.
 
 **Related:**
-- `docs/01-requirements/srs.md` (FR-077, FR-078, FR-079)
-- `docs/01-requirements/acceptance-criteria.md` (AC-011)
+- `docs/01-requirements/srs.md` (FR-077, FR-078, FR-079, FR-080, FR-081, FR-082, FR-083)
+- `docs/01-requirements/acceptance-criteria.md` (AC-011, AC-012)
 - `docs/02-ux/winui-global-navigationview-contract-ac.md` (AC shell baseline)
 - `docs/02-ux/navigation-ia-draft.md`
 - `docs/02-ux/ui-migration-execution-plan.md`
@@ -96,6 +96,56 @@ Out of scope:
 - FR-077 -> AC-011 scenarios 1 and 4 (route contract and global-nav compatibility)
 - FR-078 -> AC-011 scenarios 2 and 3 (unified library/editor continuity and discoverability)
 - FR-079 -> AC-011 scenario 3 (import/export discoverability and non-filesystem-first primary workflow)
+- FR-080 -> AC-012 scenario 1 (editor VM-entry list visibility and selection context)
+- FR-081 -> AC-012 scenarios 2, 3, and 4 (add/remove/edit VM-entry operations using existing schema fields)
+- FR-082 -> AC-012 scenario 5 (save/reload round-trip behavior for VM-entry edits)
+- FR-083 -> AC-012 scenario 6 (library/editor continuity after VM-entry operations)
+
+---
+
+## 6) Template VM Editing Parity Contract (AD5 -> AD6)
+
+This section defines the VM-entry editing contract for AD6 implementation.
+
+### 6.1 Required editor behaviors
+
+- `templates.editor` must display template VM entries (`vmTemplates`) as an editor-local list.
+- User must be able to:
+  - select a VM entry
+  - add a VM entry
+  - remove a VM entry (with confirmation)
+  - edit VM-entry fields that already exist in schema/contracts
+- VM-entry operations are draft-first until save.
+
+### 6.2 Field scope (no schema invention)
+
+AD6 may edit only fields already defined by schema/model contracts for `vmTemplates[]` entries (for example: name, memory/cpu, base disk references, switch, and existing optional sections already represented in the model).
+
+AD6 must not:
+- add new schema keys
+- reinterpret existing schema semantics
+- introduce new domain workflows outside existing template behavior
+
+### 6.3 Save/reload and continuity expectations
+
+- Save must persist valid VM-entry edits through existing template persistence path.
+- Reload/reopen must reflect saved VM-entry changes accurately.
+- Validation failures must block invalid persistence and provide actionable feedback.
+- Library/editor continuity must remain stable after VM-entry edits (including route/context coherence and visible metadata consistency where shown).
+
+### 6.4 AD6 in/out boundary
+
+In scope for AD6:
+- VM-entry list and editor interactions in `templates.editor`
+- add/remove/edit flows for existing schema fields
+- confirmation flow for remove
+- save/reload parity and continuity behavior
+
+Out of scope for AD6:
+- schema additions or migrations
+- new template-domain feature invention
+- Deploy/Assets/global-nav redesign
+- cross-capability behavior changes unrelated to Templates editing parity
 
 ---
 

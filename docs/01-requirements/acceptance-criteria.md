@@ -1185,6 +1185,105 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-012 — WinUI Templates VM Entry Editing Parity (AD5)
+
+**Related FRs:** FR-080, FR-081, FR-082, FR-083, FR-012, FR-014, FR-015
+
+## Scenarios
+
+### 1) VM list visible in editor context
+**Given**
+- User is in `templates.editor`
+- A template document is loaded (existing or draft)
+
+**When**
+- User views editor content
+
+**Then**
+- Template VM entries (`vmTemplates`) are visible as an editor-local list
+- User can select a VM entry to edit its fields within Templates editor context
+
+### 2) Add VM entry
+**Given**
+- User is editing a template in `templates.editor`
+
+**When**
+- User chooses to add a VM entry
+
+**Then**
+- A new VM entry is added to editor draft state
+- Required fields are surfaced for completion/validation
+- Save remains blocked until required validation conditions are met
+
+### 3) Remove VM entry with confirmation
+**Given**
+- User has selected an existing VM entry in editor
+
+**When**
+- User chooses remove and confirms
+
+**Then**
+- Selected VM entry is removed from editor draft state
+- Removal is not committed until template save
+- User receives clear confirmation/result feedback
+
+### 4) Edit VM-entry fields using existing schema
+**Given**
+- User has selected a VM entry in editor
+
+**When**
+- User edits supported VM-entry fields already defined in template schema/contracts
+
+**Then**
+- Editor updates draft state without introducing new schema fields
+- Validation behavior remains consistent with existing template rules
+- Invalid state is surfaced with actionable guidance
+
+### 5) Save/reload round-trip for VM-entry edits
+**Given**
+- User has changed VM-entry data in editor
+
+**When**
+- User saves and later reloads/reopens the template
+
+**Then**
+- Saved VM-entry changes persist and reload accurately
+- Validation failures prevent invalid persistence
+- No silent data loss occurs for valid saved VM-entry changes
+
+### 6) Library <-> Editor continuity after VM edits
+**Given**
+- User performs add/remove/edit operations and saves (or receives validation failure)
+
+**When**
+- User returns to `templates.library` and/or reopens the same template in editor
+
+**Then**
+- Template context remains coherent across library/editor transitions
+- Library reflects saved VM-entry state (for example item metadata/count consistency where shown)
+- Navigation remains inside `Templates` capability context
+
+## Scope boundary for AD6 implementation
+- In scope:
+  - VM entry list rendering in editor
+  - add/remove/edit behaviors for existing schema fields
+  - save/reload continuity and validation feedback
+- Out of scope:
+  - new template schema fields
+  - new template domain semantics unrelated to existing schema
+  - Deploy/Assets/global-nav redesign work
+
+## Definition of Done
+- [ ] VM entry list is available in `templates.editor`
+- [ ] Add/remove/edit VM-entry flows are implemented against existing schema fields
+- [ ] Remove requires explicit confirmation
+- [ ] Save/reload round-trip preserves valid VM-entry edits
+- [ ] Validation/error behavior is explicit and actionable
+- [ ] Library/editor continuity remains stable after VM-entry edits
+- [ ] No schema/domain scope expansion is introduced
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules

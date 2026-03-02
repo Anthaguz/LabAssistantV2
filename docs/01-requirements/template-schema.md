@@ -83,6 +83,11 @@ Validation rule:
 
 - At least one of `vhdxId` or `vhdPath` must exist for each VM.
 
+Editor parity clarification:
+
+- WinUI template VM-entry editing parity (AD5/AD6) operates on these existing `vmTemplates[]` fields and existing optional subobjects only.
+- VM-entry editing parity does not add schema keys by itself.
+
 ## Network Scope (v1)
 
 For v1 topology, only switch attachment is canonical:
