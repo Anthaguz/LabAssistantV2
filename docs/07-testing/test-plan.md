@@ -184,6 +184,25 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Compact and expanded interactions remain discoverable and non-ambiguous.
   - Active navigation highlight remains the context signal, with no breadcrumb dependency introduced in this slice.
 
+## TC-013: Milestone AD Templates Convergence Verification
+- **Related AC:** `AC-011`, `AC-012`, `FR-077`, `FR-078`, `FR-079`, `FR-080`, `FR-081`, `FR-082`, `FR-083`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AD (`#300`, `#301`, `#302`, `#307`, `#308`, `#303`)
+- **Steps:**
+  1. Run automated AD matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneADScenarioMatrixTests.cs`.
+  2. Run the Milestone AD checklist in `docs/07-testing/milestone-ad-templates-convergence-checklist.md`.
+  3. Verify Templates routing (`templates.library` default from parent, local navigation to `templates.editor`).
+  4. Verify unified workflow continuity (Library selection -> Editor context -> back to Library with coherent selection state).
+  5. Verify AD3 operation entry points and AC-012 VM-edit parity flows (add/remove/edit/apply + save/reload round-trip).
+  6. Verify layout/overflow sanity for Templates surfaces across compact/normal/wide window sizes.
+- **Expected:**
+  - Templates capability follows canonical routing and global-nav compatibility contract.
+  - Library and Editor operate as one coherent capability workflow.
+  - AD3 operation entry paths are available and actionable with explicit status/error messaging.
+  - AC-012 VM-entry parity behavior is observable and stable through save/reload.
+  - Templates layout remains scroll-safe and does not regress to overflow/infinite-growth behavior.
+  - AD closure evidence includes both automated structural checks and manual runtime verification.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.

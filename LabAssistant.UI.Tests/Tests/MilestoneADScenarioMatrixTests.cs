@@ -68,6 +68,31 @@ public sealed class MilestoneADScenarioMatrixTests
     }
 
     [Fact]
+    public void MainWindow_PreservesLibraryEditorContinuity_WithoutFilesystemFirstFallback()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("OpenSelectedTemplateInEditorAsync()", source);
+        Assert.Contains("_activeTemplateEditorDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedTemplateLibraryItem.FilePath);", source);
+        Assert.Contains("TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;", source);
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
+    }
+
+    [Fact]
+    public void MainWindow_UsesExistingTemplateVmSchemaFields_WithoutNewUiKeys()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("_selectedTemplateVmEntry.SwitchName", source);
+        Assert.Contains("_selectedTemplateVmEntry.VhdxId", source);
+        Assert.Contains("_selectedTemplateVmEntry.VhdPath", source);
+        Assert.Contains("_selectedTemplateVmEntry.VhdxSignature", source);
+        Assert.DoesNotContain("OperatingSystem", source);
+        Assert.DoesNotContain("DomainName", source);
+    }
+
+    [Fact]
     public void TemplateViews_ExposeOperationalControls_ForAd3()
     {
         var libraryXaml = LoadTemplatesLibraryViewXaml();
@@ -97,6 +122,9 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.NotNull(FindByName(editorXaml, "SaveTemplateAsButton"));
         Assert.NotNull(FindByName(editorXaml, "ValidateTemplateButton"));
         Assert.NotNull(FindByName(editorXaml, "TemplateEditorStatusTextBlock"));
+        Assert.Contains(
+            editorXaml.Descendants(),
+            element => element.Name.LocalName == "ScrollViewer");
     }
 
     [Fact]
