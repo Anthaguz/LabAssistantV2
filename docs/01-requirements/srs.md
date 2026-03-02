@@ -319,8 +319,6 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-073:** WinUI Diagnostics shall provide a read-only structured log viewer (Phase 1) using stable envelope fields with dynamic context inspection.
-
-- **FR-074:** WinUI shell and migrated capability surfaces shall follow a documented layout constraints contract that defines bounded region sizing, explicit scroll ownership, overflow handling rules, and resize behavior expectations for compact/normal/wide widths.
   - **Envelope fields:** `ts`, `level`, `event`, `operationId`, `result`
   - **Viewer behavior (Phase 1):**
     - render envelope columns
@@ -335,9 +333,21 @@ Each requirement must be **testable** and mapped to acceptance criteria.
     - advanced visualizations/timelines
   - **Priority:** P1
 
+- **FR-074:** WinUI shell and migrated capability surfaces shall follow a documented layout constraints contract that defines bounded region sizing, explicit scroll ownership, overflow handling rules, and resize behavior expectations for compact/normal/wide widths.
+  - **Priority:** P1
+
+- **FR-075:** WinUI shell shall use a global `NavigationView` (`LeftCompact`) for top-level capability navigation with hierarchical child actions/subviews per capability.
+  - **Acceptance details:** Expanded mode shows entity labels and child actions; compact mode remains icon-first and must provide a non-hover path to child actions.
+  - **Priority:** P1
+
+- **FR-076:** WinUI shell navigation shall use canonical route keys in `capability.subview` format, with deterministic startup at `machines.overview`.
+  - **Acceptance details:** Selecting a parent entity routes to its default child route; `Settings` is placed as footer navigation.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
+- See `docs/02-ux/winui-global-navigationview-contract-ac.md` for Milestone AC global NavigationView behavior and routing contract.
 
 ---
 
