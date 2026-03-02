@@ -77,8 +77,8 @@ public sealed class ShellViewModel
                 displayName: "Settings",
                 isFooter: true,
                 [
-                    new ShellSubview(ShellRouteKeys.SettingsGeneral, "General", ["Apply"]),
-                    new ShellSubview(ShellRouteKeys.SettingsMachines, "Machines", ["Save Policy"])
+                    new ShellSubview(ShellRouteKeys.SettingsMachines, "Machines", ["Save Policy"]),
+                    new ShellSubview(ShellRouteKeys.SettingsGeneral, "General", ["Apply"])
                 ])
         ];
 

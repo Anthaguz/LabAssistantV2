@@ -180,20 +180,24 @@ public sealed partial class MainWindow : Window
                 Icon = new FontIcon { Glyph = capability.Glyph }
             };
 
-            foreach (var subview in capability.Subviews)
+            if (!capability.IsFooter)
             {
-                var childItem = new NavigationViewItem
+                foreach (var subview in capability.Subviews)
                 {
-                    Content = subview.DisplayName,
-                    Tag = subview.RouteKey
-                };
-                parentItem.MenuItems.Add(childItem);
-                _routeToNavigationItem[subview.RouteKey] = childItem;
+                    var childItem = new NavigationViewItem
+                    {
+                        Content = subview.DisplayName,
+                        Tag = subview.RouteKey
+                    };
+                    parentItem.MenuItems.Add(childItem);
+                    _routeToNavigationItem[subview.RouteKey] = childItem;
+                }
             }
 
             if (capability.IsFooter)
             {
                 GlobalNavigationView.FooterMenuItems.Add(parentItem);
+                _routeToNavigationItem[capability.DefaultSubview.RouteKey] = parentItem;
             }
             else
             {
