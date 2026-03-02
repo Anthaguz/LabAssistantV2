@@ -130,24 +130,31 @@
                             <Border
                                 x:Name="TemplatesLocalNavigationPanel"
                                 Padding="8"
-                                Background="{StaticResource ShellBackgroundBrush}"
+                                Background="{StaticResource ShellContentBackgroundBrush}"
                                 BorderBrush="{StaticResource ShellBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6"
                                 Visibility="Collapsed">
                                 <TabView
                                     x:Name="TemplatesSubviewTabView"
+                                    IsAddTabButtonVisible="False"
                                     SelectionChanged="TemplatesSubviewTabView_SelectionChanged">
-                                    <TabViewItem x:Name="TemplatesLibraryTabViewItem" Header="Library" />
-                                    <TabViewItem x:Name="TemplatesEditorTabViewItem" Header="Editor" />
+                                    <TabView.Resources>
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="{ThemeResource ShellBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="{ThemeResource ShellContentBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderForeground" Color="{ThemeResource ShellTextSecondaryColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderForegroundSelected" Color="{ThemeResource ShellTextPrimaryColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="{ThemeResource ShellBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderForegroundPointerOver" Color="{ThemeResource ShellTextPrimaryColor}" />
+                                    </TabView.Resources>
+                                    <TabViewItem x:Name="TemplatesLibraryTabViewItem" Header="Library" IsClosable="False">
+                                        <templateViews:TemplatesLibraryView x:Name="TemplatesLibraryViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="TemplatesEditorTabViewItem" Header="Editor" IsClosable="False">
+                                        <templateViews:TemplatesEditorView x:Name="TemplatesEditorViewHost" />
+                                    </TabViewItem>
                                 </TabView>
                             </Border>
-                            <templateViews:TemplatesLibraryView
-                                x:Name="TemplatesLibraryViewHost"
-                                Visibility="Collapsed" />
-                            <templateViews:TemplatesEditorView
-                                x:Name="TemplatesEditorViewHost"
-                                Visibility="Collapsed" />
                             <Border
                                 x:Name="SettingsMachinesPanel"
                                 Padding="12"

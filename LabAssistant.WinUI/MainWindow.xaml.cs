@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, NavigationViewItem> _routeToCapabilityNavigationItem = new(StringComparer.Ordinal);
     private readonly IMachinesCapabilityService _machinesCapabilityService;
     private readonly IStructuredLogViewerService _structuredLogViewerService;
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
@@ -53,8 +54,6 @@ public sealed partial class MainWindow : Window
     private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
-    private FrameworkElement TemplatesLibraryPanel => TemplatesLibraryViewHost;
-    private FrameworkElement TemplatesEditorPanel => TemplatesEditorViewHost;
     private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
     private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
     private ListView MachinesListView => MachinesOverviewView.MachinesListView;
@@ -171,6 +170,7 @@ public sealed partial class MainWindow : Window
     private void ConfigureNavigationView()
     {
         _routeToNavigationItem.Clear();
+        _routeToCapabilityNavigationItem.Clear();
         GlobalNavigationView.MenuItems.Clear();
         GlobalNavigationView.FooterMenuItems.Clear();
 
@@ -194,6 +194,7 @@ public sealed partial class MainWindow : Window
                     };
                     parentItem.MenuItems.Add(childItem);
                     _routeToNavigationItem[subview.RouteKey] = childItem;
+                    _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
                 }
             }
 
@@ -201,6 +202,7 @@ public sealed partial class MainWindow : Window
             {
                 GlobalNavigationView.FooterMenuItems.Add(parentItem);
                 _routeToNavigationItem[capability.DefaultSubview.RouteKey] = parentItem;
+                _routeToCapabilityNavigationItem[capability.DefaultSubview.RouteKey] = parentItem;
             }
             else
             {
@@ -241,8 +243,6 @@ public sealed partial class MainWindow : Window
         IssueBadgeTextBlock.Text = _issueCount.ToString();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesLibraryPanel.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesEditorPanel.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;
         SyncTemplatesSubviewSelection();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
@@ -337,7 +337,7 @@ public sealed partial class MainWindow : Window
 
     private void QueueNavigationSelectionUpdate()
     {
-        if (!_routeToNavigationItem.TryGetValue(_activeRouteKey, out var selectedNavigationItem))
+        if (!_routeToCapabilityNavigationItem.TryGetValue(_activeRouteKey, out var selectedNavigationItem))
         {
             return;
         }
