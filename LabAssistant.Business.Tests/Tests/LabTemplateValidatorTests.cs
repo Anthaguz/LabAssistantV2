@@ -207,4 +207,66 @@ public class LabTemplateValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.Contains("guestNetworkConfig.dnsServers must not contain empty values.", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Validate_RejectsDuplicateSwitchNames()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchNames = [ "Default Switch", "default switch" ]
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, []);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("switchNames must not contain duplicates.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_RejectsEmptySwitchNameValuesInSwitchNames()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchNames = [ "Default Switch", " " ]
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, []);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("switchNames must not contain empty values.", StringComparison.Ordinal));
+    }
 }

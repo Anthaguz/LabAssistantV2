@@ -98,6 +98,24 @@ public static class LabTemplateValidator
                 result.MissingVhdxIds.Add(vm.VhdxId!);
             }
 
+            if (vm.SwitchNames is not null)
+            {
+                if (vm.SwitchNames.Any(string.IsNullOrWhiteSpace))
+                {
+                    result.Errors.Add($"VM '{vmName}' switchNames must not contain empty values.");
+                }
+
+                var distinctSwitches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var switchName in vm.SwitchNames.Where(name => !string.IsNullOrWhiteSpace(name)))
+                {
+                    if (!distinctSwitches.Add(switchName.Trim()))
+                    {
+                        result.Errors.Add($"VM '{vmName}' switchNames must not contain duplicates.");
+                        break;
+                    }
+                }
+            }
+
             ValidateGuestStepConfig(vm, result);
         }
 

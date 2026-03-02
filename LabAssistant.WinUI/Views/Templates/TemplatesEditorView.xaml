@@ -192,8 +192,25 @@
                                         <ColumnDefinition Width="130" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Switch" />
-                                    <TextBox x:Name="TemplateVmSwitchTextBox" Grid.Column="1" />
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        VerticalAlignment="Top"
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="Switches" />
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <StackPanel
+                                            x:Name="TemplateVmSwitchRowsPanel"
+                                            Spacing="6" />
+                                        <Button
+                                            x:Name="AddTemplateVmSwitchRowButton"
+                                            HorizontalAlignment="Left"
+                                            Content="+ Add Switch" />
+                                        <TextBlock
+                                            x:Name="TemplateVmSwitchGuidanceTextBlock"
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="No switch rows. Optional for template VM."
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
                                 </Grid>
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>

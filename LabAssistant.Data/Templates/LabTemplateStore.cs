@@ -229,6 +229,7 @@ public class LabTemplateStore : ILabTemplateStore
         {
             var vm = normalized.VmTemplates[i];
             vm.GuestNetworkConfig = NormalizeGuestNetworkPlaceholder(vm.GuestNetworkConfig);
+            NormalizeSwitchAssignments(vm);
             if (!string.IsNullOrWhiteSpace(vm.VmId))
             {
                 continue;
@@ -244,6 +245,7 @@ public class LabTemplateStore : ILabTemplateStore
                 VhdPath = vm.VhdPath,
                 VhdxSignature = vm.VhdxSignature,
                 SwitchName = vm.SwitchName,
+                SwitchNames = vm.SwitchNames?.ToList(),
                 TimeZoneConfig = Clone(vm.TimeZoneConfig),
                 SoftwareConfig = Clone(vm.SoftwareConfig),
                 RoleConfig = Clone(vm.RoleConfig),
@@ -299,6 +301,22 @@ public class LabTemplateStore : ILabTemplateStore
         }
 
         return config;
+    }
+
+    private static void NormalizeSwitchAssignments(VmTemplate vm)
+    {
+        var canonical = vm.SwitchNames?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .ToList() ?? [];
+
+        if (canonical.Count == 0 && !string.IsNullOrWhiteSpace(vm.SwitchName))
+        {
+            canonical.Add(vm.SwitchName.Trim());
+        }
+
+        vm.SwitchNames = canonical.Count > 0 ? canonical : null;
+        vm.SwitchName = canonical.Count > 0 ? canonical[0] : null;
     }
 
     private static TimeZoneStepConfig? Clone(TimeZoneStepConfig? source)
