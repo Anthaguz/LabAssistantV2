@@ -57,6 +57,10 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", source);
         Assert.Contains("ValidateTemplateButton.Click += ValidateTemplateButton_Click;", source);
         Assert.Contains("BackToLibraryButton.Click += BackToLibraryButton_Click;", source);
+        Assert.Contains("TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;", source);
+        Assert.Contains("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", source);
+        Assert.Contains("RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;", source);
+        Assert.Contains("ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;", source);
         Assert.Contains("_templatesCapabilityService.SaveAsync", source);
         Assert.Contains("_templatesCapabilityService.ImportAsync", source);
         Assert.Contains("_templatesCapabilityService.ExportAsync", source);
@@ -78,10 +82,34 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.NotNull(FindByName(libraryXaml, "TemplatesLibraryStatusTextBlock"));
         Assert.NotNull(FindByName(editorXaml, "TemplateNameTextBox"));
         Assert.NotNull(FindByName(editorXaml, "TemplateDescriptionTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmListView"));
+        Assert.NotNull(FindByName(editorXaml, "AddTemplateVmButton"));
+        Assert.NotNull(FindByName(editorXaml, "RemoveTemplateVmButton"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmNameTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmMemoryTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmCpuTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmSwitchTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxIdTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdPathTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxSignatureTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "ApplyTemplateVmChangesButton"));
         Assert.NotNull(FindByName(editorXaml, "SaveTemplateButton"));
         Assert.NotNull(FindByName(editorXaml, "SaveTemplateAsButton"));
         Assert.NotNull(FindByName(editorXaml, "ValidateTemplateButton"));
         Assert.NotNull(FindByName(editorXaml, "TemplateEditorStatusTextBlock"));
+    }
+
+    [Fact]
+    public void MainWindow_ImplementsVmEntryParityFlow_WithSaveReloadGuards()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("RefreshTemplateVmEntriesFromDocument()", source);
+        Assert.Contains("SyncTemplateVmEntriesToDocument()", source);
+        Assert.Contains("TryApplySelectedTemplateVmFields(showSuccessStatus: false)", source);
+        Assert.Contains("Remove VM Entry", source);
+        Assert.Contains("Added VM entry", source);
+        Assert.Contains("Removed VM entry", source);
     }
 
     private static XDocument LoadMainWindowXaml()
