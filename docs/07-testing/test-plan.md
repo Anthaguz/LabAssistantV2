@@ -150,6 +150,23 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - RDP action remains visible but disabled until readiness policy work is delivered.
   - Structured logs include machine action operation context and delete scope fields.
 
+## TC-011: Milestone AB Layout Hardening + View Decomposition Verification
+- **Related AC:** `AC-007` (WinUI shell foundation behavior continuity), Milestone AB layout constraints contract (`#286`) and decomposition/hardening implementation (`#287`)
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AB (`#286`, `#287`, `#288`)
+- **Steps:**
+  1. Run automated AB matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneABScenarioMatrixTests.cs`.
+  2. Run the Milestone AB checklist in `docs/07-testing/milestone-ab-layout-hardening-checklist.md`.
+  3. Verify compact/normal/wide resize behavior across Machines and Diagnostics surfaces.
+  4. Verify overflow/scroll ownership behavior, especially long Diagnostics payload details and filter/action reachability.
+  5. Verify extracted host rendering remains stable while switching capabilities/subviews (no empty-host regressions).
+- **Expected:**
+  - MainWindow host-based decomposition contract remains intact for extracted views.
+  - Visibility wiring remains valid and prevents empty surface regressions.
+  - Dense surfaces remain usable under constrained widths without hidden primary controls.
+  - Scroll ownership remains stable (bounded internal scroll where intended, no parent layout breakage from long content).
+  - AB validation is covered by both deterministic structural tests and repeatable manual resize/interaction checks.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.
