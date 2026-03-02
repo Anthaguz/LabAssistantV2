@@ -13,10 +13,9 @@ using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.Views.Diagnostics;
 using LabAssistant.WinUI.Views.Machines;
 using LabAssistant.WinUI.Views.Templates;
+using LabAssistant.WinUI.Interop;
 using Microsoft.UI.Dispatching;
 using WinRT.Interop;
-using Windows.Storage;
-using Windows.Storage.Pickers;
 
 namespace LabAssistant.WinUI;
 
@@ -695,85 +694,18 @@ public sealed partial class MainWindow : Window
         template.Description = TemplateDescriptionTextBox.Text?.Trim();
     }
 
-    private async Task<string?> PickTemplateFileForOpenAsync()
+    private Task<string?> PickTemplateFileForOpenAsync()
     {
-        try
-        {
-            var picker = new FileOpenPicker();
-            picker.FileTypeFilter.Add(".json");
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-            StorageFile? file = await picker.PickSingleFileAsync();
-            return file?.Path;
-        }
-        catch (Exception ex)
-        {
-            TemplatesLibraryStatusTextBlock.Text = $"File picker unavailable. Enter template path manually. {ex.Message}";
-            return await PromptForPathAsync(
-                title: "Import Template (manual path)",
-                placeholder: @"C:\path\to\template.json",
-                requireExistingFile: true);
-        }
+        var hwnd = WindowNative.GetWindowHandle(this);
+        var selectedPath = NativeFileDialogs.ShowOpenJsonDialog(hwnd);
+        return Task.FromResult(selectedPath);
     }
 
-    private async Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName)
+    private Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName)
     {
-        try
-        {
-            var picker = new FileSavePicker
-            {
-                SuggestedFileName = suggestedFileName
-            };
-            picker.FileTypeChoices.Add("JSON template", [".json"]);
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-            StorageFile? file = await picker.PickSaveFileAsync();
-            return file?.Path;
-        }
-        catch (Exception ex)
-        {
-            TemplatesLibraryStatusTextBlock.Text = $"Save picker unavailable. Enter destination path manually. {ex.Message}";
-            return await PromptForPathAsync(
-                title: "Export Template (manual path)",
-                placeholder: $@"C:\path\to\{suggestedFileName}",
-                requireExistingFile: false);
-        }
-    }
-
-    private async Task<string?> PromptForPathAsync(string title, string placeholder, bool requireExistingFile)
-    {
-        var pathTextBox = new TextBox
-        {
-            PlaceholderText = placeholder
-        };
-
-        var dialog = new ContentDialog
-        {
-            XamlRoot = RootLayout.XamlRoot,
-            Title = title,
-            PrimaryButtonText = "Use Path",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Primary,
-            Content = pathTextBox
-        };
-
-        var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Primary)
-        {
-            return null;
-        }
-
-        var selectedPath = pathTextBox.Text?.Trim();
-        if (string.IsNullOrWhiteSpace(selectedPath))
-        {
-            return null;
-        }
-
-        if (requireExistingFile && !File.Exists(selectedPath))
-        {
-            TemplatesLibraryStatusTextBlock.Text = $"File not found: {selectedPath}";
-            return null;
-        }
-
-        return selectedPath;
+        var hwnd = WindowNative.GetWindowHandle(this);
+        var selectedPath = NativeFileDialogs.ShowSaveJsonDialog(hwnd, suggestedFileName);
+        return Task.FromResult(selectedPath);
     }
 
     private void TemplateLibraryListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
