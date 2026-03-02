@@ -1031,6 +1031,85 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-010 â€” WinUI Global NavigationView Convergence (AC1)
+
+**Related FRs:** FR-075, FR-076
+
+## Scenarios
+
+### 1) Global NavigationView model
+**Given**
+- WinUI shell is running
+
+**When**
+- User views shell navigation
+
+**Then**
+- Shell uses a single global `NavigationView` in `LeftCompact` mode
+- Compact state is icon-first
+- Expanded state shows labels and hierarchical entity/action entries
+
+### 2) Entity and child-action routing
+**Given**
+- Top-level entities have child actions/subviews
+
+**When**
+- User selects navigation items
+
+**Then**
+- Selecting a parent entity routes to that entity's default child route
+- Selecting a child routes directly to that child
+- Canonical route keys use `capability.subview` format
+
+### 3) Compact-mode child access (non-hover)
+**Given**
+- Navigation is in compact icon-only mode
+
+**When**
+- User selects an entity icon
+
+**Then**
+- Child actions become accessible via flyout/compact affordance
+- Child access does not depend on hover-only behavior
+
+### 4) Startup and context defaults
+**Given**
+- App starts from a fresh launch
+
+**When**
+- Startup navigation resolves
+
+**Then**
+- Default startup route is `machines.overview`
+- Last selected capability/route is not restored in this slice
+- Active navigation highlight provides context (breadcrumbs not required in this slice)
+
+### 5) Settings placement
+**Given**
+- User inspects global navigation
+
+**When**
+- Navigation is rendered
+
+**Then**
+- `Settings` appears as footer navigation (cog entry), separate from main entity list
+
+## Expected UI
+- One global shell `NavigationView` (LeftCompact)
+- Main entity list with hierarchical child entries
+- Compact-mode child access affordance
+- Footer `Settings` entry
+
+## Definition of Done
+- [ ] Navigation model matches `docs/02-ux/winui-global-navigationview-contract-ac.md`
+- [ ] Route keys use canonical `capability.subview`
+- [ ] Parent-select-to-default-child behavior is implemented
+- [ ] Compact mode exposes child actions without hover dependency
+- [ ] Startup route is `machines.overview`
+- [ ] Settings is rendered as footer entry
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules

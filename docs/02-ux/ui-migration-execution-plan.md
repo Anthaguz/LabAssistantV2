@@ -14,6 +14,7 @@
 - `docs/02-ux/ui-framework-decision-rubric.md`
 - `docs/02-ux/ui-framework-decision-record-y3.md`
 - `docs/02-ux/winui-shell-contract-aa.md`
+- `docs/02-ux/winui-global-navigationview-contract-ac.md`
 - `docs/02-ux/winui-layout-constraints-contract.md`
 - `docs/03-architecture/gui-action-map.deploy.md`
 - `docs/03-architecture/gui-action-map.templates.md`
@@ -177,6 +178,18 @@ Use a staged migration plan, not a big-bang rewrite.
 - continue capability migrations after Stage F based on prioritized contract issues
 
 This order minimizes behavior risk and establishes shell + Machines UX patterns before migrating the highest-risk Deploy surface.
+
+## 5.2 AC Navigation Convergence Gate
+
+Before Templates/Assets migration depth increases, WinUI shell must satisfy:
+- `docs/02-ux/winui-global-navigationview-contract-ac.md`
+
+Gate expectations:
+- one global `NavigationView` (`LeftCompact`)
+- hierarchical entity/action routing
+- canonical `capability.subview` route keys
+- startup route fixed at `machines.overview`
+- `Settings` footer placement
 
 ---
 

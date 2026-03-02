@@ -8,6 +8,7 @@
 - `docs/02-ux/ui-framework-decision-record-y3.md`
 - `docs/02-ux/navigation-ia-draft.md`
 - `docs/02-ux/ui-migration-execution-plan.md`
+- `docs/02-ux/winui-global-navigationview-contract-ac.md`
 - `docs/01-requirements/machines-capability-contract.md`
 
 ---
@@ -37,6 +38,8 @@ The shell must provide these regions:
 ---
 
 ## 3. Navigation Contract
+
+Note: Milestone AC introduces the global `NavigationView` convergence contract for hierarchical entity/action routing. AA navigation rules remain valid unless superseded by `docs/02-ux/winui-global-navigationview-contract-ac.md`.
 
 ### 3.1 Left Navigation
 

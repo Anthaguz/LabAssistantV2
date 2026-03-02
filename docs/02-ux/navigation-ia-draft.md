@@ -12,6 +12,7 @@
 - `docs/02-ux/ui-migration-execution-plan.md`
 - `docs/02-ux/ui-framework-decision-record-y3.md`
 - `docs/02-ux/winui-shell-contract-aa.md`
+- `docs/02-ux/winui-global-navigationview-contract-ac.md`
 - `docs/02-ux/winui-layout-constraints-contract.md`
 
 ---
@@ -46,6 +47,18 @@
 - `Settings`
 
 This aligns with the capability taxonomy and gives stable top-level structure without turning navigation into a raw command list.
+
+## 2.3 Milestone AC Navigation Convergence (Approved)
+
+For WinUI migration implementation, the shell navigation baseline is now:
+- single global `NavigationView` in `LeftCompact` mode
+- hierarchical entity -> child-action model
+- canonical route keys in `capability.subview` format
+- deterministic startup route `machines.overview`
+- `Settings` as footer navigation entry
+
+Behavioral contract source:
+- `docs/02-ux/winui-global-navigationview-contract-ac.md`
 
 ---
 
