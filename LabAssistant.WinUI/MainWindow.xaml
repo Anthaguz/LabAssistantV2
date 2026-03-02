@@ -102,7 +102,6 @@
                 IsSettingsVisible="False"
                 OpenPaneLength="280"
                 PaneDisplayMode="LeftCompact"
-                SelectionFollowsFocus="Disabled"
                 ItemInvoked="GlobalNavigationView_ItemInvoked">
                 <NavigationView.Content>
                     <Border
