@@ -165,7 +165,24 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Visibility wiring remains valid and prevents empty surface regressions.
   - Dense surfaces remain usable under constrained widths without hidden primary controls.
   - Scroll ownership remains stable (bounded internal scroll where intended, no parent layout breakage from long content).
-  - AB validation is covered by both deterministic structural tests and repeatable manual resize/interaction checks.
+- AB validation is covered by both deterministic structural tests and repeatable manual resize/interaction checks.
+
+## TC-012: Milestone AC Global NavigationView Convergence Verification
+- **Related AC:** `AC-010`, `FR-075`, `FR-076`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AC (`#292`, `#293`, `#294`)
+- **Steps:**
+  1. Run automated AC matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneACScenarioMatrixTests.cs`.
+  2. Run the Milestone AC checklist in `docs/07-testing/milestone-ac-global-navigationview-checklist.md`.
+  3. Verify global entity set + settings footer placement and startup route determinism (`machines.overview`).
+  4. Verify expanded parent->default child behavior and direct child route selection.
+  5. Verify compact mode child accessibility by click (no hover-only dependency) and accepted compact parent-click behavior.
+- **Expected:**
+  - Global NavigationView model remains stable in `LeftCompact` mode.
+  - Entity hierarchy and settings footer placement remain consistent with AC contract.
+  - Canonical route usage and startup route remain deterministic across restarts.
+  - Compact and expanded interactions remain discoverable and non-ambiguous.
+  - Active navigation highlight remains the context signal, with no breadcrumb dependency introduced in this slice.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
