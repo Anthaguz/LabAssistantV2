@@ -8,6 +8,7 @@
         BorderBrush="{StaticResource ShellBorderBrush}"
         BorderThickness="1"
         CornerRadius="6">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="10">
             <TextBlock
                 Foreground="{StaticResource ShellTextPrimaryBrush}"
@@ -220,5 +221,6 @@
                 Text="No template loaded."
                 TextWrapping="Wrap" />
         </StackPanel>
+        </ScrollViewer>
     </Border>
 </UserControl>
