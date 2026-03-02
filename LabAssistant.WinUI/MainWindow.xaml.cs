@@ -41,6 +41,7 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingMachineEditControls;
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
+    private bool _isUpdatingNavigationSelection;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -232,10 +233,7 @@ public sealed partial class MainWindow : Window
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
         NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
 
-        if (_routeToNavigationItem.TryGetValue(_activeRouteKey, out var selectedNavigationItem))
-        {
-            GlobalNavigationView.SelectedItem = selectedNavigationItem;
-        }
+        QueueNavigationSelectionUpdate();
 
         UpdateReadinessPollingState();
         UpdateRdpReadinessUi();
@@ -288,6 +286,11 @@ public sealed partial class MainWindow : Window
 
     private void GlobalNavigationView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
+        if (_isUpdatingNavigationSelection)
+        {
+            return;
+        }
+
         if (args.InvokedItemContainer is not NavigationViewItem invokedItem)
         {
             return;
@@ -305,6 +308,32 @@ public sealed partial class MainWindow : Window
         }
 
         NavigateToRoute(key);
+    }
+
+    private void QueueNavigationSelectionUpdate()
+    {
+        if (!_routeToNavigationItem.TryGetValue(_activeRouteKey, out var selectedNavigationItem))
+        {
+            return;
+        }
+
+        if (ReferenceEquals(GlobalNavigationView.SelectedItem, selectedNavigationItem))
+        {
+            return;
+        }
+
+        _isUpdatingNavigationSelection = true;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                GlobalNavigationView.SelectedItem = selectedNavigationItem;
+            }
+            finally
+            {
+                _isUpdatingNavigationSelection = false;
+            }
+        });
     }
 
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
