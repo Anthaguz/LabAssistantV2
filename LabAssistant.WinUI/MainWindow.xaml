@@ -3,7 +3,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:diagViews="using:LabAssistant.WinUI.Views.Diagnostics"
-    xmlns:machineViews="using:LabAssistant.WinUI.Views.Machines">
+    xmlns:machineViews="using:LabAssistant.WinUI.Views.Machines"
+    xmlns:templateViews="using:LabAssistant.WinUI.Views.Templates">
     <Grid x:Name="RootLayout" Background="{StaticResource ShellBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="56" />
@@ -126,6 +127,34 @@
                             <machineViews:MachinesOverviewView
                                 x:Name="MachinesOverviewViewHost"
                                 Visibility="Collapsed" />
+                            <Border
+                                x:Name="TemplatesLocalNavigationPanel"
+                                Padding="8"
+                                Background="{StaticResource ShellContentBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <TabView
+                                    x:Name="TemplatesSubviewTabView"
+                                    IsAddTabButtonVisible="False"
+                                    SelectionChanged="TemplatesSubviewTabView_SelectionChanged">
+                                    <TabView.Resources>
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="{ThemeResource ShellBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="{ThemeResource ShellContentBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderForeground" Color="{ThemeResource ShellTextSecondaryColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderForegroundSelected" Color="{ThemeResource ShellTextPrimaryColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="{ThemeResource ShellBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderForegroundPointerOver" Color="{ThemeResource ShellTextPrimaryColor}" />
+                                    </TabView.Resources>
+                                    <TabViewItem x:Name="TemplatesLibraryTabViewItem" Header="Library" IsClosable="False">
+                                        <templateViews:TemplatesLibraryView x:Name="TemplatesLibraryViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="TemplatesEditorTabViewItem" Header="Editor" IsClosable="False">
+                                        <templateViews:TemplatesEditorView x:Name="TemplatesEditorViewHost" />
+                                    </TabViewItem>
+                                </TabView>
+                            </Border>
                             <Border
                                 x:Name="SettingsMachinesPanel"
                                 Padding="12"
