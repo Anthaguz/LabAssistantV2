@@ -1386,6 +1386,94 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-014 - WinUI Deploy From-Template Convergence (AF1)
+
+**Related FRs:** FR-087, FR-088, FR-089, FR-090, FR-014, FR-015
+
+## Scenarios
+
+### 1) Deploy routing and template-first entry
+**Given**
+- User is in WinUI global navigation
+
+**When**
+- User selects Deploy capability
+
+**Then**
+- AF route resolves to `deploy.from_template`
+- From-template workflow is the active Deploy slice for AF
+- On-the-fly migration remains explicitly deferred in AF scope
+
+### 2) Required disk identity unresolved/ambiguous blocks deploy
+**Given**
+- A selected template contains VM disk references that cannot be resolved deterministically using AE rules
+
+**When**
+- User runs readiness or attempts deploy
+
+**Then**
+- Readiness returns blocking state for required unresolved/ambiguous disk identity
+- Deploy start is blocked until user resolves required disk identity
+- Blocking status is explicit and actionable
+
+### 3) Switch mapping compatibility with partial warnings
+**Given**
+- Template VM switch data contains canonical `switchNames`, legacy `switchName`, or mixed compatibility state
+
+**When**
+- Deploy readiness evaluates switch mappings
+
+**Then**
+- Mapping prefers `switchNames` and falls back to `switchName` when needed
+- Missing/partial switch mapping surfaces warning-level guidance when deploy can continue
+- Warning text identifies affected VM rows and correction path
+
+### 4) Correction affordances for readiness failures
+**Given**
+- Deploy readiness reports blocking compatibility issues
+
+**When**
+- User inspects readiness output
+
+**Then**
+- UI shows auto-resolve suggestions where deterministic repair is possible
+- UI provides explicit `Open in Templates Editor` correction action
+- Correction flow is non-silent and does not require guesswork
+
+### 5) Compact-first deploy result visibility
+**Given**
+- User starts a from-template deployment
+
+**When**
+- Progress and outcomes are rendered
+
+**Then**
+- Sticky status/progress remains visible
+- Per-VM result rows are concise by default
+- Per-VM details are expandable on demand
+- Global warnings/errors are collapsed by default but remain discoverable
+
+## Scope boundary for AF implementation
+- In scope:
+  - Deploy `from-template` route and workflow in WinUI
+  - AE compatibility checks and readiness correction affordances
+  - compact-first results presentation model
+- Out of scope:
+  - Deploy `on-the-fly` migration
+  - WPF Deploy changes
+  - new deployment semantics
+  - schema/model changes unrelated to approved compatibility behavior
+
+## Definition of Done
+- [ ] `deploy.from_template` route behavior is explicit and testable for AF
+- [ ] Required unresolved/ambiguous disk identity is blocking and actionable
+- [ ] Switch mapping compatibility behavior (`switchNames` preferred, `switchName` fallback) is explicit
+- [ ] Auto-resolve suggestions and `Open in Templates Editor` correction action are defined
+- [ ] Compact-first results visibility with expandable details is defined
+- [ ] AF scope boundaries are explicit and enforceable
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
