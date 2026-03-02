@@ -23,8 +23,9 @@ public sealed class MilestoneADScenarioMatrixTests
         var xaml = LoadMainWindowXaml();
 
         Assert.NotNull(FindByName(xaml, "TemplatesLocalNavigationPanel"));
-        Assert.NotNull(FindByName(xaml, "TemplatesLibraryNavButton"));
-        Assert.NotNull(FindByName(xaml, "TemplatesEditorNavButton"));
+        Assert.NotNull(FindByName(xaml, "TemplatesSubviewTabView"));
+        Assert.NotNull(FindByName(xaml, "TemplatesLibraryTabViewItem"));
+        Assert.NotNull(FindByName(xaml, "TemplatesEditorTabViewItem"));
         Assert.NotNull(FindByName(xaml, "TemplatesLibraryViewHost"));
         Assert.NotNull(FindByName(xaml, "TemplatesEditorViewHost"));
     }
@@ -34,8 +35,8 @@ public sealed class MilestoneADScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
 
-        Assert.Contains("TemplatesLibraryNavButton_Click", source);
-        Assert.Contains("TemplatesEditorNavButton_Click", source);
+        Assert.Contains("TemplatesSubviewTabView_SelectionChanged", source);
+        Assert.Contains("SyncTemplatesSubviewSelection()", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("GlobalNavigationView.FooterMenuItems.Add(parentItem);", source);

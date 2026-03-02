@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
     private bool _isUpdatingNavigationSelection;
+    private bool _isUpdatingTemplatesSubviewSelection;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -242,8 +243,7 @@ public sealed partial class MainWindow : Window
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLibraryPanel.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesEditorPanel.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesLibraryNavButton.IsEnabled = !IsTemplatesLibraryActive;
-        TemplatesEditorNavButton.IsEnabled = !IsTemplatesEditorActive;
+        SyncTemplatesSubviewSelection();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
         NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
@@ -373,14 +373,28 @@ public sealed partial class MainWindow : Window
         ApplyState();
     }
 
-    private void TemplatesLibraryNavButton_Click(object sender, RoutedEventArgs e)
+    private void TemplatesSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
-    }
+        if (_isUpdatingTemplatesSubviewSelection)
+        {
+            return;
+        }
 
-    private void TemplatesEditorNavButton_Click(object sender, RoutedEventArgs e)
-    {
-        NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+        if (TemplatesSubviewTabView.SelectedItem is not TabViewItem selectedTab)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(selectedTab, TemplatesLibraryTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
+            return;
+        }
+
+        if (ReferenceEquals(selectedTab, TemplatesEditorTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+        }
     }
 
     private async void SaveMachinesDeletionPolicyButton_Click(object sender, RoutedEventArgs e)
@@ -446,6 +460,30 @@ public sealed partial class MainWindow : Window
 
     private bool IsDiagnosticsLogsActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.DiagnosticsLogs, StringComparison.Ordinal);
+
+    private void SyncTemplatesSubviewSelection()
+    {
+        if (!IsTemplatesCapabilityActive)
+        {
+            return;
+        }
+
+        var expectedSelection = IsTemplatesEditorActive ? TemplatesEditorTabViewItem : TemplatesLibraryTabViewItem;
+        if (ReferenceEquals(TemplatesSubviewTabView.SelectedItem, expectedSelection))
+        {
+            return;
+        }
+
+        _isUpdatingTemplatesSubviewSelection = true;
+        try
+        {
+            TemplatesSubviewTabView.SelectedItem = expectedSelection;
+        }
+        finally
+        {
+            _isUpdatingTemplatesSubviewSelection = false;
+        }
+    }
 
     private void InitializeRdpReadinessTimer()
     {
