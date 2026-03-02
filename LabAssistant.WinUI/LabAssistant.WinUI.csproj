@@ -15,7 +15,7 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <WindowsAppSdkBootstrapInitialize>true</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
