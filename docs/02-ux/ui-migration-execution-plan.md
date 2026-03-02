@@ -15,6 +15,7 @@
 - `docs/02-ux/ui-framework-decision-record-y3.md`
 - `docs/02-ux/winui-shell-contract-aa.md`
 - `docs/02-ux/winui-global-navigationview-contract-ac.md`
+- `docs/02-ux/winui-templates-capability-contract-ad.md`
 - `docs/02-ux/winui-layout-constraints-contract.md`
 - `docs/03-architecture/gui-action-map.deploy.md`
 - `docs/03-architecture/gui-action-map.templates.md`
@@ -242,6 +243,9 @@ Gate expectations:
 
 **Goal**
 - unify currently split template workflows into a coherent Templates area
+- route Templates through canonical child routes with deterministic parent default:
+  - `templates.library` (default)
+  - `templates.editor`
 
 **Current pain points to fix**
 - list/details/editor split
@@ -253,6 +257,15 @@ Gate expectations:
 - vmId preservation/lifecycle
 - validation + missing VHDX resolution flows
 - template logging/error-feed behavior distinctions
+
+**Milestone AD sequencing contract**
+- AD1 (docs-first): finalize Templates capability routing/workflow contract and FR/AC traceability.
+- AD2 (UI scaffolding only): implement Templates parent/child route surfaces and navigation transitions without adding new template domain behavior.
+- AD3 (operational wiring): connect existing template behaviors (library/editor/import/export/save paths) into unified Templates capability context without feature invention.
+- Out of scope during AD sequencing:
+  - Deploy/Assets capability behavior changes
+  - template domain expansion beyond existing semantics
+  - cross-capability workflow redesigns unrelated to Templates convergence
 
 **Verification baseline**
 - template load/save/import/export tests

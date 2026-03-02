@@ -13,6 +13,7 @@
 - `docs/02-ux/ui-framework-decision-record-y3.md`
 - `docs/02-ux/winui-shell-contract-aa.md`
 - `docs/02-ux/winui-global-navigationview-contract-ac.md`
+- `docs/02-ux/winui-templates-capability-contract-ad.md`
 - `docs/02-ux/winui-layout-constraints-contract.md`
 
 ---
@@ -59,6 +60,19 @@ For WinUI migration implementation, the shell navigation baseline is now:
 
 Behavioral contract source:
 - `docs/02-ux/winui-global-navigationview-contract-ac.md`
+
+## 2.4 Milestone AD Templates Capability Contract (Approved)
+
+For Templates convergence planning and implementation sequencing:
+- parent capability route is `Templates`
+- canonical child routes are:
+  - `templates.library` (default child)
+  - `templates.editor`
+- `templates.details` is deferred unless explicitly approved by a later milestone contract
+- selecting parent `Templates` routes to `templates.library` and remains aligned with AC global nav behavior
+
+Behavioral contract source:
+- `docs/02-ux/winui-templates-capability-contract-ad.md`
 
 ---
 
@@ -190,10 +204,14 @@ should become one coherent Templates workflow.
 
 ### Suggested subviews/actions
 - Template Library (list/search/filter)
-- Template Details
 - Template Editor (integrated, not isolated)
 - Import / Export
 - Validation + missing-reference resolution
+
+### Canonical route contract
+- `templates.library` (default)
+- `templates.editor`
+- `templates.details` deferred (not required for AD2/AD3)
 
 ### Model note (current reality)
 - Templates are lab-level (`LabTemplate`) and contain per-VM definitions (`VmTemplate`).
@@ -337,7 +355,8 @@ This is why the next deliverable after IA should be the GUI Action Map.
 
 - Resolved: default landing capability is `Machines` for WinUI shell implementation.
 - Resolved: layout constraints and scroll ownership are defined in `docs/02-ux/winui-layout-constraints-contract.md` and are mandatory for AB2+ implementation slices.
+- Resolved: Templates capability routing/workflow contract is defined in `docs/02-ux/winui-templates-capability-contract-ad.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?
-- `TBD:` Capability-specific inner layouts for Templates/Assets/Diagnostics in WinUI (within layout contract constraints)
+- `TBD:` Capability-specific inner layouts for Assets/Diagnostics in WinUI (within layout contract constraints)

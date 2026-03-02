@@ -1110,11 +1110,83 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-011 — WinUI Templates Capability Convergence (AD1)
+
+**Related FRs:** FR-077, FR-078, FR-079, FR-075, FR-076
+
+## Scenarios
+
+### 1) Parent Templates routes to default child
+**Given**
+- WinUI global navigation is active
+
+**When**
+- User selects parent `Templates` capability
+
+**Then**
+- Navigation resolves to `templates.library`
+- Routing remains in canonical `capability.subview` format
+- Behavior remains consistent with global NavigationView contract (AC-010)
+
+### 2) Library to Editor transition continuity
+**Given**
+- User is in `templates.library`
+- A template is selected from the library list
+
+**When**
+- User chooses to open or edit the selected template
+
+**Then**
+- Navigation transitions to `templates.editor`
+- Selected template context is preserved through the transition
+- User remains in `Templates` capability context (no cross-capability jump)
+
+### 3) Unified Templates action discoverability
+**Given**
+- User is operating within `Templates` capability
+
+**When**
+- User looks for core template operations
+
+**Then**
+- Library/search/select actions are discoverable in `Templates`
+- Create/edit/save actions are discoverable in `Templates`
+- Import/export entry points are discoverable in `Templates`
+- Primary edit workflow does not require filesystem-first file hunting
+
+### 4) No regression against global navigation behavior
+**Given**
+- Templates routes are enabled under global NavigationView
+
+**When**
+- User switches among capabilities and Templates subviews
+
+**Then**
+- Global nav contract remains intact (entity hierarchy, compact/expanded behavior, settings footer)
+- Startup route remains `machines.overview`
+- No implicit breadcrumb dependency is introduced by Templates convergence contract
+
+## Expected UI
+- Parent capability: `Templates`
+- Canonical child routes:
+  - `templates.library` (default)
+  - `templates.editor`
+- `templates.details` deferred unless approved by future milestone contract
+- Unified Templates capability context for library + editor + import/export entry points
+
+## Definition of Done
+- [ ] Parent `Templates` routes deterministically to `templates.library`
+- [ ] `templates.library` and `templates.editor` routes are explicit in contract/docs
+- [ ] Unified library-to-editor workflow continuity is documented and testable
+- [ ] Import/export discoverability is defined within Templates capability context
+- [ ] No AC-010 global navigation behavior is contradicted
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
 - Whether to store deployment history records locally
 - RDP readiness policy beyond v1 host-observable checks (for example guest policy/NLA/firewall introspection).
-- Templates capability inner layout contract in WinUI (`TBD`)
 - Assets capability inner layout contract in WinUI (`TBD`)
 - Include rotated structured logs in Phase 1 viewer (`structured-events.1.jsonl`, etc.) or defer.
