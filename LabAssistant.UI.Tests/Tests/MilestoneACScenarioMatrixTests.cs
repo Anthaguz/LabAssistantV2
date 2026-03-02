@@ -47,7 +47,7 @@ public sealed class MilestoneACScenarioMatrixTests
         Assert.Contains("key: \"machines\"", source);
         Assert.Contains("new ShellSubview(ShellRouteKeys.MachinesOverview, \"Overview\"", source);
         Assert.Contains("key: \"deploy\"", source);
-        Assert.Contains("new ShellSubview(ShellRouteKeys.DeployOnTheFly, \"On-the-fly\"", source);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.DeployOnTheFly, \"Quick Deploy\"", source);
         Assert.Contains("key: \"templates\"", source);
         Assert.Contains("new ShellSubview(ShellRouteKeys.TemplatesLibrary, \"Library\"", source);
         Assert.Contains("key: \"assets\"", source);
