@@ -177,6 +177,34 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
         });
     }
 
+    public Task<TemplatesVhdxCatalogLoadResult> LoadVhdxCatalogOptionsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var catalogPath = _settingsStore.Settings.CatalogPath;
+        var catalogResult = _catalogStore.Load(catalogPath);
+        var items = catalogResult.Items
+            .OrderBy(item => item.OsName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.OsVersion, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(item => new TemplatesVhdxCatalogItem
+            {
+                Id = item.Id,
+                Path = item.Path,
+                OsName = item.OsName,
+                OsVersion = item.OsVersion,
+                Generation = item.Generation,
+                Signature = item.Signature
+            })
+            .ToList();
+
+        return Task.FromResult(new TemplatesVhdxCatalogLoadResult
+        {
+            Items = items,
+            Errors = catalogResult.Errors.ToList()
+        });
+    }
+
     public Task<TemplateOperationResult> SaveAsync(
         TemplateEditorDocument document,
         string? targetFilePath = null,

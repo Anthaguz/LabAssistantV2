@@ -117,6 +117,8 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.NotNull(FindByName(editorXaml, "TemplateVmSwitchRowsPanel"));
         Assert.NotNull(FindByName(editorXaml, "AddTemplateVmSwitchRowButton"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmSwitchGuidanceTextBlock"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxCatalogComboBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxGuidanceTextBlock"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxIdTextBox"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdPathTextBox"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxSignatureTextBox"));
@@ -153,6 +155,18 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("TryGetTemplateSelectedSwitches", source);
         Assert.Contains("Duplicate switch", source);
         Assert.Contains("No host switches available", source);
+    }
+
+    [Fact]
+    public void MainWindow_DefinesTemplateVhdxCatalogSelector_AndUnresolvedGuidance()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("EnsureTemplateVhdxCatalogOptionsAsync", source);
+        Assert.Contains("TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;", source);
+        Assert.Contains("ResolveTemplateVhdxCatalogOption", source);
+        Assert.Contains("Legacy path-based reference loaded. Select a catalog entry to normalize.", source);
+        Assert.Contains("Catalog entry", source);
     }
 
     private static XDocument LoadMainWindowXaml()

@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
+    private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
@@ -59,6 +60,7 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingTemplatesSubviewSelection;
     private bool _isUpdatingTemplateVmEditorControls;
     private bool _isUpdatingTemplateVmSwitchRows;
+    private bool _isUpdatingTemplateVhdxSelector;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -142,6 +144,8 @@ public sealed partial class MainWindow : Window
     private StackPanel TemplateVmSwitchRowsPanel => TemplatesEditorView.TemplateVmSwitchRowsPanelControl;
     private Button AddTemplateVmSwitchRowButton => TemplatesEditorView.AddTemplateVmSwitchRowButtonControl;
     private TextBlock TemplateVmSwitchGuidanceTextBlock => TemplatesEditorView.TemplateVmSwitchGuidanceTextBlockControl;
+    private ComboBox TemplateVmVhdxCatalogComboBox => TemplatesEditorView.TemplateVmVhdxCatalogComboBoxControl;
+    private TextBlock TemplateVmVhdxGuidanceTextBlock => TemplatesEditorView.TemplateVmVhdxGuidanceTextBlockControl;
     private TextBox TemplateVmVhdxIdTextBox => TemplatesEditorView.TemplateVmVhdxIdTextBoxControl;
     private TextBox TemplateVmVhdPathTextBox => TemplatesEditorView.TemplateVmVhdPathTextBoxControl;
     private TextBox TemplateVmVhdxSignatureTextBox => TemplatesEditorView.TemplateVmVhdxSignatureTextBoxControl;
@@ -152,6 +156,7 @@ public sealed partial class MainWindow : Window
     private Button ValidateTemplateButton => TemplatesEditorView.ValidateTemplateButtonControl;
     private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
     private const string TemplateSwitchPlaceholder = "(Select switch)";
+    private const string TemplateVhdxPlaceholder = "(Keep current / unresolved)";
 
     public MainWindow()
     {
@@ -179,6 +184,7 @@ public sealed partial class MainWindow : Window
             RootLayout.Focus(FocusState.Programmatic);
             await EnsureMachinesInventoryAsync(forceRefresh: true);
             await EnsureTemplateSwitchesAsync(forceRefresh: true);
+            await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: true);
             await EnsureTemplatesLibraryAsync(forceRefresh: true);
             await LoadMachinesDeletionPolicyAsync();
         };
@@ -240,6 +246,7 @@ public sealed partial class MainWindow : Window
         AddTemplateVmButton.Click += AddTemplateVmButton_Click;
         RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;
         AddTemplateVmSwitchRowButton.Click += AddTemplateVmSwitchRowButton_Click;
+        TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;
         ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;
     }
 
@@ -590,6 +597,7 @@ public sealed partial class MainWindow : Window
         AddTemplateVmButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
         RemoveTemplateVmButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
         AddTemplateVmSwitchRowButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
+        TemplateVmVhdxCatalogComboBox.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
         ApplyTemplateVmChangesButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
 
         if (_activeTemplateEditorDocument is null)
@@ -694,6 +702,7 @@ public sealed partial class MainWindow : Window
         {
             _activeTemplateEditorDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedTemplateLibraryItem.FilePath);
             await EnsureTemplateSwitchesAsync(forceRefresh: false);
+            await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: false);
             BindTemplateEditorDocument();
             TemplateEditorStatusTextBlock.Text = "Template loaded.";
             NavigateToRoute(ShellRouteKeys.TemplatesEditor);
@@ -745,6 +754,34 @@ public sealed partial class MainWindow : Window
         }
 
         RenderTemplateSwitchRowsFromVm();
+    }
+
+    private async Task EnsureTemplateVhdxCatalogOptionsAsync(bool forceRefresh)
+    {
+        if (!forceRefresh && _templateVhdxCatalogOptions.Count > 0)
+        {
+            return;
+        }
+
+        _templateVhdxCatalogOptions.Clear();
+        var result = await _templatesCapabilityService.LoadVhdxCatalogOptionsAsync();
+        foreach (var item in result.Items)
+        {
+            _templateVhdxCatalogOptions.Add(new TemplateVhdxCatalogOption(
+                item.Id,
+                item.Path,
+                item.OsName,
+                item.OsVersion,
+                item.Generation,
+                item.Signature));
+        }
+
+        if (result.Errors.Count > 0)
+        {
+            TemplateVmVhdxGuidanceTextBlock.Text = $"Catalog warning: {result.Errors[0]}";
+        }
+
+        UpdateTemplateVhdxSelectorFromVm();
     }
 
     private bool PullEditorFieldsIntoDocument()
@@ -825,6 +862,7 @@ public sealed partial class MainWindow : Window
                 TemplateVmVhdPathTextBox.Text = string.Empty;
                 TemplateVmVhdxSignatureTextBox.Text = string.Empty;
                 RenderTemplateSwitchRows(Array.Empty<string>());
+                UpdateTemplateVhdxSelectorFromVm();
                 return;
             }
 
@@ -836,6 +874,7 @@ public sealed partial class MainWindow : Window
             TemplateVmVhdPathTextBox.Text = _selectedTemplateVmEntry.VhdPath ?? string.Empty;
             TemplateVmVhdxSignatureTextBox.Text = _selectedTemplateVmEntry.VhdxSignature ?? string.Empty;
             RenderTemplateSwitchRowsFromVm();
+            UpdateTemplateVhdxSelectorFromVm();
         }
         finally
         {
@@ -880,9 +919,13 @@ public sealed partial class MainWindow : Window
 
         _selectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;
         _selectedTemplateVmEntry.SwitchName = selectedSwitches.Count > 0 ? selectedSwitches[0] : null;
-        _selectedTemplateVmEntry.VhdxId = string.IsNullOrWhiteSpace(TemplateVmVhdxIdTextBox.Text) ? null : TemplateVmVhdxIdTextBox.Text.Trim();
-        _selectedTemplateVmEntry.VhdPath = string.IsNullOrWhiteSpace(TemplateVmVhdPathTextBox.Text) ? null : TemplateVmVhdPathTextBox.Text.Trim();
-        _selectedTemplateVmEntry.VhdxSignature = string.IsNullOrWhiteSpace(TemplateVmVhdxSignatureTextBox.Text) ? null : TemplateVmVhdxSignatureTextBox.Text.Trim();
+
+        if (TemplateVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedCatalogOption)
+        {
+            _selectedTemplateVmEntry.VhdxId = selectedCatalogOption.Id;
+            _selectedTemplateVmEntry.VhdPath = selectedCatalogOption.Path;
+            _selectedTemplateVmEntry.VhdxSignature = selectedCatalogOption.Signature;
+        }
 
         RefreshTemplateVmListView();
         SyncTemplateVmEntriesToDocument();
@@ -1012,6 +1055,25 @@ public sealed partial class MainWindow : Window
         UpdateTemplateSwitchGuidanceText();
     }
 
+    private void TemplateVmVhdxCatalogComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingTemplateVhdxSelector || _selectedTemplateVmEntry is null)
+        {
+            return;
+        }
+
+        if (TemplateVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedCatalogOption)
+        {
+            TemplateVmVhdxIdTextBox.Text = selectedCatalogOption.Id;
+            TemplateVmVhdPathTextBox.Text = selectedCatalogOption.Path;
+            TemplateVmVhdxSignatureTextBox.Text = selectedCatalogOption.Signature ?? string.Empty;
+            TemplateVmVhdxGuidanceTextBlock.Text = "Catalog entry selected. Save to persist.";
+            return;
+        }
+
+        UpdateTemplateVhdxSelectorGuidance();
+    }
+
     private bool TryGetTemplateSelectedSwitches(out List<string> selectedSwitches, out string? validationError)
     {
         selectedSwitches = [];
@@ -1077,6 +1139,86 @@ public sealed partial class MainWindow : Window
         }
 
         TemplateVmSwitchGuidanceTextBlock.Text = "Switch rows configured.";
+    }
+
+    private void UpdateTemplateVhdxSelectorFromVm()
+    {
+        _isUpdatingTemplateVhdxSelector = true;
+        try
+        {
+            TemplateVmVhdxCatalogComboBox.ItemsSource = null;
+            var options = new List<object> { TemplateVhdxPlaceholder };
+            options.AddRange(_templateVhdxCatalogOptions);
+            TemplateVmVhdxCatalogComboBox.ItemsSource = options;
+
+            if (_selectedTemplateVmEntry is null)
+            {
+                TemplateVmVhdxCatalogComboBox.SelectedItem = TemplateVhdxPlaceholder;
+                TemplateVmVhdxGuidanceTextBlock.Text = "Select a VM entry to configure base disk.";
+                return;
+            }
+
+            var selectedOption = ResolveTemplateVhdxCatalogOption(_selectedTemplateVmEntry);
+            object selectedItem = selectedOption is null ? TemplateVhdxPlaceholder : selectedOption;
+            TemplateVmVhdxCatalogComboBox.SelectedItem = selectedItem;
+            UpdateTemplateVhdxSelectorGuidance(selectedOption);
+        }
+        finally
+        {
+            _isUpdatingTemplateVhdxSelector = false;
+        }
+    }
+
+    private TemplateVhdxCatalogOption? ResolveTemplateVhdxCatalogOption(VmTemplate vmTemplate)
+    {
+        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))
+        {
+            return _templateVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Id, vmTemplate.VhdxId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdPath))
+        {
+            return _templateVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Path, vmTemplate.VhdPath, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
+    }
+
+    private void UpdateTemplateVhdxSelectorGuidance(TemplateVhdxCatalogOption? selectedOption = null)
+    {
+        if (_selectedTemplateVmEntry is null)
+        {
+            TemplateVmVhdxGuidanceTextBlock.Text = "Select a VM entry to configure base disk.";
+            return;
+        }
+
+        if (_templateVhdxCatalogOptions.Count == 0)
+        {
+            TemplateVmVhdxGuidanceTextBlock.Text = "No catalog entries available. Import base disks in Assets > Disks.";
+            return;
+        }
+
+        if (selectedOption is not null)
+        {
+            TemplateVmVhdxGuidanceTextBlock.Text = $"Catalog entry '{selectedOption.DisplayLabel}' selected.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_selectedTemplateVmEntry.VhdxId))
+        {
+            TemplateVmVhdxGuidanceTextBlock.Text = $"Catalog entry '{_selectedTemplateVmEntry.VhdxId}' is missing. Select a replacement from catalog.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_selectedTemplateVmEntry.VhdPath))
+        {
+            TemplateVmVhdxGuidanceTextBlock.Text = "Legacy path-based reference loaded. Select a catalog entry to normalize.";
+            return;
+        }
+
+        TemplateVmVhdxGuidanceTextBlock.Text = "Catalog-backed selection is preferred.";
     }
 
     private Task<string?> PickTemplateFileForOpenAsync()
@@ -1204,6 +1346,7 @@ public sealed partial class MainWindow : Window
         {
             _activeTemplateEditorDocument = await _templatesCapabilityService.CreateDraftAsync();
             await EnsureTemplateSwitchesAsync(forceRefresh: false);
+            await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: false);
             BindTemplateEditorDocument();
             TemplateEditorStatusTextBlock.Text = "New template draft created.";
             NavigateToRoute(ShellRouteKeys.TemplatesEditor);
@@ -2552,5 +2695,42 @@ public sealed partial class MainWindow : Window
 
         var result = await dialog.ShowAsync();
         return result == ContentDialogResult.Primary;
+    }
+
+    private sealed class TemplateVhdxCatalogOption
+    {
+        public TemplateVhdxCatalogOption(
+            string id,
+            string path,
+            string osName,
+            string osVersion,
+            int generation,
+            string? signature)
+        {
+            Id = id;
+            Path = path;
+            OsName = osName;
+            OsVersion = osVersion;
+            Generation = generation;
+            Signature = signature;
+        }
+
+        public string Id { get; }
+
+        public string Path { get; }
+
+        public string OsName { get; }
+
+        public string OsVersion { get; }
+
+        public int Generation { get; }
+
+        public string? Signature { get; }
+
+        public string DisplayLabel => string.IsNullOrWhiteSpace(OsName) && string.IsNullOrWhiteSpace(OsVersion)
+            ? $"{Id} (Gen{Generation})"
+            : $"{OsName} {OsVersion} (Gen{Generation})";
+
+        public override string ToString() => $"{DisplayLabel} - {Id}";
     }
 }
