@@ -16,8 +16,13 @@
             BorderBrush="{StaticResource ShellBorderBrush}"
             BorderThickness="1"
             CornerRadius="6">
-            <StackPanel Spacing="8">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
+            <Grid RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Stretch">
                     <TextBlock
                         VerticalAlignment="Center"
                         Foreground="{StaticResource ShellTextPrimaryBrush}"
@@ -34,7 +39,7 @@
                 <ListView
                     x:Name="MachinesListView"
                     x:FieldModifier="public"
-                    Height="360">
+                    Grid.Row="1">
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Grid Padding="6">
@@ -59,7 +64,7 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-            </StackPanel>
+            </Grid>
         </Border>
 
         <Border
@@ -69,6 +74,7 @@
             BorderBrush="{StaticResource ShellBorderBrush}"
             BorderThickness="1"
             CornerRadius="6">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="10">
                 <TextBlock
                     Foreground="{StaticResource ShellTextPrimaryBrush}"
@@ -166,6 +172,7 @@
                     Text="Select a VM to run actions."
                     TextWrapping="Wrap" />
             </StackPanel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </UserControl>

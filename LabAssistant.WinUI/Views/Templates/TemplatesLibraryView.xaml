@@ -8,18 +8,28 @@
         BorderBrush="{StaticResource ShellBorderBrush}"
         BorderThickness="1"
         CornerRadius="6">
-        <StackPanel Spacing="10">
+        <Grid RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <TextBlock
+                Grid.Row="0"
                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                 FontSize="16"
                 FontWeight="SemiBold"
                 Text="Template Library" />
             <TextBlock
+                Grid.Row="1"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                 Text="Browse, open, import, export, create, and delete templates from one capability surface."
                 TextWrapping="Wrap" />
 
-            <Grid ColumnSpacing="8">
+            <Grid Grid.Row="2" ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -44,7 +54,7 @@
                     Content="Reload" />
             </Grid>
 
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
                 <Button x:Name="OpenTemplateInEditorButton" Content="Open in Editor" />
                 <Button x:Name="CreateTemplateButton" Content="Create New" />
                 <Button x:Name="DeleteTemplateButton" Content="Delete" />
@@ -53,26 +63,65 @@
             </StackPanel>
 
             <Border
-                Height="260"
+                Grid.Row="4"
+                MinHeight="260"
                 Background="{StaticResource ShellContentBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-                <ListView x:Name="TemplateLibraryListView" Padding="8" SelectionMode="Single">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid
+                        Grid.Row="0"
+                        Padding="12,8"
+                        Background="{StaticResource ShellBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="90" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="0"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Template" />
+                        <TextBlock
+                            Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            Margin="0,0,8,0"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="VMs" />
+                    </Grid>
+
+                    <ListView
+                        x:Name="TemplateLibraryListView"
+                        Grid.Row="1"
+                        SelectionMode="Single">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
-                            <Setter Property="Margin" Value="0,0,0,8" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="MinHeight" Value="74" />
+                            <Setter Property="Padding" Value="0" />
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate>
-                            <Border
-                                Padding="10"
-                                Background="{StaticResource ShellBackgroundBrush}"
+                            <Grid
+                                Padding="12,10"
                                 BorderBrush="{StaticResource ShellBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6">
-                                <StackPanel Spacing="4">
+                                BorderThickness="0,0,0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="90" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="4">
                                     <TextBlock
                                         FontSize="14"
                                         FontWeight="SemiBold"
@@ -81,27 +130,31 @@
                                     <TextBlock
                                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                                         Text="{Binding Description}"
+                                        MaxLines="2"
+                                        TextTrimming="WordEllipsis"
                                         TextWrapping="WrapWholeWords" />
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="VMs:" />
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="{Binding VmCount}" />
-                                    </StackPanel>
                                 </StackPanel>
-                            </Border>
+
+                                <TextBlock
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,0,8,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    Text="{Binding VmCount}" />
+                            </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
+                </Grid>
             </Border>
 
             <TextBlock
                 x:Name="TemplatesLibraryStatusTextBlock"
+                Grid.Row="5"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                 Text="No templates loaded."
                 TextWrapping="Wrap" />
-        </StackPanel>
+        </Grid>
     </Border>
 </UserControl>
