@@ -32,8 +32,10 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
+    private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
+    private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
     private ShellSubview _activeSubview;
     private string _activeRouteKey = string.Empty;
@@ -56,6 +58,7 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingTemplatesSubviewSelection;
     private bool _isUpdatingTemplateVmEditorControls;
+    private bool _isUpdatingTemplateVmSwitchRows;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -136,7 +139,9 @@ public sealed partial class MainWindow : Window
     private TextBox TemplateVmNameTextBox => TemplatesEditorView.TemplateVmNameTextBoxControl;
     private TextBox TemplateVmMemoryTextBox => TemplatesEditorView.TemplateVmMemoryTextBoxControl;
     private TextBox TemplateVmCpuTextBox => TemplatesEditorView.TemplateVmCpuTextBoxControl;
-    private TextBox TemplateVmSwitchTextBox => TemplatesEditorView.TemplateVmSwitchTextBoxControl;
+    private StackPanel TemplateVmSwitchRowsPanel => TemplatesEditorView.TemplateVmSwitchRowsPanelControl;
+    private Button AddTemplateVmSwitchRowButton => TemplatesEditorView.AddTemplateVmSwitchRowButtonControl;
+    private TextBlock TemplateVmSwitchGuidanceTextBlock => TemplatesEditorView.TemplateVmSwitchGuidanceTextBlockControl;
     private TextBox TemplateVmVhdxIdTextBox => TemplatesEditorView.TemplateVmVhdxIdTextBoxControl;
     private TextBox TemplateVmVhdPathTextBox => TemplatesEditorView.TemplateVmVhdPathTextBoxControl;
     private TextBox TemplateVmVhdxSignatureTextBox => TemplatesEditorView.TemplateVmVhdxSignatureTextBoxControl;
@@ -146,6 +151,7 @@ public sealed partial class MainWindow : Window
     private Button SaveTemplateAsButton => TemplatesEditorView.SaveTemplateAsButtonControl;
     private Button ValidateTemplateButton => TemplatesEditorView.ValidateTemplateButtonControl;
     private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
+    private const string TemplateSwitchPlaceholder = "(Select switch)";
 
     public MainWindow()
     {
@@ -172,6 +178,7 @@ public sealed partial class MainWindow : Window
         {
             RootLayout.Focus(FocusState.Programmatic);
             await EnsureMachinesInventoryAsync(forceRefresh: true);
+            await EnsureTemplateSwitchesAsync(forceRefresh: true);
             await EnsureTemplatesLibraryAsync(forceRefresh: true);
             await LoadMachinesDeletionPolicyAsync();
         };
@@ -232,6 +239,7 @@ public sealed partial class MainWindow : Window
         BackToLibraryButton.Click += BackToLibraryButton_Click;
         AddTemplateVmButton.Click += AddTemplateVmButton_Click;
         RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;
+        AddTemplateVmSwitchRowButton.Click += AddTemplateVmSwitchRowButton_Click;
         ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;
     }
 
@@ -581,6 +589,7 @@ public sealed partial class MainWindow : Window
         BackToLibraryButton.IsEnabled = !_isTemplatesLoading;
         AddTemplateVmButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
         RemoveTemplateVmButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
+        AddTemplateVmSwitchRowButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
         ApplyTemplateVmChangesButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
 
         if (_activeTemplateEditorDocument is null)
@@ -594,6 +603,7 @@ public sealed partial class MainWindow : Window
             _templateVmEntries.Clear();
             _selectedTemplateVmEntry = null;
             UpdateTemplateVmEditorPanel();
+            UpdateTemplateSwitchGuidanceText();
             return;
         }
 
@@ -604,6 +614,7 @@ public sealed partial class MainWindow : Window
         TemplateFilePathTextBlock.Text = $"File path: {_activeTemplateEditorDocument.SourceFilePath ?? "new template (not saved)"}";
         TemplateVmCountTextBlock.Text = $"VMs: {_activeTemplateEditorDocument.Template.VmTemplates.Count}";
         UpdateTemplateVmEditorPanel();
+        UpdateTemplateSwitchGuidanceText();
     }
 
     private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
@@ -682,6 +693,7 @@ public sealed partial class MainWindow : Window
         try
         {
             _activeTemplateEditorDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedTemplateLibraryItem.FilePath);
+            await EnsureTemplateSwitchesAsync(forceRefresh: false);
             BindTemplateEditorDocument();
             TemplateEditorStatusTextBlock.Text = "Template loaded.";
             NavigateToRoute(ShellRouteKeys.TemplatesEditor);
@@ -709,6 +721,30 @@ public sealed partial class MainWindow : Window
         TemplateNameTextBox.Text = _activeTemplateEditorDocument.Template.Name;
         TemplateDescriptionTextBox.Text = _activeTemplateEditorDocument.Template.Description ?? string.Empty;
         UpdateTemplatesUi();
+    }
+
+    private async Task EnsureTemplateSwitchesAsync(bool forceRefresh)
+    {
+        if (!forceRefresh && _templateAvailableSwitches.Count > 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var switches = await _machinesCapabilityService.LoadVirtualSwitchesAsync();
+            _templateAvailableSwitches = switches
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception)
+        {
+            _templateAvailableSwitches = Array.Empty<string>();
+        }
+
+        RenderTemplateSwitchRowsFromVm();
     }
 
     private bool PullEditorFieldsIntoDocument()
@@ -785,10 +821,10 @@ public sealed partial class MainWindow : Window
                 TemplateVmNameTextBox.Text = string.Empty;
                 TemplateVmMemoryTextBox.Text = string.Empty;
                 TemplateVmCpuTextBox.Text = string.Empty;
-                TemplateVmSwitchTextBox.Text = string.Empty;
                 TemplateVmVhdxIdTextBox.Text = string.Empty;
                 TemplateVmVhdPathTextBox.Text = string.Empty;
                 TemplateVmVhdxSignatureTextBox.Text = string.Empty;
+                RenderTemplateSwitchRows(Array.Empty<string>());
                 return;
             }
 
@@ -796,10 +832,10 @@ public sealed partial class MainWindow : Window
             TemplateVmNameTextBox.Text = _selectedTemplateVmEntry.Name;
             TemplateVmMemoryTextBox.Text = _selectedTemplateVmEntry.MemoryMb.ToString();
             TemplateVmCpuTextBox.Text = _selectedTemplateVmEntry.CpuCount.ToString();
-            TemplateVmSwitchTextBox.Text = _selectedTemplateVmEntry.SwitchName ?? string.Empty;
             TemplateVmVhdxIdTextBox.Text = _selectedTemplateVmEntry.VhdxId ?? string.Empty;
             TemplateVmVhdPathTextBox.Text = _selectedTemplateVmEntry.VhdPath ?? string.Empty;
             TemplateVmVhdxSignatureTextBox.Text = _selectedTemplateVmEntry.VhdxSignature ?? string.Empty;
+            RenderTemplateSwitchRowsFromVm();
         }
         finally
         {
@@ -836,7 +872,14 @@ public sealed partial class MainWindow : Window
         _selectedTemplateVmEntry.Name = vmName;
         _selectedTemplateVmEntry.MemoryMb = memoryMb;
         _selectedTemplateVmEntry.CpuCount = cpuCount;
-        _selectedTemplateVmEntry.SwitchName = string.IsNullOrWhiteSpace(TemplateVmSwitchTextBox.Text) ? null : TemplateVmSwitchTextBox.Text.Trim();
+        if (!TryGetTemplateSelectedSwitches(out var selectedSwitches, out var switchValidationError))
+        {
+            TemplateEditorStatusTextBlock.Text = switchValidationError;
+            return false;
+        }
+
+        _selectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;
+        _selectedTemplateVmEntry.SwitchName = selectedSwitches.Count > 0 ? selectedSwitches[0] : null;
         _selectedTemplateVmEntry.VhdxId = string.IsNullOrWhiteSpace(TemplateVmVhdxIdTextBox.Text) ? null : TemplateVmVhdxIdTextBox.Text.Trim();
         _selectedTemplateVmEntry.VhdPath = string.IsNullOrWhiteSpace(TemplateVmVhdPathTextBox.Text) ? null : TemplateVmVhdPathTextBox.Text.Trim();
         _selectedTemplateVmEntry.VhdxSignature = string.IsNullOrWhiteSpace(TemplateVmVhdxSignatureTextBox.Text) ? null : TemplateVmVhdxSignatureTextBox.Text.Trim();
@@ -849,6 +892,191 @@ public sealed partial class MainWindow : Window
         }
 
         return true;
+    }
+
+    private void RenderTemplateSwitchRowsFromVm()
+    {
+        var switches = _selectedTemplateVmEntry?.SwitchNames?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .ToList() ?? [];
+
+        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(_selectedTemplateVmEntry?.SwitchName))
+        {
+            switches.Add(_selectedTemplateVmEntry.SwitchName!.Trim());
+        }
+
+        RenderTemplateSwitchRows(switches);
+    }
+
+    private void RenderTemplateSwitchRows(IReadOnlyList<string> selectedSwitches)
+    {
+        _isUpdatingTemplateVmSwitchRows = true;
+        try
+        {
+            TemplateVmSwitchRowsPanel.Children.Clear();
+            _templateVmSwitchRowCombos.Clear();
+
+            foreach (var switchName in selectedSwitches)
+            {
+                AddTemplateSwitchRow(switchName);
+            }
+        }
+        finally
+        {
+            _isUpdatingTemplateVmSwitchRows = false;
+        }
+
+        UpdateTemplateSwitchGuidanceText();
+    }
+
+    private void AddTemplateSwitchRow(string? selectedSwitch)
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 8
+        };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var combo = new ComboBox
+        {
+            MinWidth = 220
+        };
+        combo.Items.Add(TemplateSwitchPlaceholder);
+        foreach (var switchName in _templateAvailableSwitches)
+        {
+            combo.Items.Add(switchName);
+        }
+
+        var validSelection = !string.IsNullOrWhiteSpace(selectedSwitch) &&
+                             _templateAvailableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase);
+        combo.SelectedItem = validSelection ? selectedSwitch : TemplateSwitchPlaceholder;
+        combo.SelectionChanged += TemplateVmSwitchRowCombo_SelectionChanged;
+        _templateVmSwitchRowCombos.Add(combo);
+        Grid.SetColumn(combo, 0);
+        row.Children.Add(combo);
+
+        var removeButton = new Button
+        {
+            Content = "-",
+            Tag = combo
+        };
+        ToolTipService.SetToolTip(removeButton, "Remove switch");
+        removeButton.Click += RemoveTemplateVmSwitchRowButton_Click;
+        Grid.SetColumn(removeButton, 1);
+        row.Children.Add(removeButton);
+
+        TemplateVmSwitchRowsPanel.Children.Add(row);
+    }
+
+    private void AddTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTemplateVmEntry is null)
+        {
+            TemplateEditorStatusTextBlock.Text = "Select a VM entry first.";
+            return;
+        }
+
+        AddTemplateSwitchRow(null);
+        UpdateTemplateSwitchGuidanceText();
+    }
+
+    private void RemoveTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not ComboBox combo)
+        {
+            return;
+        }
+
+        _templateVmSwitchRowCombos.Remove(combo);
+
+        var rowToRemove = TemplateVmSwitchRowsPanel.Children
+            .OfType<Grid>()
+            .FirstOrDefault(grid => grid.Children.OfType<ComboBox>().Any(c => ReferenceEquals(c, combo)));
+        if (rowToRemove is not null)
+        {
+            TemplateVmSwitchRowsPanel.Children.Remove(rowToRemove);
+        }
+
+        UpdateTemplateSwitchGuidanceText();
+    }
+
+    private void TemplateVmSwitchRowCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingTemplateVmSwitchRows)
+        {
+            return;
+        }
+
+        UpdateTemplateSwitchGuidanceText();
+    }
+
+    private bool TryGetTemplateSelectedSwitches(out List<string> selectedSwitches, out string? validationError)
+    {
+        selectedSwitches = [];
+        validationError = null;
+
+        if (_templateVmSwitchRowCombos.Count == 0)
+        {
+            return true;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var combo in _templateVmSwitchRowCombos)
+        {
+            var selected = combo.SelectedItem?.ToString();
+            if (string.IsNullOrWhiteSpace(selected) || string.Equals(selected, TemplateSwitchPlaceholder, StringComparison.Ordinal))
+            {
+                validationError = "Each switch row must have a selected host switch or be removed.";
+                return false;
+            }
+
+            if (!_templateAvailableSwitches.Contains(selected, StringComparer.OrdinalIgnoreCase))
+            {
+                validationError = $"Switch '{selected}' is not available on this host.";
+                return false;
+            }
+
+            if (!seen.Add(selected))
+            {
+                validationError = $"Duplicate switch '{selected}' is not allowed.";
+                return false;
+            }
+
+            selectedSwitches.Add(selected);
+        }
+
+        return true;
+    }
+
+    private void UpdateTemplateSwitchGuidanceText()
+    {
+        if (_selectedTemplateVmEntry is null)
+        {
+            TemplateVmSwitchGuidanceTextBlock.Text = "Select a VM entry to configure switch assignments.";
+            return;
+        }
+
+        if (_templateAvailableSwitches.Count == 0)
+        {
+            TemplateVmSwitchGuidanceTextBlock.Text = "No host switches available. Add a host switch before assigning VM switch rows.";
+            return;
+        }
+
+        if (_templateVmSwitchRowCombos.Count == 0)
+        {
+            TemplateVmSwitchGuidanceTextBlock.Text = "No switch rows. Optional for template VM.";
+            return;
+        }
+
+        if (!TryGetTemplateSelectedSwitches(out _, out var error))
+        {
+            TemplateVmSwitchGuidanceTextBlock.Text = error ?? "Switch selection requires attention.";
+            return;
+        }
+
+        TemplateVmSwitchGuidanceTextBlock.Text = "Switch rows configured.";
     }
 
     private Task<string?> PickTemplateFileForOpenAsync()
@@ -975,6 +1203,7 @@ public sealed partial class MainWindow : Window
         try
         {
             _activeTemplateEditorDocument = await _templatesCapabilityService.CreateDraftAsync();
+            await EnsureTemplateSwitchesAsync(forceRefresh: false);
             BindTemplateEditorDocument();
             TemplateEditorStatusTextBlock.Text = "New template draft created.";
             NavigateToRoute(ShellRouteKeys.TemplatesEditor);

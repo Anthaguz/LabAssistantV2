@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace LabAssistant.Models.Templates;
 
@@ -46,6 +47,11 @@ public class VmTemplate
     /// Virtual switch name override (optional).
     /// </summary>
     public string? SwitchName { get; set; }
+
+    /// <summary>
+    /// Canonical VM switch assignments for multi-NIC/multi-switch templates (optional).
+    /// </summary>
+    public List<string>? SwitchNames { get; set; }
 
     /// <summary>
     /// Optional persisted settings for the implemented time zone guest step.

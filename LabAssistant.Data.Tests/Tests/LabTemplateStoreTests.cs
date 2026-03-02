@@ -299,6 +299,112 @@ public class LabTemplateStoreTests
         Assert.Contains(result.Warnings, warning => warning.Contains("newer minor/patch than supported", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void LoadFromFile_SwitchNameOnly_PromotesToCanonicalSwitchNames()
+    {
+        var folder = BuildTempRoot();
+        var filePath = Path.Combine(folder, "switchname-only.json");
+        File.WriteAllText(filePath, """
+                               {
+                                 "id": "lab-switch",
+                                 "name": "Switch Legacy",
+                                 "schemaVersion": "1.0.0",
+                                 "templateRevision": 1,
+                                 "createdWithAppVersion": "1.0.0",
+                                 "templateType": "lab-template",
+                                 "vmTemplates": [
+                                   {
+                                     "vmId": "vm-1",
+                                     "name": "vm1",
+                                     "memoryMb": 1024,
+                                     "cpuCount": 1,
+                                     "vhdPath": "C:/base.vhdx",
+                                     "switchName": "Default Switch"
+                                   }
+                                 ]
+                               }
+                               """);
+
+        var store = new LabTemplateStore();
+        var loaded = store.LoadFromFile(filePath);
+
+        Assert.Equal(["Default Switch"], loaded.VmTemplates[0].SwitchNames);
+        Assert.Equal("Default Switch", loaded.VmTemplates[0].SwitchName);
+    }
+
+    [Fact]
+    public void SaveToFile_PersistsSwitchNames_AndDualWritesLegacySwitchName()
+    {
+        var folder = BuildTempRoot();
+        var path = Path.Combine(folder, "switches.json");
+        var store = new LabTemplateStore();
+        var template = new LabTemplate
+        {
+            Id = "lab-switch",
+            Name = "Switch Canonical",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            {
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchNames = ["Default Switch", "External"]
+                }
+            }
+        };
+
+        store.SaveToFile(path, template);
+        var loaded = store.LoadFromFile(path);
+
+        Assert.Equal(["Default Switch", "External"], loaded.VmTemplates[0].SwitchNames);
+        Assert.Equal("Default Switch", loaded.VmTemplates[0].SwitchName);
+
+        var json = File.ReadAllText(path);
+        Assert.Contains("\"switchNames\"", json);
+        Assert.Contains("\"switchName\": \"Default Switch\"", json);
+    }
+
+    [Fact]
+    public void LoadFromFile_MixedSwitchPayload_PrefersSwitchNames()
+    {
+        var folder = BuildTempRoot();
+        var filePath = Path.Combine(folder, "switch-mixed.json");
+        File.WriteAllText(filePath, """
+                               {
+                                 "id": "lab-switch",
+                                 "name": "Switch Mixed",
+                                 "schemaVersion": "1.0.0",
+                                 "templateRevision": 1,
+                                 "createdWithAppVersion": "1.0.0",
+                                 "templateType": "lab-template",
+                                 "vmTemplates": [
+                                   {
+                                     "vmId": "vm-1",
+                                     "name": "vm1",
+                                     "memoryMb": 1024,
+                                     "cpuCount": 1,
+                                     "vhdPath": "C:/base.vhdx",
+                                     "switchName": "Legacy Switch",
+                                     "switchNames": [ "Canonical-1", "Canonical-2" ]
+                                   }
+                                 ]
+                               }
+                               """);
+
+        var store = new LabTemplateStore();
+        var loaded = store.LoadFromFile(filePath);
+
+        Assert.Equal(["Canonical-1", "Canonical-2"], loaded.VmTemplates[0].SwitchNames);
+        Assert.Equal("Canonical-1", loaded.VmTemplates[0].SwitchName);
+    }
+
     private static string BuildTempRoot()
     {
         var folder = Path.Combine(Path.GetTempPath(), "LabAssistantTests", Guid.NewGuid().ToString("N"));

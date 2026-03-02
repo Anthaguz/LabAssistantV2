@@ -85,6 +85,7 @@ public sealed class MilestoneADScenarioMatrixTests
         var source = LoadMainWindowSource();
 
         Assert.Contains("_selectedTemplateVmEntry.SwitchName", source);
+        Assert.Contains("_selectedTemplateVmEntry.SwitchNames", source);
         Assert.Contains("_selectedTemplateVmEntry.VhdxId", source);
         Assert.Contains("_selectedTemplateVmEntry.VhdPath", source);
         Assert.Contains("_selectedTemplateVmEntry.VhdxSignature", source);
@@ -113,7 +114,9 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.NotNull(FindByName(editorXaml, "TemplateVmNameTextBox"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmMemoryTextBox"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmCpuTextBox"));
-        Assert.NotNull(FindByName(editorXaml, "TemplateVmSwitchTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmSwitchRowsPanel"));
+        Assert.NotNull(FindByName(editorXaml, "AddTemplateVmSwitchRowButton"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateVmSwitchGuidanceTextBlock"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxIdTextBox"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdPathTextBox"));
         Assert.NotNull(FindByName(editorXaml, "TemplateVmVhdxSignatureTextBox"));
@@ -138,6 +141,18 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("Remove VM Entry", source);
         Assert.Contains("Added VM entry", source);
         Assert.Contains("Removed VM entry", source);
+    }
+
+    [Fact]
+    public void MainWindow_DefinesTemplateSwitchSelectorRows_AndValidationGuards()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("AddTemplateVmSwitchRowButton_Click", source);
+        Assert.Contains("RemoveTemplateVmSwitchRowButton_Click", source);
+        Assert.Contains("TryGetTemplateSelectedSwitches", source);
+        Assert.Contains("Duplicate switch", source);
+        Assert.Contains("No host switches available", source);
     }
 
     private static XDocument LoadMainWindowXaml()

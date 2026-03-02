@@ -35,7 +35,11 @@ public sealed partial class TemplatesEditorView : UserControl
 
     public TextBox TemplateVmCpuTextBoxControl => TemplateVmCpuTextBox;
 
-    public TextBox TemplateVmSwitchTextBoxControl => TemplateVmSwitchTextBox;
+    public StackPanel TemplateVmSwitchRowsPanelControl => TemplateVmSwitchRowsPanel;
+
+    public Button AddTemplateVmSwitchRowButtonControl => AddTemplateVmSwitchRowButton;
+
+    public TextBlock TemplateVmSwitchGuidanceTextBlockControl => TemplateVmSwitchGuidanceTextBlock;
 
     public TextBox TemplateVmVhdxIdTextBoxControl => TemplateVmVhdxIdTextBox;
 
