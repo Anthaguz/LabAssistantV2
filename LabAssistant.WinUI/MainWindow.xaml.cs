@@ -120,8 +120,6 @@ public sealed partial class MainWindow : Window
     private Button ImportTemplateButton => TemplatesLibraryView.ImportTemplateButtonControl;
     private Button ExportTemplateButton => TemplatesLibraryView.ExportTemplateButtonControl;
     private TextBlock TemplatesLibraryStatusTextBlock => TemplatesLibraryView.TemplatesLibraryStatusTextBlockControl;
-    private TextBlock TemplatesLibrarySelectionTextBlock => TemplatesLibraryView.TemplatesLibrarySelectionTextBlockControl;
-    private TextBlock SelectedTemplatePathTextBlock => TemplatesLibraryView.SelectedTemplatePathTextBlockControl;
     private TextBox TemplateNameTextBox => TemplatesEditorView.TemplateNameTextBoxControl;
     private TextBox TemplateDescriptionTextBox => TemplatesEditorView.TemplateDescriptionTextBoxControl;
     private TextBlock TemplateEditorContextTextBlock => TemplatesEditorView.TemplateEditorContextTextBlockControl;
@@ -562,11 +560,6 @@ public sealed partial class MainWindow : Window
         ValidateTemplateButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
         BackToLibraryButton.IsEnabled = !_isTemplatesLoading;
 
-        SelectedTemplatePathTextBlock.Text = _selectedTemplateLibraryItem?.FilePath ?? "-";
-        TemplatesLibrarySelectionTextBlock.Text = _selectedTemplateLibraryItem is null
-            ? "Select a template to open, export, or delete."
-            : $"Selected: {_selectedTemplateLibraryItem.Name} ({_selectedTemplateLibraryItem.TemplateId})";
-
         if (_activeTemplateEditorDocument is null)
         {
             TemplateEditorContextTextBlock.Text = "No template selected.";
@@ -588,7 +581,7 @@ public sealed partial class MainWindow : Window
 
     private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
     {
-        if (_isTemplatesLoading)
+        if (_isTemplatesLoading && !forceRefresh)
         {
             return;
         }
@@ -598,8 +591,12 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        var ownsLoadingState = !_isTemplatesLoading;
+        if (ownsLoadingState)
+        {
+            _isTemplatesLoading = true;
+            UpdateTemplatesUi();
+        }
         TemplatesLibraryStatusTextBlock.Text = "Loading templates...";
 
         try
@@ -637,8 +634,11 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            if (ownsLoadingState)
+            {
+                _isTemplatesLoading = false;
+                UpdateTemplatesUi();
+            }
         }
     }
 
@@ -697,23 +697,83 @@ public sealed partial class MainWindow : Window
 
     private async Task<string?> PickTemplateFileForOpenAsync()
     {
-        var picker = new FileOpenPicker();
-        picker.FileTypeFilter.Add(".json");
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-        StorageFile? file = await picker.PickSingleFileAsync();
-        return file?.Path;
+        try
+        {
+            var picker = new FileOpenPicker();
+            picker.FileTypeFilter.Add(".json");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            StorageFile? file = await picker.PickSingleFileAsync();
+            return file?.Path;
+        }
+        catch (Exception ex)
+        {
+            TemplatesLibraryStatusTextBlock.Text = $"File picker unavailable. Enter template path manually. {ex.Message}";
+            return await PromptForPathAsync(
+                title: "Import Template (manual path)",
+                placeholder: @"C:\path\to\template.json",
+                requireExistingFile: true);
+        }
     }
 
     private async Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName)
     {
-        var picker = new FileSavePicker
+        try
         {
-            SuggestedFileName = suggestedFileName
+            var picker = new FileSavePicker
+            {
+                SuggestedFileName = suggestedFileName
+            };
+            picker.FileTypeChoices.Add("JSON template", [".json"]);
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            StorageFile? file = await picker.PickSaveFileAsync();
+            return file?.Path;
+        }
+        catch (Exception ex)
+        {
+            TemplatesLibraryStatusTextBlock.Text = $"Save picker unavailable. Enter destination path manually. {ex.Message}";
+            return await PromptForPathAsync(
+                title: "Export Template (manual path)",
+                placeholder: $@"C:\path\to\{suggestedFileName}",
+                requireExistingFile: false);
+        }
+    }
+
+    private async Task<string?> PromptForPathAsync(string title, string placeholder, bool requireExistingFile)
+    {
+        var pathTextBox = new TextBox
+        {
+            PlaceholderText = placeholder
         };
-        picker.FileTypeChoices.Add("JSON template", [".json"]);
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-        StorageFile? file = await picker.PickSaveFileAsync();
-        return file?.Path;
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = RootLayout.XamlRoot,
+            Title = title,
+            PrimaryButtonText = "Use Path",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            Content = pathTextBox
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return null;
+        }
+
+        var selectedPath = pathTextBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(selectedPath))
+        {
+            return null;
+        }
+
+        if (requireExistingFile && !File.Exists(selectedPath))
+        {
+            TemplatesLibraryStatusTextBlock.Text = $"File not found: {selectedPath}";
+            return null;
+        }
+
+        return selectedPath;
     }
 
     private void TemplateLibraryListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -789,7 +849,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.DeleteAsync(_selectedTemplateLibraryItem.FilePath);
-            TemplatesLibraryStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            TemplatesLibraryStatusTextBlock.Text = result.UserMessage;
             if (result.Success)
             {
                 _selectedTemplateLibraryItem = null;
@@ -817,7 +877,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.ImportAsync(sourcePath);
-            TemplatesLibraryStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            TemplatesLibraryStatusTextBlock.Text = result.UserMessage;
             if (result.Success)
             {
                 await EnsureTemplatesLibraryAsync(forceRefresh: true);
@@ -851,7 +911,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.ExportAsync(_selectedTemplateLibraryItem.FilePath, destinationPath);
-            TemplatesLibraryStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            TemplatesLibraryStatusTextBlock.Text = result.UserMessage;
         }
         finally
         {
@@ -874,7 +934,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument);
-            TemplateEditorStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            TemplateEditorStatusTextBlock.Text = result.UserMessage;
             if (result.Success)
             {
                 _activeTemplateEditorDocument = new TemplateEditorDocument
@@ -917,7 +977,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument, destinationPath, saveAs: true);
-            TemplateEditorStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            TemplateEditorStatusTextBlock.Text = result.UserMessage;
             if (result.Success)
             {
                 _activeTemplateEditorDocument = new TemplateEditorDocument

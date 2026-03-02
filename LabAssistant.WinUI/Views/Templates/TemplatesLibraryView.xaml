@@ -52,48 +52,56 @@
                 <Button x:Name="ExportTemplateButton" Content="Export" />
             </StackPanel>
 
-            <ListView x:Name="TemplateLibraryListView" Height="240" SelectionMode="Single">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Spacing="4">
-                            <TextBlock
-                                FontSize="14"
-                                FontWeight="SemiBold"
-                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                Text="{Binding Name}" />
-                            <TextBlock
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="{Binding Description}"
-                                TextWrapping="WrapWholeWords" />
-                            <TextBlock
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="{Binding TemplateId}" />
-                            <TextBlock
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="{Binding FilePath}" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+            <Border
+                Height="260"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <ListView x:Name="TemplateLibraryListView" Padding="8" SelectionMode="Single">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Margin" Value="0,0,0,8" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Border
+                                Padding="10"
+                                Background="{StaticResource ShellBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                                <StackPanel Spacing="4">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        Text="{Binding Name}" />
+                                    <TextBlock
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="{Binding Description}"
+                                        TextWrapping="WrapWholeWords" />
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="VMs:" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{Binding VmCount}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Border>
 
             <TextBlock
                 x:Name="TemplatesLibraryStatusTextBlock"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                 Text="No templates loaded."
                 TextWrapping="Wrap" />
-            <TextBlock
-                x:Name="TemplatesLibrarySelectionTextBlock"
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Select a template to open, export, or delete."
-                TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Selected path:" />
-                <TextBlock
-                    x:Name="SelectedTemplatePathTextBlock"
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="-"
-                    TextWrapping="Wrap" />
-            </StackPanel>
         </StackPanel>
     </Border>
 </UserControl>

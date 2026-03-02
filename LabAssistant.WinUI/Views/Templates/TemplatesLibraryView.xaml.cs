@@ -30,8 +30,4 @@ public sealed partial class TemplatesLibraryView : UserControl
     public Button ExportTemplateButtonControl => ExportTemplateButton;
 
     public TextBlock TemplatesLibraryStatusTextBlockControl => TemplatesLibraryStatusTextBlock;
-
-    public TextBlock TemplatesLibrarySelectionTextBlockControl => TemplatesLibrarySelectionTextBlock;
-
-    public TextBlock SelectedTemplatePathTextBlockControl => SelectedTemplatePathTextBlock;
 }
