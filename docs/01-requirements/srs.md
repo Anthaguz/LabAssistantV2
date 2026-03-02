@@ -345,10 +345,26 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** Selecting a parent entity routes to its default child route; `Settings` is placed as footer navigation.
   - **Priority:** P1
 
+- **FR-077:** WinUI `Templates` capability shall use canonical child routes with deterministic parent default routing:
+  - `templates.library` (default child)
+  - `templates.editor`
+  - `templates.details` is deferred unless explicitly approved in a future milestone contract.
+  - **Acceptance details:** Selecting parent `Templates` routes to `templates.library` and remains consistent with global navigation rules from FR-075/FR-076.
+  - **Priority:** P1
+
+- **FR-078:** WinUI `Templates` capability shall provide a unified workflow surface that keeps template library and template editing in one coherent capability context.
+  - **Acceptance details:** Users can list/search/select templates, open selected template into editor, and perform create/edit/save flows without leaving `Templates` capability context.
+  - **Priority:** P1
+
+- **FR-079:** WinUI `Templates` capability shall keep import/export entry points discoverable within `Templates` capability context and shall not require file-hunt-first workflow as the primary edit path.
+  - **Acceptance details:** Import/export remain available from `Templates` capability surfaces while existing template schema validation and compatibility semantics remain unchanged.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
 - See `docs/02-ux/winui-global-navigationview-contract-ac.md` for Milestone AC global NavigationView behavior and routing contract.
+- See `docs/02-ux/winui-templates-capability-contract-ad.md` for Milestone AD `Templates` routing and unified workflow contract.
 
 ---
 
