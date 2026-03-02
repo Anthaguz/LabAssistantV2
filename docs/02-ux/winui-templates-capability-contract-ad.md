@@ -5,8 +5,8 @@
 **Status:** Approved contract for Milestone AD planning/implementation.
 
 **Related:**
-- `docs/01-requirements/srs.md` (FR-077, FR-078, FR-079, FR-080, FR-081, FR-082, FR-083)
-- `docs/01-requirements/acceptance-criteria.md` (AC-011, AC-012)
+- `docs/01-requirements/srs.md` (FR-077, FR-078, FR-079, FR-080, FR-081, FR-082, FR-083, FR-084, FR-085, FR-086)
+- `docs/01-requirements/acceptance-criteria.md` (AC-011, AC-012, AC-013)
 - `docs/02-ux/winui-global-navigationview-contract-ac.md` (AC shell baseline)
 - `docs/02-ux/navigation-ia-draft.md`
 - `docs/02-ux/ui-migration-execution-plan.md`
@@ -100,6 +100,9 @@ Out of scope:
 - FR-081 -> AC-012 scenarios 2, 3, and 4 (add/remove/edit VM-entry operations using existing schema fields)
 - FR-082 -> AC-012 scenario 5 (save/reload round-trip behavior for VM-entry edits)
 - FR-083 -> AC-012 scenario 6 (library/editor continuity after VM-entry operations)
+- FR-084 -> AC-013 scenarios 1 and 2 (host-backed switch selector, multi-row rules, persistence compatibility)
+- FR-085 -> AC-013 scenarios 3 and 4 (catalog-first VHDX selection and path-based backward compatibility)
+- FR-086 -> AC-013 scenarios 5 and 6 (deterministic normalization precedence and save confirmation on ambiguity)
 
 ---
 
@@ -146,6 +149,57 @@ Out of scope for AD6:
 - new template-domain feature invention
 - Deploy/Assets/global-nav redesign
 - cross-capability behavior changes unrelated to Templates editing parity
+
+---
+
+## 7) Templates Selector and Normalization Contract (AE1 -> AE2/AE3/AE4)
+
+This section defines the docs-first contract for Templates selector/data-binding hardening work.
+
+### 7.1 Switch selector contract (AE2)
+
+- Replace free-text switch field with selector rows bound to host switch discovery.
+- VM switch assignment is optional; no row is required for a VM entry.
+- If one or more rows exist, each row must resolve to a valid switch selection.
+- Users can add row(s) via `+` and remove row(s) individually via row-level remove action.
+- Duplicate switch selections across rows are invalid and must show actionable validation.
+- Persistence contract:
+  - `switchNames` is canonical when present.
+  - `switchName` is dual-written as legacy fallback from the first `switchNames` value.
+  - Readers prefer `switchNames` then fallback to `switchName`.
+
+### 7.2 VHDX catalog-first selector contract (AE3)
+
+- Replace path-first primary interaction with catalog-first selection.
+- Existing path-only templates remain loadable/editable.
+- If catalog reference is missing/unavailable, UI must show explicit fallback status and guidance.
+- Persistence remains within existing VHDX reference semantics (`vhdxId`, `vhdxSignature`, `vhdPath`) without adding new disk identity fields.
+
+### 7.3 VHDX normalization and display contract (AE4)
+
+- Deterministic precedence for effective identity:
+  1. `vhdxId`
+  2. `vhdxSignature`
+  3. `vhdPath`
+- Editor must show effective source-of-truth and ambiguity state.
+- Conflicts/ambiguities require explicit user confirmation before save proceeds.
+- Validation and warnings must be actionable and non-silent.
+
+### 7.4 AE scope boundary
+
+In scope:
+- Templates selector UX/data-binding hardening using existing/frozen disk identity semantics and controlled switch schema compatibility extension.
+
+Out of scope:
+- Deploy/Assets/global-nav changes
+- base-disk domain redesign
+- new template runtime semantics beyond selector/normalization display and save-confirmation behavior
+
+### 7.5 Follow-up implementation issues
+
+- `#313`: switch selector implementation
+- `#314`: VHDX catalog-first selector implementation
+- `#315`: VHDX normalization and display policy implementation
 
 ---
 

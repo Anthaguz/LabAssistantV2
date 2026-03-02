@@ -77,16 +77,36 @@ VM entry fields (`vmTemplates[]`):
 - `vhdxId` (optional): catalog reference id.
 - `vhdPath` (optional fallback): base image path when id is unavailable.
 - `vhdxSignature` (optional): portable match signature.
-- `switchName` (required for v1 deployment): Hyper-V virtual switch name.
+- `switchName` (legacy fallback): single Hyper-V virtual switch name.
+- `switchNames` (optional): ordered list of Hyper-V virtual switch names for multi-NIC template editing and deployment mapping.
 
 Validation rule:
 
 - At least one of `vhdxId` or `vhdPath` must exist for each VM.
+- If `switchNames` is present:
+  - values must be non-empty
+  - duplicate switch names are not allowed
+- If `switchNames` is absent, `switchName` may be used for legacy compatibility.
+
+Switch persistence compatibility rule:
+
+- During transition, writers may dual-write:
+  - `switchNames` as canonical (when available)
+  - `switchName` as legacy fallback using the first `switchNames` entry
+- Readers must prefer `switchNames` when present, and fallback to `switchName` otherwise.
 
 Editor parity clarification:
 
 - WinUI template VM-entry editing parity (AD5/AD6) operates on these existing `vmTemplates[]` fields and existing optional subobjects only.
-- VM-entry editing parity does not add schema keys by itself.
+- Templates selector hardening (AE) introduces `switchNames` as a controlled schema extension with compatibility fallback to legacy `switchName`.
+
+VHDX normalization clarification:
+
+- Resolution precedence for effective base-disk identity is:
+  1. `vhdxId`
+  2. `vhdxSignature`
+  3. `vhdPath`
+- `vhdxSignature` is a deterministic catalog-level signature composed from normalized OS metadata + generation (+ optional size), not a cryptographic file hash.
 
 ## Network Scope (v1)
 

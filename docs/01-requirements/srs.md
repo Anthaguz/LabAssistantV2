@@ -379,6 +379,19 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** After save/delete/add/edit operations, editor and library state remain coherent (selected template/context, counts, and reload behavior) without cross-capability navigation.
   - **Priority:** P1
 
+- **FR-084:** WinUI `Templates` VM editor shall replace free-text switch entry with host-backed selector UX supporting optional multi-switch assignment.
+  - **Acceptance details:** Switch selection is optional at VM level; if one or more switch rows are present, each row must resolve to a valid host switch value and duplicate switch values are disallowed. Selector UX shall support add/remove row interactions.
+  - **Schema note:** `switchNames` is the canonical multi-switch list with compatibility fallback to legacy `switchName`.
+  - **Priority:** P1
+
+- **FR-085:** WinUI `Templates` VM editor shall use catalog-first VHDX selection while preserving backward compatibility for existing path-based templates.
+  - **Acceptance details:** UI presents catalog selection as primary workflow; existing templates containing only path-based references remain loadable/editable and use documented fallback/ambiguity messaging when referenced catalog entries are missing or unavailable.
+  - **Priority:** P1
+
+- **FR-086:** WinUI `Templates` shall apply deterministic VHDX identity normalization and conflict messaging using existing fields.
+  - **Acceptance details:** Effective identity precedence is `vhdxId` then `vhdxSignature` then `vhdPath`; conflicts/ambiguities require explicit user confirmation before save and expose actionable warning text.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.

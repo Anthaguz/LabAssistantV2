@@ -1284,6 +1284,108 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-013 - WinUI Templates Selector and Normalization Hardening (AE1)
+
+**Related FRs:** FR-084, FR-085, FR-086, FR-014, FR-015
+
+## Scenarios
+
+### 1) Switch selector population and empty state
+**Given**
+- User opens VM settings in `templates.editor`
+- Host switch discovery returns available switches or none
+
+**When**
+- User interacts with switch assignment controls
+
+**Then**
+- Switch controls render as selector rows populated from host switch discovery
+- If no host switches are available, UI shows explicit non-silent guidance
+- VM-level switch assignment remains optional unless rows are present
+
+### 2) Multi-switch row rules and persistence
+**Given**
+- User adds one or more switch rows for a VM entry
+
+**When**
+- User selects switch values and saves template
+
+**Then**
+- Each present row must have a selected switch value
+- Duplicate switch values are rejected with actionable validation feedback
+- Persisted output uses `switchNames` as canonical list
+- Legacy `switchName` is dual-written from first `switchNames` entry for compatibility
+- Reload preserves selected switch rows/values
+
+### 3) Catalog-first VHDX selection
+**Given**
+- User edits VM VHDX references in `templates.editor`
+
+**When**
+- User selects a base disk
+
+**Then**
+- Catalog-backed selection is the primary interaction path
+- Manual path-first editing is not the primary interaction path
+
+### 4) Backward-compatible path-only templates
+**Given**
+- Template VM entry has only legacy path-based VHDX reference
+
+**When**
+- User opens and edits the template
+
+**Then**
+- Template remains loadable/editable without schema migration failure
+- UI displays fallback status when no matching catalog entry is currently available
+- Save behavior remains explicit and non-silent
+
+### 5) Deterministic VHDX normalization precedence
+**Given**
+- VM entry contains any combination of `vhdxId`, `vhdxSignature`, and `vhdPath`
+
+**When**
+- Editor resolves effective disk identity for display/validation
+
+**Then**
+- Precedence is deterministic: `vhdxId` -> `vhdxSignature` -> `vhdPath`
+- Effective source-of-truth is visible to user in editor context
+
+### 6) Conflict and ambiguity messaging
+**Given**
+- VHDX references are mixed/conflicting/ambiguous
+
+**When**
+- User attempts save
+
+**Then**
+- User receives actionable warning message describing ambiguity
+- Save requires explicit user confirmation before continuing
+- No silent conflict resolution occurs
+
+### 7) Scope boundary guard
+**Given**
+- AE selector/normalization hardening work
+
+**When**
+- Team validates contract compliance
+
+**Then**
+- No template-domain expansion beyond selector UX/data-binding hardening is introduced
+- No unrelated Deploy/Assets/global-nav behavior is changed
+- Schema change scope is limited to `switchNames` plus compatibility fallback rules
+
+## Definition of Done
+- [ ] Switch selector behavior is documented with host-backed data source and empty-state guidance
+- [ ] Multi-switch add/remove and duplicate validation rules are documented
+- [ ] `switchNames` canonical + `switchName` fallback dual-write rule is documented
+- [ ] Catalog-first VHDX selector behavior is documented with backward compatibility handling
+- [ ] Deterministic normalization precedence is documented
+- [ ] Conflict/ambiguity save confirmation rule is documented
+- [ ] Scope boundary for AE2/AE3/AE4 is explicit and testable
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
