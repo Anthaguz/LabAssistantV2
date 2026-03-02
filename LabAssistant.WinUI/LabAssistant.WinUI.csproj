@@ -5,19 +5,16 @@
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
-    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
-    <AppxGetPackagePropertiesEnabled>false</AppxGetPackagePropertiesEnabled>
-    <AppxPackage>false</AppxPackage>
-    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
-    <EnableMsixTooling>false</EnableMsixTooling>
-    <UseRidGraph>true</UseRidGraph>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
-    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
-    <WindowsAppSdkBootstrapInitialize>true</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

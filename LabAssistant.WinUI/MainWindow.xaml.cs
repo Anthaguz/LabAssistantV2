@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media.Animation;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.Views.Diagnostics;
@@ -19,10 +18,8 @@ namespace LabAssistant.WinUI;
 
 public sealed partial class MainWindow : Window
 {
-    private const double DrawerWidth = 280;
-    private const int DrawerAnimationDurationMs = 180;
-
     private readonly ShellViewModel _shellViewModel = new();
+    private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
     private readonly IMachinesCapabilityService _machinesCapabilityService;
     private readonly IStructuredLogViewerService _structuredLogViewerService;
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
@@ -31,6 +28,7 @@ public sealed partial class MainWindow : Window
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
     private ShellSubview _activeSubview;
+    private string _activeRouteKey = string.Empty;
     private MachineInventoryItem? _selectedMachine;
     private MachineRdpReadinessResult _selectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
     private MachineEditSnapshot? _loadedEditSnapshot;
@@ -43,7 +41,7 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingMachineEditControls;
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
-    private bool _isDrawerOpen;
+    private bool _isUpdatingNavigationSelection;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -104,14 +102,14 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         _machinesCapabilityService = App.Services.GetRequiredService<IMachinesCapabilityService>();
         _structuredLogViewerService = App.Services.GetRequiredService<IStructuredLogViewerService>();
-        _activeCapability = _shellViewModel.GetCapability("Machines");
-        _activeSubview = _activeCapability.DefaultSubview;
+        _activeRouteKey = _shellViewModel.StartupRoute;
+        _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         MachinesListView.ItemsSource = _machineInventory;
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireMachinesHandlers();
         WireDiagnosticsLogsHandlers();
         ConfigureShellIcons();
-        InitializeDrawer();
+        ConfigureNavigationView();
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
         RootLayout.KeyDown += RootLayout_KeyDown;
@@ -165,32 +163,47 @@ public sealed partial class MainWindow : Window
     {
         HamburgerButton.Content = CreateIconGlyph(ShellIconToken.Menu);
         InsightsToggleButton.Content = CreateIconGlyph(ShellIconToken.Insights);
-
-        MachinesRailButton.Content = CreateIconGlyph(ShellIconToken.Machines);
-        DeployRailButton.Content = CreateIconGlyph(ShellIconToken.Deploy);
-        TemplatesRailButton.Content = CreateIconGlyph(ShellIconToken.Templates);
-        AssetsRailButton.Content = CreateIconGlyph(ShellIconToken.Assets);
-        DiagnosticsRailButton.Content = CreateIconGlyph(ShellIconToken.Diagnostics);
-        SettingsRailButton.Content = CreateIconGlyph(ShellIconToken.Settings);
-
-        MachinesDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Machines, "Machines");
-        DeployDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Deploy, "Deploy");
-        TemplatesDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Templates, "Templates");
-        AssetsDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Assets, "Assets");
-        DiagnosticsDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Diagnostics, "Diagnostics");
-        SettingsDrawerButton.Content = CreateDrawerButtonContent(ShellIconToken.Settings, "Settings");
     }
 
-    private object CreateDrawerButtonContent(string token, string label)
+    private void ConfigureNavigationView()
     {
-        var container = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        container.Children.Add(CreateIconGlyph(token));
-        container.Children.Add(new TextBlock
+        _routeToNavigationItem.Clear();
+        GlobalNavigationView.MenuItems.Clear();
+        GlobalNavigationView.FooterMenuItems.Clear();
+
+        foreach (var capability in _shellViewModel.Capabilities)
         {
-            Text = label,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTopBarForegroundBrush"]
-        });
-        return container;
+            var parentItem = new NavigationViewItem
+            {
+                Content = capability.DisplayName,
+                Tag = capability.Key,
+                Icon = new FontIcon { Glyph = capability.Glyph }
+            };
+
+            if (!capability.IsFooter)
+            {
+                foreach (var subview in capability.Subviews)
+                {
+                    var childItem = new NavigationViewItem
+                    {
+                        Content = subview.DisplayName,
+                        Tag = subview.RouteKey
+                    };
+                    parentItem.MenuItems.Add(childItem);
+                    _routeToNavigationItem[subview.RouteKey] = childItem;
+                }
+            }
+
+            if (capability.IsFooter)
+            {
+                GlobalNavigationView.FooterMenuItems.Add(parentItem);
+                _routeToNavigationItem[capability.DefaultSubview.RouteKey] = parentItem;
+            }
+            else
+            {
+                GlobalNavigationView.MenuItems.Add(parentItem);
+            }
+        }
     }
 
     private TextBlock CreateIconGlyph(string token)
@@ -203,64 +216,9 @@ public sealed partial class MainWindow : Window
         };
     }
 
-    private void InitializeDrawer()
-    {
-        DrawerTranslateTransform.X = -DrawerWidth;
-        CapabilityDrawer.Visibility = Visibility.Collapsed;
-        DrawerScrim.Visibility = Visibility.Collapsed;
-    }
-
-    private void SetDrawerOpen(bool isOpen)
-    {
-        if (_isDrawerOpen == isOpen)
-        {
-            return;
-        }
-
-        _isDrawerOpen = isOpen;
-
-        if (isOpen)
-        {
-            DrawerScrim.Visibility = Visibility.Visible;
-            CapabilityDrawer.Visibility = Visibility.Visible;
-            AnimateDrawer(-DrawerWidth, 0, onCompleted: null);
-            return;
-        }
-
-        AnimateDrawer(DrawerTranslateTransform.X, -DrawerWidth, () =>
-        {
-            CapabilityDrawer.Visibility = Visibility.Collapsed;
-            DrawerScrim.Visibility = Visibility.Collapsed;
-        });
-    }
-
-    private void AnimateDrawer(double from, double to, Action? onCompleted)
-    {
-        var storyboard = new Storyboard();
-        var animation = new DoubleAnimation
-        {
-            From = from,
-            To = to,
-            Duration = TimeSpan.FromMilliseconds(DrawerAnimationDurationMs),
-            EnableDependentAnimation = true,
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-
-        Storyboard.SetTarget(animation, DrawerTranslateTransform);
-        Storyboard.SetTargetProperty(animation, nameof(DrawerTranslateTransform.X));
-        storyboard.Children.Add(animation);
-
-        if (onCompleted is not null)
-        {
-            storyboard.Completed += (_, _) => onCompleted();
-        }
-
-        storyboard.Begin();
-    }
-
     private void ApplyState()
     {
-        BreadcrumbTextBlock.Text = $"{_activeCapability.DisplayName} > {_activeSubview.DisplayName}";
+        CurrentRouteTextBlock.Text = $"{_activeCapability.DisplayName} / {_activeSubview.DisplayName}";
         ContentTitleTextBlock.Text = _activeCapability.DisplayName;
         ContentDescriptionTextBlock.Text = IsMachinesOverviewActive
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
@@ -268,7 +226,7 @@ public sealed partial class MainWindow : Window
                 ? "Configure Machines policy defaults."
                 : IsDiagnosticsLogsActive
                     ? "Inspect canonical structured logs with envelope fields and dynamic context."
-                : $"Subview: {_activeSubview.DisplayName}. This is scaffold-only placeholder content for AA2b.";
+                : $"Subview: {_activeSubview.DisplayName}. Placeholder content until capability migration lands.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
         InsightsPanel.Visibility = _isInsightsOpen ? Visibility.Visible : Visibility.Collapsed;
@@ -278,8 +236,9 @@ public sealed partial class MainWindow : Window
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
         NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
-        RenderSubviewSelector();
-        RenderSubviewToolbar();
+
+        QueueNavigationSelectionUpdate();
+
         UpdateReadinessPollingState();
         UpdateRdpReadinessUi();
         UpdateMachineActionButtons();
@@ -294,97 +253,101 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void RenderSubviewSelector()
+    private void NavigateToRoute(string routeKey)
     {
-        SubviewSelectorPanel.Children.Clear();
-
-        foreach (var subview in _activeCapability.Subviews)
+        if (!_shellViewModel.TryResolveRoute(routeKey, out var capability, out var subview))
         {
-            var button = new Button
-            {
-                Content = subview.DisplayName,
-                Tag = subview.Key,
-                Height = 32,
-                Padding = new Thickness(12, 0, 12, 0),
-                CornerRadius = new CornerRadius(8),
-                BorderThickness = new Thickness(1),
-                BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellBorderBrush"],
-                Foreground = subview.Key == _activeSubview.Key
-                    ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTopBarForegroundBrush"]
-                    : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextPrimaryBrush"],
-                Background = subview.Key == _activeSubview.Key
-                    ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellAccentBrush"]
-                    : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellContentBackgroundBrush"]
-            };
-
-            button.Click += SubviewButton_Click;
-            SubviewSelectorPanel.Children.Add(button);
+            return;
         }
-    }
 
-    private void RenderSubviewToolbar()
-    {
-        SubviewToolbarPanel.Children.Clear();
-
-        foreach (var action in _activeSubview.ToolbarActions)
+        var changedCapability = !string.Equals(_activeCapability.Key, capability.Key, StringComparison.Ordinal);
+        var changedSubview = !string.Equals(_activeSubview.RouteKey, subview.RouteKey, StringComparison.Ordinal);
+        if (!changedCapability && !changedSubview)
         {
-            var button = new Button
-            {
-                Content = action,
-                IsEnabled = false,
-                Height = 32,
-                Padding = new Thickness(10, 0, 10, 0)
-            };
+            return;
+        }
 
-            SubviewToolbarPanel.Children.Add(button);
+        if (changedCapability || changedSubview)
+        {
+            DiscardMachineEditDraft();
+        }
+
+        _activeCapability = capability;
+        _activeSubview = subview;
+        _activeRouteKey = subview.RouteKey;
+        ApplyState();
+
+        if (IsMachinesOverviewActive)
+        {
+            _ = EnsureMachinesInventoryAsync(forceRefresh: false);
         }
     }
 
     private void HamburgerButton_Click(object sender, RoutedEventArgs e)
     {
-        SetDrawerOpen(!_isDrawerOpen);
-        ApplyState();
+        GlobalNavigationView.IsPaneOpen = !GlobalNavigationView.IsPaneOpen;
     }
 
-    private void CapabilityButton_Click(object sender, RoutedEventArgs e)
+    private void GlobalNavigationView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
-        if (sender is Button { Tag: string capability } &&
-            _shellViewModel.Capabilities.Any(entry => string.Equals(entry.DisplayName, capability, StringComparison.Ordinal)))
+        if (_isUpdatingNavigationSelection)
         {
-            DiscardMachineEditDraft();
-            _activeCapability = _shellViewModel.GetCapability(capability);
-            _activeSubview = _activeCapability.DefaultSubview;
-            SetDrawerOpen(false);
-            ApplyState();
-            if (IsMachinesOverviewActive)
+            return;
+        }
+
+        if (args.InvokedItemContainer is not NavigationViewItem invokedItem)
+        {
+            return;
+        }
+
+        if (invokedItem.Tag is not string key)
+        {
+            return;
+        }
+
+        if (_shellViewModel.TryResolveCapability(key, out var capability))
+        {
+            var isCollapsedCompactPane =
+                sender.PaneDisplayMode == NavigationViewPaneDisplayMode.LeftCompact &&
+                !sender.IsPaneOpen;
+
+            // In compact mode, parent-icon clicks should expose child options, not force default navigation.
+            if (isCollapsedCompactPane && capability.Subviews.Count > 0)
             {
-                _ = EnsureMachinesInventoryAsync(forceRefresh: false);
+                return;
             }
+
+            NavigateToRoute(capability.DefaultSubview.RouteKey);
+            return;
         }
+
+        NavigateToRoute(key);
     }
 
-    private void SubviewButton_Click(object sender, RoutedEventArgs e)
+    private void QueueNavigationSelectionUpdate()
     {
-        if (sender is not Button { Tag: string subviewKey })
+        if (!_routeToNavigationItem.TryGetValue(_activeRouteKey, out var selectedNavigationItem))
         {
             return;
         }
 
-        var selectedSubview = _activeCapability.Subviews.FirstOrDefault(
-            subview => string.Equals(subview.Key, subviewKey, StringComparison.Ordinal));
-
-        if (selectedSubview is null)
+        if (ReferenceEquals(GlobalNavigationView.SelectedItem, selectedNavigationItem))
         {
             return;
         }
 
-        DiscardMachineEditDraft();
-        _activeSubview = selectedSubview;
-        ApplyState();
-        if (IsMachinesOverviewActive)
+        _isUpdatingNavigationSelection = true;
+        DispatcherQueue.TryEnqueue(() =>
         {
-            _ = EnsureMachinesInventoryAsync(forceRefresh: false);
-        }
+            try
+            {
+                GlobalNavigationView.SelectedItem = selectedNavigationItem;
+            }
+            finally
+            {
+                _isUpdatingNavigationSelection = false;
+            }
+        });
     }
 
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
@@ -427,43 +390,32 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void DrawerScrim_Tapped(object sender, TappedRoutedEventArgs e)
-    {
-        SetDrawerOpen(false);
-        ApplyState();
-    }
-
     private void RootLayout_KeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == Windows.System.VirtualKey.Escape && _isDrawerOpen)
+        if (e.Key == Windows.System.VirtualKey.Escape && GlobalNavigationView.IsPaneOpen)
         {
-            SetDrawerOpen(false);
-            ApplyState();
+            GlobalNavigationView.IsPaneOpen = false;
             e.Handled = true;
         }
     }
 
     private void EscapeAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        if (_isDrawerOpen)
+        if (GlobalNavigationView.IsPaneOpen)
         {
-            SetDrawerOpen(false);
-            ApplyState();
+            GlobalNavigationView.IsPaneOpen = false;
             args.Handled = true;
         }
     }
 
     private bool IsMachinesOverviewActive =>
-        string.Equals(_activeCapability.DisplayName, "Machines", StringComparison.Ordinal) &&
-        string.Equals(_activeSubview.Key, "overview", StringComparison.Ordinal);
+        string.Equals(_activeRouteKey, ShellRouteKeys.MachinesOverview, StringComparison.Ordinal);
 
     private bool IsSettingsMachinesActive =>
-        string.Equals(_activeCapability.DisplayName, "Settings", StringComparison.Ordinal) &&
-        string.Equals(_activeSubview.Key, "machines", StringComparison.Ordinal);
+        string.Equals(_activeRouteKey, ShellRouteKeys.SettingsMachines, StringComparison.Ordinal);
 
     private bool IsDiagnosticsLogsActive =>
-        string.Equals(_activeCapability.DisplayName, "Diagnostics", StringComparison.Ordinal) &&
-        string.Equals(_activeSubview.Key, "logs", StringComparison.Ordinal);
+        string.Equals(_activeRouteKey, ShellRouteKeys.DiagnosticsLogs, StringComparison.Ordinal);
 
     private void InitializeRdpReadinessTimer()
     {

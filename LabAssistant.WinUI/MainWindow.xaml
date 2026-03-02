@@ -33,15 +33,15 @@
                     Content=" "
                     FontFamily="Segoe MDL2 Assets"
                     Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                    ToolTipService.ToolTip="Open capabilities" />
+                    ToolTipService.ToolTip="Toggle navigation pane" />
 
                 <TextBlock
-                    x:Name="BreadcrumbTextBlock"
+                    x:Name="CurrentRouteTextBlock"
                     Grid.Column="1"
                     Margin="12,0,0,0"
                     VerticalAlignment="Center"
                     Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                    Text="Capability / Machines" />
+                    Text="Machines / Overview" />
 
                 <Button
                     x:Name="ThemeToggleButton"
@@ -89,125 +89,93 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="64" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="320" />
             </Grid.ColumnDefinitions>
 
-            <Border
+            <NavigationView
+                x:Name="GlobalNavigationView"
                 Grid.Column="0"
-                Background="{StaticResource ShellRailBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="0,0,1,0">
-                <StackPanel Margin="0,8,0,0" Spacing="4">
-                    <Button x:Name="MachinesRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Machines" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Machines" />
-                    <Button x:Name="DeployRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Deploy" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Deploy" />
-                    <Button x:Name="TemplatesRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Templates" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Templates" />
-                    <Button x:Name="AssetsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Assets" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Assets" />
-                    <Button x:Name="DiagnosticsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Diagnostics" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Diagnostics" />
-                    <Button x:Name="SettingsRailButton" Width="48" Height="44" Margin="8,0,8,0" Click="CapabilityButton_Click" Content=" " Tag="Settings" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ShellTopBarForegroundBrush}" ToolTipService.ToolTip="Settings" />
-                </StackPanel>
-            </Border>
-
-            <Border
-                Grid.Column="1"
-                Margin="16"
-                Padding="20"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="8">
-                <StackPanel Spacing="12">
-                    <TextBlock
-                        x:Name="ContentTitleTextBlock"
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontSize="24"
-                        FontWeight="SemiBold"
-                        Text="Machines Shell Host" />
+                CompactPaneLength="56"
+                IsBackButtonVisible="Collapsed"
+                IsPaneToggleButtonVisible="False"
+                IsSettingsVisible="False"
+                OpenPaneLength="280"
+                PaneDisplayMode="LeftCompact"
+                ItemInvoked="GlobalNavigationView_ItemInvoked">
+                <NavigationView.Content>
                     <Border
-                        Padding="8"
-                        Background="{StaticResource ShellBackgroundBrush}"
+                        Margin="16"
+                        Padding="20"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
                         BorderBrush="{StaticResource ShellBorderBrush}"
                         BorderThickness="1"
-                        CornerRadius="6">
-                        <Grid MinHeight="40">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel
-                                x:Name="SubviewSelectorPanel"
-                                Orientation="Horizontal"
-                                Spacing="6"
-                                VerticalAlignment="Center" />
-                            <StackPanel
-                                x:Name="SubviewToolbarPanel"
-                                Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="6"
-                                VerticalAlignment="Center" />
-                        </Grid>
-                    </Border>
-                    <TextBlock
-                        x:Name="ContentDescriptionTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Machines feature content is intentionally out of scope for #266."
-                        TextWrapping="Wrap" />
-                    <machineViews:MachinesOverviewView
-                        x:Name="MachinesOverviewViewHost"
-                        Visibility="Collapsed" />
-                    <Border
-                        x:Name="SettingsMachinesPanel"
-                        Padding="12"
-                        Background="{StaticResource ShellBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Visibility="Collapsed">
-                        <StackPanel Spacing="10">
+                        CornerRadius="8">
+                        <StackPanel Spacing="12">
                             <TextBlock
+                                x:Name="ContentTitleTextBlock"
                                 Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                FontSize="16"
+                                FontSize="24"
                                 FontWeight="SemiBold"
-                                Text="Machines Deletion Policy" />
+                                Text="Machines Shell Host" />
                             <TextBlock
+                                x:Name="ContentDescriptionTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Sets the default delete scope for Machines. Confirmation still shows effective scope before delete."
+                                Text="Machines feature content is intentionally out of scope for #266."
                                 TextWrapping="Wrap" />
-                            <ComboBox x:Name="MachinesDeletionPolicyComboBox" Width="420">
-                                <ComboBoxItem Tag="AskEveryTime" Content="Ask every time (default)" />
-                                <ComboBoxItem Tag="AlwaysDeleteDisks" Content="Always delete disks" />
-                                <ComboBoxItem Tag="AlwaysDeleteDisksForLabAssistantProvisioned" Content="Always delete disks for LabAssistant-provisioned VMs" />
-                                <ComboBoxItem Tag="AlwaysDeleteDisksForDifferencingOnly" Content="Always delete disks for differencing disks only" />
-                            </ComboBox>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="SaveMachinesDeletionPolicyButton" Click="SaveMachinesDeletionPolicyButton_Click" Content="Save policy" />
-                                <TextBlock
-                                    x:Name="MachinesDeletionPolicyStatusTextBlock"
-                                    VerticalAlignment="Center"
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="Policy not loaded." />
-                            </StackPanel>
+                            <machineViews:MachinesOverviewView
+                                x:Name="MachinesOverviewViewHost"
+                                Visibility="Collapsed" />
+                            <Border
+                                x:Name="SettingsMachinesPanel"
+                                Padding="12"
+                                Background="{StaticResource ShellBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <StackPanel Spacing="10">
+                                    <TextBlock
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        FontSize="16"
+                                        FontWeight="SemiBold"
+                                        Text="Machines Deletion Policy" />
+                                    <TextBlock
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="Sets the default delete scope for Machines. Confirmation still shows effective scope before delete."
+                                        TextWrapping="Wrap" />
+                                    <ComboBox x:Name="MachinesDeletionPolicyComboBox" Width="420">
+                                        <ComboBoxItem Tag="AskEveryTime" Content="Ask every time (default)" />
+                                        <ComboBoxItem Tag="AlwaysDeleteDisks" Content="Always delete disks" />
+                                        <ComboBoxItem Tag="AlwaysDeleteDisksForLabAssistantProvisioned" Content="Always delete disks for LabAssistant-provisioned VMs" />
+                                        <ComboBoxItem Tag="AlwaysDeleteDisksForDifferencingOnly" Content="Always delete disks for differencing disks only" />
+                                    </ComboBox>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="SaveMachinesDeletionPolicyButton" Click="SaveMachinesDeletionPolicyButton_Click" Content="Save policy" />
+                                        <TextBlock
+                                            x:Name="MachinesDeletionPolicyStatusTextBlock"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="Policy not loaded." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <diagViews:DiagnosticsLogsView
+                                x:Name="DiagnosticsLogsViewHost"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="NonMachinesPlaceholderTextBlock"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Subview placeholder content."
+                                TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
-                    <diagViews:DiagnosticsLogsView
-                        x:Name="DiagnosticsLogsViewHost"
-                        Visibility="Collapsed" />
-                    <TextBlock
-                        x:Name="NonMachinesPlaceholderTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Subview placeholder content."
-                        TextWrapping="Wrap" />
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        FontStyle="Italic"
-                        Text="AA2b scaffold-only: capability-local navigation, toolbar placeholders, and routing context. Feature operations remain out of scope." />
-                </StackPanel>
-            </Border>
+                </NavigationView.Content>
+            </NavigationView>
 
             <Border
                 x:Name="InsightsPanel"
-                Grid.Column="2"
+                Grid.Column="1"
                 Margin="0,16,16,16"
                 Padding="16"
                 Background="{StaticResource ShellInsightsBackgroundBrush}"
@@ -233,36 +201,5 @@
                 </StackPanel>
             </Border>
         </Grid>
-
-        <Border
-            x:Name="DrawerScrim"
-            Grid.Row="1"
-            Background="{StaticResource ShellScrimBrush}"
-            Tapped="DrawerScrim_Tapped"
-            Visibility="Collapsed" />
-
-        <Border
-            x:Name="CapabilityDrawer"
-            Grid.Row="1"
-            Width="280"
-            HorizontalAlignment="Left"
-            Padding="16"
-            Background="{StaticResource ShellDrawerBackgroundBrush}"
-            BorderBrush="{StaticResource ShellBorderBrush}"
-            BorderThickness="0,0,1,0"
-            Visibility="Collapsed">
-            <Border.RenderTransform>
-                <TranslateTransform x:Name="DrawerTranslateTransform" X="-280" />
-            </Border.RenderTransform>
-            <StackPanel Spacing="6">
-                <TextBlock Foreground="{StaticResource ShellTopBarForegroundBrush}" FontSize="18" FontWeight="SemiBold" Text="Capabilities" />
-                <Button x:Name="MachinesDrawerButton" Click="CapabilityButton_Click" Content="Machines" Tag="Machines" />
-                <Button x:Name="DeployDrawerButton" Click="CapabilityButton_Click" Content="Deploy" Tag="Deploy" />
-                <Button x:Name="TemplatesDrawerButton" Click="CapabilityButton_Click" Content="Templates" Tag="Templates" />
-                <Button x:Name="AssetsDrawerButton" Click="CapabilityButton_Click" Content="Assets" Tag="Assets" />
-                <Button x:Name="DiagnosticsDrawerButton" Click="CapabilityButton_Click" Content="Diagnostics" Tag="Diagnostics" />
-                <Button x:Name="SettingsDrawerButton" Click="CapabilityButton_Click" Content="Settings" Tag="Settings" />
-            </StackPanel>
-        </Border>
     </Grid>
 </Window>

@@ -30,15 +30,13 @@ public sealed class MilestoneABScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_KeepsDrawerInContentRow_BelowTopBar()
+    public void MainWindow_UsesNavigationViewInContentRow_BelowTopBar()
     {
         var xaml = LoadMainWindowXaml();
-        var drawer = FindByName(xaml, "CapabilityDrawer");
-        var scrim = FindByName(xaml, "DrawerScrim");
+        var navigationView = FindByName(xaml, "GlobalNavigationView");
 
-        Assert.Equal("1", GetAttributeValue(drawer, "Grid.Row"));
-        Assert.Equal("1", GetAttributeValue(scrim, "Grid.Row"));
-        Assert.Equal("280", drawer.Attribute("Width")?.Value);
+        Assert.Equal("LeftCompact", navigationView.Attribute("PaneDisplayMode")?.Value);
+        Assert.Equal("280", navigationView.Attribute("OpenPaneLength")?.Value);
     }
 
     [Fact]

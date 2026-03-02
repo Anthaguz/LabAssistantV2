@@ -3,87 +3,134 @@ using LabAssistant.WinUI.Theming;
 
 namespace LabAssistant.WinUI.ViewModels;
 
+public static class ShellRouteKeys
+{
+    public const string MachinesOverview = "machines.overview";
+    public const string DeployOnTheFly = "deploy.on_the_fly";
+    public const string DeployFromTemplate = "deploy.from_template";
+    public const string TemplatesLibrary = "templates.library";
+    public const string TemplatesEditor = "templates.editor";
+    public const string AssetsDisks = "assets.disks";
+    public const string AssetsSwitches = "assets.switches";
+    public const string DiagnosticsOverview = "diagnostics.overview";
+    public const string DiagnosticsLogs = "diagnostics.logs";
+    public const string SettingsGeneral = "settings.general";
+    public const string SettingsMachines = "settings.machines";
+}
+
 public sealed class ShellViewModel
 {
     private readonly Dictionary<string, ShellCapability> _capabilityLookup;
+    private readonly Dictionary<string, (ShellCapability Capability, ShellSubview Subview)> _routeLookup;
 
     public ShellViewModel()
     {
         Capabilities =
         [
             new ShellCapability(
-                ShellIconToken.Machines,
-                "Machines",
-                [new ShellSubview("overview", "Overview", ["Refresh", "Filter"])]),
-            new ShellCapability(
-                ShellIconToken.Deploy,
-                "Deploy",
+                key: "machines",
+                token: ShellIconToken.Machines,
+                displayName: "Machines",
+                isFooter: false,
                 [
-                    new ShellSubview("on-the-fly", "On-the-fly", ["Start", "Validate"]),
-                    new ShellSubview("from-template", "From Template", ["Select Template", "Preview"])
+                    new ShellSubview(ShellRouteKeys.MachinesOverview, "Overview", ["Refresh", "Filter"])
                 ]),
             new ShellCapability(
-                ShellIconToken.Templates,
-                "Templates",
+                key: "deploy",
+                token: ShellIconToken.Deploy,
+                displayName: "Deploy",
+                isFooter: false,
                 [
-                    new ShellSubview("library", "Library", ["Import", "Export"]),
-                    new ShellSubview("editor", "Editor", ["Save Draft", "Validate"])
+                    new ShellSubview(ShellRouteKeys.DeployOnTheFly, "Quick Deploy", ["Start", "Validate"]),
+                    new ShellSubview(ShellRouteKeys.DeployFromTemplate, "From Template", ["Select Template", "Preview"])
                 ]),
             new ShellCapability(
-                ShellIconToken.Assets,
-                "Assets",
+                key: "templates",
+                token: ShellIconToken.Templates,
+                displayName: "Templates",
+                isFooter: false,
                 [
-                    new ShellSubview("disks", "Disks", ["Add Disk", "Validate"]),
-                    new ShellSubview("virtual-switches", "Virtual Switches", ["Add Switch", "Refresh"])
+                    new ShellSubview(ShellRouteKeys.TemplatesLibrary, "Library", ["Import", "Export"]),
+                    new ShellSubview(ShellRouteKeys.TemplatesEditor, "Editor", ["Save Draft", "Validate"])
                 ]),
             new ShellCapability(
-                ShellIconToken.Diagnostics,
-                "Diagnostics",
+                key: "assets",
+                token: ShellIconToken.Assets,
+                displayName: "Assets",
+                isFooter: false,
                 [
-                    new ShellSubview("overview", "Overview", ["Export Bundle"]),
-                    new ShellSubview("logs", "Logs", ["Reload", "Open Raw JSONL"])
+                    new ShellSubview(ShellRouteKeys.AssetsDisks, "Disks", ["Add Disk", "Validate"]),
+                    new ShellSubview(ShellRouteKeys.AssetsSwitches, "Virtual Switches", ["Add Switch", "Refresh"])
                 ]),
             new ShellCapability(
-                ShellIconToken.Settings,
-                "Settings",
+                key: "diagnostics",
+                token: ShellIconToken.Diagnostics,
+                displayName: "Diagnostics",
+                isFooter: false,
                 [
-                    new ShellSubview("general", "General", ["Apply", "Reset"]),
-                    new ShellSubview("machines", "Machines", ["Save Policy"])
+                    new ShellSubview(ShellRouteKeys.DiagnosticsOverview, "Overview", ["Export Bundle"]),
+                    new ShellSubview(ShellRouteKeys.DiagnosticsLogs, "Logs", ["Reload", "Open Raw JSONL"])
+                ]),
+            new ShellCapability(
+                key: "settings",
+                token: ShellIconToken.Settings,
+                displayName: "Settings",
+                isFooter: true,
+                [
+                    new ShellSubview(ShellRouteKeys.SettingsMachines, "Machines", ["Save Policy"]),
+                    new ShellSubview(ShellRouteKeys.SettingsGeneral, "General", ["Apply"])
                 ])
         ];
 
-        _capabilityLookup = Capabilities.ToDictionary(
-            capability => capability.DisplayName,
-            capability => capability,
-            StringComparer.Ordinal);
+        _capabilityLookup = Capabilities.ToDictionary(capability => capability.Key, StringComparer.Ordinal);
+        _routeLookup = Capabilities
+            .SelectMany(capability => capability.Subviews.Select(subview => (capability, subview)))
+            .ToDictionary(entry => entry.subview.RouteKey, entry => (entry.capability, entry.subview), StringComparer.Ordinal);
     }
 
     public ObservableCollection<ShellCapability> Capabilities { get; }
 
-    public ShellCapability GetCapability(string capabilityDisplayName)
+    public string StartupRoute => ShellRouteKeys.MachinesOverview;
+
+    public bool TryResolveRoute(string routeKey, out ShellCapability capability, out ShellSubview subview)
     {
-        if (_capabilityLookup.TryGetValue(capabilityDisplayName, out var capability))
+        if (_routeLookup.TryGetValue(routeKey, out var resolved))
         {
-            return capability;
+            capability = resolved.Capability;
+            subview = resolved.Subview;
+            return true;
         }
 
-        return Capabilities[0];
+        capability = Capabilities[0];
+        subview = capability.DefaultSubview;
+        return false;
+    }
+
+    public bool TryResolveCapability(string capabilityKey, out ShellCapability capability)
+    {
+        return _capabilityLookup.TryGetValue(capabilityKey, out capability!);
     }
 }
 
 public sealed class ShellCapability
 {
-    public ShellCapability(string token, string displayName, IReadOnlyList<ShellSubview> subviews)
+    public ShellCapability(string key, string token, string displayName, bool isFooter, IReadOnlyList<ShellSubview> subviews)
     {
+        Key = key;
         Token = token;
         DisplayName = displayName;
+        IsFooter = isFooter;
         Subviews = subviews;
         DefaultSubview = subviews[0];
     }
 
+    public string Key { get; }
+
     public string Token { get; }
 
     public string DisplayName { get; }
+
+    public bool IsFooter { get; }
 
     public string Glyph => ShellIconCatalog.GetGlyph(Token);
 
@@ -94,14 +141,14 @@ public sealed class ShellCapability
 
 public sealed class ShellSubview
 {
-    public ShellSubview(string key, string displayName, IReadOnlyList<string> toolbarActions)
+    public ShellSubview(string routeKey, string displayName, IReadOnlyList<string> toolbarActions)
     {
-        Key = key;
+        RouteKey = routeKey;
         DisplayName = displayName;
         ToolbarActions = toolbarActions;
     }
 
-    public string Key { get; }
+    public string RouteKey { get; }
 
     public string DisplayName { get; }
 

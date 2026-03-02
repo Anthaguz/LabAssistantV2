@@ -4,6 +4,7 @@ using LabAssistant.Services.Logging;
 using InfrastructureServices = LabAssistant.Services.ServiceCollectionExtensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
+using System.Diagnostics;
 
 namespace LabAssistant.WinUI;
 
@@ -17,6 +18,14 @@ public partial class App : Application
     {
         InitializeComponent();
         RequestedTheme = ApplicationTheme.Light;
+
+#if DEBUG
+        // Emit unhandled XAML details in Output so fail-fast dumps have a matching managed breadcrumb.
+        UnhandledException += (_, e) =>
+        {
+            Debug.WriteLine($"[WinUI UnhandledException] {e.Message}");
+        };
+#endif
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
