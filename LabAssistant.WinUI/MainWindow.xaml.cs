@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Controls;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
+using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Diagnostics;
 using LabAssistant.WinUI.Views.Machines;
 using LabAssistant.WinUI.Views.Templates;
@@ -69,8 +70,10 @@ public sealed partial class MainWindow : Window
     private DateTimeOffset _lastOnDemandRdpRefreshUtc = DateTimeOffset.MinValue;
 
     private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
+    private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
+    private FrameworkElement DeployFromTemplatePanel => DeployFromTemplateViewHost;
     private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
     private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
     private ListView MachinesListView => MachinesOverviewView.MachinesListView;
@@ -117,6 +120,12 @@ public sealed partial class MainWindow : Window
     private TextBox SelectedLogContextTextBox => DiagnosticsLogsView.SelectedLogContextTextBox;
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
+    private ComboBox DeployTemplateSelectorComboBox => DeployFromTemplateView.DeployTemplateSelectorComboBoxControl;
+    private Button DeployReloadTemplatesButton => DeployFromTemplateView.DeployReloadTemplatesButtonControl;
+    private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
+    private Button DeployResolveSuggestionsButton => DeployFromTemplateView.DeployResolveSuggestionsButtonControl;
+    private Button DeployOpenTemplateEditorButton => DeployFromTemplateView.DeployOpenTemplateEditorButtonControl;
+    private TextBlock DeployActionStatusTextBlock => DeployFromTemplateView.DeployActionStatusTextBlockControl;
     private ListView TemplateLibraryListView => TemplatesLibraryView.TemplateLibraryListViewControl;
     private TextBox TemplateSearchTextBox => TemplatesLibraryView.TemplateSearchTextBoxControl;
     private Button ApplyTemplateSearchButton => TemplatesLibraryView.ApplyTemplateSearchButtonControl;
@@ -173,6 +182,7 @@ public sealed partial class MainWindow : Window
         WireMachinesHandlers();
         WireDiagnosticsLogsHandlers();
         WireTemplatesHandlers();
+        WireDeployHandlers();
         ConfigureShellIcons();
         ConfigureNavigationView();
         Title = "LabAssistant.WinUI";
@@ -250,6 +260,19 @@ public sealed partial class MainWindow : Window
         ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;
     }
 
+    private void WireDeployHandlers()
+    {
+        DeployReloadTemplatesButton.Click += DeployReloadTemplatesButton_Click;
+        DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;
+        DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;
+        DeployTemplateSelectorComboBox.ItemsSource = new[]
+        {
+            "(No template selected)",
+            "AF2 scaffold item - template wiring lands in AF3"
+        };
+        DeployTemplateSelectorComboBox.SelectedIndex = 0;
+    }
+
     private void ConfigureShellIcons()
     {
         HamburgerButton.Content = CreateIconGlyph(ShellIconToken.Menu);
@@ -316,6 +339,8 @@ public sealed partial class MainWindow : Window
         ContentTitleTextBlock.Text = _activeCapability.DisplayName;
         ContentDescriptionTextBlock.Text = IsMachinesOverviewActive
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
+            : IsDeployFromTemplateActive
+                ? "Select template inputs and review compact readiness summary. Execution and gating wire in AF3."
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
                 : IsTemplatesEditorActive
@@ -331,12 +356,13 @@ public sealed partial class MainWindow : Window
         IssueBadge.Visibility = _issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         IssueBadgeTextBlock.Text = _issueCount.ToString();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
+        DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         SyncTemplatesSubviewSelection();
         UpdateTemplatesUi();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
 
         QueueNavigationSelectionUpdate();
 
@@ -356,6 +382,11 @@ public sealed partial class MainWindow : Window
         if (IsTemplatesLibraryActive)
         {
             _ = EnsureTemplatesLibraryAsync(forceRefresh: false);
+        }
+
+        if (IsDeployFromTemplateActive)
+        {
+            UpdateDeployFromTemplateScaffoldStatus("AF2 scaffold active. Readiness and execution wiring are deferred to AF3.");
         }
     }
 
@@ -541,6 +572,9 @@ public sealed partial class MainWindow : Window
     private bool IsMachinesOverviewActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.MachinesOverview, StringComparison.Ordinal);
 
+    private bool IsDeployFromTemplateActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.DeployFromTemplate, StringComparison.Ordinal);
+
     private bool IsTemplatesLibraryActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesLibrary, StringComparison.Ordinal);
 
@@ -578,6 +612,28 @@ public sealed partial class MainWindow : Window
         {
             _isUpdatingTemplatesSubviewSelection = false;
         }
+    }
+
+    private void DeployReloadTemplatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateDeployFromTemplateScaffoldStatus("AF2 scaffold: template reload placeholder. AF3 wires real template retrieval.");
+    }
+
+    private void DeployResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateDeployFromTemplateScaffoldStatus("AF2 scaffold: resolve suggestions placeholder. AF3 wires compatibility suggestions.");
+    }
+
+    private void DeployOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateDeployFromTemplateScaffoldStatus("Opening Templates editor for correction flow.");
+        NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+    }
+
+    private void UpdateDeployFromTemplateScaffoldStatus(string message)
+    {
+        DeployReadinessSummaryTextBlock.Text = "Compact readiness summary placeholder. AF3 adds blocking/warning semantics.";
+        DeployActionStatusTextBlock.Text = message;
     }
 
     private void UpdateTemplatesUi()
