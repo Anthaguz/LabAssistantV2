@@ -307,6 +307,16 @@ public sealed partial class MainWindow : Window
 
         if (_shellViewModel.TryResolveCapability(key, out var capability))
         {
+            var isCollapsedCompactPane =
+                sender.PaneDisplayMode == NavigationViewPaneDisplayMode.LeftCompact &&
+                !sender.IsPaneOpen;
+
+            // In compact mode, parent-icon clicks should expose child options, not force default navigation.
+            if (isCollapsedCompactPane && capability.Subviews.Count > 0)
+            {
+                return;
+            }
+
             NavigateToRoute(capability.DefaultSubview.RouteKey);
             return;
         }

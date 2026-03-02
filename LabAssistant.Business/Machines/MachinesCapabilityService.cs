@@ -3,6 +3,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
@@ -281,7 +282,12 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            throw;
+            return LogReadinessResult(
+                operationId,
+                context,
+                MachineRdpReadinessState.Unknown,
+                MachineRdpReadinessReasonCodes.CheckFailed,
+                "RDP readiness check was cancelled.");
         }
         catch (Exception ex)
         {
@@ -707,18 +713,30 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         int timeoutMs,
         CancellationToken cancellationToken)
     {
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeoutMs);
-
         using var client = new TcpClient();
+        var connectTask = client.ConnectAsync(host, port);
+        var stopwatch = Stopwatch.StartNew();
         try
         {
-            await client.ConnectAsync(host, port, timeoutCts.Token);
+            while (!connectTask.IsCompleted)
+            {
+                if (cancellationToken.IsCancellationRequested || stopwatch.ElapsedMilliseconds >= timeoutMs)
+                {
+                    return false;
+                }
+
+                await Task.Delay(50);
+            }
+
+            await connectTask;
             return true;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (SocketException)
         {
-            // Timeout reached: treat as port unreachable, not as an explicit user/system cancellation.
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
             return false;
         }
     }
