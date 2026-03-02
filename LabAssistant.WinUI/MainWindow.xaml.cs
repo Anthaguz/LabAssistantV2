@@ -51,8 +51,10 @@ public sealed partial class MainWindow : Window
 
     private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
-
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
+    private FrameworkElement TemplatesLibraryPanel => TemplatesLibraryViewHost;
+    private FrameworkElement TemplatesEditorPanel => TemplatesEditorViewHost;
+    private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
     private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
     private ListView MachinesListView => MachinesOverviewView.MachinesListView;
     private TextBlock SelectedVmNameTextBlock => MachinesOverviewView.SelectedVmNameTextBlock;
@@ -222,6 +224,10 @@ public sealed partial class MainWindow : Window
         ContentTitleTextBlock.Text = _activeCapability.DisplayName;
         ContentDescriptionTextBlock.Text = IsMachinesOverviewActive
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
+            : IsTemplatesLibraryActive
+                ? "Browse templates and start create/open/import/export flows from one Templates capability context."
+                : IsTemplatesEditorActive
+                    ? "Edit template content in-place. AD2 currently provides scaffold-only sections."
             : IsSettingsMachinesActive
                 ? "Configure Machines policy defaults."
                 : IsDiagnosticsLogsActive
@@ -233,9 +239,14 @@ public sealed partial class MainWindow : Window
         IssueBadge.Visibility = _issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         IssueBadgeTextBlock.Text = _issueCount.ToString();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesLibraryPanel.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesEditorPanel.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesLibraryNavButton.IsEnabled = !IsTemplatesLibraryActive;
+        TemplatesEditorNavButton.IsEnabled = !IsTemplatesEditorActive;
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
 
         QueueNavigationSelectionUpdate();
 
@@ -362,6 +373,16 @@ public sealed partial class MainWindow : Window
         ApplyState();
     }
 
+    private void TemplatesLibraryNavButton_Click(object sender, RoutedEventArgs e)
+    {
+        NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
+    }
+
+    private void TemplatesEditorNavButton_Click(object sender, RoutedEventArgs e)
+    {
+        NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+    }
+
     private async void SaveMachinesDeletionPolicyButton_Click(object sender, RoutedEventArgs e)
     {
         if (MachinesDeletionPolicyComboBox.SelectedItem is not ComboBoxItem selectedItem ||
@@ -410,6 +431,15 @@ public sealed partial class MainWindow : Window
 
     private bool IsMachinesOverviewActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.MachinesOverview, StringComparison.Ordinal);
+
+    private bool IsTemplatesLibraryActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesLibrary, StringComparison.Ordinal);
+
+    private bool IsTemplatesEditorActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesEditor, StringComparison.Ordinal);
+
+    private bool IsTemplatesCapabilityActive =>
+        IsTemplatesLibraryActive || IsTemplatesEditorActive;
 
     private bool IsSettingsMachinesActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.SettingsMachines, StringComparison.Ordinal);
