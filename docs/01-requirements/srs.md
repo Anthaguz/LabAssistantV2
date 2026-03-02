@@ -392,11 +392,28 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** Effective identity precedence is `vhdxId` then `vhdxSignature` then `vhdPath`; unresolved conflicts/ambiguities block save until user selects a resolving catalog entry, and UI exposes actionable warning text.
   - **Priority:** P1
 
+- **FR-087:** WinUI Deploy migration Milestone AF shall implement `from-template` workflow as the first Deploy slice and explicitly defer `on-the-fly` migration.
+  - **Acceptance details:** WinUI Deploy parent/child routing remains canonical with deterministic route key `deploy.from_template` for AF scope.
+  - **Priority:** P1
+
+- **FR-088:** WinUI Deploy `from-template` shall consume Templates AE compatibility semantics for disk and switch references.
+  - **Acceptance details:** Deploy compatibility handling prefers `switchNames` with fallback to legacy `switchName`; disk identity uses AE normalization semantics and required unresolved/ambiguous disk identity is blocking.
+  - **Priority:** P1
+
+- **FR-089:** WinUI Deploy readiness for `from-template` shall provide explicit correction affordances when compatibility checks fail.
+  - **Acceptance details:** Blocking compatibility errors provide actionable correction paths, including auto-resolve suggestions and explicit `Open in Templates Editor` action.
+  - **Priority:** P1
+
+- **FR-090:** WinUI Deploy `from-template` results UX shall use compact-first visibility with progressive disclosure.
+  - **Acceptance details:** sticky status/progress is always visible; per-VM rows are concise by default with expandable details; global warnings/errors are collapsed by default while remaining discoverable.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
 - See `docs/02-ux/winui-global-navigationview-contract-ac.md` for Milestone AC global NavigationView behavior and routing contract.
 - See `docs/02-ux/winui-templates-capability-contract-ad.md` for Milestone AD `Templates` routing and unified workflow contract.
+- See `docs/02-ux/winui-deploy-from-template-contract-af.md` for Milestone AF `Deploy from-template` routing, readiness, and results visibility contract.
 
 ---
 

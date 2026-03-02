@@ -189,6 +189,11 @@ Examples:
 - `Deploy` should focus on provisioning workflows, not general Hyper-V VM administration
 - Single-VM and multi-VM deployment should remain the same Deploy workspace (same GUI), not separate top-level modes
 
+### AF contract note
+- AF migration slice is `from-template` first with canonical route `deploy.from_template`.
+- `deploy.on_the_fly` migration is explicitly deferred in AF scope.
+- Deploy readiness/review surface must expose correction actions when AE compatibility issues block deploy.
+
 ---
 
 ## 4.3 Templates

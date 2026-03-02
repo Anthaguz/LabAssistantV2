@@ -16,6 +16,7 @@
 - `docs/02-ux/winui-shell-contract-aa.md`
 - `docs/02-ux/winui-global-navigationview-contract-ac.md`
 - `docs/02-ux/winui-templates-capability-contract-ad.md`
+- `docs/02-ux/winui-deploy-from-template-contract-af.md`
 - `docs/02-ux/winui-layout-constraints-contract.md`
 - `docs/03-architecture/gui-action-map.deploy.md`
 - `docs/03-architecture/gui-action-map.templates.md`
@@ -228,11 +229,19 @@ Gate expectations:
 
 **Goal**
 - migrate/rebuild Deploy workspace after shell + Machines baseline is stable
+- execute from-template-first migration slice for WinUI:
+  - AF1 docs contract
+  - AF2 route/scaffold
+  - AF3 readiness compatibility and correction actions
+  - AF4 compact-first results visibility
 
 **Must preserve**
 - readiness quick/full semantics
 - deploy/cancel/cleanup behavior
 - outcome summaries and guest-step outcomes
+- AE compatibility semantics when consuming template disk/switch identity:
+  - required unresolved/ambiguous disk identity remains blocking
+  - switch mapping prefers `switchNames` with `switchName` fallback
 
 **Verification baseline**
 - Milestones R/U/W automated tests
