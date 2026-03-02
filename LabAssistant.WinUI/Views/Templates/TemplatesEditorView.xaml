@@ -7,14 +7,14 @@
         Background="{StaticResource ShellBackgroundBrush}"
         BorderBrush="{StaticResource ShellBorderBrush}"
         BorderThickness="1"
-        CornerRadius="6">
+        CornerRadius="6"
+        VerticalAlignment="Stretch">
         <Grid RowSpacing="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -43,21 +43,7 @@
                         <ColumnDefinition Width="3*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock
-                            x:Name="TemplateEditorContextTextBlock"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="No template selected."
-                            TextWrapping="Wrap" />
-                        <TextBlock
-                            x:Name="TemplateVmCountTextBlock"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="VMs: 0"
-                            TextWrapping="Wrap" />
-                        <TextBlock
-                            Margin="0,4,0,0"
-                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                            FontWeight="SemiBold"
-                            Text="Template Name" />
+                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Template Name" />
                         <TextBox x:Name="TemplateNameTextBox" PlaceholderText="Template name" />
                         <TextBlock
                             Foreground="{StaticResource ShellTextPrimaryBrush}"
@@ -72,6 +58,16 @@
                             TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock
+                            x:Name="TemplateEditorContextTextBlock"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="No template selected."
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="TemplateVmCountTextBlock"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="VMs: 0"
+                            TextWrapping="Wrap" />
                         <TextBlock
                             x:Name="TemplateIdTextBlock"
                             Foreground="{StaticResource ShellTextSecondaryBrush}"
@@ -234,19 +230,20 @@
                 </Border>
             </Grid>
 
-            <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
-                <Button x:Name="SaveTemplateButton" Content="Save" />
-                <Button x:Name="SaveTemplateAsButton" Content="Save As" />
-                <Button x:Name="ValidateTemplateButton" Content="Validate" />
-                <Button x:Name="BackToLibraryButton" Content="Back to Library" />
+            <StackPanel Grid.Row="4" Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="SaveTemplateButton" Content="Save" />
+                    <Button x:Name="SaveTemplateAsButton" Content="Save As" />
+                    <Button x:Name="ValidateTemplateButton" Content="Validate" />
+                    <Button x:Name="BackToLibraryButton" Content="Back to Library" />
+                </StackPanel>
+                <TextBlock
+                    x:Name="TemplateEditorStatusTextBlock"
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="No template loaded."
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
             </StackPanel>
-
-            <TextBlock
-                x:Name="TemplateEditorStatusTextBlock"
-                Grid.Row="5"
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="No template loaded."
-                TextWrapping="Wrap" />
         </Grid>
     </Border>
 </UserControl>

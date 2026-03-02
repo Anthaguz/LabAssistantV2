@@ -132,39 +132,57 @@
                                 Text="Machines feature content is intentionally out of scope for #266."
                                 TextWrapping="Wrap" />
                             <Grid Grid.Row="2">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
                                 <machineViews:MachinesOverviewView
                                     x:Name="MachinesOverviewViewHost"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
                                     Visibility="Collapsed" />
                                 <Border
                                     x:Name="TemplatesLocalNavigationPanel"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
                                     Padding="8"
                                     Background="{StaticResource ShellContentBackgroundBrush}"
                                     BorderBrush="{StaticResource ShellBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="6"
+                                    VerticalAlignment="Stretch"
                                     Visibility="Collapsed">
                                     <TabView
                                         x:Name="TemplatesSubviewTabView"
                                         IsAddTabButtonVisible="False"
+                                        VerticalAlignment="Stretch"
                                         SelectionChanged="TemplatesSubviewTabView_SelectionChanged">
-                                        <TabView.Resources>
-                                            <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="{ThemeResource ShellBackgroundColor}" />
-                                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="{ThemeResource ShellContentBackgroundColor}" />
-                                            <SolidColorBrush x:Key="TabViewItemHeaderForeground" Color="{ThemeResource ShellTextSecondaryColor}" />
+                                    <TabView.Resources>
+                                        <Style TargetType="TabViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="{ThemeResource ShellBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="{ThemeResource ShellContentBackgroundColor}" />
+                                        <SolidColorBrush x:Key="TabViewItemHeaderForeground" Color="{ThemeResource ShellTextSecondaryColor}" />
                                             <SolidColorBrush x:Key="TabViewItemHeaderForegroundSelected" Color="{ThemeResource ShellTextPrimaryColor}" />
                                             <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="{ThemeResource ShellBackgroundColor}" />
                                             <SolidColorBrush x:Key="TabViewItemHeaderForegroundPointerOver" Color="{ThemeResource ShellTextPrimaryColor}" />
-                                        </TabView.Resources>
-                                        <TabViewItem x:Name="TemplatesLibraryTabViewItem" Header="Library" IsClosable="False">
-                                            <templateViews:TemplatesLibraryView x:Name="TemplatesLibraryViewHost" />
-                                        </TabViewItem>
-                                        <TabViewItem x:Name="TemplatesEditorTabViewItem" Header="Editor" IsClosable="False">
-                                            <templateViews:TemplatesEditorView x:Name="TemplatesEditorViewHost" />
-                                        </TabViewItem>
-                                    </TabView>
-                                </Border>
+                                    </TabView.Resources>
+                                    <TabViewItem x:Name="TemplatesLibraryTabViewItem" Header="Library" IsClosable="False">
+                                        <templateViews:TemplatesLibraryView x:Name="TemplatesLibraryViewHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="TemplatesEditorTabViewItem" Header="Editor" IsClosable="False">
+                                        <templateViews:TemplatesEditorView x:Name="TemplatesEditorViewHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                                    </TabViewItem>
+                                </TabView>
+                            </Border>
                                 <Border
                                     x:Name="SettingsMachinesPanel"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
                                     Padding="12"
                                     Background="{StaticResource ShellBackgroundBrush}"
                                     BorderBrush="{StaticResource ShellBorderBrush}"
@@ -199,9 +217,13 @@
                                 </Border>
                                 <diagViews:DiagnosticsLogsView
                                     x:Name="DiagnosticsLogsViewHost"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
                                     Visibility="Collapsed" />
                                 <TextBlock
                                     x:Name="NonMachinesPlaceholderTextBlock"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     Text="Subview placeholder content."
                                     TextWrapping="Wrap" />
