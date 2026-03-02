@@ -31,28 +31,38 @@ public sealed class MilestoneAFScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployFromTemplateView_DefinesRequiredAf2ScaffoldControls()
+    public void DeployFromTemplateView_DefinesRequiredAf2Af3ScaffoldControls()
     {
         var xaml = LoadDeployFromTemplateViewXaml();
 
         Assert.NotNull(FindByName(xaml, "DeployTemplateSelectorComboBox"));
         Assert.NotNull(FindByName(xaml, "DeployReadinessSummaryPanel"));
         Assert.NotNull(FindByName(xaml, "DeployReadinessSummaryTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployEvaluateReadinessButton"));
         Assert.NotNull(FindByName(xaml, "DeployResolveSuggestionsButton"));
         Assert.NotNull(FindByName(xaml, "DeployOpenTemplateEditorButton"));
+        Assert.NotNull(FindByName(xaml, "DeployStartButton"));
         Assert.NotNull(FindByName(xaml, "DeployActionStatusTextBlock"));
     }
 
     [Fact]
-    public void MainWindow_WiresDeployScaffoldActionsWithoutExecutionSemantics()
+    public void MainWindow_WiresDeployReadinessAndExecutionFlowForAf3()
     {
         var source = LoadMainWindowSource();
 
         Assert.Contains("WireDeployHandlers()", source);
+        Assert.Contains("DeployEvaluateReadinessButton.Click += DeployEvaluateReadinessButton_Click;", source);
+        Assert.Contains("DeployStartButton.Click += DeployStartButton_Click;", source);
+        Assert.Contains("DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;", source);
+        Assert.Contains("await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);", source);
+        Assert.Contains("await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Full);", source);
+        Assert.Contains("await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);", source);
+        Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", source);
         Assert.Contains("DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;", source);
         Assert.Contains("DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;", source);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
-        Assert.DoesNotContain("StartDeploymentAsync(", source);
+        Assert.Contains("await OpenTemplateInEditorAsync(_selectedDeployTemplateLibraryItem, fromDeploy: true);", source);
+        Assert.Contains("private static DeployDiskResolution ResolveDeployDiskIdentity", source);
+        Assert.Contains("private static DeploySwitchResolution ResolveDeploySwitches", source);
     }
 
     private static XDocument LoadMainWindowXaml()

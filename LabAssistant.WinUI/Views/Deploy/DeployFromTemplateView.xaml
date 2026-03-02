@@ -35,6 +35,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <ComboBox
                     x:Name="DeployTemplateSelectorComboBox"
@@ -44,6 +45,10 @@
                     x:Name="DeployReloadTemplatesButton"
                     Grid.Column="1"
                     Content="Reload" />
+                <Button
+                    x:Name="DeployEvaluateReadinessButton"
+                    Grid.Column="2"
+                    Content="Evaluate" />
             </Grid>
 
             <Border
@@ -86,6 +91,9 @@
                         <Button
                             x:Name="DeployOpenTemplateEditorButton"
                             Content="Open in Templates Editor" />
+                        <Button
+                            x:Name="DeployStartButton"
+                            Content="Start Deploy" />
                     </StackPanel>
                     <TextBlock
                         x:Name="DeployActionStatusTextBlock"
