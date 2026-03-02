@@ -4,7 +4,7 @@
 
 **Status:** Approved implementation contract for Milestone AB.
 
-**Scope:** WinUI shell and first migrated capability surfaces (`Machines`, `Diagnostics > Logs`).
+**Scope:** WinUI shell and first migrated capability surfaces (`Machines`, `Diagnostics > Logs`, `Templates`).
 
 **Out of scope:** Feature behavior changes, runtime orchestration changes, visual theme redesign.
 
@@ -41,6 +41,7 @@ All WinUI shell pages shall follow the same top-level region sizing model:
 6. **Content host**
 - Must use bounded layout containers (`Grid` with `*` rows/columns preferred).
 - Surface-level children cannot rely on infinite-height measurement.
+- Primary content regions are fluid by default (`*` sizing). Fixed heights are allowed only for explicitly bounded utility surfaces and must be documented per-view.
 
 ---
 
@@ -154,6 +155,11 @@ Define expected behavior by width bands (exact pixel values may be tuned in impl
 - Primary scroll owner: machines workspace content region.
 - VM list/details/actions area must remain visible and operable under compact and normal widths.
 - Dense edit sections (CPU/memory/network) must use bounded sections and avoid pushing action row out of viewport.
+
+## 7.3 Templates
+- Primary scroll owner: template library list region.
+- Library content region must expand with available workspace height (no fixed list-height containers).
+- Template list must keep actions visible while list/details metadata remain readable in compact and wide layouts.
 
 ---
 

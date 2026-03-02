@@ -8,43 +8,153 @@
         BorderBrush="{StaticResource ShellBorderBrush}"
         BorderThickness="1"
         CornerRadius="6">
-        <StackPanel Spacing="10">
+        <Grid RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <TextBlock
+                Grid.Row="0"
                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                 FontSize="16"
                 FontWeight="SemiBold"
-                Text="Template Library (Scaffold)" />
+                Text="Template Library" />
             <TextBlock
+                Grid.Row="1"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="AD2 scaffold: list/search/actions only. AD3 will wire operations."
+                Text="Browse, open, import, export, create, and delete templates from one capability surface."
                 TextWrapping="Wrap" />
 
-            <Grid ColumnSpacing="8">
+            <Grid Grid.Row="2" ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBox
+                    x:Name="TemplateSearchTextBox"
                     Grid.Column="0"
-                    PlaceholderText="Search templates (placeholder)" />
-                <ComboBox
+                    PlaceholderText="Search by name, id, or description" />
+                <Button
+                    x:Name="ApplyTemplateSearchButton"
                     Grid.Column="1"
-                    MinWidth="180"
-                    PlaceholderText="Filter (placeholder)" />
+                    Content="Apply" />
+                <Button
+                    x:Name="ClearTemplateSearchButton"
+                    Grid.Column="2"
+                    Content="Clear" />
+                <Button
+                    x:Name="ReloadTemplatesButton"
+                    Grid.Column="3"
+                    Content="Reload" />
             </Grid>
 
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Open" IsEnabled="False" />
-                <Button Content="Create" IsEnabled="False" />
-                <Button Content="Import" IsEnabled="False" />
-                <Button Content="Export" IsEnabled="False" />
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="OpenTemplateInEditorButton" Content="Open in Editor" />
+                <Button x:Name="CreateTemplateButton" Content="Create New" />
+                <Button x:Name="DeleteTemplateButton" Content="Delete" />
+                <Button x:Name="ImportTemplateButton" Content="Import" />
+                <Button x:Name="ExportTemplateButton" Content="Export" />
             </StackPanel>
 
-            <ListView Height="220">
-                <ListViewItem Content="Template placeholder A" />
-                <ListViewItem Content="Template placeholder B" />
-                <ListViewItem Content="Template placeholder C" />
-            </ListView>
-        </StackPanel>
+            <Border
+                Grid.Row="4"
+                MinHeight="260"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid
+                        Grid.Row="0"
+                        Padding="12,8"
+                        Background="{StaticResource ShellBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="90" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="0"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Template" />
+                        <TextBlock
+                            Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            Margin="0,0,8,0"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="VMs" />
+                    </Grid>
+
+                    <ListView
+                        x:Name="TemplateLibraryListView"
+                        Grid.Row="1"
+                        SelectionMode="Single">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="MinHeight" Value="74" />
+                            <Setter Property="Padding" Value="0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid
+                                Padding="12,10"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="0,0,0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="90" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        Text="{Binding Name}" />
+                                    <TextBlock
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="{Binding Description}"
+                                        MaxLines="2"
+                                        TextTrimming="WordEllipsis"
+                                        TextWrapping="WrapWholeWords" />
+                                </StackPanel>
+
+                                <TextBlock
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,0,8,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    Text="{Binding VmCount}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                </Grid>
+            </Border>
+
+            <TextBlock
+                x:Name="TemplatesLibraryStatusTextBlock"
+                Grid.Row="5"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="No templates loaded."
+                TextWrapping="Wrap" />
+        </Grid>
     </Border>
 </UserControl>
