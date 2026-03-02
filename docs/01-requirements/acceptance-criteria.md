@@ -667,6 +667,7 @@ Each readiness result shall include, at minimum:
 - `Ready` => `Open RDP` enabled
 - `NotReady` or `Unknown` => `Open RDP` disabled with concise reason text/tool tip
 - A manual recheck action is available and does not block UI interaction
+- Transient probe timeout/cancellation/unreachable outcomes during background or manual checks are handled as non-fatal readiness outcomes and must not crash the app
 
 ### 5) Delete VM — Scope Selection and Confirmation
 **Given**
@@ -762,6 +763,7 @@ Each readiness result shall include, at minimum:
 - [ ] Console and RDP are separate actions; RDP disabled-state behavior is explicit when unavailable
 - [ ] RDP readiness v1 criteria (running + IPv4 + TCP 3389 reachability) gate button enablement
 - [ ] Readiness checks are asynchronous/non-blocking and support manual recheck
+- [ ] Transient probe timeout/cancellation outcomes do not crash Machines UI and are surfaced as readiness state updates (not exception-driven user errors)
 - [ ] Delete flow supports VM-only vs VM+disks scopes with confirmation
 - [ ] Machines deletion policy modes and safety guard behavior are defined and testable
 - [ ] Delete-with-storage cleanup removes safe/owned VM folder artifacts or reports explicit actionable failure
