@@ -1,6 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text.Json;
+using LabAssistant.Business.Deployment;
+using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Configuration;
+using LabAssistant.Models.Deployment;
 using LabAssistant.Business.Machines;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Templates;
@@ -28,6 +32,11 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, NavigationViewItem> _routeToCapabilityNavigationItem = new(StringComparer.Ordinal);
     private readonly IMachinesCapabilityService _machinesCapabilityService;
     private readonly ITemplatesCapabilityService _templatesCapabilityService;
+    private readonly IDeploymentPreflightService _deploymentPreflightService;
+    private readonly IDeploymentCoordinator _deploymentCoordinator;
+    private readonly IDeploymentOutcomeSummaryBuilder _deploymentOutcomeSummaryBuilder;
+    private readonly IAppSettingsStore _settingsStore;
+    private readonly IVhdxCatalogStore _vhdxCatalogStore;
     private readonly IStructuredLogViewerService _structuredLogViewerService;
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
@@ -35,6 +44,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
+    private readonly List<DeployCompatibilityIssue> _deployCompatibilityIssues = [];
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
@@ -48,6 +58,9 @@ public sealed partial class MainWindow : Window
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
     private TemplateLibraryItem? _selectedTemplateLibraryItem;
     private TemplateEditorDocument? _activeTemplateEditorDocument;
+    private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;
+    private TemplateEditorDocument? _activeDeployTemplateDocument;
+    private DeploymentReadinessReport? _deployReadinessReport;
     private VmTemplate? _selectedTemplateVmEntry;
     private bool _isMachineActionRunning;
     private bool _isRdpReadinessRefreshRunning;
@@ -62,6 +75,9 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingTemplateVmEditorControls;
     private bool _isUpdatingTemplateVmSwitchRows;
     private bool _isUpdatingTemplateVhdxSelector;
+    private bool _isDeployLoadingTemplates;
+    private bool _isDeployEvaluatingReadiness;
+    private bool _isDeployStarting;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -122,9 +138,11 @@ public sealed partial class MainWindow : Window
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
     private ComboBox DeployTemplateSelectorComboBox => DeployFromTemplateView.DeployTemplateSelectorComboBoxControl;
     private Button DeployReloadTemplatesButton => DeployFromTemplateView.DeployReloadTemplatesButtonControl;
+    private Button DeployEvaluateReadinessButton => DeployFromTemplateView.DeployEvaluateReadinessButtonControl;
     private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
     private Button DeployResolveSuggestionsButton => DeployFromTemplateView.DeployResolveSuggestionsButtonControl;
     private Button DeployOpenTemplateEditorButton => DeployFromTemplateView.DeployOpenTemplateEditorButtonControl;
+    private Button DeployStartButton => DeployFromTemplateView.DeployStartButtonControl;
     private TextBlock DeployActionStatusTextBlock => DeployFromTemplateView.DeployActionStatusTextBlockControl;
     private ListView TemplateLibraryListView => TemplatesLibraryView.TemplateLibraryListViewControl;
     private TextBox TemplateSearchTextBox => TemplatesLibraryView.TemplateSearchTextBoxControl;
@@ -172,6 +190,11 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         _machinesCapabilityService = App.Services.GetRequiredService<IMachinesCapabilityService>();
         _templatesCapabilityService = App.Services.GetRequiredService<ITemplatesCapabilityService>();
+        _deploymentPreflightService = App.Services.GetRequiredService<IDeploymentPreflightService>();
+        _deploymentCoordinator = App.Services.GetRequiredService<IDeploymentCoordinator>();
+        _deploymentOutcomeSummaryBuilder = App.Services.GetRequiredService<IDeploymentOutcomeSummaryBuilder>();
+        _settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
+        _vhdxCatalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
         _structuredLogViewerService = App.Services.GetRequiredService<IStructuredLogViewerService>();
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
@@ -263,14 +286,13 @@ public sealed partial class MainWindow : Window
     private void WireDeployHandlers()
     {
         DeployReloadTemplatesButton.Click += DeployReloadTemplatesButton_Click;
+        DeployEvaluateReadinessButton.Click += DeployEvaluateReadinessButton_Click;
         DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;
         DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;
-        DeployTemplateSelectorComboBox.ItemsSource = new[]
-        {
-            "(No template selected)",
-            "AF2 scaffold item - template wiring lands in AF3"
-        };
-        DeployTemplateSelectorComboBox.SelectedIndex = 0;
+        DeployStartButton.Click += DeployStartButton_Click;
+        DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
+        DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
+        DeployTemplateSelectorComboBox.ItemsSource = _templateLibraryItems;
     }
 
     private void ConfigureShellIcons()
@@ -386,7 +408,8 @@ public sealed partial class MainWindow : Window
 
         if (IsDeployFromTemplateActive)
         {
-            UpdateDeployFromTemplateScaffoldStatus("AF2 scaffold active. Readiness and execution wiring are deferred to AF3.");
+            _ = EnsureDeployTemplatesLoadedAsync(forceRefresh: false);
+            UpdateDeployUi();
         }
     }
 
@@ -614,26 +637,73 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void DeployReloadTemplatesButton_Click(object sender, RoutedEventArgs e)
+    private async void DeployReloadTemplatesButton_Click(object sender, RoutedEventArgs e)
     {
-        UpdateDeployFromTemplateScaffoldStatus("AF2 scaffold: template reload placeholder. AF3 wires real template retrieval.");
+        await EnsureDeployTemplatesLoadedAsync(forceRefresh: true);
     }
 
-    private void DeployResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
+    private async void DeployEvaluateReadinessButton_Click(object sender, RoutedEventArgs e)
     {
-        UpdateDeployFromTemplateScaffoldStatus("AF2 scaffold: resolve suggestions placeholder. AF3 wires compatibility suggestions.");
+        await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
     }
 
-    private void DeployOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
+    private async void DeployResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
     {
-        UpdateDeployFromTemplateScaffoldStatus("Opening Templates editor for correction flow.");
-        NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+        if (_activeDeployTemplateDocument is null)
+        {
+            DeployActionStatusTextBlock.Text = "Select a template first.";
+            return;
+        }
+
+        var applied = await ApplyDeployResolveSuggestionsAsync(_activeDeployTemplateDocument.Template);
+        DeployActionStatusTextBlock.Text = applied == 0
+            ? "No auto-resolve suggestions available for the current template state."
+            : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...";
+        await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
     }
 
-    private void UpdateDeployFromTemplateScaffoldStatus(string message)
+    private async void DeployOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
     {
-        DeployReadinessSummaryTextBlock.Text = "Compact readiness summary placeholder. AF3 adds blocking/warning semantics.";
-        DeployActionStatusTextBlock.Text = message;
+        if (_selectedDeployTemplateLibraryItem is null)
+        {
+            DeployActionStatusTextBlock.Text = "Select a template first.";
+            return;
+        }
+
+        await OpenTemplateInEditorAsync(_selectedDeployTemplateLibraryItem, fromDeploy: true);
+    }
+
+    private async void DeployTemplateSelectorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isDeployLoadingTemplates || _isTemplatesLoading)
+        {
+            return;
+        }
+
+        _selectedDeployTemplateLibraryItem = DeployTemplateSelectorComboBox.SelectedItem as TemplateLibraryItem;
+        if (_selectedDeployTemplateLibraryItem is null)
+        {
+            _activeDeployTemplateDocument = null;
+            _deployReadinessReport = null;
+            _deployCompatibilityIssues.Clear();
+            UpdateDeployUi();
+            return;
+        }
+
+        try
+        {
+            _activeDeployTemplateDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedDeployTemplateLibraryItem.FilePath);
+            DeployActionStatusTextBlock.Text = $"Loaded '{_selectedDeployTemplateLibraryItem.Name}' for deploy readiness.";
+            await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
+        }
+        catch (Exception ex)
+        {
+            _activeDeployTemplateDocument = null;
+            _deployReadinessReport = null;
+            _deployCompatibilityIssues.Clear();
+            DeployActionStatusTextBlock.Text = $"Failed to load selected template. {ex.Message}";
+            UpdateDeployUi();
+        }
     }
 
     private void UpdateTemplatesUi()
@@ -679,6 +749,459 @@ public sealed partial class MainWindow : Window
         TemplateVmCountTextBlock.Text = $"VMs: {_activeTemplateEditorDocument.Template.VmTemplates.Count}";
         UpdateTemplateVmEditorPanel();
         UpdateTemplateSwitchGuidanceText();
+    }
+
+    private void UpdateDeployUi()
+    {
+        var hasTemplate = _activeDeployTemplateDocument is not null;
+        var hasBlockingFailures = _deployCompatibilityIssues.Any(issue => issue.IsBlocking) ||
+                                  (_deployReadinessReport?.HasBlockingFailures ?? false);
+
+        DeployTemplateSelectorComboBox.IsEnabled = !_isDeployLoadingTemplates && !_isDeployStarting;
+        DeployReloadTemplatesButton.IsEnabled = !_isDeployLoadingTemplates && !_isDeployStarting;
+        DeployEvaluateReadinessButton.IsEnabled = hasTemplate && !_isDeployEvaluatingReadiness && !_isDeployStarting;
+        DeployResolveSuggestionsButton.IsEnabled = hasTemplate && !_isDeployEvaluatingReadiness && !_isDeployStarting;
+        DeployOpenTemplateEditorButton.IsEnabled = _selectedDeployTemplateLibraryItem is not null && !_isDeployStarting;
+        DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures && !_isDeployEvaluatingReadiness && !_isDeployStarting;
+
+        if (_activeDeployTemplateDocument is null)
+        {
+            DeployReadinessSummaryTextBlock.Text = "Select a template to evaluate readiness and run deploy.";
+            return;
+        }
+
+        var failCount = _deployCompatibilityIssues.Count(issue => issue.IsBlocking) +
+                        (_deployReadinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Fail) ?? 0);
+        var warnCount = _deployCompatibilityIssues.Count(issue => !issue.IsBlocking) +
+                        (_deployReadinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn) ?? 0);
+        var passCount = _deployReadinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Pass) ?? 0;
+        var deployState = hasBlockingFailures ? "Blocked" : "Ready";
+        DeployReadinessSummaryTextBlock.Text =
+            $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
+            $"Template: {_activeDeployTemplateDocument.Template.Name} ({_activeDeployTemplateDocument.Template.VmTemplates.Count} VMs).";
+    }
+
+    private async Task EnsureDeployTemplatesLoadedAsync(bool forceRefresh)
+    {
+        if (!forceRefresh && _templateLibraryItems.Count > 0)
+        {
+            DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
+            UpdateDeployUi();
+            return;
+        }
+
+        _isDeployLoadingTemplates = true;
+        UpdateDeployUi();
+        DeployActionStatusTextBlock.Text = "Loading templates for deploy...";
+
+        try
+        {
+            await EnsureTemplatesLibraryAsync(forceRefresh: forceRefresh);
+
+            if (_templateLibraryItems.Count == 0)
+            {
+                _selectedDeployTemplateLibraryItem = null;
+                _activeDeployTemplateDocument = null;
+                _deployReadinessReport = null;
+                _deployCompatibilityIssues.Clear();
+                DeployActionStatusTextBlock.Text = "No templates available for deploy.";
+            }
+            else
+            {
+                _selectedDeployTemplateLibraryItem ??= _templateLibraryItems[0];
+                DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
+                DeployActionStatusTextBlock.Text = $"Loaded {_templateLibraryItems.Count} template(s) for deploy.";
+            }
+        }
+        catch (Exception ex)
+        {
+            DeployActionStatusTextBlock.Text = $"Failed to load deploy templates. {ex.Message}";
+        }
+        finally
+        {
+            _isDeployLoadingTemplates = false;
+            UpdateDeployUi();
+        }
+    }
+
+    private async Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode)
+    {
+        if (_activeDeployTemplateDocument is null)
+        {
+            DeployActionStatusTextBlock.Text = "Select a template first.";
+            UpdateDeployUi();
+            return;
+        }
+
+        _isDeployEvaluatingReadiness = true;
+        DeployActionStatusTextBlock.Text = mode == DeploymentPreflightMode.Full
+            ? "Running full deploy readiness evaluation..."
+            : "Running quick deploy readiness evaluation...";
+
+        try
+        {
+            await EnsureTemplateSwitchesAsync(forceRefresh: false);
+            var deployContext = BuildDeployContext(_activeDeployTemplateDocument.Template);
+            _deployCompatibilityIssues.Clear();
+            _deployCompatibilityIssues.AddRange(deployContext.CompatibilityIssues);
+
+            _deployReadinessReport = await _deploymentPreflightService.RunAsync(deployContext.MultiVmContext, mode);
+
+            var blockingCount = _deployCompatibilityIssues.Count(issue => issue.IsBlocking) +
+                                _deployReadinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Fail);
+            var warningCount = _deployCompatibilityIssues.Count(issue => !issue.IsBlocking) +
+                               _deployReadinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn);
+            DeployActionStatusTextBlock.Text = blockingCount > 0
+                ? $"Readiness found {blockingCount} blocking issue(s) and {warningCount} warning(s)."
+                : warningCount > 0
+                    ? $"Readiness passed with {warningCount} warning(s)."
+                    : "Readiness passed with no issues.";
+        }
+        catch (Exception ex)
+        {
+            _deployReadinessReport = null;
+            _deployCompatibilityIssues.Clear();
+            DeployActionStatusTextBlock.Text = $"Readiness evaluation failed. {ex.Message}";
+        }
+        finally
+        {
+            _isDeployEvaluatingReadiness = false;
+            UpdateDeployUi();
+        }
+    }
+
+    private async void DeployStartButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeDeployTemplateDocument is null)
+        {
+            DeployActionStatusTextBlock.Text = "Select a template first.";
+            return;
+        }
+
+        _isDeployStarting = true;
+        UpdateDeployUi();
+        try
+        {
+            await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Full);
+            var hasBlockingFailures = _deployCompatibilityIssues.Any(issue => issue.IsBlocking) ||
+                                      (_deployReadinessReport?.HasBlockingFailures ?? false);
+            if (hasBlockingFailures)
+            {
+                DeployActionStatusTextBlock.Text = "Deploy blocked by readiness failures. Resolve blocking items first.";
+                return;
+            }
+
+            var deployContext = BuildDeployContext(_activeDeployTemplateDocument.Template);
+            DeployActionStatusTextBlock.Text = "Starting deployment...";
+            await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);
+
+            var summary = _deploymentOutcomeSummaryBuilder.Build(deployContext.MultiVmContext);
+            DeployActionStatusTextBlock.Text =
+                $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, " +
+                $"Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Residuals={summary.ResidualVmCount}.";
+        }
+        catch (Exception ex)
+        {
+            DeployActionStatusTextBlock.Text = $"Deploy failed. {ex.Message}";
+        }
+        finally
+        {
+            _isDeployStarting = false;
+            UpdateDeployUi();
+        }
+    }
+
+    private async Task<int> ApplyDeployResolveSuggestionsAsync(LabTemplate template)
+    {
+        var catalogResult = _vhdxCatalogStore.Load(_settingsStore.Settings.CatalogPath);
+        var catalogItems = catalogResult.Items;
+        var templateSwitches = _templateAvailableSwitches.Count > 0
+            ? _templateAvailableSwitches
+            : await _machinesCapabilityService.LoadVirtualSwitchesAsync();
+        var availableSwitches = templateSwitches
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var applied = 0;
+        foreach (var vm in template.VmTemplates)
+        {
+            var switchNames = vm.SwitchNames?.Where(name => !string.IsNullOrWhiteSpace(name)).ToList() ?? [];
+            if (switchNames.Count == 0 && !string.IsNullOrWhiteSpace(vm.SwitchName))
+            {
+                switchNames.Add(vm.SwitchName);
+            }
+
+            if (switchNames.Count > 0)
+            {
+                var normalized = switchNames
+                    .Where(name => availableSwitches.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (normalized.Count != switchNames.Count)
+                {
+                    applied++;
+                }
+
+                vm.SwitchNames = normalized.Count > 0 ? normalized : null;
+                vm.SwitchName = normalized.Count > 0 ? normalized[0] : null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(vm.VhdxId))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(vm.VhdxSignature))
+            {
+                var signatureMatches = VhdxSignature.FindMatches(vm.VhdxSignature, catalogItems);
+                if (signatureMatches.Count == 1)
+                {
+                    var match = signatureMatches[0];
+                    vm.VhdxId = match.Id;
+                    vm.VhdPath = match.Path;
+                    vm.VhdxSignature = match.Signature;
+                    applied++;
+                    continue;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(vm.VhdPath))
+            {
+                var pathMatch = catalogItems.FirstOrDefault(item =>
+                    string.Equals(item.Path, vm.VhdPath, StringComparison.OrdinalIgnoreCase));
+                if (pathMatch is not null)
+                {
+                    vm.VhdxId = pathMatch.Id;
+                    vm.VhdxSignature = pathMatch.Signature;
+                    vm.VhdPath = pathMatch.Path;
+                    applied++;
+                }
+            }
+        }
+
+        return applied;
+    }
+
+    private DeployContextBuildResult BuildDeployContext(LabTemplate template)
+    {
+        var compatibilityIssues = new List<DeployCompatibilityIssue>();
+        var settings = _settingsStore.Settings;
+        var catalogResult = _vhdxCatalogStore.Load(settings.CatalogPath);
+        var catalogItems = catalogResult.Items.ToList();
+        var availableSwitches = _templateAvailableSwitches.ToList();
+
+        var contexts = new List<VmDeploymentContext>();
+        foreach (var vmTemplate in template.VmTemplates)
+        {
+            var vmName = string.IsNullOrWhiteSpace(vmTemplate.Name) ? "Unnamed-VM" : vmTemplate.Name.Trim();
+            var vmId = Guid.TryParse(vmTemplate.VmId, out var parsedVmId) ? parsedVmId : Guid.NewGuid();
+
+            var diskResolution = ResolveDeployDiskIdentity(vmTemplate, catalogItems);
+            compatibilityIssues.AddRange(diskResolution.Issues.Select(issue => issue with { VmName = vmName }));
+
+            var switchResolution = ResolveDeploySwitches(vmTemplate, availableSwitches);
+            compatibilityIssues.AddRange(switchResolution.Issues.Select(issue => issue with { VmName = vmName }));
+
+            var vmPath = Path.Combine(settings.VmBasePath, vmName);
+            var vhdPath = Path.Combine(vmPath, $"{vmName}.vhdx");
+
+            var context = new VmDeploymentContext
+            {
+                VmId = vmId,
+                VmName = vmName,
+                MemoryMb = vmTemplate.MemoryMb > 0 ? vmTemplate.MemoryMb : settings.DefaultVmMemoryMb,
+                CpuCount = vmTemplate.CpuCount > 0 ? vmTemplate.CpuCount : settings.DefaultCpuCount,
+                VmPath = vmPath,
+                VhdPath = vhdPath,
+                BaseVhdPath = diskResolution.EffectiveBasePath,
+                VhdxId = diskResolution.EffectiveId,
+                VhdxSignature = diskResolution.EffectiveSignature,
+                VirtualSwitchName = switchResolution.EffectiveSwitch,
+                PerVmFailFast = settings.PerVmFailFast,
+                NonBlockingOptionalSteps = new List<string>(settings.NonBlockingOptionalSteps ?? []),
+                ConfigureTimeZone = vmTemplate.TimeZoneConfig?.Enabled == true,
+                InstallSoftware = vmTemplate.SoftwareConfig?.Enabled == true,
+                InstallRole = vmTemplate.RoleConfig?.Enabled == true,
+                ConfigureNetworkInformation = vmTemplate.GuestNetworkConfig?.Enabled == true,
+                TimeZoneConfig = vmTemplate.TimeZoneConfig,
+                SoftwareConfig = vmTemplate.SoftwareConfig,
+                RoleConfig = vmTemplate.RoleConfig,
+                GuestNetworkConfig = vmTemplate.GuestNetworkConfig
+            };
+            contexts.Add(context);
+        }
+
+        var multiVmContext = new MultiVmDeploymentContext
+        {
+            VmContexts = contexts,
+            StopAllOnAnyVmFailure = settings.StopAllOnAnyVmFailure
+        };
+
+        return new DeployContextBuildResult(multiVmContext, compatibilityIssues);
+    }
+
+    private static DeployDiskResolution ResolveDeployDiskIdentity(VmTemplate vmTemplate, IReadOnlyList<VhdxCatalogItem> catalogItems)
+    {
+        var issues = new List<DeployCompatibilityIssue>();
+        var idMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdxId)
+            ? null
+            : catalogItems.FirstOrDefault(item => string.Equals(item.Id, vmTemplate.VhdxId, StringComparison.OrdinalIgnoreCase));
+
+        var signatureMatches = string.IsNullOrWhiteSpace(vmTemplate.VhdxSignature)
+            ? []
+            : VhdxSignature.FindMatches(vmTemplate.VhdxSignature, catalogItems).ToList();
+
+        var pathMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdPath)
+            ? null
+            : catalogItems.FirstOrDefault(item => string.Equals(item.Path, vmTemplate.VhdPath, StringComparison.OrdinalIgnoreCase));
+
+        if (idMatch is not null)
+        {
+            var pathConflict = !string.IsNullOrWhiteSpace(vmTemplate.VhdPath) &&
+                               !string.Equals(vmTemplate.VhdPath, idMatch.Path, StringComparison.OrdinalIgnoreCase);
+            var signatureConflict = !string.IsNullOrWhiteSpace(vmTemplate.VhdxSignature) &&
+                                    !string.IsNullOrWhiteSpace(idMatch.Signature) &&
+                                    !string.Equals(vmTemplate.VhdxSignature, idMatch.Signature, StringComparison.OrdinalIgnoreCase);
+            if (pathConflict || signatureConflict)
+            {
+                issues.Add(new DeployCompatibilityIssue(
+                    VmName: string.Empty,
+                    IsBlocking: true,
+                    Message: "Disk identity conflict detected. Resolve in Templates editor.",
+                    Guidance: "Select one catalog-backed identity and save template."));
+                return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
+            }
+
+            return new DeployDiskResolution(idMatch.Path, idMatch.Id, idMatch.Signature, issues);
+        }
+
+        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))
+        {
+            issues.Add(new DeployCompatibilityIssue(
+                VmName: string.Empty,
+                IsBlocking: true,
+                Message: $"Catalog entry '{vmTemplate.VhdxId}' is missing.",
+                Guidance: "Open in Templates editor and select a valid catalog disk."));
+            return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
+        }
+
+        if (signatureMatches.Count > 1)
+        {
+            issues.Add(new DeployCompatibilityIssue(
+                VmName: string.Empty,
+                IsBlocking: true,
+                Message: "Disk signature maps to multiple catalog entries.",
+                Guidance: "Resolve ambiguous disk selection in Templates editor."));
+            return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
+        }
+
+        if (signatureMatches.Count == 1)
+        {
+            var match = signatureMatches[0];
+            return new DeployDiskResolution(match.Path, match.Id, match.Signature, issues);
+        }
+
+        if (pathMatch is not null)
+        {
+            issues.Add(new DeployCompatibilityIssue(
+                VmName: string.Empty,
+                IsBlocking: false,
+                Message: "Using legacy path-based disk match.",
+                Guidance: "Use resolve suggestions or Templates editor to normalize to catalog id."));
+            return new DeployDiskResolution(pathMatch.Path, pathMatch.Id, pathMatch.Signature, issues);
+        }
+
+        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdPath))
+        {
+            issues.Add(new DeployCompatibilityIssue(
+                VmName: string.Empty,
+                IsBlocking: true,
+                Message: "Disk path does not match catalog entries.",
+                Guidance: "Open in Templates editor and choose a valid catalog base disk."));
+            return new DeployDiskResolution(vmTemplate.VhdPath, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
+        }
+
+        issues.Add(new DeployCompatibilityIssue(
+            VmName: string.Empty,
+            IsBlocking: true,
+            Message: "No disk identity configured.",
+            Guidance: "Open in Templates editor and select a base disk."));
+        return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
+    }
+
+    private static DeploySwitchResolution ResolveDeploySwitches(VmTemplate vmTemplate, IReadOnlyList<string> availableSwitches)
+    {
+        var issues = new List<DeployCompatibilityIssue>();
+        var switches = vmTemplate.SwitchNames?
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+
+        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(vmTemplate.SwitchName))
+        {
+            switches.Add(vmTemplate.SwitchName);
+        }
+
+        if (switches.Count == 0)
+        {
+            issues.Add(new DeployCompatibilityIssue(
+                VmName: string.Empty,
+                IsBlocking: false,
+                Message: "No switch assigned.",
+                Guidance: "Assign a switch in Templates editor if networking is required."));
+            return new DeploySwitchResolution(string.Empty, issues);
+        }
+
+        var available = switches
+            .Where(name => availableSwitches.Contains(name, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+        var missing = switches.Where(name => !available.Contains(name, StringComparer.OrdinalIgnoreCase)).ToList();
+        if (missing.Count > 0)
+        {
+            issues.Add(new DeployCompatibilityIssue(
+                VmName: string.Empty,
+                IsBlocking: false,
+                Message: $"Switch mapping partial/missing ({string.Join(", ", missing)}).",
+                Guidance: "Open in Templates editor to update switch mapping."));
+        }
+
+        return new DeploySwitchResolution(available.FirstOrDefault() ?? string.Empty, issues);
+    }
+
+    private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)
+    {
+        _selectedTemplateLibraryItem = templateItem;
+        TemplateLibraryListView.SelectedItem = templateItem;
+
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            _activeTemplateEditorDocument = await _templatesCapabilityService.LoadForEditorAsync(templateItem.FilePath);
+            await EnsureTemplateSwitchesAsync(forceRefresh: false);
+            await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: false);
+            BindTemplateEditorDocument();
+            TemplateEditorStatusTextBlock.Text = "Template loaded.";
+            NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+            if (fromDeploy)
+            {
+                DeployActionStatusTextBlock.Text = $"Opened '{templateItem.Name}' in Templates editor.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TemplateEditorStatusTextBlock.Text = $"Failed to open template. {ex.Message}";
+            if (fromDeploy)
+            {
+                DeployActionStatusTextBlock.Text = $"Failed to open template in editor. {ex.Message}";
+            }
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+            UpdateDeployUi();
+        }
     }
 
     private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
@@ -729,6 +1252,13 @@ public sealed partial class MainWindow : Window
                     .FirstOrDefault(item => string.Equals(item.FilePath, _selectedTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
                 TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;
             }
+
+            if (_selectedDeployTemplateLibraryItem is not null)
+            {
+                _selectedDeployTemplateLibraryItem = _templateLibraryItems
+                    .FirstOrDefault(item => string.Equals(item.FilePath, _selectedDeployTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
+                DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
+            }
         }
         catch (Exception ex)
         {
@@ -752,26 +1282,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _isTemplatesLoading = true;
-        UpdateTemplatesUi();
-        try
-        {
-            _activeTemplateEditorDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedTemplateLibraryItem.FilePath);
-            await EnsureTemplateSwitchesAsync(forceRefresh: false);
-            await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: false);
-            BindTemplateEditorDocument();
-            TemplateEditorStatusTextBlock.Text = "Template loaded.";
-            NavigateToRoute(ShellRouteKeys.TemplatesEditor);
-        }
-        catch (Exception ex)
-        {
-            TemplateEditorStatusTextBlock.Text = $"Failed to open template. {ex.Message}";
-        }
-        finally
-        {
-            _isTemplatesLoading = false;
-            UpdateTemplatesUi();
-        }
+        await OpenTemplateInEditorAsync(_selectedTemplateLibraryItem, fromDeploy: false);
     }
 
     private void BindTemplateEditorDocument()
@@ -2905,4 +3416,24 @@ public sealed partial class MainWindow : Window
         TemplateVhdxCatalogOption? EffectiveOption,
         string Message,
         string EffectiveSourceLabel);
+
+    private sealed record DeployCompatibilityIssue(
+        string VmName,
+        bool IsBlocking,
+        string Message,
+        string Guidance);
+
+    private sealed record DeployDiskResolution(
+        string EffectiveBasePath,
+        string? EffectiveId,
+        string? EffectiveSignature,
+        IReadOnlyList<DeployCompatibilityIssue> Issues);
+
+    private sealed record DeploySwitchResolution(
+        string EffectiveSwitch,
+        IReadOnlyList<DeployCompatibilityIssue> Issues);
+
+    private sealed record DeployContextBuildResult(
+        MultiVmDeploymentContext MultiVmContext,
+        IReadOnlyList<DeployCompatibilityIssue> CompatibilityIssues);
 }

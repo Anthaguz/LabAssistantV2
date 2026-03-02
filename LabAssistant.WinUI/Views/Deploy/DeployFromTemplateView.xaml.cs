@@ -13,6 +13,8 @@ public sealed partial class DeployFromTemplateView : UserControl
 
     public Button DeployReloadTemplatesButtonControl => DeployReloadTemplatesButton;
 
+    public Button DeployEvaluateReadinessButtonControl => DeployEvaluateReadinessButton;
+
     public Border DeployReadinessSummaryPanelControl => DeployReadinessSummaryPanel;
 
     public TextBlock DeployReadinessSummaryTextBlockControl => DeployReadinessSummaryTextBlock;
@@ -20,6 +22,8 @@ public sealed partial class DeployFromTemplateView : UserControl
     public Button DeployResolveSuggestionsButtonControl => DeployResolveSuggestionsButton;
 
     public Button DeployOpenTemplateEditorButtonControl => DeployOpenTemplateEditorButton;
+
+    public Button DeployStartButtonControl => DeployStartButton;
 
     public TextBlock DeployActionStatusTextBlockControl => DeployActionStatusTextBlock;
 }
