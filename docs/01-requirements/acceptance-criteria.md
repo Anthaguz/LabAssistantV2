@@ -1360,7 +1360,7 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - User receives actionable warning message describing ambiguity
-- Save requires explicit user confirmation before continuing
+- Save is blocked until user resolves ambiguity by selecting a catalog entry
 - No silent conflict resolution occurs
 
 ### 7) Scope boundary guard
@@ -1381,7 +1381,7 @@ Each readiness result shall include, at minimum:
 - [ ] `switchNames` canonical + `switchName` fallback dual-write rule is documented
 - [ ] Catalog-first VHDX selector behavior is documented with backward compatibility handling
 - [ ] Deterministic normalization precedence is documented
-- [ ] Conflict/ambiguity save confirmation rule is documented
+- [ ] Conflict/ambiguity save blocking rule is documented
 - [ ] Scope boundary for AE2/AE3/AE4 is explicit and testable
 
 ---

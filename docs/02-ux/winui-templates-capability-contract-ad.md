@@ -102,7 +102,7 @@ Out of scope:
 - FR-083 -> AC-012 scenario 6 (library/editor continuity after VM-entry operations)
 - FR-084 -> AC-013 scenarios 1 and 2 (host-backed switch selector, multi-row rules, persistence compatibility)
 - FR-085 -> AC-013 scenarios 3 and 4 (catalog-first VHDX selection and path-based backward compatibility)
-- FR-086 -> AC-013 scenarios 5 and 6 (deterministic normalization precedence and save confirmation on ambiguity)
+- FR-086 -> AC-013 scenarios 5 and 6 (deterministic normalization precedence and save blocking on ambiguity)
 
 ---
 
@@ -182,7 +182,7 @@ This section defines the docs-first contract for Templates selector/data-binding
   2. `vhdxSignature`
   3. `vhdPath`
 - Editor must show effective source-of-truth and ambiguity state.
-- Conflicts/ambiguities require explicit user confirmation before save proceeds.
+- Conflicts/ambiguities require user resolution by selecting a catalog entry before save proceeds.
 - Validation and warnings must be actionable and non-silent.
 
 ### 7.4 AE scope boundary
@@ -193,7 +193,7 @@ In scope:
 Out of scope:
 - Deploy/Assets/global-nav changes
 - base-disk domain redesign
-- new template runtime semantics beyond selector/normalization display and save-confirmation behavior
+- new template runtime semantics beyond selector/normalization display and save-blocking behavior
 
 ### 7.5 Follow-up implementation issues
 
