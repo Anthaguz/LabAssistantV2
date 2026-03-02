@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text.Json;
 using LabAssistant.Business.Machines;
+using LabAssistant.Business.Templates;
 using LabAssistant.Services.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -11,8 +12,11 @@ using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.Views.Diagnostics;
 using LabAssistant.WinUI.Views.Machines;
+using LabAssistant.WinUI.Views.Templates;
 using Microsoft.UI.Dispatching;
 using WinRT.Interop;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 
 namespace LabAssistant.WinUI;
 
@@ -22,9 +26,11 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
     private readonly Dictionary<string, NavigationViewItem> _routeToCapabilityNavigationItem = new(StringComparer.Ordinal);
     private readonly IMachinesCapabilityService _machinesCapabilityService;
+    private readonly ITemplatesCapabilityService _templatesCapabilityService;
     private readonly IStructuredLogViewerService _structuredLogViewerService;
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
+    private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
@@ -35,6 +41,8 @@ public sealed partial class MainWindow : Window
     private MachineEditSnapshot? _loadedEditSnapshot;
     private MachineEditDraft? _editDraft;
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
+    private TemplateLibraryItem? _selectedTemplateLibraryItem;
+    private TemplateEditorDocument? _activeTemplateEditorDocument;
     private bool _isMachineActionRunning;
     private bool _isRdpReadinessRefreshRunning;
     private bool _isMachineEditLoading;
@@ -42,6 +50,7 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingMachineEditControls;
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
+    private bool _isTemplatesLoading;
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingTemplatesSubviewSelection;
     private bool _isInsightsOpen;
@@ -98,18 +107,47 @@ public sealed partial class MainWindow : Window
     private ListView StructuredLogsListView => DiagnosticsLogsView.StructuredLogsListView;
     private TextBlock SelectedLogEnvelopeTextBlock => DiagnosticsLogsView.SelectedLogEnvelopeTextBlock;
     private TextBox SelectedLogContextTextBox => DiagnosticsLogsView.SelectedLogContextTextBox;
+    private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
+    private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
+    private ListView TemplateLibraryListView => TemplatesLibraryView.TemplateLibraryListViewControl;
+    private TextBox TemplateSearchTextBox => TemplatesLibraryView.TemplateSearchTextBoxControl;
+    private Button ApplyTemplateSearchButton => TemplatesLibraryView.ApplyTemplateSearchButtonControl;
+    private Button ClearTemplateSearchButton => TemplatesLibraryView.ClearTemplateSearchButtonControl;
+    private Button ReloadTemplatesButton => TemplatesLibraryView.ReloadTemplatesButtonControl;
+    private Button OpenTemplateInEditorButton => TemplatesLibraryView.OpenTemplateInEditorButtonControl;
+    private Button CreateTemplateButton => TemplatesLibraryView.CreateTemplateButtonControl;
+    private Button DeleteTemplateButton => TemplatesLibraryView.DeleteTemplateButtonControl;
+    private Button ImportTemplateButton => TemplatesLibraryView.ImportTemplateButtonControl;
+    private Button ExportTemplateButton => TemplatesLibraryView.ExportTemplateButtonControl;
+    private TextBlock TemplatesLibraryStatusTextBlock => TemplatesLibraryView.TemplatesLibraryStatusTextBlockControl;
+    private TextBlock TemplatesLibrarySelectionTextBlock => TemplatesLibraryView.TemplatesLibrarySelectionTextBlockControl;
+    private TextBlock SelectedTemplatePathTextBlock => TemplatesLibraryView.SelectedTemplatePathTextBlockControl;
+    private TextBox TemplateNameTextBox => TemplatesEditorView.TemplateNameTextBoxControl;
+    private TextBox TemplateDescriptionTextBox => TemplatesEditorView.TemplateDescriptionTextBoxControl;
+    private TextBlock TemplateEditorContextTextBlock => TemplatesEditorView.TemplateEditorContextTextBlockControl;
+    private TextBlock TemplateIdTextBlock => TemplatesEditorView.TemplateIdTextBlockControl;
+    private TextBlock TemplateFilePathTextBlock => TemplatesEditorView.TemplateFilePathTextBlockControl;
+    private TextBlock TemplateVmCountTextBlock => TemplatesEditorView.TemplateVmCountTextBlockControl;
+    private TextBlock TemplateEditorStatusTextBlock => TemplatesEditorView.TemplateEditorStatusTextBlockControl;
+    private Button SaveTemplateButton => TemplatesEditorView.SaveTemplateButtonControl;
+    private Button SaveTemplateAsButton => TemplatesEditorView.SaveTemplateAsButtonControl;
+    private Button ValidateTemplateButton => TemplatesEditorView.ValidateTemplateButtonControl;
+    private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
 
     public MainWindow()
     {
         InitializeComponent();
         _machinesCapabilityService = App.Services.GetRequiredService<IMachinesCapabilityService>();
+        _templatesCapabilityService = App.Services.GetRequiredService<ITemplatesCapabilityService>();
         _structuredLogViewerService = App.Services.GetRequiredService<IStructuredLogViewerService>();
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         MachinesListView.ItemsSource = _machineInventory;
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
+        TemplateLibraryListView.ItemsSource = _templateLibraryItems;
         WireMachinesHandlers();
         WireDiagnosticsLogsHandlers();
+        WireTemplatesHandlers();
         ConfigureShellIcons();
         ConfigureNavigationView();
         Title = "LabAssistant.WinUI";
@@ -120,6 +158,7 @@ public sealed partial class MainWindow : Window
         {
             RootLayout.Focus(FocusState.Programmatic);
             await EnsureMachinesInventoryAsync(forceRefresh: true);
+            await EnsureTemplatesLibraryAsync(forceRefresh: true);
             await LoadMachinesDeletionPolicyAsync();
         };
         ApplyState();
@@ -159,6 +198,23 @@ public sealed partial class MainWindow : Window
         ReloadLogsButton.Click += ReloadLogsButton_Click;
         OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
         StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
+    }
+
+    private void WireTemplatesHandlers()
+    {
+        TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;
+        ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;
+        ClearTemplateSearchButton.Click += ClearTemplateSearchButton_Click;
+        ReloadTemplatesButton.Click += ReloadTemplatesButton_Click;
+        OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;
+        CreateTemplateButton.Click += CreateTemplateButton_Click;
+        DeleteTemplateButton.Click += DeleteTemplateButton_Click;
+        ImportTemplateButton.Click += ImportTemplateButton_Click;
+        ExportTemplateButton.Click += ExportTemplateButton_Click;
+        SaveTemplateButton.Click += SaveTemplateButton_Click;
+        SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;
+        ValidateTemplateButton.Click += ValidateTemplateButton_Click;
+        BackToLibraryButton.Click += BackToLibraryButton_Click;
     }
 
     private void ConfigureShellIcons()
@@ -230,7 +286,7 @@ public sealed partial class MainWindow : Window
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
                 : IsTemplatesEditorActive
-                    ? "Edit template content in-place. AD2 currently provides scaffold-only sections."
+                    ? "Edit template metadata, validate, and save through existing template workflows."
             : IsSettingsMachinesActive
                 ? "Configure Machines policy defaults."
                 : IsDiagnosticsLogsActive
@@ -244,6 +300,7 @@ public sealed partial class MainWindow : Window
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         SyncTemplatesSubviewSelection();
+        UpdateTemplatesUi();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
         NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
@@ -261,6 +318,11 @@ public sealed partial class MainWindow : Window
         if (IsDiagnosticsLogsActive)
         {
             _ = EnsureStructuredLogsLoadedAsync(forceReload: false);
+        }
+
+        if (IsTemplatesLibraryActive)
+        {
+            _ = EnsureTemplatesLibraryAsync(forceRefresh: false);
         }
     }
 
@@ -483,6 +545,419 @@ public sealed partial class MainWindow : Window
         {
             _isUpdatingTemplatesSubviewSelection = false;
         }
+    }
+
+    private void UpdateTemplatesUi()
+    {
+        OpenTemplateInEditorButton.IsEnabled = _selectedTemplateLibraryItem is not null && !_isTemplatesLoading;
+        DeleteTemplateButton.IsEnabled = _selectedTemplateLibraryItem is not null && !_isTemplatesLoading;
+        ExportTemplateButton.IsEnabled = _selectedTemplateLibraryItem is not null && !_isTemplatesLoading;
+        ApplyTemplateSearchButton.IsEnabled = !_isTemplatesLoading;
+        ClearTemplateSearchButton.IsEnabled = !_isTemplatesLoading;
+        ReloadTemplatesButton.IsEnabled = !_isTemplatesLoading;
+        ImportTemplateButton.IsEnabled = !_isTemplatesLoading;
+        CreateTemplateButton.IsEnabled = !_isTemplatesLoading;
+        SaveTemplateButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
+        SaveTemplateAsButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
+        ValidateTemplateButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
+        BackToLibraryButton.IsEnabled = !_isTemplatesLoading;
+
+        SelectedTemplatePathTextBlock.Text = _selectedTemplateLibraryItem?.FilePath ?? "-";
+        TemplatesLibrarySelectionTextBlock.Text = _selectedTemplateLibraryItem is null
+            ? "Select a template to open, export, or delete."
+            : $"Selected: {_selectedTemplateLibraryItem.Name} ({_selectedTemplateLibraryItem.TemplateId})";
+
+        if (_activeTemplateEditorDocument is null)
+        {
+            TemplateEditorContextTextBlock.Text = "No template selected.";
+            TemplateIdTextBlock.Text = "Template ID: -";
+            TemplateFilePathTextBlock.Text = "File path: new template (not saved)";
+            TemplateVmCountTextBlock.Text = "VMs: 0";
+            TemplateNameTextBox.Text = string.Empty;
+            TemplateDescriptionTextBox.Text = string.Empty;
+            return;
+        }
+
+        TemplateEditorContextTextBlock.Text = string.IsNullOrWhiteSpace(_activeTemplateEditorDocument.SourceFilePath)
+            ? "Editing new template draft."
+            : "Editing existing template.";
+        TemplateIdTextBlock.Text = $"Template ID: {_activeTemplateEditorDocument.Template.Id}";
+        TemplateFilePathTextBlock.Text = $"File path: {_activeTemplateEditorDocument.SourceFilePath ?? "new template (not saved)"}";
+        TemplateVmCountTextBlock.Text = $"VMs: {_activeTemplateEditorDocument.Template.VmTemplates.Count}";
+    }
+
+    private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
+    {
+        if (_isTemplatesLoading)
+        {
+            return;
+        }
+
+        if (!forceRefresh && _templateLibraryItems.Count > 0)
+        {
+            return;
+        }
+
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        TemplatesLibraryStatusTextBlock.Text = "Loading templates...";
+
+        try
+        {
+            var result = await _templatesCapabilityService.LoadLibraryAsync(TemplateSearchTextBox.Text);
+            _templateLibraryItems.Clear();
+            foreach (var item in result.Items)
+            {
+                _templateLibraryItems.Add(item);
+            }
+
+            if (_templateLibraryItems.Count == 0)
+            {
+                TemplatesLibraryStatusTextBlock.Text = result.Errors.Count == 0
+                    ? "No templates found in configured template folder."
+                    : $"No templates loaded. {result.Errors[0]}";
+            }
+            else
+            {
+                TemplatesLibraryStatusTextBlock.Text = result.Errors.Count == 0
+                    ? $"Loaded {_templateLibraryItems.Count} template(s)."
+                    : $"Loaded {_templateLibraryItems.Count} template(s) with warnings.";
+            }
+
+            if (_selectedTemplateLibraryItem is not null)
+            {
+                _selectedTemplateLibraryItem = _templateLibraryItems
+                    .FirstOrDefault(item => string.Equals(item.FilePath, _selectedTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
+                TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;
+            }
+        }
+        catch (Exception ex)
+        {
+            TemplatesLibraryStatusTextBlock.Text = $"Failed to load templates. {ex.Message}";
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private async Task OpenSelectedTemplateInEditorAsync()
+    {
+        if (_selectedTemplateLibraryItem is null)
+        {
+            TemplatesLibraryStatusTextBlock.Text = "Select a template first.";
+            return;
+        }
+
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            _activeTemplateEditorDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedTemplateLibraryItem.FilePath);
+            BindTemplateEditorDocument();
+            TemplateEditorStatusTextBlock.Text = "Template loaded.";
+            NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+        }
+        catch (Exception ex)
+        {
+            TemplateEditorStatusTextBlock.Text = $"Failed to open template. {ex.Message}";
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private void BindTemplateEditorDocument()
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            UpdateTemplatesUi();
+            return;
+        }
+
+        TemplateNameTextBox.Text = _activeTemplateEditorDocument.Template.Name;
+        TemplateDescriptionTextBox.Text = _activeTemplateEditorDocument.Template.Description ?? string.Empty;
+        UpdateTemplatesUi();
+    }
+
+    private void PullEditorFieldsIntoDocument()
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            return;
+        }
+
+        var template = _activeTemplateEditorDocument.Template;
+        template.Name = TemplateNameTextBox.Text?.Trim() ?? string.Empty;
+        template.Description = TemplateDescriptionTextBox.Text?.Trim();
+    }
+
+    private async Task<string?> PickTemplateFileForOpenAsync()
+    {
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add(".json");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        StorageFile? file = await picker.PickSingleFileAsync();
+        return file?.Path;
+    }
+
+    private async Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName)
+    {
+        var picker = new FileSavePicker
+        {
+            SuggestedFileName = suggestedFileName
+        };
+        picker.FileTypeChoices.Add("JSON template", [".json"]);
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        StorageFile? file = await picker.PickSaveFileAsync();
+        return file?.Path;
+    }
+
+    private void TemplateLibraryListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedTemplateLibraryItem = TemplateLibraryListView.SelectedItem as TemplateLibraryItem;
+        UpdateTemplatesUi();
+    }
+
+    private async void ApplyTemplateSearchButton_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureTemplatesLibraryAsync(forceRefresh: true);
+    }
+
+    private async void ClearTemplateSearchButton_Click(object sender, RoutedEventArgs e)
+    {
+        TemplateSearchTextBox.Text = string.Empty;
+        await EnsureTemplatesLibraryAsync(forceRefresh: true);
+    }
+
+    private async void ReloadTemplatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureTemplatesLibraryAsync(forceRefresh: true);
+    }
+
+    private async void OpenTemplateInEditorButton_Click(object sender, RoutedEventArgs e)
+    {
+        await OpenSelectedTemplateInEditorAsync();
+    }
+
+    private async void CreateTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            _activeTemplateEditorDocument = await _templatesCapabilityService.CreateDraftAsync();
+            BindTemplateEditorDocument();
+            TemplateEditorStatusTextBlock.Text = "New template draft created.";
+            NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private async void DeleteTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTemplateLibraryItem is null)
+        {
+            TemplatesLibraryStatusTextBlock.Text = "Select a template first.";
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = RootLayout.XamlRoot,
+            Title = "Delete Template",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            Content = $"Delete '{_selectedTemplateLibraryItem.Name}'? This removes the template file.",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            var result = await _templatesCapabilityService.DeleteAsync(_selectedTemplateLibraryItem.FilePath);
+            TemplatesLibraryStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            if (result.Success)
+            {
+                _selectedTemplateLibraryItem = null;
+                await EnsureTemplatesLibraryAsync(forceRefresh: true);
+            }
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private async void ImportTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        var sourcePath = await PickTemplateFileForOpenAsync();
+        if (string.IsNullOrWhiteSpace(sourcePath))
+        {
+            TemplatesLibraryStatusTextBlock.Text = "Import cancelled.";
+            return;
+        }
+
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            var result = await _templatesCapabilityService.ImportAsync(sourcePath);
+            TemplatesLibraryStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            if (result.Success)
+            {
+                await EnsureTemplatesLibraryAsync(forceRefresh: true);
+            }
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private async void ExportTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTemplateLibraryItem is null)
+        {
+            TemplatesLibraryStatusTextBlock.Text = "Select a template first.";
+            return;
+        }
+
+        var suggestedName = Path.GetFileName(_selectedTemplateLibraryItem.FilePath);
+        var destinationPath = await PickTemplateFileForSaveAsync(suggestedName);
+        if (string.IsNullOrWhiteSpace(destinationPath))
+        {
+            TemplatesLibraryStatusTextBlock.Text = "Export cancelled.";
+            return;
+        }
+
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            var result = await _templatesCapabilityService.ExportAsync(_selectedTemplateLibraryItem.FilePath, destinationPath);
+            TemplatesLibraryStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private async void SaveTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            TemplateEditorStatusTextBlock.Text = "No template loaded.";
+            return;
+        }
+
+        PullEditorFieldsIntoDocument();
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument);
+            TemplateEditorStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            if (result.Success)
+            {
+                _activeTemplateEditorDocument = new TemplateEditorDocument
+                {
+                    Template = _activeTemplateEditorDocument.Template,
+                    SourceFilePath = result.FilePath
+                };
+                BindTemplateEditorDocument();
+                await EnsureTemplatesLibraryAsync(forceRefresh: true);
+            }
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private async void SaveTemplateAsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            TemplateEditorStatusTextBlock.Text = "No template loaded.";
+            return;
+        }
+
+        PullEditorFieldsIntoDocument();
+        var suggestedName = string.IsNullOrWhiteSpace(_activeTemplateEditorDocument.Template.Name)
+            ? "lab-template"
+            : _activeTemplateEditorDocument.Template.Name;
+        var destinationPath = await PickTemplateFileForSaveAsync(suggestedName);
+        if (string.IsNullOrWhiteSpace(destinationPath))
+        {
+            TemplateEditorStatusTextBlock.Text = "Save As cancelled.";
+            return;
+        }
+
+        _isTemplatesLoading = true;
+        UpdateTemplatesUi();
+        try
+        {
+            var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument, destinationPath, saveAs: true);
+            TemplateEditorStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
+            if (result.Success)
+            {
+                _activeTemplateEditorDocument = new TemplateEditorDocument
+                {
+                    Template = _activeTemplateEditorDocument.Template,
+                    SourceFilePath = result.FilePath
+                };
+                BindTemplateEditorDocument();
+                await EnsureTemplatesLibraryAsync(forceRefresh: true);
+            }
+        }
+        finally
+        {
+            _isTemplatesLoading = false;
+            UpdateTemplatesUi();
+        }
+    }
+
+    private async void ValidateTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            TemplateEditorStatusTextBlock.Text = "No template loaded.";
+            return;
+        }
+
+        PullEditorFieldsIntoDocument();
+        var result = await _templatesCapabilityService.ValidateAsync(_activeTemplateEditorDocument);
+        if (result.IsValid)
+        {
+            TemplateEditorStatusTextBlock.Text = "Template validation passed.";
+            return;
+        }
+
+        TemplateEditorStatusTextBlock.Text = "Validation failed: " + string.Join(" ", result.Errors);
+    }
+
+    private void BackToLibraryButton_Click(object sender, RoutedEventArgs e)
+    {
+        NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
     }
 
     private void InitializeRdpReadinessTimer()

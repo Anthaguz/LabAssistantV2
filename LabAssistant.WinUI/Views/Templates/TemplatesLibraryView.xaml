@@ -13,38 +13,87 @@
                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                 FontSize="16"
                 FontWeight="SemiBold"
-                Text="Template Library (Scaffold)" />
+                Text="Template Library" />
             <TextBlock
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="AD2 scaffold: list/search/actions only. AD3 will wire operations."
+                Text="Browse, open, import, export, create, and delete templates from one capability surface."
                 TextWrapping="Wrap" />
 
             <Grid ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBox
+                    x:Name="TemplateSearchTextBox"
                     Grid.Column="0"
-                    PlaceholderText="Search templates (placeholder)" />
-                <ComboBox
+                    PlaceholderText="Search by name, id, or description" />
+                <Button
+                    x:Name="ApplyTemplateSearchButton"
                     Grid.Column="1"
-                    MinWidth="180"
-                    PlaceholderText="Filter (placeholder)" />
+                    Content="Apply" />
+                <Button
+                    x:Name="ClearTemplateSearchButton"
+                    Grid.Column="2"
+                    Content="Clear" />
+                <Button
+                    x:Name="ReloadTemplatesButton"
+                    Grid.Column="3"
+                    Content="Reload" />
             </Grid>
 
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Open" IsEnabled="False" />
-                <Button Content="Create" IsEnabled="False" />
-                <Button Content="Import" IsEnabled="False" />
-                <Button Content="Export" IsEnabled="False" />
+                <Button x:Name="OpenTemplateInEditorButton" Content="Open in Editor" />
+                <Button x:Name="CreateTemplateButton" Content="Create New" />
+                <Button x:Name="DeleteTemplateButton" Content="Delete" />
+                <Button x:Name="ImportTemplateButton" Content="Import" />
+                <Button x:Name="ExportTemplateButton" Content="Export" />
             </StackPanel>
 
-            <ListView Height="220">
-                <ListViewItem Content="Template placeholder A" />
-                <ListViewItem Content="Template placeholder B" />
-                <ListViewItem Content="Template placeholder C" />
+            <ListView x:Name="TemplateLibraryListView" Height="240" SelectionMode="Single">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                Text="{Binding Name}" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{Binding Description}"
+                                TextWrapping="WrapWholeWords" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{Binding TemplateId}" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{Binding FilePath}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
             </ListView>
+
+            <TextBlock
+                x:Name="TemplatesLibraryStatusTextBlock"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="No templates loaded."
+                TextWrapping="Wrap" />
+            <TextBlock
+                x:Name="TemplatesLibrarySelectionTextBlock"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="Select a template to open, export, or delete."
+                TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Selected path:" />
+                <TextBlock
+                    x:Name="SelectedTemplatePathTextBlock"
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="-"
+                    TextWrapping="Wrap" />
+            </StackPanel>
         </StackPanel>
     </Border>
 </UserControl>

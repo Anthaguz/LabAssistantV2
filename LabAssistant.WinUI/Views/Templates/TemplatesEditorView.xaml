@@ -13,10 +13,10 @@
                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                 FontSize="16"
                 FontWeight="SemiBold"
-                Text="Template Editor (Scaffold)" />
+                Text="Template Editor" />
             <TextBlock
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="AD2 scaffold: editor sections and save actions are placeholders. AD3 will wire template operations."
+                Text="Edit template metadata, validate, and save. VM and schema details preserve existing behavior."
                 TextWrapping="Wrap" />
 
             <Border
@@ -25,34 +25,66 @@
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="Selected template context: (placeholder)"
-                    TextWrapping="Wrap" />
+                <StackPanel Spacing="4">
+                    <TextBlock
+                        x:Name="TemplateEditorContextTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="No template selected."
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="TemplateIdTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Template ID: -"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="TemplateFilePathTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="File path: new template (not saved)"
+                        TextWrapping="Wrap" />
+                </StackPanel>
             </Border>
 
-            <Grid ColumnSpacing="8">
+            <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="6">
-                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Metadata Section" />
-                    <TextBox PlaceholderText="Template name (placeholder)" />
-                    <TextBox PlaceholderText="Description (placeholder)" />
+                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Metadata" />
+                    <TextBox x:Name="TemplateNameTextBox" PlaceholderText="Template name" />
+                    <TextBox
+                        x:Name="TemplateDescriptionTextBox"
+                        AcceptsReturn="True"
+                        Height="120"
+                        PlaceholderText="Description"
+                        TextWrapping="Wrap" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="6">
-                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="VM Definitions Section" />
-                    <TextBox PlaceholderText="VM item editor (placeholder)" />
-                    <TextBox PlaceholderText="Network/base disk references (placeholder)" />
+                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Read-only Summary" />
+                    <TextBlock
+                        x:Name="TemplateVmCountTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="VMs: 0"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Detailed VM editing remains in existing domain workflow and will be incrementally migrated."
+                        TextWrapping="Wrap" />
                 </StackPanel>
             </Grid>
 
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Save" IsEnabled="False" />
-                <Button Content="Save As" IsEnabled="False" />
-                <Button Content="Validate" IsEnabled="False" />
+                <Button x:Name="SaveTemplateButton" Content="Save" />
+                <Button x:Name="SaveTemplateAsButton" Content="Save As" />
+                <Button x:Name="ValidateTemplateButton" Content="Validate" />
+                <Button x:Name="BackToLibraryButton" Content="Back to Library" />
             </StackPanel>
+
+            <TextBlock
+                x:Name="TemplateEditorStatusTextBlock"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="No template loaded."
+                TextWrapping="Wrap" />
         </StackPanel>
     </Border>
 </UserControl>

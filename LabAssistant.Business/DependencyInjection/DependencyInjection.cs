@@ -96,6 +96,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<MissingVhdxResolutionService>();
         services.AddSingleton<TemplateSelectionService>();
         services.AddSingleton<TemplateValidationService>();
+        services.AddSingleton<ITemplatesCapabilityService, TemplatesCapabilityService>();
 
         services.AddTransient<VirtualSwitchProvider>();
         services.AddTransient<DeploymentPipelineBuilder>();

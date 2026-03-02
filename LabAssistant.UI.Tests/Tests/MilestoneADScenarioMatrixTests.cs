@@ -42,9 +42,63 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("GlobalNavigationView.FooterMenuItems.Add(parentItem);", source);
     }
 
+    [Fact]
+    public void MainWindow_WiresTemplatesOperations_ForLibraryAndEditorFlows()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("WireTemplatesHandlers()", source);
+        Assert.Contains("OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;", source);
+        Assert.Contains("CreateTemplateButton.Click += CreateTemplateButton_Click;", source);
+        Assert.Contains("DeleteTemplateButton.Click += DeleteTemplateButton_Click;", source);
+        Assert.Contains("ImportTemplateButton.Click += ImportTemplateButton_Click;", source);
+        Assert.Contains("ExportTemplateButton.Click += ExportTemplateButton_Click;", source);
+        Assert.Contains("SaveTemplateButton.Click += SaveTemplateButton_Click;", source);
+        Assert.Contains("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", source);
+        Assert.Contains("ValidateTemplateButton.Click += ValidateTemplateButton_Click;", source);
+        Assert.Contains("BackToLibraryButton.Click += BackToLibraryButton_Click;", source);
+        Assert.Contains("_templatesCapabilityService.SaveAsync", source);
+        Assert.Contains("_templatesCapabilityService.ImportAsync", source);
+        Assert.Contains("_templatesCapabilityService.ExportAsync", source);
+        Assert.Contains("_templatesCapabilityService.DeleteAsync", source);
+    }
+
+    [Fact]
+    public void TemplateViews_ExposeOperationalControls_ForAd3()
+    {
+        var libraryXaml = LoadTemplatesLibraryViewXaml();
+        var editorXaml = LoadTemplatesEditorViewXaml();
+
+        Assert.NotNull(FindByName(libraryXaml, "TemplateLibraryListView"));
+        Assert.NotNull(FindByName(libraryXaml, "OpenTemplateInEditorButton"));
+        Assert.NotNull(FindByName(libraryXaml, "CreateTemplateButton"));
+        Assert.NotNull(FindByName(libraryXaml, "DeleteTemplateButton"));
+        Assert.NotNull(FindByName(libraryXaml, "ImportTemplateButton"));
+        Assert.NotNull(FindByName(libraryXaml, "ExportTemplateButton"));
+        Assert.NotNull(FindByName(libraryXaml, "TemplatesLibraryStatusTextBlock"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateNameTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateDescriptionTextBox"));
+        Assert.NotNull(FindByName(editorXaml, "SaveTemplateButton"));
+        Assert.NotNull(FindByName(editorXaml, "SaveTemplateAsButton"));
+        Assert.NotNull(FindByName(editorXaml, "ValidateTemplateButton"));
+        Assert.NotNull(FindByName(editorXaml, "TemplateEditorStatusTextBlock"));
+    }
+
     private static XDocument LoadMainWindowXaml()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadTemplatesLibraryViewXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Templates", "TemplatesLibraryView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadTemplatesEditorViewXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Templates", "TemplatesEditorView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
     }
 
