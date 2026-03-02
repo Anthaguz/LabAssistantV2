@@ -203,6 +203,24 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Templates layout remains scroll-safe and does not regress to overflow/infinite-growth behavior.
   - AD closure evidence includes both automated structural checks and manual runtime verification.
 
+## TC-014: Milestone AE Templates Selector and Normalization Verification
+- **Related AC:** `AC-013`, `FR-084`, `FR-085`, `FR-086`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AE (`#312`, `#313`, `#314`, `#315`, `#316`)
+- **Steps:**
+  1. Run automated AE matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAEScenarioMatrixTests.cs`.
+  2. Run the Milestone AE checklist in `docs/07-testing/milestone-ae-templates-selector-normalization-checklist.md`.
+  3. Verify switch selector rows (`add/remove`, `zero-row valid`, duplicate/empty-row guards, empty-host guidance).
+  4. Verify catalog-first VHDX selector behavior and path-first legacy compatibility guidance.
+  5. Verify normalization conflict policy blocks save until catalog resolution when identities conflict.
+  6. Verify save/reload determinism for switch compatibility and effective VHD identity.
+- **Expected:**
+  - Templates routing/context continuity remains intact while executing selector workflows.
+  - Switch selector behavior and compatibility rules remain explicit and guard-railed.
+  - VHDX catalog-first selection is discoverable, with actionable guidance for legacy/missing catalog states.
+  - Deterministic normalization precedence is enforced and save-blocking conflict behavior is observable.
+  - AE closure evidence includes both automated structural checks and manual runtime verification.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.
