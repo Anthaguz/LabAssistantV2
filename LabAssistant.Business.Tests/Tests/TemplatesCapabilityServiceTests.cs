@@ -92,10 +92,47 @@ public sealed class TemplatesCapabilityServiceTests
         }
     }
 
-    private static ITemplatesCapabilityService CreateService(string templateFolder, ILabTemplateStore templateStore)
+    [Fact]
+    public async Task LoadVhdxCatalogOptionsAsync_ReturnsCatalogItems()
+    {
+        var tempRoot = CreateTempFolder();
+        try
+        {
+            var templateStore = new LabTemplateStore();
+            var catalogItems = new List<VhdxCatalogItem>
+            {
+                new()
+                {
+                    Id = "disk-1",
+                    Path = @"C:\base\disk1.vhdx",
+                    OsName = "Windows Server",
+                    OsVersion = "2022",
+                    Generation = 2,
+                    Signature = "sig-1"
+                }
+            };
+            var service = CreateService(tempRoot, templateStore, catalogItems);
+
+            var result = await service.LoadVhdxCatalogOptionsAsync();
+
+            Assert.Single(result.Items);
+            Assert.Equal("disk-1", result.Items[0].Id);
+            Assert.Equal(@"C:\base\disk1.vhdx", result.Items[0].Path);
+            Assert.Empty(result.Errors);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    private static ITemplatesCapabilityService CreateService(
+        string templateFolder,
+        ILabTemplateStore templateStore,
+        IReadOnlyList<VhdxCatalogItem>? catalogItems = null)
     {
         var settingsStore = new FakeAppSettingsStore(templateFolder);
-        var catalogStore = new FakeCatalogStore();
+        var catalogStore = new FakeCatalogStore(catalogItems);
         var catalogService = new CatalogService(catalogStore, settingsStore, NullStructuredLogger.Instance);
         var validationService = new TemplateValidationService(catalogService);
         return new TemplatesCapabilityService(
@@ -135,9 +172,18 @@ public sealed class TemplatesCapabilityServiceTests
 
     private sealed class FakeCatalogStore : IVhdxCatalogStore
     {
+        private readonly IReadOnlyList<VhdxCatalogItem> _items;
+
+        public FakeCatalogStore(IReadOnlyList<VhdxCatalogItem>? items = null)
+        {
+            _items = items ?? [];
+        }
+
         public VhdxCatalogLoadResult Load(string catalogPath)
         {
-            return new VhdxCatalogLoadResult();
+            var result = new VhdxCatalogLoadResult();
+            result.Items.AddRange(_items);
+            return result;
         }
 
         public VhdxCatalogSaveResult Save(string catalogPath, IEnumerable<VhdxCatalogItem> items)

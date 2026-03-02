@@ -10,6 +10,8 @@ public interface ITemplatesCapabilityService
 
     Task<TemplateEditorDocument> LoadForEditorAsync(string filePath, CancellationToken cancellationToken = default);
 
+    Task<TemplatesVhdxCatalogLoadResult> LoadVhdxCatalogOptionsAsync(CancellationToken cancellationToken = default);
+
     Task<TemplateOperationResult> SaveAsync(
         TemplateEditorDocument document,
         string? targetFilePath = null,
@@ -77,4 +79,26 @@ public sealed class TemplateOperationResult
     public string UserMessage { get; init; } = string.Empty;
 
     public string? FilePath { get; init; }
+}
+
+public sealed class TemplatesVhdxCatalogLoadResult
+{
+    public IReadOnlyList<TemplatesVhdxCatalogItem> Items { get; init; } = Array.Empty<TemplatesVhdxCatalogItem>();
+
+    public IReadOnlyList<string> Errors { get; init; } = Array.Empty<string>();
+}
+
+public sealed class TemplatesVhdxCatalogItem
+{
+    public string Id { get; init; } = string.Empty;
+
+    public string Path { get; init; } = string.Empty;
+
+    public string OsName { get; init; } = string.Empty;
+
+    public string OsVersion { get; init; } = string.Empty;
+
+    public int Generation { get; init; }
+
+    public string? Signature { get; init; }
 }

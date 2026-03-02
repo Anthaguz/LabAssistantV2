@@ -43,6 +43,10 @@ public sealed partial class TemplatesEditorView : UserControl
 
     public TextBox TemplateVmVhdxIdTextBoxControl => TemplateVmVhdxIdTextBox;
 
+    public ComboBox TemplateVmVhdxCatalogComboBoxControl => TemplateVmVhdxCatalogComboBox;
+
+    public TextBlock TemplateVmVhdxGuidanceTextBlockControl => TemplateVmVhdxGuidanceTextBlock;
+
     public TextBox TemplateVmVhdPathTextBoxControl => TemplateVmVhdPathTextBox;
 
     public TextBox TemplateVmVhdxSignatureTextBoxControl => TemplateVmVhdxSignatureTextBox;

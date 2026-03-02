@@ -217,8 +217,29 @@
                                         <ColumnDefinition Width="130" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        VerticalAlignment="Top"
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="Base Disk" />
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <ComboBox
+                                            x:Name="TemplateVmVhdxCatalogComboBox"
+                                            PlaceholderText="Select imported base disk" />
+                                        <TextBlock
+                                            x:Name="TemplateVmVhdxGuidanceTextBlock"
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="Catalog-backed selection is preferred."
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VHDX Id" />
-                                    <TextBox x:Name="TemplateVmVhdxIdTextBox" Grid.Column="1" />
+                                    <TextBox x:Name="TemplateVmVhdxIdTextBox" Grid.Column="1" IsReadOnly="True" />
                                 </Grid>
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
@@ -226,7 +247,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VHD Path" />
-                                    <TextBox x:Name="TemplateVmVhdPathTextBox" Grid.Column="1" />
+                                    <TextBox x:Name="TemplateVmVhdPathTextBox" Grid.Column="1" IsReadOnly="True" />
                                 </Grid>
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
@@ -234,7 +255,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VHDX Signature" />
-                                    <TextBox x:Name="TemplateVmVhdxSignatureTextBox" Grid.Column="1" />
+                                    <TextBox x:Name="TemplateVmVhdxSignatureTextBox" Grid.Column="1" IsReadOnly="True" />
                                 </Grid>
                             </StackPanel>
                         </ScrollViewer>
