@@ -1,0 +1,105 @@
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Deploy.DeployFromTemplateView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border
+        Padding="12"
+        Background="{StaticResource ShellBackgroundBrush}"
+        BorderBrush="{StaticResource ShellBorderBrush}"
+        BorderThickness="1"
+        CornerRadius="6">
+        <Grid RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Text="Deploy From Template" />
+
+            <TextBlock
+                Grid.Row="1"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="AF2 scaffold only. Readiness and execution semantics are wired in AF3/AF4."
+                TextWrapping="Wrap" />
+
+            <Grid Grid.Row="2" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox
+                    x:Name="DeployTemplateSelectorComboBox"
+                    Grid.Column="0"
+                    PlaceholderText="Select a template (AF3 wiring pending)" />
+                <Button
+                    x:Name="DeployReloadTemplatesButton"
+                    Grid.Column="1"
+                    Content="Reload" />
+            </Grid>
+
+            <Border
+                x:Name="DeployReadinessSummaryPanel"
+                Grid.Row="3"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="4">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Readiness Summary (Compact)" />
+                    <TextBlock
+                        x:Name="DeployReadinessSummaryTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="No readiness evaluation yet. AF3 will wire compatibility and blocking behavior."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Row="4"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Correction Actions (Placeholder)" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            x:Name="DeployResolveSuggestionsButton"
+                            Content="Resolve Suggestions" />
+                        <Button
+                            x:Name="DeployOpenTemplateEditorButton"
+                            Content="Open in Templates Editor" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="DeployActionStatusTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="No action selected."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock
+                Grid.Row="5"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="AF2 scaffold keeps Deploy from-template route and surface stable for AF3 wiring."
+                TextWrapping="Wrap" />
+        </Grid>
+    </Border>
+</UserControl>

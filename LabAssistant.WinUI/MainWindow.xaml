@@ -2,6 +2,7 @@
     x:Class="LabAssistant.WinUI.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:deployViews="using:LabAssistant.WinUI.Views.Deploy"
     xmlns:diagViews="using:LabAssistant.WinUI.Views.Diagnostics"
     xmlns:machineViews="using:LabAssistant.WinUI.Views.Machines"
     xmlns:templateViews="using:LabAssistant.WinUI.Views.Templates">
@@ -140,6 +141,11 @@
                                 </Grid.ColumnDefinitions>
                                 <machineViews:MachinesOverviewView
                                     x:Name="MachinesOverviewViewHost"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Visibility="Collapsed" />
+                                <deployViews:DeployFromTemplateView
+                                    x:Name="DeployFromTemplateViewHost"
                                     Grid.Row="0"
                                     Grid.Column="0"
                                     Visibility="Collapsed" />

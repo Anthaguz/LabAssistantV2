@@ -41,8 +41,8 @@ public sealed class ShellViewModel
                 displayName: "Deploy",
                 isFooter: false,
                 [
-                    new ShellSubview(ShellRouteKeys.DeployOnTheFly, "Quick Deploy", ["Start", "Validate"]),
-                    new ShellSubview(ShellRouteKeys.DeployFromTemplate, "From Template", ["Select Template", "Preview"])
+                    new ShellSubview(ShellRouteKeys.DeployFromTemplate, "From Template", ["Select Template", "Preview"]),
+                    new ShellSubview(ShellRouteKeys.DeployOnTheFly, "Quick Deploy", ["Start", "Validate"])
                 ]),
             new ShellCapability(
                 key: "templates",
