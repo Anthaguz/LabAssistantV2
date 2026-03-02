@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using LabAssistant.Business.Machines;
 using LabAssistant.Business.Templates;
+using LabAssistant.Models.Templates;
 using LabAssistant.Services.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -30,6 +31,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
+    private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
@@ -42,6 +44,7 @@ public sealed partial class MainWindow : Window
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
     private TemplateLibraryItem? _selectedTemplateLibraryItem;
     private TemplateEditorDocument? _activeTemplateEditorDocument;
+    private VmTemplate? _selectedTemplateVmEntry;
     private bool _isMachineActionRunning;
     private bool _isRdpReadinessRefreshRunning;
     private bool _isMachineEditLoading;
@@ -52,6 +55,7 @@ public sealed partial class MainWindow : Window
     private bool _isTemplatesLoading;
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingTemplatesSubviewSelection;
+    private bool _isUpdatingTemplateVmEditorControls;
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
     private int _issueCount = 3;
@@ -125,6 +129,18 @@ public sealed partial class MainWindow : Window
     private TextBlock TemplateIdTextBlock => TemplatesEditorView.TemplateIdTextBlockControl;
     private TextBlock TemplateFilePathTextBlock => TemplatesEditorView.TemplateFilePathTextBlockControl;
     private TextBlock TemplateVmCountTextBlock => TemplatesEditorView.TemplateVmCountTextBlockControl;
+    private ListView TemplateVmListView => TemplatesEditorView.TemplateVmListViewControl;
+    private Button AddTemplateVmButton => TemplatesEditorView.AddTemplateVmButtonControl;
+    private Button RemoveTemplateVmButton => TemplatesEditorView.RemoveTemplateVmButtonControl;
+    private TextBlock TemplateVmIdTextBlock => TemplatesEditorView.TemplateVmIdTextBlockControl;
+    private TextBox TemplateVmNameTextBox => TemplatesEditorView.TemplateVmNameTextBoxControl;
+    private TextBox TemplateVmMemoryTextBox => TemplatesEditorView.TemplateVmMemoryTextBoxControl;
+    private TextBox TemplateVmCpuTextBox => TemplatesEditorView.TemplateVmCpuTextBoxControl;
+    private TextBox TemplateVmSwitchTextBox => TemplatesEditorView.TemplateVmSwitchTextBoxControl;
+    private TextBox TemplateVmVhdxIdTextBox => TemplatesEditorView.TemplateVmVhdxIdTextBoxControl;
+    private TextBox TemplateVmVhdPathTextBox => TemplatesEditorView.TemplateVmVhdPathTextBoxControl;
+    private TextBox TemplateVmVhdxSignatureTextBox => TemplatesEditorView.TemplateVmVhdxSignatureTextBoxControl;
+    private Button ApplyTemplateVmChangesButton => TemplatesEditorView.ApplyTemplateVmChangesButtonControl;
     private TextBlock TemplateEditorStatusTextBlock => TemplatesEditorView.TemplateEditorStatusTextBlockControl;
     private Button SaveTemplateButton => TemplatesEditorView.SaveTemplateButtonControl;
     private Button SaveTemplateAsButton => TemplatesEditorView.SaveTemplateAsButtonControl;
@@ -142,6 +158,7 @@ public sealed partial class MainWindow : Window
         MachinesListView.ItemsSource = _machineInventory;
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
         TemplateLibraryListView.ItemsSource = _templateLibraryItems;
+        TemplateVmListView.ItemsSource = _templateVmEntries;
         WireMachinesHandlers();
         WireDiagnosticsLogsHandlers();
         WireTemplatesHandlers();
@@ -200,6 +217,7 @@ public sealed partial class MainWindow : Window
     private void WireTemplatesHandlers()
     {
         TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;
+        TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;
         ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;
         ClearTemplateSearchButton.Click += ClearTemplateSearchButton_Click;
         ReloadTemplatesButton.Click += ReloadTemplatesButton_Click;
@@ -212,6 +230,9 @@ public sealed partial class MainWindow : Window
         SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;
         ValidateTemplateButton.Click += ValidateTemplateButton_Click;
         BackToLibraryButton.Click += BackToLibraryButton_Click;
+        AddTemplateVmButton.Click += AddTemplateVmButton_Click;
+        RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;
+        ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;
     }
 
     private void ConfigureShellIcons()
@@ -558,6 +579,9 @@ public sealed partial class MainWindow : Window
         SaveTemplateAsButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
         ValidateTemplateButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
         BackToLibraryButton.IsEnabled = !_isTemplatesLoading;
+        AddTemplateVmButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
+        RemoveTemplateVmButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
+        ApplyTemplateVmChangesButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
 
         if (_activeTemplateEditorDocument is null)
         {
@@ -567,6 +591,9 @@ public sealed partial class MainWindow : Window
             TemplateVmCountTextBlock.Text = "VMs: 0";
             TemplateNameTextBox.Text = string.Empty;
             TemplateDescriptionTextBox.Text = string.Empty;
+            _templateVmEntries.Clear();
+            _selectedTemplateVmEntry = null;
+            UpdateTemplateVmEditorPanel();
             return;
         }
 
@@ -576,6 +603,7 @@ public sealed partial class MainWindow : Window
         TemplateIdTextBlock.Text = $"Template ID: {_activeTemplateEditorDocument.Template.Id}";
         TemplateFilePathTextBlock.Text = $"File path: {_activeTemplateEditorDocument.SourceFilePath ?? "new template (not saved)"}";
         TemplateVmCountTextBlock.Text = $"VMs: {_activeTemplateEditorDocument.Template.VmTemplates.Count}";
+        UpdateTemplateVmEditorPanel();
     }
 
     private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
@@ -677,21 +705,150 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        RefreshTemplateVmEntriesFromDocument();
         TemplateNameTextBox.Text = _activeTemplateEditorDocument.Template.Name;
         TemplateDescriptionTextBox.Text = _activeTemplateEditorDocument.Template.Description ?? string.Empty;
         UpdateTemplatesUi();
     }
 
-    private void PullEditorFieldsIntoDocument()
+    private bool PullEditorFieldsIntoDocument()
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            return false;
+        }
+
+        if (!TryApplySelectedTemplateVmFields(showSuccessStatus: false))
+        {
+            return false;
+        }
+
+        var template = _activeTemplateEditorDocument.Template;
+        template.Name = TemplateNameTextBox.Text?.Trim() ?? string.Empty;
+        template.Description = TemplateDescriptionTextBox.Text?.Trim();
+        SyncTemplateVmEntriesToDocument();
+        return true;
+    }
+
+    private void RefreshTemplateVmEntriesFromDocument()
+    {
+        _templateVmEntries.Clear();
+        _selectedTemplateVmEntry = null;
+        if (_activeTemplateEditorDocument is null)
+        {
+            return;
+        }
+
+        foreach (var vmTemplate in _activeTemplateEditorDocument.Template.VmTemplates)
+        {
+            _templateVmEntries.Add(vmTemplate);
+        }
+
+        if (_templateVmEntries.Count > 0)
+        {
+            _selectedTemplateVmEntry = _templateVmEntries[0];
+            TemplateVmListView.SelectedItem = _selectedTemplateVmEntry;
+        }
+        else
+        {
+            TemplateVmListView.SelectedItem = null;
+        }
+    }
+
+    private void SyncTemplateVmEntriesToDocument()
     {
         if (_activeTemplateEditorDocument is null)
         {
             return;
         }
 
-        var template = _activeTemplateEditorDocument.Template;
-        template.Name = TemplateNameTextBox.Text?.Trim() ?? string.Empty;
-        template.Description = TemplateDescriptionTextBox.Text?.Trim();
+        _activeTemplateEditorDocument.Template.VmTemplates = _templateVmEntries.ToList();
+        TemplateVmCountTextBlock.Text = $"VMs: {_activeTemplateEditorDocument.Template.VmTemplates.Count}";
+    }
+
+    private void RefreshTemplateVmListView()
+    {
+        var selectedVm = _selectedTemplateVmEntry;
+        TemplateVmListView.ItemsSource = null;
+        TemplateVmListView.ItemsSource = _templateVmEntries;
+        TemplateVmListView.SelectedItem = selectedVm;
+    }
+
+    private void UpdateTemplateVmEditorPanel()
+    {
+        _isUpdatingTemplateVmEditorControls = true;
+        try
+        {
+            if (_selectedTemplateVmEntry is null)
+            {
+                TemplateVmIdTextBlock.Text = "VM ID: -";
+                TemplateVmNameTextBox.Text = string.Empty;
+                TemplateVmMemoryTextBox.Text = string.Empty;
+                TemplateVmCpuTextBox.Text = string.Empty;
+                TemplateVmSwitchTextBox.Text = string.Empty;
+                TemplateVmVhdxIdTextBox.Text = string.Empty;
+                TemplateVmVhdPathTextBox.Text = string.Empty;
+                TemplateVmVhdxSignatureTextBox.Text = string.Empty;
+                return;
+            }
+
+            TemplateVmIdTextBlock.Text = $"VM ID: {_selectedTemplateVmEntry.VmId}";
+            TemplateVmNameTextBox.Text = _selectedTemplateVmEntry.Name;
+            TemplateVmMemoryTextBox.Text = _selectedTemplateVmEntry.MemoryMb.ToString();
+            TemplateVmCpuTextBox.Text = _selectedTemplateVmEntry.CpuCount.ToString();
+            TemplateVmSwitchTextBox.Text = _selectedTemplateVmEntry.SwitchName ?? string.Empty;
+            TemplateVmVhdxIdTextBox.Text = _selectedTemplateVmEntry.VhdxId ?? string.Empty;
+            TemplateVmVhdPathTextBox.Text = _selectedTemplateVmEntry.VhdPath ?? string.Empty;
+            TemplateVmVhdxSignatureTextBox.Text = _selectedTemplateVmEntry.VhdxSignature ?? string.Empty;
+        }
+        finally
+        {
+            _isUpdatingTemplateVmEditorControls = false;
+        }
+    }
+
+    private bool TryApplySelectedTemplateVmFields(bool showSuccessStatus)
+    {
+        if (_activeTemplateEditorDocument is null || _selectedTemplateVmEntry is null || _isUpdatingTemplateVmEditorControls)
+        {
+            return true;
+        }
+
+        var vmName = TemplateVmNameTextBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(vmName))
+        {
+            TemplateEditorStatusTextBlock.Text = "VM name is required.";
+            return false;
+        }
+
+        if (!int.TryParse(TemplateVmMemoryTextBox.Text, out var memoryMb) || memoryMb <= 0)
+        {
+            TemplateEditorStatusTextBlock.Text = "Memory must be a positive integer.";
+            return false;
+        }
+
+        if (!int.TryParse(TemplateVmCpuTextBox.Text, out var cpuCount) || cpuCount <= 0)
+        {
+            TemplateEditorStatusTextBlock.Text = "CPU count must be a positive integer.";
+            return false;
+        }
+
+        _selectedTemplateVmEntry.Name = vmName;
+        _selectedTemplateVmEntry.MemoryMb = memoryMb;
+        _selectedTemplateVmEntry.CpuCount = cpuCount;
+        _selectedTemplateVmEntry.SwitchName = string.IsNullOrWhiteSpace(TemplateVmSwitchTextBox.Text) ? null : TemplateVmSwitchTextBox.Text.Trim();
+        _selectedTemplateVmEntry.VhdxId = string.IsNullOrWhiteSpace(TemplateVmVhdxIdTextBox.Text) ? null : TemplateVmVhdxIdTextBox.Text.Trim();
+        _selectedTemplateVmEntry.VhdPath = string.IsNullOrWhiteSpace(TemplateVmVhdPathTextBox.Text) ? null : TemplateVmVhdPathTextBox.Text.Trim();
+        _selectedTemplateVmEntry.VhdxSignature = string.IsNullOrWhiteSpace(TemplateVmVhdxSignatureTextBox.Text) ? null : TemplateVmVhdxSignatureTextBox.Text.Trim();
+
+        RefreshTemplateVmListView();
+        SyncTemplateVmEntriesToDocument();
+        if (showSuccessStatus)
+        {
+            TemplateEditorStatusTextBlock.Text = $"Updated VM entry '{vmName}'.";
+        }
+
+        return true;
     }
 
     private Task<string?> PickTemplateFileForOpenAsync()
@@ -711,6 +868,82 @@ public sealed partial class MainWindow : Window
     private void TemplateLibraryListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedTemplateLibraryItem = TemplateLibraryListView.SelectedItem as TemplateLibraryItem;
+        UpdateTemplatesUi();
+    }
+
+    private void TemplateVmListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedTemplateVmEntry = TemplateVmListView.SelectedItem as VmTemplate;
+        UpdateTemplateVmEditorPanel();
+        UpdateTemplatesUi();
+    }
+
+    private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            TemplateEditorStatusTextBlock.Text = "Load or create a template first.";
+            return;
+        }
+
+        var nextVmNumber = _templateVmEntries.Count + 1;
+        var vmEntry = new VmTemplate
+        {
+            Name = $"VM-{nextVmNumber}",
+            MemoryMb = 2048,
+            CpuCount = 2
+        };
+        _templateVmEntries.Add(vmEntry);
+        _selectedTemplateVmEntry = vmEntry;
+        TemplateVmListView.SelectedItem = vmEntry;
+        SyncTemplateVmEntriesToDocument();
+        UpdateTemplateVmEditorPanel();
+        TemplateEditorStatusTextBlock.Text = $"Added VM entry '{vmEntry.Name}'.";
+        UpdateTemplatesUi();
+    }
+
+    private async void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTemplateVmEntry is null)
+        {
+            TemplateEditorStatusTextBlock.Text = "Select a VM entry first.";
+            return;
+        }
+
+        var vmName = _selectedTemplateVmEntry.Name;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = RootLayout.XamlRoot,
+            Title = "Remove VM Entry",
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
+            Content = $"Remove VM entry '{vmName}' from this template draft?",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        _templateVmEntries.Remove(_selectedTemplateVmEntry);
+        _selectedTemplateVmEntry = _templateVmEntries.FirstOrDefault();
+        TemplateVmListView.SelectedItem = _selectedTemplateVmEntry;
+        SyncTemplateVmEntriesToDocument();
+        UpdateTemplateVmEditorPanel();
+        TemplateEditorStatusTextBlock.Text = $"Removed VM entry '{vmName}'.";
+        UpdateTemplatesUi();
+    }
+
+    private void ApplyTemplateVmChangesButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTemplateVmEntry is null)
+        {
+            TemplateEditorStatusTextBlock.Text = "Select a VM entry first.";
+            return;
+        }
+
+        TryApplySelectedTemplateVmFields(showSuccessStatus: true);
         UpdateTemplatesUi();
     }
 
@@ -860,7 +1093,10 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        PullEditorFieldsIntoDocument();
+        if (!PullEditorFieldsIntoDocument())
+        {
+            return;
+        }
         _isTemplatesLoading = true;
         UpdateTemplatesUi();
         try
@@ -893,7 +1129,10 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        PullEditorFieldsIntoDocument();
+        if (!PullEditorFieldsIntoDocument())
+        {
+            return;
+        }
         var suggestedName = string.IsNullOrWhiteSpace(_activeTemplateEditorDocument.Template.Name)
             ? "lab-template"
             : _activeTemplateEditorDocument.Template.Name;
@@ -936,7 +1175,10 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        PullEditorFieldsIntoDocument();
+        if (!PullEditorFieldsIntoDocument())
+        {
+            return;
+        }
         var result = await _templatesCapabilityService.ValidateAsync(_activeTemplateEditorDocument);
         if (result.IsValid)
         {

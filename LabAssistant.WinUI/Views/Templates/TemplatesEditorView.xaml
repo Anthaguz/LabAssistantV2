@@ -7,84 +7,243 @@
         Background="{StaticResource ShellBackgroundBrush}"
         BorderBrush="{StaticResource ShellBorderBrush}"
         BorderThickness="1"
-        CornerRadius="6">
-        <StackPanel Spacing="10">
+        CornerRadius="6"
+        VerticalAlignment="Stretch">
+        <Grid RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
             <TextBlock
+                Grid.Row="0"
                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                 FontSize="16"
                 FontWeight="SemiBold"
                 Text="Template Editor" />
             <TextBlock
+                Grid.Row="1"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Edit template metadata, validate, and save. VM and schema details preserve existing behavior."
+                Text="Edit template metadata and VM entries, then save."
                 TextWrapping="Wrap" />
 
             <Border
+                Grid.Row="2"
                 Padding="8"
                 Background="{StaticResource ShellContentBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-                <StackPanel Spacing="4">
-                    <TextBlock
-                        x:Name="TemplateEditorContextTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="No template selected."
-                        TextWrapping="Wrap" />
-                    <TextBlock
-                        x:Name="TemplateIdTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Template ID: -"
-                        TextWrapping="Wrap" />
-                    <TextBlock
-                        x:Name="TemplateFilePathTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="File path: new template (not saved)"
-                        TextWrapping="Wrap" />
-                </StackPanel>
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="3*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Template Name" />
+                        <TextBox x:Name="TemplateNameTextBox" PlaceholderText="Template name" />
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Description" />
+                        <TextBox
+                            x:Name="TemplateDescriptionTextBox"
+                            AcceptsReturn="True"
+                            MinHeight="64"
+                            MaxHeight="120"
+                            PlaceholderText="Description"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock
+                            x:Name="TemplateEditorContextTextBlock"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="No template selected."
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="TemplateVmCountTextBlock"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="VMs: 0"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="TemplateIdTextBlock"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Template ID: -"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="TemplateFilePathTextBlock"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="File path: new template (not saved)"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
             </Border>
 
-            <Grid ColumnSpacing="12">
+            <Grid Grid.Row="3" ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="3*" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Spacing="6">
-                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Metadata" />
-                    <TextBox x:Name="TemplateNameTextBox" PlaceholderText="Template name" />
-                    <TextBox
-                        x:Name="TemplateDescriptionTextBox"
-                        AcceptsReturn="True"
-                        Height="120"
-                        PlaceholderText="Description"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="6">
-                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Read-only Summary" />
-                    <TextBlock
-                        x:Name="TemplateVmCountTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="VMs: 0"
-                        TextWrapping="Wrap" />
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Detailed VM editing remains in existing domain workflow and will be incrementally migrated."
-                        TextWrapping="Wrap" />
-                </StackPanel>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    Grid.Column="0"
+                    Padding="8"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            Grid.Row="0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Template VMs" />
+                        <ListView
+                            x:Name="TemplateVmListView"
+                            Grid.Row="1"
+                            SelectionMode="Single">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            Grid.Column="0"
+                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                            Text="{Binding Name}" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{Binding CpuCount}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="AddTemplateVmButton" Content="Add VM" />
+                            <Button x:Name="RemoveTemplateVmButton" Content="Remove VM" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border
+                    Grid.Column="1"
+                    Padding="8"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            Grid.Row="0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Selected VM Configuration" />
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="8" Margin="0,0,10,0">
+                                <TextBlock
+                                    x:Name="TemplateVmIdTextBlock"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="VM ID: -" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Name" />
+                                    <TextBox x:Name="TemplateVmNameTextBox" Grid.Column="1" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Memory (MB)" />
+                                    <TextBox x:Name="TemplateVmMemoryTextBox" Grid.Column="1" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="CPU Count" />
+                                    <TextBox x:Name="TemplateVmCpuTextBox" Grid.Column="1" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Switch" />
+                                    <TextBox x:Name="TemplateVmSwitchTextBox" Grid.Column="1" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VHDX Id" />
+                                    <TextBox x:Name="TemplateVmVhdxIdTextBox" Grid.Column="1" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VHD Path" />
+                                    <TextBox x:Name="TemplateVmVhdPathTextBox" Grid.Column="1" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VHDX Signature" />
+                                    <TextBox x:Name="TemplateVmVhdxSignatureTextBox" Grid.Column="1" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Button
+                            x:Name="ApplyTemplateVmChangesButton"
+                            Grid.Row="2"
+                            HorizontalAlignment="Left"
+                            Content="Apply VM Changes" />
+                    </Grid>
+                </Border>
             </Grid>
 
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button x:Name="SaveTemplateButton" Content="Save" />
-                <Button x:Name="SaveTemplateAsButton" Content="Save As" />
-                <Button x:Name="ValidateTemplateButton" Content="Validate" />
-                <Button x:Name="BackToLibraryButton" Content="Back to Library" />
+            <StackPanel Grid.Row="4" Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="SaveTemplateButton" Content="Save" />
+                    <Button x:Name="SaveTemplateAsButton" Content="Save As" />
+                    <Button x:Name="ValidateTemplateButton" Content="Validate" />
+                    <Button x:Name="BackToLibraryButton" Content="Back to Library" />
+                </StackPanel>
+                <TextBlock
+                    x:Name="TemplateEditorStatusTextBlock"
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="No template loaded."
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
             </StackPanel>
-
-            <TextBlock
-                x:Name="TemplateEditorStatusTextBlock"
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="No template loaded."
-                TextWrapping="Wrap" />
-        </StackPanel>
+        </Grid>
     </Border>
 </UserControl>
