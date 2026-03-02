@@ -20,29 +20,25 @@ public sealed class MilestoneAAScenarioMatrixTests
     }
 
     [Fact]
-    public void Shell_DrawerContract_UsesFixedWidthAndContentRowOverlay()
+    public void Shell_NavigationView_UsesLeftCompactContract()
     {
         var xaml = LoadMainWindowXaml();
-        var drawer = FindByName(xaml, "CapabilityDrawer");
-        var scrim = FindByName(xaml, "DrawerScrim");
+        var navigationView = FindByName(xaml, "GlobalNavigationView");
 
-        Assert.Equal("280", drawer.Attribute("Width")?.Value);
-        Assert.Equal("1", GetAttributeValue(drawer, "Grid.Row"));
-        Assert.Equal("1", GetAttributeValue(scrim, "Grid.Row"));
+        Assert.Equal("LeftCompact", navigationView.Attribute("PaneDisplayMode")?.Value);
+        Assert.Equal("280", navigationView.Attribute("OpenPaneLength")?.Value);
+        Assert.Equal("56", navigationView.Attribute("CompactPaneLength")?.Value);
     }
 
     [Fact]
-    public void Shell_CapabilityNavigation_ListsExpectedCapabilitiesInRailAndDrawer()
+    public void Shell_CapabilityNavigation_DefinesExpectedCapabilityKeys()
     {
-        var xaml = LoadMainWindowXaml();
-        var expectedTags = new[] { "Machines", "Deploy", "Templates", "Assets", "Diagnostics", "Settings" };
+        var shellSource = LoadShellViewModelSource();
+        var expectedCapabilityTags = new[] { "machines", "deploy", "templates", "assets", "diagnostics", "settings" };
 
-        foreach (var tag in expectedTags)
+        foreach (var tag in expectedCapabilityTags)
         {
-            Assert.Contains(xaml.Descendants().Where(e => e.Name.LocalName == "Button"),
-                b => b.Attribute("Tag")?.Value == tag && (b.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value?.Contains("RailButton") ?? false));
-            Assert.Contains(xaml.Descendants().Where(e => e.Name.LocalName == "Button"),
-                b => b.Attribute("Tag")?.Value == tag && (b.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value?.Contains("DrawerButton") ?? false));
+            Assert.Contains($"key: \"{tag}\"", shellSource);
         }
     }
 
@@ -221,6 +217,12 @@ public sealed class MilestoneAAScenarioMatrixTests
             "Machines",
             "MachinesOverviewView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static string LoadShellViewModelSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "ShellViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static XElement FindByName(XDocument xaml, string name)
