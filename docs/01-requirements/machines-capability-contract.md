@@ -93,18 +93,7 @@ Readiness evaluation requirements:
 - background refresh while `Machines` view is active
 - manual recheck available
 - disabled state exposes concise reason text/guidance
-
-### 4.1 RDP readiness v1 policy (resolved)
-`Open RDP` enablement in v1 is based on fast host-observable checks only:
-- VM state is running
-- At least one VM IPv4 address is discoverable from Hyper-V host-side data
-- Host TCP probe to `<vm-ip>:3389` succeeds within short timeout (4000ms target)
-
-Readiness evaluation requirements:
-- asynchronous and non-blocking
-- background refresh while `Machines` view is active
-- manual recheck available
-- disabled state exposes concise reason text/guidance
+- transient probe timeout/cancellation/unreachable outcomes are non-fatal and resolve to readiness state updates (`NotReady`/`Unknown`) without crashing app flow
 
 ---
 

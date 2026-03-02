@@ -271,6 +271,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
     - VM has at least one IPv4 address observable from host-side Hyper-V data
     - Host can reach guest TCP port 3389 within a short probe timeout (4000ms target)
   - **Execution details:** readiness checks must run asynchronously/background and must not block Machines UI interactions.
+  - **Stability details:** transient probe timeout/cancellation/unreachable outcomes during background/manual checks are treated as non-fatal readiness results (for example `NotReady`/`Unknown`) and must not crash the app or produce repeated user-facing exception noise.
   - **Priority:** P1
 
 - **FR-065:** The system shall support VM deletion options:
