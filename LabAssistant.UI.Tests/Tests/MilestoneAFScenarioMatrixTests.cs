@@ -31,18 +31,26 @@ public sealed class MilestoneAFScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployFromTemplateView_DefinesRequiredAf2Af3ScaffoldControls()
+    public void DeployFromTemplateView_DefinesRequiredAf4CompactResultsControls()
     {
         var xaml = LoadDeployFromTemplateViewXaml();
 
         Assert.NotNull(FindByName(xaml, "DeployTemplateSelectorComboBox"));
         Assert.NotNull(FindByName(xaml, "DeployReadinessSummaryPanel"));
+        Assert.NotNull(FindByName(xaml, "DeployOverallStateTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployProgressBar"));
+        Assert.NotNull(FindByName(xaml, "DeployProgressSummaryTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployGlobalIssuesBadgeTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployReadinessSummaryTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployEvaluateReadinessButton"));
         Assert.NotNull(FindByName(xaml, "DeployResolveSuggestionsButton"));
         Assert.NotNull(FindByName(xaml, "DeployOpenTemplateEditorButton"));
         Assert.NotNull(FindByName(xaml, "DeployStartButton"));
         Assert.NotNull(FindByName(xaml, "DeployActionStatusTextBlock"));
+        var globalIssuesExpander = FindByName(xaml, "DeployGlobalIssuesExpander");
+        Assert.Equal("False", globalIssuesExpander.Attribute("IsExpanded")?.Value);
+        Assert.NotNull(FindByName(xaml, "DeployGlobalIssuesListView"));
+        Assert.NotNull(FindByName(xaml, "DeployVmResultsListView"));
     }
 
     [Fact]
@@ -63,6 +71,9 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("await OpenTemplateInEditorAsync(_selectedDeployTemplateLibraryItem, fromDeploy: true);", source);
         Assert.Contains("private static DeployDiskResolution ResolveDeployDiskIdentity", source);
         Assert.Contains("private static DeploySwitchResolution ResolveDeploySwitches", source);
+        Assert.Contains("private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)", source);
+        Assert.Contains("DeployProgressBar.Value = _deployProgressPercent;", source);
+        Assert.Contains("DeployGlobalIssuesBadgeTextBlock.Text = $\"Issues: {_deployIssueRows.Count}\";", source);
     }
 
     private static XDocument LoadMainWindowXaml()
