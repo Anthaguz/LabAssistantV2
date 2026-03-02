@@ -164,9 +164,22 @@ public sealed class MilestoneADScenarioMatrixTests
 
         Assert.Contains("EnsureTemplateVhdxCatalogOptionsAsync", source);
         Assert.Contains("TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;", source);
-        Assert.Contains("ResolveTemplateVhdxCatalogOption", source);
         Assert.Contains("Legacy path-based reference loaded. Select a catalog entry to normalize.", source);
         Assert.Contains("Catalog entry", source);
+    }
+
+    [Fact]
+    public void MainWindow_DefinesDeterministicVhdxNormalizationPrecedence_AndConflictBlocking()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("EvaluateTemplateVhdxNormalization", source);
+        Assert.Contains("Resolved from vhdxId.", source);
+        Assert.Contains("Resolved from vhdxSignature.", source);
+        Assert.Contains("Resolved from vhdPath.", source);
+        Assert.Contains("VHD identity conflict detected. Select a catalog entry to resolve before saving.", source);
+        Assert.Contains("Multiple catalog entries match vhdxSignature. Select one entry before saving.", source);
+        Assert.Contains("Catalog entry '", source);
     }
 
     private static XDocument LoadMainWindowXaml()

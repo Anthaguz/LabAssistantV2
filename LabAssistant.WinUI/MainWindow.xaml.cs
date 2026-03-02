@@ -926,6 +926,22 @@ public sealed partial class MainWindow : Window
             _selectedTemplateVmEntry.VhdPath = selectedCatalogOption.Path;
             _selectedTemplateVmEntry.VhdxSignature = selectedCatalogOption.Signature;
         }
+        else
+        {
+            var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry);
+            if (normalization.RequiresUserResolution)
+            {
+                TemplateEditorStatusTextBlock.Text = normalization.Message;
+                return false;
+            }
+
+            if (normalization.EffectiveOption is not null)
+            {
+                _selectedTemplateVmEntry.VhdxId = normalization.EffectiveOption.Id;
+                _selectedTemplateVmEntry.VhdPath = normalization.EffectiveOption.Path;
+                _selectedTemplateVmEntry.VhdxSignature = normalization.EffectiveOption.Signature;
+            }
+        }
 
         RefreshTemplateVmListView();
         SyncTemplateVmEntriesToDocument();
@@ -1067,7 +1083,8 @@ public sealed partial class MainWindow : Window
             TemplateVmVhdxIdTextBox.Text = selectedCatalogOption.Id;
             TemplateVmVhdPathTextBox.Text = selectedCatalogOption.Path;
             TemplateVmVhdxSignatureTextBox.Text = selectedCatalogOption.Signature ?? string.Empty;
-            TemplateVmVhdxGuidanceTextBlock.Text = "Catalog entry selected. Save to persist.";
+            var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry, selectedCatalogOption);
+            TemplateVmVhdxGuidanceTextBlock.Text = $"{normalization.EffectiveSourceLabel} Catalog entry selected. Save to persist.";
             return;
         }
 
@@ -1158,10 +1175,12 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            var selectedOption = ResolveTemplateVhdxCatalogOption(_selectedTemplateVmEntry);
-            object selectedItem = selectedOption is null ? TemplateVhdxPlaceholder : selectedOption;
+            var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry);
+            object selectedItem = normalization.RequiresUserResolution || normalization.EffectiveOption is null
+                ? TemplateVhdxPlaceholder
+                : normalization.EffectiveOption;
             TemplateVmVhdxCatalogComboBox.SelectedItem = selectedItem;
-            UpdateTemplateVhdxSelectorGuidance(selectedOption);
+            UpdateTemplateVhdxSelectorGuidance(normalization);
         }
         finally
         {
@@ -1169,24 +1188,19 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private TemplateVhdxCatalogOption? ResolveTemplateVhdxCatalogOption(VmTemplate vmTemplate)
+    private void UpdateTemplateVhdxSelectorGuidance()
     {
-        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))
+        if (_selectedTemplateVmEntry is null)
         {
-            return _templateVhdxCatalogOptions.FirstOrDefault(option =>
-                string.Equals(option.Id, vmTemplate.VhdxId, StringComparison.OrdinalIgnoreCase));
+            TemplateVmVhdxGuidanceTextBlock.Text = "Select a VM entry to configure base disk.";
+            return;
         }
 
-        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdPath))
-        {
-            return _templateVhdxCatalogOptions.FirstOrDefault(option =>
-                string.Equals(option.Path, vmTemplate.VhdPath, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return null;
+        var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry);
+        UpdateTemplateVhdxSelectorGuidance(normalization);
     }
 
-    private void UpdateTemplateVhdxSelectorGuidance(TemplateVhdxCatalogOption? selectedOption = null)
+    private void UpdateTemplateVhdxSelectorGuidance(TemplateVhdxNormalizationResult normalization)
     {
         if (_selectedTemplateVmEntry is null)
         {
@@ -1200,15 +1214,15 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (selectedOption is not null)
+        if (normalization.RequiresUserResolution)
         {
-            TemplateVmVhdxGuidanceTextBlock.Text = $"Catalog entry '{selectedOption.DisplayLabel}' selected.";
+            TemplateVmVhdxGuidanceTextBlock.Text = normalization.Message;
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_selectedTemplateVmEntry.VhdxId))
+        if (normalization.EffectiveOption is not null)
         {
-            TemplateVmVhdxGuidanceTextBlock.Text = $"Catalog entry '{_selectedTemplateVmEntry.VhdxId}' is missing. Select a replacement from catalog.";
+            TemplateVmVhdxGuidanceTextBlock.Text = $"{normalization.EffectiveSourceLabel} Effective disk: {normalization.EffectiveOption.DisplayLabel} ({normalization.EffectiveOption.Id}).";
             return;
         }
 
@@ -1219,6 +1233,102 @@ public sealed partial class MainWindow : Window
         }
 
         TemplateVmVhdxGuidanceTextBlock.Text = "Catalog-backed selection is preferred.";
+    }
+
+    private TemplateVhdxNormalizationResult EvaluateTemplateVhdxNormalization(
+        VmTemplate vmTemplate,
+        TemplateVhdxCatalogOption? userSelection = null)
+    {
+        var idMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdxId)
+            ? null
+            : _templateVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Id, vmTemplate.VhdxId, StringComparison.OrdinalIgnoreCase));
+
+        var signatureMatches = string.IsNullOrWhiteSpace(vmTemplate.VhdxSignature)
+            ? []
+            : _templateVhdxCatalogOptions
+                .Where(option => !string.IsNullOrWhiteSpace(option.Signature) &&
+                                 string.Equals(option.Signature, vmTemplate.VhdxSignature, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        var pathMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdPath)
+            ? null
+            : _templateVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Path, vmTemplate.VhdPath, StringComparison.OrdinalIgnoreCase));
+
+        if (userSelection is not null)
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: userSelection,
+                Message: "User selected replacement catalog entry.",
+                EffectiveSourceLabel: "Effective source: selected catalog.");
+        }
+
+        if (idMatch is not null)
+        {
+            var pathConflict = !string.IsNullOrWhiteSpace(vmTemplate.VhdPath)
+                               && !string.Equals(vmTemplate.VhdPath, idMatch.Path, StringComparison.OrdinalIgnoreCase);
+            var signatureConflict = !string.IsNullOrWhiteSpace(vmTemplate.VhdxSignature)
+                                    && !string.IsNullOrWhiteSpace(idMatch.Signature)
+                                    && !string.Equals(vmTemplate.VhdxSignature, idMatch.Signature, StringComparison.OrdinalIgnoreCase);
+            if (pathConflict || signatureConflict)
+            {
+                return new TemplateVhdxNormalizationResult(
+                    RequiresUserResolution: true,
+                    EffectiveOption: null,
+                    Message: "VHD identity conflict detected. Select a catalog entry to resolve before saving.",
+                    EffectiveSourceLabel: "Effective source: unresolved.");
+            }
+
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: idMatch,
+                Message: "Resolved from vhdxId.",
+                EffectiveSourceLabel: "Effective source: vhdxId.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: true,
+                EffectiveOption: null,
+                Message: $"Catalog entry '{vmTemplate.VhdxId}' is missing. Select a replacement before saving.",
+                EffectiveSourceLabel: "Effective source: unresolved.");
+        }
+
+        if (signatureMatches.Count > 1)
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: true,
+                EffectiveOption: null,
+                Message: "Multiple catalog entries match vhdxSignature. Select one entry before saving.",
+                EffectiveSourceLabel: "Effective source: unresolved.");
+        }
+
+        if (signatureMatches.Count == 1)
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: signatureMatches[0],
+                Message: "Resolved from vhdxSignature.",
+                EffectiveSourceLabel: "Effective source: vhdxSignature.");
+        }
+
+        if (pathMatch is not null)
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: pathMatch,
+                Message: "Resolved from vhdPath.",
+                EffectiveSourceLabel: "Effective source: vhdPath.");
+        }
+
+        return new TemplateVhdxNormalizationResult(
+            RequiresUserResolution: false,
+            EffectiveOption: null,
+            Message: "No matching catalog entry found; keeping path-first reference.",
+            EffectiveSourceLabel: "Effective source: legacy path.");
     }
 
     private Task<string?> PickTemplateFileForOpenAsync()
@@ -2733,4 +2843,10 @@ public sealed partial class MainWindow : Window
 
         public override string ToString() => $"{DisplayLabel} - {Id}";
     }
+
+    private sealed record TemplateVhdxNormalizationResult(
+        bool RequiresUserResolution,
+        TemplateVhdxCatalogOption? EffectiveOption,
+        string Message,
+        string EffectiveSourceLabel);
 }
