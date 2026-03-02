@@ -59,6 +59,41 @@ public sealed class MilestoneACScenarioMatrixTests
         Assert.Contains("DefaultSubview = subviews[0];", source);
     }
 
+    [Fact]
+    public void ShellViewModel_DefinesExpectedEntitySet_AndContractLabels()
+    {
+        var source = LoadShellViewModelSource();
+
+        Assert.Contains("displayName: \"Machines\"", source);
+        Assert.Contains("displayName: \"Deploy\"", source);
+        Assert.Contains("displayName: \"Templates\"", source);
+        Assert.Contains("displayName: \"Assets\"", source);
+        Assert.Contains("displayName: \"Diagnostics\"", source);
+        Assert.Contains("displayName: \"Settings\"", source);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.DeployOnTheFly, \"Quick Deploy\"", source);
+    }
+
+    [Fact]
+    public void MainWindow_WiresSettingsToFooter_AndUsesActiveNavSelectionSignal()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("GlobalNavigationView.FooterMenuItems.Add(parentItem);", source);
+        Assert.Contains("GlobalNavigationView.SelectedItem = selectedNavigationItem;", source);
+        Assert.DoesNotContain("Breadcrumb", source);
+    }
+
+    [Fact]
+    public void MainWindow_CompactParentClickAvoidsAccidentalDefaultNavigation()
+    {
+        var source = LoadMainWindowSource();
+
+        Assert.Contains("sender.PaneDisplayMode == NavigationViewPaneDisplayMode.LeftCompact", source);
+        Assert.Contains("!sender.IsPaneOpen", source);
+        Assert.Contains("if (isCollapsedCompactPane && capability.Subviews.Count > 0)", source);
+        Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", source);
+    }
+
     private static XDocument LoadMainWindowXaml()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml");
@@ -68,6 +103,12 @@ public sealed class MilestoneACScenarioMatrixTests
     private static string LoadShellViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "ShellViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadMainWindowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
