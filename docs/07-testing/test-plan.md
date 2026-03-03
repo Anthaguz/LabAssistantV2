@@ -221,6 +221,25 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Deterministic normalization precedence is enforced and save-blocking conflict behavior is observable.
   - AE closure evidence includes both automated structural checks and manual runtime verification.
 
+## TC-015: Milestone AF Deploy From-Template Convergence Verification
+- **Related AC:** `AC-014`, `FR-087`, `FR-088`, `FR-089`, `FR-090`
+- **Type:** Manual (real Windows machine / Hyper-V host) + automated coverage
+- **Related milestone:** Milestone AF (`#322`, `#323`, `#324`, `#325`, `#326`)
+- **Steps:**
+  1. Run automated AF matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAFScenarioMatrixTests.cs`.
+  2. Run the Milestone AF checklist in `docs/07-testing/milestone-af-deploy-from-template-checklist.md`.
+  3. Verify Deploy parent scope defaults to `deploy.from_template` and on-the-fly remains deferred for AF.
+  4. Verify readiness/gating behavior (blocking disk identity conflicts, warning switch mapping states, gated deploy start).
+  5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and route/context handoff.
+  6. Verify AF4 compact-first results UX (sticky compact strip, concise per-VM rows, collapsed-by-default details and global issues drawer, badge/count updates).
+  7. Verify layout sanity across compact/normal/wide window sizes with stable scroll ownership.
+- **Expected:**
+  - AF route/scope behavior remains deterministic and aligned with from-template-first contract.
+  - Readiness classification and deploy gating enforce blocking vs warning conditions without silent fallback.
+  - Correction actions are discoverable and preserve template context during handoff flows.
+  - Compact-first results UX remains usable, dense-by-default, and expandable on demand.
+  - AF closure evidence includes both automated structural checks and repeatable manual runtime verification.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.
