@@ -74,6 +74,31 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)", source);
         Assert.Contains("DeployProgressBar.Value = _deployProgressPercent;", source);
         Assert.Contains("DeployGlobalIssuesBadgeTextBlock.Text = $\"Issues: {_deployIssueRows.Count}\";", source);
+        Assert.Contains("Switch mapping partial/missing", source);
+        Assert.Contains("Disk identity conflict detected.", source);
+        Assert.Contains("DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures", source);
+    }
+
+    [Fact]
+    public void DeployFromTemplateView_PerVmAndGlobalDetailsDefaultToCollapsed()
+    {
+        var xaml = LoadDeployFromTemplateViewXaml();
+        var expanders = xaml.Descendants().Where(element => element.Name.LocalName == "Expander").ToList();
+
+        Assert.True(expanders.Count >= 2, "Expected global issues expander and per-VM row expander.");
+        Assert.True(expanders.Count(element => string.Equals(element.Attribute("IsExpanded")?.Value, "False", StringComparison.Ordinal)) >= 2);
+    }
+
+    [Fact]
+    public void AfDeployChanges_PreserveTemplatesRouteAndGlobalNavigationContractSignals()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var shellSource = LoadShellViewModelSource();
+
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", mainWindowSource);
+        Assert.Contains("private void GlobalNavigationView_ItemInvoked", mainWindowSource);
+        Assert.Contains("public const string TemplatesLibrary = \"templates.library\";", shellSource);
+        Assert.Contains("public const string TemplatesEditor = \"templates.editor\";", shellSource);
     }
 
     private static XDocument LoadMainWindowXaml()
