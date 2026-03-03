@@ -237,8 +237,27 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - AF route/scope behavior remains deterministic and aligned with from-template-first contract.
   - Readiness classification and deploy gating enforce blocking vs warning conditions without silent fallback.
   - Correction actions are discoverable and preserve template context during handoff flows.
-  - Compact-first results UX remains usable, dense-by-default, and expandable on demand.
-  - AF closure evidence includes both automated structural checks and repeatable manual runtime verification.
+- Compact-first results UX remains usable, dense-by-default, and expandable on demand.
+- AF closure evidence includes both automated structural checks and repeatable manual runtime verification.
+
+## TC-016: Milestone AG Deploy On-the-Fly Convergence Verification
+- **Related AC:** `AC-015`, `FR-091`, `FR-092`, `FR-093`, `FR-094`
+- **Type:** Manual (real Windows machine / Hyper-V host) + automated coverage
+- **Related milestone:** Milestone AG (`#332`, `#333`, `#334`, `#335`, `#336`)
+- **Steps:**
+  1. Run automated AG matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAGScenarioMatrixTests.cs`.
+  2. Run the Milestone AG checklist in `docs/07-testing/milestone-ag-deploy-on-the-fly-checklist.md`.
+  3. Verify route/scope behavior (`deploy.on_the_fly`) and Deploy subview continuity.
+  4. Verify readiness gating (blocking vs warning) and deploy-start enablement rules.
+  5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and context handoff.
+  6. Verify compact results behavior (sticky summary strip, per-VM rows, collapsed-by-default details, issue summary badge updates).
+  7. Verify layout/overflow/scroll behavior across compact/normal/wide windows.
+- **Expected:**
+  - On-the-fly route and scaffold remain stable and contract-aligned.
+  - Readiness classification enforces blocking conditions and preserves warning-only flow.
+  - Correction actions are discoverable and functional with predictable context transfer.
+  - Compact-first results remain readable with details available on demand.
+  - AG closure evidence is supported by automated structural checks plus manual runtime verification.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.

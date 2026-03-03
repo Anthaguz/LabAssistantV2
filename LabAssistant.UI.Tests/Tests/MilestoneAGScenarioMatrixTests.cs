@@ -74,11 +74,25 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("_ = EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh: false);", source);
         Assert.Contains("DeployOnTheFlyVmSwitchComboBox.SelectionChanged += DeployOnTheFlyVmSwitchComboBox_SelectionChanged;", source);
         Assert.Contains("DeployOnTheFlyVmVhdxCatalogComboBox.SelectionChanged += DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged;", source);
+        Assert.Contains("var hasBlockingFailures = _deployOnTheFlyCompatibilityIssues.Any(issue => issue.IsBlocking) ||", source);
+        Assert.Contains("(_deployOnTheFlyReadinessReport?.HasBlockingFailures ?? false);", source);
         Assert.Contains("DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;", source);
         Assert.Contains("AttachDeployOnTheFlyProgressCallbacks(deployContext.MultiVmContext);", source);
         Assert.Contains("UpdateDeployOnTheFlyRowsFromSummary(summary);", source);
         Assert.Contains("DeployOnTheFlyProgressBar.Value = _deployOnTheFlyProgressPercent;", source);
         Assert.Contains("DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\";", source);
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
+        Assert.Contains("ApplyDeployResolveSuggestionsAsync(template);", source);
+    }
+
+    [Fact]
+    public void DeployOnTheFlyView_UsesCollapsedVmDetailsPatternForAg4()
+    {
+        var source = LoadDeployOnTheFlyViewSource();
+
+        Assert.Contains("<Expander IsExpanded=\"False\">", source);
+        Assert.Contains("Text=\"Deployment Results\"", source);
+        Assert.Contains("x:Name=\"DeployOnTheFlyVmResultsListView\"", source);
     }
 
     [Fact]
@@ -102,6 +116,12 @@ public sealed class MilestoneAGScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyViewSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadShellViewModelSource()
