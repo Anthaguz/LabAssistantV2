@@ -23,9 +23,13 @@ public sealed partial class DeployOnTheFlyView : UserControl
 
     public TextBox DeployOnTheFlyVmCpuTextBoxControl => DeployOnTheFlyVmCpuTextBox;
 
-    public TextBox DeployOnTheFlyVmVhdPathTextBoxControl => DeployOnTheFlyVmVhdPathTextBox;
+    public ComboBox DeployOnTheFlyVmVhdxCatalogComboBoxControl => DeployOnTheFlyVmVhdxCatalogComboBox;
 
-    public TextBox DeployOnTheFlyVmSwitchesTextBoxControl => DeployOnTheFlyVmSwitchesTextBox;
+    public ComboBox DeployOnTheFlyVmSwitchComboBoxControl => DeployOnTheFlyVmSwitchComboBox;
+
+    public TextBlock DeployOnTheFlyVmSwitchGuidanceTextBlockControl => DeployOnTheFlyVmSwitchGuidanceTextBlock;
+
+    public TextBlock DeployOnTheFlyVmVhdxGuidanceTextBlockControl => DeployOnTheFlyVmVhdxGuidanceTextBlock;
 
     public Button DeployOnTheFlyApplyVmChangesButtonControl => DeployOnTheFlyApplyVmChangesButton;
 
@@ -40,10 +44,6 @@ public sealed partial class DeployOnTheFlyView : UserControl
     public TextBlock DeployOnTheFlyGlobalIssuesBadgeTextBlockControl => DeployOnTheFlyGlobalIssuesBadgeTextBlock;
 
     public TextBlock DeployOnTheFlyReadinessSummaryTextBlockControl => DeployOnTheFlyReadinessSummaryTextBlock;
-
-    public Expander DeployOnTheFlyGlobalIssuesExpanderControl => DeployOnTheFlyGlobalIssuesExpander;
-
-    public ListView DeployOnTheFlyGlobalIssuesListViewControl => DeployOnTheFlyGlobalIssuesListView;
 
     public ListView DeployOnTheFlyVmResultsListViewControl => DeployOnTheFlyVmResultsListView;
 

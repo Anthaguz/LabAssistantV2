@@ -15,7 +15,6 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -23,12 +22,12 @@
                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                 FontSize="16"
                 FontWeight="SemiBold"
-                Text="Deploy On-the-Fly" />
+                Text="Quick Deploy" />
 
             <TextBlock
                 Grid.Row="1"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Configure VM entries, evaluate readiness, apply corrections, and start deploy when unblocked."
+                Text="Configure VM entries, evaluate readiness, resolve blockers, and start deploy when ready."
                 TextWrapping="Wrap" />
 
             <Border
@@ -74,7 +73,7 @@
                         VerticalAlignment="Center"
                         Foreground="{StaticResource ShellWarnBrush}"
                         FontWeight="SemiBold"
-                        Text="Issues: 0" />
+                        Text="Blocking: 0 | Warnings: 0" />
                     <TextBlock
                         x:Name="DeployOnTheFlyReadinessSummaryTextBlock"
                         Grid.Column="0"
@@ -86,7 +85,8 @@
 
             <Grid Grid.Row="3" ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.1*" />
+                    <ColumnDefinition Width="1.0*" />
+                    <ColumnDefinition Width="1.25*" />
                     <ColumnDefinition Width="1.4*" />
                 </Grid.ColumnDefinitions>
 
@@ -115,16 +115,11 @@
                             SelectionMode="Single">
                             <ListView.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Padding="4" Spacing="2">
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                            FontWeight="SemiBold"
-                                            Text="{Binding Name}" />
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="{Binding VmId}"
-                                            TextWrapping="WrapWholeWords" />
-                                    </StackPanel>
+                                    <TextBlock
+                                        Padding="6,4"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        FontWeight="SemiBold"
+                                        Text="{Binding Name}" />
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
@@ -147,71 +142,177 @@
                     BorderBrush="{StaticResource ShellBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
-                    <Grid RowSpacing="8" ColumnSpacing="8">
+                    <Grid RowSpacing="8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="140" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+
                         <TextBlock
                             Grid.Row="0"
-                            Grid.Column="0"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="Name" />
-                        <TextBox
-                            x:Name="DeployOnTheFlyVmNameTextBox"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="VM Properties" />
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <Grid RowSpacing="8" ColumnSpacing="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="Name" />
+                                <TextBox
+                                    x:Name="DeployOnTheFlyVmNameTextBox"
+                                    Grid.Row="0"
+                                    Grid.Column="1" />
+
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="Memory (MB)" />
+                                <TextBox
+                                    x:Name="DeployOnTheFlyVmMemoryTextBox"
+                                    Grid.Row="1"
+                                    Grid.Column="1" />
+
+                                <TextBlock
+                                    Grid.Row="2"
+                                    Grid.Column="0"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="CPU" />
+                                <TextBox
+                                    x:Name="DeployOnTheFlyVmCpuTextBox"
+                                    Grid.Row="2"
+                                    Grid.Column="1" />
+
+                                <TextBlock
+                                    Grid.Row="3"
+                                    Grid.Column="0"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="Base disk" />
+                                <ComboBox
+                                    x:Name="DeployOnTheFlyVmVhdxCatalogComboBox"
+                                    Grid.Row="3"
+                                    Grid.Column="1" />
+
+                                <TextBlock
+                                    Grid.Row="4"
+                                    Grid.Column="0"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="Switch" />
+                                <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6">
+                                    <ComboBox x:Name="DeployOnTheFlyVmSwitchComboBox" />
+                                    <TextBlock
+                                        x:Name="DeployOnTheFlyVmSwitchGuidanceTextBlock"
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        FontSize="12"
+                                        Text="Switch selection is optional."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <TextBlock
+                                    x:Name="DeployOnTheFlyVmVhdxGuidanceTextBlock"
+                                    Grid.Row="5"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    FontSize="12"
+                                    Text="Catalog-backed selection is preferred."
+                                    TextWrapping="Wrap" />
+                            </Grid>
+                        </ScrollViewer>
+
+                        <Button
+                            x:Name="DeployOnTheFlyApplyVmChangesButton"
+                            Grid.Row="2"
+                            Content="Apply VM Changes"
+                            HorizontalAlignment="Left" />
+                    </Grid>
+                </Border>
+
+                <Border
+                    Grid.Column="2"
+                    Padding="10"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
                             Grid.Row="0"
-                            Grid.Column="1" />
-                        <TextBlock
-                            Grid.Row="1"
-                            Grid.Column="0"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="Memory (MB)" />
-                        <TextBox
-                            x:Name="DeployOnTheFlyVmMemoryTextBox"
-                            Grid.Row="1"
-                            Grid.Column="1" />
-                        <TextBlock
-                            Grid.Row="2"
-                            Grid.Column="0"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="CPU" />
-                        <TextBox
-                            x:Name="DeployOnTheFlyVmCpuTextBox"
-                            Grid.Row="2"
-                            Grid.Column="1" />
-                        <TextBlock
-                            Grid.Row="3"
-                            Grid.Column="0"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="VHD path" />
-                        <TextBox
-                            x:Name="DeployOnTheFlyVmVhdPathTextBox"
-                            Grid.Row="3"
-                            Grid.Column="1" />
-                        <TextBlock
-                            Grid.Row="4"
-                            Grid.Column="0"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="Switches" />
-                        <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6">
-                            <TextBox x:Name="DeployOnTheFlyVmSwitchesTextBox" />
-                            <TextBlock
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                FontSize="12"
-                                Text="Comma-separated switch names. Optional."
-                                TextWrapping="Wrap" />
-                            <Button
-                                x:Name="DeployOnTheFlyApplyVmChangesButton"
-                                Content="Apply VM Changes"
-                                HorizontalAlignment="Left" />
-                        </StackPanel>
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Deployment Results" />
+
+                        <ListView x:Name="DeployOnTheFlyVmResultsListView" Grid.Row="1" SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Margin="0,0,0,8"
+                                        Padding="8"
+                                        BorderBrush="{StaticResource ShellBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Background="{StaticResource ShellBackgroundBrush}">
+                                        <StackPanel Spacing="6">
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    Grid.Column="0"
+                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                    FontWeight="SemiBold"
+                                                    Text="{Binding VmName}" />
+                                                <TextBlock
+                                                    Grid.Column="1"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="{Binding Status}" />
+                                            </Grid>
+                                            <ProgressBar
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Value="{Binding ProgressPercent}"
+                                                Height="6" />
+                                            <TextBlock
+                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                Text="{Binding Summary}"
+                                                TextWrapping="Wrap" />
+                                            <Expander IsExpanded="False">
+                                                <Expander.Header>
+                                                    <TextBlock Text="Details" Foreground="{StaticResource ShellTextSecondaryBrush}" />
+                                                </Expander.Header>
+                                                <TextBlock
+                                                    Margin="0,6,0,0"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="{Binding Details}"
+                                                    TextWrapping="Wrap" />
+                                            </Expander>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
                     </Grid>
                 </Border>
             </Grid>
@@ -245,86 +346,6 @@
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
-
-            <Grid Grid.Row="5" RowSpacing="8">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <Expander
-                    x:Name="DeployOnTheFlyGlobalIssuesExpander"
-                    Grid.Row="0"
-                    IsExpanded="False">
-                    <Expander.Header>
-                        <TextBlock
-                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                            FontWeight="SemiBold"
-                            Text="Global warnings / errors" />
-                    </Expander.Header>
-                    <Border
-                        Margin="0,8,0,0"
-                        Padding="8"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <ListView x:Name="DeployOnTheFlyGlobalIssuesListView" SelectionMode="None" />
-                    </Border>
-                </Expander>
-
-                <Border
-                    Grid.Row="1"
-                    Background="{StaticResource ShellContentBackgroundBrush}"
-                    BorderBrush="{StaticResource ShellBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="6">
-                    <ListView x:Name="DeployOnTheFlyVmResultsListView" SelectionMode="None">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <Expander IsExpanded="False">
-                                    <Expander.Header>
-                                        <Grid Padding="8,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock
-                                                Grid.Column="0"
-                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                                FontWeight="SemiBold"
-                                                Text="{Binding VmName}" />
-                                            <TextBlock
-                                                Grid.Column="1"
-                                                Margin="8,0,0,0"
-                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                Text="{Binding Status}" />
-                                            <TextBlock
-                                                Grid.Column="2"
-                                                Margin="10,0,0,0"
-                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                Text="{Binding Summary}" />
-                                        </Grid>
-                                    </Expander.Header>
-                                    <Border
-                                        Padding="8"
-                                        Margin="0,4,0,8"
-                                        Background="{StaticResource ShellBackgroundBrush}"
-                                        BorderBrush="{StaticResource ShellBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6">
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="{Binding Details}"
-                                            TextWrapping="Wrap" />
-                                    </Border>
-                                </Expander>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </Border>
-            </Grid>
         </Grid>
     </Border>
 </UserControl>

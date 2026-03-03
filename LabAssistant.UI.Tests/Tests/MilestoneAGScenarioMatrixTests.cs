@@ -37,8 +37,10 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmNameTextBox"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmMemoryTextBox"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmCpuTextBox"));
-        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmVhdPathTextBox"));
-        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmSwitchesTextBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmVhdxCatalogComboBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmSwitchComboBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmSwitchGuidanceTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmVhdxGuidanceTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyApplyVmChangesButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyReadinessSummaryPanel"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyOverallStateTextBlock"));
@@ -51,10 +53,8 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyOpenTemplateEditorButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyStartButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyStatusTextBlock"));
-        var globalIssuesExpander = FindByName(xaml, "DeployOnTheFlyGlobalIssuesExpander");
-        Assert.Equal("False", globalIssuesExpander.Attribute("IsExpanded")?.Value);
-        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyGlobalIssuesListView"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmResultsListView"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmEditorPanel"));
     }
 
     [Fact]
@@ -71,12 +71,14 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures", source);
         Assert.Contains("await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);", source);
         Assert.Contains("BuildOnTheFlyTemplate()", source);
+        Assert.Contains("_ = EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh: false);", source);
+        Assert.Contains("DeployOnTheFlyVmSwitchComboBox.SelectionChanged += DeployOnTheFlyVmSwitchComboBox_SelectionChanged;", source);
+        Assert.Contains("DeployOnTheFlyVmVhdxCatalogComboBox.SelectionChanged += DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged;", source);
         Assert.Contains("DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;", source);
-        Assert.Contains("DeployOnTheFlyGlobalIssuesListView.ItemsSource = _deployOnTheFlyIssueRows;", source);
-        Assert.Contains("DeployOnTheFlyGlobalIssuesExpander.IsExpanded = false;", source);
+        Assert.Contains("AttachDeployOnTheFlyProgressCallbacks(deployContext.MultiVmContext);", source);
         Assert.Contains("UpdateDeployOnTheFlyRowsFromSummary(summary);", source);
         Assert.Contains("DeployOnTheFlyProgressBar.Value = _deployOnTheFlyProgressPercent;", source);
-        Assert.Contains("DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $\"Issues: {_deployOnTheFlyIssueRows.Count}\";", source);
+        Assert.Contains("DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\";", source);
     }
 
     [Fact]

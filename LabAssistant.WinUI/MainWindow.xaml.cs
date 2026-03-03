@@ -47,6 +47,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<DeployIssueRow> _deployIssueRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
+    private readonly Dictionary<string, DeployVmProgressState> _deployOnTheFlyProgressByVm = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
     private readonly List<DeployCompatibilityIssue> _deployCompatibilityIssues = [];
@@ -89,6 +90,7 @@ public sealed partial class MainWindow : Window
     private bool _isDeployOnTheFlyEvaluatingReadiness;
     private bool _isDeployOnTheFlyStarting;
     private bool _isUpdatingDeployOnTheFlyEditor;
+    private bool _showDeployOnTheFlyAllVmRows;
     private string _deployLifecycleState = "Idle";
     private int _deployProgressPercent;
     private string _deployProgressSummary = "No deployment started.";
@@ -177,16 +179,16 @@ public sealed partial class MainWindow : Window
     private TextBox DeployOnTheFlyVmNameTextBox => DeployOnTheFlyView.DeployOnTheFlyVmNameTextBoxControl;
     private TextBox DeployOnTheFlyVmMemoryTextBox => DeployOnTheFlyView.DeployOnTheFlyVmMemoryTextBoxControl;
     private TextBox DeployOnTheFlyVmCpuTextBox => DeployOnTheFlyView.DeployOnTheFlyVmCpuTextBoxControl;
-    private TextBox DeployOnTheFlyVmVhdPathTextBox => DeployOnTheFlyView.DeployOnTheFlyVmVhdPathTextBoxControl;
-    private TextBox DeployOnTheFlyVmSwitchesTextBox => DeployOnTheFlyView.DeployOnTheFlyVmSwitchesTextBoxControl;
+    private ComboBox DeployOnTheFlyVmVhdxCatalogComboBox => DeployOnTheFlyView.DeployOnTheFlyVmVhdxCatalogComboBoxControl;
+    private ComboBox DeployOnTheFlyVmSwitchComboBox => DeployOnTheFlyView.DeployOnTheFlyVmSwitchComboBoxControl;
+    private TextBlock DeployOnTheFlyVmSwitchGuidanceTextBlock => DeployOnTheFlyView.DeployOnTheFlyVmSwitchGuidanceTextBlockControl;
+    private TextBlock DeployOnTheFlyVmVhdxGuidanceTextBlock => DeployOnTheFlyView.DeployOnTheFlyVmVhdxGuidanceTextBlockControl;
     private Button DeployOnTheFlyApplyVmChangesButton => DeployOnTheFlyView.DeployOnTheFlyApplyVmChangesButtonControl;
     private TextBlock DeployOnTheFlyOverallStateTextBlock => DeployOnTheFlyView.DeployOnTheFlyOverallStateTextBlockControl;
     private ProgressBar DeployOnTheFlyProgressBar => DeployOnTheFlyView.DeployOnTheFlyProgressBarControl;
     private TextBlock DeployOnTheFlyProgressSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyProgressSummaryTextBlockControl;
     private TextBlock DeployOnTheFlyGlobalIssuesBadgeTextBlock => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployOnTheFlyReadinessSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyReadinessSummaryTextBlockControl;
-    private Expander DeployOnTheFlyGlobalIssuesExpander => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesExpanderControl;
-    private ListView DeployOnTheFlyGlobalIssuesListView => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesListViewControl;
     private ListView DeployOnTheFlyVmResultsListView => DeployOnTheFlyView.DeployOnTheFlyVmResultsListViewControl;
     private Button DeployOnTheFlyEvaluateButton => DeployOnTheFlyView.DeployOnTheFlyEvaluateButtonControl;
     private Button DeployOnTheFlyResolveSuggestionsButton => DeployOnTheFlyView.DeployOnTheFlyResolveSuggestionsButtonControl;
@@ -233,6 +235,8 @@ public sealed partial class MainWindow : Window
     private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
     private const string TemplateSwitchPlaceholder = "(Select switch)";
     private const string TemplateVhdxPlaceholder = "(Keep current / unresolved)";
+    private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
+    private const string DeployOnTheFlyVhdxPlaceholder = "(Select base disk)";
 
     public MainWindow()
     {
@@ -353,13 +357,13 @@ public sealed partial class MainWindow : Window
         DeployOnTheFlyAddVmButton.Click += DeployOnTheFlyAddVmButton_Click;
         DeployOnTheFlyRemoveVmButton.Click += DeployOnTheFlyRemoveVmButton_Click;
         DeployOnTheFlyApplyVmChangesButton.Click += DeployOnTheFlyApplyVmChangesButton_Click;
+        DeployOnTheFlyVmSwitchComboBox.SelectionChanged += DeployOnTheFlyVmSwitchComboBox_SelectionChanged;
+        DeployOnTheFlyVmVhdxCatalogComboBox.SelectionChanged += DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged;
         DeployOnTheFlyEvaluateButton.Click += DeployOnTheFlyEvaluateButton_Click;
         DeployOnTheFlyResolveSuggestionsButton.Click += DeployOnTheFlyResolveSuggestionsButton_Click;
         DeployOnTheFlyOpenTemplateEditorButton.Click += DeployOnTheFlyOpenTemplateEditorButton_Click;
         DeployOnTheFlyStartButton.Click += DeployOnTheFlyStartButton_Click;
         DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;
-        DeployOnTheFlyGlobalIssuesListView.ItemsSource = _deployOnTheFlyIssueRows;
-        DeployOnTheFlyGlobalIssuesExpander.IsExpanded = false;
         EnsureDeployOnTheFlySeeded();
         UpdateDeployOnTheFlyEditorPanel();
         UpdateDeployOnTheFlyUi();
@@ -434,7 +438,7 @@ public sealed partial class MainWindow : Window
             : IsDeployFromTemplateActive
                 ? "Select template inputs and review compact readiness summary. Execution and gating wire in AF3."
             : IsDeployOnTheFlyActive
-                ? "Configure VM entries for on-the-fly deploy. AG2 provides scaffold regions; readiness and execution wiring land in AG3."
+                ? "Configure VM entries for Quick Deploy. Evaluate readiness, resolve blockers, and run deployment."
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
                 : IsTemplatesEditorActive
@@ -488,6 +492,7 @@ public sealed partial class MainWindow : Window
         if (IsDeployOnTheFlyActive)
         {
             EnsureDeployOnTheFlySeeded();
+            _ = EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh: false);
             UpdateDeployOnTheFlyUi();
         }
     }
@@ -703,7 +708,7 @@ public sealed partial class MainWindow : Window
     {
         return new VmTemplate
         {
-            Name = $"onfly-vm-{sequence}",
+            Name = $"Quick VM {sequence}",
             MemoryMb = 2048,
             CpuCount = 2
         };
@@ -729,8 +734,8 @@ public sealed partial class MainWindow : Window
     {
         return new LabTemplate
         {
-            Name = "On-the-fly Deploy Draft",
-            Description = "Generated on-the-fly deploy input.",
+            Name = "Quick Deploy Draft",
+            Description = "Generated quick deploy input.",
             VmTemplates = _deployOnTheFlyVmEntries.Select(CloneVmTemplate).ToList()
         };
     }
@@ -763,20 +768,78 @@ public sealed partial class MainWindow : Window
                 DeployOnTheFlyVmNameTextBox.Text = string.Empty;
                 DeployOnTheFlyVmMemoryTextBox.Text = string.Empty;
                 DeployOnTheFlyVmCpuTextBox.Text = string.Empty;
-                DeployOnTheFlyVmVhdPathTextBox.Text = string.Empty;
-                DeployOnTheFlyVmSwitchesTextBox.Text = string.Empty;
+                UpdateDeployOnTheFlySelectorsFromVm();
                 return;
             }
 
             DeployOnTheFlyVmNameTextBox.Text = _selectedDeployOnTheFlyVmEntry.Name;
             DeployOnTheFlyVmMemoryTextBox.Text = _selectedDeployOnTheFlyVmEntry.MemoryMb.ToString();
             DeployOnTheFlyVmCpuTextBox.Text = _selectedDeployOnTheFlyVmEntry.CpuCount.ToString();
-            DeployOnTheFlyVmVhdPathTextBox.Text = _selectedDeployOnTheFlyVmEntry.VhdPath ?? string.Empty;
-            DeployOnTheFlyVmSwitchesTextBox.Text = string.Join(", ", _selectedDeployOnTheFlyVmEntry.SwitchNames ?? []);
+            UpdateDeployOnTheFlySelectorsFromVm();
         }
         finally
         {
             _isUpdatingDeployOnTheFlyEditor = false;
+        }
+    }
+
+    private void UpdateDeployOnTheFlySelectorsFromVm()
+    {
+        var switchItems = new List<object> { DeployOnTheFlySwitchPlaceholder };
+        switchItems.AddRange(_templateAvailableSwitches);
+        DeployOnTheFlyVmSwitchComboBox.ItemsSource = switchItems;
+
+        var vhdItems = new List<object> { DeployOnTheFlyVhdxPlaceholder };
+        vhdItems.AddRange(_templateVhdxCatalogOptions);
+        DeployOnTheFlyVmVhdxCatalogComboBox.ItemsSource = vhdItems;
+
+        if (_selectedDeployOnTheFlyVmEntry is null)
+        {
+            DeployOnTheFlyVmSwitchComboBox.SelectedItem = DeployOnTheFlySwitchPlaceholder;
+            DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem = DeployOnTheFlyVhdxPlaceholder;
+            DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = "Select a VM entry first.";
+            DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = "Select a VM entry first.";
+            return;
+        }
+
+        var selectedSwitch = _selectedDeployOnTheFlyVmEntry.SwitchNames?.FirstOrDefault()
+                             ?? _selectedDeployOnTheFlyVmEntry.SwitchName;
+        if (!string.IsNullOrWhiteSpace(selectedSwitch) &&
+            _templateAvailableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase))
+        {
+            DeployOnTheFlyVmSwitchComboBox.SelectedItem = _templateAvailableSwitches.First(name =>
+                string.Equals(name, selectedSwitch, StringComparison.OrdinalIgnoreCase));
+            DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = "Switch selected from host inventory.";
+        }
+        else
+        {
+            DeployOnTheFlyVmSwitchComboBox.SelectedItem = DeployOnTheFlySwitchPlaceholder;
+            DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = _templateAvailableSwitches.Count == 0
+                ? "No host switches available. Add a switch in Assets first."
+                : "Switch selection is optional.";
+        }
+
+        var vhdSelection = string.IsNullOrWhiteSpace(_selectedDeployOnTheFlyVmEntry.VhdxId)
+            ? null
+            : _templateVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Id, _selectedDeployOnTheFlyVmEntry.VhdxId, StringComparison.OrdinalIgnoreCase));
+        if (vhdSelection is null && !string.IsNullOrWhiteSpace(_selectedDeployOnTheFlyVmEntry.VhdPath))
+        {
+            vhdSelection = _templateVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Path, _selectedDeployOnTheFlyVmEntry.VhdPath, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (vhdSelection is not null)
+        {
+            DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem = vhdSelection;
+            DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = $"Selected: {vhdSelection.DisplayLabel} ({vhdSelection.Id}).";
+        }
+        else
+        {
+            DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem = DeployOnTheFlyVhdxPlaceholder;
+            DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = _templateVhdxCatalogOptions.Count == 0
+                ? "No VHDX catalog entries available. Import base disks in Assets first."
+                : "Select a base disk from catalog.";
         }
     }
 
@@ -809,16 +872,31 @@ public sealed partial class MainWindow : Window
         _selectedDeployOnTheFlyVmEntry.Name = vmName;
         _selectedDeployOnTheFlyVmEntry.MemoryMb = memoryMb;
         _selectedDeployOnTheFlyVmEntry.CpuCount = cpuCount;
-        _selectedDeployOnTheFlyVmEntry.VhdPath = string.IsNullOrWhiteSpace(DeployOnTheFlyVmVhdPathTextBox.Text)
-            ? null
-            : DeployOnTheFlyVmVhdPathTextBox.Text.Trim();
 
-        var switchNames = (DeployOnTheFlyVmSwitchesTextBox.Text ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        _selectedDeployOnTheFlyVmEntry.SwitchNames = switchNames.Count > 0 ? switchNames : null;
-        _selectedDeployOnTheFlyVmEntry.SwitchName = switchNames.Count > 0 ? switchNames[0] : null;
+        if (DeployOnTheFlyVmSwitchComboBox.SelectedItem is string selectedSwitch &&
+            !string.Equals(selectedSwitch, DeployOnTheFlySwitchPlaceholder, StringComparison.Ordinal))
+        {
+            _selectedDeployOnTheFlyVmEntry.SwitchNames = [selectedSwitch];
+            _selectedDeployOnTheFlyVmEntry.SwitchName = selectedSwitch;
+        }
+        else
+        {
+            _selectedDeployOnTheFlyVmEntry.SwitchNames = null;
+            _selectedDeployOnTheFlyVmEntry.SwitchName = null;
+        }
+
+        if (DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedCatalogOption)
+        {
+            _selectedDeployOnTheFlyVmEntry.VhdxId = selectedCatalogOption.Id;
+            _selectedDeployOnTheFlyVmEntry.VhdPath = selectedCatalogOption.Path;
+            _selectedDeployOnTheFlyVmEntry.VhdxSignature = selectedCatalogOption.Signature;
+        }
+        else
+        {
+            _selectedDeployOnTheFlyVmEntry.VhdxId = null;
+            _selectedDeployOnTheFlyVmEntry.VhdPath = null;
+            _selectedDeployOnTheFlyVmEntry.VhdxSignature = null;
+        }
 
         DeployOnTheFlyVmEntriesListView.ItemsSource = null;
         DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyVmEntries;
@@ -834,6 +912,7 @@ public sealed partial class MainWindow : Window
 
     private async Task EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode mode)
     {
+        _showDeployOnTheFlyAllVmRows = false;
         if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: false) && _selectedDeployOnTheFlyVmEntry is not null)
         {
             return;
@@ -852,8 +931,8 @@ public sealed partial class MainWindow : Window
             ? "Running full readiness checks..."
             : "Running quick readiness checks...";
         DeployOnTheFlyStatusTextBlock.Text = mode == DeploymentPreflightMode.Full
-            ? "Running full on-the-fly readiness evaluation..."
-            : "Running quick on-the-fly readiness evaluation...";
+            ? "Running full quick deploy readiness evaluation..."
+            : "Running quick deploy readiness evaluation...";
 
         try
         {
@@ -936,7 +1015,9 @@ public sealed partial class MainWindow : Window
         DeployOnTheFlyOverallStateTextBlock.Text = _deployOnTheFlyLifecycleState;
         DeployOnTheFlyProgressBar.Value = _deployOnTheFlyProgressPercent;
         DeployOnTheFlyProgressSummaryTextBlock.Text = _deployOnTheFlyProgressSummary;
-        DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployOnTheFlyIssueRows.Count}";
+        var blockingIssueCount = _deployOnTheFlyIssueRows.Count(issue => string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
+        var warningIssueCount = _deployOnTheFlyIssueRows.Count(issue => !string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
+        DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}";
         DeployOnTheFlyReadinessSummaryTextBlock.Text = _deployOnTheFlyReadinessSummary;
     }
 
@@ -1066,6 +1147,7 @@ public sealed partial class MainWindow : Window
 
     private void DeployOnTheFlyAddVmButton_Click(object sender, RoutedEventArgs e)
     {
+        _showDeployOnTheFlyAllVmRows = false;
         var nextSequence = _deployOnTheFlyVmEntries.Count + 1;
         var entry = CreateDefaultDeployOnTheFlyVmEntry(nextSequence);
         _deployOnTheFlyVmEntries.Add(entry);
@@ -1084,6 +1166,7 @@ public sealed partial class MainWindow : Window
 
     private async void DeployOnTheFlyRemoveVmButton_Click(object sender, RoutedEventArgs e)
     {
+        _showDeployOnTheFlyAllVmRows = false;
         if (_selectedDeployOnTheFlyVmEntry is null)
         {
             DeployOnTheFlyStatusTextBlock.Text = "Select a VM entry first.";
@@ -1097,7 +1180,7 @@ public sealed partial class MainWindow : Window
             Title = "Remove VM Entry",
             PrimaryButtonText = "Remove",
             CloseButtonText = "Cancel",
-            Content = $"Remove '{vmName}' from on-the-fly deploy configuration?",
+            Content = $"Remove '{vmName}' from quick deploy configuration?",
             DefaultButton = ContentDialogButton.Close
         };
 
@@ -1124,6 +1207,7 @@ public sealed partial class MainWindow : Window
 
     private void DeployOnTheFlyApplyVmChangesButton_Click(object sender, RoutedEventArgs e)
     {
+        _showDeployOnTheFlyAllVmRows = false;
         if (_selectedDeployOnTheFlyVmEntry is null)
         {
             DeployOnTheFlyStatusTextBlock.Text = "Select a VM entry first.";
@@ -1142,6 +1226,35 @@ public sealed partial class MainWindow : Window
         _deployOnTheFlyProgressSummary = "No deployment started.";
         _deployOnTheFlyReadinessSummary = "Readiness has not been evaluated.";
         UpdateDeployOnTheFlyUi();
+    }
+
+    private void DeployOnTheFlyVmSwitchComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingDeployOnTheFlyEditor)
+        {
+            return;
+        }
+
+        DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = DeployOnTheFlyVmSwitchComboBox.SelectedItem is string selected &&
+                                                        !string.Equals(selected, DeployOnTheFlySwitchPlaceholder, StringComparison.Ordinal)
+            ? $"Selected switch: {selected}"
+            : _templateAvailableSwitches.Count == 0
+                ? "No host switches available. Add a switch in Assets first."
+                : "Switch selection is optional.";
+    }
+
+    private void DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingDeployOnTheFlyEditor)
+        {
+            return;
+        }
+
+        DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedOption
+            ? $"Selected: {selectedOption.DisplayLabel} ({selectedOption.Id})."
+            : _templateVhdxCatalogOptions.Count == 0
+                ? "No VHDX catalog entries available. Import base disks in Assets first."
+                : "Select a base disk from catalog.";
     }
 
     private async void DeployOnTheFlyEvaluateButton_Click(object sender, RoutedEventArgs e)
@@ -1165,7 +1278,7 @@ public sealed partial class MainWindow : Window
         }
 
         DeployOnTheFlyStatusTextBlock.Text = applied == 0
-            ? "No auto-resolve suggestions available for the current on-the-fly configuration."
+            ? "No auto-resolve suggestions available for the current quick deploy configuration."
             : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...";
         await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Quick);
     }
@@ -1189,9 +1302,9 @@ public sealed partial class MainWindow : Window
             SourceFilePath = null
         };
         BindTemplateEditorDocument();
-        TemplateEditorStatusTextBlock.Text = "Opened on-the-fly configuration in Templates editor.";
+        TemplateEditorStatusTextBlock.Text = "Opened quick deploy configuration in Templates editor.";
         NavigateToRoute(ShellRouteKeys.TemplatesEditor);
-        DeployOnTheFlyStatusTextBlock.Text = "Opened on-the-fly configuration in Templates editor.";
+        DeployOnTheFlyStatusTextBlock.Text = "Opened quick deploy configuration in Templates editor.";
     }
 
     private async void DeployOnTheFlyStartButton_Click(object sender, RoutedEventArgs e)
@@ -1208,8 +1321,10 @@ public sealed partial class MainWindow : Window
         }
 
         _isDeployOnTheFlyStarting = true;
+        _showDeployOnTheFlyAllVmRows = true;
+        _deployOnTheFlyProgressByVm.Clear();
         _deployOnTheFlyLifecycleState = "Running";
-        _deployOnTheFlyProgressPercent = 50;
+        _deployOnTheFlyProgressPercent = 15;
         _deployOnTheFlyProgressSummary = "Preparing deployment...";
         _deployOnTheFlyReadinessSummary = "Preparing deployment...";
         UpdateDeployOnTheFlyUi();
@@ -1230,9 +1345,13 @@ public sealed partial class MainWindow : Window
 
             var template = BuildOnTheFlyTemplate();
             var deployContext = BuildDeployContext(template);
-            _deployOnTheFlyProgressPercent = 70;
+            InitializeDeployOnTheFlyProgressRows(deployContext.MultiVmContext);
+            AttachDeployOnTheFlyProgressCallbacks(deployContext.MultiVmContext);
+            _deployOnTheFlyProgressPercent = 40;
             _deployOnTheFlyProgressSummary = $"Deploying {deployContext.MultiVmContext.VmContexts.Count} VM(s)...";
-            DeployOnTheFlyStatusTextBlock.Text = "Starting on-the-fly deployment...";
+            DeployOnTheFlyStatusTextBlock.Text = "Starting quick deploy...";
+            UpdateDeployOnTheFlyResultRows();
+            UpdateDeployOnTheFlyUi();
             await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);
             var summary = _deploymentOutcomeSummaryBuilder.Build(deployContext.MultiVmContext);
             UpdateDeployOnTheFlyRowsFromSummary(summary);
@@ -1261,9 +1380,79 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
+            _showDeployOnTheFlyAllVmRows = true;
             _isDeployOnTheFlyStarting = false;
             UpdateDeployOnTheFlyUi();
         }
+    }
+
+    private void InitializeDeployOnTheFlyProgressRows(MultiVmDeploymentContext context)
+    {
+        _deployOnTheFlyProgressByVm.Clear();
+
+        foreach (var vmContext in context.VmContexts)
+        {
+            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
+            _deployOnTheFlyProgressByVm[vmName] = new DeployVmProgressState(
+                vmName,
+                BuildExpectedDeployStepNames(vmContext));
+        }
+    }
+
+    private void AttachDeployOnTheFlyProgressCallbacks(MultiVmDeploymentContext context)
+    {
+        foreach (var vmContext in context.VmContexts)
+        {
+            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
+            vmContext.LogCallback = message => DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_deployOnTheFlyProgressByVm.TryGetValue(vmName, out var state))
+                {
+                    return;
+                }
+
+                state.AddLogLine(message);
+                UpdateDeployOnTheFlyResultRows();
+                UpdateDeployOnTheFlyUi();
+            });
+        }
+    }
+
+    private static IReadOnlyList<string> BuildExpectedDeployStepNames(VmDeploymentContext context)
+    {
+        var stepNames = new List<string>
+        {
+            "Check Hyper-V",
+            "Create VM folder",
+            "Create differencing disk",
+            "Create VM",
+            "Add network adapter",
+            "Configure VM",
+            "Enable guest services",
+            "Start VM"
+        };
+
+        if (context.ConfigureTimeZone)
+        {
+            stepNames.Add("Set time zone");
+        }
+
+        if (context.InstallSoftware)
+        {
+            stepNames.Add("Install software");
+        }
+
+        if (context.InstallRole)
+        {
+            stepNames.Add("Install role");
+        }
+
+        if (context.ConfigureNetworkInformation)
+        {
+            stepNames.Add("Configure network information");
+        }
+
+        return stepNames;
     }
 
     private void UpdateTemplatesUi()
@@ -1412,7 +1601,8 @@ public sealed partial class MainWindow : Window
                 VmName: vmName,
                 Status: status,
                 Summary: summary,
-                Details: string.Join(Environment.NewLine, detailLines)));
+                Details: string.Join(Environment.NewLine, detailLines),
+                ProgressPercent: hasBlocking ? 100 : hasWarnings ? 80 : 100));
         }
     }
 
@@ -1446,6 +1636,21 @@ public sealed partial class MainWindow : Window
     {
         _deployOnTheFlyVmResultRows.Clear();
 
+        if (_showDeployOnTheFlyAllVmRows && _deployOnTheFlyProgressByVm.Count > 0)
+        {
+            foreach (var state in _deployOnTheFlyProgressByVm.Values.OrderBy(value => value.VmName, StringComparer.OrdinalIgnoreCase))
+            {
+                _deployOnTheFlyVmResultRows.Add(new DeployVmResultRow(
+                    VmName: state.VmName,
+                    Status: state.Status,
+                    Summary: state.Summary,
+                    Details: string.Join(Environment.NewLine, state.DetailLines),
+                    ProgressPercent: state.ProgressPercent));
+            }
+
+            return;
+        }
+
         var vmNames = _deployOnTheFlyVmEntries
             .Select(vm => string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -1474,11 +1679,17 @@ public sealed partial class MainWindow : Window
                               vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Fail);
             var hasWarnings = vmCompatibilityIssues.Any(issue => !issue.IsBlocking) ||
                               vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Warn);
+            if (!hasBlocking && !hasWarnings)
+            {
+                continue;
+            }
 
             var status = hasBlocking ? "Blocked" : hasWarnings ? "Warning" : "Ready";
-            var summary = vmCompatibilityIssues.Count + vmReadinessResults.Count == 0
-                ? "No issues"
-                : $"Issues: {vmCompatibilityIssues.Count + vmReadinessResults.Count}";
+            var blockingCount = vmCompatibilityIssues.Count(issue => issue.IsBlocking) +
+                                vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Fail);
+            var warningCount = vmCompatibilityIssues.Count(issue => !issue.IsBlocking) +
+                               vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Warn);
+            var summary = $"Blocking: {blockingCount} | Warnings: {warningCount}";
 
             var detailLines = new List<string>();
             detailLines.AddRange(vmCompatibilityIssues.Select(issue =>
@@ -1494,7 +1705,8 @@ public sealed partial class MainWindow : Window
                 VmName: vmName,
                 Status: status,
                 Summary: summary,
-                Details: string.Join(Environment.NewLine, detailLines)));
+                Details: string.Join(Environment.NewLine, detailLines),
+                ProgressPercent: hasBlocking ? 100 : 80));
         }
     }
 
@@ -1551,7 +1763,8 @@ public sealed partial class MainWindow : Window
                 VmName: vmOutcome.VmName,
                 Status: vmOutcome.Status.ToString(),
                 Summary: vmOutcome.Cleanup.CleanupRan ? $"Cleanup {vmOutcome.Cleanup.Status}" : "No cleanup",
-                Details: string.Join(Environment.NewLine, detailLines)));
+                Details: string.Join(Environment.NewLine, detailLines),
+                ProgressPercent: 100));
         }
 
         _deployIssueRows.Clear();
@@ -1587,11 +1800,18 @@ public sealed partial class MainWindow : Window
                     $"- {outcome.DisplayName}: {outcome.Result}{(string.IsNullOrWhiteSpace(outcome.SkipReason) ? string.Empty : $" ({outcome.SkipReason})")}"));
             }
 
+            if (_deployOnTheFlyProgressByVm.TryGetValue(vmOutcome.VmName, out var liveState))
+            {
+                liveState.MarkCompleted(vmOutcome.Status.ToString(), vmOutcome.Cleanup.CleanupRan ? $"Cleanup {vmOutcome.Cleanup.Status}" : "Completed");
+                detailLines = liveState.DetailLines.ToList();
+            }
+
             _deployOnTheFlyVmResultRows.Add(new DeployVmResultRow(
                 VmName: vmOutcome.VmName,
                 Status: vmOutcome.Status.ToString(),
                 Summary: vmOutcome.Cleanup.CleanupRan ? $"Cleanup {vmOutcome.Cleanup.Status}" : "No cleanup",
-                Details: string.Join(Environment.NewLine, detailLines)));
+                Details: string.Join(Environment.NewLine, detailLines),
+                ProgressPercent: 100));
         }
 
         _deployOnTheFlyIssueRows.Clear();
@@ -2221,6 +2441,14 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateTemplateVhdxSelectorFromVm();
+    }
+
+    private async Task EnsureDeployOnTheFlyReferenceDataAsync(bool forceRefresh)
+    {
+        await EnsureTemplateSwitchesAsync(forceRefresh);
+        await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh);
+        UpdateDeployOnTheFlyEditorPanel();
+        UpdateDeployOnTheFlyUi();
     }
 
     private bool PullEditorFieldsIntoDocument()
@@ -4309,11 +4537,118 @@ public sealed partial class MainWindow : Window
         MultiVmDeploymentContext MultiVmContext,
         IReadOnlyList<DeployCompatibilityIssue> CompatibilityIssues);
 
+    private sealed class DeployVmProgressState
+    {
+        private readonly HashSet<string> _completedSteps = new(StringComparer.OrdinalIgnoreCase);
+        private readonly IReadOnlyList<string> _expectedSteps;
+
+        public DeployVmProgressState(string vmName, IReadOnlyList<string> expectedSteps)
+        {
+            VmName = vmName;
+            _expectedSteps = expectedSteps;
+            Status = "Queued";
+            Summary = "Queued for deployment.";
+            DetailLines.Add("- Queued");
+            ProgressPercent = 0;
+        }
+
+        public string VmName { get; }
+
+        public string Status { get; private set; }
+
+        public string Summary { get; private set; }
+
+        public int ProgressPercent { get; private set; }
+
+        public List<string> DetailLines { get; } = [];
+
+        public void AddLogLine(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            var trimmed = message.Trim();
+            DetailLines.Add($"- {trimmed}");
+            if (DetailLines.Count > 60)
+            {
+                DetailLines.RemoveAt(0);
+            }
+
+            var normalized = trimmed.ToLowerInvariant();
+            if (normalized.StartsWith("❌", StringComparison.Ordinal) || normalized.Contains("failed"))
+            {
+                Status = "Failed";
+                Summary = trimmed.TrimStart('❌').Trim();
+            }
+            else if (normalized.StartsWith("✅", StringComparison.Ordinal) || normalized.Contains("completed"))
+            {
+                Status = "Running";
+                Summary = trimmed.TrimStart('✅').Trim();
+            }
+            else
+            {
+                Status = "Running";
+                Summary = trimmed;
+            }
+
+            var stepName = TryMapStepName(trimmed);
+            if (stepName is not null && (normalized.StartsWith("✅", StringComparison.Ordinal) || normalized.StartsWith("❌", StringComparison.Ordinal)))
+            {
+                _completedSteps.Add(stepName);
+            }
+
+            if (Status == "Failed")
+            {
+                ProgressPercent = 100;
+                return;
+            }
+
+            if (_expectedSteps.Count == 0)
+            {
+                ProgressPercent = 50;
+                return;
+            }
+
+            var completedCount = _completedSteps.Count;
+            var rawProgress = (int)Math.Round((double)completedCount / _expectedSteps.Count * 100d, MidpointRounding.AwayFromZero);
+            ProgressPercent = Math.Clamp(rawProgress, 5, 99);
+        }
+
+        public void MarkCompleted(string status, string summary)
+        {
+            Status = status;
+            Summary = summary;
+            ProgressPercent = 100;
+            DetailLines.Add($"- {summary}");
+        }
+
+        private static string? TryMapStepName(string message)
+        {
+            return message switch
+            {
+                var value when value.Contains("Creating folder for VM", StringComparison.OrdinalIgnoreCase) => "Create VM folder",
+                var value when value.Contains("Creating differencing VHD", StringComparison.OrdinalIgnoreCase) => "Create differencing disk",
+                var value when value.Contains("Creating VM", StringComparison.OrdinalIgnoreCase) => "Create VM",
+                var value when value.Contains("Adding network adapter", StringComparison.OrdinalIgnoreCase) => "Add network adapter",
+                var value when value.Contains("Enabling VM guest services", StringComparison.OrdinalIgnoreCase) => "Enable guest services",
+                var value when value.Contains("Starting VM", StringComparison.OrdinalIgnoreCase) => "Start VM",
+                var value when value.Contains("SetTimeZoneStep", StringComparison.OrdinalIgnoreCase) => "Set time zone",
+                var value when value.Contains("InstallSoftwareStep", StringComparison.OrdinalIgnoreCase) => "Install software",
+                var value when value.Contains("InstallRoleStep", StringComparison.OrdinalIgnoreCase) => "Install role",
+                var value when value.Contains("ConfigureNetworkInformationStep", StringComparison.OrdinalIgnoreCase) => "Configure network information",
+                _ => null
+            };
+        }
+    }
+
     private sealed record DeployVmResultRow(
         string VmName,
         string Status,
         string Summary,
-        string Details);
+        string Details,
+        int ProgressPercent);
 
     private sealed record DeployIssueRow(
         string Scope,
