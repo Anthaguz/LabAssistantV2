@@ -1,0 +1,107 @@
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Deploy.DeployOnTheFlyView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border
+        Padding="12"
+        Background="{StaticResource ShellBackgroundBrush}"
+        BorderBrush="{StaticResource ShellBorderBrush}"
+        BorderThickness="1"
+        CornerRadius="6">
+        <Grid RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Text="Deploy On-the-Fly" />
+
+            <TextBlock
+                Grid.Row="1"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="AG2 scaffold only: VM entry configuration, readiness summary, and correction actions are surfaced here. Behavior wiring lands in AG3."
+                TextWrapping="Wrap" />
+
+            <Border
+                x:Name="DeployOnTheFlyVmEntriesPanel"
+                Grid.Row="2"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="VM Entries / Configuration (Scaffold)" />
+                    <ListView
+                        x:Name="DeployOnTheFlyVmEntriesListView"
+                        SelectionMode="None"
+                        IsHitTestVisible="False">
+                        <ListViewItem Content="VM entry rows will be wired in AG3." />
+                    </ListView>
+                </StackPanel>
+            </Border>
+
+            <Border
+                x:Name="DeployOnTheFlyReadinessSummaryPanel"
+                Grid.Row="3"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Readiness Summary (Scaffold)" />
+                    <TextBlock
+                        x:Name="DeployOnTheFlyReadinessSummaryTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Readiness taxonomy and blocking/warning evaluation are deferred to AG3."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Row="4"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            x:Name="DeployOnTheFlyEvaluateButton"
+                            Content="Evaluate (Scaffold)" />
+                        <Button
+                            x:Name="DeployOnTheFlyResolveSuggestionsButton"
+                            Content="Resolve Suggestions (Scaffold)" />
+                        <Button
+                            x:Name="DeployOnTheFlyOpenTemplateEditorButton"
+                            Content="Open in Templates Editor (Scaffold)" />
+                        <Button
+                            x:Name="DeployOnTheFlyStartButton"
+                            Content="Start Deploy (Scaffold)" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="DeployOnTheFlyStatusTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="AG2 scaffold active. Readiness and execution behavior wiring is deferred to AG3."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>
