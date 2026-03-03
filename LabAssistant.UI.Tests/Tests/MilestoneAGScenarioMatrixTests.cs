@@ -26,13 +26,22 @@ public sealed class MilestoneAGScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployOnTheFlyView_DefinesRequiredAg2ScaffoldRegions()
+    public void DeployOnTheFlyView_DefinesRequiredAgScaffoldAndBehaviorRegions()
     {
         var xaml = LoadDeployOnTheFlyViewXaml();
 
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmEntriesPanel"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmEntriesListView"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyAddVmButton"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyRemoveVmButton"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmNameTextBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmMemoryTextBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmCpuTextBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmVhdPathTextBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmSwitchesTextBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyApplyVmChangesButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyReadinessSummaryPanel"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyOverallStateTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyReadinessSummaryTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyEvaluateButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyResolveSuggestionsButton"));
@@ -42,14 +51,19 @@ public sealed class MilestoneAGScenarioMatrixTests
     }
 
     [Fact]
-    public void Ag2_RemainsScaffoldOnlyWithoutOnTheFlyBehaviorWiring()
+    public void MainWindow_WiresOnTheFlyReadinessCorrectionAndExecutionForAg3()
     {
         var source = LoadMainWindowSource();
 
-        Assert.DoesNotContain("DeployOnTheFlyEvaluateButton.Click +=", source);
-        Assert.DoesNotContain("DeployOnTheFlyStartButton.Click +=", source);
-        Assert.DoesNotContain("EvaluateDeployOnTheFlyReadinessAsync", source);
-        Assert.DoesNotContain("DeployOnTheFlyStartButton_Click", source);
+        Assert.Contains("DeployOnTheFlyEvaluateButton.Click += DeployOnTheFlyEvaluateButton_Click;", source);
+        Assert.Contains("DeployOnTheFlyResolveSuggestionsButton.Click += DeployOnTheFlyResolveSuggestionsButton_Click;", source);
+        Assert.Contains("DeployOnTheFlyOpenTemplateEditorButton.Click += DeployOnTheFlyOpenTemplateEditorButton_Click;", source);
+        Assert.Contains("DeployOnTheFlyStartButton.Click += DeployOnTheFlyStartButton_Click;", source);
+        Assert.Contains("await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Quick);", source);
+        Assert.Contains("await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);", source);
+        Assert.Contains("DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures", source);
+        Assert.Contains("await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);", source);
+        Assert.Contains("BuildOnTheFlyTemplate()", source);
     }
 
     [Fact]

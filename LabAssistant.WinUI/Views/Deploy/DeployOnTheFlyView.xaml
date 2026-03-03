@@ -27,30 +27,140 @@
             <TextBlock
                 Grid.Row="1"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="AG2 scaffold only: VM entry configuration, readiness summary, and correction actions are surfaced here. Behavior wiring lands in AG3."
+                Text="Configure VM entries, evaluate readiness, apply corrections, and start deploy when unblocked."
                 TextWrapping="Wrap" />
 
-            <Border
-                x:Name="DeployOnTheFlyVmEntriesPanel"
-                Grid.Row="2"
-                Padding="10"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <StackPanel Spacing="8">
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="VM Entries / Configuration (Scaffold)" />
-                    <ListView
-                        x:Name="DeployOnTheFlyVmEntriesListView"
-                        SelectionMode="None"
-                        IsHitTestVisible="False">
-                        <ListViewItem Content="VM entry rows will be wired in AG3." />
-                    </ListView>
-                </StackPanel>
-            </Border>
+            <Grid Grid.Row="2" ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.1*" />
+                    <ColumnDefinition Width="1.4*" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    x:Name="DeployOnTheFlyVmEntriesPanel"
+                    Grid.Column="0"
+                    Padding="10"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            Grid.Row="0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="VM Entries" />
+                        <ListView
+                            x:Name="DeployOnTheFlyVmEntriesListView"
+                            Grid.Row="1"
+                            SelectionMode="Single">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Padding="4" Spacing="2">
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding Name}" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{Binding VmId}"
+                                            TextWrapping="WrapWholeWords" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+                            <Button
+                                x:Name="DeployOnTheFlyAddVmButton"
+                                Content="Add VM" />
+                            <Button
+                                x:Name="DeployOnTheFlyRemoveVmButton"
+                                Content="Remove VM" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border
+                    x:Name="DeployOnTheFlyVmEditorPanel"
+                    Grid.Column="1"
+                    Padding="10"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <Grid RowSpacing="8" ColumnSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Name" />
+                        <TextBox
+                            x:Name="DeployOnTheFlyVmNameTextBox"
+                            Grid.Row="0"
+                            Grid.Column="1" />
+                        <TextBlock
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Memory (MB)" />
+                        <TextBox
+                            x:Name="DeployOnTheFlyVmMemoryTextBox"
+                            Grid.Row="1"
+                            Grid.Column="1" />
+                        <TextBlock
+                            Grid.Row="2"
+                            Grid.Column="0"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="CPU" />
+                        <TextBox
+                            x:Name="DeployOnTheFlyVmCpuTextBox"
+                            Grid.Row="2"
+                            Grid.Column="1" />
+                        <TextBlock
+                            Grid.Row="3"
+                            Grid.Column="0"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="VHD path" />
+                        <TextBox
+                            x:Name="DeployOnTheFlyVmVhdPathTextBox"
+                            Grid.Row="3"
+                            Grid.Column="1" />
+                        <TextBlock
+                            Grid.Row="4"
+                            Grid.Column="0"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Switches" />
+                        <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6">
+                            <TextBox x:Name="DeployOnTheFlyVmSwitchesTextBox" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                FontSize="12"
+                                Text="Comma-separated switch names. Optional."
+                                TextWrapping="Wrap" />
+                            <Button
+                                x:Name="DeployOnTheFlyApplyVmChangesButton"
+                                Content="Apply VM Changes"
+                                HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
 
             <Border
                 x:Name="DeployOnTheFlyReadinessSummaryPanel"
@@ -60,15 +170,16 @@
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="6">
                     <TextBlock
+                        x:Name="DeployOnTheFlyOverallStateTextBlock"
                         Foreground="{StaticResource ShellTextPrimaryBrush}"
                         FontWeight="SemiBold"
-                        Text="Readiness Summary (Scaffold)" />
+                        Text="Idle" />
                     <TextBlock
                         x:Name="DeployOnTheFlyReadinessSummaryTextBlock"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Readiness taxonomy and blocking/warning evaluation are deferred to AG3."
+                        Text="Readiness has not been evaluated."
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
@@ -84,21 +195,21 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button
                             x:Name="DeployOnTheFlyEvaluateButton"
-                            Content="Evaluate (Scaffold)" />
+                            Content="Evaluate" />
                         <Button
                             x:Name="DeployOnTheFlyResolveSuggestionsButton"
-                            Content="Resolve Suggestions (Scaffold)" />
+                            Content="Resolve Suggestions" />
                         <Button
                             x:Name="DeployOnTheFlyOpenTemplateEditorButton"
-                            Content="Open in Templates Editor (Scaffold)" />
+                            Content="Open in Templates Editor" />
                         <Button
                             x:Name="DeployOnTheFlyStartButton"
-                            Content="Start Deploy (Scaffold)" />
+                            Content="Start Deploy" />
                     </StackPanel>
                     <TextBlock
                         x:Name="DeployOnTheFlyStatusTextBlock"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="AG2 scaffold active. Readiness and execution behavior wiring is deferred to AG3."
+                        Text="Ready."
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
