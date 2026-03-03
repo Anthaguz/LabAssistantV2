@@ -408,12 +408,29 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** sticky status/progress is always visible; per-VM rows are concise by default with expandable details; global warnings/errors are collapsed by default while remaining discoverable.
   - **Priority:** P1
 
+- **FR-091:** WinUI Deploy migration Milestone AG shall implement `on-the-fly` workflow convergence while leaving WPF Deploy untouched.
+  - **Acceptance details:** WinUI Deploy route model includes deterministic `deploy.on_the_fly` subview behavior for AG scope and preserves AF `deploy.from_template` behavior without contract drift.
+  - **Priority:** P1
+
+- **FR-092:** WinUI Deploy `on-the-fly` readiness shall classify input validation and environment checks as blocking or warning before start.
+  - **Acceptance details:** Required unresolved inputs (for example missing required disk identity, invalid VM entry state, or invalid required switch selection) are blocking; non-critical mapping issues are warning-only with actionable guidance.
+  - **Priority:** P1
+
+- **FR-093:** WinUI Deploy `on-the-fly` shall provide correction affordances for blocking readiness issues and gate execution until blocking issues are resolved.
+  - **Acceptance details:** Readiness output provides explicit correction actions and preserves existing deployment orchestration semantics once unblocked.
+  - **Priority:** P1
+
+- **FR-094:** WinUI Deploy `on-the-fly` results UX shall follow compact-first visibility parity with AF results patterns.
+  - **Acceptance details:** sticky summary/progress remains visible; per-VM rows are concise by default with expandable details; global warnings/errors remain collapsed by default and discoverable.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
 - See `docs/02-ux/winui-global-navigationview-contract-ac.md` for Milestone AC global NavigationView behavior and routing contract.
 - See `docs/02-ux/winui-templates-capability-contract-ad.md` for Milestone AD `Templates` routing and unified workflow contract.
 - See `docs/02-ux/winui-deploy-from-template-contract-af.md` for Milestone AF `Deploy from-template` routing, readiness, and results visibility contract.
+- See `docs/02-ux/winui-deploy-on-the-fly-contract-ag.md` for Milestone AG `Deploy on-the-fly` routing, readiness, correction affordances, and results visibility parity contract.
 
 ---
 

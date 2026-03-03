@@ -194,6 +194,11 @@ Examples:
 - `deploy.on_the_fly` migration is explicitly deferred in AF scope.
 - Deploy readiness/review surface must expose correction actions when AE compatibility issues block deploy.
 
+### AG contract note
+- AG migration slice converges the `deploy.on_the_fly` workflow with canonical route `deploy.on_the_fly`.
+- AG reuses AF readiness/correction interaction patterns where applicable (blocking vs warning classification + explicit correction affordances).
+- AG keeps compact-first results visibility parity (sticky summary, concise rows, expandable details, collapsed global issues by default).
+
 ---
 
 ## 4.3 Templates

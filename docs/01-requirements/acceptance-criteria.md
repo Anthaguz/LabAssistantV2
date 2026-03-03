@@ -1474,6 +1474,93 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-015 - WinUI Deploy On-the-Fly Convergence (AG1)
+
+**Related FRs:** FR-091, FR-092, FR-093, FR-094, FR-014, FR-015, FR-020, FR-021, FR-024, FR-025, FR-043, FR-045
+
+## Scenarios
+
+### 1) Deploy routing and on-the-fly entry
+**Given**
+- User is in WinUI global navigation
+
+**When**
+- User selects Deploy on-the-fly path
+
+**Then**
+- Route resolves to `deploy.on_the_fly`
+- On-the-fly workflow is active for AG scope
+- AF from-template behavior remains available and unchanged
+
+### 2) On-the-fly input model and required readiness checks
+**Given**
+- User configures one or more VM entries on-the-fly
+
+**When**
+- Readiness evaluation runs
+
+**Then**
+- Required inputs are validated before start (VM identity/config completeness, required disk identity, required switch selections)
+- Blocking vs warning outcomes are explicit
+- Blocking outcomes prevent deploy start
+
+### 3) Correction affordances for blocking readiness issues
+**Given**
+- Readiness returns blocking results for one or more VM entries
+
+**When**
+- User inspects readiness output
+
+**Then**
+- UI provides actionable correction affordances for blocking issues
+- Correction flow is explicit and non-silent
+- Deploy start remains gated until blocking issues are resolved
+
+### 4) Execution boundary and orchestration semantics
+**Given**
+- Readiness is unblocked
+
+**When**
+- User starts on-the-fly deploy
+
+**Then**
+- Execution uses existing deployment orchestration semantics
+- No AG-only behavior invents new deploy runtime semantics
+- Existing structured operation logging contract remains preserved
+
+### 5) Compact-first results visibility parity
+**Given**
+- On-the-fly deploy is running or completed
+
+**When**
+- Results are shown
+
+**Then**
+- Sticky summary/progress remains visible
+- Per-VM rows are concise by default with expandable details
+- Global warnings/errors are collapsed by default and discoverable
+
+## Scope boundary for AG implementation
+- In scope:
+  - WinUI `deploy.on_the_fly` route and workspace convergence
+  - On-the-fly readiness taxonomy and correction affordances
+  - Compact-first results UX parity with AF pattern
+- Out of scope:
+  - WPF Deploy changes
+  - From-template contract semantics changes
+  - schema/model changes not required by approved requirements
+  - deployment domain behavior redesign
+
+## Definition of Done
+- [ ] `deploy.on_the_fly` route behavior is explicit and testable for AG
+- [ ] Blocking vs warning readiness taxonomy is explicit for on-the-fly inputs
+- [ ] Correction affordances for blocking readiness issues are defined
+- [ ] Execution boundary preserves existing deployment orchestration semantics
+- [ ] Compact-first results parity contract is explicit and testable
+- [ ] AG scope boundaries are explicit and enforceable
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules

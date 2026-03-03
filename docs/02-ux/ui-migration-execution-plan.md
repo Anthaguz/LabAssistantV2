@@ -443,6 +443,19 @@ Use small, reviewable milestones/issues. Avoid "UI rewrite" as a single task.
 
 This is illustrative, not a committed roadmap yet.
 
+### Current WinUI migration contract sequence (active)
+- Milestone AF (`Deploy from-template`) closure baseline:
+  - AF1 docs contract
+  - AF2 route/scaffold
+  - AF3 readiness compatibility and correction actions
+  - AF4 compact-first results visibility
+  - AF5 closure matrix/checklist
+- Milestone AG (`Deploy on-the-fly`) planned sequence:
+  - AG1 docs contract
+  - AG2 route/scaffold
+  - AG3 readiness + execution wiring
+  - AG4 compact-first results parity + closure evidence
+
 ---
 
 ## 10. What This Plan Intentionally Does Not Decide Yet
