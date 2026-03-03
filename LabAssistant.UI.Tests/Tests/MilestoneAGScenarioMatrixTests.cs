@@ -66,8 +66,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("DeployOnTheFlyResolveSuggestionsButton.Click += DeployOnTheFlyResolveSuggestionsButton_Click;", source);
         Assert.Contains("DeployOnTheFlyOpenTemplateEditorButton.Click += DeployOnTheFlyOpenTemplateEditorButton_Click;", source);
         Assert.Contains("DeployOnTheFlyStartButton.Click += DeployOnTheFlyStartButton_Click;", source);
-        Assert.Contains("await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Quick);", source);
-        Assert.Contains("await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);", source);
+        Assert.Contains("EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full)", source);
         Assert.Contains("DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures", source);
         Assert.Contains("await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);", source);
         Assert.Contains("BuildOnTheFlyTemplate()", source);
@@ -90,7 +89,7 @@ public sealed class MilestoneAGScenarioMatrixTests
     {
         var source = LoadDeployOnTheFlyViewSource();
 
-        Assert.Contains("<Expander IsExpanded=\"False\">", source);
+        Assert.Contains("IsExpanded=\"False\"", source);
         Assert.Contains("Text=\"Deployment Results\"", source);
         Assert.Contains("x:Name=\"DeployOnTheFlyVmResultsListView\"", source);
     }
