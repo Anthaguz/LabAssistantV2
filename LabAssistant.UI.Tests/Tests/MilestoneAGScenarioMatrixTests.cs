@@ -42,12 +42,19 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyApplyVmChangesButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyReadinessSummaryPanel"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyOverallStateTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyProgressBar"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyProgressSummaryTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyGlobalIssuesBadgeTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyReadinessSummaryTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyEvaluateButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyResolveSuggestionsButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyOpenTemplateEditorButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyStartButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyStatusTextBlock"));
+        var globalIssuesExpander = FindByName(xaml, "DeployOnTheFlyGlobalIssuesExpander");
+        Assert.Equal("False", globalIssuesExpander.Attribute("IsExpanded")?.Value);
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyGlobalIssuesListView"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmResultsListView"));
     }
 
     [Fact]
@@ -64,6 +71,12 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures", source);
         Assert.Contains("await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);", source);
         Assert.Contains("BuildOnTheFlyTemplate()", source);
+        Assert.Contains("DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;", source);
+        Assert.Contains("DeployOnTheFlyGlobalIssuesListView.ItemsSource = _deployOnTheFlyIssueRows;", source);
+        Assert.Contains("DeployOnTheFlyGlobalIssuesExpander.IsExpanded = false;", source);
+        Assert.Contains("UpdateDeployOnTheFlyRowsFromSummary(summary);", source);
+        Assert.Contains("DeployOnTheFlyProgressBar.Value = _deployOnTheFlyProgressPercent;", source);
+        Assert.Contains("DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $\"Issues: {_deployOnTheFlyIssueRows.Count}\";", source);
     }
 
     [Fact]

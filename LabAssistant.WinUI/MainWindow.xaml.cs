@@ -45,6 +45,8 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployIssueRows = [];
+    private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
+    private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
     private readonly List<DeployCompatibilityIssue> _deployCompatibilityIssues = [];
@@ -91,6 +93,8 @@ public sealed partial class MainWindow : Window
     private int _deployProgressPercent;
     private string _deployProgressSummary = "No deployment started.";
     private string _deployOnTheFlyLifecycleState = "Idle";
+    private int _deployOnTheFlyProgressPercent;
+    private string _deployOnTheFlyProgressSummary = "No deployment started.";
     private string _deployOnTheFlyReadinessSummary = "Readiness has not been evaluated.";
     private bool _isInsightsOpen;
     private ElementTheme _theme = ElementTheme.Light;
@@ -177,7 +181,13 @@ public sealed partial class MainWindow : Window
     private TextBox DeployOnTheFlyVmSwitchesTextBox => DeployOnTheFlyView.DeployOnTheFlyVmSwitchesTextBoxControl;
     private Button DeployOnTheFlyApplyVmChangesButton => DeployOnTheFlyView.DeployOnTheFlyApplyVmChangesButtonControl;
     private TextBlock DeployOnTheFlyOverallStateTextBlock => DeployOnTheFlyView.DeployOnTheFlyOverallStateTextBlockControl;
+    private ProgressBar DeployOnTheFlyProgressBar => DeployOnTheFlyView.DeployOnTheFlyProgressBarControl;
+    private TextBlock DeployOnTheFlyProgressSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyProgressSummaryTextBlockControl;
+    private TextBlock DeployOnTheFlyGlobalIssuesBadgeTextBlock => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployOnTheFlyReadinessSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyReadinessSummaryTextBlockControl;
+    private Expander DeployOnTheFlyGlobalIssuesExpander => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesExpanderControl;
+    private ListView DeployOnTheFlyGlobalIssuesListView => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesListViewControl;
+    private ListView DeployOnTheFlyVmResultsListView => DeployOnTheFlyView.DeployOnTheFlyVmResultsListViewControl;
     private Button DeployOnTheFlyEvaluateButton => DeployOnTheFlyView.DeployOnTheFlyEvaluateButtonControl;
     private Button DeployOnTheFlyResolveSuggestionsButton => DeployOnTheFlyView.DeployOnTheFlyResolveSuggestionsButtonControl;
     private Button DeployOnTheFlyOpenTemplateEditorButton => DeployOnTheFlyView.DeployOnTheFlyOpenTemplateEditorButtonControl;
@@ -347,6 +357,9 @@ public sealed partial class MainWindow : Window
         DeployOnTheFlyResolveSuggestionsButton.Click += DeployOnTheFlyResolveSuggestionsButton_Click;
         DeployOnTheFlyOpenTemplateEditorButton.Click += DeployOnTheFlyOpenTemplateEditorButton_Click;
         DeployOnTheFlyStartButton.Click += DeployOnTheFlyStartButton_Click;
+        DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;
+        DeployOnTheFlyGlobalIssuesListView.ItemsSource = _deployOnTheFlyIssueRows;
+        DeployOnTheFlyGlobalIssuesExpander.IsExpanded = false;
         EnsureDeployOnTheFlySeeded();
         UpdateDeployOnTheFlyEditorPanel();
         UpdateDeployOnTheFlyUi();
@@ -834,6 +847,10 @@ public sealed partial class MainWindow : Window
 
         _isDeployOnTheFlyEvaluatingReadiness = true;
         _deployOnTheFlyLifecycleState = "Evaluating";
+        _deployOnTheFlyProgressPercent = mode == DeploymentPreflightMode.Full ? 18 : 12;
+        _deployOnTheFlyProgressSummary = mode == DeploymentPreflightMode.Full
+            ? "Running full readiness checks..."
+            : "Running quick readiness checks...";
         DeployOnTheFlyStatusTextBlock.Text = mode == DeploymentPreflightMode.Full
             ? "Running full on-the-fly readiness evaluation..."
             : "Running quick on-the-fly readiness evaluation...";
@@ -853,6 +870,12 @@ public sealed partial class MainWindow : Window
                                _deployOnTheFlyReadinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn);
 
             _deployOnTheFlyLifecycleState = blockingCount > 0 ? "Blocked" : warningCount > 0 ? "Warning" : "Ready";
+            _deployOnTheFlyProgressPercent = blockingCount > 0 ? 35 : warningCount > 0 ? 45 : 55;
+            _deployOnTheFlyProgressSummary = blockingCount > 0
+                ? "Readiness blocked."
+                : warningCount > 0
+                    ? "Readiness passed with warnings."
+                    : "Readiness passed.";
             _deployOnTheFlyReadinessSummary = blockingCount > 0
                 ? $"Readiness blocked ({blockingCount} fail, {warningCount} warn)."
                 : warningCount > 0
@@ -869,6 +892,8 @@ public sealed partial class MainWindow : Window
             _deployOnTheFlyReadinessReport = null;
             _deployOnTheFlyCompatibilityIssues.Clear();
             _deployOnTheFlyLifecycleState = "Error";
+            _deployOnTheFlyProgressPercent = 0;
+            _deployOnTheFlyProgressSummary = "Readiness evaluation failed.";
             _deployOnTheFlyReadinessSummary = "Readiness evaluation failed.";
             DeployOnTheFlyStatusTextBlock.Text = $"Readiness evaluation failed. {ex.Message}";
         }
@@ -901,9 +926,17 @@ public sealed partial class MainWindow : Window
         {
             _deployOnTheFlyLifecycleState = "Idle";
             _deployOnTheFlyReadinessSummary = "Add at least one VM entry to evaluate readiness.";
+            _deployOnTheFlyProgressPercent = 0;
+            _deployOnTheFlyProgressSummary = "No deployment started.";
         }
 
+        UpdateDeployOnTheFlyResultRows();
+        UpdateDeployOnTheFlyIssueRows();
+
         DeployOnTheFlyOverallStateTextBlock.Text = _deployOnTheFlyLifecycleState;
+        DeployOnTheFlyProgressBar.Value = _deployOnTheFlyProgressPercent;
+        DeployOnTheFlyProgressSummaryTextBlock.Text = _deployOnTheFlyProgressSummary;
+        DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployOnTheFlyIssueRows.Count}";
         DeployOnTheFlyReadinessSummaryTextBlock.Text = _deployOnTheFlyReadinessSummary;
     }
 
@@ -1041,6 +1074,8 @@ public sealed partial class MainWindow : Window
         _deployOnTheFlyReadinessReport = null;
         _deployOnTheFlyCompatibilityIssues.Clear();
         _deployOnTheFlyLifecycleState = "Idle";
+        _deployOnTheFlyProgressPercent = 0;
+        _deployOnTheFlyProgressSummary = "No deployment started.";
         _deployOnTheFlyReadinessSummary = "Readiness has not been evaluated.";
         DeployOnTheFlyStatusTextBlock.Text = $"Added VM entry '{entry.Name}'.";
         UpdateDeployOnTheFlyEditorPanel();
@@ -1077,6 +1112,8 @@ public sealed partial class MainWindow : Window
         _deployOnTheFlyReadinessReport = null;
         _deployOnTheFlyCompatibilityIssues.Clear();
         _deployOnTheFlyLifecycleState = "Idle";
+        _deployOnTheFlyProgressPercent = 0;
+        _deployOnTheFlyProgressSummary = "No deployment started.";
         _deployOnTheFlyReadinessSummary = _deployOnTheFlyVmEntries.Count == 0
             ? "Add at least one VM entry to evaluate readiness."
             : "Readiness has not been evaluated.";
@@ -1101,6 +1138,8 @@ public sealed partial class MainWindow : Window
         _deployOnTheFlyReadinessReport = null;
         _deployOnTheFlyCompatibilityIssues.Clear();
         _deployOnTheFlyLifecycleState = "Idle";
+        _deployOnTheFlyProgressPercent = 0;
+        _deployOnTheFlyProgressSummary = "No deployment started.";
         _deployOnTheFlyReadinessSummary = "Readiness has not been evaluated.";
         UpdateDeployOnTheFlyUi();
     }
@@ -1170,6 +1209,8 @@ public sealed partial class MainWindow : Window
 
         _isDeployOnTheFlyStarting = true;
         _deployOnTheFlyLifecycleState = "Running";
+        _deployOnTheFlyProgressPercent = 50;
+        _deployOnTheFlyProgressSummary = "Preparing deployment...";
         _deployOnTheFlyReadinessSummary = "Preparing deployment...";
         UpdateDeployOnTheFlyUi();
         try
@@ -1180,6 +1221,8 @@ public sealed partial class MainWindow : Window
             if (hasBlockingFailures)
             {
                 _deployOnTheFlyLifecycleState = "Blocked";
+                _deployOnTheFlyProgressPercent = 35;
+                _deployOnTheFlyProgressSummary = "Deployment blocked by readiness failures.";
                 _deployOnTheFlyReadinessSummary = "Deployment blocked by readiness failures.";
                 DeployOnTheFlyStatusTextBlock.Text = "Deploy blocked by readiness failures. Resolve blocking items first.";
                 return;
@@ -1187,9 +1230,12 @@ public sealed partial class MainWindow : Window
 
             var template = BuildOnTheFlyTemplate();
             var deployContext = BuildDeployContext(template);
+            _deployOnTheFlyProgressPercent = 70;
+            _deployOnTheFlyProgressSummary = $"Deploying {deployContext.MultiVmContext.VmContexts.Count} VM(s)...";
             DeployOnTheFlyStatusTextBlock.Text = "Starting on-the-fly deployment...";
             await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);
             var summary = _deploymentOutcomeSummaryBuilder.Build(deployContext.MultiVmContext);
+            UpdateDeployOnTheFlyRowsFromSummary(summary);
 
             _deployOnTheFlyLifecycleState = summary.OperationState switch
             {
@@ -1198,6 +1244,8 @@ public sealed partial class MainWindow : Window
                 DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
                 _ => "Completed"
             };
+            _deployOnTheFlyProgressPercent = 100;
+            _deployOnTheFlyProgressSummary = $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.";
             _deployOnTheFlyReadinessSummary =
                 $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.";
             DeployOnTheFlyStatusTextBlock.Text =
@@ -1206,6 +1254,8 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             _deployOnTheFlyLifecycleState = "Failed";
+            _deployOnTheFlyProgressPercent = 100;
+            _deployOnTheFlyProgressSummary = "Deployment failed.";
             _deployOnTheFlyReadinessSummary = "Deployment failed.";
             DeployOnTheFlyStatusTextBlock.Text = $"Deploy failed. {ex.Message}";
         }
@@ -1392,6 +1442,88 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void UpdateDeployOnTheFlyResultRows()
+    {
+        _deployOnTheFlyVmResultRows.Clear();
+
+        var vmNames = _deployOnTheFlyVmEntries
+            .Select(vm => string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var compatibilityByVm = _deployOnTheFlyCompatibilityIssues
+            .Where(issue => !string.IsNullOrWhiteSpace(issue.VmName))
+            .GroupBy(issue => issue.VmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var readinessByVm = (_deployOnTheFlyReadinessReport?.Results ?? [])
+            .SelectMany(result => result.AffectedVmNames.Select(vmName => (vmName, result)))
+            .Where(tuple => !string.IsNullOrWhiteSpace(tuple.vmName))
+            .GroupBy(tuple => tuple.vmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.result).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var vmName in vmNames)
+        {
+            compatibilityByVm.TryGetValue(vmName, out var vmCompatibilityIssues);
+            readinessByVm.TryGetValue(vmName, out var vmReadinessResults);
+
+            vmCompatibilityIssues ??= [];
+            vmReadinessResults ??= [];
+
+            var hasBlocking = vmCompatibilityIssues.Any(issue => issue.IsBlocking) ||
+                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Fail);
+            var hasWarnings = vmCompatibilityIssues.Any(issue => !issue.IsBlocking) ||
+                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Warn);
+
+            var status = hasBlocking ? "Blocked" : hasWarnings ? "Warning" : "Ready";
+            var summary = vmCompatibilityIssues.Count + vmReadinessResults.Count == 0
+                ? "No issues"
+                : $"Issues: {vmCompatibilityIssues.Count + vmReadinessResults.Count}";
+
+            var detailLines = new List<string>();
+            detailLines.AddRange(vmCompatibilityIssues.Select(issue =>
+                $"{(issue.IsBlocking ? "BLOCK" : "WARN")}: {issue.Message} - {issue.Guidance}"));
+            detailLines.AddRange(vmReadinessResults.Select(result =>
+                $"{result.Status}: {result.Message} - {result.ActionableGuidance}"));
+            if (detailLines.Count == 0)
+            {
+                detailLines.Add("No detailed readiness findings for this VM.");
+            }
+
+            _deployOnTheFlyVmResultRows.Add(new DeployVmResultRow(
+                VmName: vmName,
+                Status: status,
+                Summary: summary,
+                Details: string.Join(Environment.NewLine, detailLines)));
+        }
+    }
+
+    private void UpdateDeployOnTheFlyIssueRows()
+    {
+        _deployOnTheFlyIssueRows.Clear();
+
+        foreach (var issue in _deployOnTheFlyCompatibilityIssues)
+        {
+            var scope = string.IsNullOrWhiteSpace(issue.VmName) ? "Global" : issue.VmName;
+            _deployOnTheFlyIssueRows.Add(new DeployIssueRow(
+                Scope: scope,
+                Severity: issue.IsBlocking ? "Block" : "Warn",
+                Message: $"{issue.Message} {issue.Guidance}".Trim()));
+        }
+
+        if (_deployOnTheFlyReadinessReport is not null)
+        {
+            foreach (var result in _deployOnTheFlyReadinessReport.Results.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
+            {
+                var scope = result.AffectedVmNames.Count == 0 ? "Global" : string.Join(", ", result.AffectedVmNames);
+                _deployOnTheFlyIssueRows.Add(new DeployIssueRow(
+                    Scope: scope,
+                    Severity: result.Status == DeploymentReadinessStatus.Fail ? "Block" : "Warn",
+                    Message: $"{result.Message} {result.ActionableGuidance}".Trim()));
+            }
+        }
+    }
+
     private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)
     {
         _deployVmResultRows.Clear();
@@ -1426,6 +1558,46 @@ public sealed partial class MainWindow : Window
         foreach (var residual in summary.Residuals)
         {
             _deployIssueRows.Add(new DeployIssueRow(
+                Scope: residual.VmName,
+                Severity: "Warn",
+                Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
+        }
+    }
+
+    private void UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)
+    {
+        _deployOnTheFlyVmResultRows.Clear();
+
+        foreach (var vmOutcome in summary.VmOutcomes)
+        {
+            var cleanupSummary = vmOutcome.Cleanup.CleanupRan
+                ? $"Cleanup={vmOutcome.Cleanup.Status}, Residuals={vmOutcome.Cleanup.ResidualCount}"
+                : "Cleanup=NotNeeded";
+            var detailLines = new List<string>
+            {
+                $"Reason: {vmOutcome.Reason ?? "none"}",
+                $"Failure step: {vmOutcome.FailureStepKey ?? "none"}",
+                cleanupSummary
+            };
+
+            if (vmOutcome.GuestStepOutcomes.Count > 0)
+            {
+                detailLines.Add("Guest steps:");
+                detailLines.AddRange(vmOutcome.GuestStepOutcomes.Select(outcome =>
+                    $"- {outcome.DisplayName}: {outcome.Result}{(string.IsNullOrWhiteSpace(outcome.SkipReason) ? string.Empty : $" ({outcome.SkipReason})")}"));
+            }
+
+            _deployOnTheFlyVmResultRows.Add(new DeployVmResultRow(
+                VmName: vmOutcome.VmName,
+                Status: vmOutcome.Status.ToString(),
+                Summary: vmOutcome.Cleanup.CleanupRan ? $"Cleanup {vmOutcome.Cleanup.Status}" : "No cleanup",
+                Details: string.Join(Environment.NewLine, detailLines)));
+        }
+
+        _deployOnTheFlyIssueRows.Clear();
+        foreach (var residual in summary.Residuals)
+        {
+            _deployOnTheFlyIssueRows.Add(new DeployIssueRow(
                 Scope: residual.VmName,
                 Severity: "Warn",
                 Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
