@@ -92,9 +92,11 @@ public sealed partial class MainWindow : Window
 
     private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
+    private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private FrameworkElement DeployFromTemplatePanel => DeployFromTemplateViewHost;
+    private FrameworkElement DeployOnTheFlyPanel => DeployOnTheFlyViewHost;
     private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
     private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
     private ListView MachinesListView => MachinesOverviewView.MachinesListView;
@@ -380,6 +382,8 @@ public sealed partial class MainWindow : Window
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
             : IsDeployFromTemplateActive
                 ? "Select template inputs and review compact readiness summary. Execution and gating wire in AF3."
+            : IsDeployOnTheFlyActive
+                ? "Configure VM entries for on-the-fly deploy. AG2 provides scaffold regions; readiness and execution wiring land in AG3."
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
                 : IsTemplatesEditorActive
@@ -396,12 +400,13 @@ public sealed partial class MainWindow : Window
         IssueBadgeTextBlock.Text = _issueCount.ToString();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
+        DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         SyncTemplatesSubviewSelection();
         UpdateTemplatesUi();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
 
         QueueNavigationSelectionUpdate();
 
@@ -614,6 +619,9 @@ public sealed partial class MainWindow : Window
 
     private bool IsDeployFromTemplateActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.DeployFromTemplate, StringComparison.Ordinal);
+
+    private bool IsDeployOnTheFlyActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.DeployOnTheFly, StringComparison.Ordinal);
 
     private bool IsTemplatesLibraryActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesLibrary, StringComparison.Ordinal);

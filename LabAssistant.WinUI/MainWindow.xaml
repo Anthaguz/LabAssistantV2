@@ -149,6 +149,11 @@
                                     Grid.Row="0"
                                     Grid.Column="0"
                                     Visibility="Collapsed" />
+                                <deployViews:DeployOnTheFlyView
+                                    x:Name="DeployOnTheFlyViewHost"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Visibility="Collapsed" />
                                 <Border
                                     x:Name="TemplatesLocalNavigationPanel"
                                     Grid.Row="0"
