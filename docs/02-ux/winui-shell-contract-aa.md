@@ -99,12 +99,16 @@ When no VM is selected:
 
 ---
 
-## 5. Right Insights Panel Contract
+## 5. Right Panel Ownership Contract
 
-- Right panel is closed by default.
-- Triggered by warning/issue icon in shell.
-- If there are active issues, icon displays a visible count badge.
-- AA scope includes shell placement + toggle behavior, not full diagnostics feature parity.
+- Right panel is a first-class shell region with explicit owner lifecycle rules.
+- Ownership precedence: active capability owns right-panel content contract.
+- AH2 initial ownership slice: Deploy owns right-panel timeline/results/issue context.
+- Default state: collapsed unless owner marks active-run context.
+- Lifecycle reset: switching capabilities resets panel state/content to incoming owner contract (no stale content carryover).
+- Compact fallback: panel collapses below contract threshold in AH2.
+- Right panel owns internal vertical scroll; parent shell layout remains bounded.
+- Shell icon badge reflects owner-context issue count when available.
 
 ---
 

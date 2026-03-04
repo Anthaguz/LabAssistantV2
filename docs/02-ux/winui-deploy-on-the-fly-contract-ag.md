@@ -106,6 +106,7 @@ On-the-fly results UX follows compact-first progressive disclosure:
 - per-VM rows are concise by default
 - per-VM details are expandable on demand
 - global warnings/errors remain collapsed by default and discoverable
+- in AH2+, deploy timeline/results/issue context is hosted by shell right panel ownership contract
 
 Goal is parity of interaction model, not forced visual duplication.
 

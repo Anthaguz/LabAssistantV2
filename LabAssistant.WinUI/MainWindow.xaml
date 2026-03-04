@@ -67,7 +67,7 @@
                         Content=" "
                         FontFamily="Segoe MDL2 Assets"
                         Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                        ToolTipService.ToolTip="Toggle insights panel" />
+                        ToolTipService.ToolTip="Toggle details panel" />
                     <Border
                         x:Name="IssueBadge"
                         HorizontalAlignment="Right"
@@ -92,7 +92,7 @@
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="320" />
+                <ColumnDefinition x:Name="ShellRightPanelColumn" Width="0" />
             </Grid.ColumnDefinitions>
 
             <NavigationView
@@ -248,28 +248,67 @@
                 x:Name="InsightsPanel"
                 Grid.Column="1"
                 Margin="0,16,16,16"
-                Padding="16"
+                Padding="12"
                 Background="{StaticResource ShellInsightsBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
                 Visibility="Collapsed">
-                <StackPanel Spacing="10">
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontSize="18"
-                        FontWeight="SemiBold"
-                        Text="Insights" />
-                    <Border Padding="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
-                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Readiness has 2 blocking items." TextWrapping="Wrap" />
-                    </Border>
-                    <Border Padding="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
-                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Diagnostics export completed with warnings." TextWrapping="Wrap" />
-                    </Border>
-                    <Border Padding="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
-                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="One VM has pending guest-step configuration." TextWrapping="Wrap" />
-                    </Border>
-                </StackPanel>
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="RightPanelTitleTextBlock"
+                            Grid.Column="0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontSize="17"
+                            FontWeight="SemiBold"
+                            Text="Details" />
+                        <Button
+                            x:Name="CloseRightPanelButton"
+                            Grid.Column="1"
+                            Width="34"
+                            Height="30"
+                            Padding="0"
+                            Content=""
+                            FontFamily="Segoe MDL2 Assets"
+                            ToolTipService.ToolTip="Close details panel"
+                            Click="CloseRightPanelButton_Click" />
+                    </Grid>
+
+                    <ScrollViewer
+                        Grid.Row="1"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+                        <Grid>
+                            <deployViews:DeployFromTemplateRightPanelView
+                                x:Name="DeployFromTemplateRightPanelViewHost"
+                                Visibility="Collapsed" />
+                            <deployViews:DeployOnTheFlyRightPanelView
+                                x:Name="DeployOnTheFlyRightPanelViewHost"
+                                Visibility="Collapsed" />
+                            <Border
+                                x:Name="RightPanelEmptyStateBorder"
+                                Padding="10"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="This capability does not own the shell details panel."
+                                    TextWrapping="Wrap" />
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

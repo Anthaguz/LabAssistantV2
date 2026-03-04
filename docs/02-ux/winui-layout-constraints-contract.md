@@ -35,8 +35,9 @@ All WinUI shell pages shall follow the same top-level region sizing model:
 - Fixed width (`280px` standard unless explicitly changed by contract).
 - Opens inside workspace row; does not cover top bar.
 
-5. **Right insights panel** (fixed width, collapsed by default)
-- Width bounded; internal content may scroll when needed.
+5. **Right shell panel** (fixed width, collapsed by default)
+- Width bounded; internal content owns vertical scroll when needed.
+- Active capability owns panel content contract; non-owner content is not retained.
 
 6. **Content host**
 - Must use bounded layout containers (`Grid` with `*` rows/columns preferred).
@@ -160,6 +161,13 @@ Define expected behavior by width bands (exact pixel values may be tuned in impl
 - Primary scroll owner: template library list region.
 - Library content region must expand with available workspace height (no fixed list-height containers).
 - Template list must keep actions visible while list/details metadata remain readable in compact and wide layouts.
+
+## 7.4 Deploy right-panel ownership (AH2 initial slice)
+- Primary scroll owner: shell right panel `ScrollViewer`.
+- Deploy from-template and quick deploy timeline/results/issue context render in right panel while deploy workspace remains focused on configuration/actions.
+- Right panel defaults collapsed on route entry unless deploy run is active.
+- On capability switch, right panel state/content reset to new owner contract.
+- Compact-width fallback collapses right panel to protect workspace usability.
 
 ---
 

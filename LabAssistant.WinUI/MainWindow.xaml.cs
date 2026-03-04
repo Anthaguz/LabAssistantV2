@@ -102,9 +102,12 @@ public sealed partial class MainWindow : Window
     private int _deployOnTheFlyProgressPercent;
     private string _deployOnTheFlyProgressSummary = "No deployment started.";
     private string _deployOnTheFlyReadinessSummary = "Readiness has not been evaluated.";
-    private bool _isInsightsOpen;
+    private bool _isShellRightPanelOpen;
+    private bool _isShellRightPanelInCompactFallback;
+    private string _shellRightPanelOwnerCapabilityKey = string.Empty;
+    private const double ShellRightPanelCompactThreshold = 1360;
+    private const double ShellRightPanelExpandedWidth = 380;
     private ElementTheme _theme = ElementTheme.Light;
-    private int _issueCount = 3;
     private DispatcherQueueTimer? _rdpReadinessTimer;
     private DateTimeOffset _lastRdpReadinessRefreshUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _lastOnDemandRdpRefreshUtc = DateTimeOffset.MinValue;
@@ -113,10 +116,14 @@ public sealed partial class MainWindow : Window
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
     private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
+    private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
+    private DeployOnTheFlyRightPanelView DeployOnTheFlyRightPanelView => DeployOnTheFlyRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private FrameworkElement DeployFromTemplatePanel => DeployFromTemplateViewHost;
     private FrameworkElement DeployOnTheFlyPanel => DeployOnTheFlyViewHost;
     private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
+    private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
+    private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
     private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
     private ListView MachinesListView => MachinesOverviewView.MachinesListView;
     private TextBlock SelectedVmNameTextBlock => MachinesOverviewView.SelectedVmNameTextBlock;
@@ -170,9 +177,9 @@ public sealed partial class MainWindow : Window
     private TextBlock DeployProgressSummaryTextBlock => DeployFromTemplateView.DeployProgressSummaryTextBlockControl;
     private TextBlock DeployGlobalIssuesBadgeTextBlock => DeployFromTemplateView.DeployGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
-    private Expander DeployGlobalIssuesExpander => DeployFromTemplateView.DeployGlobalIssuesExpanderControl;
-    private ListView DeployGlobalIssuesListView => DeployFromTemplateView.DeployGlobalIssuesListViewControl;
-    private ListView DeployVmResultsListView => DeployFromTemplateView.DeployVmResultsListViewControl;
+    private Expander DeployGlobalIssuesExpander => DeployFromTemplateRightPanelView.DeployGlobalIssuesExpanderControl;
+    private ListView DeployGlobalIssuesListView => DeployFromTemplateRightPanelView.DeployGlobalIssuesListViewControl;
+    private ListView DeployVmResultsListView => DeployFromTemplateRightPanelView.DeployVmResultsListViewControl;
     private Button DeployResolveSuggestionsButton => DeployFromTemplateView.DeployResolveSuggestionsButtonControl;
     private Button DeployOpenTemplateEditorButton => DeployFromTemplateView.DeployOpenTemplateEditorButtonControl;
     private Button DeployStartButton => DeployFromTemplateView.DeployStartButtonControl;
@@ -193,7 +200,7 @@ public sealed partial class MainWindow : Window
     private TextBlock DeployOnTheFlyProgressSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyProgressSummaryTextBlockControl;
     private TextBlock DeployOnTheFlyGlobalIssuesBadgeTextBlock => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployOnTheFlyReadinessSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyReadinessSummaryTextBlockControl;
-    private ListView DeployOnTheFlyVmResultsListView => DeployOnTheFlyView.DeployOnTheFlyVmResultsListViewControl;
+    private ListView DeployOnTheFlyVmResultsListView => DeployOnTheFlyRightPanelView.DeployOnTheFlyVmResultsListViewControl;
     private Button DeployOnTheFlyEvaluateButton => DeployOnTheFlyView.DeployOnTheFlyEvaluateButtonControl;
     private Button DeployOnTheFlyResolveSuggestionsButton => DeployOnTheFlyView.DeployOnTheFlyResolveSuggestionsButtonControl;
     private Button DeployOnTheFlyOpenTemplateEditorButton => DeployOnTheFlyView.DeployOnTheFlyOpenTemplateEditorButtonControl;
@@ -241,6 +248,7 @@ public sealed partial class MainWindow : Window
     private const string TemplateVhdxPlaceholder = "(Keep current / unresolved)";
     private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
     private const string DeployOnTheFlyVhdxPlaceholder = "(Select base disk)";
+    private const string DeployCapabilityKey = "deploy";
 
     public MainWindow()
     {
@@ -268,6 +276,7 @@ public sealed partial class MainWindow : Window
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
         RootLayout.KeyDown += RootLayout_KeyDown;
+        RootLayout.SizeChanged += RootLayout_SizeChanged;
         InitializeRdpReadinessTimer();
         RootLayout.Loaded += async (_, _) =>
         {
@@ -457,9 +466,7 @@ public sealed partial class MainWindow : Window
                 : $"Subview: {_activeSubview.DisplayName}. Placeholder content until capability migration lands.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
-        InsightsPanel.Visibility = _isInsightsOpen ? Visibility.Visible : Visibility.Collapsed;
-        IssueBadge.Visibility = _issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-        IssueBadgeTextBlock.Text = _issueCount.ToString();
+        ApplyRightPanelState();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
         DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
@@ -512,6 +519,99 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void RootLayout_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var isCompact = e.NewSize.Width < ShellRightPanelCompactThreshold;
+        if (_isShellRightPanelInCompactFallback == isCompact)
+        {
+            return;
+        }
+
+        _isShellRightPanelInCompactFallback = isCompact;
+        if (_isShellRightPanelInCompactFallback)
+        {
+            _isShellRightPanelOpen = false;
+        }
+
+        ApplyRightPanelState();
+    }
+
+    private void ResetRightPanelForCapabilitySwitch(string incomingCapabilityKey)
+    {
+        _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(incomingCapabilityKey);
+        _isShellRightPanelOpen = false;
+        DeployGlobalIssuesExpander.IsExpanded = false;
+    }
+
+    private string ResolveRightPanelOwnerCapabilityKey(string capabilityKey)
+    {
+        return string.Equals(capabilityKey, DeployCapabilityKey, StringComparison.Ordinal)
+            ? DeployCapabilityKey
+            : string.Empty;
+    }
+
+    private bool CanActiveCapabilityOwnRightPanel()
+    {
+        return string.Equals(_shellRightPanelOwnerCapabilityKey, DeployCapabilityKey, StringComparison.Ordinal);
+    }
+
+    private bool ShouldOwnerAutoOpenRightPanel()
+    {
+        if (!CanActiveCapabilityOwnRightPanel())
+        {
+            return false;
+        }
+
+        return _isDeployStarting ||
+            _isDeployOnTheFlyStarting ||
+            string.Equals(_deployLifecycleState, "Running", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ApplyRightPanelState()
+    {
+        if (RootLayout.ActualWidth > 0)
+        {
+            _isShellRightPanelInCompactFallback = RootLayout.ActualWidth < ShellRightPanelCompactThreshold;
+        }
+
+        _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(_activeCapability.Key);
+        if (_isShellRightPanelInCompactFallback && _isShellRightPanelOpen)
+        {
+            _isShellRightPanelOpen = false;
+        }
+
+        if (ShouldOwnerAutoOpenRightPanel())
+        {
+            _isShellRightPanelOpen = true;
+        }
+
+        var hasOwner = CanActiveCapabilityOwnRightPanel();
+        var showPanel = hasOwner && _isShellRightPanelOpen && !_isShellRightPanelInCompactFallback;
+        InsightsPanel.Visibility = showPanel ? Visibility.Visible : Visibility.Collapsed;
+        ShellRightPanelColumn.Width = showPanel ? new GridLength(ShellRightPanelExpandedWidth) : new GridLength(0);
+        InsightsToggleButton.IsEnabled = hasOwner && !_isShellRightPanelInCompactFallback;
+        InsightsToggleButton.Opacity = InsightsToggleButton.IsEnabled ? 1.0 : 0.45;
+        RightPanelTitleTextBlock.Text = IsDeployFromTemplateActive
+            ? "Deploy From Template Details"
+            : IsDeployOnTheFlyActive
+                ? "Quick Deploy Details"
+                : "Details";
+        DeployFromTemplateRightPanel.Visibility = IsDeployFromTemplateActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
+        DeployOnTheFlyRightPanel.Visibility = IsDeployOnTheFlyActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
+        RightPanelEmptyStateBorder.Visibility = (!IsDeployFromTemplateActive && !IsDeployOnTheFlyActive && showPanel)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        var issueCount = IsDeployFromTemplateActive
+            ? _deployIssueRows.Count
+            : IsDeployOnTheFlyActive
+                ? _deployOnTheFlyIssueRows.Count
+                : 0;
+        IssueBadge.Visibility = issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+        IssueBadgeTextBlock.Text = issueCount.ToString();
+    }
+
     private void NavigateToRoute(string routeKey)
     {
         if (!_shellViewModel.TryResolveRoute(routeKey, out var capability, out var subview))
@@ -529,6 +629,11 @@ public sealed partial class MainWindow : Window
         if (changedCapability || changedSubview)
         {
             DiscardMachineEditDraft();
+        }
+
+        if (changedCapability)
+        {
+            ResetRightPanelForCapabilitySwitch(capability.Key);
         }
 
         _activeCapability = capability;
@@ -611,8 +716,24 @@ public sealed partial class MainWindow : Window
 
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
     {
-        _isInsightsOpen = !_isInsightsOpen;
-        ApplyState();
+        if (!CanActiveCapabilityOwnRightPanel())
+        {
+            return;
+        }
+
+        _isShellRightPanelOpen = !_isShellRightPanelOpen;
+        ApplyRightPanelState();
+    }
+
+    private void CloseRightPanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isShellRightPanelOpen)
+        {
+            return;
+        }
+
+        _isShellRightPanelOpen = false;
+        ApplyRightPanelState();
     }
 
     private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
@@ -1077,6 +1198,7 @@ public sealed partial class MainWindow : Window
         var warningIssueCount = _deployOnTheFlyIssueRows.Count(issue => !string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
         DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}";
         DeployOnTheFlyReadinessSummaryTextBlock.Text = _deployOnTheFlyReadinessSummary;
+        ApplyRightPanelState();
     }
 
     private bool IsTemplatesLibraryActive =>
@@ -1670,6 +1792,7 @@ public sealed partial class MainWindow : Window
             DeployGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployIssueRows.Count}";
             UpdateDeployResultRows();
             UpdateDeployIssueRows();
+            ApplyRightPanelState();
             return;
         }
 
@@ -1690,6 +1813,7 @@ public sealed partial class MainWindow : Window
 
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
+        ApplyRightPanelState();
     }
 
     private void UpdateDeployResultRows()

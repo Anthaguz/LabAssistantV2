@@ -53,7 +53,6 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyOpenTemplateEditorButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyStartButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyStatusTextBlock"));
-        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmResultsListView"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmEditorPanel"));
     }
 
@@ -85,12 +84,12 @@ public sealed class MilestoneAGScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployOnTheFlyView_UsesCollapsedVmDetailsPatternForAg4()
+    public void DeployOnTheFlyRightPanelView_UsesCollapsedVmDetailsPatternForAg4()
     {
-        var source = LoadDeployOnTheFlyViewSource();
+        var source = LoadDeployOnTheFlyRightPanelViewSource();
 
         Assert.Contains("IsExpanded=\"False\"", source);
-        Assert.Contains("Text=\"Deployment Results\"", source);
+        Assert.Contains("Text=\"Quick Deploy progress and VM step details.\"", source);
         Assert.Contains("x:Name=\"DeployOnTheFlyVmResultsListView\"", source);
     }
 
@@ -117,9 +116,9 @@ public sealed class MilestoneAGScenarioMatrixTests
         return XDocument.Load(Path.GetFullPath(path));
     }
 
-    private static string LoadDeployOnTheFlyViewSource()
+    private static string LoadDeployOnTheFlyRightPanelViewSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyRightPanelView.xaml");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

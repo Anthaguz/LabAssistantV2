@@ -432,6 +432,10 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** step labels must not be duplicated as separate start/finish rows; running uses spinner state, terminal states use icon changes, skipped/non-applicable steps are hidden, and optional parent rows are hidden when no child step executes.
   - **Priority:** P1
 
+- **FR-097:** WinUI shell right panel shall follow explicit ownership and lifecycle rules, with Deploy as the initial owning capability for timeline/results/issue context.
+  - **Acceptance details:** active capability decides panel content owner; switching capabilities resets panel content state to the new owner contract; panel defaults collapsed unless owner marks active run context; compact-width fallback collapses panel; right panel owns internal vertical scroll.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.

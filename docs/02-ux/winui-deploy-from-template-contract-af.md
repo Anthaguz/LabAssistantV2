@@ -98,6 +98,7 @@ AF baseline for from-template run results:
 - per-VM rows are concise by default
 - per-VM details are expandable on demand
 - global warnings/errors are collapsed by default and expandable when needed
+- in AH2+, deploy timeline/results/issue context is hosted by shell right panel ownership contract (not page-local right column)
 
 Behavior-preservation requirement:
 - deployment semantics (execution, cancellation, cleanup, logging) remain unchanged

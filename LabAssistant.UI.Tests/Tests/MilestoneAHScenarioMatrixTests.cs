@@ -48,16 +48,16 @@ public sealed class MilestoneAHScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployViews_RenderSingleLabelTimelineRowsWithStateIndicators()
+    public void DeployRightPanelViews_RenderSingleLabelTimelineRowsWithStateIndicators()
     {
-        var fromTemplateXaml = LoadDeployFromTemplateViewXaml();
-        var onTheFlyXaml = LoadDeployOnTheFlyViewXaml();
+        var fromTemplateXaml = LoadDeployFromTemplateRightPanelViewXaml();
+        var onTheFlyXaml = LoadDeployOnTheFlyRightPanelViewXaml();
 
         Assert.NotNull(FindByName(fromTemplateXaml, "DeployVmResultsListView"));
         Assert.NotNull(FindByName(onTheFlyXaml, "DeployOnTheFlyVmResultsListView"));
 
-        var fromTemplateSource = LoadDeployFromTemplateViewSource();
-        var onTheFlySource = LoadDeployOnTheFlyViewSource();
+        var fromTemplateSource = LoadDeployFromTemplateRightPanelViewSource();
+        var onTheFlySource = LoadDeployOnTheFlyRightPanelViewSource();
 
         Assert.Contains("ItemsSource=\"{Binding TimelineSteps}\"", fromTemplateSource);
         Assert.Contains("ItemsSource=\"{Binding TimelineSteps}\"", onTheFlySource);
@@ -65,6 +65,22 @@ public sealed class MilestoneAHScenarioMatrixTests
         Assert.Contains("Text=\"{Binding Label}\"", onTheFlySource);
         Assert.Contains("IsActive=\"{Binding IsRunning}\"", fromTemplateSource);
         Assert.Contains("IsActive=\"{Binding IsRunning}\"", onTheFlySource);
+    }
+
+    [Fact]
+    public void ShellRightPanel_DefinesDeployOwnershipLifecycleAndCompactFallback()
+    {
+        var mainWindowXaml = LoadMainWindowXaml();
+        var mainWindowSource = LoadMainWindowSource();
+
+        Assert.NotNull(FindByName(mainWindowXaml, "ShellRightPanelColumn"));
+        Assert.NotNull(FindByName(mainWindowXaml, "DeployFromTemplateRightPanelViewHost"));
+        Assert.NotNull(FindByName(mainWindowXaml, "DeployOnTheFlyRightPanelViewHost"));
+        Assert.Contains("private const double ShellRightPanelCompactThreshold", mainWindowSource);
+        Assert.Contains("private void ResetRightPanelForCapabilitySwitch", mainWindowSource);
+        Assert.Contains("private void ApplyRightPanelState()", mainWindowSource);
+        Assert.Contains("ShellRightPanelColumn.Width = showPanel ? new GridLength(ShellRightPanelExpandedWidth) : new GridLength(0);", mainWindowSource);
+        Assert.Contains("_isShellRightPanelOpen = false;", mainWindowSource);
     }
 
     [Fact]
@@ -97,27 +113,33 @@ public sealed class MilestoneAHScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static XDocument LoadDeployFromTemplateViewXaml()
+    private static XDocument LoadMainWindowXaml()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateView.xaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml");
         return XDocument.Load(Path.GetFullPath(path));
     }
 
-    private static string LoadDeployFromTemplateViewSource()
+    private static XDocument LoadDeployFromTemplateRightPanelViewXaml()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateView.xaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateRightPanelView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateRightPanelViewSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateRightPanelView.xaml");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static XDocument LoadDeployOnTheFlyViewXaml()
+    private static XDocument LoadDeployOnTheFlyRightPanelViewXaml()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyRightPanelView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
     }
 
-    private static string LoadDeployOnTheFlyViewSource()
+    private static string LoadDeployOnTheFlyRightPanelViewSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyRightPanelView.xaml");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
