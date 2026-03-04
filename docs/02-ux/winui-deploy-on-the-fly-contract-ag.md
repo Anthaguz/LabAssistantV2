@@ -5,8 +5,8 @@
 **Status:** Approved docs-first contract for Milestone AG planning/implementation.
 
 **Primary references:**
-- `docs/01-requirements/srs.md` (FR-091, FR-092, FR-093, FR-094)
-- `docs/01-requirements/acceptance-criteria.md` (AC-015)
+- `docs/01-requirements/srs.md` (FR-091, FR-092, FR-093, FR-094, FR-095, FR-096)
+- `docs/01-requirements/acceptance-criteria.md` (AC-015, AC-016)
 - `docs/02-ux/winui-deploy-from-template-contract-af.md` (interaction parity baseline)
 
 ---
@@ -36,6 +36,7 @@ Canonical route:
 
 Behavior:
 - Deploy on-the-fly entry must resolve deterministically to `deploy.on_the_fly`.
+- User-facing label should prefer `Quick Deploy` while route key remains `deploy.on_the_fly`.
 - Global navigation contract from AC milestone remains authoritative.
 - AF `deploy.from_template` route remains available and unchanged.
 
@@ -108,6 +109,13 @@ On-the-fly results UX follows compact-first progressive disclosure:
 
 Goal is parity of interaction model, not forced visual duplication.
 
+Canonical timeline row contract:
+- states: `Pending`, `Running`, `Succeeded`, `Failed`, `Skipped`
+- one label per step (no duplicated start/finish labels)
+- state drives spinner/icon rendering
+- skipped/non-applicable rows are hidden
+- nested parent rows are hidden when no child step executes
+
 ---
 
 ## 8) AG Work Packaging Guidance
@@ -134,6 +142,7 @@ Goal is parity of interaction model, not forced visual duplication.
 - FR-092 -> AC-015 scenario 2 (readiness taxonomy and blocking/warning behavior)
 - FR-093 -> AC-015 scenario 3 and 4 (correction affordances + execution gate)
 - FR-094 -> AC-015 scenario 5 (compact-first results parity)
+- FR-095 and FR-096 -> AC-016 scenarios 1-4 (canonical timeline state and rendering parity)
 
 ---
 
@@ -141,3 +150,4 @@ Goal is parity of interaction model, not forced visual duplication.
 
 - `TBD`: whether AG2 should include explicit placeholder affordance for deferred future Deploy history view.
 - `TBD`: whether AG manual checklist should require a fixed set of on-the-fly blocking fixture configurations for repeatability.
+- `TBD`: add clickable "jump to fix field" actions from readiness issue rows (for example disk/switch issues route focus directly to the affected VM field in Quick Deploy).

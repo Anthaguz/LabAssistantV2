@@ -203,10 +203,36 @@
                                         BorderBrush="{StaticResource ShellBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="6">
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="{Binding Details}"
-                                            TextWrapping="Wrap" />
+                                        <ItemsControl ItemsSource="{Binding TimelineSteps}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,4" ColumnSpacing="8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="20" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <ProgressRing
+                                                            Grid.Column="0"
+                                                            Width="14"
+                                                            Height="14"
+                                                            IsActive="{Binding IsRunning}"
+                                                            Visibility="{Binding RunningIndicatorVisibility}" />
+                                                        <TextBlock
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            HorizontalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="{Binding IconGlyph}"
+                                                            Visibility="{Binding StaticIconVisibility}" />
+                                                        <TextBlock
+                                                            Grid.Column="1"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="{Binding Label}"
+                                                            TextWrapping="Wrap" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </Border>
                                 </Expander>
                             </DataTemplate>

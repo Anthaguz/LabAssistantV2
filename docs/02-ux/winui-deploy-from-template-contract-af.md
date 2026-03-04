@@ -5,8 +5,8 @@
 **Status:** Approved docs-first contract for Milestone AF planning/implementation.
 
 **Related:**
-- `docs/01-requirements/srs.md` (FR-087, FR-088, FR-089, FR-090)
-- `docs/01-requirements/acceptance-criteria.md` (AC-014)
+- `docs/01-requirements/srs.md` (FR-087, FR-088, FR-089, FR-090, FR-095, FR-096)
+- `docs/01-requirements/acceptance-criteria.md` (AC-014, AC-016)
 - `docs/02-ux/winui-global-navigationview-contract-ac.md`
 - `docs/02-ux/winui-templates-capability-contract-ad.md`
 - `docs/02-ux/ui-migration-execution-plan.md`
@@ -103,6 +103,13 @@ Behavior-preservation requirement:
 - deployment semantics (execution, cancellation, cleanup, logging) remain unchanged
 - AF changes presentation and correction affordances, not core deployment logic
 
+Canonical timeline row contract:
+- states: `Pending`, `Running`, `Succeeded`, `Failed`, `Skipped`
+- one label per step (no duplicated start/finish labels)
+- state drives spinner/icon rendering
+- skipped/non-applicable rows are hidden
+- nested parent rows are hidden when no child step executes
+
 ---
 
 ## 6) AF Work Packaging Guidance
@@ -143,6 +150,7 @@ Out of scope:
 - FR-088 -> AC-014 scenarios 2 and 3 (disk/switch compatibility behavior)
 - FR-089 -> AC-014 scenario 4 (correction affordances)
 - FR-090 -> AC-014 scenario 5 (compact-first results visibility)
+- FR-095 and FR-096 -> AC-016 scenarios 1-4 (canonical timeline state and rendering parity)
 
 ---
 

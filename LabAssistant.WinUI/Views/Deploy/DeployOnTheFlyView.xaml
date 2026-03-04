@@ -241,7 +241,8 @@
                             x:Name="DeployOnTheFlyApplyVmChangesButton"
                             Grid.Row="2"
                             Content="Apply VM Changes"
-                            HorizontalAlignment="Left" />
+                            HorizontalAlignment="Left"
+                            Visibility="Collapsed" />
                     </Grid>
                 </Border>
 
@@ -264,52 +265,145 @@
                             Text="Deployment Results" />
 
                         <ListView x:Name="DeployOnTheFlyVmResultsListView" Grid.Row="1" SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="0" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
-                                    <Border
-                                        Margin="0,0,0,8"
-                                        Padding="8"
-                                        BorderBrush="{StaticResource ShellBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Background="{StaticResource ShellBackgroundBrush}">
-                                        <StackPanel Spacing="6">
-                                            <Grid ColumnSpacing="10">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
+                                    <Grid>
+                                        <Border
+                                            Margin="0,0,0,8"
+                                            Padding="10,8"
+                                            HorizontalAlignment="Stretch"
+                                            BorderBrush="{StaticResource ShellBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Background="{StaticResource ShellBackgroundBrush}"
+                                            Visibility="{Binding FlatCardVisibility}">
+                                            <Grid RowSpacing="6">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <Grid Grid.Row="0" ColumnSpacing="10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock
+                                                        Grid.Column="0"
+                                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                        FontWeight="SemiBold"
+                                                        Text="{Binding VmName}" />
+                                                    <TextBlock
+                                                        Grid.Column="1"
+                                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                        Text="{Binding Status}" />
+                                                </Grid>
+                                                <ProgressBar
+                                                    Grid.Row="1"
+                                                    Minimum="0"
+                                                    Maximum="100"
+                                                    Value="{Binding ProgressPercent}"
+                                                    Height="6" />
                                                 <TextBlock
-                                                    Grid.Column="0"
-                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                                    FontWeight="SemiBold"
-                                                    Text="{Binding VmName}" />
-                                                <TextBlock
-                                                    Grid.Column="1"
+                                                    Grid.Row="2"
                                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                    Text="{Binding Status}" />
+                                                    Text="{Binding DisplaySummary}"
+                                                    TextWrapping="Wrap"
+                                                    Visibility="{Binding SummaryVisibility}" />
                                             </Grid>
-                                            <ProgressBar
-                                                Minimum="0"
-                                                Maximum="100"
-                                                Value="{Binding ProgressPercent}"
-                                                Height="6" />
-                                            <TextBlock
-                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                Text="{Binding Summary}"
-                                                TextWrapping="Wrap" />
-                                            <Expander IsExpanded="False">
-                                                <Expander.Header>
-                                                    <TextBlock Text="Details" Foreground="{StaticResource ShellTextSecondaryBrush}" />
-                                                </Expander.Header>
-                                                <TextBlock
-                                                    Margin="0,6,0,0"
-                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                    Text="{Binding Details}"
-                                                    TextWrapping="Wrap" />
-                                            </Expander>
-                                        </StackPanel>
-                                    </Border>
+                                        </Border>
+
+                                        <Expander
+                                            IsExpanded="False"
+                                            Margin="0,0,0,8"
+                                            HorizontalAlignment="Stretch"
+                                            BorderBrush="{StaticResource ShellBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Background="{StaticResource ShellBackgroundBrush}"
+                                            Visibility="{Binding ExpanderVisibility}">
+                                            <Expander.Header>
+                                                <Grid Padding="10,8" RowSpacing="6">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <Grid Grid.Row="0" ColumnSpacing="10">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock
+                                                            Grid.Column="0"
+                                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                            FontWeight="SemiBold"
+                                                            Text="{Binding VmName}" />
+                                                        <TextBlock
+                                                            Grid.Column="1"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="{Binding Status}" />
+                                                    </Grid>
+                                                    <ProgressBar
+                                                        Grid.Row="1"
+                                                        Minimum="0"
+                                                        Maximum="100"
+                                                        Value="{Binding ProgressPercent}"
+                                                        Height="6" />
+                                                    <TextBlock
+                                                        Grid.Row="2"
+                                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                        Text="{Binding DisplaySummary}"
+                                                        TextWrapping="Wrap"
+                                                        Visibility="{Binding SummaryVisibility}" />
+                                                </Grid>
+                                            </Expander.Header>
+                                            <Border
+                                                Padding="10,8"
+                                                Margin="8,0,8,8"
+                                                Background="{StaticResource ShellContentBackgroundBrush}"
+                                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6">
+                                                <ItemsControl ItemsSource="{Binding TimelineSteps}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,0,0,4" ColumnSpacing="8">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="20" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <ProgressRing
+                                                                    Grid.Column="0"
+                                                                    Width="14"
+                                                                    Height="14"
+                                                                    IsActive="{Binding IsRunning}"
+                                                                    Visibility="{Binding RunningIndicatorVisibility}" />
+                                                                <TextBlock
+                                                                    Grid.Column="0"
+                                                                    VerticalAlignment="Center"
+                                                                    HorizontalAlignment="Center"
+                                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                    Text="{Binding IconGlyph}"
+                                                                    Visibility="{Binding StaticIconVisibility}" />
+                                                                <TextBlock
+                                                                    Grid.Column="1"
+                                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                    Text="{Binding Label}"
+                                                                    TextWrapping="Wrap" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Border>
+                                        </Expander>
+                                    </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>

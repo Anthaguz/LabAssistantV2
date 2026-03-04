@@ -424,6 +424,14 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** sticky summary/progress remains visible; per-VM rows are concise by default with expandable details; global warnings/errors remain collapsed by default and discoverable.
   - **Priority:** P1
 
+- **FR-095:** WinUI Deploy timelines (from-template and quick deploy) shall use a canonical step-state contract driven by explicit step-state data.
+  - **Acceptance details:** canonical states are `Pending`, `Running`, `Succeeded`, `Failed`, and `Skipped`; timeline rows bind to state data instead of deriving completion from inferred text wherever state data is available.
+  - **Priority:** P1
+
+- **FR-096:** WinUI Deploy timeline rendering shall show one label per step with icon-state progression and deterministic transition behavior.
+  - **Acceptance details:** step labels must not be duplicated as separate start/finish rows; running uses spinner state, terminal states use icon changes, skipped/non-applicable steps are hidden, and optional parent rows are hidden when no child step executes.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.

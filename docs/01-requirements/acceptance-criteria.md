@@ -1485,7 +1485,7 @@ Each readiness result shall include, at minimum:
 - User is in WinUI global navigation
 
 **When**
-- User selects Deploy on-the-fly path
+- User selects Deploy on-the-fly path (user-facing label may be `Quick Deploy`)
 
 **Then**
 - Route resolves to `deploy.on_the_fly`
@@ -1558,6 +1558,68 @@ Each readiness result shall include, at minimum:
 - [ ] Execution boundary preserves existing deployment orchestration semantics
 - [ ] Compact-first results parity contract is explicit and testable
 - [ ] AG scope boundaries are explicit and enforceable
+
+---
+
+# AC-016 - WinUI Deploy Timeline Canonical Step-State Contract (AH1)
+
+**Related FRs:** FR-095, FR-096, FR-090, FR-094
+
+## Scenarios
+
+### 1) Canonical step-state model is explicit
+**Given**
+- Deploy timeline rendering for from-template or quick deploy
+
+**When**
+- Timeline state is projected for UI rows
+
+**Then**
+- Canonical states are available: `Pending`, `Running`, `Succeeded`, `Failed`, `Skipped`
+- UI row rendering reads explicit state values (not text-only inference as the primary source)
+
+### 2) Single-label step rendering and icon-state progression
+**Given**
+- A VM deploy run with multiple steps
+
+**When**
+- Step state transitions from pending to running to terminal state
+
+**Then**
+- Each step label appears only once in the timeline
+- Running state uses spinner indicator
+- Terminal states use deterministic icon-state output (`Succeeded`, `Failed`, or `Skipped`)
+- Duplicate label patterns such as separate “start row” and “completed row” are not used
+
+### 3) Optional/skipped step visibility rules
+**Given**
+- Optional or nested step groups with non-applicable steps
+
+**When**
+- Timeline rows are produced
+
+**Then**
+- Skipped/non-applicable rows are hidden
+- Parent row is hidden when no child step executes
+- Timeline includes only steps that will run, are running, or have completed
+
+### 4) AF/AG parity and non-regression
+**Given**
+- Timeline rendering exists in both deploy flows
+
+**When**
+- User runs from-template and quick deploy flows
+
+**Then**
+- Both flows follow the same canonical icon-state timeline rules
+- Existing readiness gating and deployment execution semantics remain unchanged
+- Route contracts remain intact (`deploy.from_template`, `deploy.on_the_fly`)
+
+## Definition of Done
+- [ ] Canonical timeline states are explicit and testable
+- [ ] Single-label step rendering with state-driven icons is explicit and testable
+- [ ] Skipped/non-applicable visibility rules are explicit and testable
+- [ ] AF and quick deploy timeline parity is explicit without semantics drift
 
 ---
 
