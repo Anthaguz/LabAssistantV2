@@ -31,9 +31,10 @@ public sealed class MilestoneAFScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployFromTemplateView_DefinesRequiredAf4CompactResultsControls()
+    public void DeployFromTemplateView_AndRightPanel_DefineRequiredAf4CompactResultsControls()
     {
         var xaml = LoadDeployFromTemplateViewXaml();
+        var rightPanelXaml = LoadDeployFromTemplateRightPanelViewXaml();
 
         Assert.NotNull(FindByName(xaml, "DeployTemplateSelectorComboBox"));
         Assert.NotNull(FindByName(xaml, "DeployReadinessSummaryPanel"));
@@ -47,10 +48,10 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.NotNull(FindByName(xaml, "DeployOpenTemplateEditorButton"));
         Assert.NotNull(FindByName(xaml, "DeployStartButton"));
         Assert.NotNull(FindByName(xaml, "DeployActionStatusTextBlock"));
-        var globalIssuesExpander = FindByName(xaml, "DeployGlobalIssuesExpander");
+        var globalIssuesExpander = FindByName(rightPanelXaml, "DeployGlobalIssuesExpander");
         Assert.Equal("False", globalIssuesExpander.Attribute("IsExpanded")?.Value);
-        Assert.NotNull(FindByName(xaml, "DeployGlobalIssuesListView"));
-        Assert.NotNull(FindByName(xaml, "DeployVmResultsListView"));
+        Assert.NotNull(FindByName(rightPanelXaml, "DeployGlobalIssuesListView"));
+        Assert.NotNull(FindByName(rightPanelXaml, "DeployVmResultsListView"));
     }
 
     [Fact]
@@ -80,9 +81,9 @@ public sealed class MilestoneAFScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployFromTemplateView_PerVmAndGlobalDetailsDefaultToCollapsed()
+    public void DeployFromTemplateRightPanelView_PerVmAndGlobalDetailsDefaultToCollapsed()
     {
-        var xaml = LoadDeployFromTemplateViewXaml();
+        var xaml = LoadDeployFromTemplateRightPanelViewXaml();
         var expanders = xaml.Descendants().Where(element => element.Name.LocalName == "Expander").ToList();
 
         Assert.True(expanders.Count >= 2, "Expected global issues expander and per-VM row expander.");
@@ -110,6 +111,12 @@ public sealed class MilestoneAFScenarioMatrixTests
     private static XDocument LoadDeployFromTemplateViewXaml()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadDeployFromTemplateRightPanelViewXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateRightPanelView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
     }
 

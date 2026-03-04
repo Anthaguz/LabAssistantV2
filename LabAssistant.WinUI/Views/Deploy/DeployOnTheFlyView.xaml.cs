@@ -45,8 +45,6 @@ public sealed partial class DeployOnTheFlyView : UserControl
 
     public TextBlock DeployOnTheFlyReadinessSummaryTextBlockControl => DeployOnTheFlyReadinessSummaryTextBlock;
 
-    public ListView DeployOnTheFlyVmResultsListViewControl => DeployOnTheFlyVmResultsListView;
-
     public Button DeployOnTheFlyEvaluateButtonControl => DeployOnTheFlyEvaluateButton;
 
     public Button DeployOnTheFlyResolveSuggestionsButtonControl => DeployOnTheFlyResolveSuggestionsButton;

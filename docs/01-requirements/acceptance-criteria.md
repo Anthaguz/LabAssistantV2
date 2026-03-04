@@ -1623,6 +1623,77 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-017 - WinUI Shell Right-Panel Ownership Contract (AH2)
+
+**Related FRs:** FR-097, FR-090, FR-094, FR-074
+
+## Scenarios
+
+### 1) Ownership precedence follows active capability
+**Given**
+- Shell right panel region is available
+
+**When**
+- User navigates between capabilities
+
+**Then**
+- Active capability determines right-panel owner
+- Deploy capability owns right-panel timeline/results/issue content in AH2 initial slice
+- Non-owning capabilities do not retain stale Deploy panel content
+
+### 2) Lifecycle reset on capability switch
+**Given**
+- Right panel has expanded state/content while in Deploy
+
+**When**
+- User switches to another capability and later returns
+
+**Then**
+- Panel content state resets according to owner contract
+- Default entry state is collapsed unless owner marks active-run context
+
+### 3) Compact fallback behavior
+**Given**
+- Window width crosses compact threshold
+
+**When**
+- Right panel is open
+
+**Then**
+- Right panel collapses in compact fallback mode for AH2
+- Main capability workspace remains usable without horizontal clipping
+
+### 4) Scroll ownership in right panel
+**Given**
+- Right panel contains long timeline/results content
+
+**When**
+- Content exceeds available panel height
+
+**Then**
+- Right panel owns vertical scrolling
+- Parent shell regions remain bounded and avoid unbounded growth
+
+### 5) Deploy non-regression guard
+**Given**
+- Deploy from-template and quick deploy flows are available
+
+**When**
+- User runs readiness and deployment lifecycle actions
+
+**Then**
+- Existing readiness/gating/execution behavior remains unchanged
+- Deploy timeline/results/issue context is visible through shell-owned right panel
+
+## Definition of Done
+- [ ] Right-panel ownership precedence and lifecycle reset rules are explicit and testable
+- [ ] Deploy right-panel ownership initial slice is explicit and testable
+- [ ] Compact fallback behavior is explicit and testable
+- [ ] Right-panel scroll ownership rule is explicit and testable
+- [ ] Deploy behavior non-regression is explicit and testable
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules

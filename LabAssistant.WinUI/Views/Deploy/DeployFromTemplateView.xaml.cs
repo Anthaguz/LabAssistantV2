@@ -27,12 +27,6 @@ public sealed partial class DeployFromTemplateView : UserControl
 
     public TextBlock DeployReadinessSummaryTextBlockControl => DeployReadinessSummaryTextBlock;
 
-    public Expander DeployGlobalIssuesExpanderControl => DeployGlobalIssuesExpander;
-
-    public ListView DeployGlobalIssuesListViewControl => DeployGlobalIssuesListView;
-
-    public ListView DeployVmResultsListViewControl => DeployVmResultsListView;
-
     public Button DeployResolveSuggestionsButtonControl => DeployResolveSuggestionsButton;
 
     public Button DeployOpenTemplateEditorButtonControl => DeployOpenTemplateEditorButton;
