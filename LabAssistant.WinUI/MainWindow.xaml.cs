@@ -105,7 +105,7 @@ public sealed partial class MainWindow : Window
     private bool _isShellRightPanelOpen;
     private bool _isShellRightPanelInCompactFallback;
     private string _shellRightPanelOwnerCapabilityKey = string.Empty;
-    private const double ShellRightPanelCompactThreshold = 1360;
+    private const double ShellRightPanelCompactThreshold = 1200;
     private const double ShellRightPanelExpandedWidth = 380;
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
