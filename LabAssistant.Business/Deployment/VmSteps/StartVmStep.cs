@@ -9,6 +9,8 @@ public class StartVmStep : DeploymentStep
 {
     private readonly ISessionResolver _resolver;
     private readonly Func<IPersistentPowerShellSession, IHyperVService> _hyperVFactory;
+    protected override string StepKey => DeploymentStepKeys.StartVm;
+    protected override string StepLabel => "Start VM";
 
     public StartVmStep(ISessionResolver resolver, Func<IPersistentPowerShellSession, IHyperVService> hyperVFactory)
     {

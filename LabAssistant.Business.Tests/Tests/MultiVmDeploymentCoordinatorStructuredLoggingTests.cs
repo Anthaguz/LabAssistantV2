@@ -227,6 +227,53 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         }
     }
 
+    [Fact]
+    public async Task DeployAll_EmitsStepStateUpdates_PerVmWithDeterministicSequence()
+    {
+        var logger = new RecordingStructuredLogger();
+        var coordinator = CreateCoordinator(new FakePipelineBuilder(_ => new NoOpStep()), new FakeCleanupOrchestrator(), logger);
+        var vm1Updates = new List<DeployStepStateUpdate>();
+        var vm2Updates = new List<DeployStepStateUpdate>();
+        var vm1 = new VmDeploymentContext
+        {
+            VmId = Guid.NewGuid(),
+            VmName = "vm1",
+            StepStateEmitter = update => vm1Updates.Add(update)
+        };
+        var vm2 = new VmDeploymentContext
+        {
+            VmId = Guid.NewGuid(),
+            VmName = "vm2",
+            StepStateEmitter = update => vm2Updates.Add(update)
+        };
+        var multi = new MultiVmDeploymentContext
+        {
+            OperationId = "op-step-state",
+            VmContexts = { vm1, vm2 }
+        };
+
+        await coordinator.DeployAllAsync(multi);
+
+        Assert.NotEmpty(vm1Updates);
+        Assert.NotEmpty(vm2Updates);
+        Assert.All(vm1Updates, update =>
+        {
+            Assert.Equal("op-step-state", update.OperationId);
+            Assert.Equal(vm1.VmId, update.VmId);
+            Assert.Equal("vm1", update.VmName);
+        });
+        Assert.All(vm2Updates, update =>
+        {
+            Assert.Equal("op-step-state", update.OperationId);
+            Assert.Equal(vm2.VmId, update.VmId);
+            Assert.Equal("vm2", update.VmName);
+        });
+        Assert.Equal([DeployStepState.Pending, DeployStepState.Running, DeployStepState.Succeeded], vm1Updates.Select(update => update.State).ToArray());
+        Assert.Equal([DeployStepState.Pending, DeployStepState.Running, DeployStepState.Succeeded], vm2Updates.Select(update => update.State).ToArray());
+        Assert.True(vm1Updates[0].Sequence < vm1Updates[1].Sequence && vm1Updates[1].Sequence < vm1Updates[2].Sequence);
+        Assert.True(vm2Updates[0].Sequence < vm2Updates[1].Sequence && vm2Updates[1].Sequence < vm2Updates[2].Sequence);
+    }
+
     private static void AssertHasRequiredFields(StructuredLogEvent logEvent)
     {
         Assert.False(string.IsNullOrWhiteSpace(logEvent.Ts));

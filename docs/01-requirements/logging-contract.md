@@ -64,6 +64,32 @@ Context fields by scenario (inside `context`):
 - `errorCode`, `errorMessage`, `exceptionType`
 - `resourcePath` (when relevant)
 
+## Deploy Step-State UI Event Contract (AH3)
+
+In addition to structured JSONL events, Deploy exposes an in-memory step-state update payload for WinUI timeline source-of-truth rendering.
+
+Required payload fields:
+
+- `operationId`
+- `vmId`
+- `vmName`
+- `stepKey`
+- `stepLabel`
+- `state` (`Pending`, `Running`, `Succeeded`, `Failed`, `Skipped`)
+- `timestampUtc` (UTC)
+- `sequence` (deterministic per-VM ordering key)
+
+Optional payload fields:
+
+- `message` (concise step context)
+
+Rules:
+
+- One step label transitions through states over time.
+- Failed is terminal for that step.
+- Skipped optional steps are represented in payload; UI may hide them per timeline display policy.
+- WinUI timeline state must consume this payload instead of inferring transitions from free-form status text.
+
 ## Required Event Families
 
 Deployment (v1 emitted):

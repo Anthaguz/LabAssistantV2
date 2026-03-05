@@ -6,6 +6,9 @@ using LabAssistant.Services.Logging;
 namespace LabAssistant.Business.Deployment;
 public class CheckHyperVStep : DeploymentStep
 {
+    protected override string StepKey => DeploymentStepKeys.CheckHyperV;
+    protected override string StepLabel => "Check Hyper-V";
+
     protected override async Task HandleAsync(VmDeploymentContext context)
     {
         if (!HyperVHelper.IsHyperVEnabled())

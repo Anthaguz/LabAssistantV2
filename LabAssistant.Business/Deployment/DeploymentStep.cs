@@ -10,6 +10,7 @@ public abstract class DeploymentStep
 {
     protected DeploymentStep? _next;
     protected virtual string StepKey => GetType().Name;
+    protected virtual string StepLabel => StepKey;
 
     public DeploymentStep SetNext(DeploymentStep next)
     {
@@ -20,12 +21,15 @@ public abstract class DeploymentStep
     public async Task ExecuteAsync(VmDeploymentContext context)
     {
         var stepKey = StepKey;
+        var stepLabel = StepLabel;
         if (context.ShouldAbort?.Invoke() == true)
         {
             context.MarkCancelled();
             return;
         }
         if (!context.IsSuccess && context.PerVmFailFast) return;
+        context.EmitStepState(stepKey, stepLabel, DeployStepState.Pending);
+        context.EmitStepState(stepKey, stepLabel, DeployStepState.Running);
         EmitStepEvent(context, "StepStarted", "info", null, stepKey);
         try
         {
@@ -39,12 +43,25 @@ public abstract class DeploymentStep
                 "error",
                 "exception",
                 stepKey,
-                RuntimeErrorMetadataNormalizer.Merge(
+                    RuntimeErrorMetadataNormalizer.Merge(
                     new Dictionary<string, object?> { ["errorMessage"] = ex.Message },
                     RuntimeErrorMetadataNormalizer.FromException(ex)));
+            context.EmitStepState(stepKey, stepLabel, DeployStepState.Failed, ex.Message);
             throw;
         }
-        EmitStepEvent(context, "StepCompleted", "info", context.IsSuccess ? "success" : "failed", stepKey);
+        var terminalState = context.TryConsumeStepTerminalOverride(stepKey, out var overrideState, out var overrideMessage)
+            ? overrideState
+            : context.IsSuccess
+                ? DeployStepState.Succeeded
+                : DeployStepState.Failed;
+        var stepResult = terminalState switch
+        {
+            DeployStepState.Succeeded => "success",
+            DeployStepState.Skipped => "skipped",
+            _ => "failed"
+        };
+        EmitStepEvent(context, "StepCompleted", "info", stepResult, stepKey);
+        context.EmitStepState(stepKey, stepLabel, terminalState, overrideMessage);
         if (context.ShouldAbort?.Invoke() == true)
         {
             context.MarkCancelled();

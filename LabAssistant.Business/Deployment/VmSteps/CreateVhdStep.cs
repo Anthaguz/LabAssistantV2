@@ -9,6 +9,8 @@ public class CreateVhdStep : DeploymentStep
 {
     private readonly ISessionResolver _resolver;
     private readonly Func<IPersistentPowerShellSession, IHyperVService> _hyperVFactory;
+    protected override string StepKey => DeploymentStepKeys.CreateVhd;
+    protected override string StepLabel => "Create differencing disk";
 
     public CreateVhdStep(ISessionResolver resolver, Func<IPersistentPowerShellSession, IHyperVService> hyperVFactory)
     {

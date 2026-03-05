@@ -1694,6 +1694,64 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-018 - Deploy Backend-to-UI Step-State Event Contract (AH3)
+
+**Related FRs:** FR-098, FR-099, FR-095, FR-096
+
+## Scenarios
+
+### 1) Explicit per-step event payload contract
+**Given**
+- Deploy orchestration executes per-VM steps in from-template or quick deploy
+
+**When**
+- A step changes state
+
+**Then**
+- Backend emits explicit step-state update payload with required fields:
+  - `operationId`
+  - `vmId`
+  - `vmName`
+  - `stepKey`
+  - `stepLabel`
+  - `state` (`Pending`, `Running`, `Succeeded`, `Failed`, `Skipped`)
+  - `timestampUtc`
+  - deterministic per-VM `sequence`
+- Optional concise `message` may be included
+
+### 2) Deterministic ordering and terminal semantics
+**Given**
+- Step-state updates are emitted for a VM
+
+**When**
+- Timeline projection consumes updates
+
+**Then**
+- Step ordering is deterministic by per-VM sequence
+- One step label transitions through states over time without duplicate start/complete rows
+- Failed step transitions are terminal for that step
+- Skipped optional steps are represented consistently in event stream
+
+### 3) WinUI source-of-truth integration
+**Given**
+- Deploy right-panel timeline is visible
+
+**When**
+- Deployment progresses
+
+**Then**
+- Timeline state updates are driven by backend step-state stream
+- Text/status messages may supplement summaries but do not drive state inference
+- AF/AG route behavior and right-panel ownership behavior remain unchanged
+
+## Definition of Done
+- [ ] Backend step-state payload contract is explicit and testable
+- [ ] Deterministic per-VM sequence and terminal semantics are explicit and testable
+- [ ] WinUI timeline uses explicit step-state updates as source-of-truth
+- [ ] AF/AG route + AH2 panel ownership non-regression is explicit and testable
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules

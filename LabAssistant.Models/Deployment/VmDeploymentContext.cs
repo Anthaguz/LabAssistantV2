@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using LabAssistant.Models.PowerShell;
 using LabAssistant.Models.Templates;
 
@@ -60,12 +61,60 @@ namespace LabAssistant.Models.Deployment
         public PowerShellHandle? PowerShellHandle { get; set; }
         public Action<string>? LogCallback { get; set; }
         public Action<string, string, string?, IReadOnlyDictionary<string, object?>?>? StructuredEventEmitter { get; set; }
+        public Action<DeployStepStateUpdate>? StepStateEmitter { get; set; }
         public Action? OnBlockingFailure { get; set; }
         public Func<bool>? ShouldAbort { get; set; }
+        public string OperationId { get; set; } = string.Empty;
+
+        private readonly Dictionary<string, (DeployStepState State, string? Message)> _stepTerminalOverrides = new(StringComparer.OrdinalIgnoreCase);
+        private long _stepStateSequence;
 
         public bool IsStepNonBlocking(string stepKey)
         {
             return NonBlockingOptionalSteps != null && NonBlockingOptionalSteps.Contains(stepKey);
+        }
+
+        public void EmitStepState(
+            string stepKey,
+            string stepLabel,
+            DeployStepState state,
+            string? message = null)
+        {
+            if (StepStateEmitter is null || string.IsNullOrWhiteSpace(OperationId))
+            {
+                return;
+            }
+
+            StepStateEmitter.Invoke(new DeployStepStateUpdate(
+                OperationId: OperationId,
+                VmId: VmId,
+                VmName: VmName,
+                StepKey: stepKey,
+                StepLabel: stepLabel,
+                State: state,
+                Message: message,
+                TimestampUtc: DateTimeOffset.UtcNow,
+                Sequence: Interlocked.Increment(ref _stepStateSequence)));
+        }
+
+        public void SetStepTerminalOverride(string stepKey, DeployStepState state, string? message = null)
+        {
+            _stepTerminalOverrides[stepKey] = (state, message);
+        }
+
+        public bool TryConsumeStepTerminalOverride(string stepKey, out DeployStepState state, out string? message)
+        {
+            if (_stepTerminalOverrides.TryGetValue(stepKey, out var value))
+            {
+                state = value.State;
+                message = value.Message;
+                _stepTerminalOverrides.Remove(stepKey);
+                return true;
+            }
+
+            state = default;
+            message = null;
+            return false;
         }
 
         public void MarkFailure(
@@ -164,6 +213,10 @@ namespace LabAssistant.Models.Deployment
             Logs.Clear();
             PowerShellHandle = null;
             StructuredEventEmitter = null;
+            StepStateEmitter = null;
+            OperationId = string.Empty;
+            _stepTerminalOverrides.Clear();
+            Interlocked.Exchange(ref _stepStateSequence, 0);
         }
     }
 }

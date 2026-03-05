@@ -10,6 +10,8 @@ namespace LabAssistant.Business.Deployment
     {
         private readonly ISessionResolver _resolver;
         private readonly Func<IPersistentPowerShellSession, IHyperVService> _hyperVFactory;
+        protected override string StepKey => DeploymentStepKeys.EnableGuestServices;
+        protected override string StepLabel => "Enable guest services";
 
         public EnableGuestServicesStep(ISessionResolver resolver, Func<IPersistentPowerShellSession, IHyperVService> hyperVFactory)
         {

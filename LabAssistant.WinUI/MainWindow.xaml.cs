@@ -1014,6 +1014,7 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
+        var previousName = _selectedDeployOnTheFlyVmEntry.Name;
         _selectedDeployOnTheFlyVmEntry.Name = vmName;
         _selectedDeployOnTheFlyVmEntry.MemoryMb = memoryMb;
         _selectedDeployOnTheFlyVmEntry.CpuCount = cpuCount;
@@ -1048,7 +1049,31 @@ public sealed partial class MainWindow : Window
             DeployOnTheFlyStatusTextBlock.Text = $"Updated '{vmName}'.";
         }
 
+        if (!string.Equals(previousName, vmName, StringComparison.Ordinal))
+        {
+            RefreshDeployOnTheFlyVmEntriesList();
+        }
+
         return true;
+    }
+
+    private void RefreshDeployOnTheFlyVmEntriesList()
+    {
+        var selectedVmId = _selectedDeployOnTheFlyVmEntry?.VmId;
+        DeployOnTheFlyVmEntriesListView.ItemsSource = null;
+        DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyVmEntries;
+
+        if (string.IsNullOrWhiteSpace(selectedVmId))
+        {
+            return;
+        }
+
+        var selected = _deployOnTheFlyVmEntries.FirstOrDefault(vm =>
+            string.Equals(vm.VmId, selectedVmId, StringComparison.OrdinalIgnoreCase));
+        if (selected is not null)
+        {
+            DeployOnTheFlyVmEntriesListView.SelectedItem = selected;
+        }
     }
 
     private async Task EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode mode)
@@ -1615,7 +1640,27 @@ public sealed partial class MainWindow : Window
                     return;
                 }
 
-                state.AddLogLine(message);
+                state.UpdateSummaryMessage(message);
+                if (isOnTheFly)
+                {
+                    UpdateDeployOnTheFlyResultRows();
+                    UpdateDeployOnTheFlyUi();
+                }
+                else
+                {
+                    UpdateDeployResultRows();
+                    UpdateDeployUi();
+                }
+            });
+
+            vmContext.StepStateEmitter = update => DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!stateByVm.TryGetValue(vmName, out var state))
+                {
+                    return;
+                }
+
+                state.ApplyStepStateUpdate(update);
                 if (isOnTheFly)
                 {
                     UpdateDeployOnTheFlyResultRows();
@@ -1632,38 +1677,40 @@ public sealed partial class MainWindow : Window
 
     private static IReadOnlyList<DeployTimelineStepDefinition> BuildExpectedDeploySteps(VmDeploymentContext context)
     {
-        var stepDefinitions = new List<DeployTimelineStepDefinition>
+        var steps = new List<DeployTimelineStepDefinition>
         {
-            new("Create VM folder", "creating folder for vm", "created folder for vm"),
-            new("Create differencing disk", "creating differencing vhd", "created vhd"),
-            new("Create VM", "creating vm", "created vm"),
-            new("Add network adapter", "adding network adapter", "added "),
-            new("Configure VM", "configurevmstep", "configuring vm"),
-            new("Enable guest services", "enabling vm guest services", "enabled vm guest services"),
-            new("Start VM", "starting vm", "started vm")
+            new(DeploymentStepKeys.CheckHyperV, "Check Hyper-V"),
+            new(DeploymentStepKeys.CreateVmFolder, "Create VM folder"),
+            new(DeploymentStepKeys.CreateVhd, "Create differencing disk"),
+            new(DeploymentStepKeys.CreateVm, "Create VM"),
+            new(DeploymentStepKeys.AddNicToVm, "Add network adapter"),
+            new(DeploymentStepKeys.ConfigureVm, "Configure VM"),
+            new(DeploymentStepKeys.EnableGuestServices, "Enable guest services"),
+            new(DeploymentStepKeys.DisableVmCheckpoints, "Disable VM checkpoints"),
+            new(DeploymentStepKeys.StartVm, "Start VM")
         };
 
         if (context.ConfigureTimeZone)
         {
-            stepDefinitions.Add(new DeployTimelineStepDefinition("Set time zone", "settimezone"));
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.SetTimeZone, "Set Time Zone"));
         }
 
         if (context.InstallSoftware)
         {
-            stepDefinitions.Add(new DeployTimelineStepDefinition("Install software", "installsoftware"));
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallSoftware, "Install Software"));
         }
 
         if (context.InstallRole)
         {
-            stepDefinitions.Add(new DeployTimelineStepDefinition("Install role", "installrole"));
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallRole, "Install Role"));
         }
 
         if (context.ConfigureNetworkInformation)
         {
-            stepDefinitions.Add(new DeployTimelineStepDefinition("Configure network information", "configurenetworkinformation"));
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.ConfigureNetworkInformation, "Configure Network Information"));
         }
 
-        return stepDefinitions;
+        return steps;
     }
 
     private static IReadOnlyList<DeployTimelineStepRow> CreateReadinessTimelineSteps(
@@ -4813,8 +4860,8 @@ public sealed partial class MainWindow : Window
 
 
     private sealed record DeployTimelineStepDefinition(
-        string Label,
-        params string[] MatchTokens);
+        string StepKey,
+        string Label);
 
     private sealed record DeployTimelineStepRow(
         string Label,
@@ -4831,15 +4878,20 @@ public sealed partial class MainWindow : Window
 
     private sealed class DeployVmProgressState
     {
-        private readonly IReadOnlyList<DeployTimelineStepDefinition> _expectedSteps;
-        private readonly Dictionary<string, DeployTimelineStepState> _stepStates;
+        private readonly Dictionary<string, DeployTimelineStepState> _stepStatesByKey;
+        private readonly Dictionary<string, string> _stepLabelsByKey;
+        private readonly List<string> _stepOrder;
 
         public DeployVmProgressState(string vmName, IReadOnlyList<DeployTimelineStepDefinition> expectedSteps)
         {
             VmName = vmName;
-            _expectedSteps = expectedSteps;
-            _stepStates = _expectedSteps.ToDictionary(
+            _stepOrder = expectedSteps.Select(step => step.StepKey).ToList();
+            _stepLabelsByKey = expectedSteps.ToDictionary(
+                step => step.StepKey,
                 step => step.Label,
+                StringComparer.OrdinalIgnoreCase);
+            _stepStatesByKey = expectedSteps.ToDictionary(
+                step => step.StepKey,
                 _ => DeployTimelineStepState.Pending,
                 StringComparer.OrdinalIgnoreCase);
             Status = "Queued";
@@ -4855,96 +4907,94 @@ public sealed partial class MainWindow : Window
 
         public int ProgressPercent { get; private set; }
 
-        public void AddLogLine(string message)
+        public void ApplyStepStateUpdate(DeployStepStateUpdate update)
+        {
+            if (string.IsNullOrWhiteSpace(update.StepKey))
+            {
+                return;
+            }
+
+            if (!_stepStatesByKey.ContainsKey(update.StepKey))
+            {
+                _stepStatesByKey[update.StepKey] = DeployTimelineStepState.Pending;
+                _stepOrder.Add(update.StepKey);
+            }
+
+            if (!string.IsNullOrWhiteSpace(update.StepLabel))
+            {
+                _stepLabelsByKey[update.StepKey] = update.StepLabel;
+            }
+
+            var mappedState = MapState(update.State);
+            var currentState = _stepStatesByKey[update.StepKey];
+            if (IsTerminal(currentState) && !IsTerminal(mappedState))
+            {
+                return;
+            }
+
+            _stepStatesByKey[update.StepKey] = mappedState;
+            Status = mappedState switch
+            {
+                DeployTimelineStepState.Pending => "Queued",
+                DeployTimelineStepState.Running => "Running",
+                DeployTimelineStepState.Succeeded => "Succeeded",
+                DeployTimelineStepState.Failed => "Failed",
+                DeployTimelineStepState.Skipped => "Skipped",
+                _ => Status
+            };
+            if (!string.IsNullOrWhiteSpace(update.Message))
+            {
+                Summary = update.Message.Trim();
+            }
+            else if (string.IsNullOrWhiteSpace(Summary) || Status == "Queued")
+            {
+                Summary = $"{ResolveStepLabel(update.StepKey)}: {Status}";
+            }
+
+            RefreshProgress();
+        }
+
+        public void UpdateSummaryMessage(string? message)
         {
             if (string.IsNullOrWhiteSpace(message))
             {
                 return;
             }
 
-            var trimmed = message.Trim();
-            var normalized = trimmed.ToLowerInvariant();
-            var isFailure = normalized.Contains("failed", StringComparison.Ordinal) ||
-                            normalized.Contains("error", StringComparison.Ordinal);
-            var isSuccess = normalized.Contains("completed", StringComparison.Ordinal) ||
-                            normalized.Contains("succeeded", StringComparison.Ordinal) ||
-                            normalized.Contains("done", StringComparison.Ordinal);
-
-            var matchedStep = _expectedSteps.FirstOrDefault(step =>
-                step.MatchTokens.Any(token => normalized.Contains(token, StringComparison.Ordinal)));
-
-            if (matchedStep is not null)
-            {
-                var state = isFailure
-                    ? DeployTimelineStepState.Failed
-                    : isSuccess
-                        ? DeployTimelineStepState.Succeeded
-                        : DeployTimelineStepState.Running;
-
-                if (state == DeployTimelineStepState.Running)
-                {
-                    foreach (var label in _stepStates.Keys.ToList())
-                    {
-                        if (string.Equals(label, matchedStep.Label, StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
-
-                        if (_stepStates[label] == DeployTimelineStepState.Running)
-                        {
-                            _stepStates[label] = DeployTimelineStepState.Succeeded;
-                        }
-                    }
-                }
-
-                var currentState = _stepStates[matchedStep.Label];
-                if (currentState != DeployTimelineStepState.Failed)
-                {
-                    _stepStates[matchedStep.Label] = state;
-                }
-            }
-
-            if (isFailure)
-            {
-                Status = "Failed";
-                Summary = trimmed;
-            }
-            else
-            {
-                Status = "Running";
-                Summary = trimmed;
-            }
-
-            RefreshProgress();
+            Summary = message.Trim();
         }
 
         public void MarkCompleted(string status, string summary)
         {
             var isFailed = status.Contains("failed", StringComparison.OrdinalIgnoreCase);
             var isCancelled = status.Contains("cancel", StringComparison.OrdinalIgnoreCase);
+            var hasStepFailure = _stepStatesByKey.Values.Any(state => state == DeployTimelineStepState.Failed);
+            var effectiveFailed = isFailed || hasStepFailure;
 
-            foreach (var label in _stepStates.Keys.ToList())
+            foreach (var stepKey in _stepStatesByKey.Keys.ToList())
             {
-                var state = _stepStates[label];
+                var state = _stepStatesByKey[stepKey];
                 if (state == DeployTimelineStepState.Running)
                 {
-                    _stepStates[label] = isFailed ? DeployTimelineStepState.Failed : isCancelled ? DeployTimelineStepState.Skipped : DeployTimelineStepState.Succeeded;
+                    _stepStatesByKey[stepKey] = effectiveFailed ? DeployTimelineStepState.Failed : isCancelled ? DeployTimelineStepState.Skipped : DeployTimelineStepState.Succeeded;
                 }
                 else if (state == DeployTimelineStepState.Pending)
                 {
-                    _stepStates[label] = isCancelled ? DeployTimelineStepState.Skipped : isFailed ? DeployTimelineStepState.Failed : DeployTimelineStepState.Succeeded;
+                    _stepStatesByKey[stepKey] = isCancelled ? DeployTimelineStepState.Skipped : effectiveFailed ? DeployTimelineStepState.Failed : DeployTimelineStepState.Succeeded;
                 }
             }
 
-            Status = status;
+            Status = effectiveFailed && !status.Contains("failed", StringComparison.OrdinalIgnoreCase)
+                ? "Failed"
+                : status;
             Summary = summary;
             ProgressPercent = 100;
         }
 
         public DeployVmResultRow ToRow()
         {
-            var timelineSteps = _expectedSteps
-                .Select(step => new DeployTimelineStepRow(step.Label, _stepStates[step.Label]))
+            var timelineSteps = _stepOrder
+                .Select(stepKey => new DeployTimelineStepRow(ResolveStepLabel(stepKey), _stepStatesByKey[stepKey]))
                 .Where(step => step.State != DeployTimelineStepState.Skipped)
                 .ToList();
 
@@ -4964,16 +5014,42 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            if (_stepStates.Count == 0)
+            var visibleStates = _stepStatesByKey.Values.Where(state => state != DeployTimelineStepState.Skipped).ToList();
+            if (visibleStates.Count == 0)
             {
                 ProgressPercent = 50;
                 return;
             }
 
-            var terminalSteps = _stepStates.Values.Count(state =>
+            var terminalSteps = visibleStates.Count(state =>
                 state == DeployTimelineStepState.Succeeded || state == DeployTimelineStepState.Failed);
-            var rawProgress = (int)Math.Round((double)terminalSteps / _stepStates.Count * 100d, MidpointRounding.AwayFromZero);
+            var rawProgress = (int)Math.Round((double)terminalSteps / visibleStates.Count * 100d, MidpointRounding.AwayFromZero);
             ProgressPercent = Math.Clamp(rawProgress, 5, 99);
+        }
+
+        private string ResolveStepLabel(string stepKey)
+        {
+            return _stepLabelsByKey.TryGetValue(stepKey, out var label) && !string.IsNullOrWhiteSpace(label)
+                ? label
+                : stepKey;
+        }
+
+        private static DeployTimelineStepState MapState(DeployStepState state)
+        {
+            return state switch
+            {
+                DeployStepState.Pending => DeployTimelineStepState.Pending,
+                DeployStepState.Running => DeployTimelineStepState.Running,
+                DeployStepState.Succeeded => DeployTimelineStepState.Succeeded,
+                DeployStepState.Failed => DeployTimelineStepState.Failed,
+                DeployStepState.Skipped => DeployTimelineStepState.Skipped,
+                _ => DeployTimelineStepState.Pending
+            };
+        }
+
+        private static bool IsTerminal(DeployTimelineStepState state)
+        {
+            return state is DeployTimelineStepState.Succeeded or DeployTimelineStepState.Failed or DeployTimelineStepState.Skipped;
         }
     }
 
