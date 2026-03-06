@@ -27,7 +27,7 @@
             <TextBlock
                 Grid.Row="1"
                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Scaffold-only WinUI Base Disks surface with explicit list, details, actions, and state regions. Runtime catalog wiring lands in AJ3."
+                Text="Manage registered base disks with in-context metadata editing, validation visibility, and registry-only removal."
                 TextWrapping="Wrap" />
 
             <Border
@@ -66,7 +66,7 @@
                         Grid.Column="4"
                         VerticalAlignment="Center"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Placeholder actions only in AJ2."
+                        Text="Registry-only removal. Active runtime consumer detection is not implemented in AJ3."
                         TextAlignment="Right"
                         TextWrapping="Wrap" />
                 </Grid>
@@ -128,8 +128,24 @@
                             x:Name="AssetsBaseDisksListView"
                             Grid.Row="1"
                             SelectionMode="Single">
-                            <ListViewItem Content="Scaffold item placeholder" />
-                            <ListViewItem Content="Selection context will wire in AJ3" />
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding DisplayName}" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{Binding SecondaryText}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{Binding ValidationSummary}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
                         </ListView>
                     </Grid>
                 </Border>
@@ -152,7 +168,17 @@
                             <TextBlock
                                 x:Name="AssetsBaseDisksSelectedDiskSummaryTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="No runtime-selected disk yet. AJ2 reserves this region for selected-item details and readiness summary."
+                                Text="Select a base disk to inspect metadata, validation state, and registry-only removal warnings."
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="AssetsBaseDisksSelectedDiskValidationTextBlock"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Validation has not been evaluated."
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="AssetsBaseDisksReferenceWarningTextBlock"
+                                Foreground="{StaticResource ShellWarnBrush}"
+                                Text="No removal assessment has been performed."
                                 TextWrapping="Wrap" />
 
                             <Border
@@ -171,41 +197,89 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <TextBlock
                                         Grid.Row="0"
                                         Grid.Column="0"
                                         VerticalAlignment="Center"
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                        Text="Label" />
+                                        Text="OS name" />
                                     <TextBox
-                                        x:Name="AssetsBaseDisksLabelTextBox"
+                                        x:Name="AssetsBaseDisksOsNameTextBox"
                                         Grid.Row="0"
                                         Grid.Column="1"
-                                        PlaceholderText="Friendly label (surface only)" />
+                                        PlaceholderText="Windows Server" />
                                     <TextBlock
                                         Grid.Row="1"
                                         Grid.Column="0"
                                         VerticalAlignment="Center"
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                        Text="OS classification" />
+                                        Text="OS version" />
                                     <TextBox
-                                        x:Name="AssetsBaseDisksOsClassificationTextBox"
+                                        x:Name="AssetsBaseDisksOsVersionTextBox"
                                         Grid.Row="1"
                                         Grid.Column="1"
-                                        PlaceholderText="OS classification (surface only)" />
+                                        PlaceholderText="2022" />
                                     <TextBlock
                                         Grid.Row="2"
                                         Grid.Column="0"
                                         VerticalAlignment="Center"
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"
                                         Text="Path" />
+                                    <Grid Grid.Row="2" Grid.Column="1" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox
+                                            x:Name="AssetsBaseDisksPathTextBox"
+                                            Grid.Column="0"
+                                            IsReadOnly="True"
+                                            PlaceholderText="Select a VHDX path to register or edit." />
+                                        <Button
+                                            x:Name="AssetsBaseDisksBrowsePathButton"
+                                            Grid.Column="1"
+                                            Content="Browse" />
+                                    </Grid>
+                                    <TextBlock
+                                        Grid.Row="3"
+                                        Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        Text="Generation" />
                                     <TextBox
-                                        x:Name="AssetsBaseDisksPathTextBox"
-                                        Grid.Row="2"
+                                        x:Name="AssetsBaseDisksGenerationTextBox"
+                                        Grid.Row="3"
                                         Grid.Column="1"
-                                        IsReadOnly="True"
-                                        PlaceholderText="Disk path and metadata summary appear here in AJ3" />
+                                        PlaceholderText="1 or 2" />
+                                    <TextBlock
+                                        Grid.Row="4"
+                                        Grid.Column="0"
+                                        VerticalAlignment="Top"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        Text="Notes" />
+                                    <TextBox
+                                        x:Name="AssetsBaseDisksNotesTextBox"
+                                        Grid.Row="4"
+                                        Grid.Column="1"
+                                        AcceptsReturn="True"
+                                        MinHeight="72"
+                                        TextWrapping="Wrap"
+                                        PlaceholderText="Optional notes" />
+                                    <StackPanel
+                                        Grid.Row="5"
+                                        Grid.Column="0"
+                                        Grid.ColumnSpan="2"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        Spacing="8">
+                                        <Button
+                                            x:Name="AssetsBaseDisksSaveMetadataButton"
+                                            Content="Save Metadata" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </StackPanel>
@@ -239,6 +313,7 @@
                                 FontWeight="SemiBold"
                                 Text="Loading State" />
                             <TextBlock
+                                x:Name="AssetsBaseDisksLoadingStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                                 Text="Use this region to show catalog loading progress without hiding the capability surface."
                                 TextWrapping="Wrap" />
@@ -259,6 +334,7 @@
                                 FontWeight="SemiBold"
                                 Text="Empty State" />
                             <TextBlock
+                                x:Name="AssetsBaseDisksEmptyStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                                 Text="Use this region to explain that no base disks are registered and point users toward import/register."
                                 TextWrapping="Wrap" />
@@ -279,6 +355,7 @@
                                 FontWeight="SemiBold"
                                 Text="Error State" />
                             <TextBlock
+                                x:Name="AssetsBaseDisksErrorStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                                 Text="Use this region to show actionable load/refresh/import failure messaging without collapsing the surface."
                                 TextWrapping="Wrap" />

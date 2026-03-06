@@ -12,10 +12,11 @@ internal static class NativeFileDialogs
     private const int OfnExplorer = 0x00080000;
     private const int OfnNoChangeDir = 0x00000008;
     private const string JsonFilter = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0\0";
+    private const string VhdxFilter = "VHDX files (*.vhdx)\0*.vhdx\0All files (*.*)\0*.*\0\0";
 
     public static string? ShowOpenJsonDialog(nint ownerWindow)
     {
-        using var context = CreateDialogContext(ownerWindow);
+        using var context = CreateDialogContext(ownerWindow, JsonFilter, "json");
         context.Dialog.lpstrTitle = "Import Template";
         context.Dialog.Flags = OfnExplorer | OfnPathMustExist | OfnFileMustExist | OfnNoChangeDir;
         if (GetOpenFileName(ref context.Dialog))
@@ -29,7 +30,7 @@ internal static class NativeFileDialogs
 
     public static string? ShowSaveJsonDialog(nint ownerWindow, string suggestedFileName)
     {
-        using var context = CreateDialogContext(ownerWindow);
+        using var context = CreateDialogContext(ownerWindow, JsonFilter, "json");
         context.Dialog.lpstrTitle = "Export Template";
         context.Dialog.Flags = OfnExplorer | OfnPathMustExist | OfnOverwritePrompt | OfnNoChangeDir;
         if (!string.IsNullOrWhiteSpace(suggestedFileName))
@@ -46,7 +47,21 @@ internal static class NativeFileDialogs
         return null;
     }
 
-    private static DialogContext CreateDialogContext(nint ownerWindow)
+    public static string? ShowOpenVhdxDialog(nint ownerWindow)
+    {
+        using var context = CreateDialogContext(ownerWindow, VhdxFilter, "vhdx");
+        context.Dialog.lpstrTitle = "Select Base Disk";
+        context.Dialog.Flags = OfnExplorer | OfnPathMustExist | OfnFileMustExist | OfnNoChangeDir;
+        if (GetOpenFileName(ref context.Dialog))
+        {
+            return ReadNullTerminatedString(context.Dialog.lpstrFile);
+        }
+
+        ThrowIfDialogError("Open VHDX dialog failed");
+        return null;
+    }
+
+    private static DialogContext CreateDialogContext(nint ownerWindow, string filter, string defaultExtension)
     {
         var fileBuffer = Marshal.AllocHGlobal(MaxPathChars * sizeof(char));
         var fileTitleBuffer = Marshal.AllocHGlobal(MaxFileTitleChars * sizeof(char));
@@ -57,14 +72,14 @@ internal static class NativeFileDialogs
         {
             lStructSize = Marshal.SizeOf<OPENFILENAME>(),
             hwndOwner = ownerWindow,
-            lpstrFilter = JsonFilter,
+            lpstrFilter = filter,
             nFilterIndex = 1,
             lpstrFile = fileBuffer,
             nMaxFile = MaxPathChars,
             lpstrFileTitle = fileTitleBuffer,
             nMaxFileTitle = MaxFileTitleChars,
             lpstrInitialDir = string.Empty,
-            lpstrDefExt = "json",
+            lpstrDefExt = defaultExtension,
             lpstrCustomFilter = string.Empty,
             lpstrTitle = string.Empty,
             lpTemplateName = string.Empty

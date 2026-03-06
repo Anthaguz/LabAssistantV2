@@ -31,9 +31,35 @@ public sealed partial class AssetsBaseDisksView : UserControl
 
     public Border AssetsBaseDisksMetadataEditRegionControl => AssetsBaseDisksMetadataEditRegion;
 
+    public TextBlock AssetsBaseDisksSelectedDiskSummaryTextBlockControl => AssetsBaseDisksSelectedDiskSummaryTextBlock;
+
+    public TextBlock AssetsBaseDisksSelectedDiskValidationTextBlockControl => AssetsBaseDisksSelectedDiskValidationTextBlock;
+
+    public TextBlock AssetsBaseDisksReferenceWarningTextBlockControl => AssetsBaseDisksReferenceWarningTextBlock;
+
+    public TextBox AssetsBaseDisksOsNameTextBoxControl => AssetsBaseDisksOsNameTextBox;
+
+    public TextBox AssetsBaseDisksOsVersionTextBoxControl => AssetsBaseDisksOsVersionTextBox;
+
+    public TextBox AssetsBaseDisksPathTextBoxControl => AssetsBaseDisksPathTextBox;
+
+    public Button AssetsBaseDisksBrowsePathButtonControl => AssetsBaseDisksBrowsePathButton;
+
+    public TextBox AssetsBaseDisksGenerationTextBoxControl => AssetsBaseDisksGenerationTextBox;
+
+    public TextBox AssetsBaseDisksNotesTextBoxControl => AssetsBaseDisksNotesTextBox;
+
+    public Button AssetsBaseDisksSaveMetadataButtonControl => AssetsBaseDisksSaveMetadataButton;
+
     public Border AssetsBaseDisksLoadingStatePanelControl => AssetsBaseDisksLoadingStatePanel;
 
     public Border AssetsBaseDisksEmptyStatePanelControl => AssetsBaseDisksEmptyStatePanel;
 
     public Border AssetsBaseDisksErrorStatePanelControl => AssetsBaseDisksErrorStatePanel;
+
+    public TextBlock AssetsBaseDisksLoadingStateTextBlockControl => AssetsBaseDisksLoadingStateTextBlock;
+
+    public TextBlock AssetsBaseDisksEmptyStateTextBlockControl => AssetsBaseDisksEmptyStateTextBlock;
+
+    public TextBlock AssetsBaseDisksErrorStateTextBlockControl => AssetsBaseDisksErrorStateTextBlock;
 }
