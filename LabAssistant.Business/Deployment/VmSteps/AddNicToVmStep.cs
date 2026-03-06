@@ -9,6 +9,8 @@ public class AddNicToVmStep : DeploymentStep
 {
     private readonly ISessionResolver _resolver;
     private readonly Func<IPersistentPowerShellSession, IHyperVService> _hyperVFactory;
+    protected override string StepKey => DeploymentStepKeys.AddNicToVm;
+    protected override string StepLabel => "Add network adapter";
 
     public AddNicToVmStep(ISessionResolver resolver, Func<IPersistentPowerShellSession, IHyperVService> hyperVFactory)
     {

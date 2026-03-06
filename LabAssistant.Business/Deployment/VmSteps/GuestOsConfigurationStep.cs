@@ -13,6 +13,7 @@ namespace LabAssistant.Business.Deployment
         protected virtual bool IsImplementedStep => true;
 
         protected override string StepKey => GuestStepKey;
+        protected override string StepLabel => GuestStepDisplayName;
 
         protected override async Task HandleAsync(VmDeploymentContext context)
         {
@@ -44,6 +45,7 @@ namespace LabAssistant.Business.Deployment
         {
             context.Logs.Add(message);
             DebugLogger.Log($"[GuestOsConfigurationStep] {message}");
+            context.SetStepTerminalOverride(GuestStepKey, DeployStepState.Skipped, message);
             context.RecordGuestStepOutcome(GuestStepKey, GuestStepDisplayName, GuestStepOutcomeResults.Skipped, skipReason, message);
             EmitStepEvent(
                 context,

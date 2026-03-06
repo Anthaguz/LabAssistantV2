@@ -9,9 +9,12 @@ public sealed class MilestoneAHScenarioMatrixTests
     public void DeployTimeline_DefinesCanonicalStepStateModel()
     {
         var stateSource = LoadTimelineStateSource();
+        var deploymentStepStateSource = LoadDeploymentStepStateContractSource();
         var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("public enum DeployTimelineStepState", stateSource);
+        Assert.Contains("public enum DeployStepState", deploymentStepStateSource);
+        Assert.Contains("public sealed record DeployStepStateUpdate", deploymentStepStateSource);
         Assert.Contains("Pending", stateSource);
         Assert.Contains("Running", stateSource);
         Assert.Contains("Succeeded", stateSource);
@@ -42,8 +45,9 @@ public sealed class MilestoneAHScenarioMatrixTests
         var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains(".Where(step => step.State != DeployTimelineStepState.Skipped)", mainWindowSource);
-        Assert.Contains("_stepStates[label] == DeployTimelineStepState.Running", mainWindowSource);
-        Assert.Contains("_stepStates[label] = DeployTimelineStepState.Succeeded;", mainWindowSource);
+        Assert.Contains("state.ApplyStepStateUpdate(update);", mainWindowSource);
+        Assert.Contains("private static DeployTimelineStepState MapState(DeployStepState state)", mainWindowSource);
+        Assert.Contains("public void ApplyStepStateUpdate(DeployStepStateUpdate update)", mainWindowSource);
         Assert.Contains("public void MarkCompleted(string status, string summary)", mainWindowSource);
     }
 
@@ -110,6 +114,12 @@ public sealed class MilestoneAHScenarioMatrixTests
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeploymentStepStateContractSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.Models", "Deployment", "DeployStepStateUpdate.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

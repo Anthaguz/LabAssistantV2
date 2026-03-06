@@ -436,6 +436,14 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** active capability decides panel content owner; switching capabilities resets panel content state to the new owner contract; panel defaults collapsed unless owner marks active run context; compact-width fallback collapses panel; right panel owns internal vertical scroll.
   - **Priority:** P1
 
+- **FR-098:** Deploy orchestration shall emit explicit per-VM step-state updates for UI timeline consumption in both from-template and quick deploy flows.
+  - **Acceptance details:** each update includes `operationId`, `vmId`, `vmName`, `stepKey`, `stepLabel`, `state`, `timestampUtc`, and deterministic per-VM `sequence`; optional concise message is allowed.
+  - **Priority:** P1
+
+- **FR-099:** WinUI Deploy timeline projection shall consume explicit step-state updates as source-of-truth rather than relying on status-text inference.
+  - **Acceptance details:** one step label transitions through state changes over time; per-VM ordering remains deterministic; failed steps are terminal; skipped representation follows AH timeline display policy.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.

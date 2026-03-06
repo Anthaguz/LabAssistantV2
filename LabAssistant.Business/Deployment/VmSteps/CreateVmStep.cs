@@ -9,6 +9,8 @@ public class CreateVmStep : DeploymentStep
 {
     private readonly ISessionResolver _resolver;
     private readonly Func<IPersistentPowerShellSession, IHyperVService> _hyperVFactory;
+    protected override string StepKey => DeploymentStepKeys.CreateVm;
+    protected override string StepLabel => "Create VM";
 
     public CreateVmStep(ISessionResolver resolver, Func<IPersistentPowerShellSession, IHyperVService> hyperVFactory)
     {

@@ -110,6 +110,7 @@ Canonical timeline row contract:
 - state drives spinner/icon rendering
 - skipped/non-applicable rows are hidden
 - nested parent rows are hidden when no child step executes
+- timeline state source is backend step-state update payload contract (AH3), not status-text inference
 
 ---
 

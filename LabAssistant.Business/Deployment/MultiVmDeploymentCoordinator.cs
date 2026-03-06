@@ -48,6 +48,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
 
             _sessionResolver.RegisterSession(handle, session);
             context.PowerShellHandle = handle;
+            context.OperationId = multiContext.OperationId;
             context.StructuredEventEmitter = (eventName, level, result, extraContext) =>
                 EmitVmScopedEvent(eventName, level, multiContext, context, result, extraContext);
             EmitVmScopedEvent("VmDeployStarted", "info", multiContext, context, "started");
@@ -119,6 +120,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             {
                 EmitVmTerminalEvent(multiContext, context);
                 context.StructuredEventEmitter = null;
+                context.StepStateEmitter = null;
                 session.Dispose();
                 _sessionResolver.RemoveSession(handle);
                 DebugLogger.Log($"Disposed session for VM: {context.VmName}");

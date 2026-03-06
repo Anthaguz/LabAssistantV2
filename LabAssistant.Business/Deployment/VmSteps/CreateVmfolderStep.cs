@@ -9,6 +9,9 @@ namespace LabAssistant.Business.Deployment;
 
 public class CreateVmFolderStep : DeploymentStep
 {
+    protected override string StepKey => DeploymentStepKeys.CreateVmFolder;
+    protected override string StepLabel => "Create VM folder";
+
     protected override async Task HandleAsync(VmDeploymentContext context)
     {
         context.LogCallback?.Invoke($"Creating folder for VM '{context.VmName}'...");
