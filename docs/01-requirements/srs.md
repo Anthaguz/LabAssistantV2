@@ -444,6 +444,22 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** one step label transitions through state changes over time; per-VM ordering remains deterministic; failed steps are terminal; skipped representation follows AH timeline display policy.
   - **Priority:** P1
 
+- **FR-100:** WinUI `Assets` shall expose a canonical `assets.base_disks` subview for Base Disk management within the existing shell route model.
+  - **Acceptance details:** `assets.base_disks` is the AJ canonical Base Disks route; local `Assets` subview navigation may use tabs/segments bound to canonical route keys; AJ does not redefine shell-wide top-level `Assets` click behavior beyond requiring `assets.base_disks` to exist as the default Base Disks child route when Assets resolves to a child subview.
+  - **Priority:** P1
+
+- **FR-101:** WinUI `Assets` Base Disks shall provide an in-context management surface for registered base disks that preserves current base-disk domain behavior.
+  - **Acceptance details:** the surface shall support list, refresh, import/register, metadata edit, validation/readiness visibility, and remove actions without requiring a separate edit route; metadata editing remains in selected-item details context and does not invent new schema or disk-domain semantics.
+  - **Priority:** P1
+
+- **FR-102:** WinUI `Assets` Base Disks shall classify registration and catalog validation outcomes as blocking or warning with actionable user guidance.
+  - **Acceptance details:** blocking states include invalid path/file type, inaccessible or locked disk, failed required metadata extraction, and other conditions that prevent a catalog entry from being safely registered or validated; warning states may indicate non-blocking readiness concerns while keeping the item visible and actionable; empty/loading/error states must be explicit and non-silent.
+  - **Priority:** P1
+
+- **FR-103:** WinUI `Assets` Base Disks removal shall enforce explicit safety guardrails and operation-scoped diagnostics.
+  - **Acceptance details:** AJ scope covers registry removal, not underlying file deletion; remove requires explicit confirmation, must surface whether the disk appears in use or referenced, blocks or warns per approved safety taxonomy, and emits structured logs with `operationId`, `baseDiskId`, action context, result, and error details; failed removal must not leave partial registry state.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -451,6 +467,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-templates-capability-contract-ad.md` for Milestone AD `Templates` routing and unified workflow contract.
 - See `docs/02-ux/winui-deploy-from-template-contract-af.md` for Milestone AF `Deploy from-template` routing, readiness, and results visibility contract.
 - See `docs/02-ux/winui-deploy-on-the-fly-contract-ag.md` for Milestone AG `Deploy on-the-fly` routing, readiness, correction affordances, and results visibility parity contract.
+- See `docs/02-ux/winui-assets-base-disks-capability-contract-aj.md` for Milestone AJ `Assets > Base Disks` routing, operations, validation taxonomy, and removal safety contract.
 
 ---
 

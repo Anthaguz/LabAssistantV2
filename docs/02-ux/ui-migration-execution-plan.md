@@ -285,15 +285,28 @@ Gate expectations:
 
 **Goal**
 - centralize asset management while preserving in-flow shortcuts
+- introduce canonical WinUI Assets subview contract starting with `assets.base_disks`
 
 **Must preserve**
 - VHDX catalog CRUD + integrity validation
 - subset validation behavior (post-`#219`)
 - missing VHDX repair + inline import
 - `VmConfigPanel` asset shortcuts in Deploy/Templates
+- existing base-disk metadata edit semantics from FR-051
 
 **Must represent honestly**
 - Switch management maturity (placeholder vs implemented)
+- AJ1 scopes only `assets.base_disks`; `assets.switches` and `assets.isos` remain deferred until later contracts approve them
+
+**AJ sequencing contract**
+- AJ1 (docs-first): define `assets.base_disks` route, Base Disks operations contract, validation taxonomy, remove guardrails, and traceability.
+- AJ2 (scaffold-only): introduce WinUI Assets/Base Disks surface and route scaffolding without new asset-domain semantics.
+- AJ3+ (operational wiring): connect existing base-disk catalog behaviors, validation visibility, and removal safety feedback into the WinUI capability surface.
+
+**Local navigation direction**
+- Assets may use tabs/segmented controls inside the capability workspace for Base Disks / future asset types.
+- These local controls must bind to canonical child routes rather than replacing shell route semantics.
+- AJ does not redefine shell-wide top-level `Assets` click behavior.
 
 **Verification baseline**
 - catalog CRUD/integrity tests
