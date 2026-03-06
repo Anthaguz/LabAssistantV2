@@ -74,6 +74,19 @@ For Templates convergence planning and implementation sequencing:
 Behavioral contract source:
 - `docs/02-ux/winui-templates-capability-contract-ad.md`
 
+## 2.5 Milestone AJ Assets Base Disks Contract (Approved)
+
+For Assets Base Disks convergence planning and implementation sequencing:
+- parent capability remains `Assets`
+- canonical AJ child route is:
+  - `assets.base_disks`
+- local Assets navigation may use tabs/segmented controls bound to canonical child routes
+- AJ1 does not redefine shell-wide top-level `Assets` click behavior; it only defines the Base Disks child-route contract
+- future `assets.switches` / `assets.isos` routes remain deferred until later contracts approve them
+
+Behavioral contract source:
+- `docs/02-ux/winui-assets-base-disks-capability-contract-aj.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -241,16 +254,18 @@ should become one coherent Templates workflow.
 
 ### Suggested subviews/actions
 - Base Disks (VHDX Catalog)
-  - list / add / edit / remove
+  - canonical route `assets.base_disks`
+  - list / refresh / import / edit metadata / validate / remove
   - integrity validation
 - Virtual Switches (future expansion)
   - list / create / edit / delete
 - Asset Health / Validation (future)
 
 ### Workspace context ideas
-- asset type selector (Base Disks / Switches)
+- route-bound asset type selector (Base Disks / Switches / future ISOs)
 - asset list
 - selected asset details / actions
+- in-context metadata editing for the selected asset where applicable
 
 ### Naming
 - Top-level category remains **Assets** (agreed)
@@ -369,4 +384,4 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?
-- `TBD:` Capability-specific inner layouts for Assets/Diagnostics in WinUI (within layout contract constraints)
+- `TBD:` Capability-specific inner layouts for deferred Assets subviews beyond `assets.base_disks`, and Diagnostics details within layout contract constraints

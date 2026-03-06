@@ -1752,10 +1752,131 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-019 - WinUI Assets Base Disks Capability Convergence (AJ1)
+
+**Related FRs:** FR-100, FR-101, FR-102, FR-103, FR-050, FR-051, FR-052, FR-053, FR-054
+
+## Scenarios
+
+### 1) Route and local navigation contract
+**Given**
+- User enters `Assets` in WinUI
+
+**When**
+- Base Disks subview is selected or the Assets capability resolves to its Base Disks child view
+
+**Then**
+- Route resolves to `assets.base_disks`
+- Base Disks is the canonical AJ subview
+- Local Assets navigation may use tabs/segments bound to canonical child routes
+- AJ1 does not redefine shell-wide top-level `Assets` click behavior beyond the Base Disks child-route contract
+
+### 2) Base disk library surface and state behavior
+**Given**
+- User is in `assets.base_disks`
+
+**When**
+- The view loads, refreshes, or returns no items
+
+**Then**
+- A base disk list is shown when items exist
+- Empty state is explicit and includes import/register guidance
+- Loading state is explicit
+- Load/refresh failure state is explicit and actionable
+- Selected-disk details context is available for metadata visibility/editing without a separate edit route
+
+### 3) Import/register and metadata edit contract
+**Given**
+- User selects a VHD/VHDX path to register or edits metadata on an existing entry
+
+**When**
+- The action is submitted
+
+**Then**
+- Blocking validation prevents invalid or inaccessible disks from being registered
+- Successful registration adds the item to the list and details context
+- Metadata edit remains in-context on the selected-disk surface
+- Save/update feedback is actionable and non-silent
+- Existing base disk semantics from AC-004 remain preserved
+
+### 4) Validation and readiness taxonomy
+**Given**
+- A base disk entry is loaded or being changed
+
+**When**
+- Validation/readiness is evaluated
+
+**Then**
+- Blocking conditions are presented as blocking and prevent unsafe completion of the relevant action
+- Warning conditions remain visible without being misrepresented as blocking
+- Guidance explains what the user must fix vs what the user may review later
+- Validation does not silently hide empty/error/loading states
+
+### 5) Remove with safety guardrails
+**Given**
+- User attempts to remove a registered base disk
+
+**When**
+- The remove action is invoked
+
+**Then**
+- Confirmation is required
+- AJ1 removal scope is registry removal only; underlying file deletion is not part of this contract
+- The UI surfaces whether the disk appears referenced/in-use and classifies the condition as block or warning per contract
+- Removal failure produces actionable feedback and does not leave partial registry state
+- Successful removal removes the entry from selection surfaces
+
+### 6) Logging and diagnostics contract
+**Given**
+- User performs list/refresh/import/edit/validate/remove actions in `assets.base_disks`
+
+**When**
+- The action starts, completes, or fails
+
+**Then**
+- Structured logs are emitted with `operationId`
+- Logged context includes action, `baseDiskId` when available, file path when relevant, result, and error details
+- Diagnostics semantics remain consistent with existing base-disk domain behavior
+
+## Expected UI
+- `assets.base_disks` route-backed Base Disks surface inside `Assets`
+- Local Assets subview navigation pattern suitable for future `Base Disks` / `Virtual Switches` / `ISOs` growth
+- Base disk list
+- Refresh/import/register actions
+- Selected base disk details with in-context metadata edit
+- Validation/readiness status visibility
+- Remove action with confirmation and safety messaging
+- Explicit empty/loading/error states
+
+## Expected Logs
+- `BaseDiskListRequested` / `BaseDiskListLoaded` / `BaseDiskListFailed`
+- `BaseDiskRefreshRequested` / `BaseDiskRefreshCompleted` / `BaseDiskRefreshFailed`
+- `BaseDiskRegisterStarted` / `BaseDiskRegistered` / `BaseDiskRegisterFailed`
+- `BaseDiskMetadataUpdateStarted` / `BaseDiskMetadataUpdated` / `BaseDiskMetadataUpdateFailed`
+- `BaseDiskValidationEvaluated`
+- `BaseDiskRemoveStarted` / `BaseDiskRemoved` / `BaseDiskRemoveBlocked` / `BaseDiskRemoveFailed`
+- Fields: `operationId`, action, `baseDiskId` (when available), filePath (when relevant), readiness/result classification, result, error details
+
+## Expected Artifacts / Side Effects
+- Base disk registry list loads through existing catalog/store behavior
+- Registration and metadata edit preserve current persistence semantics
+- Remove updates registry state only in AJ scope
+- Existing missing-disk mapping behavior for Deploy/Templates remains unchanged
+
+## Definition of Done
+- [ ] `assets.base_disks` route and local Assets navigation contract are explicit and testable
+- [ ] Base disk list/refresh/import/edit/validate/remove behavior is explicit for AJ2/AJ3
+- [ ] Blocking vs warning semantics are explicit and actionable
+- [ ] Remove safety guardrails are explicit, including registry-only scope and in-use/reference messaging
+- [ ] Logging expectations with `operationId` are explicit and traceable
+- [ ] No shell-wide `Assets` click behavior changes are introduced by AJ1
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
 - Whether to store deployment history records locally
 - RDP readiness policy beyond v1 host-observable checks (for example guest policy/NLA/firewall introspection).
-- Assets capability inner layout contract in WinUI (`TBD`)
+- Deferred Assets inner layout details beyond `assets.base_disks` (for example `assets.switches` / `assets.isos`)
 - Include rotated structured logs in Phase 1 viewer (`structured-events.1.jsonl`, etc.) or defer.
