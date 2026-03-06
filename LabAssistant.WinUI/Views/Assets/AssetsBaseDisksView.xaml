@@ -1,0 +1,291 @@
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Assets.AssetsBaseDisksView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border
+        Padding="12"
+        Background="{StaticResource ShellBackgroundBrush}"
+        BorderBrush="{StaticResource ShellBorderBrush}"
+        BorderThickness="1"
+        CornerRadius="6">
+        <Grid RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Text="Assets / Base Disks" />
+
+            <TextBlock
+                Grid.Row="1"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="Scaffold-only WinUI Base Disks surface with explicit list, details, actions, and state regions. Runtime catalog wiring lands in AJ3."
+                TextWrapping="Wrap" />
+
+            <Border
+                x:Name="AssetsBaseDisksActionsRegion"
+                Grid.Row="2"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button
+                        x:Name="AssetsBaseDisksRefreshButton"
+                        Grid.Column="0"
+                        Content="Refresh" />
+                    <Button
+                        x:Name="AssetsBaseDisksImportButton"
+                        Grid.Column="1"
+                        Content="Import / Register" />
+                    <Button
+                        x:Name="AssetsBaseDisksValidateButton"
+                        Grid.Column="2"
+                        Content="Validate" />
+                    <Button
+                        x:Name="AssetsBaseDisksRemoveButton"
+                        Grid.Column="3"
+                        Content="Remove" />
+                    <TextBlock
+                        Grid.Column="4"
+                        VerticalAlignment="Center"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Placeholder actions only in AJ2."
+                        TextAlignment="Right"
+                        TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+
+            <Border
+                x:Name="AssetsBaseDisksStatusRegion"
+                Grid.Row="3"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="6">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Status / Feedback" />
+                    <TextBlock
+                        x:Name="AssetsBaseDisksStatusTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Scaffold only. Loading, empty, and error states are modeled explicitly below."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Grid
+                x:Name="AssetsBaseDisksWorkspaceGrid"
+                Grid.Row="4"
+                ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.15*" />
+                    <ColumnDefinition Width="1.4*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    x:Name="AssetsBaseDisksListRegion"
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Padding="10"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Registered Base Disks" />
+                        <ListView
+                            x:Name="AssetsBaseDisksListView"
+                            Grid.Row="1"
+                            SelectionMode="Single">
+                            <ListViewItem Content="Scaffold item placeholder" />
+                            <ListViewItem Content="Selection context will wire in AJ3" />
+                        </ListView>
+                    </Grid>
+                </Border>
+
+                <Border
+                    x:Name="AssetsBaseDisksDetailsRegion"
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    Padding="10"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="10">
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Selected Disk Details" />
+                            <TextBlock
+                                x:Name="AssetsBaseDisksSelectedDiskSummaryTextBlock"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="No runtime-selected disk yet. AJ2 reserves this region for selected-item details and readiness summary."
+                                TextWrapping="Wrap" />
+
+                            <Border
+                                x:Name="AssetsBaseDisksMetadataEditRegion"
+                                Padding="10"
+                                Background="{StaticResource ShellBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                                <Grid ColumnSpacing="12" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock
+                                        Grid.Row="0"
+                                        Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        Text="Label" />
+                                    <TextBox
+                                        x:Name="AssetsBaseDisksLabelTextBox"
+                                        Grid.Row="0"
+                                        Grid.Column="1"
+                                        PlaceholderText="Friendly label (surface only)" />
+                                    <TextBlock
+                                        Grid.Row="1"
+                                        Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        Text="OS classification" />
+                                    <TextBox
+                                        x:Name="AssetsBaseDisksOsClassificationTextBox"
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        PlaceholderText="OS classification (surface only)" />
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        Text="Path" />
+                                    <TextBox
+                                        x:Name="AssetsBaseDisksPathTextBox"
+                                        Grid.Row="2"
+                                        Grid.Column="1"
+                                        IsReadOnly="True"
+                                        PlaceholderText="Disk path and metadata summary appear here in AJ3" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <Grid
+                    x:Name="AssetsBaseDisksStateRegion"
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    Margin="0,12,0,0"
+                    ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border
+                        x:Name="AssetsBaseDisksLoadingStatePanel"
+                        Grid.Column="0"
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <StackPanel Spacing="6">
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Loading State" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Use this region to show catalog loading progress without hiding the capability surface."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        x:Name="AssetsBaseDisksEmptyStatePanel"
+                        Grid.Column="1"
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <StackPanel Spacing="6">
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Empty State" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Use this region to explain that no base disks are registered and point users toward import/register."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        x:Name="AssetsBaseDisksErrorStatePanel"
+                        Grid.Column="2"
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <StackPanel Spacing="6">
+                            <TextBlock
+                                Foreground="{StaticResource ShellCriticalBrush}"
+                                FontWeight="SemiBold"
+                                Text="Error State" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Use this region to show actionable load/refresh/import failure messaging without collapsing the surface."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

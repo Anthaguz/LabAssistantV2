@@ -16,6 +16,7 @@ using Microsoft.UI.Xaml.Controls;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.ViewModels;
+using LabAssistant.WinUI.Views.Assets;
 using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Diagnostics;
 using LabAssistant.WinUI.Views.Machines;
@@ -116,11 +117,13 @@ public sealed partial class MainWindow : Window
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
     private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
+    private AssetsBaseDisksView AssetsBaseDisksView => AssetsBaseDisksViewHost;
     private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
     private DeployOnTheFlyRightPanelView DeployOnTheFlyRightPanelView => DeployOnTheFlyRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private FrameworkElement DeployFromTemplatePanel => DeployFromTemplateViewHost;
     private FrameworkElement DeployOnTheFlyPanel => DeployOnTheFlyViewHost;
+    private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
     private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
     private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
@@ -455,6 +458,8 @@ public sealed partial class MainWindow : Window
                 ? "Select template inputs and review compact readiness summary. Execution and gating wire in AF3."
             : IsDeployOnTheFlyActive
                 ? "Configure VM entries for Quick Deploy. Evaluate readiness, resolve blockers, and run deployment."
+            : IsAssetsBaseDisksActive
+                ? "Manage imported base disks with explicit list, details, placeholder actions, and visible loading/empty/error states."
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
                 : IsTemplatesEditorActive
@@ -470,12 +475,13 @@ public sealed partial class MainWindow : Window
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
         DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         SyncTemplatesSubviewSelection();
         UpdateTemplatesUi();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive || IsAssetsBaseDisksActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
 
         QueueNavigationSelectionUpdate();
 
@@ -1231,6 +1237,9 @@ public sealed partial class MainWindow : Window
 
     private bool IsTemplatesEditorActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesEditor, StringComparison.Ordinal);
+
+    private bool IsAssetsBaseDisksActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.AssetsBaseDisks, StringComparison.Ordinal);
 
     private bool IsTemplatesCapabilityActive =>
         IsTemplatesLibraryActive || IsTemplatesEditorActive;
@@ -3198,7 +3207,7 @@ public sealed partial class MainWindow : Window
 
         if (_templateVhdxCatalogOptions.Count == 0)
         {
-            TemplateVmVhdxGuidanceTextBlock.Text = "No catalog entries available. Import base disks in Assets > Disks.";
+            TemplateVmVhdxGuidanceTextBlock.Text = "No catalog entries available. Import base disks in Assets > Base Disks.";
             return;
         }
 

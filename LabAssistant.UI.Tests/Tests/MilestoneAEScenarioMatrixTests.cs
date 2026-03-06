@@ -67,7 +67,7 @@ public sealed class MilestoneAEScenarioMatrixTests
         Assert.Contains("EnsureTemplateVhdxCatalogOptionsAsync", source);
         Assert.Contains("TemplateVmVhdxCatalogComboBox_SelectionChanged", source);
         Assert.Contains("Legacy path-based reference loaded. Select a catalog entry to normalize.", source);
-        Assert.Contains("No catalog entries available. Import base disks in Assets > Disks.", source);
+        Assert.Contains("No catalog entries available. Import base disks in Assets > Base Disks.", source);
     }
 
     [Fact]

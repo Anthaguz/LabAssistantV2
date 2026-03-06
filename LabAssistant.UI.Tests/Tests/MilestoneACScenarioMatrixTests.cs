@@ -30,7 +30,7 @@ public sealed class MilestoneACScenarioMatrixTests
         Assert.Contains("public const string DeployFromTemplate = \"deploy.from_template\";", source);
         Assert.Contains("public const string TemplatesLibrary = \"templates.library\";", source);
         Assert.Contains("public const string TemplatesEditor = \"templates.editor\";", source);
-        Assert.Contains("public const string AssetsDisks = \"assets.disks\";", source);
+        Assert.Contains("public const string AssetsBaseDisks = \"assets.base_disks\";", source);
         Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", source);
         Assert.Contains("public const string DiagnosticsOverview = \"diagnostics.overview\";", source);
         Assert.Contains("public const string DiagnosticsLogs = \"diagnostics.logs\";", source);
@@ -51,7 +51,7 @@ public sealed class MilestoneACScenarioMatrixTests
         Assert.Contains("key: \"templates\"", source);
         Assert.Contains("new ShellSubview(ShellRouteKeys.TemplatesLibrary, \"Library\"", source);
         Assert.Contains("key: \"assets\"", source);
-        Assert.Contains("new ShellSubview(ShellRouteKeys.AssetsDisks, \"Disks\"", source);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.AssetsBaseDisks, \"Base Disks\"", source);
         Assert.Contains("key: \"diagnostics\"", source);
         Assert.Contains("new ShellSubview(ShellRouteKeys.DiagnosticsOverview, \"Overview\"", source);
         Assert.Contains("key: \"settings\"", source);
