@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <AssemblyName>LabAssistant</AssemblyName>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <UseWinUI>true</UseWinUI>
@@ -8,7 +9,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkBootstrapInitialize>true</WindowsAppSdkBootstrapInitialize>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -19,7 +20,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.7" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.*" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,4 +28,15 @@
     <ProjectReference Include="..\LabAssistant.Models\LabAssistant.Models.csproj" />
     <ProjectReference Include="..\LabAssistant.Services\LabAssistant.Services.csproj" />
   </ItemGroup>
+
+  <Target Name="CopyAppPriToPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <_AppPriFile>$(OutputPath)$(AssemblyName).pri</_AppPriFile>
+    </PropertyGroup>
+    <Copy
+      SourceFiles="$(_AppPriFile)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(_AppPriFile)')" />
+  </Target>
 </Project>
