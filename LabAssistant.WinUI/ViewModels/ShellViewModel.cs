@@ -10,7 +10,7 @@ public static class ShellRouteKeys
     public const string DeployFromTemplate = "deploy.from_template";
     public const string TemplatesLibrary = "templates.library";
     public const string TemplatesEditor = "templates.editor";
-    public const string AssetsDisks = "assets.disks";
+    public const string AssetsBaseDisks = "assets.base_disks";
     public const string AssetsSwitches = "assets.switches";
     public const string DiagnosticsOverview = "diagnostics.overview";
     public const string DiagnosticsLogs = "diagnostics.logs";
@@ -59,7 +59,7 @@ public sealed class ShellViewModel
                 displayName: "Assets",
                 isFooter: false,
                 [
-                    new ShellSubview(ShellRouteKeys.AssetsDisks, "Disks", ["Add Disk", "Validate"]),
+                    new ShellSubview(ShellRouteKeys.AssetsBaseDisks, "Base Disks", ["Refresh", "Import", "Remove"]),
                     new ShellSubview(ShellRouteKeys.AssetsSwitches, "Virtual Switches", ["Add Switch", "Refresh"])
                 ]),
             new ShellCapability(
