@@ -1,4 +1,5 @@
 using LabAssistant.Business;
+using LabAssistant.WinUI.Diagnostics;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Services.Logging;
 using InfrastructureServices = LabAssistant.Services.ServiceCollectionExtensions;
@@ -16,8 +17,36 @@ public partial class App : Application
 
     public App()
     {
+        StartupCrashLogger.MarkPhase("App.ctor", "enter");
         InitializeComponent();
-        RequestedTheme = ApplicationTheme.Light;
+        StartupCrashLogger.MarkPhase("App.ctor", "after InitializeComponent");
+        StartupCrashLogger.MarkPhase("App.ctor", "theme unchanged");
+
+        UnhandledException += (_, e) =>
+        {
+            StartupCrashLogger.LogMessage("Application.UnhandledException", e.Message);
+            if (e.Exception is Exception ex)
+            {
+                StartupCrashLogger.LogException("Application.UnhandledException", ex);
+            }
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                StartupCrashLogger.LogException("AppDomain.CurrentDomain.UnhandledException", ex);
+            }
+            else
+            {
+                StartupCrashLogger.LogMessage("AppDomain.CurrentDomain.UnhandledException", e.ExceptionObject?.ToString() ?? "<null>");
+            }
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            StartupCrashLogger.LogException("TaskScheduler.UnobservedTaskException", e.Exception);
+        };
 
 #if DEBUG
         // Emit unhandled XAML details in Output so fail-fast dumps have a matching managed breadcrumb.
@@ -30,19 +59,38 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        base.OnLaunched(args);
+        StartupCrashLogger.MarkPhase("OnLaunched", "enter");
+        try
+        {
+            base.OnLaunched(args);
+            StartupCrashLogger.MarkPhase("OnLaunched", "after base.OnLaunched");
 
-        var serviceCollection = new ServiceCollection();
-        InfrastructureServices.AddInfrastructureServices(serviceCollection);
-        serviceCollection.AddBusinessServices();
-        serviceCollection.AddPersistenceServices();
+            var serviceCollection = new ServiceCollection();
+            StartupCrashLogger.MarkPhase("OnLaunched", "before service registration");
+            InfrastructureServices.AddInfrastructureServices(serviceCollection);
+            serviceCollection.AddBusinessServices();
+            serviceCollection.AddPersistenceServices();
+            StartupCrashLogger.MarkPhase("OnLaunched", "after service registration");
 
-        Services = serviceCollection.BuildServiceProvider();
-        var settingsStore = Services.GetRequiredService<IAppSettingsStore>();
-        settingsStore.LoadOrCreate();
-        DebugLogger.SetLogFolder(settingsStore.Settings.LogFolder);
+            Services = serviceCollection.BuildServiceProvider();
+            StartupCrashLogger.MarkPhase("OnLaunched", "after service provider build");
+            var settingsStore = Services.GetRequiredService<IAppSettingsStore>();
+            StartupCrashLogger.MarkPhase("OnLaunched", "before settings load");
+            settingsStore.LoadOrCreate();
+            StartupCrashLogger.MarkPhase("OnLaunched", "after settings load");
+            DebugLogger.SetLogFolder(settingsStore.Settings.LogFolder);
+            StartupCrashLogger.MarkPhase("OnLaunched", "after DebugLogger.SetLogFolder");
 
-        _window = new MainWindow();
-        _window.Activate();
+            StartupCrashLogger.MarkPhase("OnLaunched", "before MainWindow ctor");
+            _window = new MainWindow();
+            StartupCrashLogger.MarkPhase("OnLaunched", "after MainWindow ctor");
+            _window.Activate();
+            StartupCrashLogger.MarkPhase("OnLaunched", "after MainWindow.Activate");
+        }
+        catch (Exception ex)
+        {
+            StartupCrashLogger.LogException("App.OnLaunched", ex);
+            throw;
+        }
     }
 }
