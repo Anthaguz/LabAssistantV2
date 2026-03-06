@@ -28,9 +28,9 @@ public sealed class CatalogService
 
     public string CatalogPath => _settingsStore.Settings.CatalogPath;
 
-    public VhdxCatalogLoadResult LoadCatalog()
+    public VhdxCatalogLoadResult LoadCatalog(string? operationId = null)
     {
-        var operationId = Guid.NewGuid().ToString("N");
+        operationId ??= Guid.NewGuid().ToString("N");
         try
         {
             var result = _catalogStore.Load(CatalogPath);
@@ -64,9 +64,9 @@ public sealed class CatalogService
         }
     }
 
-    public VhdxCatalogSaveResult SaveCatalog(IEnumerable<VhdxCatalogItem> items, IEnumerable<VhdxCatalogItem>? itemsToValidate = null)
+    public VhdxCatalogSaveResult SaveCatalog(IEnumerable<VhdxCatalogItem> items, IEnumerable<VhdxCatalogItem>? itemsToValidate = null, string? operationId = null)
     {
-        var operationId = Guid.NewGuid().ToString("N");
+        operationId ??= Guid.NewGuid().ToString("N");
         var itemList = items?.ToList() ?? new List<VhdxCatalogItem>();
         try
         {

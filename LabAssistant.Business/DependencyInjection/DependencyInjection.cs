@@ -63,6 +63,7 @@ using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Machines;
 using LabAssistant.Business.Templates;
+using LabAssistant.Business.Assets;
 using LabAssistant.Data.Catalog;
 using LabAssistant.Data.Configuration;
 using LabAssistant.Data.Templates;
@@ -93,6 +94,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<ConfigureNetworkInformationStep>();
         services.AddTransient<CheckHyperVStep>();
         services.AddSingleton<CatalogService>();
+        services.AddSingleton<IAssetsBaseDisksCapabilityService, AssetsBaseDisksCapabilityService>();
         services.AddSingleton<MissingVhdxResolutionService>();
         services.AddSingleton<TemplateSelectionService>();
         services.AddSingleton<TemplateValidationService>();

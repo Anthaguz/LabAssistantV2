@@ -48,15 +48,24 @@ public sealed class MilestoneAJScenarioMatrixTests
     }
 
     [Fact]
-    public void Aj2_RemainsScaffoldOnly_WithoutAssetsRuntimeOperationWiring()
+    public void Aj3_WiresAssetsBaseDisksRuntimeOperations_WithoutChangingCanonicalRoute()
     {
         var source = LoadMainWindowSource();
+        var nativeFileDialogsSource = LoadNativeFileDialogsSource();
+        var capabilitySource = LoadAssetsBaseDisksCapabilityServiceSource();
 
         Assert.Contains("private bool IsAssetsBaseDisksActive =>", source);
-        Assert.DoesNotContain("EnsureAssetsBaseDisks", source);
-        Assert.DoesNotContain("LoadAssetsBaseDisks", source);
-        Assert.DoesNotContain("RegisterBaseDisk", source);
-        Assert.DoesNotContain("RemoveBaseDisk", source);
+        Assert.Contains("EnsureAssetsBaseDisksAsync", source);
+        Assert.Contains("AssetsBaseDisksRefreshButton_Click", source);
+        Assert.Contains("AssetsBaseDisksImportButton_Click", source);
+        Assert.Contains("AssetsBaseDisksValidateButton_Click", source);
+        Assert.Contains("AssetsBaseDisksSaveMetadataButton_Click", source);
+        Assert.Contains("AssetsBaseDisksRemoveButton_Click", source);
+        Assert.Contains("ShowAssetsBaseDiskRemoveConfirmationDialogAsync", source);
+        Assert.Contains("IAssetsBaseDisksCapabilityService", source);
+        Assert.Contains("ShowOpenVhdxDialog", nativeFileDialogsSource);
+        Assert.Contains("Active runtime consumer detection is not currently implemented.", capabilitySource);
+        Assert.Contains("Base disk removed from the registry.", capabilitySource);
     }
 
     private static string LoadShellViewModelSource()
@@ -80,6 +89,18 @@ public sealed class MilestoneAJScenarioMatrixTests
     private static string LoadMainWindowXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadNativeFileDialogsSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Interop", "NativeFileDialogs.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksCapabilityServiceSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.Business", "Assets", "AssetsBaseDisksCapabilityService.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
