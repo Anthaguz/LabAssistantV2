@@ -53,10 +53,12 @@ public sealed class MilestoneAJScenarioMatrixTests
         var source = LoadMainWindowSource();
         var nativeFileDialogsSource = LoadNativeFileDialogsSource();
         var capabilitySource = LoadAssetsBaseDisksCapabilityServiceSource();
+        var xamlSource = LoadAssetsBaseDisksViewXamlSource();
 
         Assert.Contains("private bool IsAssetsBaseDisksActive =>", source);
         Assert.Contains("EnsureAssetsBaseDisksAsync", source);
         Assert.Contains("_pendingAssetsBaseDiskDraft", source);
+        Assert.Contains("_hasAssetsBaseDisksErrorState", source);
         Assert.Contains("AssetsBaseDisksRefreshButton_Click", source);
         Assert.Contains("AssetsBaseDisksImportButton_Click", source);
         Assert.Contains("AssetsBaseDisksValidateButton_Click", source);
@@ -64,10 +66,12 @@ public sealed class MilestoneAJScenarioMatrixTests
         Assert.Contains("AssetsBaseDisksRemoveButton_Click", source);
         Assert.Contains("ShowAssetsBaseDiskRemoveConfirmationDialogAsync", source);
         Assert.Contains("FormatAssetsBaseDiskValidationText", source);
+        Assert.Contains("AssetsBaseDisksErrorStatePanel.Visibility = _hasAssetsBaseDisksErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
         Assert.Contains("IAssetsBaseDisksCapabilityService", source);
         Assert.Contains("ShowOpenVhdxDialog", nativeFileDialogsSource);
         Assert.Contains("Active runtime consumer detection is not currently implemented.", capabilitySource);
         Assert.Contains("Base disk removed from the registry.", capabilitySource);
+        Assert.Contains("Registry-only removal.", xamlSource);
         Assert.Contains("Validate and Save Metadata", source);
     }
 
@@ -111,6 +115,12 @@ public sealed class MilestoneAJScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksViewXamlSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static XElement FindByName(XDocument xaml, string name)

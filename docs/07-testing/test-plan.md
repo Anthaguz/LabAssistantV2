@@ -256,8 +256,28 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - On-the-fly route and scaffold remain stable and contract-aligned.
   - Readiness classification enforces blocking conditions and preserves warning-only flow.
   - Correction actions are discoverable and functional with predictable context transfer.
-  - Compact-first results remain readable with details available on demand.
+- Compact-first results remain readable with details available on demand.
   - AG closure evidence is supported by automated structural checks plus manual runtime verification.
+
+## TC-017: Milestone AJ Base Disks Convergence Verification
+- **Related AC:** `AC-019`, `FR-100`, `FR-101`, `FR-102`, `FR-103`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AJ (`#355`, `#356`, `#357`, `#358`, `#359`)
+- **Steps:**
+  1. Run automated AJ matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAJScenarioMatrixTests.cs`.
+  2. Run the Milestone AJ checklist in `docs/07-testing/milestone-aj-base-disks-convergence-checklist.md`.
+  3. Verify `assets.base_disks` route and shell hosting remain canonical and stable.
+  4. Verify scaffold regions and explicit loading/empty/error states remain present.
+  5. Verify operational Base Disks behavior: list, refresh, import/register, metadata edit/save, validate, and registry-only remove.
+  6. Verify AJ4 hardening behavior: pending-draft continuity, readable validation summaries, actionable failure messaging, and stable selection reconciliation.
+  7. Verify known template reference warnings remain explicit and active runtime consumer detection is still called out as not implemented.
+- **Expected:**
+  - Base Disks remains a first-class WinUI capability at `assets.base_disks`.
+  - AJ2 scaffold contract remains structurally intact.
+  - AJ3 operational hooks remain present and usable.
+  - AJ4 UX/data-binding hardening remains intact without semantic/domain drift.
+  - Registry-only remove wording and current reference-warning limitation remain explicit.
+  - AJ closure evidence includes both automated structural checks and repeatable manual runtime verification.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
