@@ -460,6 +460,22 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** AJ scope covers registry removal, not underlying file deletion; remove requires explicit confirmation, must surface whether the disk appears in use or referenced, blocks or warns per approved safety taxonomy, and emits structured logs with `operationId`, `baseDiskId`, action context, result, and error details; failed removal must not leave partial registry state.
   - **Priority:** P1
 
+- **FR-104:** WinUI `Assets` shall expose a canonical `assets.switches` subview for virtual switch management within the existing shell route model.
+  - **Acceptance details:** `assets.switches` is the AK canonical Switches route; local `Assets` subview navigation may use tabs/segments bound to canonical route keys; AK does not redefine shell-wide top-level `Assets` click behavior beyond requiring `assets.switches` to exist as an explicit child route.
+  - **Priority:** P1
+
+- **FR-105:** WinUI `Assets` Switches shall provide an in-context management surface for existing switch CRUD behavior.
+  - **Acceptance details:** the surface shall support list, refresh, create, edit, validation/readiness visibility, and delete actions without requiring a separate editor route; create/edit remains in selected-item details context and does not invent new switch-domain semantics.
+  - **Priority:** P1
+
+- **FR-106:** WinUI `Assets` Switches shall classify switch validation and host-readiness outcomes as blocking or warning with actionable user guidance.
+  - **Acceptance details:** blocking states include duplicate-name conflicts, invalid or unsupported switch configuration, unavailable required host state, and delete attempts that violate approved AK safety rules; warning states may indicate non-blocking host or inventory conditions while keeping the switch visible and actionable; empty/loading/error states must be explicit and non-silent.
+  - **Priority:** P1
+
+- **FR-107:** WinUI `Assets` Switches deletion shall require explicit confirmation, block deletion when any Hyper-V VM is attached to the switch regardless of VM power state, and emit structured logs with `operationId`.
+  - **Acceptance details:** delete remains a switch-management action only and does not broaden into topology redesign; if any VM is attached, deletion is blocked with concrete feedback; if deletion proceeds, logs include action, `switchName`, `switchType`, result, and error details.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -468,6 +484,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-deploy-from-template-contract-af.md` for Milestone AF `Deploy from-template` routing, readiness, and results visibility contract.
 - See `docs/02-ux/winui-deploy-on-the-fly-contract-ag.md` for Milestone AG `Deploy on-the-fly` routing, readiness, correction affordances, and results visibility parity contract.
 - See `docs/02-ux/winui-assets-base-disks-capability-contract-aj.md` for Milestone AJ `Assets > Base Disks` routing, operations, validation taxonomy, and removal safety contract.
+- See `docs/02-ux/winui-assets-switches-capability-contract-ak.md` for Milestone AK `Assets > Switches` routing, CRUD surface, validation taxonomy, and deletion guardrail contract.
 
 ---
 

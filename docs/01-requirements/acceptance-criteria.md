@@ -1873,6 +1873,125 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-020 - WinUI Assets Switches Capability Convergence (AK1)
+
+**Related FRs:** FR-104, FR-105, FR-106, FR-107, FR-030, FR-031, FR-033, FR-034, FR-035
+
+## Scenarios
+
+### 1) Route and local navigation contract
+**Given**
+- User enters `Assets` in WinUI
+
+**When**
+- Switches subview is selected or the Assets capability resolves to its Switches child view
+
+**Then**
+- Route resolves to `assets.switches`
+- Switches is the canonical AK child route under `Assets`
+- Local Assets navigation may use tabs/segments bound to canonical child routes
+- AK1 does not redefine shell-wide top-level `Assets` click behavior beyond the Switches child-route contract
+
+### 2) Switches surface and state behavior
+**Given**
+- User is in `assets.switches`
+
+**When**
+- The view loads, refreshes, or returns no items
+
+**Then**
+- A switch list is shown when items exist
+- Selected-switch details context is available for inspection and in-context editing
+- Loading, empty, and error states are explicit and actionable
+- Actions and status/feedback regions remain visible without requiring a separate route
+
+### 3) Create and edit workflow contract
+**Given**
+- User creates a new switch or edits an existing switch in the selected-switch details context
+
+**When**
+- The action is submitted
+
+**Then**
+- Existing switch CRUD semantics from FR-033 and FR-034 are preserved
+- Create/edit occurs in-context on the Switches surface rather than a separate editor route
+- Blocking validation prevents invalid or unsupported switch configuration from being applied
+- Successful create/update reconciles list selection and details state without silent failure
+- Feedback is actionable and non-silent
+
+### 4) Validation and readiness taxonomy
+**Given**
+- A switch create/edit/delete action is evaluated
+
+**When**
+- Validation/readiness is performed
+
+**Then**
+- Blocking conditions are presented explicitly as blocking
+- Warning conditions remain visible without being misrepresented as blocking
+- Duplicate-name conflicts, invalid configuration, unavailable host state, and unsupported updates are surfaced with concrete guidance
+- Validation does not silently hide load/empty/error states
+
+### 5) Delete with safety guardrails
+**Given**
+- User attempts to delete an existing virtual switch
+
+**When**
+- The delete action is invoked
+
+**Then**
+- Confirmation is required
+- Deletion is blocked if any Hyper-V VM is attached to the switch, regardless of VM power state
+- Blocking feedback is concrete and actionable
+- Successful delete removes the switch from the list and details context
+- AK1 does not invent broader topology-management semantics beyond current switch CRUD scope
+
+### 6) Logging and diagnostics contract
+**Given**
+- User performs load/refresh/create/edit/delete actions in `assets.switches`
+
+**When**
+- The action starts, completes, or fails
+
+**Then**
+- Structured logs are emitted with `operationId`
+- Logged context includes action, `switchName`, `switchType`, result, and error details
+- Diagnostics semantics remain consistent with existing switch CRUD behavior
+
+## Expected UI
+- `assets.switches` route-backed Switches surface inside `Assets`
+- Local Assets subview navigation pattern suitable for Base Disks / Switches / future ISOs growth
+- Switch list
+- Selected-switch details with in-context create/edit workflow
+- Load/refresh/create/update/delete actions
+- Validation/readiness status visibility
+- Explicit loading/empty/error states
+
+## Expected Logs
+- `SwitchListRequested` / `SwitchListLoaded` / `SwitchListFailed`
+- `SwitchRefreshRequested` / `SwitchRefreshCompleted` / `SwitchRefreshFailed`
+- `SwitchCreateStarted` / `SwitchCreated` / `SwitchCreateFailed`
+- `SwitchUpdateStarted` / `SwitchUpdated` / `SwitchUpdateFailed`
+- `SwitchValidationEvaluated`
+- `SwitchDeleteStarted` / `SwitchDeleteBlocked` / `SwitchDeleted` / `SwitchDeleteFailed`
+- Fields: `operationId`, action, `switchName`, `switchType`, result, error details
+
+## Expected Artifacts / Side Effects
+- Hyper-V virtual switch inventory loads through existing switch-management behavior
+- Create/update/delete preserve existing switch CRUD semantics
+- Delete remains blocked whenever any Hyper-V VM is attached to the switch
+- Existing deploy/template switch selection semantics remain unchanged
+
+## Definition of Done
+- [ ] `assets.switches` route and local Assets navigation contract are explicit and testable
+- [ ] Switch list/load/refresh/create/edit/delete behavior is explicit for AK2/AK3
+- [ ] Blocking vs warning semantics are explicit and actionable
+- [ ] Delete safety guardrails are explicit, including “block if any VM is attached”
+- [ ] Logging expectations with `operationId` are explicit and traceable
+- [ ] No shell-wide `Assets` click behavior changes are introduced by AK1
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
