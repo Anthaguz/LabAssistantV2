@@ -87,6 +87,20 @@ For Assets Base Disks convergence planning and implementation sequencing:
 Behavioral contract source:
 - `docs/02-ux/winui-assets-base-disks-capability-contract-aj.md`
 
+## 2.6 Milestone AK Assets Switches Contract (Approved)
+
+For Assets Switches convergence planning and implementation sequencing:
+- parent capability remains `Assets`
+- canonical AK child route is:
+  - `assets.switches`
+- local Assets navigation may use tabs/segmented controls bound to canonical child routes
+- AK1 does not redefine shell-wide top-level `Assets` click behavior; it only defines the Switches child-route contract
+- `assets.switches` is the next explicit child route after `assets.base_disks`
+- future `assets.isos` route remains deferred until a later contract approves it
+
+Behavioral contract source:
+- `docs/02-ux/winui-assets-switches-capability-contract-ak.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -258,6 +272,7 @@ should become one coherent Templates workflow.
   - list / refresh / import / edit metadata / validate / remove
   - integrity validation
 - Virtual Switches (future expansion)
+  - canonical route `assets.switches`
   - list / create / edit / delete
 - Asset Health / Validation (future)
 

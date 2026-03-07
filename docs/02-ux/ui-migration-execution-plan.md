@@ -296,12 +296,17 @@ Gate expectations:
 
 **Must represent honestly**
 - Switch management maturity (placeholder vs implemented)
-- AJ1 scopes only `assets.base_disks`; `assets.switches` and `assets.isos` remain deferred until later contracts approve them
+- AJ1 scopes only `assets.base_disks`; AK1 defines `assets.switches`; `assets.isos` remains deferred until later contracts approve it
 
 **AJ sequencing contract**
 - AJ1 (docs-first): define `assets.base_disks` route, Base Disks operations contract, validation taxonomy, remove guardrails, and traceability.
 - AJ2 (scaffold-only): introduce WinUI Assets/Base Disks surface and route scaffolding without new asset-domain semantics.
 - AJ3+ (operational wiring): connect existing base-disk catalog behaviors, validation visibility, and removal safety feedback into the WinUI capability surface.
+
+**AK sequencing contract**
+- AK1 (docs-first): define `assets.switches` route, Switches CRUD surface contract, validation taxonomy, delete guardrails, and traceability.
+- AK2 (scaffold-only): introduce WinUI Assets/Switches surface and route scaffolding without new switch-domain semantics.
+- AK3+ (operational wiring): connect existing switch-management behaviors, validation visibility, and deletion safety feedback into the WinUI capability surface.
 
 **Local navigation direction**
 - Assets may use tabs/segmented controls inside the capability workspace for Base Disks / future asset types.
