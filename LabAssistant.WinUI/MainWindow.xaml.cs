@@ -130,12 +130,14 @@ public sealed partial class MainWindow : Window
     private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
     private AssetsBaseDisksView AssetsBaseDisksView => AssetsBaseDisksViewHost;
+    private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;
     private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
     private DeployOnTheFlyRightPanelView DeployOnTheFlyRightPanelView => DeployOnTheFlyRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private FrameworkElement DeployFromTemplatePanel => DeployFromTemplateViewHost;
     private FrameworkElement DeployOnTheFlyPanel => DeployOnTheFlyViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
+    private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
     private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
     private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
@@ -513,6 +515,8 @@ public sealed partial class MainWindow : Window
                 ? "Configure VM entries for Quick Deploy. Evaluate readiness, resolve blockers, and run deployment."
             : IsAssetsBaseDisksActive
                 ? "Manage imported base disks with explicit list, details, placeholder actions, and visible loading/empty/error states."
+            : IsAssetsSwitchesActive
+                ? "Manage Hyper-V virtual switches with in-context create/edit scaffolding, explicit state regions, and no AK3 CRUD wiring yet."
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
                 : IsTemplatesEditorActive
@@ -529,12 +533,13 @@ public sealed partial class MainWindow : Window
         DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
         DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
+        AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         SyncTemplatesSubviewSelection();
         UpdateTemplatesUi();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive || IsAssetsBaseDisksActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive || IsAssetsBaseDisksActive || IsAssetsSwitchesActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
 
         QueueNavigationSelectionUpdate();
 
@@ -1774,6 +1779,9 @@ public sealed partial class MainWindow : Window
 
     private bool IsAssetsBaseDisksActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.AssetsBaseDisks, StringComparison.Ordinal);
+
+    private bool IsAssetsSwitchesActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.AssetsSwitches, StringComparison.Ordinal);
 
     private bool IsTemplatesCapabilityActive =>
         IsTemplatesLibraryActive || IsTemplatesEditorActive;
