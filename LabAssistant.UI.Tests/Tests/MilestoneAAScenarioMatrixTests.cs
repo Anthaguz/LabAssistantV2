@@ -300,6 +300,31 @@ public sealed class MilestoneAAScenarioMatrixTests
             return Task.FromResult<IReadOnlyList<string>>(["Default Switch"]);
         }
 
+        public Task<IReadOnlyList<HyperVVirtualSwitchInfo>> ListVirtualSwitchesAsync()
+        {
+            return Task.FromResult<IReadOnlyList<HyperVVirtualSwitchInfo>>([]);
+        }
+
+        public Task<IReadOnlyList<string>> GetAttachedVmNamesForSwitchAsync(string switchName)
+        {
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        }
+
+        public Task<HyperVMachineActionResult> CreateVirtualSwitchAsync(HyperVVirtualSwitchCreateRequest request)
+        {
+            return Task.FromResult(new HyperVMachineActionResult { Success = true });
+        }
+
+        public Task<HyperVMachineActionResult> RenameVirtualSwitchAsync(string currentName, string newName)
+        {
+            return Task.FromResult(new HyperVMachineActionResult { Success = true });
+        }
+
+        public Task<HyperVMachineActionResult> DeleteVirtualSwitchAsync(string switchName)
+        {
+            return Task.FromResult(new HyperVMachineActionResult { Success = true });
+        }
+
         public Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request)
         {
             return Task.FromResult(new HyperVMachineActionResult { Success = true });

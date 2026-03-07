@@ -187,6 +187,100 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         };
     }
 
+    public async Task<IReadOnlyList<HyperVVirtualSwitchInfo>> ListVirtualSwitchesAsync()
+    {
+        const string script = """
+            $items = Get-VMSwitch | ForEach-Object {
+                [PSCustomObject]@{
+                    Name = $_.Name
+                    SwitchType = $_.SwitchType.ToString()
+                    AdapterName = $_.NetAdapterInterfaceDescription
+                }
+            }
+            $items | ConvertTo-Json -Compress -Depth 4
+            """;
+
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+        }
+
+        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(cleanedOutput))
+        {
+            return Array.Empty<HyperVVirtualSwitchInfo>();
+        }
+
+        using var document = JsonDocument.Parse(cleanedOutput);
+        return document.RootElement.ValueKind switch
+        {
+            JsonValueKind.Array => document.RootElement.EnumerateArray()
+                .Select(ParseVirtualSwitchInfo)
+                .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            JsonValueKind.Object => [ParseVirtualSwitchInfo(document.RootElement)],
+            _ => Array.Empty<HyperVVirtualSwitchInfo>()
+        };
+    }
+
+    public async Task<IReadOnlyList<string>> GetAttachedVmNamesForSwitchAsync(string switchName)
+    {
+        var script = $$"""
+            $items = Get-VMNetworkAdapter -All -ErrorAction SilentlyContinue |
+                Where-Object { $_.SwitchName -eq {{Quote(switchName)}} } |
+                Select-Object -ExpandProperty VMName -Unique
+            $items | ConvertTo-Json -Compress
+            """;
+
+        var (output, error) = await ExecuteWithFreshSessionAsync(script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+        }
+
+        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(cleanedOutput))
+        {
+            return Array.Empty<string>();
+        }
+
+        using var document = JsonDocument.Parse(cleanedOutput);
+        return document.RootElement.ValueKind switch
+        {
+            JsonValueKind.Array => document.RootElement.EnumerateArray()
+                .Select(element => element.GetString())
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name!)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            JsonValueKind.String when !string.IsNullOrWhiteSpace(document.RootElement.GetString()) => [document.RootElement.GetString()!],
+            _ => Array.Empty<string>()
+        };
+    }
+
+    public Task<HyperVMachineActionResult> CreateVirtualSwitchAsync(HyperVVirtualSwitchCreateRequest request)
+    {
+        var script = string.Equals(request.SwitchType, "External", StringComparison.OrdinalIgnoreCase)
+            ? $"New-VMSwitch -Name {Quote(request.Name)} -NetAdapterName {Quote(request.AdapterName ?? string.Empty)} -AllowManagementOS $true -ErrorAction Stop"
+            : $"New-VMSwitch -Name {Quote(request.Name)} -SwitchType {Quote(request.SwitchType)} -ErrorAction Stop";
+        return ExecuteCommandAsync(script);
+    }
+
+    public Task<HyperVMachineActionResult> RenameVirtualSwitchAsync(string currentName, string newName)
+    {
+        var script = $"Rename-VMSwitch -Name {Quote(currentName)} -NewName {Quote(newName)} -ErrorAction Stop";
+        return ExecuteCommandAsync(script);
+    }
+
+    public Task<HyperVMachineActionResult> DeleteVirtualSwitchAsync(string switchName)
+    {
+        var script = $"Remove-VMSwitch -Name {Quote(switchName)} -Force -ErrorAction Stop";
+        return ExecuteCommandAsync(script);
+    }
+
     public async Task<IReadOnlyList<HyperVMachineDiskClassificationResult>> ClassifyVmDisksAsync(
         string vmName,
         IReadOnlyCollection<string> knownBaseDiskPaths,
@@ -544,6 +638,16 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             State = GetString(vmElement, "State"),
             VmPath = GetOptionalString(vmElement, "VmPath"),
             DiskPaths = GetDiskPaths(vmElement)
+        };
+    }
+
+    private static HyperVVirtualSwitchInfo ParseVirtualSwitchInfo(JsonElement element)
+    {
+        return new HyperVVirtualSwitchInfo
+        {
+            Name = GetString(element, "Name"),
+            SwitchType = GetString(element, "SwitchType"),
+            AdapterName = GetOptionalString(element, "AdapterName")
         };
     }
 

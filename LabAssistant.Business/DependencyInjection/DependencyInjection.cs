@@ -95,6 +95,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTransient<CheckHyperVStep>();
         services.AddSingleton<CatalogService>();
         services.AddSingleton<IAssetsBaseDisksCapabilityService, AssetsBaseDisksCapabilityService>();
+        services.AddSingleton<IAssetsSwitchesCapabilityService, AssetsSwitchesCapabilityService>();
         services.AddSingleton<MissingVhdxResolutionService>();
         services.AddSingleton<TemplateSelectionService>();
         services.AddSingleton<TemplateValidationService>();

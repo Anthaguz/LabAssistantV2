@@ -133,17 +133,24 @@
                             x:Name="AssetsSwitchesListView"
                             Grid.Row="1"
                             SelectionMode="Single">
-                            <ListViewItem>
-                                <StackPanel Spacing="2">
-                                    <TextBlock
-                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                        FontWeight="SemiBold"
-                                        Text="Example Switch" />
-                                    <TextBlock
-                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="External - Placeholder inventory row for AK2 scaffold validation." />
-                                </StackPanel>
-                            </ListViewItem>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding DisplayName}" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{Binding SecondaryText}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{Binding ValidationSummary}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
                         </ListView>
                     </Grid>
                 </Border>
@@ -256,15 +263,16 @@
                                         Grid.Column="0"
                                         VerticalAlignment="Top"
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                        Text="Notes" />
+                                        Text="Attached VMs" />
                                     <TextBox
-                                        x:Name="AssetsSwitchesNotesTextBox"
+                                        x:Name="AssetsSwitchesAttachedVmsTextBox"
                                         Grid.Row="3"
                                         Grid.Column="1"
                                         AcceptsReturn="True"
+                                        IsReadOnly="True"
                                         MinHeight="72"
                                         TextWrapping="Wrap"
-                                        PlaceholderText="Operational notes, delete warnings, or AK3 validation output." />
+                                        PlaceholderText="Attached VM names and delete guidance appear here." />
                                 </Grid>
                             </Border>
                         </StackPanel>

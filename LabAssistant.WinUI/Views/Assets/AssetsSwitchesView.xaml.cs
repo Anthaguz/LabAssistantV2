@@ -45,7 +45,7 @@ public sealed partial class AssetsSwitchesView : UserControl
 
     public TextBox AssetsSwitchesAdapterTextBoxControl => AssetsSwitchesAdapterTextBox;
 
-    public TextBox AssetsSwitchesNotesTextBoxControl => AssetsSwitchesNotesTextBox;
+    public TextBox AssetsSwitchesAttachedVmsTextBoxControl => AssetsSwitchesAttachedVmsTextBox;
 
     public Border AssetsSwitchesLoadingStatePanelControl => AssetsSwitchesLoadingStatePanel;
 
