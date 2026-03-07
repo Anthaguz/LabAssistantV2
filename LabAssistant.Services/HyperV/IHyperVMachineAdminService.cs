@@ -8,6 +8,16 @@ public interface IHyperVMachineAdminService
 
     Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync();
 
+    Task<IReadOnlyList<HyperVVirtualSwitchInfo>> ListVirtualSwitchesAsync();
+
+    Task<IReadOnlyList<string>> GetAttachedVmNamesForSwitchAsync(string switchName);
+
+    Task<HyperVMachineActionResult> CreateVirtualSwitchAsync(HyperVVirtualSwitchCreateRequest request);
+
+    Task<HyperVMachineActionResult> RenameVirtualSwitchAsync(string currentName, string newName);
+
+    Task<HyperVMachineActionResult> DeleteVirtualSwitchAsync(string switchName);
+
     Task<HyperVMachineActionResult> StartVmAsync(string vmName);
 
     Task<HyperVMachineActionResult> StopVmAsync(string vmName);
@@ -74,6 +84,24 @@ public sealed class HyperVMachineNetworkAdapterInfo
     public string AdapterName { get; init; } = string.Empty;
 
     public string? SwitchName { get; init; }
+}
+
+public sealed class HyperVVirtualSwitchInfo
+{
+    public string Name { get; init; } = string.Empty;
+
+    public string SwitchType { get; init; } = string.Empty;
+
+    public string? AdapterName { get; init; }
+}
+
+public sealed class HyperVVirtualSwitchCreateRequest
+{
+    public string Name { get; init; } = string.Empty;
+
+    public string SwitchType { get; init; } = string.Empty;
+
+    public string? AdapterName { get; init; }
 }
 
 public sealed class HyperVMachineEditRequest

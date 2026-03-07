@@ -49,19 +49,27 @@ public sealed class MilestoneAKScenarioMatrixTests
     }
 
     [Fact]
-    public void Ak2_RemainsScaffoldOnly_WithoutAk3SwitchCrudWiring()
+    public void Ak3_WiresSwitchOperations_WithExplicitDeleteGuardrails()
     {
         var source = LoadMainWindowSource();
         var viewSource = LoadAssetsSwitchesViewXamlSource();
+        var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
 
-        Assert.DoesNotContain("EnsureAssetsSwitchesAsync", source);
-        Assert.DoesNotContain("AssetsSwitchesRefreshButton_Click", source);
-        Assert.DoesNotContain("AssetsSwitchesCreateButton_Click", source);
-        Assert.DoesNotContain("AssetsSwitchesApplyButton_Click", source);
-        Assert.DoesNotContain("AssetsSwitchesValidateButton_Click", source);
-        Assert.DoesNotContain("AssetsSwitchesDeleteButton_Click", source);
-        Assert.DoesNotContain("IAssetsSwitchesCapabilityService", source);
-        Assert.Contains("Scaffold only. Delete guardrails and Hyper-V wiring arrive in AK3.", viewSource);
+        Assert.Contains("EnsureAssetsSwitchesAsync", source);
+        Assert.Contains("UpdateAssetsSwitchesUi", source);
+        Assert.Contains("AssetsSwitchesRefreshButton_Click", source);
+        Assert.Contains("AssetsSwitchesCreateButton_Click", source);
+        Assert.Contains("AssetsSwitchesApplyButton_Click", source);
+        Assert.Contains("AssetsSwitchesValidateButton_Click", source);
+        Assert.Contains("AssetsSwitchesDeleteButton_Click", source);
+        Assert.Contains("ShowAssetsSwitchDeleteConfirmationDialogAsync", source);
+        Assert.Contains("IAssetsSwitchesCapabilityService", source);
+        Assert.Contains("_hasAssetsSwitchesErrorState", source);
+        Assert.Contains("AssetsSwitchesErrorStatePanel.Visibility = _hasAssetsSwitchesErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("Delete is allowed only when no Hyper-V VM is attached to the switch.", source);
+        Assert.Contains("Delete is blocked because at least one VM is attached to this switch.", capabilitySource);
+        Assert.Contains("Switch type changes are not supported. Create a new switch instead.", capabilitySource);
+        Assert.Contains("External adapter rebinding is not supported here. Create a new switch instead.", capabilitySource);
         Assert.Contains("External: binds the switch to a host network adapter for outside connectivity.", viewSource);
     }
 
@@ -92,6 +100,12 @@ public sealed class MilestoneAKScenarioMatrixTests
     private static string LoadAssetsSwitchesViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsSwitchesView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesCapabilityServiceSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.Business", "Assets", "AssetsSwitchesCapabilityService.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

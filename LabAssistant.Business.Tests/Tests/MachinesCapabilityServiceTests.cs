@@ -356,6 +356,16 @@ public class MachinesCapabilityServiceTests
 
         public Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync() => Task.FromResult(SwitchNames);
 
+        public Task<IReadOnlyList<HyperVVirtualSwitchInfo>> ListVirtualSwitchesAsync() => Task.FromResult<IReadOnlyList<HyperVVirtualSwitchInfo>>(Array.Empty<HyperVVirtualSwitchInfo>());
+
+        public Task<IReadOnlyList<string>> GetAttachedVmNamesForSwitchAsync(string switchName) => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        public Task<HyperVMachineActionResult> CreateVirtualSwitchAsync(HyperVVirtualSwitchCreateRequest request) => Task.FromResult(ActionResult);
+
+        public Task<HyperVMachineActionResult> RenameVirtualSwitchAsync(string currentName, string newName) => Task.FromResult(ActionResult);
+
+        public Task<HyperVMachineActionResult> DeleteVirtualSwitchAsync(string switchName) => Task.FromResult(ActionResult);
+
         public Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request)
         {
             LastEditRequest = request;
