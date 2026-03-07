@@ -48,7 +48,7 @@ public sealed class MilestoneAJScenarioMatrixTests
     }
 
     [Fact]
-    public void Aj3_WiresAssetsBaseDisksRuntimeOperations_WithoutChangingCanonicalRoute()
+    public void Aj4_HardensAssetsBaseDisksStateContinuity_AndActionableMessaging()
     {
         var source = LoadMainWindowSource();
         var nativeFileDialogsSource = LoadNativeFileDialogsSource();
@@ -56,16 +56,19 @@ public sealed class MilestoneAJScenarioMatrixTests
 
         Assert.Contains("private bool IsAssetsBaseDisksActive =>", source);
         Assert.Contains("EnsureAssetsBaseDisksAsync", source);
+        Assert.Contains("_pendingAssetsBaseDiskDraft", source);
         Assert.Contains("AssetsBaseDisksRefreshButton_Click", source);
         Assert.Contains("AssetsBaseDisksImportButton_Click", source);
         Assert.Contains("AssetsBaseDisksValidateButton_Click", source);
         Assert.Contains("AssetsBaseDisksSaveMetadataButton_Click", source);
         Assert.Contains("AssetsBaseDisksRemoveButton_Click", source);
         Assert.Contains("ShowAssetsBaseDiskRemoveConfirmationDialogAsync", source);
+        Assert.Contains("FormatAssetsBaseDiskValidationText", source);
         Assert.Contains("IAssetsBaseDisksCapabilityService", source);
         Assert.Contains("ShowOpenVhdxDialog", nativeFileDialogsSource);
         Assert.Contains("Active runtime consumer detection is not currently implemented.", capabilitySource);
         Assert.Contains("Base disk removed from the registry.", capabilitySource);
+        Assert.Contains("Validate and Save Metadata", source);
     }
 
     private static string LoadShellViewModelSource()
