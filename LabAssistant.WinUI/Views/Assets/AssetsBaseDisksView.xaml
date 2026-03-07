@@ -88,7 +88,7 @@
                     <TextBlock
                         x:Name="AssetsBaseDisksStatusTextBlock"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Scaffold only. Loading, empty, and error states are modeled explicitly below."
+                        Text="Base disk status, validation, and recovery guidance appear here."
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
@@ -315,7 +315,7 @@
                             <TextBlock
                                 x:Name="AssetsBaseDisksLoadingStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Use this region to show catalog loading progress without hiding the capability surface."
+                                Text="Catalog loading and refresh progress appears here."
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
@@ -336,7 +336,7 @@
                             <TextBlock
                                 x:Name="AssetsBaseDisksEmptyStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Use this region to explain that no base disks are registered and point users toward import/register."
+                                Text="No base disks are registered yet. Import a VHDX, review the metadata, then save it to register the disk."
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
@@ -357,7 +357,7 @@
                             <TextBlock
                                 x:Name="AssetsBaseDisksErrorStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Use this region to show actionable load/refresh/import failure messaging without collapsing the surface."
+                                Text="Actionable load, save, validate, or remove failures appear here."
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
