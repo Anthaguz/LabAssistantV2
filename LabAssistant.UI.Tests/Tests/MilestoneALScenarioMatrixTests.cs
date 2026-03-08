@@ -95,7 +95,9 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", mainWindowSource);
 
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenLogsButton\"", diagnosticsOverviewSource);
+        Assert.Contains("x:Name=\"DiagnosticsOverviewOpenSupportExportButton\"", diagnosticsOverviewSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", mainWindowSource);
+        Assert.Contains("OpenStructuredLogLocation();", mainWindowSource);
     }
 
     [Fact]

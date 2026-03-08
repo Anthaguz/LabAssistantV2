@@ -210,6 +210,8 @@ public sealed partial class MainWindow : Window
     private TextBox SelectedLogContextTextBox => DiagnosticsLogsView.SelectedLogContextTextBox;
     private Button DiagnosticsOverviewOpenLogsButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenLogsButtonControl;
     private TextBlock DiagnosticsOverviewLogsSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewLogsSummaryTextBlockControl;
+    private Button DiagnosticsOverviewOpenSupportExportButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenSupportExportButtonControl;
+    private TextBlock DiagnosticsOverviewSupportSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewSupportSummaryTextBlockControl;
     private Button AssetsOverviewOpenBaseDisksButton => AssetsOverviewView.AssetsOverviewOpenBaseDisksButtonControl;
     private Button AssetsOverviewOpenSwitchesButton => AssetsOverviewView.AssetsOverviewOpenSwitchesButtonControl;
     private TextBlock AssetsOverviewBaseDisksSummaryTextBlock => AssetsOverviewView.AssetsOverviewBaseDisksSummaryTextBlockControl;
@@ -520,6 +522,7 @@ public sealed partial class MainWindow : Window
         DeployOverviewOpenQuickDeployButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
         DeployOverviewOpenFromTemplateButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
         DiagnosticsOverviewOpenLogsButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
+        DiagnosticsOverviewOpenSupportExportButton.Click += (_, _) => OpenStructuredLogLocation();
     }
 
     private void ConfigureShellIcons()
@@ -1063,6 +1066,7 @@ public sealed partial class MainWindow : Window
             : _structuredLogEntries.Count > 0
                 ? $"{_structuredLogEntries.Count} structured log entries are currently loaded."
                 : "Open Logs to inspect structured events and current support context.";
+        DiagnosticsOverviewSupportSummaryTextBlock.Text = "Open the current structured log location for support export or manual diagnostics collection.";
     }
 
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
@@ -5333,6 +5337,11 @@ public sealed partial class MainWindow : Window
     }
 
     private void OpenRawJsonlButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenStructuredLogLocation();
+    }
+
+    private void OpenStructuredLogLocation()
     {
         var filePath = _structuredLogViewerService.GetStructuredLogFilePath();
         try

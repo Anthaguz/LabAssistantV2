@@ -12,4 +12,8 @@ public sealed partial class DiagnosticsOverviewView : UserControl
     public Button DiagnosticsOverviewOpenLogsButtonControl => DiagnosticsOverviewOpenLogsButton;
 
     public TextBlock DiagnosticsOverviewLogsSummaryTextBlockControl => DiagnosticsOverviewLogsSummaryTextBlock;
+
+    public Button DiagnosticsOverviewOpenSupportExportButtonControl => DiagnosticsOverviewOpenSupportExportButton;
+
+    public TextBlock DiagnosticsOverviewSupportSummaryTextBlockControl => DiagnosticsOverviewSupportSummaryTextBlock;
 }

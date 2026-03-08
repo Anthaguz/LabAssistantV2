@@ -5,7 +5,7 @@
     <Grid RowSpacing="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <TextBlock
@@ -13,28 +13,60 @@
             Text="Use Diagnostics to inspect structured log activity and support signals without leaving the capability workspace."
             TextWrapping="Wrap" />
 
-        <Border
+        <Grid
             Grid.Row="1"
-            Padding="12"
-            Background="{StaticResource ShellBackgroundBrush}"
-            BorderBrush="{StaticResource ShellBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="6">
-            <StackPanel Spacing="8">
-                <TextBlock
-                    Foreground="{StaticResource ShellTextPrimaryBrush}"
-                    FontWeight="SemiBold"
-                    Text="Logs" />
-                <TextBlock
-                    x:Name="DiagnosticsOverviewLogsSummaryTextBlock"
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="Open Logs to inspect structured events and current support context."
-                    TextWrapping="Wrap" />
-                <Button
-                    x:Name="DiagnosticsOverviewOpenLogsButton"
-                    HorizontalAlignment="Left"
-                    Content="Open Logs" />
-            </StackPanel>
-        </Border>
+            ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Padding="12"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Logs" />
+                    <TextBlock
+                        x:Name="DiagnosticsOverviewLogsSummaryTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Open Logs to inspect structured events and current support context."
+                        TextWrapping="Wrap" />
+                    <Button
+                        x:Name="DiagnosticsOverviewOpenLogsButton"
+                        HorizontalAlignment="Left"
+                        Content="Open Logs" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Padding="12"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Support Export" />
+                    <TextBlock
+                        x:Name="DiagnosticsOverviewSupportSummaryTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Open the current structured log file location for support export and manual bundle collection."
+                        TextWrapping="Wrap" />
+                    <Button
+                        x:Name="DiagnosticsOverviewOpenSupportExportButton"
+                        HorizontalAlignment="Left"
+                        Content="Open Log Location" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
