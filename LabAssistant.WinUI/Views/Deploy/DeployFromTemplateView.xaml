@@ -13,24 +13,9 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock
-                Grid.Row="0"
-                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                FontSize="16"
-                FontWeight="SemiBold"
-                Text="Deploy From Template" />
-
-            <TextBlock
-                Grid.Row="1"
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Deploy from-template with compact status, expandable per-VM details, and collapsed global issue drawer."
-                TextWrapping="Wrap" />
-
-            <Grid Grid.Row="2" ColumnSpacing="8">
+            <Grid Grid.Row="0" ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -52,7 +37,7 @@
 
             <Border
                 x:Name="DeployReadinessSummaryPanel"
-                Grid.Row="3"
+                Grid.Row="1"
                 Padding="10"
                 Background="{StaticResource ShellContentBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
@@ -104,7 +89,7 @@
             </Border>
 
             <Border
-                Grid.Row="4"
+                Grid.Row="2"
                 Padding="10"
                 Background="{StaticResource ShellContentBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
