@@ -52,13 +52,27 @@
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                         Text="No deployment started."
                         TextWrapping="Wrap" />
+                    <StackPanel
+                        Grid.Column="3"
+                        HorizontalAlignment="Right"
+                        Spacing="4">
+                        <Button
+                            x:Name="DeployOnTheFlyOpenResultsPanelButton"
+                            Content="Open Progress / Results" />
+                        <TextBlock
+                            x:Name="DeployOnTheFlyResultsPanelSummaryTextBlock"
+                            HorizontalAlignment="Right"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            FontSize="12"
+                            Text="Use the side panel during or after deploy for progress and results." />
+                    </StackPanel>
                     <TextBlock
                         x:Name="DeployOnTheFlyGlobalIssuesBadgeTextBlock"
                         Grid.Column="3"
-                        VerticalAlignment="Center"
                         Foreground="{StaticResource ShellWarnBrush}"
                         FontWeight="SemiBold"
-                        Text="Blocking: 0 | Warnings: 0" />
+                        Text="Blocking: 0 | Warnings: 0"
+                        Visibility="Collapsed" />
                     <TextBlock
                         x:Name="DeployOnTheFlyReadinessSummaryTextBlock"
                         Grid.Column="0"

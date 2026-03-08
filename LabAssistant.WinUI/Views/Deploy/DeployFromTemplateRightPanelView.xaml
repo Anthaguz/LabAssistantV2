@@ -16,7 +16,7 @@
                 <TextBlock
                     Foreground="{StaticResource ShellTextPrimaryBrush}"
                     FontWeight="SemiBold"
-                    Text="Global warnings / errors" />
+                    Text="Run warnings / errors" />
             </Expander.Header>
             <Border
                 Margin="0,8,0,0"

@@ -23,6 +23,10 @@ public sealed partial class DeployFromTemplateView : UserControl
 
     public TextBlock DeployProgressSummaryTextBlockControl => DeployProgressSummaryTextBlock;
 
+    public Button DeployOpenResultsPanelButtonControl => DeployOpenResultsPanelButton;
+
+    public TextBlock DeployResultsPanelSummaryTextBlockControl => DeployResultsPanelSummaryTextBlock;
+
     public TextBlock DeployGlobalIssuesBadgeTextBlockControl => DeployGlobalIssuesBadgeTextBlock;
 
     public TextBlock DeployReadinessSummaryTextBlockControl => DeployReadinessSummaryTextBlock;

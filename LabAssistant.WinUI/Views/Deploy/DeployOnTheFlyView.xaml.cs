@@ -41,6 +41,10 @@ public sealed partial class DeployOnTheFlyView : UserControl
 
     public TextBlock DeployOnTheFlyProgressSummaryTextBlockControl => DeployOnTheFlyProgressSummaryTextBlock;
 
+    public Button DeployOnTheFlyOpenResultsPanelButtonControl => DeployOnTheFlyOpenResultsPanelButton;
+
+    public TextBlock DeployOnTheFlyResultsPanelSummaryTextBlockControl => DeployOnTheFlyResultsPanelSummaryTextBlock;
+
     public TextBlock DeployOnTheFlyGlobalIssuesBadgeTextBlockControl => DeployOnTheFlyGlobalIssuesBadgeTextBlock;
 
     public TextBlock DeployOnTheFlyReadinessSummaryTextBlockControl => DeployOnTheFlyReadinessSummaryTextBlock;

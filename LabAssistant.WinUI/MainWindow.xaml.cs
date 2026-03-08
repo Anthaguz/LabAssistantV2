@@ -269,6 +269,8 @@ public sealed partial class MainWindow : Window
     private TextBlock DeployOverallStateTextBlock => DeployFromTemplateView.DeployOverallStateTextBlockControl;
     private ProgressBar DeployProgressBar => DeployFromTemplateView.DeployProgressBarControl;
     private TextBlock DeployProgressSummaryTextBlock => DeployFromTemplateView.DeployProgressSummaryTextBlockControl;
+    private Button DeployOpenResultsPanelButton => DeployFromTemplateView.DeployOpenResultsPanelButtonControl;
+    private TextBlock DeployResultsPanelSummaryTextBlock => DeployFromTemplateView.DeployResultsPanelSummaryTextBlockControl;
     private TextBlock DeployGlobalIssuesBadgeTextBlock => DeployFromTemplateView.DeployGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
     private Expander DeployGlobalIssuesExpander => DeployFromTemplateRightPanelView.DeployGlobalIssuesExpanderControl;
@@ -292,6 +294,8 @@ public sealed partial class MainWindow : Window
     private TextBlock DeployOnTheFlyOverallStateTextBlock => DeployOnTheFlyView.DeployOnTheFlyOverallStateTextBlockControl;
     private ProgressBar DeployOnTheFlyProgressBar => DeployOnTheFlyView.DeployOnTheFlyProgressBarControl;
     private TextBlock DeployOnTheFlyProgressSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyProgressSummaryTextBlockControl;
+    private Button DeployOnTheFlyOpenResultsPanelButton => DeployOnTheFlyView.DeployOnTheFlyOpenResultsPanelButtonControl;
+    private TextBlock DeployOnTheFlyResultsPanelSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyResultsPanelSummaryTextBlockControl;
     private TextBlock DeployOnTheFlyGlobalIssuesBadgeTextBlock => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployOnTheFlyReadinessSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyReadinessSummaryTextBlockControl;
     private ListView DeployOnTheFlyVmResultsListView => DeployOnTheFlyRightPanelView.DeployOnTheFlyVmResultsListViewControl;
@@ -489,6 +493,7 @@ public sealed partial class MainWindow : Window
         DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
         DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
         DeployTemplateSelectorComboBox.ItemsSource = _templateLibraryItems;
+        DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
         DeployVmResultsListView.ItemsSource = _deployVmResultRows;
         DeployGlobalIssuesListView.ItemsSource = _deployIssueRows;
         DeployGlobalIssuesExpander.IsExpanded = false;
@@ -509,6 +514,7 @@ public sealed partial class MainWindow : Window
         DeployOnTheFlyResolveSuggestionsButton.Click += DeployOnTheFlyResolveSuggestionsButton_Click;
         DeployOnTheFlyOpenTemplateEditorButton.Click += DeployOnTheFlyOpenTemplateEditorButton_Click;
         DeployOnTheFlyStartButton.Click += DeployOnTheFlyStartButton_Click;
+        DeployOnTheFlyOpenResultsPanelButton.Click += DeployOnTheFlyOpenResultsPanelButton_Click;
         DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;
         EnsureDeployOnTheFlySeeded();
         UpdateDeployOnTheFlyEditorPanel();
@@ -777,24 +783,49 @@ public sealed partial class MainWindow : Window
         ShellRightPanelColumn.Width = showPanel ? new GridLength(ShellRightPanelExpandedWidth) : new GridLength(0);
         InsightsToggleButton.IsEnabled = hasOwner && !_isShellRightPanelInCompactFallback;
         InsightsToggleButton.Opacity = InsightsToggleButton.IsEnabled ? 1.0 : 0.45;
+        ToolTipService.SetToolTip(InsightsToggleButton, "Toggle progress and results panel");
         RightPanelTitleTextBlock.Text = IsDeployFromTemplateActive
-            ? "Deploy From Template Details"
+            ? "From Template Progress / Results"
             : IsDeployOnTheFlyActive
-                ? "Quick Deploy Details"
+                ? "Quick Deploy Progress / Results"
                 : "Details";
         DeployFromTemplateRightPanel.Visibility = IsDeployFromTemplateActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
         DeployOnTheFlyRightPanel.Visibility = IsDeployOnTheFlyActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
         RightPanelEmptyStateBorder.Visibility = (!IsDeployFromTemplateActive && !IsDeployOnTheFlyActive && showPanel)
             ? Visibility.Visible
             : Visibility.Collapsed;
+        UpdateDeployRightPanelLaunchers(showPanel);
+        IssueBadge.Visibility = Visibility.Collapsed;
+        IssueBadgeTextBlock.Text = string.Empty;
+    }
 
-        var issueCount = IsDeployFromTemplateActive
-            ? _deployIssueRows.Count
-            : IsDeployOnTheFlyActive
-                ? _deployOnTheFlyIssueRows.Count
-                : 0;
-        IssueBadge.Visibility = issueCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-        IssueBadgeTextBlock.Text = issueCount.ToString();
+    private void UpdateDeployRightPanelLaunchers(bool showPanel)
+    {
+        var panelUnavailable = _isShellRightPanelInCompactFallback;
+        var fromTemplateIsRunning = _isDeployStarting || string.Equals(_deployLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+        var quickDeployIsRunning = _isDeployOnTheFlyStarting || string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+
+        DeployOpenResultsPanelButton.Content = showPanel && IsDeployFromTemplateActive ? "Hide Progress / Results" : "Open Progress / Results";
+        DeployOnTheFlyOpenResultsPanelButton.Content = showPanel && IsDeployOnTheFlyActive ? "Hide Progress / Results" : "Open Progress / Results";
+
+        DeployOpenResultsPanelButton.IsEnabled = IsDeployFromTemplateActive && !panelUnavailable;
+        DeployOnTheFlyOpenResultsPanelButton.IsEnabled = IsDeployOnTheFlyActive && !panelUnavailable;
+
+        DeployResultsPanelSummaryTextBlock.Text = panelUnavailable
+            ? "Expand the window to review the progress and results panel."
+            : fromTemplateIsRunning
+                ? "The panel auto-opens while deployment runs and stays available for result review."
+                : _deployVmResultRows.Count > 0
+                    ? $"{_deployVmResultRows.Count} VM result row(s) are available for review."
+                    : "Use the side panel during or after deploy for progress, timeline, and results.";
+
+        DeployOnTheFlyResultsPanelSummaryTextBlock.Text = panelUnavailable
+            ? "Expand the window to review the progress and results panel."
+            : quickDeployIsRunning
+                ? "The panel auto-opens while deployment runs and stays available for result review."
+                : _deployOnTheFlyVmResultRows.Count > 0
+                    ? $"{_deployOnTheFlyVmResultRows.Count} VM result row(s) are available for review."
+                    : "Use the side panel during or after deploy for progress, timeline, and results.";
     }
 
     private void NavigateToRoute(string routeKey)
@@ -1072,6 +1103,27 @@ public sealed partial class MainWindow : Window
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
     {
         if (!CanActiveCapabilityOwnRightPanel())
+        {
+            return;
+        }
+
+        _isShellRightPanelOpen = !_isShellRightPanelOpen;
+        ApplyRightPanelState();
+    }
+
+    private void DeployOpenResultsPanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleDeployRightPanelFromWorkflow();
+    }
+
+    private void DeployOnTheFlyOpenResultsPanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleDeployRightPanelFromWorkflow();
+    }
+
+    private void ToggleDeployRightPanelFromWorkflow()
+    {
+        if (!CanActiveCapabilityOwnRightPanel() || _isShellRightPanelInCompactFallback)
         {
             return;
         }
