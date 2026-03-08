@@ -275,9 +275,29 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Base Disks remains a first-class WinUI capability at `assets.base_disks`.
   - AJ2 scaffold contract remains structurally intact.
   - AJ3 operational hooks remain present and usable.
-  - AJ4 UX/data-binding hardening remains intact without semantic/domain drift.
-  - Registry-only remove wording and current reference-warning limitation remain explicit.
-  - AJ closure evidence includes both automated structural checks and repeatable manual runtime verification.
+- AJ4 UX/data-binding hardening remains intact without semantic/domain drift.
+- Registry-only remove wording and current reference-warning limitation remain explicit.
+- AJ closure evidence includes both automated structural checks and repeatable manual runtime verification.
+
+## TC-018: Milestone AK Switches Convergence Verification
+- **Related AC:** `AC-020`, `FR-104`, `FR-105`, `FR-106`, `FR-107`
+- **Type:** Manual (real Windows machine / Hyper-V host) + automated coverage
+- **Related milestone:** Milestone AK (`#365`, `#366`, `#367`, `#368`, `#369`)
+- **Steps:**
+  1. Run automated AK matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAKScenarioMatrixTests.cs`.
+  2. Run the Milestone AK checklist in `docs/07-testing/milestone-ak-switches-convergence-checklist.md`.
+  3. Verify `assets.switches` route and shell hosting remain canonical and stable.
+  4. Verify AK2 scaffold continuity for list/details/edit/actions and explicit loading/empty/error state containers.
+  5. Verify AK3 operational continuity for load/refresh/create/update/delete wiring, conservative update rules, and delete blocking when any VM is attached.
+  6. Verify AK4 hardening continuity for draft preservation, live inline validation, attached-VM visibility, reduced delete-overemphasis, and stable route/title behavior.
+  7. Verify delete guardrails remain explicit while attached-VM information is presented as normal host-state context.
+- **Expected:**
+  - Switches remains a first-class WinUI capability at `assets.switches`.
+  - AK2 scaffold structure remains intact and visible.
+  - AK3 operational behavior remains present without topology/domain drift.
+  - AK4 hardening remains intact, especially around draft continuity, inline validation, and attached-VM visibility.
+  - Delete remains blocked if any VM is attached, regardless of VM power state.
+  - AK closure evidence includes both automated structural checks and repeatable manual runtime verification.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
