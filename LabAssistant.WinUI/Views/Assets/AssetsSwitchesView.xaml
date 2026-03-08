@@ -10,97 +10,13 @@
         CornerRadius="6">
         <Grid RowSpacing="10">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-
-            <TextBlock
-                Grid.Row="0"
-                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                FontSize="16"
-                FontWeight="SemiBold"
-                Text="Assets / Virtual Switches" />
-
-            <TextBlock
-                Grid.Row="1"
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Manage Hyper-V virtual switches with in-context create/edit flow, explicit validation signals, and guarded delete semantics."
-                TextWrapping="Wrap" />
-
-            <Border
-                x:Name="AssetsSwitchesActionsRegion"
-                Grid.Row="2"
-                Padding="10"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        x:Name="AssetsSwitchesRefreshButton"
-                        Grid.Column="0"
-                        Content="Refresh" />
-                    <Button
-                        x:Name="AssetsSwitchesCreateButton"
-                        Grid.Column="1"
-                        Content="Create" />
-                    <Button
-                        x:Name="AssetsSwitchesApplyButton"
-                        Grid.Column="2"
-                        Content="Apply" />
-                    <Button
-                        x:Name="AssetsSwitchesValidateButton"
-                        Grid.Column="3"
-                        Content="Validate" />
-                    <Button
-                        x:Name="AssetsSwitchesDeleteButton"
-                        Grid.Column="4"
-                        Content="Delete" />
-                    <TextBlock
-                        Grid.Column="5"
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Scaffold only. Delete guardrails and Hyper-V wiring arrive in AK3."
-                        TextAlignment="Right"
-                        TextWrapping="Wrap" />
-                </Grid>
-            </Border>
-
-            <Border
-                x:Name="AssetsSwitchesStatusRegion"
-                Grid.Row="3"
-                Padding="10"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <StackPanel Spacing="6">
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Status / Feedback" />
-                    <TextBlock
-                        x:Name="AssetsSwitchesStatusTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Switch loading, validation, and delete guidance will appear here when AK3 wiring is added."
-                        TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
 
             <Grid
                 x:Name="AssetsSwitchesWorkspaceGrid"
-                Grid.Row="4"
+                Grid.Row="0"
                 ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.15*" />
@@ -125,10 +41,26 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <TextBlock
-                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                            FontWeight="SemiBold"
-                            Text="Virtual Switch Inventory" />
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Grid.Column="0"
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Virtual Switch Inventory" />
+                            <Button
+                                x:Name="AssetsSwitchesRefreshButton"
+                                Grid.Column="1"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                ToolTipService.ToolTip="Refresh switch inventory">
+                                <FontIcon Glyph="&#xE72C;" />
+                            </Button>
+                        </Grid>
                         <ListView
                             x:Name="AssetsSwitchesListView"
                             Grid.Row="1"
@@ -143,10 +75,6 @@
                                         <TextBlock
                                             Foreground="{StaticResource ShellTextSecondaryBrush}"
                                             Text="{Binding SecondaryText}"
-                                            TextWrapping="Wrap" />
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="{Binding ValidationSummary}"
                                             TextWrapping="Wrap" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -166,24 +94,47 @@
                     CornerRadius="6">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Spacing="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    Grid.Column="0"
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    FontWeight="SemiBold"
+                                    Text="Selected Switch Details" />
+                                <Button
+                                    x:Name="AssetsSwitchesCreateButton"
+                                    Grid.Column="1"
+                                    Margin="0,0,8,0"
+                                    Content="New" />
+                                <Button
+                                    x:Name="AssetsSwitchesApplyButton"
+                                    Grid.Column="2"
+                                    Margin="0,0,8,0"
+                                    Content="Apply" />
+                                <Button
+                                    x:Name="AssetsSwitchesDeleteButton"
+                                    Grid.Column="3"
+                                    Content="Delete" />
+                            </Grid>
                             <TextBlock
-                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                FontWeight="SemiBold"
-                                Text="Selected Switch Details" />
-                            <TextBlock
-                                x:Name="AssetsSwitchesSelectedSwitchSummaryTextBlock"
+                                x:Name="AssetsSwitchesStatusTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Select a switch to review configuration, validation state, and delete constraints."
+                                Visibility="Collapsed"
                                 TextWrapping="Wrap" />
                             <TextBlock
                                 x:Name="AssetsSwitchesSelectedSwitchValidationTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Validation has not been evaluated."
+                                Text="Select a switch or click New to begin."
                                 TextWrapping="Wrap" />
                             <TextBlock
                                 x:Name="AssetsSwitchesDeleteConstraintTextBlock"
                                 Foreground="{StaticResource ShellWarnBrush}"
-                                Text="Delete guardrails are scaffold-only in AK2."
+                                Visibility="Collapsed"
                                 TextWrapping="Wrap" />
 
                             <Border
@@ -264,15 +215,23 @@
                                         VerticalAlignment="Top"
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"
                                         Text="Attached VMs" />
-                                    <TextBox
-                                        x:Name="AssetsSwitchesAttachedVmsTextBox"
+                                    <StackPanel
                                         Grid.Row="3"
                                         Grid.Column="1"
-                                        AcceptsReturn="True"
-                                        IsReadOnly="True"
-                                        MinHeight="72"
-                                        TextWrapping="Wrap"
-                                        PlaceholderText="Attached VM names and delete guidance appear here." />
+                                        Spacing="6">
+                                        <TextBlock
+                                            x:Name="AssetsSwitchesAttachedVmsHintTextBlock"
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="No attached VMs."
+                                            TextWrapping="Wrap" />
+                                        <ListView
+                                            x:Name="AssetsSwitchesAttachedVmsListView"
+                                            MaxHeight="120"
+                                            MinHeight="72"
+                                            IsItemClickEnabled="False"
+                                            ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                            SelectionMode="None" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </StackPanel>
@@ -328,7 +287,7 @@
                             <TextBlock
                                 x:Name="AssetsSwitchesEmptyStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="No switches loaded yet. AK3 will populate inventory and create flow." />
+                                Text="No virtual switches were found on this host. Click Create to prepare a new switch." />
                         </StackPanel>
                     </Border>
 
@@ -345,10 +304,17 @@
                                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                                 FontWeight="SemiBold"
                                 Text="Error State" />
-                            <TextBlock
-                                x:Name="AssetsSwitchesErrorStateTextBlock"
+                            <TextBox
+                                x:Name="AssetsSwitchesErrorStateTextBox"
+                                AcceptsReturn="True"
+                                IsReadOnly="True"
+                                MinHeight="72"
+                                BorderThickness="0"
+                                Background="Transparent"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Switch load and validation failures will surface here with actionable recovery text." />
+                                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                Text="Switch load, save, and blocked-delete guidance appears here with recovery steps."
+                                TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                 </Grid>

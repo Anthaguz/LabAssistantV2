@@ -6,6 +6,8 @@ public interface IAssetsSwitchesCapabilityService
 {
     Task<AssetsSwitchesInventoryResult> LoadAsync(bool isRefresh = false, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<string>> GetAttachedVmNamesAsync(string switchName, CancellationToken cancellationToken = default);
+
     Task<AssetsSwitchValidationResult> ValidateAsync(AssetsSwitchDraft draft, CancellationToken cancellationToken = default);
 
     Task<AssetsSwitchOperationResult> SaveAsync(AssetsSwitchDraft draft, CancellationToken cancellationToken = default);

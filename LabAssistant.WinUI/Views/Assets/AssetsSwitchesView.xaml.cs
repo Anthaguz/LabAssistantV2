@@ -9,19 +9,13 @@ public sealed partial class AssetsSwitchesView : UserControl
         InitializeComponent();
     }
 
-    public Border AssetsSwitchesActionsRegionControl => AssetsSwitchesActionsRegion;
-
     public Button AssetsSwitchesRefreshButtonControl => AssetsSwitchesRefreshButton;
 
     public Button AssetsSwitchesCreateButtonControl => AssetsSwitchesCreateButton;
 
     public Button AssetsSwitchesApplyButtonControl => AssetsSwitchesApplyButton;
 
-    public Button AssetsSwitchesValidateButtonControl => AssetsSwitchesValidateButton;
-
     public Button AssetsSwitchesDeleteButtonControl => AssetsSwitchesDeleteButton;
-
-    public Border AssetsSwitchesStatusRegionControl => AssetsSwitchesStatusRegion;
 
     public TextBlock AssetsSwitchesStatusTextBlockControl => AssetsSwitchesStatusTextBlock;
 
@@ -33,8 +27,6 @@ public sealed partial class AssetsSwitchesView : UserControl
 
     public Border AssetsSwitchesEditRegionControl => AssetsSwitchesEditRegion;
 
-    public TextBlock AssetsSwitchesSelectedSwitchSummaryTextBlockControl => AssetsSwitchesSelectedSwitchSummaryTextBlock;
-
     public TextBlock AssetsSwitchesSelectedSwitchValidationTextBlockControl => AssetsSwitchesSelectedSwitchValidationTextBlock;
 
     public TextBlock AssetsSwitchesDeleteConstraintTextBlockControl => AssetsSwitchesDeleteConstraintTextBlock;
@@ -45,7 +37,9 @@ public sealed partial class AssetsSwitchesView : UserControl
 
     public TextBox AssetsSwitchesAdapterTextBoxControl => AssetsSwitchesAdapterTextBox;
 
-    public TextBox AssetsSwitchesAttachedVmsTextBoxControl => AssetsSwitchesAttachedVmsTextBox;
+    public TextBlock AssetsSwitchesAttachedVmsHintTextBlockControl => AssetsSwitchesAttachedVmsHintTextBlock;
+
+    public ListView AssetsSwitchesAttachedVmsListViewControl => AssetsSwitchesAttachedVmsListView;
 
     public Border AssetsSwitchesLoadingStatePanelControl => AssetsSwitchesLoadingStatePanel;
 
@@ -57,5 +51,5 @@ public sealed partial class AssetsSwitchesView : UserControl
 
     public TextBlock AssetsSwitchesEmptyStateTextBlockControl => AssetsSwitchesEmptyStateTextBlock;
 
-    public TextBlock AssetsSwitchesErrorStateTextBlockControl => AssetsSwitchesErrorStateTextBlock;
+    public TextBox AssetsSwitchesErrorStateTextBoxControl => AssetsSwitchesErrorStateTextBox;
 }
