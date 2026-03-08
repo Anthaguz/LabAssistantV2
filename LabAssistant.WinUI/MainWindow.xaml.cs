@@ -553,19 +553,13 @@ public sealed partial class MainWindow : Window
     private void ApplyState()
     {
         CurrentRouteTextBlock.Text = $"{_activeCapability.DisplayName} / {_activeSubview.DisplayName}";
-        ContentTitleTextBlock.Text = IsAssetsSwitchesActive
-            ? _activeSubview.DisplayName
-            : _activeCapability.DisplayName;
+        ContentTitleTextBlock.Text = _activeCapability.DisplayName;
         ContentDescriptionTextBlock.Text = IsMachinesOverviewActive
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
-            : IsDeployFromTemplateActive
-                ? "Select template inputs and review compact readiness summary. Execution and gating wire in AF3."
-            : IsDeployOnTheFlyActive
-                ? "Configure VM entries for Quick Deploy. Evaluate readiness, resolve blockers, and run deployment."
-            : IsAssetsBaseDisksActive
-                ? "Manage imported base disks with explicit list, details, placeholder actions, and visible loading/empty/error states."
-            : IsAssetsSwitchesActive
-                ? "Manage Hyper-V virtual switches with live inventory, in-context create/edit, validation visibility, and guarded delete behavior."
+            : (IsDeployFromTemplateActive || IsDeployOnTheFlyActive)
+                ? "Configure and run deployment workflows from one capability surface with readiness, remediation, and results context."
+            : (IsAssetsBaseDisksActive || IsAssetsSwitchesActive)
+                ? "Manage shared Hyper-V assets, inventory, and compatibility state from one capability surface."
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
                 : IsTemplatesEditorActive

@@ -12,27 +12,12 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <TextBlock
-                Grid.Row="0"
-                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                FontSize="16"
-                FontWeight="SemiBold"
-                Text="Assets / Base Disks" />
-
-            <TextBlock
-                Grid.Row="1"
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Manage registered base disks with in-context metadata editing, validation visibility, and registry-only removal."
-                TextWrapping="Wrap" />
-
             <Border
                 x:Name="AssetsBaseDisksActionsRegion"
-                Grid.Row="2"
+                Grid.Row="0"
                 Padding="10"
                 Background="{StaticResource ShellContentBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
@@ -74,7 +59,7 @@
 
             <Border
                 x:Name="AssetsBaseDisksStatusRegion"
-                Grid.Row="3"
+                Grid.Row="1"
                 Padding="10"
                 Background="{StaticResource ShellContentBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
@@ -95,7 +80,7 @@
 
             <Grid
                 x:Name="AssetsBaseDisksWorkspaceGrid"
-                Grid.Row="4"
+                Grid.Row="2"
                 ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.15*" />

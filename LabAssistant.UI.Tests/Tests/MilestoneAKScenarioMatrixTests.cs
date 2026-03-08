@@ -132,8 +132,8 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("_hasAssetsSwitchesErrorState", source);
         Assert.Contains("Attached VMs currently using this switch.", source);
         Assert.DoesNotContain("Delete eligibility is checked when you click Delete.", source);
-        Assert.Contains("ContentTitleTextBlock.Text = IsAssetsSwitchesActive", source);
-        Assert.Contains("_activeSubview.DisplayName", source);
+        Assert.Contains("ContentTitleTextBlock.Text = _activeCapability.DisplayName;", source);
+        Assert.Contains("Manage shared Hyper-V assets, inventory, and compatibility state from one capability surface.", source);
         Assert.DoesNotContain("Assets / Virtual Switches", viewSource);
     }
 
