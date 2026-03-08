@@ -6,17 +6,21 @@ namespace LabAssistant.UI.Tests.Tests;
 public sealed class MilestoneAFScenarioMatrixTests
 {
     [Fact]
-    public void ShellViewModel_DeployParentDefaultsToFromTemplateForAf()
+    public void ShellViewModel_DeployParentDefaultsToOverview_WithApprovedSubviewOrder()
     {
         var source = LoadShellViewModelSource();
 
-        var fromTemplateIndex = source.IndexOf("new ShellSubview(ShellRouteKeys.DeployFromTemplate", StringComparison.Ordinal);
+        var overviewIndex = source.IndexOf("new ShellSubview(ShellRouteKeys.DeployOverview", StringComparison.Ordinal);
         var onTheFlyIndex = source.IndexOf("new ShellSubview(ShellRouteKeys.DeployOnTheFly", StringComparison.Ordinal);
+        var fromTemplateIndex = source.IndexOf("new ShellSubview(ShellRouteKeys.DeployFromTemplate", StringComparison.Ordinal);
 
+        Assert.Contains("public const string DeployOverview = \"deploy.overview\";", source);
         Assert.Contains("public const string DeployFromTemplate = \"deploy.from_template\";", source);
+        Assert.True(overviewIndex >= 0, "Deploy overview route must exist.");
         Assert.True(fromTemplateIndex >= 0, "Deploy from-template route must exist.");
         Assert.True(onTheFlyIndex >= 0, "Deploy on-the-fly route must exist.");
-        Assert.True(fromTemplateIndex < onTheFlyIndex, "Deploy from-template must be the default child ordering for AF.");
+        Assert.True(overviewIndex < onTheFlyIndex, "Deploy overview must be the first local subview.");
+        Assert.True(onTheFlyIndex < fromTemplateIndex, "Quick Deploy must remain ahead of From Template in local ordering.");
     }
 
     [Fact]

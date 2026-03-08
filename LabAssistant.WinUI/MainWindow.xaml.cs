@@ -108,6 +108,9 @@ public sealed partial class MainWindow : Window
     private int _assetsSwitchesAssessmentRequestVersion;
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingTemplatesSubviewSelection;
+    private bool _isUpdatingDeploySubviewSelection;
+    private bool _isUpdatingAssetsSubviewSelection;
+    private bool _isUpdatingDiagnosticsSubviewSelection;
     private bool _isUpdatingTemplateVmEditorControls;
     private bool _isUpdatingTemplateVmSwitchRows;
     private bool _isUpdatingTemplateVhdxSelector;
@@ -138,19 +141,28 @@ public sealed partial class MainWindow : Window
     private DateTimeOffset _lastOnDemandRdpRefreshUtc = DateTimeOffset.MinValue;
 
     private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
+    private DeployOverviewView DeployOverviewView => DeployOverviewViewHost;
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
     private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
+    private DiagnosticsOverviewView DiagnosticsOverviewView => DiagnosticsOverviewViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
+    private AssetsOverviewView AssetsOverviewView => AssetsOverviewViewHost;
     private AssetsBaseDisksView AssetsBaseDisksView => AssetsBaseDisksViewHost;
     private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;
     private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
     private DeployOnTheFlyRightPanelView DeployOnTheFlyRightPanelView => DeployOnTheFlyRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
+    private FrameworkElement DeployOverviewPanel => DeployOverviewViewHost;
     private FrameworkElement DeployFromTemplatePanel => DeployFromTemplateViewHost;
     private FrameworkElement DeployOnTheFlyPanel => DeployOnTheFlyViewHost;
+    private FrameworkElement DiagnosticsOverviewPanel => DiagnosticsOverviewViewHost;
+    private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
     private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
     private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
+    private FrameworkElement DeployLocalNavPanel => DeployLocalNavigationPanel;
+    private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
+    private FrameworkElement DiagnosticsLocalNavPanel => DiagnosticsLocalNavigationPanel;
     private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
     private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
@@ -196,6 +208,14 @@ public sealed partial class MainWindow : Window
     private ListView StructuredLogsListView => DiagnosticsLogsView.StructuredLogsListView;
     private TextBlock SelectedLogEnvelopeTextBlock => DiagnosticsLogsView.SelectedLogEnvelopeTextBlock;
     private TextBox SelectedLogContextTextBox => DiagnosticsLogsView.SelectedLogContextTextBox;
+    private Button DiagnosticsOverviewOpenLogsButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenLogsButtonControl;
+    private TextBlock DiagnosticsOverviewLogsSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewLogsSummaryTextBlockControl;
+    private Button DiagnosticsOverviewOpenSupportExportButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenSupportExportButtonControl;
+    private TextBlock DiagnosticsOverviewSupportSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewSupportSummaryTextBlockControl;
+    private Button AssetsOverviewOpenBaseDisksButton => AssetsOverviewView.AssetsOverviewOpenBaseDisksButtonControl;
+    private Button AssetsOverviewOpenSwitchesButton => AssetsOverviewView.AssetsOverviewOpenSwitchesButtonControl;
+    private TextBlock AssetsOverviewBaseDisksSummaryTextBlock => AssetsOverviewView.AssetsOverviewBaseDisksSummaryTextBlockControl;
+    private TextBlock AssetsOverviewSwitchesSummaryTextBlock => AssetsOverviewView.AssetsOverviewSwitchesSummaryTextBlockControl;
     private ListView AssetsBaseDisksListView => AssetsBaseDisksView.AssetsBaseDisksListViewControl;
     private Button AssetsBaseDisksRefreshButton => AssetsBaseDisksView.AssetsBaseDisksRefreshButtonControl;
     private Button AssetsBaseDisksImportButton => AssetsBaseDisksView.AssetsBaseDisksImportButtonControl;
@@ -239,6 +259,10 @@ public sealed partial class MainWindow : Window
     private TextBox AssetsSwitchesErrorStateTextBox => AssetsSwitchesView.AssetsSwitchesErrorStateTextBoxControl;
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
+    private Button DeployOverviewOpenQuickDeployButton => DeployOverviewView.DeployOverviewOpenQuickDeployButtonControl;
+    private Button DeployOverviewOpenFromTemplateButton => DeployOverviewView.DeployOverviewOpenFromTemplateButtonControl;
+    private TextBlock DeployOverviewQuickDeploySummaryTextBlock => DeployOverviewView.DeployOverviewQuickDeploySummaryTextBlockControl;
+    private TextBlock DeployOverviewFromTemplateSummaryTextBlock => DeployOverviewView.DeployOverviewFromTemplateSummaryTextBlockControl;
     private ComboBox DeployTemplateSelectorComboBox => DeployFromTemplateView.DeployTemplateSelectorComboBoxControl;
     private Button DeployReloadTemplatesButton => DeployFromTemplateView.DeployReloadTemplatesButtonControl;
     private Button DeployEvaluateReadinessButton => DeployFromTemplateView.DeployEvaluateReadinessButtonControl;
@@ -348,6 +372,7 @@ public sealed partial class MainWindow : Window
         WireDiagnosticsLogsHandlers();
         WireTemplatesHandlers();
         WireDeployHandlers();
+        WireOverviewHandlers();
         ConfigureShellIcons();
         ConfigureNavigationView();
         Title = "LabAssistant.WinUI";
@@ -490,6 +515,16 @@ public sealed partial class MainWindow : Window
         UpdateDeployOnTheFlyUi();
     }
 
+    private void WireOverviewHandlers()
+    {
+        AssetsOverviewOpenBaseDisksButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);
+        AssetsOverviewOpenSwitchesButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsSwitches);
+        DeployOverviewOpenQuickDeployButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
+        DeployOverviewOpenFromTemplateButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
+        DiagnosticsOverviewOpenLogsButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
+        DiagnosticsOverviewOpenSupportExportButton.Click += (_, _) => OpenStructuredLogLocation();
+    }
+
     private void ConfigureShellIcons()
     {
         HamburgerButton.Content = CreateIconGlyph(ShellIconToken.Menu);
@@ -516,6 +551,13 @@ public sealed partial class MainWindow : Window
             {
                 foreach (var subview in capability.Subviews)
                 {
+                    if (capability.HasOverview && string.Equals(subview.RouteKey, capability.DefaultSubview.RouteKey, StringComparison.Ordinal))
+                    {
+                        _routeToNavigationItem[subview.RouteKey] = parentItem;
+                        _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
+                        continue;
+                    }
+
                     var childItem = new NavigationViewItem
                     {
                         Content = subview.DisplayName,
@@ -556,9 +598,9 @@ public sealed partial class MainWindow : Window
         ContentTitleTextBlock.Text = _activeCapability.DisplayName;
         ContentDescriptionTextBlock.Text = IsMachinesOverviewActive
             ? "Manage host Hyper-V VMs. Start/stop/restart, open console, or delete with explicit scope."
-            : (IsDeployFromTemplateActive || IsDeployOnTheFlyActive)
+            : IsDeployCapabilityActive
                 ? "Configure and run deployment workflows from one capability surface with readiness, remediation, and results context."
-            : (IsAssetsBaseDisksActive || IsAssetsSwitchesActive)
+            : IsAssetsCapabilityActive
                 ? "Manage shared Hyper-V assets, inventory, and compatibility state from one capability surface."
             : IsTemplatesLibraryActive
                 ? "Browse templates and start create/open/import/export flows from one Templates capability context."
@@ -566,23 +608,32 @@ public sealed partial class MainWindow : Window
                     ? "Edit template metadata, validate, and save through existing template workflows."
             : IsSettingsMachinesActive
                 ? "Configure Machines policy defaults."
-                : IsDiagnosticsLogsActive
-                    ? "Inspect canonical structured logs with envelope fields and dynamic context."
+                : IsDiagnosticsCapabilityActive
+                    ? "Inspect support-oriented diagnostics and structured log context from one capability surface."
                 : $"Subview: {_activeSubview.DisplayName}. Placeholder content until capability migration lands.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
         ApplyRightPanelState();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
+        DeployLocalNavPanel.Visibility = IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        DeployOverviewPanel.Visibility = IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
         DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
+        AssetsLocalNavPanel.Visibility = IsAssetsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        AssetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
         TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         SyncTemplatesSubviewSelection();
+        SyncDeploySubviewSelection();
+        SyncAssetsSubviewSelection();
+        SyncDiagnosticsSubviewSelection();
         UpdateTemplatesUi();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
-        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive || IsAssetsBaseDisksActive || IsAssetsSwitchesActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsLogsActive) ? Visibility.Collapsed : Visibility.Visible;
+        NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployCapabilityActive || IsAssetsCapabilityActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsCapabilityActive) ? Visibility.Collapsed : Visibility.Visible;
 
         QueueNavigationSelectionUpdate();
 
@@ -592,6 +643,11 @@ public sealed partial class MainWindow : Window
         if (IsSettingsMachinesActive)
         {
             _ = LoadMachinesDeletionPolicyAsync();
+        }
+
+        if (IsDiagnosticsOverviewActive)
+        {
+            UpdateDiagnosticsOverviewUi();
         }
 
         if (IsDiagnosticsLogsActive)
@@ -604,6 +660,11 @@ public sealed partial class MainWindow : Window
             _ = EnsureTemplatesLibraryAsync(forceRefresh: false);
         }
 
+        if (IsAssetsOverviewActive)
+        {
+            UpdateAssetsOverviewUi();
+        }
+
         if (IsAssetsBaseDisksActive)
         {
             _ = EnsureAssetsBaseDisksAsync(forceRefresh: false);
@@ -614,6 +675,11 @@ public sealed partial class MainWindow : Window
         {
             _ = EnsureAssetsSwitchesAsync(forceRefresh: false);
             UpdateAssetsSwitchesUi();
+        }
+
+        if (IsDeployOverviewActive)
+        {
+            UpdateDeployOverviewUi();
         }
 
         if (IsDeployFromTemplateActive)
@@ -790,16 +856,6 @@ public sealed partial class MainWindow : Window
 
         if (_shellViewModel.TryResolveCapability(key, out var capability))
         {
-            var isCollapsedCompactPane =
-                sender.PaneDisplayMode == NavigationViewPaneDisplayMode.LeftCompact &&
-                !sender.IsPaneOpen;
-
-            // In compact mode, parent-icon clicks should expose child options, not force default navigation.
-            if (isCollapsedCompactPane && capability.Subviews.Count > 0)
-            {
-                return;
-            }
-
             NavigateToRoute(capability.DefaultSubview.RouteKey);
             return;
         }
@@ -831,6 +887,186 @@ public sealed partial class MainWindow : Window
                 _isUpdatingNavigationSelection = false;
             }
         });
+    }
+
+    private void DeploySubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingDeploySubviewSelection || DeploySubviewTabView.SelectedItem is not TabViewItem selectedTab)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(selectedTab, DeployOverviewTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.DeployOverview);
+        }
+        else if (ReferenceEquals(selectedTab, DeployQuickDeployTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
+        }
+        else if (ReferenceEquals(selectedTab, DeployFromTemplateTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
+        }
+    }
+
+    private void AssetsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingAssetsSubviewSelection || AssetsSubviewTabView.SelectedItem is not TabViewItem selectedTab)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(selectedTab, AssetsOverviewTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.AssetsOverview);
+        }
+        else if (ReferenceEquals(selectedTab, AssetsBaseDisksTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);
+        }
+        else if (ReferenceEquals(selectedTab, AssetsSwitchesTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.AssetsSwitches);
+        }
+    }
+
+    private void DiagnosticsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingDiagnosticsSubviewSelection || DiagnosticsSubviewTabView.SelectedItem is not TabViewItem selectedTab)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(selectedTab, DiagnosticsOverviewTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.DiagnosticsOverview);
+        }
+        else if (ReferenceEquals(selectedTab, DiagnosticsLogsTabViewItem))
+        {
+            NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
+        }
+    }
+
+    private void SyncDeploySubviewSelection()
+    {
+        if (!IsDeployCapabilityActive)
+        {
+            return;
+        }
+
+        var selectedTab = IsDeployOverviewActive
+            ? DeployOverviewTabViewItem
+            : IsDeployOnTheFlyActive
+                ? DeployQuickDeployTabViewItem
+                : DeployFromTemplateTabViewItem;
+
+        if (ReferenceEquals(DeploySubviewTabView.SelectedItem, selectedTab))
+        {
+            return;
+        }
+
+        _isUpdatingDeploySubviewSelection = true;
+        try
+        {
+            DeploySubviewTabView.SelectedItem = selectedTab;
+        }
+        finally
+        {
+            _isUpdatingDeploySubviewSelection = false;
+        }
+    }
+
+    private void SyncAssetsSubviewSelection()
+    {
+        if (!IsAssetsCapabilityActive)
+        {
+            return;
+        }
+
+        var selectedTab = IsAssetsOverviewActive
+            ? AssetsOverviewTabViewItem
+            : IsAssetsBaseDisksActive
+                ? AssetsBaseDisksTabViewItem
+                : AssetsSwitchesTabViewItem;
+
+        if (ReferenceEquals(AssetsSubviewTabView.SelectedItem, selectedTab))
+        {
+            return;
+        }
+
+        _isUpdatingAssetsSubviewSelection = true;
+        try
+        {
+            AssetsSubviewTabView.SelectedItem = selectedTab;
+        }
+        finally
+        {
+            _isUpdatingAssetsSubviewSelection = false;
+        }
+    }
+
+    private void SyncDiagnosticsSubviewSelection()
+    {
+        if (!IsDiagnosticsCapabilityActive)
+        {
+            return;
+        }
+
+        var selectedTab = IsDiagnosticsOverviewActive
+            ? DiagnosticsOverviewTabViewItem
+            : DiagnosticsLogsTabViewItem;
+
+        if (ReferenceEquals(DiagnosticsSubviewTabView.SelectedItem, selectedTab))
+        {
+            return;
+        }
+
+        _isUpdatingDiagnosticsSubviewSelection = true;
+        try
+        {
+            DiagnosticsSubviewTabView.SelectedItem = selectedTab;
+        }
+        finally
+        {
+            _isUpdatingDiagnosticsSubviewSelection = false;
+        }
+    }
+
+    private void UpdateAssetsOverviewUi()
+    {
+        AssetsOverviewBaseDisksSummaryTextBlock.Text = _isAssetsBaseDisksLoading
+            ? "Base disk inventory is loading."
+            : _assetsBaseDiskRows.Count > 0
+                ? $"{_assetsBaseDiskRows.Count} base disks currently loaded."
+                : "Open Base Disks to inspect imported VHDX inventory.";
+        AssetsOverviewSwitchesSummaryTextBlock.Text = _isAssetsSwitchesLoading
+            ? "Switch inventory is loading."
+            : _assetsSwitchRows.Count > 0
+                ? $"{_assetsSwitchRows.Count} virtual switches currently loaded."
+                : "Open Switches to inspect host virtual switch inventory.";
+    }
+
+    private void UpdateDeployOverviewUi()
+    {
+        DeployOverviewQuickDeploySummaryTextBlock.Text = _deployOnTheFlyVmEntries.Count > 0
+            ? $"{_deployOnTheFlyVmEntries.Count} VM entries currently staged in the Quick Deploy draft."
+            : "Open Quick Deploy to configure VM entries and run deployment.";
+        DeployOverviewFromTemplateSummaryTextBlock.Text = _isDeployLoadingTemplates
+            ? "Template inventory is loading."
+            : _templateLibraryItems.Count > 0
+                ? $"{_templateLibraryItems.Count} templates currently available for From Template."
+                : "Open From Template to load template inventory and review readiness.";
+    }
+
+    private void UpdateDiagnosticsOverviewUi()
+    {
+        DiagnosticsOverviewLogsSummaryTextBlock.Text = _isStructuredLogsLoading
+            ? "Structured logs are loading."
+            : _structuredLogEntries.Count > 0
+                ? $"{_structuredLogEntries.Count} structured log entries are currently loaded."
+                : "Open Logs to inspect structured events and current support context.";
+        DiagnosticsOverviewSupportSummaryTextBlock.Text = "Open the current structured log location for support export or manual diagnostics collection.";
     }
 
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
@@ -934,11 +1170,17 @@ public sealed partial class MainWindow : Window
     private bool IsMachinesOverviewActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.MachinesOverview, StringComparison.Ordinal);
 
+    private bool IsDeployOverviewActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.DeployOverview, StringComparison.Ordinal);
+
     private bool IsDeployFromTemplateActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.DeployFromTemplate, StringComparison.Ordinal);
 
     private bool IsDeployOnTheFlyActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.DeployOnTheFly, StringComparison.Ordinal);
+
+    private bool IsDeployCapabilityActive =>
+        IsDeployOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive;
 
     private void EnsureDeployOnTheFlySeeded()
     {
@@ -2336,11 +2578,17 @@ public sealed partial class MainWindow : Window
     private bool IsTemplatesEditorActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesEditor, StringComparison.Ordinal);
 
+    private bool IsAssetsOverviewActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.AssetsOverview, StringComparison.Ordinal);
+
     private bool IsAssetsBaseDisksActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.AssetsBaseDisks, StringComparison.Ordinal);
 
     private bool IsAssetsSwitchesActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.AssetsSwitches, StringComparison.Ordinal);
+
+    private bool IsAssetsCapabilityActive =>
+        IsAssetsOverviewActive || IsAssetsBaseDisksActive || IsAssetsSwitchesActive;
 
     private bool IsTemplatesCapabilityActive =>
         IsTemplatesLibraryActive || IsTemplatesEditorActive;
@@ -2348,8 +2596,14 @@ public sealed partial class MainWindow : Window
     private bool IsSettingsMachinesActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.SettingsMachines, StringComparison.Ordinal);
 
+    private bool IsDiagnosticsOverviewActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.DiagnosticsOverview, StringComparison.Ordinal);
+
     private bool IsDiagnosticsLogsActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.DiagnosticsLogs, StringComparison.Ordinal);
+
+    private bool IsDiagnosticsCapabilityActive =>
+        IsDiagnosticsOverviewActive || IsDiagnosticsLogsActive;
 
     private void SyncTemplatesSubviewSelection()
     {
@@ -5083,6 +5337,11 @@ public sealed partial class MainWindow : Window
     }
 
     private void OpenRawJsonlButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenStructuredLogLocation();
+    }
+
+    private void OpenStructuredLogLocation()
     {
         var filePath = _structuredLogViewerService.GetStructuredLogFilePath();
         try

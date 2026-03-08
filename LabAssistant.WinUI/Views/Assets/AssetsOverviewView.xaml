@@ -1,0 +1,72 @@
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Assets.AssetsOverviewView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Foreground="{StaticResource ShellTextSecondaryBrush}"
+            Text="Use Assets to inspect shared disk and switch inventory without leaving the capability workspace."
+            TextWrapping="Wrap" />
+
+        <Grid
+            Grid.Row="1"
+            ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Padding="12"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Base Disks" />
+                    <TextBlock
+                        x:Name="AssetsOverviewBaseDisksSummaryTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Open Base Disks to inspect imported VHDX inventory."
+                        TextWrapping="Wrap" />
+                    <Button
+                        x:Name="AssetsOverviewOpenBaseDisksButton"
+                        HorizontalAlignment="Left"
+                        Content="Open Base Disks" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Padding="12"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Switches" />
+                    <TextBlock
+                        x:Name="AssetsOverviewSwitchesSummaryTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Open Switches to inspect host virtual switch inventory."
+                        TextWrapping="Wrap" />
+                    <Button
+                        x:Name="AssetsOverviewOpenSwitchesButton"
+                        HorizontalAlignment="Left"
+                        Content="Open Switches" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
