@@ -28,24 +28,25 @@ public sealed class MilestoneAKScenarioMatrixTests
     }
 
     [Fact]
-    public void AssetsSwitchesView_DefinesScaffoldRegionsAndExplicitStateContainers()
+    public void AssetsSwitchesView_DefinesOperationalRegionsAndExplicitStateContainers()
     {
         var xaml = LoadAssetsSwitchesViewXaml();
 
-        Assert.NotNull(FindByName(xaml, "AssetsSwitchesActionsRegion"));
-        Assert.NotNull(FindByName(xaml, "AssetsSwitchesStatusRegion"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesListRegion"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesDetailsRegion"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesEditRegion"));
+        Assert.NotNull(FindByName(xaml, "AssetsSwitchesStatusTextBlock"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesLoadingStatePanel"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesEmptyStatePanel"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesErrorStatePanel"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesRefreshButton"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesCreateButton"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesApplyButton"));
-        Assert.NotNull(FindByName(xaml, "AssetsSwitchesValidateButton"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesDeleteButton"));
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesTypeInfoButton"));
+        Assert.NotNull(FindByName(xaml, "AssetsSwitchesAttachedVmsHintTextBlock"));
+        Assert.NotNull(FindByName(xaml, "AssetsSwitchesAttachedVmsListView"));
+        Assert.NotNull(FindByName(xaml, "AssetsSwitchesErrorStateTextBox"));
     }
 
     [Fact]
@@ -60,7 +61,6 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("AssetsSwitchesRefreshButton_Click", source);
         Assert.Contains("AssetsSwitchesCreateButton_Click", source);
         Assert.Contains("AssetsSwitchesApplyButton_Click", source);
-        Assert.Contains("AssetsSwitchesValidateButton_Click", source);
         Assert.Contains("AssetsSwitchesDeleteButton_Click", source);
         Assert.Contains("ShowAssetsSwitchDeleteConfirmationDialogAsync", source);
         Assert.Contains("IAssetsSwitchesCapabilityService", source);
@@ -71,6 +71,31 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("Switch type changes are not supported. Create a new switch instead.", capabilitySource);
         Assert.Contains("External adapter rebinding is not supported here. Create a new switch instead.", capabilitySource);
         Assert.Contains("External: binds the switch to a host network adapter for outside connectivity.", viewSource);
+    }
+
+    [Fact]
+    public void Ak4_HardensSwitchDraftAndStateVisibilityPaths()
+    {
+        var source = LoadMainWindowSource();
+        var viewSource = LoadAssetsSwitchesViewXamlSource();
+
+        Assert.Contains("_pendingAssetsSwitchDraft", source);
+        Assert.Contains("CaptureAssetsSwitchDraftFromEditor", source);
+        Assert.Contains("ApplyAssetsSwitchValidationResult", source);
+        Assert.Contains("ApplyAssetsSwitchDeleteAssessment", source);
+        Assert.Contains("RefreshAssetsSwitchValidationAsync", source);
+        Assert.Contains("LoadAssetsSwitchAttachedVmNamesAsync", source);
+        Assert.Contains("SetAssetsSwitchAttachedVmState", source);
+        Assert.Contains("ClearAssetsSwitchesErrorState", source);
+        Assert.Contains("AssetsSwitchesErrorStatePanel.Visibility = _hasAssetsSwitchesErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("Virtual switch inventory refreshed. The current new-switch draft was preserved.", source);
+        Assert.Contains("Delete blocked. Disconnect the attached VMs from this switch and refresh before trying again.", source);
+        Assert.Contains("Attached VMs currently using this switch.", source);
+        Assert.Contains("Select a switch or click New to begin.", viewSource);
+        Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", viewSource);
+        Assert.DoesNotContain("AssetsSwitchesActionsRegion", viewSource);
+        Assert.DoesNotContain("AssetsSwitchesStatusRegion", viewSource);
+        Assert.Contains("Content=\"New\"", viewSource);
     }
 
     private static string LoadShellViewModelSource()
@@ -113,6 +138,6 @@ public sealed class MilestoneAKScenarioMatrixTests
     {
         return xaml
             .Descendants()
-            .Single(element => element.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == name);
+            .Single(element => element.Attributes().Any(attribute => attribute.Name.LocalName == "Name" && attribute.Value == name));
     }
 }

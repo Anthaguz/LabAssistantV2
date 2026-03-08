@@ -6,8 +6,8 @@ namespace LabAssistant.WinUI.Models.Assets;
 
 public sealed class AssetsSwitchListRow : INotifyPropertyChanged
 {
-    private string _validationSummary = "Validation has not been evaluated.";
-    private string _deleteSummary = "No delete assessment has been performed.";
+    private string _validationSummary = "Validation updates while you edit the selected switch.";
+    private string _deleteSummary = string.Empty;
 
     public AssetsSwitchListRow(AssetsSwitchRecord record)
     {

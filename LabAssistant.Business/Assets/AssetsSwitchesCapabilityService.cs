@@ -104,6 +104,54 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         };
     }
 
+    public async Task<IReadOnlyList<string>> GetAttachedVmNamesAsync(string switchName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var operationId = Guid.NewGuid().ToString("N");
+
+        _structuredLogger.Log(
+            StructuredLogLevel.Info,
+            "SwitchAttachedVmListRequested",
+            operationId,
+            "started",
+            new Dictionary<string, object?>
+            {
+                ["switchName"] = switchName
+            });
+
+        try
+        {
+            var attachedVmNames = await _machineAdminService.GetAttachedVmNamesForSwitchAsync(switchName);
+            _structuredLogger.Log(
+                StructuredLogLevel.Info,
+                "SwitchAttachedVmListLoaded",
+                operationId,
+                "success",
+                new Dictionary<string, object?>
+                {
+                    ["switchName"] = switchName,
+                    ["attachedVmCount"] = attachedVmNames.Count
+                });
+
+            return attachedVmNames;
+        }
+        catch (Exception ex)
+        {
+            _structuredLogger.Log(
+                StructuredLogLevel.Warn,
+                "SwitchAttachedVmListFailed",
+                operationId,
+                "failed",
+                new Dictionary<string, object?>
+                {
+                    ["switchName"] = switchName,
+                    ["error"] = ex.Message
+                });
+
+            return Array.Empty<string>();
+        }
+    }
+
     public async Task<AssetsSwitchOperationResult> SaveAsync(AssetsSwitchDraft draft, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -160,10 +208,11 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
 
             if (!actionResult.Success)
             {
+                var summarizedError = SummarizeSwitchActionError(actionResult.ErrorMessage, "Switch operation failed.");
                 return CreateFailure(
                     operationId,
-                    actionResult.ErrorMessage ?? "Switch operation failed.",
-                    [actionResult.ErrorMessage ?? "Switch operation failed."],
+                    summarizedError,
+                    [summarizedError],
                     draft,
                     draft.IsNew ? "SwitchCreateFailed" : "SwitchUpdateFailed");
             }
@@ -335,8 +384,8 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                 {
                     Success = false,
                     OperationId = operationId,
-                    UserMessage = result.ErrorMessage ?? "Virtual switch delete failed.",
-                    Errors = [result.ErrorMessage ?? "Virtual switch delete failed."]
+                    UserMessage = SummarizeSwitchActionError(result.ErrorMessage, "Virtual switch delete failed."),
+                    Errors = [SummarizeSwitchActionError(result.ErrorMessage, "Virtual switch delete failed.")]
                 };
             }
 
@@ -372,14 +421,14 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                     ["error"] = ex.Message
                 });
 
-            return new AssetsSwitchOperationResult
-            {
-                Success = false,
-                OperationId = operationId,
-                UserMessage = ex.Message,
-                Errors = [ex.Message]
-            };
-        }
+                return new AssetsSwitchOperationResult
+                {
+                    Success = false,
+                    OperationId = operationId,
+                    UserMessage = SummarizeSwitchActionError(ex.Message, "Virtual switch delete failed."),
+                    Errors = [SummarizeSwitchActionError(ex.Message, "Virtual switch delete failed.")]
+                };
+            }
     }
 
     private async Task<IReadOnlyList<HyperVVirtualSwitchInfo>> SafeListAsync()
@@ -450,20 +499,13 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             };
         }
 
-        var passDetails = new List<string>
-        {
-            $"Type: {switchType}"
-        };
-        if (!string.IsNullOrWhiteSpace(adapterName))
-        {
-            passDetails.Add($"Adapter / target: {adapterName}");
-        }
-
         return new AssetsSwitchValidationResult
         {
             Severity = "Pass",
-            Summary = "Switch configuration is ready.",
-            Details = passDetails
+            Summary = draft.IsNew
+                ? "This switch can be created with the current settings."
+                : "This switch can be updated with the current settings.",
+            Details = Array.Empty<string>()
         };
     }
 
@@ -509,5 +551,15 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
     {
         var trimmed = value?.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    private static string SummarizeSwitchActionError(string? rawMessage, string fallback)
+    {
+        var firstLine = (rawMessage ?? fallback)
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
+
+        return string.IsNullOrWhiteSpace(firstLine) ? fallback : firstLine;
     }
 }

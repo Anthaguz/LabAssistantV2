@@ -229,8 +229,9 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
     {
         var script = $$"""
             $items = Get-VMNetworkAdapter -All -ErrorAction SilentlyContinue |
-                Where-Object { $_.SwitchName -eq {{Quote(switchName)}} } |
-                Select-Object -ExpandProperty VMName -Unique
+                Where-Object { $_.SwitchName -eq {{Quote(switchName)}} -and -not [string]::IsNullOrWhiteSpace($_.VMName) } |
+                ForEach-Object { $_.VMName } |
+                Sort-Object -Unique
             $items | ConvertTo-Json -Compress
             """;
 
