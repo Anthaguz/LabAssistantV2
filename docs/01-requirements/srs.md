@@ -476,6 +476,26 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** delete remains a switch-management action only and does not broaden into topology redesign; if any VM is attached, deletion is blocked with concrete feedback; if deletion proceeds, logs include action, `switchName`, `switchType`, result, and error details.
   - **Priority:** P1
 
+- **FR-108:** WinUI shell capability navigation shall distinguish capability-level routing from capability-local navigation and shall use deterministic parent-click behavior across expanded, collapsed, and compact modes.
+  - **Acceptance details:** capabilities with approved `Overview` surfaces shall route parent-click to their `Overview`; capabilities without approved `Overview` surfaces shall route parent-click to their default operational child or workspace; collapsed compact navigation shall not depend on hover/pop-up child choosers; compact shell mode may replace the persistent left rail with a hamburger-invoked navigation drawer.
+  - **Priority:** P1
+
+- **FR-109:** WinUI shell and migrated capability surfaces shall use explicit header-ownership rules so capability title/description context is owned by the shell and child views do not repeat page-level title bands by default.
+  - **Acceptance details:** shell header presents capability-level title and optional capability-level description; child views use local section labels only unless a later contract explicitly justifies a child-owned page header; overview/tab selection or local workflow state shall provide child-view orientation rather than duplicating shell context.
+  - **Priority:** P1
+
+- **FR-110:** WinUI capability-local navigation shall support approved overview/index surfaces only where they add routing or status value, and shall preserve explicit workflow-state exceptions where a peer tab model would be misleading.
+  - **Acceptance details:** `Assets`, `Deploy`, and `Diagnostics` use approved `Overview`-first local navigation; `Machines` remains single-surface for current scope; `Templates` keeps `Library` as the primary capability surface while `Editor` remains a workflow-state entered from explicit actions rather than a permanently exposed peer destination.
+  - **Priority:** P1
+
+- **FR-111:** WinUI shell right panel shall remain shell-owned infrastructure, but capability views shall own panel meaning, trigger placement, and issue/progress scoping according to the active workflow contract.
+  - **Acceptance details:** workflow-local panel toggles and issue counts may live inside child views; `Deploy` right panel is progress/results-first, while pre-run validation issues move inline in the main workspace; right-panel content remains secondary context and must not be the primary editor surface.
+  - **Priority:** P1
+
+- **FR-112:** WinUI migrated capability surfaces shall follow shared action-placement, iconography, and compact-layout rules derived from the cross-view audit.
+  - **Acceptance details:** actions live nearest to the state they affect; `New` defaults to an inventory-level action that clears the current details/editor into draft state; icon-first command chrome with tooltips is preferred, including trash-can delete affordances and icon-based save/apply where clarity remains sufficient; compact layouts prioritize the primary workflow region and use bounded scroll owners rather than unbounded page growth.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -485,6 +505,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-deploy-on-the-fly-contract-ag.md` for Milestone AG `Deploy on-the-fly` routing, readiness, correction affordances, and results visibility parity contract.
 - See `docs/02-ux/winui-assets-base-disks-capability-contract-aj.md` for Milestone AJ `Assets > Base Disks` routing, operations, validation taxonomy, and removal safety contract.
 - See `docs/02-ux/winui-assets-switches-capability-contract-ak.md` for Milestone AK `Assets > Switches` routing, CRUD surface, validation taxonomy, and deletion guardrail contract.
+- See `docs/02-ux/winui-shell-view-consistency-contract-al.md` for Milestone AL cross-view shell/header/navigation/right-panel/action/compact-layout consistency rules.
 
 ---
 
