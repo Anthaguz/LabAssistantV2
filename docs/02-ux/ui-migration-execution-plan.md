@@ -318,6 +318,35 @@ Gate expectations:
 - missing VHDX resolution tests/checks
 - manual asset workflow checks
 
+## 6.4a Cross-view shell/view consistency (post-AK, pre-broad shell polish)
+
+**Goal**
+- standardize shell/header/navigation/right-panel/action/compact-layout behavior across already migrated WinUI capability surfaces
+- convert PM cross-view audit decisions into explicit implementation slices instead of ad hoc polish
+
+**Must preserve**
+- existing capability semantics for Deploy, Assets, Templates, Diagnostics, and Machines
+- route continuity already approved in AC/AF/AG/AH/AJ/AK contracts
+- right-panel lifecycle safety and compact fallback behavior from AH2 baseline
+
+**AL sequencing contract**
+- AL1 (docs-first): define shell/view consistency contract and FR/AC traceability from the cross-view audit
+- AL2 (header ownership): remove redundant child-owned page title/description bands where shell header should own capability context
+- AL3 (overview/tab convergence): implement approved Overview/local-tab patterns for `Assets`, `Deploy`, and `Diagnostics`
+- AL4 (Deploy right-panel convergence): move Deploy toward workflow-local right-panel trigger/progress ownership
+- AL5 (Quick Deploy inline issue convergence): shift pre-run issue handling toward inline/VM-row issue signaling
+- AL6 (From Template convergence): keep from-template as template-review/remediation/deploy workflow rather than duplicating Quick Deploy editor
+- AL7 (Templates navigation exception): keep `Library` primary and treat `Editor` as workflow-state entry rather than a permanent peer tab
+- AL8 (action/icon convergence): apply shared action-placement and icon-first command rules
+- AL9 (compact + scroll convergence): apply bounded scroll ownership and compact-mode rules across affected migrated surfaces
+- AL10 (closure evidence): add matrix/manual checklist/test-plan linkage for the cross-view contract
+
+**Out of scope during AL sequencing**
+- new domain semantics for Deploy/Templates/Assets
+- template-defined switch creation semantics beyond explicit future/TBD references
+- logging-signal redesign for Diagnostics data quality
+- Settings product-definition work beyond restoring reachability through a separate bug
+
 ## 6.5 Settings + Diagnostics (fifth migration implementation target)
 
 **Goal**
@@ -332,6 +361,7 @@ Gate expectations:
 
 **Decision required during this stage**
 - whether `LogsPage` remains temporarily as a "Deploy Debug" subview or is retired after Diagnostics UI is introduced
+- whether Diagnostics Logs filter UX should move to a stronger grid/vertical or autocomplete-driven filter model once logging signal quality work is scheduled
 
 ---
 

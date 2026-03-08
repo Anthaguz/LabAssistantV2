@@ -1992,6 +1992,110 @@ Each readiness result shall include, at minimum:
 
 ---
 
+# AC-021 - WinUI Shell and View Consistency Contract (AL1)
+
+**Related FRs:** FR-108, FR-109, FR-110, FR-111, FR-112, FR-074, FR-075, FR-097
+
+## Scenarios
+
+### 1) Parent capability navigation remains deterministic in expanded, collapsed, and compact modes
+**Given**
+- User navigates with the WinUI shell navigation
+
+**When**
+- User selects a parent capability in expanded, collapsed, or compact drawer mode
+
+**Then**
+- Parent-click routes deterministically to the approved capability default
+- Capabilities with approved `Overview` surfaces route parent-click to `Overview`
+- Capabilities without approved `Overview` surfaces route parent-click to their default operational child or workspace
+- Collapsed/compact behavior does not depend on hover/pop-up child-route choosers
+
+### 2) Capability-local overview policy is explicit and capability-specific
+**Given**
+- User enters a capability that contains multiple child surfaces
+
+**When**
+- The capability resolves its local navigation model
+
+**Then**
+- `Assets`, `Deploy`, and `Diagnostics` expose approved `Overview`-first local navigation
+- `Machines` remains single-surface for current scope
+- `Templates` keeps `Library` as the primary capability surface and does not expose `Editor` as a misleading always-peer tab
+- Child-route ordering and labeling remain explicit and testable
+
+### 3) Shell header owns capability context by default
+**Given**
+- A migrated capability surface is rendered inside the shell content host
+
+**When**
+- The user enters the capability or switches local child views
+
+**Then**
+- Shell header presents capability-level title and optional short capability-level description
+- Child views do not repeat page-level title/description bands by default
+- Child views may use local section labels, local tab labels, or workflow-state labels without duplicating shell context
+
+### 4) Right panel stays secondary and capability-scoped
+**Given**
+- A capability uses the shell right panel
+
+**When**
+- The capability renders right-panel content or triggers the panel
+
+**Then**
+- Shell owns the panel container and lifecycle, but active capability owns panel meaning and trigger placement
+- Right panel remains secondary context, not the primary editor surface
+- `Deploy` uses right panel for progress/results-first behavior
+- Pre-run issue counts and validation ownership may live in the child workflow rather than shell-global chrome
+
+### 5) Actions and iconography follow shared placement rules
+**Given**
+- A migrated capability surface exposes inventory, object, or workflow actions
+
+**When**
+- Actions are placed in the UI
+
+**Then**
+- Actions live nearest to the state they affect
+- Inventory-level actions stay in inventory/header context
+- Current-object actions stay in details/editor context
+- `New` defaults to an inventory-level action that clears the current details/editor into a draft state
+- Icon-first command chrome is preferred with tooltip labels
+- Delete actions may use trash-can iconography with confirmation as the safety layer
+
+### 6) Compact and bounded layout behavior follows explicit scroll-ownership priorities
+**Given**
+- A migrated capability surface is used at wide, medium, or compact size
+
+**When**
+- Available width or height is reduced
+
+**Then**
+- Primary workflow region remains prioritized over secondary context
+- Shell frame remains bounded and does not become an unbounded page-scroll surface
+- Right panel owns its own internal scroll
+- Operational master/detail or workflow surfaces keep bounded scroll owners rather than uncontrolled full-page growth
+- Compact mode may shift to focus-mode or hamburger-invoked navigation to preserve workspace economy
+
+## Expected UI
+- Capability-level shell header with child-view orientation handled by local tabs, section labels, or workflow-state labels
+- Approved overview/index surfaces for `Assets`, `Deploy`, and `Diagnostics`
+- Deterministic parent capability navigation in expanded, collapsed, and compact shell modes
+- Right-panel behavior that remains capability-scoped and secondary
+- Icon-first action chrome with predictable inventory/object/workflow placement
+- Compact-mode behavior that preserves primary workflow reachability
+
+## Definition of Done
+- [ ] Parent-click and compact navigation behavior are explicit and testable
+- [ ] Overview-vs-non-overview capability policy is explicit and traceable
+- [ ] Shell header ownership and child-header suppression rules are explicit and testable
+- [ ] Right-panel capability ownership and secondary-context role are explicit and testable
+- [ ] Shared action-placement and iconography rules are explicit and testable
+- [ ] Compact-mode and scroll-ownership priorities are explicit and testable
+
+---
+
 ## Open Questions / TBDs
 - Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules

@@ -101,6 +101,20 @@ For Assets Switches convergence planning and implementation sequencing:
 Behavioral contract source:
 - `docs/02-ux/winui-assets-switches-capability-contract-ak.md`
 
+## 2.7 Milestone AL Shell/View Consistency Contract (Approved)
+
+For cross-view shell and capability consistency planning:
+- parent capability click is deterministic in expanded, collapsed, and compact modes
+- capabilities with approved `Overview` surfaces use the parent row as the `Overview` entrypoint rather than a separate `Overview` child row
+- `Assets`, `Deploy`, and `Diagnostics` use approved `Overview`-first local navigation
+- `Machines` remains single-surface in current scope
+- `Templates` keeps `Library` as the primary capability surface and treats `Editor` as workflow-state entry from explicit actions
+- shell header owns capability title/description; child views avoid repeated page-level title bands by default
+- compact shell mode may replace persistent icon rail with hamburger-invoked full navigation drawer to preserve workspace width
+
+Behavioral contract source:
+- `docs/02-ux/winui-shell-view-consistency-contract-al.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -139,9 +153,10 @@ The shell should keep capability selection in the left rail/drawer and render co
 
 ## 3. Proposed Interaction Pattern (Hamburger + Left Panel)
 
-## 3.1 Hamburger behavior (future)
+## 3.1 Hamburger behavior (future / compact contract)
 - Clicking the hamburger opens a **slide-out capability drawer** from the left
-- Drawer shows top-level capability labels/actions while icon rail remains the default navigation surface
+- In compact mode, the persistent icon rail may collapse out of the viewport and the drawer becomes the primary capability navigation surface
+- Drawer shows expanded capability labels/actions rather than a hover/pop-up child chooser
 - Hover should be tooltip-only, not the primary full-menu interaction path
 - Exiting capability mode happens by:
   - selecting a capability, or
@@ -195,21 +210,27 @@ Examples:
 **Primary user goal:** Configure and run provisioning workflows with readiness, progress, and outcomes.
 
 ### Suggested subviews/actions
-- Deploy Workspace (default)
-  - on-the-fly configuration
-  - deploy from template
-  - readiness report
-  - progress/outcomes
+- Overview (default)
+- Quick Deploy
+- From Template
 - Post-deploy quick actions (future refinement)
   - open VM console
   - open RDP (when available)
 - Recent Deployments / History (future, if implemented)
 
 ### Workspace context ideas
-- current VM entries in deployment
-- selected VM context
-- compact readiness summary
-- quick actions (add VM, load template, save as template)
+- Overview:
+  - chooser between deploy modes
+  - recent or temporary draft shortcuts (future-approved refinement)
+- Quick Deploy:
+  - current VM entries in deployment
+  - selected VM context
+  - compact readiness summary
+  - quick actions (add VM, save as template)
+- From Template:
+  - template selection
+  - template readiness summary
+  - grouped dependency issues and remediation entry points
 
 ### Important boundary
 - `Deploy` is not a substitute for `Machines`
@@ -226,6 +247,11 @@ Examples:
 - AG reuses AF readiness/correction interaction patterns where applicable (blocking vs warning classification + explicit correction affordances).
 - AG keeps compact-first results visibility parity (sticky summary, concise rows, expandable details, collapsed global issues by default).
 
+### AL consistency note
+- Child-route ordering is `Overview`, `Quick Deploy`, `From Template`.
+- `Quick Deploy` is the deep editor-oriented deploy workflow.
+- `From Template` is a review/remediation/deploy workflow and should not duplicate the Quick Deploy editor surface.
+
 ---
 
 ## 4.3 Templates
@@ -239,15 +265,16 @@ Current split between:
 - template details
 should become one coherent Templates workflow.
 
-### Suggested subviews/actions
-- Template Library (list/search/filter)
-- Template Editor (integrated, not isolated)
+### Suggested surfaces/actions
+- Template Library (default)
+- Template Editor (workflow-state entry from `New Template` / `Edit Template`)
 - Import / Export
 - Validation + missing-reference resolution
 
-### Canonical route contract
-- `templates.library` (default)
-- `templates.editor`
+### Canonical route / workflow-state contract
+- `templates.library` remains the default capability route
+- `templates.editor` remains a canonical route for workflow-state entry and deep-linking
+- `templates.editor` is not treated as a permanent peer tab under AL consistency rules
 - `templates.details` deferred (not required for AD2/AD3)
 
 ### Model note (current reality)
@@ -259,6 +286,7 @@ should become one coherent Templates workflow.
 - selected template metadata
 - VM list inside selected template
 - validation status summary
+- editor-local workflow context for metadata + VM editing
 
 ---
 
@@ -267,16 +295,21 @@ should become one coherent Templates workflow.
 **Primary user goal:** Manage shared deployment and Hyper-V resources.
 
 ### Suggested subviews/actions
+- Overview (default)
 - Base Disks (VHDX Catalog)
   - canonical route `assets.base_disks`
   - list / refresh / import / edit metadata / validate / remove
   - integrity validation
-- Virtual Switches (future expansion)
+- Virtual Switches
   - canonical route `assets.switches`
   - list / create / edit / delete
+- ISOs (future)
 - Asset Health / Validation (future)
 
 ### Workspace context ideas
+- Overview:
+  - summary and navigation into child asset types
+  - inventory counts and attention/health summary
 - route-bound asset type selector (Base Disks / Switches / future ISOs)
 - asset list
 - selected asset details / actions
@@ -292,14 +325,20 @@ should become one coherent Templates workflow.
 **Primary user goal:** Troubleshoot issues and export support artifacts.
 
 ### Suggested subviews/actions
-- Diagnostics Export
+- Overview (default)
 - Logs (future `#215` Phase 1 read-only viewer)
-- Recent Issues / error history (optional future)
+- Diagnostics Export / support actions
+- Recent Issues / error history (optional future refinement)
 
 ### Workspace context ideas
-- operation filters
-- recent operations/failures
-- export options/presets (future)
+- Overview:
+  - recent issue summary
+  - support/export actions
+  - compact capability-health breakdown when useful
+- Logs:
+  - operation filters
+  - recent operations/failures
+  - export/open actions
 
 ---
 
@@ -396,6 +435,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: default landing capability is `Machines` for WinUI shell implementation.
 - Resolved: layout constraints and scroll ownership are defined in `docs/02-ux/winui-layout-constraints-contract.md` and are mandatory for AB2+ implementation slices.
 - Resolved: Templates capability routing/workflow contract is defined in `docs/02-ux/winui-templates-capability-contract-ad.md`.
+- Resolved: AL cross-view consistency contract defines overview policy, parent-click behavior, shell header ownership, and Templates workflow-state exception in `docs/02-ux/winui-shell-view-consistency-contract-al.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?

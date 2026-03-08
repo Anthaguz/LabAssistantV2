@@ -108,7 +108,7 @@ When no VM is selected:
 - Lifecycle reset: switching capabilities resets panel state/content to incoming owner contract (no stale content carryover).
 - Compact fallback: panel collapses below contract threshold in AH2.
 - Right panel owns internal vertical scroll; parent shell layout remains bounded.
-- Shell icon badge reflects owner-context issue count when available.
+- AL later refines owner-trigger/count behavior so child workflows may own panel toggles and issue counts when shell-global chrome is not the right scope.
 
 ---
 
@@ -157,3 +157,4 @@ Final brand palette is explicitly deferred.
 - `TBD:` Templates capability inner layout contract (library/details/editor arrangement in WinUI shell).
 - `TBD:` Assets capability inner layout contract (catalog/switches composition in WinUI shell).
 - `TBD:` Diagnostics capability final right-panel vs page-level ownership split once Logs UI scope is resumed.
+- `TBD:` Shell breadcrumb/current-route text role once capability-local tabs and workflow-local drill-in navigation are standardized.
