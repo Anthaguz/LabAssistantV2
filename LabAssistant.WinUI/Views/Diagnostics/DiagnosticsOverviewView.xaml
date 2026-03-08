@@ -1,0 +1,40 @@
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Diagnostics.DiagnosticsOverviewView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Foreground="{StaticResource ShellTextSecondaryBrush}"
+            Text="Use Diagnostics to inspect structured log activity and support signals without leaving the capability workspace."
+            TextWrapping="Wrap" />
+
+        <Border
+            Grid.Row="1"
+            Padding="12"
+            Background="{StaticResource ShellBackgroundBrush}"
+            BorderBrush="{StaticResource ShellBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6">
+            <StackPanel Spacing="8">
+                <TextBlock
+                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                    FontWeight="SemiBold"
+                    Text="Logs" />
+                <TextBlock
+                    x:Name="DiagnosticsOverviewLogsSummaryTextBlock"
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="Open Logs to inspect structured events and current support context."
+                    TextWrapping="Wrap" />
+                <Button
+                    x:Name="DiagnosticsOverviewOpenLogsButton"
+                    HorizontalAlignment="Left"
+                    Content="Open Logs" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

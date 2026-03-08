@@ -84,14 +84,13 @@ public sealed class MilestoneACScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_CompactParentClickAvoidsAccidentalDefaultNavigation()
+    public void MainWindow_ParentCapabilityClickRoutesToDefaultSubview()
     {
         var source = LoadMainWindowSource();
 
-        Assert.Contains("sender.PaneDisplayMode == NavigationViewPaneDisplayMode.LeftCompact", source);
-        Assert.Contains("!sender.IsPaneOpen", source);
-        Assert.Contains("if (isCollapsedCompactPane && capability.Subviews.Count > 0)", source);
+        Assert.Contains("if (_shellViewModel.TryResolveCapability(key, out var capability))", source);
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", source);
+        Assert.DoesNotContain("isCollapsedCompactPane", source);
     }
 
     private static XDocument LoadMainWindowXaml()

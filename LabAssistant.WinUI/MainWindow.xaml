@@ -118,6 +118,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <TextBlock
@@ -133,7 +134,86 @@
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                                 Text="Machines feature content is intentionally out of scope for #266."
                                 TextWrapping="Wrap" />
-                            <Grid Grid.Row="2">
+                            <Border
+                                x:Name="DeployLocalNavigationPanel"
+                                Grid.Row="2"
+                                Padding="8"
+                                Background="{StaticResource ShellContentBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <TabView
+                                    x:Name="DeploySubviewTabView"
+                                    IsAddTabButtonVisible="False"
+                                    SelectionChanged="DeploySubviewTabView_SelectionChanged">
+                                    <TabViewItem x:Name="DeployOverviewTabViewItem" Header="Overview" IsClosable="False">
+                                        <deployViews:DeployOverviewView x:Name="DeployOverviewViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="DeployQuickDeployTabViewItem" Header="Quick Deploy" IsClosable="False">
+                                        <deployViews:DeployOnTheFlyView
+                                            x:Name="DeployOnTheFlyViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="DeployFromTemplateTabViewItem" Header="From Template" IsClosable="False">
+                                        <deployViews:DeployFromTemplateView
+                                            x:Name="DeployFromTemplateViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
+                                </TabView>
+                            </Border>
+                            <Border
+                                x:Name="AssetsLocalNavigationPanel"
+                                Grid.Row="2"
+                                Padding="8"
+                                Background="{StaticResource ShellContentBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <TabView
+                                    x:Name="AssetsSubviewTabView"
+                                    IsAddTabButtonVisible="False"
+                                    SelectionChanged="AssetsSubviewTabView_SelectionChanged">
+                                    <TabViewItem x:Name="AssetsOverviewTabViewItem" Header="Overview" IsClosable="False">
+                                        <assetsViews:AssetsOverviewView x:Name="AssetsOverviewViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="AssetsBaseDisksTabViewItem" Header="Base Disks" IsClosable="False">
+                                        <assetsViews:AssetsBaseDisksView
+                                            x:Name="AssetsBaseDisksViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="AssetsSwitchesTabViewItem" Header="Switches" IsClosable="False">
+                                        <assetsViews:AssetsSwitchesView
+                                            x:Name="AssetsSwitchesViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
+                                </TabView>
+                            </Border>
+                            <Border
+                                x:Name="DiagnosticsLocalNavigationPanel"
+                                Grid.Row="2"
+                                Padding="8"
+                                Background="{StaticResource ShellContentBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <TabView
+                                    x:Name="DiagnosticsSubviewTabView"
+                                    IsAddTabButtonVisible="False"
+                                    SelectionChanged="DiagnosticsSubviewTabView_SelectionChanged">
+                                    <TabViewItem x:Name="DiagnosticsOverviewTabViewItem" Header="Overview" IsClosable="False">
+                                        <diagViews:DiagnosticsOverviewView x:Name="DiagnosticsOverviewViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="DiagnosticsLogsTabViewItem" Header="Logs" IsClosable="False">
+                                        <diagViews:DiagnosticsLogsView
+                                            x:Name="DiagnosticsLogsViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
+                                </TabView>
+                            </Border>
+                            <Grid Grid.Row="3">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
@@ -142,16 +222,6 @@
                                 </Grid.ColumnDefinitions>
                                 <machineViews:MachinesOverviewView
                                     x:Name="MachinesOverviewViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <deployViews:DeployFromTemplateView
-                                    x:Name="DeployFromTemplateViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <deployViews:DeployOnTheFlyView
-                                    x:Name="DeployOnTheFlyViewHost"
                                     Grid.Row="0"
                                     Grid.Column="0"
                                     Visibility="Collapsed" />
@@ -227,21 +297,6 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
-                                <diagViews:DiagnosticsLogsView
-                                    x:Name="DiagnosticsLogsViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <assetsViews:AssetsBaseDisksView
-                                    x:Name="AssetsBaseDisksViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <assetsViews:AssetsSwitchesView
-                                    x:Name="AssetsSwitchesViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
                                 <TextBlock
                                     x:Name="NonMachinesPlaceholderTextBlock"
                                     Grid.Row="0"

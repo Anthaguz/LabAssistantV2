@@ -6,10 +6,12 @@ namespace LabAssistant.WinUI.ViewModels;
 public static class ShellRouteKeys
 {
     public const string MachinesOverview = "machines.overview";
+    public const string DeployOverview = "deploy.overview";
     public const string DeployOnTheFly = "deploy.on_the_fly";
     public const string DeployFromTemplate = "deploy.from_template";
     public const string TemplatesLibrary = "templates.library";
     public const string TemplatesEditor = "templates.editor";
+    public const string AssetsOverview = "assets.overview";
     public const string AssetsBaseDisks = "assets.base_disks";
     public const string AssetsSwitches = "assets.switches";
     public const string DiagnosticsOverview = "diagnostics.overview";
@@ -41,8 +43,9 @@ public sealed class ShellViewModel
                 displayName: "Deploy",
                 isFooter: false,
                 [
+                    new ShellSubview(ShellRouteKeys.DeployOverview, "Overview", ["Open Quick Deploy", "Open From Template"]),
+                    new ShellSubview(ShellRouteKeys.DeployOnTheFly, "Quick Deploy", ["Start", "Validate"]),
                     new ShellSubview(ShellRouteKeys.DeployFromTemplate, "From Template", ["Select Template", "Preview"]),
-                    new ShellSubview(ShellRouteKeys.DeployOnTheFly, "Quick Deploy", ["Start", "Validate"])
                 ]),
             new ShellCapability(
                 key: "templates",
@@ -59,6 +62,7 @@ public sealed class ShellViewModel
                 displayName: "Assets",
                 isFooter: false,
                 [
+                    new ShellSubview(ShellRouteKeys.AssetsOverview, "Overview", ["Open Base Disks", "Open Switches"]),
                     new ShellSubview(ShellRouteKeys.AssetsBaseDisks, "Base Disks", ["Refresh", "Import", "Remove"]),
                     new ShellSubview(ShellRouteKeys.AssetsSwitches, "Virtual Switches", ["Add Switch", "Refresh"])
                 ]),
@@ -137,6 +141,8 @@ public sealed class ShellCapability
     public IReadOnlyList<ShellSubview> Subviews { get; }
 
     public ShellSubview DefaultSubview { get; }
+
+    public bool HasOverview => string.Equals(DefaultSubview.DisplayName, "Overview", StringComparison.Ordinal);
 }
 
 public sealed class ShellSubview
