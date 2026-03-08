@@ -189,13 +189,21 @@ Overview is not decorative. If present, it must provide at least two of:
 ### 8.4 Quick Deploy issue signaling
 - Pre-run issues should move toward field-level, group-level, and VM-row-level signaling.
 - VM rows may show warning/blocking icons with hover detail.
+- Per-VM remove action should remain row-local rather than moving into global workflow chrome.
+- Quick Deploy draft editing should prefer live in-memory updates over per-VM apply buttons.
 - Shared workflow summary near the primary deploy action may still exist as a compact readiness line.
+- Saving the current Quick Deploy draft into template authoring should use an explicit `Save as Template` style action rather than an ambiguous editor-opening label.
 
 ### 8.5 From Template remediation model
 - Shared dependency issues should be grouped where possible.
 - Safe one-to-many remapping is allowed when the issue is a shared environmental compatibility problem.
 - Broader structural fixes route to Template Editor.
 - Future switch-creation-from-template semantics remain deferred to a separate docs-first contract.
+
+### 8.6 Machines action grouping
+- Machines remains a single-surface master/detail capability.
+- Power-state actions may group together in selected-VM context.
+- Remote-access actions should remain grouped as a dedicated Console/RDP control cluster rather than being scattered among unrelated actions.
 
 ---
 
