@@ -98,6 +98,45 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("Content=\"New\"", viewSource);
     }
 
+    [Fact]
+    public void Ak5_ClosureEvidenceProtectsFullMilestoneChain()
+    {
+        var source = LoadMainWindowSource();
+        var viewSource = LoadAssetsSwitchesViewXamlSource();
+        var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
+
+        Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", LoadShellViewModelSource());
+        Assert.Contains("private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;", source);
+        Assert.Contains("AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;", source);
+
+        Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesListRegion"));
+        Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesDetailsRegion"));
+        Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesEditRegion"));
+        Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesLoadingStatePanel"));
+        Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesEmptyStatePanel"));
+        Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesErrorStatePanel"));
+
+        Assert.Contains("EnsureAssetsSwitchesAsync", source);
+        Assert.Contains("AssetsSwitchesRefreshButton_Click", source);
+        Assert.Contains("AssetsSwitchesCreateButton_Click", source);
+        Assert.Contains("AssetsSwitchesApplyButton_Click", source);
+        Assert.Contains("AssetsSwitchesDeleteButton_Click", source);
+        Assert.Contains("IAssetsSwitchesCapabilityService", source);
+        Assert.Contains("Delete is blocked because at least one VM is attached to this switch.", capabilitySource);
+        Assert.Contains("Switch type changes are not supported. Create a new switch instead.", capabilitySource);
+        Assert.Contains("External adapter rebinding is not supported here. Create a new switch instead.", capabilitySource);
+
+        Assert.Contains("_pendingAssetsSwitchDraft", source);
+        Assert.Contains("RefreshAssetsSwitchValidationAsync", source);
+        Assert.Contains("LoadAssetsSwitchAttachedVmNamesAsync", source);
+        Assert.Contains("_hasAssetsSwitchesErrorState", source);
+        Assert.Contains("Attached VMs currently using this switch.", source);
+        Assert.DoesNotContain("Delete eligibility is checked when you click Delete.", source);
+        Assert.Contains("ContentTitleTextBlock.Text = IsAssetsSwitchesActive", source);
+        Assert.Contains("_activeSubview.DisplayName", source);
+        Assert.DoesNotContain("Assets / Virtual Switches", viewSource);
+    }
+
     private static string LoadShellViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "ShellViewModel.cs");
