@@ -77,6 +77,31 @@ public sealed class MilestoneALScenarioMatrixTests
     }
 
     [Fact]
+    public void Templates_UsesLibraryAsPrimarySurface_AndKeepsEditorAsWorkflowStateEntry()
+    {
+        var xaml = LoadMainWindowXaml();
+        var mainWindowSource = LoadMainWindowSource();
+        var shellSource = LoadShellViewModelSource();
+
+        Assert.NotNull(FindByName(xaml, "TemplatesWorkspacePanel"));
+        Assert.NotNull(FindByName(xaml, "TemplatesLibraryViewHost"));
+        Assert.NotNull(FindByName(xaml, "TemplatesEditorViewHost"));
+        Assert.DoesNotContain("TemplatesSubviewTabView", xaml.ToString());
+
+        Assert.Contains("showChildRoutesInShell: false", shellSource);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.TemplatesLibrary, \"Library\"", shellSource);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.TemplatesEditor, \"Editor\"", shellSource);
+
+        Assert.Contains("if (!capability.ShowChildRoutesInShell)", mainWindowSource);
+        Assert.Contains("TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", mainWindowSource);
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", mainWindowSource);
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", mainWindowSource);
+    }
+
+    [Fact]
     public void OverviewViews_ProvideLocalRouteEntryPoints_WithoutInventingDomainSemantics()
     {
         var assetsOverviewSource = LoadAssetsOverviewViewXamlSource();

@@ -55,7 +55,8 @@ public sealed class ShellViewModel
                 [
                     new ShellSubview(ShellRouteKeys.TemplatesLibrary, "Library", ["Import", "Export"]),
                     new ShellSubview(ShellRouteKeys.TemplatesEditor, "Editor", ["Save Draft", "Validate"])
-                ]),
+                ],
+                showChildRoutesInShell: false),
             new ShellCapability(
                 key: "assets",
                 token: ShellIconToken.Assets,
@@ -118,7 +119,7 @@ public sealed class ShellViewModel
 
 public sealed class ShellCapability
 {
-    public ShellCapability(string key, string token, string displayName, bool isFooter, IReadOnlyList<ShellSubview> subviews)
+    public ShellCapability(string key, string token, string displayName, bool isFooter, IReadOnlyList<ShellSubview> subviews, bool showChildRoutesInShell = true)
     {
         Key = key;
         Token = token;
@@ -126,6 +127,7 @@ public sealed class ShellCapability
         IsFooter = isFooter;
         Subviews = subviews;
         DefaultSubview = subviews[0];
+        ShowChildRoutesInShell = showChildRoutesInShell;
     }
 
     public string Key { get; }
@@ -143,6 +145,8 @@ public sealed class ShellCapability
     public ShellSubview DefaultSubview { get; }
 
     public bool HasOverview => string.Equals(DefaultSubview.DisplayName, "Overview", StringComparison.Ordinal);
+
+    public bool ShowChildRoutesInShell { get; }
 }
 
 public sealed class ShellSubview

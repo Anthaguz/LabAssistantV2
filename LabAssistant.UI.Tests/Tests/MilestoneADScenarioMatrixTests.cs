@@ -18,28 +18,27 @@ public sealed class MilestoneADScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_DefinesTemplatesScaffoldHosts_AndLocalSubNavigation()
+    public void MainWindow_DefinesTemplatesLibraryAndEditorHosts_WithoutPeerTabs()
     {
         var xaml = LoadMainWindowXaml();
 
-        Assert.NotNull(FindByName(xaml, "TemplatesLocalNavigationPanel"));
-        Assert.NotNull(FindByName(xaml, "TemplatesSubviewTabView"));
-        Assert.NotNull(FindByName(xaml, "TemplatesLibraryTabViewItem"));
-        Assert.NotNull(FindByName(xaml, "TemplatesEditorTabViewItem"));
+        Assert.NotNull(FindByName(xaml, "TemplatesWorkspacePanel"));
         Assert.NotNull(FindByName(xaml, "TemplatesLibraryViewHost"));
         Assert.NotNull(FindByName(xaml, "TemplatesEditorViewHost"));
+        Assert.DoesNotContain("TemplatesSubviewTabView", xaml.ToString());
     }
 
     [Fact]
-    public void MainWindow_WiresTemplatesLocalNavigation_WithoutChangingGlobalFooterContract()
+    public void MainWindow_TreatsTemplatesEditorAsWorkflowStateEntry_WithoutChangingGlobalFooterContract()
     {
         var source = LoadMainWindowSource();
 
-        Assert.Contains("TemplatesSubviewTabView_SelectionChanged", source);
-        Assert.Contains("SyncTemplatesSubviewSelection()", source);
+        Assert.Contains("TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
-        Assert.Contains("GlobalNavigationView.FooterMenuItems.Add(parentItem);", source);
+        Assert.Contains("if (!capability.ShowChildRoutesInShell)", source);
     }
 
     [Fact]

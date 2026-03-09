@@ -109,7 +109,6 @@ public sealed partial class MainWindow : Window
     private int _assetsSwitchesValidationRequestVersion;
     private int _assetsSwitchesAssessmentRequestVersion;
     private bool _isUpdatingNavigationSelection;
-    private bool _isUpdatingTemplatesSubviewSelection;
     private bool _isUpdatingDeploySubviewSelection;
     private bool _isUpdatingAssetsSubviewSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
@@ -161,7 +160,7 @@ public sealed partial class MainWindow : Window
     private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
     private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
-    private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
+    private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;
     private FrameworkElement DeployLocalNavPanel => DeployLocalNavigationPanel;
     private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
     private FrameworkElement DiagnosticsLocalNavPanel => DiagnosticsLocalNavigationPanel;
@@ -566,6 +565,13 @@ public sealed partial class MainWindow : Window
             {
                 foreach (var subview in capability.Subviews)
                 {
+                    if (!capability.ShowChildRoutesInShell)
+                    {
+                        _routeToNavigationItem[subview.RouteKey] = parentItem;
+                        _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
+                        continue;
+                    }
+
                     if (capability.HasOverview && string.Equals(subview.RouteKey, capability.DefaultSubview.RouteKey, StringComparison.Ordinal))
                     {
                         _routeToNavigationItem[subview.RouteKey] = parentItem;
@@ -617,10 +623,8 @@ public sealed partial class MainWindow : Window
                 ? "Configure and run deployment workflows from one capability surface with readiness, remediation, and results context."
             : IsAssetsCapabilityActive
                 ? "Manage shared Hyper-V assets, inventory, and compatibility state from one capability surface."
-            : IsTemplatesLibraryActive
-                ? "Browse templates and start create/open/import/export flows from one Templates capability context."
-                : IsTemplatesEditorActive
-                    ? "Edit template metadata, validate, and save through existing template workflows."
+            : IsTemplatesCapabilityActive
+                ? "Browse templates and enter the editor through explicit create or edit workflows."
             : IsSettingsMachinesActive
                 ? "Configure Machines policy defaults."
                 : IsDiagnosticsCapabilityActive
@@ -638,10 +642,11 @@ public sealed partial class MainWindow : Window
         AssetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        SyncTemplatesSubviewSelection();
         SyncDeploySubviewSelection();
         SyncAssetsSubviewSelection();
         SyncDiagnosticsSubviewSelection();
@@ -1156,30 +1161,6 @@ public sealed partial class MainWindow : Window
     {
         _theme = _theme == ElementTheme.Light ? ElementTheme.Dark : ElementTheme.Light;
         ApplyState();
-    }
-
-    private void TemplatesSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUpdatingTemplatesSubviewSelection)
-        {
-            return;
-        }
-
-        if (TemplatesSubviewTabView.SelectedItem is not TabViewItem selectedTab)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(selectedTab, TemplatesLibraryTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
-            return;
-        }
-
-        if (ReferenceEquals(selectedTab, TemplatesEditorTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.TemplatesEditor);
-        }
     }
 
     private async void SaveMachinesDeletionPolicyButton_Click(object sender, RoutedEventArgs e)
@@ -2881,30 +2862,6 @@ public sealed partial class MainWindow : Window
 
     private bool IsDiagnosticsCapabilityActive =>
         IsDiagnosticsOverviewActive || IsDiagnosticsLogsActive;
-
-    private void SyncTemplatesSubviewSelection()
-    {
-        if (!IsTemplatesCapabilityActive)
-        {
-            return;
-        }
-
-        var expectedSelection = IsTemplatesEditorActive ? TemplatesEditorTabViewItem : TemplatesLibraryTabViewItem;
-        if (ReferenceEquals(TemplatesSubviewTabView.SelectedItem, expectedSelection))
-        {
-            return;
-        }
-
-        _isUpdatingTemplatesSubviewSelection = true;
-        try
-        {
-            TemplatesSubviewTabView.SelectedItem = expectedSelection;
-        }
-        finally
-        {
-            _isUpdatingTemplatesSubviewSelection = false;
-        }
-    }
 
     private async void DeployReloadTemplatesButton_Click(object sender, RoutedEventArgs e)
     {
