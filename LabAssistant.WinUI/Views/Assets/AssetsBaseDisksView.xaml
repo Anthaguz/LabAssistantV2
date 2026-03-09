@@ -18,43 +18,16 @@
             <Border
                 x:Name="AssetsBaseDisksActionsRegion"
                 Grid.Row="0"
+                Visibility="Collapsed"
                 Padding="10"
                 Background="{StaticResource ShellContentBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        x:Name="AssetsBaseDisksRefreshButton"
-                        Grid.Column="0"
-                        Content="Refresh" />
-                    <Button
-                        x:Name="AssetsBaseDisksImportButton"
-                        Grid.Column="1"
-                        Content="Import / Register" />
-                    <Button
-                        x:Name="AssetsBaseDisksValidateButton"
-                        Grid.Column="2"
-                        Content="Validate" />
-                    <Button
-                        x:Name="AssetsBaseDisksRemoveButton"
-                        Grid.Column="3"
-                        Content="Remove" />
-                    <TextBlock
-                        Grid.Column="4"
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Registry-only removal. Active runtime consumer detection is not implemented in AJ3."
-                        TextAlignment="Right"
-                        TextWrapping="Wrap" />
-                </Grid>
+                <TextBlock
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="Action placement moved into inventory and details headers."
+                    TextWrapping="Wrap" />
             </Border>
 
             <Border
@@ -105,10 +78,37 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <TextBlock
-                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                            FontWeight="SemiBold"
-                            Text="Registered Base Disks" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Grid.Column="0"
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Registered Base Disks" />
+                            <Button
+                                x:Name="AssetsBaseDisksRefreshButton"
+                                Grid.Column="1"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                Margin="0,0,8,0"
+                                ToolTipService.ToolTip="Refresh base disk inventory">
+                                <FontIcon Glyph="&#xE72C;" />
+                            </Button>
+                            <Button
+                                x:Name="AssetsBaseDisksImportButton"
+                                Grid.Column="2"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                ToolTipService.ToolTip="Import or register base disk">
+                                <FontIcon Glyph="&#xE710;" />
+                            </Button>
+                        </Grid>
                         <ListView
                             x:Name="AssetsBaseDisksListView"
                             Grid.Row="1"
@@ -146,10 +146,48 @@
                     CornerRadius="6">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Spacing="10">
-                            <TextBlock
-                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                FontWeight="SemiBold"
-                                Text="Selected Disk Details" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    Grid.Column="0"
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    FontWeight="SemiBold"
+                                    Text="Selected Disk Details" />
+                                <Button
+                                    x:Name="AssetsBaseDisksValidateButton"
+                                    Grid.Column="1"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    Margin="0,0,8,0"
+                                    ToolTipService.ToolTip="Validate selected base disk">
+                                    <FontIcon Glyph="&#xE73E;" />
+                                </Button>
+                                <Button
+                                    x:Name="AssetsBaseDisksSaveMetadataButton"
+                                    Grid.Column="2"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    Margin="0,0,8,0"
+                                    ToolTipService.ToolTip="Save base disk metadata">
+                                    <FontIcon Glyph="&#xE74E;" />
+                                </Button>
+                                <Button
+                                    x:Name="AssetsBaseDisksRemoveButton"
+                                    Grid.Column="3"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    ToolTipService.ToolTip="Remove base disk from catalog">
+                                    <FontIcon Glyph="&#xE74D;" />
+                                </Button>
+                            </Grid>
                             <TextBlock
                                 x:Name="AssetsBaseDisksSelectedDiskSummaryTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
@@ -254,17 +292,15 @@
                                         MinHeight="72"
                                         TextWrapping="Wrap"
                                         PlaceholderText="Optional notes" />
-                                    <StackPanel
+                                    <TextBlock
                                         Grid.Row="5"
                                         Grid.Column="0"
                                         Grid.ColumnSpan="2"
-                                        Orientation="Horizontal"
                                         HorizontalAlignment="Right"
-                                        Spacing="8">
-                                        <Button
-                                            x:Name="AssetsBaseDisksSaveMetadataButton"
-                                            Content="Save Metadata" />
-                                    </StackPanel>
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        FontSize="12"
+                                        Text="Use the header actions to validate, save metadata, or remove this base disk. Registry-only removal."
+                                        TextWrapping="Wrap" />
                                 </Grid>
                             </Border>
                         </StackPanel>

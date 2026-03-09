@@ -34,7 +34,12 @@
                         x:FieldModifier="public"
                         Margin="12,0,0,0"
                         VerticalAlignment="Center"
-                        Content="Refresh" />
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        ToolTipService.ToolTip="Refresh machine inventory">
+                        <FontIcon Glyph="&#xE72C;" />
+                    </Button>
                 </StackPanel>
                 <ListView
                     x:Name="MachinesListView"
@@ -135,7 +140,15 @@
                 <StackPanel x:Name="NetworkAdapterEditorPanel" x:FieldModifier="public" Spacing="6" />
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="ApplyMachineEditsButton" x:FieldModifier="public" Content="Apply" />
+                    <Button
+                        x:Name="ApplyMachineEditsButton"
+                        x:FieldModifier="public"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        ToolTipService.ToolTip="Apply machine changes">
+                        <FontIcon Glyph="&#xE74E;" />
+                    </Button>
                     <TextBlock
                         x:Name="MachineEditDirtyTextBlock"
                         x:FieldModifier="public"
@@ -150,13 +163,37 @@
                     Foreground="{StaticResource ShellTextPrimaryBrush}"
                     FontWeight="SemiBold"
                     Text="Actions" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="StartVmButton" x:FieldModifier="public" Content="Start VM" />
-                    <Button x:Name="StopVmButton" x:FieldModifier="public" Content="Stop VM" />
-                    <Button x:Name="RestartVmButton" x:FieldModifier="public" Content="Restart VM" />
-                    <Button x:Name="OpenConsoleButton" x:FieldModifier="public" Content="Open Console" />
-                    <Button x:Name="DeleteVmButton" x:FieldModifier="public" Content="Delete VM" />
-                    <Button x:Name="OpenRdpButton" x:FieldModifier="public" IsEnabled="False" Content="Open RDP" />
+                <StackPanel Spacing="8">
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            FontSize="12"
+                            Text="Power" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="StartVmButton" x:FieldModifier="public" Content="Start VM" />
+                            <Button x:Name="StopVmButton" x:FieldModifier="public" Content="Stop VM" />
+                            <Button x:Name="RestartVmButton" x:FieldModifier="public" Content="Restart VM" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            FontSize="12"
+                            Text="Remote access" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="OpenConsoleButton" x:FieldModifier="public" Content="Open Console" />
+                            <Button x:Name="OpenRdpButton" x:FieldModifier="public" IsEnabled="False" Content="Open RDP" />
+                            <Button
+                                x:Name="DeleteVmButton"
+                                x:FieldModifier="public"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                ToolTipService.ToolTip="Delete virtual machine">
+                                <FontIcon Glyph="&#xE74D;" />
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
                 <TextBlock
                     x:Name="RdpReadinessTextBlock"

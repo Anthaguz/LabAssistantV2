@@ -95,7 +95,7 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", viewSource);
         Assert.DoesNotContain("AssetsSwitchesActionsRegion", viewSource);
         Assert.DoesNotContain("AssetsSwitchesStatusRegion", viewSource);
-        Assert.Contains("Content=\"New\"", viewSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Create a new virtual switch\"", viewSource);
     }
 
     [Fact]

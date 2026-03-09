@@ -29,7 +29,12 @@
                 <Button
                     x:Name="DeployReloadTemplatesButton"
                     Grid.Column="1"
-                    Content="Reload" />
+                    Width="32"
+                    Height="32"
+                    Padding="0"
+                    ToolTipService.ToolTip="Reload templates">
+                    <FontIcon Glyph="&#xE72C;" />
+                </Button>
                 <Button
                     x:Name="DeployEvaluateReadinessButton"
                     Grid.Column="2"

@@ -225,6 +225,44 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("Review VM row badges and the selected VM details to fix blockers here before deploy.", mainWindowSource);
     }
 
+    [Fact]
+    public void MigratedViews_UseIconFirstChromeForRoutineLocalActions_AndKeepMajorWorkflowActionsTextual()
+    {
+        var machinesSource = LoadMachinesOverviewViewXamlSource();
+        var baseDisksSource = LoadAssetsBaseDisksViewXamlSource();
+        var switchesSource = LoadAssetsSwitchesViewXamlSource();
+        var quickDeploySource = LoadDeployOnTheFlyViewXamlSource();
+        var fromTemplateSource = LoadDeployFromTemplateViewXamlSource();
+
+        Assert.Contains("ToolTipService.ToolTip=\"Refresh machine inventory\"", machinesSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Apply machine changes\"", machinesSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Delete virtual machine\"", machinesSource);
+        Assert.Contains("Text=\"Power\"", machinesSource);
+        Assert.Contains("Text=\"Remote access\"", machinesSource);
+
+        Assert.Contains("ToolTipService.ToolTip=\"Refresh base disk inventory\"", baseDisksSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Import or register base disk\"", baseDisksSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Save base disk metadata\"", baseDisksSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Remove base disk from catalog\"", baseDisksSource);
+
+        Assert.Contains("ToolTipService.ToolTip=\"Refresh switch inventory\"", switchesSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Create a new virtual switch\"", switchesSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Apply switch changes\"", switchesSource);
+        Assert.Contains("ToolTipService.ToolTip=\"Delete virtual switch\"", switchesSource);
+
+        Assert.Contains("ToolTipService.ToolTip=\"Add VM\"", quickDeploySource);
+        Assert.Contains("ToolTipService.ToolTip=\"Remove VM\"", quickDeploySource);
+        Assert.Contains("Content=\"Resolve Suggestions\"", quickDeploySource);
+        Assert.Contains("Content=\"Open in Templates Editor\"", quickDeploySource);
+        Assert.Contains("Content=\"Start Deploy\"", quickDeploySource);
+
+        Assert.Contains("ToolTipService.ToolTip=\"Reload templates\"", fromTemplateSource);
+        Assert.Contains("Content=\"Review Readiness\"", fromTemplateSource);
+        Assert.Contains("Content=\"Resolve Suggestions\"", fromTemplateSource);
+        Assert.Contains("Content=\"Fix in Templates Editor\"", fromTemplateSource);
+        Assert.Contains("Content=\"Start Deploy\"", fromTemplateSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -246,6 +284,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadAssetsBaseDisksViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadMachinesOverviewViewXamlSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Machines", "MachinesOverviewView.xaml");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
