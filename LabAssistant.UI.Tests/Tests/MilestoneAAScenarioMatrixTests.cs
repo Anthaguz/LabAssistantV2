@@ -174,8 +174,10 @@ public sealed class MilestoneAAScenarioMatrixTests
     {
         var xaml = LoadMachinesOverviewXaml();
         var applyButton = FindByName(xaml, "ApplyMachineEditsButton");
+        var fontIcons = applyButton.Descendants().Where(e => e.Name.LocalName == "FontIcon");
 
-        Assert.Equal("Apply", applyButton.Attribute("Content")?.Value);
+        Assert.Null(applyButton.Attribute("Content"));
+        Assert.Contains(fontIcons, _ => true);
         Assert.DoesNotContain(
             xaml.Descendants().Where(e => e.Name.LocalName == "Button"),
             button => string.Equals(button.Attribute("Content")?.Value, "Reset", StringComparison.OrdinalIgnoreCase));

@@ -109,17 +109,32 @@
                                 <Button
                                     x:Name="AssetsSwitchesCreateButton"
                                     Grid.Column="1"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
                                     Margin="0,0,8,0"
-                                    Content="New" />
+                                    ToolTipService.ToolTip="Create a new virtual switch">
+                                    <FontIcon Glyph="&#xE710;" />
+                                </Button>
                                 <Button
                                     x:Name="AssetsSwitchesApplyButton"
                                     Grid.Column="2"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
                                     Margin="0,0,8,0"
-                                    Content="Apply" />
+                                    ToolTipService.ToolTip="Apply switch changes">
+                                    <FontIcon Glyph="&#xE74E;" />
+                                </Button>
                                 <Button
                                     x:Name="AssetsSwitchesDeleteButton"
                                     Grid.Column="3"
-                                    Content="Delete" />
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    ToolTipService.ToolTip="Delete virtual switch">
+                                    <FontIcon Glyph="&#xE74D;" />
+                                </Button>
                             </Grid>
                             <TextBlock
                                 x:Name="AssetsSwitchesStatusTextBlock"
