@@ -239,6 +239,10 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("ToolTipService.ToolTip=\"Delete virtual machine\"", machinesSource);
         Assert.Contains("Text=\"Power\"", machinesSource);
         Assert.Contains("Text=\"Remote access\"", machinesSource);
+        Assert.Contains("Text=\"Delete\"", machinesSource);
+        Assert.Contains("OpenConsoleButton", machinesSource);
+        Assert.Contains("OpenRdpButton", machinesSource);
+        Assert.Contains("DeleteVmButton", machinesSource);
 
         Assert.Contains("ToolTipService.ToolTip=\"Refresh base disk inventory\"", baseDisksSource);
         Assert.Contains("ToolTipService.ToolTip=\"Import or register base disk\"", baseDisksSource);

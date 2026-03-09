@@ -183,6 +183,14 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button x:Name="OpenConsoleButton" x:FieldModifier="public" Content="Open Console" />
                             <Button x:Name="OpenRdpButton" x:FieldModifier="public" IsEnabled="False" Content="Open RDP" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            FontSize="12"
+                            Text="Delete" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button
                                 x:Name="DeleteVmButton"
                                 x:FieldModifier="public"
