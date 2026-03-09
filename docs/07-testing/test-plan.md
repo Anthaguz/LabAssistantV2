@@ -295,9 +295,31 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Switches remains a first-class WinUI capability at `assets.switches`.
   - AK2 scaffold structure remains intact and visible.
   - AK3 operational behavior remains present without topology/domain drift.
-  - AK4 hardening remains intact, especially around draft continuity, inline validation, and attached-VM visibility.
-  - Delete remains blocked if any VM is attached, regardless of VM power state.
-  - AK closure evidence includes both automated structural checks and repeatable manual runtime verification.
+- AK4 hardening remains intact, especially around draft continuity, inline validation, and attached-VM visibility.
+- Delete remains blocked if any VM is attached, regardless of VM power state.
+- AK closure evidence includes both automated structural checks and repeatable manual runtime verification.
+
+## TC-019: Milestone AL Shell and View Consistency Verification
+- **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AL (`#378`, `#379`, `#380`, `#381`, `#382`, `#383`, `#384`, `#385`, `#386`, `#387`)
+- **Steps:**
+  1. Run automated AL matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneALScenarioMatrixTests.cs`.
+  2. Run the Milestone AL checklist in `docs/07-testing/milestone-al-shell-view-consistency-checklist.md`.
+  3. Verify shell title/description ownership and confirm targeted child views do not reintroduce duplicated page-level header bands.
+  4. Verify Overview-first behavior for `Assets`, `Deploy`, and `Diagnostics`, and verify `Templates` still uses the Library-first exception model.
+  5. Verify Deploy right-panel behavior remains workflow-local and progress/results-first, with Quick Deploy issue signaling kept in the workflow/editor surface.
+  6. Verify From Template still reads as review/remediation/deploy rather than a duplicate editor.
+  7. Verify action placement/iconography consistency across the migrated views reviewed in AL8.
+  8. Verify compact-mode and scroll-ownership behavior across the migrated operational views from AL9.
+- **Expected:**
+  - Shell remains the owner of capability-level title/description context.
+  - Assets/Deploy/Diagnostics remain Overview-first and route-bound, while Templates remains Library-first and editor-state driven.
+  - Deploy right-panel behavior remains workflow-local and progress/results-oriented.
+  - Quick Deploy issue guidance remains local to VM rows/editor, and From Template remains review/remediation oriented.
+  - Action placement and icon-first command chrome remain consistent with the approved AL rules.
+  - Compact-mode and scroll ownership remain bounded and workspace-preserving without domain/workflow redesign.
+  - AL closure evidence includes both automated structural checks and repeatable manual runtime verification.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.

@@ -318,6 +318,28 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("Content=\"Start Deploy\"", fromTemplateSource);
     }
 
+    [Fact]
+    public void ALClosureAnchors_PreserveTheFullShellViewConsistencyChain()
+    {
+        var shellSource = LoadShellViewModelSource();
+        var mainWindowSource = LoadMainWindowSource();
+        var quickDeploySource = LoadDeployOnTheFlyViewXamlSource();
+        var fromTemplateSource = LoadDeployFromTemplateViewXamlSource();
+
+        Assert.Contains("ContentTitleTextBlock.Text = _activeCapability.DisplayName;", mainWindowSource);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.AssetsOverview", shellSource);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.DeployOverview", shellSource);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.DiagnosticsOverview", shellSource);
+        Assert.Contains("showChildRoutesInShell: false", shellSource);
+        Assert.Contains("TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
+        Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
+        Assert.Contains("UpdateDeploySharedIssueSummaries();", mainWindowSource);
+        Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);
+        Assert.Contains("x:Name=\"DeployOnTheFlyEditorIssueSummaryTextBlock\"", quickDeploySource);
+        Assert.Contains("x:Name=\"DeploySharedIssuesListView\"", fromTemplateSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
