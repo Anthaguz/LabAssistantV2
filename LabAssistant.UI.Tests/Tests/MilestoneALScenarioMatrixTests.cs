@@ -157,6 +157,29 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("Text=\"Run warnings / errors\"", fromTemplateRightPanelSource);
     }
 
+    [Fact]
+    public void QuickDeploy_MovesIssueSignalingIntoWorkflowRowsAndEditorSurface()
+    {
+        var quickDeploySource = LoadDeployOnTheFlyViewXamlSource();
+        var quickDeployCodeBehindSource = LoadDeployOnTheFlyViewCodeBehindSource();
+        var mainWindowSource = LoadMainWindowSource();
+
+        Assert.Contains("x:Name=\"DeployOnTheFlyEditorIssueSummaryTextBlock\"", quickDeploySource);
+        Assert.Contains("Text=\"{Binding IssueBadgeText}\"", quickDeploySource);
+        Assert.Contains("Text=\"{Binding IssueSummary}\"", quickDeploySource);
+        Assert.Contains("Click=\"DeployOnTheFlyRowRemoveButton_Click\"", quickDeploySource);
+        Assert.Contains("Visibility=\"Collapsed\"", quickDeploySource);
+
+        Assert.Contains("public event Action<VmTemplate>? VmRemoveRequested;", quickDeployCodeBehindSource);
+        Assert.Contains("VmRemoveRequested?.Invoke(vmEntry);", quickDeployCodeBehindSource);
+
+        Assert.Contains("_deployOnTheFlyVmEntryRows", mainWindowSource);
+        Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
+        Assert.Contains("UpdateDeployOnTheFlyEditorIssueSummary();", mainWindowSource);
+        Assert.Contains("GetDeployOnTheFlyDraftIssues()", mainWindowSource);
+        Assert.Contains("Review VM row badges and the selected VM details to fix blockers here before deploy.", mainWindowSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -220,6 +243,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDiagnosticsOverviewViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Diagnostics", "DiagnosticsOverviewView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
