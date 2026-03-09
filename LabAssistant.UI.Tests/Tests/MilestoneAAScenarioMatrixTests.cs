@@ -20,14 +20,19 @@ public sealed class MilestoneAAScenarioMatrixTests
     }
 
     [Fact]
-    public void Shell_NavigationView_UsesLeftCompactContract()
+    public void Shell_NavigationView_DefinesBaselineChrome_AndRuntimeCompactDrawerBehavior()
     {
         var xaml = LoadMainWindowXaml();
+        var source = LoadMainWindowSource();
         var navigationView = FindByName(xaml, "GlobalNavigationView");
 
         Assert.Equal("LeftCompact", navigationView.Attribute("PaneDisplayMode")?.Value);
         Assert.Equal("280", navigationView.Attribute("OpenPaneLength")?.Value);
         Assert.Equal("56", navigationView.Attribute("CompactPaneLength")?.Value);
+        Assert.Contains("private void ApplyShellNavigationMode(double width)", source);
+        Assert.Contains("NavigationViewPaneDisplayMode.LeftMinimal", source);
+        Assert.Contains("GlobalNavigationView.CompactPaneLength = useDrawerMode ? 0 : 56;", source);
+        Assert.Contains("GlobalNavigationView.IsPaneOpen = false;", source);
     }
 
     [Fact]
@@ -224,6 +229,12 @@ public sealed class MilestoneAAScenarioMatrixTests
     private static string LoadShellViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "ShellViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadMainWindowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

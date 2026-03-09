@@ -226,6 +226,57 @@ public sealed class MilestoneALScenarioMatrixTests
     }
 
     [Fact]
+    public void ShellAndMigratedViews_ConvergeOnCompactDrawerAndBoundedScrollOwnership()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var machinesSource = LoadMachinesOverviewViewXamlSource();
+        var machinesCodeBehindSource = LoadMachinesOverviewViewCodeBehindSource();
+        var baseDisksSource = LoadAssetsBaseDisksViewXamlSource();
+        var baseDisksCodeBehindSource = LoadAssetsBaseDisksViewCodeBehindSource();
+        var switchesSource = LoadAssetsSwitchesViewXamlSource();
+        var switchesCodeBehindSource = LoadAssetsSwitchesViewCodeBehindSource();
+        var quickDeploySource = LoadDeployOnTheFlyViewXamlSource();
+        var quickDeployCodeBehindSource = LoadDeployOnTheFlyViewCodeBehindSource();
+        var fromTemplateSource = LoadDeployFromTemplateViewXamlSource();
+
+        Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);
+        Assert.Contains("NavigationViewPaneDisplayMode.LeftMinimal", mainWindowSource);
+        Assert.Contains("GlobalNavigationView.CompactPaneLength = useDrawerMode ? 0 : 56;", mainWindowSource);
+        Assert.Contains("GlobalNavigationView.IsPaneOpen = false;", mainWindowSource);
+        Assert.Contains("<ScrollViewer", LoadMainWindowXamlSource());
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", LoadMainWindowXamlSource());
+
+        Assert.Contains("x:Name=\"MachinesListRowDefinition\"", machinesSource);
+        Assert.Contains("x:Name=\"MachinesDetailsRowDefinition\"", machinesSource);
+        Assert.Contains("x:Name=\"MachinesInventoryRegion\"", machinesSource);
+        Assert.Contains("x:Name=\"MachinesDetailsRegion\"", machinesSource);
+        Assert.Contains("UpdateLayoutMode(", machinesCodeBehindSource);
+        Assert.Contains("CompactLayoutThreshold = 1024", machinesCodeBehindSource);
+
+        Assert.Contains("x:Name=\"AssetsBaseDisksPrimaryRowDefinition\"", baseDisksSource);
+        Assert.Contains("x:Name=\"AssetsBaseDisksStateRowDefinition\"", baseDisksSource);
+        Assert.Contains("x:Name=\"AssetsBaseDisksDetailsRowDefinition\"", baseDisksSource);
+        Assert.Contains("<ScrollViewer VerticalScrollBarVisibility=\"Auto\">", baseDisksSource);
+        Assert.Contains("CompactLayoutThreshold = 1040", baseDisksCodeBehindSource);
+
+        Assert.Contains("x:Name=\"AssetsSwitchesPrimaryRowDefinition\"", switchesSource);
+        Assert.Contains("x:Name=\"AssetsSwitchesStateRowDefinition\"", switchesSource);
+        Assert.Contains("x:Name=\"AssetsSwitchesDetailsRowDefinition\"", switchesSource);
+        Assert.Contains("AssetsSwitchesAttachedVmsListView", switchesSource);
+        Assert.Contains("CompactLayoutThreshold = 1040", switchesCodeBehindSource);
+
+        Assert.Contains("x:Name=\"DeployOnTheFlyPrimaryRowDefinition\"", quickDeploySource);
+        Assert.Contains("x:Name=\"DeployOnTheFlyEditorRowDefinition\"", quickDeploySource);
+        Assert.Contains("DeployOnTheFlyVmEntriesPanel", quickDeploySource);
+        Assert.Contains("DeployOnTheFlyVmEditorPanel", quickDeploySource);
+        Assert.Contains("CompactLayoutThreshold = 1120", quickDeployCodeBehindSource);
+
+        Assert.Contains("x:Name=\"DeployFromTemplateWorkspaceScrollViewer\"", fromTemplateSource);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", fromTemplateSource);
+        Assert.DoesNotContain("Text=\"Deploy From Template\"", fromTemplateSource);
+    }
+
+    [Fact]
     public void MigratedViews_UseIconFirstChromeForRoutineLocalActions_AndKeepMajorWorkflowActionsTextual()
     {
         var machinesSource = LoadMachinesOverviewViewXamlSource();
@@ -279,6 +330,12 @@ public sealed class MilestoneALScenarioMatrixTests
         return XDocument.Load(Path.GetFullPath(path));
     }
 
+    private static string LoadMainWindowXamlSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
     private static string LoadShellViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "ShellViewModel.cs");
@@ -297,9 +354,27 @@ public sealed class MilestoneALScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
+    private static string LoadMachinesOverviewViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Machines", "MachinesOverviewView.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
     private static string LoadAssetsSwitchesViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsSwitchesView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsSwitchesView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

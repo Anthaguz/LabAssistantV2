@@ -6,9 +6,10 @@ namespace LabAssistant.UI.Tests.Tests;
 public sealed class MilestoneACScenarioMatrixTests
 {
     [Fact]
-    public void MainWindow_DefinesGlobalNavigationViewLeftCompactContract()
+    public void MainWindow_DefinesShellNavigationInfrastructure_ForBaselineAndRuntimeCompactModes()
     {
         var xaml = LoadMainWindowXaml();
+        var source = LoadMainWindowSource();
         var nav = FindByName(xaml, "GlobalNavigationView");
 
         Assert.Equal("LeftCompact", nav.Attribute("PaneDisplayMode")?.Value);
@@ -18,6 +19,8 @@ public sealed class MilestoneACScenarioMatrixTests
         Assert.Equal("56", nav.Attribute("CompactPaneLength")?.Value);
         Assert.Equal("280", nav.Attribute("OpenPaneLength")?.Value);
         Assert.Equal("GlobalNavigationView_ItemInvoked", nav.Attribute("ItemInvoked")?.Value);
+        Assert.Contains("private void ApplyShellNavigationMode(double width)", source);
+        Assert.Contains("NavigationViewPaneDisplayMode.LeftMinimal", source);
     }
 
     [Fact]
