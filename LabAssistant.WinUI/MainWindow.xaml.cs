@@ -1683,7 +1683,7 @@ public sealed partial class MainWindow : Window
             {
                 row.IssueBadgeText = "Blocked";
                 row.IssueSummary = blockingMessages[0];
-                row.IssueBrush = Application.Current.Resources["ShellDangerBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                row.IssueBrush = Application.Current.Resources["ShellCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush;
                 row.IssueBadgeVisibility = Visibility.Visible;
                 row.IssueSummaryVisibility = Visibility.Visible;
             }

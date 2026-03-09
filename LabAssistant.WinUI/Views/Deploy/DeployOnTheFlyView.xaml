@@ -141,7 +141,7 @@
                                         <Border
                                             Grid.Column="1"
                                             Padding="8,3"
-                                            Background="{StaticResource ShellNavSelectionBrush}"
+                                            Background="{StaticResource ShellContentBackgroundBrush}"
                                             BorderBrush="{StaticResource ShellBorderBrush}"
                                             BorderThickness="1"
                                             CornerRadius="999"
