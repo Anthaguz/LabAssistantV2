@@ -1,9 +1,12 @@
+using LabAssistant.Models.Templates;
 using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Views.Deploy;
 
 public sealed partial class DeployOnTheFlyView : UserControl
 {
+    public event Action<VmTemplate>? VmRemoveRequested;
+
     public DeployOnTheFlyView()
     {
         InitializeComponent();
@@ -16,6 +19,8 @@ public sealed partial class DeployOnTheFlyView : UserControl
     public Button DeployOnTheFlyAddVmButtonControl => DeployOnTheFlyAddVmButton;
 
     public Button DeployOnTheFlyRemoveVmButtonControl => DeployOnTheFlyRemoveVmButton;
+
+    public TextBlock DeployOnTheFlyEditorIssueSummaryTextBlockControl => DeployOnTheFlyEditorIssueSummaryTextBlock;
 
     public TextBox DeployOnTheFlyVmNameTextBoxControl => DeployOnTheFlyVmNameTextBox;
 
@@ -58,4 +63,12 @@ public sealed partial class DeployOnTheFlyView : UserControl
     public Button DeployOnTheFlyStartButtonControl => DeployOnTheFlyStartButton;
 
     public TextBlock DeployOnTheFlyStatusTextBlockControl => DeployOnTheFlyStatusTextBlock;
+
+    private void DeployOnTheFlyRowRemoveButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: VmTemplate vmEntry })
+        {
+            VmRemoveRequested?.Invoke(vmEntry);
+        }
+    }
 }
