@@ -56,6 +56,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployIssueRows = [];
+    private readonly ObservableCollection<string> _deploySharedIssueSummaries = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
     private readonly Dictionary<string, DeployVmProgressState> _deployProgressByVm = new(StringComparer.OrdinalIgnoreCase);
@@ -274,6 +275,10 @@ public sealed partial class MainWindow : Window
     private TextBlock DeployResultsPanelSummaryTextBlock => DeployFromTemplateView.DeployResultsPanelSummaryTextBlockControl;
     private TextBlock DeployGlobalIssuesBadgeTextBlock => DeployFromTemplateView.DeployGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
+    private TextBlock DeployTemplateSummaryTextBlock => DeployFromTemplateView.DeployTemplateSummaryTextBlockControl;
+    private TextBlock DeployTemplateRemediationTextBlock => DeployFromTemplateView.DeployTemplateRemediationTextBlockControl;
+    private TextBlock DeploySharedIssuesSummaryTextBlock => DeployFromTemplateView.DeploySharedIssuesSummaryTextBlockControl;
+    private ListView DeploySharedIssuesListView => DeployFromTemplateView.DeploySharedIssuesListViewControl;
     private Expander DeployGlobalIssuesExpander => DeployFromTemplateRightPanelView.DeployGlobalIssuesExpanderControl;
     private ListView DeployGlobalIssuesListView => DeployFromTemplateRightPanelView.DeployGlobalIssuesListViewControl;
     private ListView DeployVmResultsListView => DeployFromTemplateRightPanelView.DeployVmResultsListViewControl;
@@ -498,6 +503,7 @@ public sealed partial class MainWindow : Window
         DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
         DeployVmResultsListView.ItemsSource = _deployVmResultRows;
         DeployGlobalIssuesListView.ItemsSource = _deployIssueRows;
+        DeploySharedIssuesListView.ItemsSource = _deploySharedIssueSummaries;
         DeployGlobalIssuesExpander.IsExpanded = false;
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
@@ -3511,12 +3517,17 @@ public sealed partial class MainWindow : Window
         if (_activeDeployTemplateDocument is null)
         {
             DeployReadinessSummaryTextBlock.Text = "Select a template to evaluate readiness and run deploy.";
+            DeployTemplateSummaryTextBlock.Text = "Select a template to review what will be deployed, how many VMs it includes, and whether environment fixes are needed.";
+            DeployTemplateRemediationTextBlock.Text = "Use Resolve Suggestions for safe environment remaps, or open Templates Editor for structural fixes.";
+            _deploySharedIssueSummaries.Clear();
+            DeploySharedIssuesSummaryTextBlock.Text = "Shared review items appear here when multiple VMs need the same remediation.";
             DeployOverallStateTextBlock.Text = _deployLifecycleState;
             DeployProgressBar.Value = _deployProgressPercent;
             DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
             DeployGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployIssueRows.Count}";
             UpdateDeployResultRows();
             UpdateDeployIssueRows();
+            UpdateDeploySharedIssueSummaries();
             ApplyRightPanelState();
             return;
         }
@@ -3530,6 +3541,11 @@ public sealed partial class MainWindow : Window
         DeployReadinessSummaryTextBlock.Text =
             $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
             $"Template: {_activeDeployTemplateDocument.Template.Name} ({_activeDeployTemplateDocument.Template.VmTemplates.Count} VMs).";
+        DeployTemplateSummaryTextBlock.Text =
+            $"Template '{_activeDeployTemplateDocument.Template.Name}' will deploy {_activeDeployTemplateDocument.Template.VmTemplates.Count} VM(s). Review shared environment blockers here before deciding whether to remediate or open the template editor.";
+        DeployTemplateRemediationTextBlock.Text = hasBlockingFailures
+            ? "Blocking issues are grouped below when possible. Use Resolve Suggestions for safe shared remaps, or Open in Templates Editor for structural fixes."
+            : "This surface is for template review and remediation. Use Open in Templates Editor only when the template itself needs structural changes.";
 
         DeployOverallStateTextBlock.Text = _deployLifecycleState;
         DeployProgressBar.Value = _deployProgressPercent;
@@ -3538,7 +3554,37 @@ public sealed partial class MainWindow : Window
 
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
+        UpdateDeploySharedIssueSummaries();
         ApplyRightPanelState();
+    }
+
+    private void UpdateDeploySharedIssueSummaries()
+    {
+        _deploySharedIssueSummaries.Clear();
+
+        var groupedIssues = _deployIssueRows
+            .Where(issue => !string.Equals(issue.Scope, "Global", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(issue => $"{issue.Severity}|{issue.Message}", StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Select(issue => issue.Scope).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+            .OrderByDescending(group => group.Key.StartsWith("Block|", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(group => group.Count())
+            .ToList();
+
+        foreach (var group in groupedIssues)
+        {
+            var scopes = group
+                .Select(issue => issue.Scope)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(scope => scope, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var message = group.First().Message;
+            var severity = group.First().Severity;
+            _deploySharedIssueSummaries.Add($"{severity}: {message} Shared across {scopes.Count} VM(s): {string.Join(", ", scopes)}");
+        }
+
+        DeploySharedIssuesSummaryTextBlock.Text = _deploySharedIssueSummaries.Count > 0
+            ? "Shared environment and compatibility issues detected across multiple VMs. Fix them here when safe, or open Templates Editor for structural changes."
+            : "No shared review items are currently grouped. Review the readiness summary, then use the main actions below.";
     }
 
     private void UpdateDeployResultRows()

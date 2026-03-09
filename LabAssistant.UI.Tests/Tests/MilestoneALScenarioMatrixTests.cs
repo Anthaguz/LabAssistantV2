@@ -135,7 +135,9 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.DoesNotContain("Text=\"Deploy From Template\"", fromTemplateSource);
         Assert.DoesNotContain("Deploy from-template with compact status, expandable per-VM details, and collapsed global issue drawer.", fromTemplateSource);
-        Assert.Contains("Text=\"Correction Actions (Placeholder)\"", fromTemplateSource);
+        Assert.Contains("Text=\"Template Review\"", fromTemplateSource);
+        Assert.Contains("Text=\"Remediation and Deploy\"", fromTemplateSource);
+        Assert.DoesNotContain("Text=\"VM Properties\"", fromTemplateSource);
     }
 
     [Fact]
@@ -155,6 +157,24 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("\"From Template Progress / Results\"", mainWindowSource);
         Assert.Contains("\"Quick Deploy Progress / Results\"", mainWindowSource);
         Assert.Contains("Text=\"Run warnings / errors\"", fromTemplateRightPanelSource);
+    }
+
+    [Fact]
+    public void FromTemplate_MainWorkspaceStaysReviewAndRemediationOriented()
+    {
+        var fromTemplateSource = LoadDeployFromTemplateViewXamlSource();
+        var mainWindowSource = LoadMainWindowSource();
+
+        Assert.Contains("x:Name=\"DeployTemplateSummaryTextBlock\"", fromTemplateSource);
+        Assert.Contains("x:Name=\"DeployTemplateRemediationTextBlock\"", fromTemplateSource);
+        Assert.Contains("x:Name=\"DeploySharedIssuesSummaryTextBlock\"", fromTemplateSource);
+        Assert.Contains("x:Name=\"DeploySharedIssuesListView\"", fromTemplateSource);
+        Assert.Contains("Content=\"Review Readiness\"", fromTemplateSource);
+        Assert.Contains("Content=\"Fix in Templates Editor\"", fromTemplateSource);
+
+        Assert.Contains("UpdateDeploySharedIssueSummaries();", mainWindowSource);
+        Assert.Contains("Template Review", fromTemplateSource);
+        Assert.Contains("This surface is for template review and remediation.", mainWindowSource);
     }
 
     [Fact]
