@@ -138,6 +138,25 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("Text=\"Correction Actions (Placeholder)\"", fromTemplateSource);
     }
 
+    [Fact]
+    public void DeployRightPanel_RemainsShellOwnedButUsesWorkflowLocalTriggers()
+    {
+        var quickDeploySource = LoadDeployOnTheFlyViewXamlSource();
+        var fromTemplateSource = LoadDeployFromTemplateViewXamlSource();
+        var mainWindowSource = LoadMainWindowSource();
+        var fromTemplateRightPanelSource = LoadDeployFromTemplateRightPanelViewXamlSource();
+
+        Assert.Contains("x:Name=\"DeployOnTheFlyOpenResultsPanelButton\"", quickDeploySource);
+        Assert.Contains("x:Name=\"DeployOpenResultsPanelButton\"", fromTemplateSource);
+        Assert.Contains("DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;", mainWindowSource);
+        Assert.Contains("DeployOnTheFlyOpenResultsPanelButton.Click += DeployOnTheFlyOpenResultsPanelButton_Click;", mainWindowSource);
+        Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
+        Assert.Contains("IssueBadge.Visibility = Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("\"From Template Progress / Results\"", mainWindowSource);
+        Assert.Contains("\"Quick Deploy Progress / Results\"", mainWindowSource);
+        Assert.Contains("Text=\"Run warnings / errors\"", fromTemplateRightPanelSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -189,6 +208,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDeployFromTemplateViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateRightPanelViewXamlSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployFromTemplateRightPanelView.xaml");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
