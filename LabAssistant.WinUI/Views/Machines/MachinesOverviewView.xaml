@@ -3,13 +3,19 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid x:Name="MachinesOverviewPanel" x:FieldModifier="public">
+        <Grid.RowDefinitions>
+            <RowDefinition x:Name="MachinesListRowDefinition" Height="*" />
+            <RowDefinition x:Name="MachinesDetailsRowDefinition" Height="0" />
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="2*" />
-            <ColumnDefinition Width="12" />
-            <ColumnDefinition Width="3*" />
+            <ColumnDefinition x:Name="MachinesListColumnDefinition" Width="2*" />
+            <ColumnDefinition x:Name="MachinesSplitterColumnDefinition" Width="12" />
+            <ColumnDefinition x:Name="MachinesDetailsColumnDefinition" Width="3*" />
         </Grid.ColumnDefinitions>
 
         <Border
+            x:Name="MachinesInventoryRegion"
+            Grid.Row="0"
             Grid.Column="0"
             Padding="8"
             Background="{StaticResource ShellBackgroundBrush}"
@@ -73,6 +79,8 @@
         </Border>
 
         <Border
+            x:Name="MachinesDetailsRegion"
+            Grid.Row="0"
             Grid.Column="2"
             Padding="12"
             Background="{StaticResource ShellBackgroundBrush}"

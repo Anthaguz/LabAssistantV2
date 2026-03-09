@@ -19,12 +19,13 @@
                 Grid.Row="0"
                 ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.15*" />
-                    <ColumnDefinition Width="1.4*" />
+                    <ColumnDefinition x:Name="AssetsSwitchesListColumnDefinition" Width="1.15*" />
+                    <ColumnDefinition x:Name="AssetsSwitchesDetailsColumnDefinition" Width="1.4*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition x:Name="AssetsSwitchesPrimaryRowDefinition" Height="*" />
+                    <RowDefinition x:Name="AssetsSwitchesStateRowDefinition" Height="Auto" />
+                    <RowDefinition x:Name="AssetsSwitchesDetailsRowDefinition" Height="0" />
                 </Grid.RowDefinitions>
 
                 <Border

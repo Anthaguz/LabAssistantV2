@@ -56,12 +56,13 @@
                 Grid.Row="2"
                 ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.15*" />
-                    <ColumnDefinition Width="1.4*" />
+                    <ColumnDefinition x:Name="AssetsBaseDisksListColumnDefinition" Width="1.15*" />
+                    <ColumnDefinition x:Name="AssetsBaseDisksDetailsColumnDefinition" Width="1.4*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition x:Name="AssetsBaseDisksPrimaryRowDefinition" Height="*" />
+                    <RowDefinition x:Name="AssetsBaseDisksStateRowDefinition" Height="Auto" />
+                    <RowDefinition x:Name="AssetsBaseDisksDetailsRowDefinition" Height="0" />
                 </Grid.RowDefinitions>
 
                 <Border

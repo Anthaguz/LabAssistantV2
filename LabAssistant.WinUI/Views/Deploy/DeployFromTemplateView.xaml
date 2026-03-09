@@ -11,9 +11,7 @@
         <Grid RowSpacing="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" ColumnSpacing="8">
@@ -41,151 +39,156 @@
                     Content="Review Readiness" />
             </Grid>
 
-            <Border
-                x:Name="DeployReadinessSummaryPanel"
+            <ScrollViewer
+                x:Name="DeployFromTemplateWorkspaceScrollViewer"
                 Grid.Row="1"
-                Padding="10"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="140" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock
-                        x:Name="DeployOverallStateTextBlock"
-                        Grid.Column="0"
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Idle" />
-                    <ProgressBar
-                        x:Name="DeployProgressBar"
-                        Grid.Column="1"
-                        Height="12"
-                        Minimum="0"
-                        Maximum="100"
-                        Value="0"
-                        VerticalAlignment="Center" />
-                    <TextBlock
-                        x:Name="DeployProgressSummaryTextBlock"
-                        Grid.Column="2"
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="No deployment started."
-                        TextWrapping="Wrap" />
-                    <StackPanel
-                        Grid.Column="3"
-                        HorizontalAlignment="Right"
-                        Spacing="4">
-                        <Button
-                            x:Name="DeployOpenResultsPanelButton"
-                            Content="Open Progress / Results" />
-                        <TextBlock
-                            x:Name="DeployResultsPanelSummaryTextBlock"
-                            HorizontalAlignment="Right"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            FontSize="12"
-                            Text="Use the side panel during or after deploy for progress and results." />
-                    </StackPanel>
-                    <TextBlock
-                        x:Name="DeployGlobalIssuesBadgeTextBlock"
-                        Grid.Column="3"
-                        Foreground="{StaticResource ShellWarnBrush}"
-                        FontWeight="SemiBold"
-                        Text="Issues: 0"
-                        Visibility="Collapsed" />
-                    <TextBlock
-                        x:Name="DeployReadinessSummaryTextBlock"
-                        Grid.Column="0"
-                        Grid.ColumnSpan="4"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Readiness summary" />
-                </Grid>
-            </Border>
-
-            <Border
-                Grid.Row="2"
-                Padding="10"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <Grid RowSpacing="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Template Review" />
-                    <TextBlock
-                        x:Name="DeployTemplateSummaryTextBlock"
-                        Grid.Row="1"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Select a template to review deployment summary, shared blockers, and remediation paths."
-                        TextWrapping="Wrap" />
-                    <TextBlock
-                        x:Name="DeployTemplateRemediationTextBlock"
-                        Grid.Row="2"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Use this surface to review readiness and choose the correct remediation path before deploy."
-                        TextWrapping="Wrap" />
-                </Grid>
-            </Border>
-
-            <Border
-                Grid.Row="3"
-                Padding="10"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <StackPanel Spacing="8">
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Remediation and Deploy" />
-                    <TextBlock
-                        x:Name="DeploySharedIssuesSummaryTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Shared review items appear here when multiple VMs need the same remediation."
-                        TextWrapping="Wrap" />
-                    <ListView
-                        x:Name="DeploySharedIssuesListView"
-                        MaxHeight="160">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="10">
+                    <Border
+                        x:Name="DeployReadinessSummaryPanel"
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                x:Name="DeployOverallStateTextBlock"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Idle" />
+                            <ProgressBar
+                                x:Name="DeployProgressBar"
+                                Grid.Column="1"
+                                Height="12"
+                                Minimum="0"
+                                Maximum="100"
+                                Value="0"
+                                VerticalAlignment="Center" />
+                            <TextBlock
+                                x:Name="DeployProgressSummaryTextBlock"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="No deployment started."
+                                TextWrapping="Wrap" />
+                            <StackPanel
+                                Grid.Column="3"
+                                HorizontalAlignment="Right"
+                                Spacing="4">
+                                <Button
+                                    x:Name="DeployOpenResultsPanelButton"
+                                    Content="Open Progress / Results" />
                                 <TextBlock
-                                    Text="{Binding}"
-                                    TextWrapping="Wrap" />
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button
-                            x:Name="DeployResolveSuggestionsButton"
-                            Content="Resolve Suggestions" />
-                        <Button
-                            x:Name="DeployOpenTemplateEditorButton"
-                            Content="Fix in Templates Editor" />
-                        <Button
-                            x:Name="DeployStartButton"
-                            Content="Start Deploy" />
-                    </StackPanel>
-                    <TextBlock
-                        x:Name="DeployActionStatusTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="No action selected."
-                        TextWrapping="Wrap" />
+                                    x:Name="DeployResultsPanelSummaryTextBlock"
+                                    HorizontalAlignment="Right"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    FontSize="12"
+                                    Text="Use the side panel during or after deploy for progress and results." />
+                            </StackPanel>
+                            <TextBlock
+                                x:Name="DeployGlobalIssuesBadgeTextBlock"
+                                Grid.Column="3"
+                                Foreground="{StaticResource ShellWarnBrush}"
+                                FontWeight="SemiBold"
+                                Text="Issues: 0"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="DeployReadinessSummaryTextBlock"
+                                Grid.Column="0"
+                                Grid.ColumnSpan="4"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Readiness summary" />
+                        </Grid>
+                    </Border>
+
+                    <Border
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <Grid RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Template Review" />
+                            <TextBlock
+                                x:Name="DeployTemplateSummaryTextBlock"
+                                Grid.Row="1"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Select a template to review deployment summary, shared blockers, and remediation paths."
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="DeployTemplateRemediationTextBlock"
+                                Grid.Row="2"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Use this surface to review readiness and choose the correct remediation path before deploy."
+                                TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
+
+                    <Border
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <StackPanel Spacing="8">
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Remediation and Deploy" />
+                            <TextBlock
+                                x:Name="DeploySharedIssuesSummaryTextBlock"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Shared review items appear here when multiple VMs need the same remediation."
+                                TextWrapping="Wrap" />
+                            <ListView
+                                x:Name="DeploySharedIssuesListView"
+                                MaxHeight="160">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Text="{Binding}"
+                                            TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button
+                                    x:Name="DeployResolveSuggestionsButton"
+                                    Content="Resolve Suggestions" />
+                                <Button
+                                    x:Name="DeployOpenTemplateEditorButton"
+                                    Content="Fix in Templates Editor" />
+                                <Button
+                                    x:Name="DeployStartButton"
+                                    Content="Start Deploy" />
+                            </StackPanel>
+                            <TextBlock
+                                x:Name="DeployActionStatusTextBlock"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="No action selected."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-            </Border>
+            </ScrollViewer>
 
         </Grid>
     </Border>

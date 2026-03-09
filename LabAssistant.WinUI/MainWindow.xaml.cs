@@ -136,6 +136,7 @@ public sealed partial class MainWindow : Window
     private string _shellRightPanelOwnerCapabilityKey = string.Empty;
     private const double ShellRightPanelCompactThreshold = 1200;
     private const double ShellRightPanelExpandedWidth = 380;
+    private const double ShellNavigationDrawerThreshold = 1100;
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
     private DateTimeOffset _lastRdpReadinessRefreshUtc = DateTimeOffset.MinValue;
@@ -385,6 +386,7 @@ public sealed partial class MainWindow : Window
         WireOverviewHandlers();
         ConfigureShellIcons();
         ConfigureNavigationView();
+        ApplyShellNavigationMode(1280);
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
         RootLayout.KeyDown += RootLayout_KeyDown;
@@ -726,6 +728,8 @@ public sealed partial class MainWindow : Window
 
     private void RootLayout_SizeChanged(object sender, SizeChangedEventArgs e)
     {
+        ApplyShellNavigationMode(e.NewSize.Width);
+
         var isCompact = e.NewSize.Width < ShellRightPanelCompactThreshold;
         if (_isShellRightPanelInCompactFallback == isCompact)
         {
@@ -739,6 +743,20 @@ public sealed partial class MainWindow : Window
         }
 
         ApplyRightPanelState();
+    }
+
+    private void ApplyShellNavigationMode(double width)
+    {
+        var useDrawerMode = width < ShellNavigationDrawerThreshold;
+        GlobalNavigationView.PaneDisplayMode = useDrawerMode
+            ? NavigationViewPaneDisplayMode.LeftMinimal
+            : NavigationViewPaneDisplayMode.LeftCompact;
+        GlobalNavigationView.CompactPaneLength = useDrawerMode ? 0 : 56;
+
+        if (useDrawerMode)
+        {
+            GlobalNavigationView.IsPaneOpen = false;
+        }
     }
 
     private void ResetRightPanelForCapabilitySwitch(string incomingCapabilityKey)

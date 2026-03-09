@@ -82,14 +82,22 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" ColumnSpacing="10">
+            <Grid
+                x:Name="DeployOnTheFlyWorkspaceGrid"
+                Grid.Row="1"
+                ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.05*" />
-                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition x:Name="DeployOnTheFlyListColumnDefinition" Width="1.05*" />
+                    <ColumnDefinition x:Name="DeployOnTheFlyEditorColumnDefinition" Width="1.25*" />
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="DeployOnTheFlyPrimaryRowDefinition" Height="*" />
+                    <RowDefinition x:Name="DeployOnTheFlyEditorRowDefinition" Height="0" />
+                </Grid.RowDefinitions>
 
                 <Border
                     x:Name="DeployOnTheFlyVmEntriesPanel"
+                    Grid.Row="0"
                     Grid.Column="0"
                     Padding="10"
                     Background="{StaticResource ShellContentBackgroundBrush}"
@@ -189,6 +197,7 @@
 
                 <Border
                     x:Name="DeployOnTheFlyVmEditorPanel"
+                    Grid.Row="0"
                     Grid.Column="1"
                     Padding="10"
                     Background="{StaticResource ShellContentBackgroundBrush}"
