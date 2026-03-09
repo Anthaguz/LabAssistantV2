@@ -13,6 +13,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" ColumnSpacing="8">
@@ -32,7 +33,7 @@
                 <Button
                     x:Name="DeployEvaluateReadinessButton"
                     Grid.Column="2"
-                    Content="Evaluate" />
+                    Content="Review Readiness" />
             </Grid>
 
             <Border
@@ -97,7 +98,7 @@
                         x:Name="DeployReadinessSummaryTextBlock"
                         Grid.Column="0"
                         Grid.ColumnSpan="4"
-                        Visibility="Collapsed"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
                         Text="Readiness summary" />
                 </Grid>
             </Border>
@@ -109,18 +110,66 @@
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Template Review" />
+                    <TextBlock
+                        x:Name="DeployTemplateSummaryTextBlock"
+                        Grid.Row="1"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Select a template to review deployment summary, shared blockers, and remediation paths."
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="DeployTemplateRemediationTextBlock"
+                        Grid.Row="2"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Use this surface to review readiness and choose the correct remediation path before deploy."
+                        TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+
+            <Border
+                Grid.Row="3"
+                Padding="10"
+                Background="{StaticResource ShellContentBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
                 <StackPanel Spacing="8">
                     <TextBlock
                         Foreground="{StaticResource ShellTextPrimaryBrush}"
                         FontWeight="SemiBold"
-                        Text="Correction Actions (Placeholder)" />
+                        Text="Remediation and Deploy" />
+                    <TextBlock
+                        x:Name="DeploySharedIssuesSummaryTextBlock"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="Shared review items appear here when multiple VMs need the same remediation."
+                        TextWrapping="Wrap" />
+                    <ListView
+                        x:Name="DeploySharedIssuesListView"
+                        MaxHeight="160">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock
+                                    Text="{Binding}"
+                                    TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button
                             x:Name="DeployResolveSuggestionsButton"
                             Content="Resolve Suggestions" />
                         <Button
                             x:Name="DeployOpenTemplateEditorButton"
-                            Content="Open in Templates Editor" />
+                            Content="Fix in Templates Editor" />
                         <Button
                             x:Name="DeployStartButton"
                             Content="Start Deploy" />

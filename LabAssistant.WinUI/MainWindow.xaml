@@ -226,7 +226,7 @@
                                     Grid.Column="0"
                                     Visibility="Collapsed" />
                                 <Border
-                                    x:Name="TemplatesLocalNavigationPanel"
+                                    x:Name="TemplatesWorkspacePanel"
                                     Grid.Row="0"
                                     Grid.Column="0"
                                     Padding="8"
@@ -236,31 +236,19 @@
                                     CornerRadius="6"
                                     VerticalAlignment="Stretch"
                                     Visibility="Collapsed">
-                                    <TabView
-                                        x:Name="TemplatesSubviewTabView"
-                                        IsAddTabButtonVisible="False"
-                                        VerticalAlignment="Stretch"
-                                        SelectionChanged="TemplatesSubviewTabView_SelectionChanged">
-                                    <TabView.Resources>
-                                        <Style TargetType="TabViewItem">
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                                        </Style>
-                                        <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="{ThemeResource ShellBackgroundColor}" />
-                                        <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="{ThemeResource ShellContentBackgroundColor}" />
-                                        <SolidColorBrush x:Key="TabViewItemHeaderForeground" Color="{ThemeResource ShellTextSecondaryColor}" />
-                                            <SolidColorBrush x:Key="TabViewItemHeaderForegroundSelected" Color="{ThemeResource ShellTextPrimaryColor}" />
-                                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="{ThemeResource ShellBackgroundColor}" />
-                                            <SolidColorBrush x:Key="TabViewItemHeaderForegroundPointerOver" Color="{ThemeResource ShellTextPrimaryColor}" />
-                                    </TabView.Resources>
-                                    <TabViewItem x:Name="TemplatesLibraryTabViewItem" Header="Library" IsClosable="False">
-                                        <templateViews:TemplatesLibraryView x:Name="TemplatesLibraryViewHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
-                                    </TabViewItem>
-                                    <TabViewItem x:Name="TemplatesEditorTabViewItem" Header="Editor" IsClosable="False">
-                                        <templateViews:TemplatesEditorView x:Name="TemplatesEditorViewHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
-                                    </TabViewItem>
-                                </TabView>
-                            </Border>
+                                    <Grid>
+                                        <templateViews:TemplatesLibraryView
+                                            x:Name="TemplatesLibraryViewHost"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch"
+                                            Visibility="Collapsed" />
+                                        <templateViews:TemplatesEditorView
+                                            x:Name="TemplatesEditorViewHost"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch"
+                                            Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
                                 <Border
                                     x:Name="SettingsMachinesPanel"
                                     Grid.Row="0"

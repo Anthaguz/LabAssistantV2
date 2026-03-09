@@ -47,6 +47,10 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.NotNull(FindByName(xaml, "DeployProgressSummaryTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployGlobalIssuesBadgeTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployReadinessSummaryTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployTemplateSummaryTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeployTemplateRemediationTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeploySharedIssuesSummaryTextBlock"));
+        Assert.NotNull(FindByName(xaml, "DeploySharedIssuesListView"));
         Assert.NotNull(FindByName(xaml, "DeployEvaluateReadinessButton"));
         Assert.NotNull(FindByName(xaml, "DeployResolveSuggestionsButton"));
         Assert.NotNull(FindByName(xaml, "DeployOpenTemplateEditorButton"));

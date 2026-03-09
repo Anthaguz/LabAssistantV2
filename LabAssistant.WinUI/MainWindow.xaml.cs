@@ -56,6 +56,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployIssueRows = [];
+    private readonly ObservableCollection<string> _deploySharedIssueSummaries = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
     private readonly Dictionary<string, DeployVmProgressState> _deployProgressByVm = new(StringComparer.OrdinalIgnoreCase);
@@ -108,7 +109,6 @@ public sealed partial class MainWindow : Window
     private int _assetsSwitchesValidationRequestVersion;
     private int _assetsSwitchesAssessmentRequestVersion;
     private bool _isUpdatingNavigationSelection;
-    private bool _isUpdatingTemplatesSubviewSelection;
     private bool _isUpdatingDeploySubviewSelection;
     private bool _isUpdatingAssetsSubviewSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
@@ -160,7 +160,7 @@ public sealed partial class MainWindow : Window
     private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
     private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
-    private FrameworkElement TemplatesLocalNavPanel => TemplatesLocalNavigationPanel;
+    private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;
     private FrameworkElement DeployLocalNavPanel => DeployLocalNavigationPanel;
     private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
     private FrameworkElement DiagnosticsLocalNavPanel => DiagnosticsLocalNavigationPanel;
@@ -274,6 +274,10 @@ public sealed partial class MainWindow : Window
     private TextBlock DeployResultsPanelSummaryTextBlock => DeployFromTemplateView.DeployResultsPanelSummaryTextBlockControl;
     private TextBlock DeployGlobalIssuesBadgeTextBlock => DeployFromTemplateView.DeployGlobalIssuesBadgeTextBlockControl;
     private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
+    private TextBlock DeployTemplateSummaryTextBlock => DeployFromTemplateView.DeployTemplateSummaryTextBlockControl;
+    private TextBlock DeployTemplateRemediationTextBlock => DeployFromTemplateView.DeployTemplateRemediationTextBlockControl;
+    private TextBlock DeploySharedIssuesSummaryTextBlock => DeployFromTemplateView.DeploySharedIssuesSummaryTextBlockControl;
+    private ListView DeploySharedIssuesListView => DeployFromTemplateView.DeploySharedIssuesListViewControl;
     private Expander DeployGlobalIssuesExpander => DeployFromTemplateRightPanelView.DeployGlobalIssuesExpanderControl;
     private ListView DeployGlobalIssuesListView => DeployFromTemplateRightPanelView.DeployGlobalIssuesListViewControl;
     private ListView DeployVmResultsListView => DeployFromTemplateRightPanelView.DeployVmResultsListViewControl;
@@ -498,6 +502,7 @@ public sealed partial class MainWindow : Window
         DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
         DeployVmResultsListView.ItemsSource = _deployVmResultRows;
         DeployGlobalIssuesListView.ItemsSource = _deployIssueRows;
+        DeploySharedIssuesListView.ItemsSource = _deploySharedIssueSummaries;
         DeployGlobalIssuesExpander.IsExpanded = false;
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
@@ -560,6 +565,13 @@ public sealed partial class MainWindow : Window
             {
                 foreach (var subview in capability.Subviews)
                 {
+                    if (!capability.ShowChildRoutesInShell)
+                    {
+                        _routeToNavigationItem[subview.RouteKey] = parentItem;
+                        _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
+                        continue;
+                    }
+
                     if (capability.HasOverview && string.Equals(subview.RouteKey, capability.DefaultSubview.RouteKey, StringComparison.Ordinal))
                     {
                         _routeToNavigationItem[subview.RouteKey] = parentItem;
@@ -611,10 +623,8 @@ public sealed partial class MainWindow : Window
                 ? "Configure and run deployment workflows from one capability surface with readiness, remediation, and results context."
             : IsAssetsCapabilityActive
                 ? "Manage shared Hyper-V assets, inventory, and compatibility state from one capability surface."
-            : IsTemplatesLibraryActive
-                ? "Browse templates and start create/open/import/export flows from one Templates capability context."
-                : IsTemplatesEditorActive
-                    ? "Edit template metadata, validate, and save through existing template workflows."
+            : IsTemplatesCapabilityActive
+                ? "Browse templates and enter the editor through explicit create or edit workflows."
             : IsSettingsMachinesActive
                 ? "Configure Machines policy defaults."
                 : IsDiagnosticsCapabilityActive
@@ -632,10 +642,11 @@ public sealed partial class MainWindow : Window
         AssetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesLocalNavPanel.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;
+        TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        SyncTemplatesSubviewSelection();
         SyncDeploySubviewSelection();
         SyncAssetsSubviewSelection();
         SyncDiagnosticsSubviewSelection();
@@ -1150,30 +1161,6 @@ public sealed partial class MainWindow : Window
     {
         _theme = _theme == ElementTheme.Light ? ElementTheme.Dark : ElementTheme.Light;
         ApplyState();
-    }
-
-    private void TemplatesSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUpdatingTemplatesSubviewSelection)
-        {
-            return;
-        }
-
-        if (TemplatesSubviewTabView.SelectedItem is not TabViewItem selectedTab)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(selectedTab, TemplatesLibraryTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
-            return;
-        }
-
-        if (ReferenceEquals(selectedTab, TemplatesEditorTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.TemplatesEditor);
-        }
     }
 
     private async void SaveMachinesDeletionPolicyButton_Click(object sender, RoutedEventArgs e)
@@ -2876,30 +2863,6 @@ public sealed partial class MainWindow : Window
     private bool IsDiagnosticsCapabilityActive =>
         IsDiagnosticsOverviewActive || IsDiagnosticsLogsActive;
 
-    private void SyncTemplatesSubviewSelection()
-    {
-        if (!IsTemplatesCapabilityActive)
-        {
-            return;
-        }
-
-        var expectedSelection = IsTemplatesEditorActive ? TemplatesEditorTabViewItem : TemplatesLibraryTabViewItem;
-        if (ReferenceEquals(TemplatesSubviewTabView.SelectedItem, expectedSelection))
-        {
-            return;
-        }
-
-        _isUpdatingTemplatesSubviewSelection = true;
-        try
-        {
-            TemplatesSubviewTabView.SelectedItem = expectedSelection;
-        }
-        finally
-        {
-            _isUpdatingTemplatesSubviewSelection = false;
-        }
-    }
-
     private async void DeployReloadTemplatesButton_Click(object sender, RoutedEventArgs e)
     {
         await EnsureDeployTemplatesLoadedAsync(forceRefresh: true);
@@ -3511,12 +3474,17 @@ public sealed partial class MainWindow : Window
         if (_activeDeployTemplateDocument is null)
         {
             DeployReadinessSummaryTextBlock.Text = "Select a template to evaluate readiness and run deploy.";
+            DeployTemplateSummaryTextBlock.Text = "Select a template to review what will be deployed, how many VMs it includes, and whether environment fixes are needed.";
+            DeployTemplateRemediationTextBlock.Text = "Use Resolve Suggestions for safe environment remaps, or open Templates Editor for structural fixes.";
+            _deploySharedIssueSummaries.Clear();
+            DeploySharedIssuesSummaryTextBlock.Text = "Shared review items appear here when multiple VMs need the same remediation.";
             DeployOverallStateTextBlock.Text = _deployLifecycleState;
             DeployProgressBar.Value = _deployProgressPercent;
             DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
             DeployGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployIssueRows.Count}";
             UpdateDeployResultRows();
             UpdateDeployIssueRows();
+            UpdateDeploySharedIssueSummaries();
             ApplyRightPanelState();
             return;
         }
@@ -3530,6 +3498,11 @@ public sealed partial class MainWindow : Window
         DeployReadinessSummaryTextBlock.Text =
             $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
             $"Template: {_activeDeployTemplateDocument.Template.Name} ({_activeDeployTemplateDocument.Template.VmTemplates.Count} VMs).";
+        DeployTemplateSummaryTextBlock.Text =
+            $"Template '{_activeDeployTemplateDocument.Template.Name}' will deploy {_activeDeployTemplateDocument.Template.VmTemplates.Count} VM(s). Review shared environment blockers here before deciding whether to remediate or open the template editor.";
+        DeployTemplateRemediationTextBlock.Text = hasBlockingFailures
+            ? "Blocking issues are grouped below when possible. Use Resolve Suggestions for safe shared remaps, or Open in Templates Editor for structural fixes."
+            : "This surface is for template review and remediation. Use Open in Templates Editor only when the template itself needs structural changes.";
 
         DeployOverallStateTextBlock.Text = _deployLifecycleState;
         DeployProgressBar.Value = _deployProgressPercent;
@@ -3538,7 +3511,37 @@ public sealed partial class MainWindow : Window
 
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
+        UpdateDeploySharedIssueSummaries();
         ApplyRightPanelState();
+    }
+
+    private void UpdateDeploySharedIssueSummaries()
+    {
+        _deploySharedIssueSummaries.Clear();
+
+        var groupedIssues = _deployIssueRows
+            .Where(issue => !string.Equals(issue.Scope, "Global", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(issue => $"{issue.Severity}|{issue.Message}", StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Select(issue => issue.Scope).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+            .OrderByDescending(group => group.Key.StartsWith("Block|", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(group => group.Count())
+            .ToList();
+
+        foreach (var group in groupedIssues)
+        {
+            var scopes = group
+                .Select(issue => issue.Scope)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(scope => scope, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var message = group.First().Message;
+            var severity = group.First().Severity;
+            _deploySharedIssueSummaries.Add($"{severity}: {message} Shared across {scopes.Count} VM(s): {string.Join(", ", scopes)}");
+        }
+
+        DeploySharedIssuesSummaryTextBlock.Text = _deploySharedIssueSummaries.Count > 0
+            ? "Shared environment and compatibility issues detected across multiple VMs. Fix them here when safe, or open Templates Editor for structural changes."
+            : "No shared review items are currently grouped. Review the readiness summary, then use the main actions below.";
     }
 
     private void UpdateDeployResultRows()
