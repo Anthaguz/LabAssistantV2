@@ -31,6 +31,14 @@ public sealed partial class DeployFromTemplateView : UserControl
 
     public TextBlock DeployReadinessSummaryTextBlockControl => DeployReadinessSummaryTextBlock;
 
+    public TextBlock DeployTemplateSummaryTextBlockControl => DeployTemplateSummaryTextBlock;
+
+    public TextBlock DeployTemplateRemediationTextBlockControl => DeployTemplateRemediationTextBlock;
+
+    public TextBlock DeploySharedIssuesSummaryTextBlockControl => DeploySharedIssuesSummaryTextBlock;
+
+    public ListView DeploySharedIssuesListViewControl => DeploySharedIssuesListView;
+
     public Button DeployResolveSuggestionsButtonControl => DeployResolveSuggestionsButton;
 
     public Button DeployOpenTemplateEditorButtonControl => DeployOpenTemplateEditorButton;
