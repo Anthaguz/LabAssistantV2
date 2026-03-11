@@ -19,6 +19,7 @@ using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.ViewModels;
+using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.Views.Assets;
 using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Diagnostics;
@@ -30,7 +31,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHost
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -45,7 +46,8 @@ public sealed partial class MainWindow : Window
     private readonly IStructuredLogViewerService _structuredLogViewerService;
     private readonly IAssetsBaseDisksCapabilityService _assetsBaseDisksCapabilityService;
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
-    private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];
+    private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();
+    private readonly MachinesWorkspaceController _machinesWorkspaceController;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
@@ -65,16 +67,10 @@ public sealed partial class MainWindow : Window
     private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
     private readonly List<DeployCompatibilityIssue> _deployCompatibilityIssues = [];
     private readonly List<DeployCompatibilityIssue> _deployOnTheFlyCompatibilityIssues = [];
-    private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
-    private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
     private ShellSubview _activeSubview;
     private string _activeRouteKey = string.Empty;
-    private MachineInventoryItem? _selectedMachine;
-    private MachineRdpReadinessResult _selectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
-    private MachineEditSnapshot? _loadedEditSnapshot;
-    private MachineEditDraft? _editDraft;
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
     private TemplateLibraryItem? _selectedTemplateLibraryItem;
     private TemplateEditorDocument? _activeTemplateEditorDocument;
@@ -88,11 +84,7 @@ public sealed partial class MainWindow : Window
     private DeploymentReadinessReport? _deployReadinessReport;
     private DeploymentReadinessReport? _deployOnTheFlyReadinessReport;
     private VmTemplate? _selectedTemplateVmEntry;
-    private bool _isMachineActionRunning;
-    private bool _isRdpReadinessRefreshRunning;
-    private bool _isMachineEditLoading;
-    private bool _isMachineEditApplying;
-    private bool _isUpdatingMachineEditControls;
+    private bool _isUpdatingMachineSelection;
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
@@ -139,8 +131,6 @@ public sealed partial class MainWindow : Window
     private const double ShellNavigationDrawerThreshold = 1100;
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
-    private DateTimeOffset _lastRdpReadinessRefreshUtc = DateTimeOffset.MinValue;
-    private DateTimeOffset _lastOnDemandRdpRefreshUtc = DateTimeOffset.MinValue;
 
     private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
     private DeployOverviewView DeployOverviewView => DeployOverviewViewHost;
@@ -192,6 +182,68 @@ public sealed partial class MainWindow : Window
     private Button OpenRdpButton => MachinesOverviewView.OpenRdpButton;
     private TextBlock RdpReadinessTextBlock => MachinesOverviewView.RdpReadinessTextBlock;
     private TextBlock MachinesStatusTextBlock => MachinesOverviewView.MachinesStatusTextBlock;
+    private ObservableCollection<MachineInventoryItem> _machineInventory => _machinesWorkspace.Inventory;
+    private Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey => _machinesWorkspace.RdpReadinessByVmKey;
+    private IReadOnlyList<string> _availableSwitches
+    {
+        get => _machinesWorkspace.AvailableSwitches;
+        set => _machinesWorkspace.AvailableSwitches = value;
+    }
+    private MachineInventoryItem? _selectedMachine
+    {
+        get => _machinesWorkspace.SelectedMachine;
+        set => _machinesWorkspace.SelectedMachine = value;
+    }
+    private MachineRdpReadinessResult _selectedRdpReadiness
+    {
+        get => _machinesWorkspace.SelectedRdpReadiness;
+        set => _machinesWorkspace.SelectedRdpReadiness = value;
+    }
+    private MachineEditSnapshot? _loadedEditSnapshot
+    {
+        get => _machinesWorkspace.LoadedEditSnapshot;
+        set => _machinesWorkspace.LoadedEditSnapshot = value;
+    }
+    private MachineEditDraft? _editDraft
+    {
+        get => _machinesWorkspace.EditDraft;
+        set => _machinesWorkspace.EditDraft = value;
+    }
+    private bool _isMachineActionRunning
+    {
+        get => _machinesWorkspace.IsMachineActionRunning;
+        set => _machinesWorkspace.IsMachineActionRunning = value;
+    }
+    private bool _isRdpReadinessRefreshRunning
+    {
+        get => _machinesWorkspace.IsRdpReadinessRefreshRunning;
+        set => _machinesWorkspace.IsRdpReadinessRefreshRunning = value;
+    }
+    private bool _isMachineEditLoading
+    {
+        get => _machinesWorkspace.IsMachineEditLoading;
+        set => _machinesWorkspace.IsMachineEditLoading = value;
+    }
+    private bool _isMachineEditApplying
+    {
+        get => _machinesWorkspace.IsMachineEditApplying;
+        set => _machinesWorkspace.IsMachineEditApplying = value;
+    }
+    private bool _isUpdatingMachineEditControls
+    {
+        get => _machinesWorkspace.IsUpdatingMachineEditControls;
+        set => _machinesWorkspace.IsUpdatingMachineEditControls = value;
+    }
+    private DateTimeOffset _lastRdpReadinessRefreshUtc
+    {
+        get => _machinesWorkspace.LastRdpReadinessRefreshUtc;
+        set => _machinesWorkspace.LastRdpReadinessRefreshUtc = value;
+    }
+    private DateTimeOffset _lastOnDemandRdpRefreshUtc
+    {
+        get => _machinesWorkspace.LastOnDemandRdpRefreshUtc;
+        set => _machinesWorkspace.LastOnDemandRdpRefreshUtc = value;
+    }
 
     private FrameworkElement DiagnosticsLogsPanel => DiagnosticsLogsViewHost;
     private TextBox LogFilterOperationIdTextBox => DiagnosticsLogsView.LogFilterOperationIdTextBox;
@@ -368,9 +420,11 @@ public sealed partial class MainWindow : Window
         _structuredLogViewerService = App.Services.GetRequiredService<IStructuredLogViewerService>();
         _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
+        _machinesWorkspaceController = new MachinesWorkspaceController(_machinesCapabilityService, _machinesWorkspace, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
-        MachinesListView.ItemsSource = _machineInventory;
+        MachinesListView.ItemsSource = _machinesWorkspace.Inventory;
+        MachinesStatusTextBlock.Text = _machinesWorkspace.StatusText;
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
         AssetsBaseDisksListView.ItemsSource = _assetsBaseDiskRows;
         AssetsSwitchesListView.ItemsSource = _assetsSwitchRows;
@@ -395,7 +449,7 @@ public sealed partial class MainWindow : Window
         RootLayout.Loaded += async (_, _) =>
         {
             RootLayout.Focus(FocusState.Programmatic);
-            await EnsureMachinesInventoryAsync(forceRefresh: true);
+            await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);
             await EnsureTemplateSwitchesAsync(forceRefresh: true);
             await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: true);
             await EnsureTemplatesLibraryAsync(forceRefresh: true);
@@ -891,7 +945,7 @@ public sealed partial class MainWindow : Window
 
         if (IsMachinesOverviewActive)
         {
-            _ = EnsureMachinesInventoryAsync(forceRefresh: false);
+            _ = _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: false);
         }
     }
 
@@ -5367,7 +5421,7 @@ public sealed partial class MainWindow : Window
     {
         _rdpReadinessTimer = DispatcherQueue.CreateTimer();
         _rdpReadinessTimer.Interval = TimeSpan.FromMinutes(5);
-        _rdpReadinessTimer.Tick += async (_, _) => await RefreshRdpReadinessAsync(selectedOnly: false);
+        _rdpReadinessTimer.Tick += async (_, _) => await _machinesWorkspaceController.RefreshRdpReadinessAsync(selectedOnly: false);
     }
 
     private void UpdateReadinessPollingState()
@@ -5386,7 +5440,7 @@ public sealed partial class MainWindow : Window
                 // Run one pass when Machines becomes active, then fall back to periodic checks.
                 if (DateTimeOffset.UtcNow - _lastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
                 {
-                    _ = RefreshRdpReadinessAsync(selectedOnly: false);
+                    _ = _machinesWorkspaceController.RefreshRdpReadinessAsync(selectedOnly: false);
                 }
             }
 
@@ -5398,67 +5452,6 @@ public sealed partial class MainWindow : Window
             _rdpReadinessTimer.Stop();
         }
 
-    }
-
-    private async Task<bool> EnsureMachinesInventoryAsync(bool forceRefresh)
-    {
-        if (!IsMachinesOverviewActive)
-        {
-            return false;
-        }
-
-        if (!forceRefresh && _machineInventory.Count > 0)
-        {
-            return true;
-        }
-
-        RefreshMachinesButton.IsEnabled = false;
-        MachinesStatusTextBlock.Text = "Loading host VM inventory...";
-
-        try
-        {
-            var inventory = await _machinesCapabilityService.LoadInventoryAsync();
-            var selectedVmName = _selectedMachine?.VmName;
-            var orderedInventory = inventory
-                .OrderBy(vm => vm.VmName, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            // Keep the currently displayed list until a new fetch succeeds.
-            _machineInventory.Clear();
-            foreach (var vm in orderedInventory)
-            {
-                _machineInventory.Add(vm);
-            }
-
-            _selectedMachine = _machineInventory.FirstOrDefault(vm =>
-                string.Equals(vm.VmName, selectedVmName, StringComparison.Ordinal));
-            MachinesListView.SelectedItem = _selectedMachine;
-
-            if (_machineInventory.Count == 0)
-            {
-                MachinesStatusTextBlock.Text = "No Hyper-V VMs found on this host.";
-            }
-            else
-            {
-                MachinesStatusTextBlock.Text = $"Loaded {_machineInventory.Count} VM(s).";
-            }
-
-            SyncRdpReadinessCache();
-            _ = LoadMachineEditStateAsync();
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            MachinesStatusTextBlock.Text = $"Failed to load VM inventory. Showing last known list. {ex.Message}";
-            return false;
-        }
-        finally
-        {
-            RefreshMachinesButton.IsEnabled = true;
-            UpdateMachineDetails();
-            UpdateMachineActionButtons();
-        }
     }
 
     private async Task EnsureStructuredLogsLoadedAsync(bool forceReload)
@@ -5590,13 +5583,12 @@ public sealed partial class MainWindow : Window
 
     private void MachinesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        DiscardMachineEditDraft();
-        _selectedMachine = MachinesListView.SelectedItem as MachineInventoryItem;
-        UpdateSelectedRdpReadinessFromCache();
-        UpdateMachineDetails();
-        UpdateRdpReadinessUi();
-        UpdateMachineActionButtons();
-        _ = LoadMachineEditStateAsync();
+        if (_isUpdatingMachineSelection)
+        {
+            return;
+        }
+
+        _ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesListView.SelectedItem as MachineInventoryItem);
     }
 
     private void UpdateMachineDetails()
@@ -5623,23 +5615,34 @@ public sealed partial class MainWindow : Window
     {
         var hasSelection = _selectedMachine is not null;
         var canRunActions = hasSelection && !_isMachineActionRunning;
+        RefreshMachinesButton.IsEnabled = !_machinesWorkspace.IsInventoryRefreshing;
+        _machinesWorkspace.CanRunSelectedMachineActions = canRunActions;
+        _machinesWorkspace.CanOpenRdp = canRunActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
+        _machinesWorkspace.CanApplyEdits = _selectedMachine is not null &&
+            !_isMachineActionRunning &&
+            !_isMachineEditLoading &&
+            !_isMachineEditApplying &&
+            HasMachineEditChanges();
+        _machinesWorkspace.RdpTooltipText = _selectedRdpReadiness.Message;
         StartVmButton.IsEnabled = canRunActions;
         StopVmButton.IsEnabled = canRunActions;
         RestartVmButton.IsEnabled = canRunActions;
         OpenConsoleButton.IsEnabled = canRunActions;
         DeleteVmButton.IsEnabled = canRunActions;
-        OpenRdpButton.IsEnabled = canRunActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
-        ToolTipService.SetToolTip(OpenRdpButton, _selectedRdpReadiness.Message);
-        ApplyMachineEditsButton.IsEnabled = _selectedMachine is not null &&
-            !_isMachineActionRunning &&
-            !_isMachineEditLoading &&
-            !_isMachineEditApplying &&
-            HasMachineEditChanges();
+        OpenRdpButton.IsEnabled = _machinesWorkspace.CanOpenRdp;
+        ToolTipService.SetToolTip(OpenRdpButton, _machinesWorkspace.RdpTooltipText);
+        ApplyMachineEditsButton.IsEnabled = _machinesWorkspace.CanApplyEdits;
+    }
+
+    private void SetMachinesStatus(string message)
+    {
+        _machinesWorkspace.StatusText = message;
+        MachinesStatusTextBlock.Text = message;
     }
 
     private async void RefreshMachinesButton_Click(object sender, RoutedEventArgs e)
     {
-        await EnsureMachinesInventoryAsync(forceRefresh: true);
+        await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);
     }
 
     private async void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
@@ -5711,208 +5714,37 @@ public sealed partial class MainWindow : Window
 
     private async void StartVmButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunMachineOperationAsync(
-            "Starting VM...",
-            vm => _machinesCapabilityService.StartVmAsync(vm),
-            refreshInventory: true);
+        await _machinesWorkspaceController.StartSelectedMachineAsync();
     }
 
     private async void StopVmButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunMachineOperationAsync(
-            "Stopping VM...",
-            vm => _machinesCapabilityService.StopVmAsync(vm),
-            refreshInventory: true);
+        await _machinesWorkspaceController.StopSelectedMachineAsync();
     }
 
     private async void RestartVmButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunMachineOperationAsync(
-            "Restarting VM...",
-            vm => _machinesCapabilityService.RestartVmAsync(vm),
-            refreshInventory: true);
+        await _machinesWorkspaceController.RestartSelectedMachineAsync();
     }
 
     private async void OpenConsoleButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunMachineOperationAsync(
-            "Opening Hyper-V Console...",
-            vm => _machinesCapabilityService.OpenConsoleAsync(vm),
-            refreshInventory: false);
+        await _machinesWorkspaceController.OpenSelectedMachineConsoleAsync();
     }
 
     private async void OpenRdpButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedMachine is null)
-        {
-            MachinesStatusTextBlock.Text = "Select a VM before running actions.";
-            return;
-        }
-
-        if (_selectedRdpReadiness.State != MachineRdpReadinessState.Ready ||
-            string.IsNullOrWhiteSpace(_selectedRdpReadiness.TargetIpv4))
-        {
-            MachinesStatusTextBlock.Text = $"RDP not ready. {_selectedRdpReadiness.Message}";
-            if (DateTimeOffset.UtcNow - _lastOnDemandRdpRefreshUtc >= TimeSpan.FromSeconds(2))
-            {
-                _lastOnDemandRdpRefreshUtc = DateTimeOffset.UtcNow;
-                await RefreshRdpReadinessAsync(selectedOnly: true);
-            }
-            return;
-        }
-
-        var targetIpv4 = _selectedRdpReadiness.TargetIpv4;
-
-        await RunMachineOperationAsync(
-            "Opening RDP...",
-            vm => _machinesCapabilityService.OpenRdpAsync(vm, targetIpv4!),
-            refreshInventory: false);
+        await _machinesWorkspaceController.OpenSelectedMachineRdpAsync();
     }
 
     private async void DeleteVmButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedMachine is null)
-        {
-            MachinesStatusTextBlock.Text = "Select a VM before running actions.";
-            return;
-        }
-
-        MachineDeletePreview preview;
-        try
-        {
-            preview = await _machinesCapabilityService.GetDeletePreviewAsync(_selectedMachine);
-        }
-        catch (Exception ex)
-        {
-            MachinesStatusTextBlock.Text = $"Failed to evaluate delete policy/classification. {ex.Message}";
-            return;
-        }
-
-        MachineDeleteScope? selectedScope;
-        var policyCanAutoSelectScope = preview.PolicyMode != MachineDeletionPolicyMode.AskEveryTime &&
-            preview.DefaultScope == MachineDeleteScope.VmAndStorage &&
-            preview.SafeForAutomaticStorageDeletion;
-
-        if (policyCanAutoSelectScope)
-        {
-            var confirmed = await ShowDeleteConfirmationDialogAsync(_selectedMachine, preview, preview.DefaultScope);
-            selectedScope = confirmed ? preview.DefaultScope : null;
-        }
-        else
-        {
-            selectedScope = await ShowDeleteScopeDialogAsync(_selectedMachine, preview);
-        }
-
-        if (selectedScope is null)
-        {
-            MachinesStatusTextBlock.Text = "Delete cancelled.";
-            return;
-        }
-
-        await RunMachineOperationAsync(
-            "Deleting VM...",
-            vm => _machinesCapabilityService.DeleteVmAsync(vm, selectedScope.Value),
-            refreshInventory: true,
-            clearSelectionOnSuccess: true);
-    }
-
-    private async Task RunMachineOperationAsync(
-        string pendingMessage,
-        Func<MachineInventoryItem, Task<MachineOperationResult>> operation,
-        bool refreshInventory,
-        bool clearSelectionOnSuccess = false)
-    {
-        if (_selectedMachine is null)
-        {
-            MachinesStatusTextBlock.Text = "Select a VM before running actions.";
-            return;
-        }
-
-        _isMachineActionRunning = true;
-        UpdateMachineActionButtons();
-        MachinesStatusTextBlock.Text = pendingMessage;
-
-        var vm = _selectedMachine;
-        try
-        {
-            var result = await operation(vm);
-            MachinesStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
-
-            if (result.Success && clearSelectionOnSuccess)
-            {
-                _selectedMachine = null;
-                MachinesListView.SelectedItem = null;
-            }
-
-            if (refreshInventory)
-            {
-                var refreshSucceeded = await EnsureMachinesInventoryAsync(forceRefresh: true);
-                if (!refreshSucceeded)
-                {
-                    MachinesStatusTextBlock.Text = $"{result.UserMessage} Inventory refresh failed; showing last known list.";
-                }
-                else if (_selectedMachine is not null)
-                {
-                    await RefreshRdpReadinessAsync(selectedOnly: true);
-                }
-            }
-            else
-            {
-                UpdateMachineDetails();
-            }
-        }
-        finally
-        {
-            _isMachineActionRunning = false;
-            UpdateMachineActionButtons();
-        }
-    }
-
-    private async Task LoadMachineEditStateAsync()
-    {
-        if (!IsMachinesOverviewActive || _selectedMachine is null)
-        {
-            ClearMachineEditControls();
-            return;
-        }
-
-        _isMachineEditLoading = true;
-        UpdateMachineActionButtons();
-        try
-        {
-            var snapshot = await _machinesCapabilityService.LoadEditSnapshotAsync(_selectedMachine);
-            _availableSwitches = await _machinesCapabilityService.LoadVirtualSwitchesAsync();
-            _loadedEditSnapshot = snapshot;
-            if (snapshot is null)
-            {
-                _editDraft = null;
-                ClearMachineEditControls();
-                MachinesStatusTextBlock.Text = "Unable to load editable VM settings.";
-                return;
-            }
-
-            _editDraft = CreateDraft(snapshot, Array.Empty<string>());
-            ApplyMachineEditDraftToControls();
-        }
-        catch (Exception ex)
-        {
-            _editDraft = null;
-            _loadedEditSnapshot = null;
-            ClearMachineEditControls();
-            MachinesStatusTextBlock.Text = $"Failed to load VM edit state. {ex.Message}";
-        }
-        finally
-        {
-            _isMachineEditLoading = false;
-            UpdateMachineActionButtons();
-        }
+        await _machinesWorkspaceController.DeleteSelectedMachineAsync();
     }
 
     private void DiscardMachineEditDraft()
     {
-        _loadedEditSnapshot = null;
-        _editDraft = null;
-        _isUpdatingMachineEditControls = false;
+        _machinesWorkspace.DiscardEditDraft();
         UpdateMachineEditDirtyIndicator();
     }
 
@@ -6122,7 +5954,7 @@ public sealed partial class MainWindow : Window
 
     private bool HasMachineEditChanges()
     {
-        return _editDraft is not null && _editDraft.ChangedFieldKeys.Count > 0;
+        return _machinesWorkspace.HasEditChanges;
     }
 
     private void UpdateMachineEditDirtyIndicator()
@@ -6133,37 +5965,7 @@ public sealed partial class MainWindow : Window
 
     private async void ApplyMachineEditsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedMachine is null || _editDraft is null || _loadedEditSnapshot is null)
-        {
-            MachinesStatusTextBlock.Text = "Select a VM and modify values before Apply.";
-            return;
-        }
-
-        if (!HasMachineEditChanges())
-        {
-            MachinesStatusTextBlock.Text = "No pending machine edits.";
-            return;
-        }
-
-        _isMachineEditApplying = true;
-        UpdateMachineActionButtons();
-        try
-        {
-            var result = await _machinesCapabilityService.ApplyEditsAsync(_selectedMachine, _editDraft);
-            MachinesStatusTextBlock.Text = $"{result.UserMessage} (operationId: {result.OperationId})";
-            if (!result.Success)
-            {
-                return;
-            }
-
-            await LoadMachineEditStateAsync();
-            await EnsureMachinesInventoryAsync(forceRefresh: true);
-        }
-        finally
-        {
-            _isMachineEditApplying = false;
-            UpdateMachineActionButtons();
-        }
+        await _machinesWorkspaceController.ApplySelectedMachineEditsAsync();
     }
 
     private void CpuCountTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
@@ -6228,49 +6030,6 @@ public sealed partial class MainWindow : Window
         return int.TryParse(text, out value);
     }
 
-    private async Task RefreshRdpReadinessAsync(bool selectedOnly)
-    {
-        if (!IsMachinesOverviewActive || _machineInventory.Count == 0)
-        {
-            return;
-        }
-
-        if (_isRdpReadinessRefreshRunning)
-        {
-            return;
-        }
-
-        var candidates = selectedOnly && _selectedMachine is not null
-            ? [ _selectedMachine ]
-            : _machineInventory.ToList();
-
-        _isRdpReadinessRefreshRunning = true;
-        _lastRdpReadinessRefreshUtc = DateTimeOffset.UtcNow;
-
-        try
-        {
-            foreach (var vm in candidates)
-            {
-                SetRdpReadiness(vm, new MachineRdpReadinessResult
-                {
-                    State = MachineRdpReadinessState.Checking,
-                    ReasonCode = MachineRdpReadinessReasonCodes.CheckFailed,
-                    Message = "Checking RDP readiness..."
-                });
-            }
-
-            foreach (var vm in candidates)
-            {
-                var readiness = await _machinesCapabilityService.EvaluateRdpReadinessAsync(vm, CancellationToken.None);
-                SetRdpReadiness(vm, readiness);
-            }
-        }
-        finally
-        {
-            _isRdpReadinessRefreshRunning = false;
-        }
-    }
-
     private async Task LoadMachinesDeletionPolicyAsync()
     {
         if (!IsSettingsMachinesActive || _isSavingDeletionPolicy)
@@ -6293,61 +6052,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void SyncRdpReadinessCache()
-    {
-        var activeVmKeys = _machineInventory.Select(GetVmReadinessKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var staleKeys = _rdpReadinessByVmKey.Keys.Where(vmKey => !activeVmKeys.Contains(vmKey)).ToList();
-        foreach (var vmKey in staleKeys)
-        {
-            _rdpReadinessByVmKey.Remove(vmKey);
-        }
-
-        foreach (var vm in _machineInventory)
-        {
-            var vmKey = GetVmReadinessKey(vm);
-            if (!_rdpReadinessByVmKey.ContainsKey(vmKey))
-            {
-                _rdpReadinessByVmKey[vmKey] = CreateUnknownReadiness("RDP readiness has not been checked yet.");
-            }
-        }
-
-        UpdateSelectedRdpReadinessFromCache();
-        UpdateRdpReadinessUi();
-        UpdateReadinessPollingState();
-    }
-
-    private void SetRdpReadiness(MachineInventoryItem vm, MachineRdpReadinessResult readiness)
-    {
-        var vmKey = GetVmReadinessKey(vm);
-        _rdpReadinessByVmKey[vmKey] = readiness;
-
-        if (_selectedMachine is not null &&
-            string.Equals(GetVmReadinessKey(_selectedMachine), vmKey, StringComparison.OrdinalIgnoreCase))
-        {
-            _selectedRdpReadiness = readiness;
-            UpdateRdpReadinessUi();
-            UpdateMachineActionButtons();
-        }
-    }
-
-    private void UpdateSelectedRdpReadinessFromCache()
-    {
-        if (_selectedMachine is null)
-        {
-            _selectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
-            return;
-        }
-
-        var selectedKey = GetVmReadinessKey(_selectedMachine);
-        if (_rdpReadinessByVmKey.TryGetValue(selectedKey, out var readiness))
-        {
-            _selectedRdpReadiness = readiness;
-            return;
-        }
-
-        _selectedRdpReadiness = CreateUnknownReadiness("RDP readiness has not been checked yet.");
-    }
-
     private void UpdateRdpReadinessUi()
     {
         if (_selectedRdpReadiness.State == MachineRdpReadinessState.Ready)
@@ -6359,25 +6063,47 @@ public sealed partial class MainWindow : Window
         RdpReadinessTextBlock.Text = $"{_selectedRdpReadiness.Message} ({_selectedRdpReadiness.ReasonCode})";
     }
 
-    private static MachineRdpReadinessResult CreateUnknownReadiness(string message)
-    {
-        return new MachineRdpReadinessResult
-        {
-            State = MachineRdpReadinessState.Unknown,
-            ReasonCode = MachineRdpReadinessReasonCodes.CheckFailed,
-            Message = message
-        };
-    }
+    bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => IsMachinesOverviewActive;
 
-    private static string GetVmReadinessKey(MachineInventoryItem vm)
+    void IMachinesWorkspaceControllerHost.SetMachinesStatus(string message) => SetMachinesStatus(message);
+
+    void IMachinesWorkspaceControllerHost.SetSelectedMachineInView(MachineInventoryItem? selectedMachine)
     {
-        if (!string.IsNullOrWhiteSpace(vm.VmId))
+        _isUpdatingMachineSelection = true;
+        try
         {
-            return vm.VmId;
+            MachinesListView.SelectedItem = selectedMachine;
         }
-
-        return vm.VmName;
+        finally
+        {
+            _isUpdatingMachineSelection = false;
+        }
     }
+
+    void IMachinesWorkspaceControllerHost.UpdateMachineDetails() => UpdateMachineDetails();
+
+    void IMachinesWorkspaceControllerHost.UpdateRdpReadinessUi() => UpdateRdpReadinessUi();
+
+    void IMachinesWorkspaceControllerHost.UpdateMachineActionButtons()
+    {
+        UpdateReadinessPollingState();
+        UpdateMachineActionButtons();
+    }
+
+    void IMachinesWorkspaceControllerHost.ClearMachineEditControls() => ClearMachineEditControls();
+
+    void IMachinesWorkspaceControllerHost.ApplyMachineEditDraftToControls() => ApplyMachineEditDraftToControls();
+
+    void IMachinesWorkspaceControllerHost.UpdateMachineEditDirtyIndicator() => UpdateMachineEditDirtyIndicator();
+
+    Task<MachineDeleteScope?> IMachinesWorkspaceControllerHost.ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview) =>
+        ShowDeleteScopeDialogAsync(vm, preview);
+
+    Task<bool> IMachinesWorkspaceControllerHost.ShowDeleteConfirmationDialogAsync(
+        MachineInventoryItem vm,
+        MachineDeletePreview preview,
+        MachineDeleteScope effectiveScope) =>
+        ShowDeleteConfirmationDialogAsync(vm, preview, effectiveScope);
 
     private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)
     {
