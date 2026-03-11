@@ -2308,3 +2308,72 @@ Each readiness result shall include, at minimum:
 - [ ] brittle source-shape coupling reduction is explicit and traceable
 - [ ] same-slice test update rule is explicit and traceable
 - [ ] temporary-scaffold-vs-stable-contract distinction is explicit and traceable
+
+---
+
+# AC-025 - WinUI Machines Workspace Extraction Seam (AM4)
+
+**Related FRs:** FR-122, FR-123, FR-124, FR-060, FR-061, FR-062, FR-063, FR-064, FR-065, FR-066, FR-071, FR-113, FR-114, FR-116, FR-117
+
+## Scenarios
+
+### 1) Machines state ownership can move out of MainWindow without changing route or shell framing
+**Given**
+- `Machines` is the first capability selected for AM extraction
+
+**When**
+- The Machines workspace seam is defined
+
+**Then**
+- Machines inventory state, selected-VM state, edit-draft state, readiness state, and action enablement/orchestration are explicitly identified as capability-local ownership
+- `machines.overview` route continuity remains preserved
+- shell continues to own capability framing while Machines-local ownership moves behind the seam
+
+### 2) Machines extraction preserves current master/detail and action behavior
+**Given**
+- Machines is currently a single-surface master/detail capability
+
+**When**
+- The extraction seam is defined
+
+**Then**
+- the single-surface master/detail behavior remains preserved
+- draft-based edit/apply behavior remains preserved
+- Console and RDP remain separate actions
+- delete behavior and delete policy integration remain preserved
+- no silent layout or workflow redesign is introduced by the seam definition
+
+### 3) Machines readiness and refresh behavior remains asynchronous and non-blocking
+**Given**
+- Machines inventory and RDP readiness currently update asynchronously
+
+**When**
+- The capability-local seam is introduced
+
+**Then**
+- inventory refresh remains non-blocking
+- RDP readiness evaluation remains non-blocking
+- shell does not remain the persistent owner of Machines-specific readiness flags or collections just to preserve refresh behavior
+
+### 4) Machines seam is narrow enough for the next extraction slices
+**Given**
+- AM5 through AM8 will extract Machines state, interactions, view exposure, and tests
+
+**When**
+- The seam contract is reviewed
+
+**Then**
+- ownership boundaries are explicit enough that later slices do not need to guess where Machines state ends and shell ownership begins
+- the seam supports pragmatic bindings/commands-first interaction rules from AM2
+- the seam supports same-slice UI test convergence from AM3
+
+## Expected Boundary
+- shell continues to host the Machines surface
+- Machines-specific state and orchestration move behind a capability-local workspace seam
+- current Machines user-visible behavior remains preserved while shell-owned direct control mutation is reduced over later AM slices
+
+## Definition of Done
+- [ ] Machines-local state/orchestration ownership is explicit and traceable
+- [ ] preserved Machines behavior constraints are explicit and traceable
+- [ ] async/non-blocking refresh/readiness preservation is explicit and traceable
+- [ ] seam guidance is narrow enough for AM5 through AM8

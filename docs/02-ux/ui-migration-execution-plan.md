@@ -390,6 +390,10 @@ Gate expectations:
 - brittle source-shape coupling should reduce where it only guards interim implementation shape
 - directly impacted UI tests must be updated in the same extraction slice as the runtime change
 
+**AM first capability seam**
+- `Machines` is the first capability extraction target
+- Machines seam must explicitly separate inventory/selection/draft/readiness/action ownership from shell ownership before runtime extraction begins
+
 ## 6.5 Settings + Diagnostics (fifth migration implementation target)
 
 **Goal**
