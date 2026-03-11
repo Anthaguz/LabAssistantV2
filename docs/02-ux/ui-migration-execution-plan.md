@@ -347,6 +347,39 @@ Gate expectations:
 - logging-signal redesign for Diagnostics data quality
 - Settings product-definition work beyond restoring reachability through a separate bug
 
+## 6.4b WinUI composition and workspace extraction (post-AL stabilization)
+
+**Goal**
+- reduce `MainWindow` ownership to shell composition concerns
+- extract capability-local state and orchestration behind narrower workspace seams
+- preserve AL shell/view behavior while making future polish, performance, and capability work less fragile
+
+**Must preserve**
+- existing capability semantics across `Machines`, `Assets`, `Templates`, `Deploy`, and `Diagnostics`
+- AL shell/header/navigation/right-panel/compact-layout behavior
+- canonical route continuity and Templates Library-first exception model
+
+**AM sequencing contract**
+- AM1 (docs-first): define shell composition boundary contract
+- AM2 (docs-first): define view interaction contract for replacing raw control-bag patterns
+- AM3 (docs-first): define UI test convergence contract for extraction work
+- AM4+ (capability seam + extraction): extract one capability slice at a time starting with `Machines`
+- later AM slices: reduce raw child-control exposure and converge tests after each capability extraction
+- AM closure: matrix/manual checklist/test-plan linkage for the extraction milestone
+
+**Recommended capability order**
+1. `Machines`
+2. `Assets`
+3. `Templates`
+4. `Deploy`
+5. `Diagnostics`
+
+**Out of scope during AM sequencing**
+- broad domain redesign
+- full MVVM purity as a goal in itself
+- performance tuning as a substitute for boundary cleanup
+- post-AL polish backlog unrelated to shell/workspace extraction
+
 ## 6.5 Settings + Diagnostics (fifth migration implementation target)
 
 **Goal**

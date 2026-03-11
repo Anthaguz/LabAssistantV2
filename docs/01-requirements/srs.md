@@ -496,6 +496,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** actions live nearest to the state they affect; `New` defaults to an inventory-level action that clears the current details/editor into draft state; icon-first command chrome with tooltips is preferred, including trash-can delete affordances and icon-based save/apply where clarity remains sufficient; compact layouts prioritize the primary workflow region and use bounded scroll owners rather than unbounded page growth.
   - **Priority:** P1
 
+- **FR-113:** WinUI `MainWindow` shall act as the shell composition root only and shall limit its direct ownership to shell chrome, route resolution, shell navigation behavior, shell header state, and shell right-panel host lifecycle.
+  - **Acceptance details:** `MainWindow` may continue to own shell-level state such as active route, active capability, shell theme state, compact drawer behavior, and right-panel container lifecycle, but it shall not remain the long-term owner of capability-local inventory state, selection state, edit drafts, workflow-specific readiness state, or capability-specific action orchestration once AM extraction slices land.
+  - **Priority:** P1
+
+- **FR-114:** WinUI migrated capabilities shall expose explicit workspace seams so capability-local state and workflow orchestration can move out of `MainWindow` without changing approved shell contracts or user-facing capability behavior.
+  - **Acceptance details:** each migrated capability may introduce a capability-scoped workspace owner (for example controller, presenter, or viewmodel) as long as shell-level behavior remains preserved; shell-to-capability integration must stay narrow and capability-specific state must no longer require broad direct control mutation from `MainWindow`.
+  - **Priority:** P1
+
+- **FR-115:** WinUI shell composition refactors shall preserve existing capability contracts and route behavior while reducing shell-level coupling to child view controls.
+  - **Acceptance details:** extraction work must preserve AL header/navigation/right-panel behavior, Templates Library-first exception behavior, and existing capability route keys; shell refactors must not silently redesign deploy, assets, templates, diagnostics, or machines semantics while introducing composition seams.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -506,6 +518,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-assets-base-disks-capability-contract-aj.md` for Milestone AJ `Assets > Base Disks` routing, operations, validation taxonomy, and removal safety contract.
 - See `docs/02-ux/winui-assets-switches-capability-contract-ak.md` for Milestone AK `Assets > Switches` routing, CRUD surface, validation taxonomy, and deletion guardrail contract.
 - See `docs/02-ux/winui-shell-view-consistency-contract-al.md` for Milestone AL cross-view shell/header/navigation/right-panel/action/compact-layout consistency rules.
+- See `docs/02-ux/winui-shell-composition-boundary-contract-am.md` for Milestone AM shell composition ownership and workspace extraction boundary rules.
 
 ---
 
