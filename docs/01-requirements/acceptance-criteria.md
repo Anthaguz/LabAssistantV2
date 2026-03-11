@@ -2103,3 +2103,73 @@ Each readiness result shall include, at minimum:
 - RDP readiness policy beyond v1 host-observable checks (for example guest policy/NLA/firewall introspection).
 - Deferred Assets inner layout details beyond `assets.base_disks` (for example `assets.switches` / `assets.isos`)
 - Include rotated structured logs in Phase 1 viewer (`structured-events.1.jsonl`, etc.) or defer.
+
+---
+
+# AC-022 - WinUI Shell Composition Boundary Contract (AM1)
+
+**Related FRs:** FR-113, FR-114, FR-115, FR-108, FR-109, FR-110, FR-111, FR-112
+
+## Scenarios
+
+### 1) MainWindow remains shell composition root only
+**Given**
+- WinUI shell is hosting migrated capability surfaces
+
+**When**
+- Runtime composition responsibilities are assigned
+
+**Then**
+- `MainWindow` owns shell chrome, route resolution, shell navigation behavior, shell header state, theme shell state, and right-panel host lifecycle
+- `MainWindow` does not remain the long-term owner of capability-local inventory state, selection state, edit drafts, readiness state, or capability-specific workflow orchestration
+- Shell ownership boundaries remain explicit and testable
+
+### 2) Capability-local state can move behind explicit workspace seams
+**Given**
+- A migrated capability must preserve current user-facing behavior while reducing shell entanglement
+
+**When**
+- Capability-local extraction work is introduced
+
+**Then**
+- The capability may introduce a capability-scoped workspace owner
+- Shell-to-capability integration remains narrow
+- Capability-local state no longer depends on broad direct child-control mutation from `MainWindow`
+- The capability remains reachable through the approved canonical route model
+
+### 3) Shell composition refactors preserve approved AL behavior
+**Given**
+- AM refactors are applied after AL shell/view consistency convergence
+
+**When**
+- Shell composition boundaries are implemented
+
+**Then**
+- Shell header ownership rules remain intact
+- Approved Overview-first capabilities remain intact
+- Templates remains Library-first with Editor as workflow-state entry
+- Deploy right-panel ownership and workflow-local trigger behavior remain intact
+- Compact navigation and bounded scroll rules remain intact unless a later contract explicitly changes them
+
+### 4) Capability workflows are not silently redesigned during extraction
+**Given**
+- A capability is being extracted away from shell-owned state
+
+**When**
+- The extraction changes internal ownership boundaries
+
+**Then**
+- Existing capability semantics, route behavior, and current user-visible contract remain preserved
+- Extraction does not silently redesign deploy, assets, templates, diagnostics, or machines workflows
+- Any new behavior change requires a separate docs-first issue
+
+## Expected UI / Runtime Boundary
+- `MainWindow` remains responsible for shell-level composition only
+- Capability-local workspace owners become the seam for state and orchestration
+- Shell continues to host capability views and route between them without becoming the persistent owner of capability-local workflow state
+
+## Definition of Done
+- [ ] `MainWindow` shell-only ownership is explicit and traceable
+- [ ] capability-local workspace seam expectations are explicit and traceable
+- [ ] AL shell/view behavior preservation requirements are explicit and traceable
+- [ ] extraction is explicitly constrained from becoming silent workflow redesign
