@@ -532,6 +532,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** stable contract tests should remain explicit and intentional; temporary scaffolding assertions should be reduced when they block legitimate boundary cleanup; the test suite should preserve migration safety without freezing the codebase into one shell-centric implementation shape.
   - **Priority:** P1
 
+- **FR-122:** WinUI `Machines` shall expose an explicit workspace extraction seam so inventory state, selected-VM state, edit-draft state, RDP readiness state, and action enablement/orchestration can move out of `MainWindow` without changing approved Machines behavior.
+  - **Acceptance details:** the Machines workspace seam must preserve the current single-surface master/detail model, `machines.overview` route continuity, draft-based apply workflow, separate Console and RDP actions, delete safety behavior, and current shell-owned capability framing from AL.
+  - **Priority:** P1
+
+- **FR-123:** WinUI `Machines` extraction shall preserve asynchronous and non-blocking readiness and inventory behavior while reducing shell-owned direct mutation of Machines controls.
+  - **Acceptance details:** RDP readiness refresh, inventory refresh, and selected-VM state updates must remain non-blocking and must not require `MainWindow` to remain the persistent owner of Machines-specific collections, drafts, or readiness flags; shell may still host capability views and dialogs without reclaiming Machines workflow ownership.
+  - **Priority:** P1
+
+- **FR-124:** WinUI `Machines` extraction shall preserve current user-visible interaction contracts while introducing a narrower Machines workspace owner boundary.
+  - **Acceptance details:** no silent redesign of Machines layout model, action grouping, delete policy behavior, RDP disabled-state behavior, or edit/apply semantics is allowed under AM4; the seam definition must be narrow enough to support AM5 through AM8 without guesswork.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -545,6 +557,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-shell-composition-boundary-contract-am.md` for Milestone AM shell composition ownership and workspace extraction boundary rules.
 - See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
 - See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
+- See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
 
 ---
 
