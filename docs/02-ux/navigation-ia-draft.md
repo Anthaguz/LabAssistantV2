@@ -438,6 +438,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: AL cross-view consistency contract defines overview policy, parent-click behavior, shell header ownership, and Templates workflow-state exception in `docs/02-ux/winui-shell-view-consistency-contract-al.md`.
 - Resolved: AM shell composition boundary keeps `MainWindow` as shell composition root while moving capability-local state/orchestration behind narrower workspace seams in `docs/02-ux/winui-shell-composition-boundary-contract-am.md`.
 - Resolved: AM view interaction contract defines bindings/commands-first with limited narrow view-local events instead of broad typed control-bag patterns in `docs/02-ux/winui-view-interaction-contract-am.md`.
+- Resolved: AM UI test convergence contract preserves stable shell/capability contracts while reducing brittle source-shape coupling during extraction in `docs/02-ux/winui-ui-test-convergence-contract-am.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?

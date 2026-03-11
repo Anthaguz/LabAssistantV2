@@ -520,6 +520,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** the target interaction contract must remain pragmatic rather than framework-dogmatic; AM refactors may use viewmodels, controllers, presenters, or mixed patterns as long as they reduce shell-to-view coupling and preserve existing capability semantics.
   - **Priority:** P1
 
+- **FR-119:** WinUI UI tests shall preserve approved shell and capability contracts while reducing brittle dependence on exact source-shape or literal-string implementation details when extraction work changes internal structure without changing behavior.
+  - **Acceptance details:** milestone tests may continue to protect contract anchors that must remain explicit, but extraction work should move tests toward state, seam, route, and behavior-oriented assertions where practical; test refactors must happen in the same issue as the corresponding runtime extraction when existing tests become too coupled to superseded structure.
+  - **Priority:** P1
+
+- **FR-120:** WinUI extraction work shall treat UI test updates as part of the implementation contract rather than as deferred cleanup after runtime refactors land.
+  - **Acceptance details:** when AM extraction work changes ownership boundaries, interaction seams, or capability-local state structure, directly impacted tests must be updated in the same slice; milestone evidence must continue to prove shell/capability contract preservation even if implementation shape changes.
+  - **Priority:** P1
+
+- **FR-121:** WinUI UI test strategy shall distinguish between tests that protect stable product contracts and tests that only protect temporary migration scaffolding or interim source shape.
+  - **Acceptance details:** stable contract tests should remain explicit and intentional; temporary scaffolding assertions should be reduced when they block legitimate boundary cleanup; the test suite should preserve migration safety without freezing the codebase into one shell-centric implementation shape.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -532,6 +544,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-shell-view-consistency-contract-al.md` for Milestone AL cross-view shell/header/navigation/right-panel/action/compact-layout consistency rules.
 - See `docs/02-ux/winui-shell-composition-boundary-contract-am.md` for Milestone AM shell composition ownership and workspace extraction boundary rules.
 - See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
+- See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
 
 ---
 
