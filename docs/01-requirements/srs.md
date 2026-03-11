@@ -508,6 +508,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** extraction work must preserve AL header/navigation/right-panel behavior, Templates Library-first exception behavior, and existing capability route keys; shell refactors must not silently redesign deploy, assets, templates, diagnostics, or machines semantics while introducing composition seams.
   - **Priority:** P1
 
+- **FR-116:** WinUI migrated views shall use bindings and commands as the default interaction model, while limiting code-behind to a small explicit surface for genuinely view-local interactions.
+  - **Acceptance details:** bindings and commands are the default pattern for state presentation and routine actions; view-local events remain acceptable only when they are narrow, explicit, and do not centralize capability orchestration in the shell; extraction work must not require shell-level direct mutation of routine child control state.
+  - **Priority:** P1
+
+- **FR-117:** WinUI migrated views shall not act as broad typed control bags for shell-level orchestration.
+  - **Acceptance details:** views may expose a narrow interaction seam or limited stateful surface needed by the current extraction step, but they shall not continue to expose dozens of raw controls for routine capability updates; child-control exposure must reduce over time as capability-local workspace seams are introduced.
+  - **Priority:** P1
+
+- **FR-118:** WinUI view interaction refactors shall preserve current capability behavior while enabling capability-local state owners to update UI through bindings, commands, and narrow interaction seams instead of broad `MainWindow` control proxies.
+  - **Acceptance details:** the target interaction contract must remain pragmatic rather than framework-dogmatic; AM refactors may use viewmodels, controllers, presenters, or mixed patterns as long as they reduce shell-to-view coupling and preserve existing capability semantics.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -519,6 +531,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-assets-switches-capability-contract-ak.md` for Milestone AK `Assets > Switches` routing, CRUD surface, validation taxonomy, and deletion guardrail contract.
 - See `docs/02-ux/winui-shell-view-consistency-contract-al.md` for Milestone AL cross-view shell/header/navigation/right-panel/action/compact-layout consistency rules.
 - See `docs/02-ux/winui-shell-composition-boundary-contract-am.md` for Milestone AM shell composition ownership and workspace extraction boundary rules.
+- See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
 
 ---
 
