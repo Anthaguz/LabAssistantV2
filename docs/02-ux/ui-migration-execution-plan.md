@@ -385,6 +385,11 @@ Gate expectations:
 - limited view-local events remain acceptable when they are narrow, explicit, and do not re-centralize orchestration in `MainWindow`
 - broad typed control-bag view patterns should reduce over the AM extraction sequence
 
+**AM test rule**
+- stable shell/capability contract tests remain protected
+- brittle source-shape coupling should reduce where it only guards interim implementation shape
+- directly impacted UI tests must be updated in the same extraction slice as the runtime change
+
 ## 6.5 Settings + Diagnostics (fifth migration implementation target)
 
 **Goal**

@@ -2241,3 +2241,70 @@ Each readiness result shall include, at minimum:
 - [ ] limited view-local event allowance is explicit and constrained
 - [ ] typed-control-bag pattern is explicitly rejected
 - [ ] pragmatic, non-dogmatic extraction rule is explicit and traceable
+
+---
+
+# AC-024 - WinUI UI Test Convergence Contract (AM3)
+
+**Related FRs:** FR-119, FR-120, FR-121, FR-113, FR-114, FR-115, FR-116, FR-117, FR-118
+
+## Scenarios
+
+### 1) Stable shell/capability contracts remain protected during extraction
+**Given**
+- AM extraction work changes internal ownership boundaries
+
+**When**
+- UI tests are evaluated or updated
+
+**Then**
+- tests continue to protect approved shell and capability contracts
+- route continuity, shell ownership rules, and approved capability behaviors remain covered
+- extraction work does not remove contract protection just because implementation structure changes
+
+### 2) Tests reduce brittle source-shape coupling where behavior is unchanged
+**Given**
+- A runtime refactor changes internal structure without changing approved behavior
+
+**When**
+- directly impacted UI tests are updated
+
+**Then**
+- tests may move away from exact source-string or source-shape assertions where those no longer represent the stable contract
+- tests prefer seam-, state-, route-, or behavior-oriented assertions where practical
+- the suite does not freeze the codebase into one shell-centric implementation shape
+
+### 3) Test updates happen in the same slice as runtime extraction
+**Given**
+- An AM extraction slice changes a capability’s ownership boundary or interaction seam
+
+**When**
+- The runtime change is implemented
+
+**Then**
+- directly impacted UI tests are updated in the same issue/PR
+- test convergence is not deferred as cleanup after the refactor lands
+- milestone evidence remains coherent at each step
+
+### 4) Temporary migration-scaffold tests are distinguished from stable contract tests
+**Given**
+- The UI test suite contains assertions created during the migration phase
+
+**When**
+- Those tests are reviewed during AM extraction
+
+**Then**
+- stable product-contract tests remain explicit and intentional
+- temporary scaffolding assertions may be reduced when they block legitimate boundary cleanup
+- the suite remains a safety mechanism rather than a structural straitjacket
+
+## Expected Test Strategy Boundary
+- stable shell/capability contracts remain explicitly covered
+- extraction-friendly tests move toward seam/state/route/behavior coverage where practical
+- runtime extraction and test convergence happen together
+
+## Definition of Done
+- [ ] stable contract protection is explicit and traceable
+- [ ] brittle source-shape coupling reduction is explicit and traceable
+- [ ] same-slice test update rule is explicit and traceable
+- [ ] temporary-scaffold-vs-stable-contract distinction is explicit and traceable
