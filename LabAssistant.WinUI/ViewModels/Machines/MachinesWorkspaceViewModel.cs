@@ -3,7 +3,7 @@ using LabAssistant.Business.Machines;
 
 namespace LabAssistant.WinUI.ViewModels.Machines;
 
-internal sealed class MachinesWorkspaceViewModel
+public sealed class MachinesWorkspaceViewModel
 {
     public ObservableCollection<MachineInventoryItem> Inventory { get; } = [];
 
@@ -13,12 +13,7 @@ internal sealed class MachinesWorkspaceViewModel
 
     public MachineInventoryItem? SelectedMachine { get; set; }
 
-    public MachineRdpReadinessResult SelectedRdpReadiness { get; set; } = new()
-    {
-        State = MachineRdpReadinessState.Unknown,
-        ReasonCode = MachineRdpReadinessReasonCodes.CheckFailed,
-        Message = "Select a VM to check RDP readiness."
-    };
+    public MachineRdpReadinessResult SelectedRdpReadiness { get; set; } = CreateUnknownReadiness("Select a VM to check RDP readiness.");
 
     public MachineEditSnapshot? LoadedEditSnapshot { get; set; }
 
@@ -62,16 +57,21 @@ internal sealed class MachinesWorkspaceViewModel
     public void ClearInventoryState()
     {
         Inventory.Clear();
-        RdpReadinessByVmKey.Clear();
         SelectedMachine = null;
-        SelectedRdpReadiness = new MachineRdpReadinessResult
-        {
-            State = MachineRdpReadinessState.Unknown,
-            ReasonCode = MachineRdpReadinessReasonCodes.CheckFailed,
-            Message = "Select a VM to check RDP readiness."
-        };
+        RdpReadinessByVmKey.Clear();
+        SelectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
         AvailableSwitches = Array.Empty<string>();
         StatusText = "No Hyper-V VMs found on this host.";
         DiscardEditDraft();
+    }
+
+    private static MachineRdpReadinessResult CreateUnknownReadiness(string message)
+    {
+        return new MachineRdpReadinessResult
+        {
+            State = MachineRdpReadinessState.Unknown,
+            ReasonCode = MachineRdpReadinessReasonCodes.CheckFailed,
+            Message = message
+        };
     }
 }
