@@ -2173,3 +2173,71 @@ Each readiness result shall include, at minimum:
 - [ ] capability-local workspace seam expectations are explicit and traceable
 - [ ] AL shell/view behavior preservation requirements are explicit and traceable
 - [ ] extraction is explicitly constrained from becoming silent workflow redesign
+
+---
+
+# AC-023 - WinUI View Interaction Contract (AM2)
+
+**Related FRs:** FR-116, FR-117, FR-118, FR-113, FR-114, FR-115
+
+## Scenarios
+
+### 1) Bindings and commands are the default interaction model
+**Given**
+- A migrated WinUI capability surface presents state and routine actions
+
+**When**
+- The interaction contract is implemented or refactored
+
+**Then**
+- bindings and commands are the default mechanism for presenting capability-local state and routine actions
+- routine UI state updates do not depend on broad shell-level direct control mutation
+- capability-local workspace owners can drive UI state without `MainWindow` acting as the normal control-updater
+
+### 2) Limited view-local events remain allowed when truly local
+**Given**
+- A view contains interactions that are genuinely local to the view surface
+
+**When**
+- The interaction seam is defined
+
+**Then**
+- a small explicit code-behind event surface may remain
+- those events stay narrow and view-local
+- those events do not re-centralize capability workflow orchestration in `MainWindow`
+- the contract remains pragmatic rather than enforcing framework purity for its own sake
+
+### 3) Views do not remain broad typed control bags
+**Given**
+- A migrated view is hosted by the shell
+
+**When**
+- The view interaction boundary is evaluated
+
+**Then**
+- the view does not continue to expose dozens of raw controls for routine capability updates
+- any exposed interaction seam remains narrow and intentional
+- child-control exposure reduces over time as capability-local extraction proceeds
+
+### 4) Interaction refactors preserve current capability behavior
+**Given**
+- Capability-local interaction ownership is being moved away from shell-level control orchestration
+
+**When**
+- bindings, commands, narrow view events, or capability-local workspace owners are introduced
+
+**Then**
+- current user-visible capability behavior remains preserved
+- extraction does not silently redesign workflow semantics
+- the chosen interaction pattern may be viewmodel-, controller-, presenter-, or mixed-based as long as the shell/view coupling is reduced and capability behavior remains intact
+
+## Expected Interaction Boundary
+- bindings and commands are the first-choice interaction model
+- limited view-local events are allowed where they are the simpler and more defensible choice
+- `MainWindow` should stop acting as a broad child-control mutation layer for routine capability updates
+
+## Definition of Done
+- [ ] bindings/commands-first rule is explicit and traceable
+- [ ] limited view-local event allowance is explicit and constrained
+- [ ] typed-control-bag pattern is explicitly rejected
+- [ ] pragmatic, non-dogmatic extraction rule is explicit and traceable

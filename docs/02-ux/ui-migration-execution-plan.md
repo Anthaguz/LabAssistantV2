@@ -380,6 +380,11 @@ Gate expectations:
 - performance tuning as a substitute for boundary cleanup
 - post-AL polish backlog unrelated to shell/workspace extraction
 
+**AM interaction rule**
+- bindings and commands are the default interaction model
+- limited view-local events remain acceptable when they are narrow, explicit, and do not re-centralize orchestration in `MainWindow`
+- broad typed control-bag view patterns should reduce over the AM extraction sequence
+
 ## 6.5 Settings + Diagnostics (fifth migration implementation target)
 
 **Goal**
