@@ -24,7 +24,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private bool _isMachineActionRunning;", source);
         Assert.DoesNotContain("private bool _isMachineEditLoading;", source);
         Assert.DoesNotContain("private bool _isMachineEditApplying;", source);
-        Assert.DoesNotContain("private DateTimeOffset _lastRdpReadinessRefreshUtc", source);
+        Assert.DoesNotContain("private DateTimeOffset _lastRdpReadinessRefreshUtc;", source);
         Assert.DoesNotContain("private async Task<bool> EnsureMachinesInventoryAsync(bool forceRefresh)", source);
         Assert.DoesNotContain("private async Task RunMachineOperationAsync(", source);
         Assert.DoesNotContain("private async Task LoadMachineEditStateAsync()", source);
@@ -53,7 +53,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_host.ShowDeleteConfirmationDialogAsync", source);
 
         Assert.Contains("await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.HandleSelectionChangedAsync(machine);", mainWindowSource);
+        Assert.Contains("_ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesListView.SelectedItem as MachineInventoryItem);", mainWindowSource);
         Assert.Contains("await _machinesWorkspaceController.StartSelectedMachineAsync();", mainWindowSource);
         Assert.Contains("await _machinesWorkspaceController.StopSelectedMachineAsync();", mainWindowSource);
         Assert.Contains("await _machinesWorkspaceController.RestartSelectedMachineAsync();", mainWindowSource);
