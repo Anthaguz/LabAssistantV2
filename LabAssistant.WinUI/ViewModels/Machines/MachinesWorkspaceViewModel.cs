@@ -21,6 +21,8 @@ public sealed class MachinesWorkspaceViewModel
 
     public bool IsMachineActionRunning { get; set; }
 
+    public bool IsInventoryRefreshing { get; set; }
+
     public bool IsRdpReadinessRefreshRunning { get; set; }
 
     public bool IsMachineEditLoading { get; set; }
@@ -58,6 +60,9 @@ public sealed class MachinesWorkspaceViewModel
         SelectedMachine = null;
         RdpReadinessByVmKey.Clear();
         SelectedRdpReadiness = CreateUnknownReadiness("Select a VM to check RDP readiness.");
+        AvailableSwitches = Array.Empty<string>();
+        StatusText = "No Hyper-V VMs found on this host.";
+        DiscardEditDraft();
     }
 
     private static MachineRdpReadinessResult CreateUnknownReadiness(string message)
