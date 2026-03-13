@@ -335,8 +335,7 @@ public sealed partial class MainWindow : Window
             new MachinesWorkspaceShellBridge(
                 () => IsMachinesOverviewActive,
                 UpdateReadinessPollingState,
-                ShowDeleteScopeDialogAsync,
-                ShowDeleteConfirmationDialogAsync));
+                () => RootLayout.XamlRoot));
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
@@ -5562,7 +5561,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)
+    /* private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)
     {
         var vmOnlyRadio = new RadioButton
         {
@@ -5681,6 +5680,8 @@ public sealed partial class MainWindow : Window
         var result = await dialog.ShowAsync();
         return result == ContentDialogResult.Primary;
     }
+
+    */
 
     private sealed class TemplateVhdxCatalogOption
     {

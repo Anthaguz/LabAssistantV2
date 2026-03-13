@@ -15,8 +15,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("new MachinesWorkspaceShellBridge(", source);
         Assert.Contains("() => IsMachinesOverviewActive,", source);
         Assert.Contains("UpdateReadinessPollingState,", source);
-        Assert.Contains("ShowDeleteScopeDialogAsync,", source);
-        Assert.Contains("ShowDeleteConfirmationDialogAsync));", source);
+        Assert.Contains("() => RootLayout.XamlRoot));", source);
         Assert.Contains("await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", source);
         Assert.Contains("_machinesWorkspaceComposition.ApplyShellState();", source);
         Assert.Contains("_machinesWorkspaceComposition.DiscardEditDraft();", source);
@@ -65,6 +64,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", source);
         Assert.Contains("private readonly Func<bool> _isMachinesOverviewActive;", source);
         Assert.Contains("private readonly Action _updateReadinessPollingState;", source);
+        Assert.Contains("private readonly Func<XamlRoot?> _getXamlRoot;", source);
         Assert.Contains("_controller = new MachinesWorkspaceController(machinesCapabilityService, _workspace, this);", source);
         Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", source);
         Assert.Contains("_view.SetStatusText(_workspace.StatusText);", source);
@@ -77,8 +77,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public Task RefreshRdpReadinessAsync(bool selectedOnly)", source);
         Assert.Contains("bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => _shellBridge.IsMachinesOverviewActive;", source);
         Assert.Contains("_shellBridge.UpdateReadinessPollingState();", source);
-        Assert.Contains("_shellBridge.ShowDeleteScopeDialogAsync", source);
-        Assert.Contains("_shellBridge.ShowDeleteConfirmationDialogAsync", source);
+        Assert.Contains("public async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)", source);
+        Assert.Contains("public async Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope)", source);
 
         Assert.Contains("public sealed partial class MainWindow : Window", mainWindowSource);
         Assert.DoesNotContain("IMachinesWorkspaceShellBridge", mainWindowSource);
@@ -140,14 +140,16 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;", mainWindowSource);
         Assert.Contains("private bool IsMachinesOverviewActive =>", mainWindowSource);
         Assert.Contains("new MachinesWorkspaceShellBridge(", mainWindowSource);
-        Assert.Contains("private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)", mainWindowSource);
-        Assert.Contains("private async Task<bool> ShowDeleteConfirmationDialogAsync(", mainWindowSource);
+        Assert.Contains("() => RootLayout.XamlRoot));", mainWindowSource);
+        Assert.DoesNotContain("ShowDeleteScopeDialogAsync,", mainWindowSource);
+        Assert.DoesNotContain("ShowDeleteConfirmationDialogAsync));", mainWindowSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("public bool HasInventory => _workspace.Inventory.Count > 0;", compositionSource);
         Assert.Contains("public DateTimeOffset LastRdpReadinessRefreshUtc => _workspace.LastRdpReadinessRefreshUtc;", compositionSource);
         Assert.Contains("private void UpdateMachineActionButtons()", compositionSource);
         Assert.Contains("private void UpdateMachineEditDraftFromControls()", compositionSource);
         Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", compositionSource);
+        Assert.Contains("Title = \"Delete VM\"", compositionSource);
 
         Assert.NotNull(FindByName(machinesXaml, "MachinesInventoryRegion"));
         Assert.NotNull(FindByName(machinesXaml, "MachinesDetailsRegion"));
