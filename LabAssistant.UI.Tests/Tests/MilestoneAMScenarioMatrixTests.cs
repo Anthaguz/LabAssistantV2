@@ -195,9 +195,12 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
         Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
         Assert.Contains("new AssetsWorkspaceHost(", mainWindowSource);
+        Assert.Contains("() => _isAssetsBaseDisksLoading,", mainWindowSource);
+        Assert.Contains("() => _isAssetsSwitchesLoading,", mainWindowSource);
+        Assert.Contains("() => _assetsBaseDiskRows.Count,", mainWindowSource);
+        Assert.Contains("() => _assetsSwitchRows.Count,", mainWindowSource);
         Assert.Contains("EnsureAssetsBaseDisksAsync,", mainWindowSource);
         Assert.Contains("EnsureAssetsSwitchesAsync,", mainWindowSource);
-        Assert.Contains("UpdateAssetsOverviewUi,", mainWindowSource);
         Assert.Contains("UpdateAssetsBaseDisksUi,", mainWindowSource);
         Assert.Contains("UpdateAssetsSwitchesUi),", mainWindowSource);
         Assert.Contains("new AssetsWorkspaceShellBridge(", mainWindowSource);
@@ -219,6 +222,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private bool _isUpdatingAssetsSubviewSelection;", mainWindowSource);
         Assert.DoesNotContain("private void AssetsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)", mainWindowSource);
         Assert.DoesNotContain("private void SyncAssetsSubviewSelection()", mainWindowSource);
+        Assert.DoesNotContain("private TextBlock AssetsOverviewBaseDisksSummaryTextBlock =>", mainWindowSource);
+        Assert.DoesNotContain("private TextBlock AssetsOverviewSwitchesSummaryTextBlock =>", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateAssetsOverviewUi()", mainWindowSource);
         Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", mainWindowSource);
         Assert.DoesNotContain("AssetsOverviewOpenSwitchesButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsSwitches);", mainWindowSource);
 
@@ -240,6 +246,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly IAssetsWorkspaceHost _host;", compositionSource);
         Assert.Contains("private readonly IAssetsWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingAssetsSubviewSelection;", compositionSource);
+        Assert.Contains("private void UpdateAssetsOverviewUi()", compositionSource);
         Assert.Contains("_baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDiskRows;", compositionSource);
         Assert.Contains("_switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;", compositionSource);
         Assert.Contains("_switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = attachedVmNames;", compositionSource);
@@ -248,11 +255,17 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_subviewTabView.SelectionChanged += AssetsSubviewTabView_SelectionChanged;", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("SyncAssetsSubviewSelection();", compositionSource);
+        Assert.Contains("UpdateAssetsOverviewUi();", compositionSource);
         Assert.Contains("_ = _host.EnsureAssetsBaseDisksAsync(forceRefresh: false);", compositionSource);
         Assert.Contains("_ = _host.EnsureAssetsSwitchesAsync(forceRefresh: false);", compositionSource);
-        Assert.Contains("_host.UpdateAssetsOverviewUi();", compositionSource);
         Assert.Contains("_host.UpdateAssetsBaseDisksUi();", compositionSource);
         Assert.Contains("_host.UpdateAssetsSwitchesUi();", compositionSource);
+        Assert.Contains("_overviewView.SetBaseDisksSummary(", compositionSource);
+        Assert.Contains("_overviewView.SetSwitchesSummary(", compositionSource);
+        Assert.Contains("_host.IsAssetsBaseDisksLoading", compositionSource);
+        Assert.Contains("_host.IsAssetsSwitchesLoading", compositionSource);
+        Assert.Contains("_host.AssetsBaseDiskCount", compositionSource);
+        Assert.Contains("_host.AssetsSwitchCount", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsSwitches);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsOverview);", compositionSource);
@@ -306,14 +319,22 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("Task EnsureAssetsBaseDisksAsync(bool forceRefresh);", hostInterfaceBlock);
         Assert.Contains("Task EnsureAssetsSwitchesAsync(bool forceRefresh);", hostInterfaceBlock);
-        Assert.Contains("void UpdateAssetsOverviewUi();", hostInterfaceBlock);
+        Assert.Contains("bool IsAssetsBaseDisksLoading { get; }", hostInterfaceBlock);
+        Assert.Contains("bool IsAssetsSwitchesLoading { get; }", hostInterfaceBlock);
+        Assert.Contains("int AssetsBaseDiskCount { get; }", hostInterfaceBlock);
+        Assert.Contains("int AssetsSwitchCount { get; }", hostInterfaceBlock);
+        Assert.DoesNotContain("UpdateAssetsOverviewUi", hostInterfaceBlock);
         Assert.Contains("void UpdateAssetsBaseDisksUi();", hostInterfaceBlock);
         Assert.Contains("void UpdateAssetsSwitchesUi();", hostInterfaceBlock);
 
         Assert.Contains("internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost", hostClassBlock);
+        Assert.Contains("private readonly Func<bool> _isAssetsBaseDisksLoading;", hostClassBlock);
+        Assert.Contains("private readonly Func<bool> _isAssetsSwitchesLoading;", hostClassBlock);
+        Assert.Contains("private readonly Func<int> _getAssetsBaseDiskCount;", hostClassBlock);
+        Assert.Contains("private readonly Func<int> _getAssetsSwitchCount;", hostClassBlock);
         Assert.Contains("private readonly Func<bool, Task> _ensureAssetsBaseDisksAsync;", hostClassBlock);
         Assert.Contains("private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;", hostClassBlock);
-        Assert.Contains("private readonly Action _updateAssetsOverviewUi;", hostClassBlock);
+        Assert.DoesNotContain("_updateAssetsOverviewUi", hostClassBlock);
         Assert.Contains("private readonly Action _updateAssetsBaseDisksUi;", hostClassBlock);
         Assert.Contains("private readonly Action _updateAssetsSwitchesUi;", hostClassBlock);
     }

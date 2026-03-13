@@ -16,4 +16,14 @@ public sealed partial class AssetsOverviewView : UserControl
     public TextBlock AssetsOverviewBaseDisksSummaryTextBlockControl => AssetsOverviewBaseDisksSummaryTextBlock;
 
     public TextBlock AssetsOverviewSwitchesSummaryTextBlockControl => AssetsOverviewSwitchesSummaryTextBlock;
+
+    public void SetBaseDisksSummary(string text)
+    {
+        AssetsOverviewBaseDisksSummaryTextBlock.Text = text;
+    }
+
+    public void SetSwitchesSummary(string text)
+    {
+        AssetsOverviewSwitchesSummaryTextBlock.Text = text;
+    }
 }
