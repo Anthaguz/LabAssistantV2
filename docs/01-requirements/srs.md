@@ -544,6 +544,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** no silent redesign of Machines layout model, action grouping, delete policy behavior, RDP disabled-state behavior, or edit/apply semantics is allowed under AM4; the seam definition must be narrow enough to support AM5 through AM8 without guesswork.
   - **Priority:** P1
 
+- **FR-125:** WinUI capability extraction shall converge on capability-local workspace composition so `MainWindow` remains the shell composition root while capability-specific view, state, and workflow composition no longer terminate in shell-owned host interfaces as a long-term architecture.
+  - **Acceptance details:** `MainWindow` may still instantiate and host capability workspaces, but capability-local UI coordination shall move behind capability workspace composition objects rather than scaling `MainWindow` into a permanent multi-capability host-interface implementation hub.
+  - **Priority:** P1
+
+- **FR-126:** WinUI views shall not depend on or receive `MainWindow` directly in order to access global or shell-owned behavior.
+  - **Acceptance details:** if cross-capability or shell-owned behavior is needed, it shall be exposed through a narrow shell/workspace abstraction or service seam rather than direct `MainWindow` injection into views; capability-local behavior should remain local to that capability workspace unless explicitly documented otherwise.
+  - **Priority:** P1
+
+- **FR-127:** WinUI capability workspaces shall be treated as long-lived while the app session is open, with route activation triggering refresh/reconciliation rather than full workspace recreation by default.
+  - **Acceptance details:** the current AM target preserves long-lived capability workspaces and explicit route-activation refresh rules; recreating capability workspaces on every navigation is out of scope unless later re-contracted, and any future lifetime change remains a `TBD`.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -558,6 +570,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
 - See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
+- See `docs/02-ux/winui-capability-workspace-composition-contract-am.md` for Milestone AM capability-local workspace composition refinement after the first Machines extraction slices.
 
 ---
 

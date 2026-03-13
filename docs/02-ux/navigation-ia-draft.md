@@ -440,6 +440,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: AM view interaction contract defines bindings/commands-first with limited narrow view-local events instead of broad typed control-bag patterns in `docs/02-ux/winui-view-interaction-contract-am.md`.
 - Resolved: AM UI test convergence contract preserves stable shell/capability contracts while reducing brittle source-shape coupling during extraction in `docs/02-ux/winui-ui-test-convergence-contract-am.md`.
 - Resolved: AM Machines extraction seam defines `Machines` as the first capability-specific workspace extraction target in `docs/02-ux/winui-machines-workspace-extraction-seam-am.md`.
+- Resolved: AM workspace refinement defines capability-local workspace composition, treats shell host interfaces as temporary bridges, and keeps workspaces long-lived by default in `docs/02-ux/winui-capability-workspace-composition-contract-am.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?

@@ -2377,3 +2377,71 @@ Each readiness result shall include, at minimum:
 - [ ] preserved Machines behavior constraints are explicit and traceable
 - [ ] async/non-blocking refresh/readiness preservation is explicit and traceable
 - [ ] seam guidance is narrow enough for AM5 through AM8
+
+---
+
+# AC-026 - WinUI Capability Workspace Composition Refinement (AM33)
+
+**Related FRs:** FR-125, FR-126, FR-127, FR-113, FR-114, FR-116, FR-117, FR-118, FR-122, FR-123, FR-124
+
+## Scenarios
+
+### 1) MainWindow remains shell composition root without becoming the long-term capability host hub
+**Given**
+- AM extraction has already moved Machines state and orchestration behind local seams
+
+**When**
+- the capability workspace composition contract is refined
+
+**Then**
+- `MainWindow` remains the shell composition root
+- capability-local composition is explicitly expected to converge behind capability workspace objects
+- capability-specific host interfaces implemented by `MainWindow` are treated as temporary migration bridges rather than a permanent scaling model
+
+### 2) Views do not depend on MainWindow directly
+**Given**
+- capability views may need shell-owned or cross-capability help in future slices
+
+**When**
+- the refined composition contract is applied
+
+**Then**
+- views are explicitly prohibited from depending on or receiving `MainWindow` directly
+- shell-owned behavior must be exposed through a narrow abstraction or service seam instead
+- capability-local behavior remains local to that capability workspace unless explicitly documented otherwise
+
+### 3) Capability workspaces remain long-lived by default
+**Given**
+- current WinUI capability hosts are long-lived during the app session
+
+**When**
+- workspace lifetime expectations are documented
+
+**Then**
+- capability workspaces are explicitly treated as long-lived while the app is open
+- route activation refreshes or reconciles state rather than recreating the workspace by default
+- any future shift toward per-navigation recreation remains a documented `TBD`, not an implicit refactor side effect
+
+### 4) Machines becomes the proof point for refinement before broader rollout
+**Given**
+- Machines is the first AM capability already partially extracted
+
+**When**
+- the refined contract is reviewed
+
+**Then**
+- the docs explicitly call for re-evaluating Machines against the tighter workspace composition target
+- later capability extraction slices (`Assets`, `Templates`, `Deploy`, `Diagnostics`) do not blindly repeat a shell-heavy pattern if Machines revealed a softer god-file risk
+
+## Expected Boundary
+- `MainWindow` hosts shell composition and capability workspace lifetime
+- capability workspaces own capability-local composition, state, and workflow coordination
+- direct view-to-`MainWindow` coupling is disallowed
+- long-lived workspaces with route-activation refresh remain the current target
+
+## Definition of Done
+- [ ] capability-local workspace composition target is explicit and traceable
+- [ ] temporary-host-bridge rule is explicit and traceable
+- [ ] no-direct-MainWindow-injection rule is explicit and traceable
+- [ ] long-lived-workspace lifetime rule is explicit and traceable
+- [ ] Machines re-evaluation requirement before broader rollout is explicit and traceable

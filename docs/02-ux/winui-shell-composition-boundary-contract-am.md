@@ -11,6 +11,7 @@
 **Related:**
 - `docs/01-requirements/srs.md` (`FR-113`..`FR-115`)
 - `docs/01-requirements/acceptance-criteria.md` (`AC-022`)
+- `docs/02-ux/winui-capability-workspace-composition-contract-am.md`
 - `docs/02-ux/winui-shell-view-consistency-contract-al.md`
 - `docs/02-ux/winui-shell-contract-aa.md`
 - `docs/02-ux/ui-migration-execution-plan.md`
@@ -41,6 +42,10 @@ That means:
 - capability host visibility at the shell level
 
 `MainWindow` may temporarily bridge to capability workspaces while extraction is in progress, but AM work should reduce that bridge over time.
+
+AM33 further refines this rule:
+- shell still owns workspace lifetime
+- but capability-local UI composition should converge behind capability workspace objects rather than permanently expanding shell-owned host interfaces
 
 ---
 

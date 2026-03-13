@@ -367,6 +367,12 @@ Gate expectations:
 - later AM slices: reduce raw child-control exposure and converge tests after each capability extraction
 - AM closure: matrix/manual checklist/test-plan linkage for the extraction milestone
 
+**AM refinement checkpoint after first Machines slices**
+- after Machines state/orchestration/view-exposure extraction, refine the capability workspace composition target before scaling the same pattern to other capabilities
+- shell-owned capability host interfaces are migration bridges, not the final intended architecture
+- capability workspaces remain long-lived by default, with route activation refreshing/reconciling state rather than recreating workspaces on every navigation
+- `MainWindow` must not become the long-term final destination for capability-local UI coordination just because extraction started there
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
