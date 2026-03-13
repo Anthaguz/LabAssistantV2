@@ -277,6 +277,17 @@ Consolidation rules:
   - or explicitly defer it with rationale when it does not affect the active slice.
 - Do not silently code through a `TBD` by making local assumptions.
 
+### 7.5 Git Branch and Base Sync Rules
+- Every issue must use its own dedicated branch.
+- Issue branches must be created from the current `origin/master` state, not from a potentially stale local `master`.
+- Before starting issue work, agents must fetch `origin/master` and confirm the branch base reflects the current remote baseline.
+- If the issue depends on earlier merged work, agents must verify that required docs/code are present on `origin/master` before editing.
+- Local scratch or support files are not part of issue scope unless the user explicitly asks to include them.
+- `HANDOFF.md` is local-only workflow state and must be ignored for issue branching, commits, and PR scope unless the user explicitly says otherwise.
+- Unrelated tracked or untracked worktree state must not be pulled into an issue branch or commit just because it exists locally.
+- If issue work starts on the wrong branch, agents must move the issue-specific changes onto a fresh dedicated branch from updated `origin/master` before committing or opening a PR.
+- PRs should contain only issue-scoped changes plus any unavoidable prerequisite baseline sync required to make the branch coherent against current `origin/master`.
+
 ---
 
 ## 8) PR Checklist (Dev Agent must follow)
