@@ -556,6 +556,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** the current AM target preserves long-lived capability workspaces and explicit route-activation refresh rules; recreating capability workspaces on every navigation is out of scope unless later re-contracted, and any future lifetime change remains a `TBD`.
   - **Priority:** P1
 
+- **FR-128:** WinUI `Machines` shall be reworked toward a capability-local workspace composition object so the shell no longer remains the practical final destination for Machines-specific UI composition after the initial extraction slices.
+  - **Acceptance details:** Machines follow-up cleanup must preserve the existing `MachinesWorkspaceViewModel` and `MachinesWorkspaceController` seams while introducing a capability-local composition owner that becomes the long-term home for Machines-specific view/controller/state coordination.
+  - **Priority:** P1
+
+- **FR-129:** WinUI `Machines` host-bridge responsibilities currently implemented by `MainWindow` shall be treated as transitional only and reduced behind the capability-local workspace composition boundary.
+  - **Acceptance details:** the post-AM33 Machines cleanup target must explicitly reduce `MainWindow` responsibility for Machines-specific view refresh, selection syncing, edit-control coordination, and controller-host bridging without changing approved Machines behavior.
+  - **Priority:** P1
+
+- **FR-130:** WinUI `Machines` follow-up cleanup shall preserve the current long-lived workspace/session model while moving Machines-specific route-activation refresh and UI coordination behind the Machines-local composition boundary.
+  - **Acceptance details:** the refined Machines target must keep `machines.overview` long-lived and route-activated without reverting to per-navigation recreation, and must preserve current compact/layout/action semantics while reducing shell-local Machines coordination.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -571,6 +583,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
 - See `docs/02-ux/winui-capability-workspace-composition-contract-am.md` for Milestone AM capability-local workspace composition refinement after the first Machines extraction slices.
+- See `docs/02-ux/winui-machines-composition-cleanup-target-am.md` for the post-AM33 Machines-specific cleanup target before broader capability rollout continues.
 
 ---
 

@@ -373,6 +373,11 @@ Gate expectations:
 - capability workspaces remain long-lived by default, with route activation refreshing/reconciling state rather than recreating workspaces on every navigation
 - `MainWindow` must not become the long-term final destination for capability-local UI coordination just because extraction started there
 
+**Machines follow-up checkpoint**
+- before broader capability rollout continues, define the Machines-specific cleanup target against the refined AM33 contract
+- use Machines as the proof point for reducing shell-side host bridges and remaining Machines-local UI coordination in `MainWindow`
+- only after that cleanup target is explicit should broader rollout continue into `Assets`
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
