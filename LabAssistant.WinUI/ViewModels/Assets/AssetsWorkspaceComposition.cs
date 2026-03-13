@@ -20,11 +20,17 @@ internal interface IAssetsWorkspaceShellBridge
 
 internal interface IAssetsWorkspaceHost
 {
+    bool IsAssetsBaseDisksLoading { get; }
+
+    bool IsAssetsSwitchesLoading { get; }
+
+    int AssetsBaseDiskCount { get; }
+
+    int AssetsSwitchCount { get; }
+
     Task EnsureAssetsBaseDisksAsync(bool forceRefresh);
 
     Task EnsureAssetsSwitchesAsync(bool forceRefresh);
-
-    void UpdateAssetsOverviewUi();
 
     void UpdateAssetsBaseDisksUi();
 
@@ -66,31 +72,46 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
 
 internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
 {
+    private readonly Func<bool> _isAssetsBaseDisksLoading;
+    private readonly Func<bool> _isAssetsSwitchesLoading;
+    private readonly Func<int> _getAssetsBaseDiskCount;
+    private readonly Func<int> _getAssetsSwitchCount;
     private readonly Func<bool, Task> _ensureAssetsBaseDisksAsync;
     private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;
-    private readonly Action _updateAssetsOverviewUi;
     private readonly Action _updateAssetsBaseDisksUi;
     private readonly Action _updateAssetsSwitchesUi;
 
     public AssetsWorkspaceHost(
+        Func<bool> isAssetsBaseDisksLoading,
+        Func<bool> isAssetsSwitchesLoading,
+        Func<int> getAssetsBaseDiskCount,
+        Func<int> getAssetsSwitchCount,
         Func<bool, Task> ensureAssetsBaseDisksAsync,
         Func<bool, Task> ensureAssetsSwitchesAsync,
-        Action updateAssetsOverviewUi,
         Action updateAssetsBaseDisksUi,
         Action updateAssetsSwitchesUi)
     {
+        _isAssetsBaseDisksLoading = isAssetsBaseDisksLoading;
+        _isAssetsSwitchesLoading = isAssetsSwitchesLoading;
+        _getAssetsBaseDiskCount = getAssetsBaseDiskCount;
+        _getAssetsSwitchCount = getAssetsSwitchCount;
         _ensureAssetsBaseDisksAsync = ensureAssetsBaseDisksAsync;
         _ensureAssetsSwitchesAsync = ensureAssetsSwitchesAsync;
-        _updateAssetsOverviewUi = updateAssetsOverviewUi;
         _updateAssetsBaseDisksUi = updateAssetsBaseDisksUi;
         _updateAssetsSwitchesUi = updateAssetsSwitchesUi;
     }
 
+    public bool IsAssetsBaseDisksLoading => _isAssetsBaseDisksLoading();
+
+    public bool IsAssetsSwitchesLoading => _isAssetsSwitchesLoading();
+
+    public int AssetsBaseDiskCount => _getAssetsBaseDiskCount();
+
+    public int AssetsSwitchCount => _getAssetsSwitchCount();
+
     public Task EnsureAssetsBaseDisksAsync(bool forceRefresh) => _ensureAssetsBaseDisksAsync(forceRefresh);
 
     public Task EnsureAssetsSwitchesAsync(bool forceRefresh) => _ensureAssetsSwitchesAsync(forceRefresh);
-
-    public void UpdateAssetsOverviewUi() => _updateAssetsOverviewUi();
 
     public void UpdateAssetsBaseDisksUi() => _updateAssetsBaseDisksUi();
 
@@ -146,7 +167,7 @@ internal sealed class AssetsWorkspaceComposition
 
         if (_shellBridge.IsAssetsOverviewActive)
         {
-            _host.UpdateAssetsOverviewUi();
+            UpdateAssetsOverviewUi();
         }
 
         if (_shellBridge.IsAssetsBaseDisksActive)
@@ -227,5 +248,19 @@ internal sealed class AssetsWorkspaceComposition
         {
             _isUpdatingAssetsSubviewSelection = false;
         }
+    }
+
+    private void UpdateAssetsOverviewUi()
+    {
+        _overviewView.SetBaseDisksSummary(_host.IsAssetsBaseDisksLoading
+            ? "Base disk inventory is loading."
+            : _host.AssetsBaseDiskCount > 0
+                ? $"{_host.AssetsBaseDiskCount} base disks currently loaded."
+                : "Open Base Disks to inspect imported VHDX inventory.");
+        _overviewView.SetSwitchesSummary(_host.IsAssetsSwitchesLoading
+            ? "Switch inventory is loading."
+            : _host.AssetsSwitchCount > 0
+                ? $"{_host.AssetsSwitchCount} virtual switches currently loaded."
+                : "Open Switches to inspect host virtual switch inventory.");
     }
 }

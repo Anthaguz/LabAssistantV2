@@ -176,8 +176,6 @@ public sealed partial class MainWindow : Window
     private TextBlock DiagnosticsOverviewLogsSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewLogsSummaryTextBlockControl;
     private Button DiagnosticsOverviewOpenSupportExportButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenSupportExportButtonControl;
     private TextBlock DiagnosticsOverviewSupportSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewSupportSummaryTextBlockControl;
-    private TextBlock AssetsOverviewBaseDisksSummaryTextBlock => AssetsOverviewView.AssetsOverviewBaseDisksSummaryTextBlockControl;
-    private TextBlock AssetsOverviewSwitchesSummaryTextBlock => AssetsOverviewView.AssetsOverviewSwitchesSummaryTextBlockControl;
     private ListView AssetsBaseDisksListView => AssetsBaseDisksView.AssetsBaseDisksListViewControl;
     private Button AssetsBaseDisksRefreshButton => AssetsBaseDisksView.AssetsBaseDisksRefreshButtonControl;
     private Button AssetsBaseDisksImportButton => AssetsBaseDisksView.AssetsBaseDisksImportButtonControl;
@@ -347,9 +345,12 @@ public sealed partial class MainWindow : Window
             _assetsSwitchRows,
             _assetsSwitchAttachedVmNames,
             new AssetsWorkspaceHost(
+                () => _isAssetsBaseDisksLoading,
+                () => _isAssetsSwitchesLoading,
+                () => _assetsBaseDiskRows.Count,
+                () => _assetsSwitchRows.Count,
                 EnsureAssetsBaseDisksAsync,
                 EnsureAssetsSwitchesAsync,
-                UpdateAssetsOverviewUi,
                 UpdateAssetsBaseDisksUi,
                 UpdateAssetsSwitchesUi),
             new AssetsWorkspaceShellBridge(
@@ -989,20 +990,6 @@ public sealed partial class MainWindow : Window
         {
             _isUpdatingDiagnosticsSubviewSelection = false;
         }
-    }
-
-    private void UpdateAssetsOverviewUi()
-    {
-        AssetsOverviewBaseDisksSummaryTextBlock.Text = _isAssetsBaseDisksLoading
-            ? "Base disk inventory is loading."
-            : _assetsBaseDiskRows.Count > 0
-                ? $"{_assetsBaseDiskRows.Count} base disks currently loaded."
-                : "Open Base Disks to inspect imported VHDX inventory.";
-        AssetsOverviewSwitchesSummaryTextBlock.Text = _isAssetsSwitchesLoading
-            ? "Switch inventory is loading."
-            : _assetsSwitchRows.Count > 0
-                ? $"{_assetsSwitchRows.Count} virtual switches currently loaded."
-                : "Open Switches to inspect host virtual switch inventory.";
     }
 
     private void UpdateDeployOverviewUi()
