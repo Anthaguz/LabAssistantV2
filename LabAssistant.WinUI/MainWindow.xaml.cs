@@ -31,7 +31,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHost
+public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -46,8 +46,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
     private readonly IStructuredLogViewerService _structuredLogViewerService;
     private readonly IAssetsBaseDisksCapabilityService _assetsBaseDisksCapabilityService;
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
-    private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();
-    private readonly MachinesWorkspaceController _machinesWorkspaceController;
+    private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
@@ -84,7 +83,6 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
     private DeploymentReadinessReport? _deployReadinessReport;
     private DeploymentReadinessReport? _deployOnTheFlyReadinessReport;
     private VmTemplate? _selectedTemplateVmEntry;
-    private bool _isUpdatingMachineSelection;
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
@@ -331,18 +329,15 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         _structuredLogViewerService = App.Services.GetRequiredService<IStructuredLogViewerService>();
         _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
-        _machinesWorkspaceController = new MachinesWorkspaceController(_machinesCapabilityService, _machinesWorkspace, this);
+        _machinesWorkspaceComposition = new MachinesWorkspaceComposition(_machinesCapabilityService, MachinesOverviewViewHost, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
-        MachinesOverviewViewHost.SetInventorySource(_machinesWorkspace.Inventory);
-        MachinesOverviewViewHost.SetStatusText(_machinesWorkspace.StatusText);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
         AssetsBaseDisksListView.ItemsSource = _assetsBaseDiskRows;
         AssetsSwitchesListView.ItemsSource = _assetsSwitchRows;
         AssetsSwitchesAttachedVmsListView.ItemsSource = _assetsSwitchAttachedVmNames;
         TemplateLibraryListView.ItemsSource = _templateLibraryItems;
         TemplateVmListView.ItemsSource = _templateVmEntries;
-        WireMachinesHandlers();
         WireAssetsBaseDisksHandlers();
         WireAssetsSwitchesHandlers();
         WireDiagnosticsLogsHandlers();
@@ -360,7 +355,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         RootLayout.Loaded += async (_, _) =>
         {
             RootLayout.Focus(FocusState.Programmatic);
-            await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);
+            await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
             await EnsureTemplateSwitchesAsync(forceRefresh: true);
             await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: true);
             await EnsureTemplatesLibraryAsync(forceRefresh: true);
@@ -376,20 +371,6 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
         appWindow?.Resize(new Windows.Graphics.SizeInt32(width, height));
-    }
-
-    private void WireMachinesHandlers()
-    {
-        MachinesOverviewViewHost.RefreshRequested += RefreshMachinesButton_Click;
-        MachinesOverviewViewHost.SelectedMachineChanged += MachinesOverviewView_SelectedMachineChanged;
-        MachinesOverviewViewHost.MachineEditChanged += MachinesOverviewView_MachineEditChanged;
-        MachinesOverviewViewHost.ApplyMachineEditsRequested += ApplyMachineEditsButton_Click;
-        MachinesOverviewViewHost.StartMachineRequested += StartVmButton_Click;
-        MachinesOverviewViewHost.StopMachineRequested += StopVmButton_Click;
-        MachinesOverviewViewHost.RestartMachineRequested += RestartVmButton_Click;
-        MachinesOverviewViewHost.OpenConsoleRequested += OpenConsoleButton_Click;
-        MachinesOverviewViewHost.DeleteMachineRequested += DeleteVmButton_Click;
-        MachinesOverviewViewHost.OpenRdpRequested += OpenRdpButton_Click;
     }
 
     private void WireDiagnosticsLogsHandlers()
@@ -619,9 +600,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
 
         QueueNavigationSelectionUpdate();
 
-        UpdateReadinessPollingState();
-        UpdateRdpReadinessUi();
-        UpdateMachineActionButtons();
+        _machinesWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)
         {
             _ = LoadMachinesDeletionPolicyAsync();
@@ -836,7 +815,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
 
         if (changedCapability || changedSubview)
         {
-            DiscardMachineEditDraft();
+            _machinesWorkspaceComposition.DiscardEditDraft();
         }
 
         if (changedCapability)
@@ -851,7 +830,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
 
         if (IsMachinesOverviewActive)
         {
-            _ = _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: false);
+            _ = _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: false);
         }
     }
 
@@ -5327,7 +5306,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
     {
         _rdpReadinessTimer = DispatcherQueue.CreateTimer();
         _rdpReadinessTimer.Interval = TimeSpan.FromMinutes(5);
-        _rdpReadinessTimer.Tick += async (_, _) => await _machinesWorkspaceController.RefreshRdpReadinessAsync(selectedOnly: false);
+        _rdpReadinessTimer.Tick += async (_, _) => await _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);
     }
 
     private void UpdateReadinessPollingState()
@@ -5337,16 +5316,16 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
             return;
         }
 
-        if (IsMachinesOverviewActive && _machinesWorkspace.Inventory.Count > 0)
+        if (IsMachinesOverviewActive && _machinesWorkspaceComposition.HasInventory)
         {
             if (!_rdpReadinessTimer.IsRunning)
             {
                 _rdpReadinessTimer.Start();
 
                 // Run one pass when Machines becomes active, then fall back to periodic checks.
-                if (DateTimeOffset.UtcNow - _machinesWorkspace.LastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
+                if (DateTimeOffset.UtcNow - _machinesWorkspaceComposition.LastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
                 {
-                    _ = _machinesWorkspaceController.RefreshRdpReadinessAsync(selectedOnly: false);
+                    _ = _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);
                 }
             }
 
@@ -5487,52 +5466,6 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         }
     }
 
-    private void MachinesOverviewView_SelectedMachineChanged(object? sender, EventArgs e)
-    {
-        if (_isUpdatingMachineSelection)
-        {
-            return;
-        }
-
-        _ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesOverviewViewHost.SelectedMachine);
-    }
-
-    private void UpdateMachineDetails()
-    {
-        MachinesOverviewViewHost.UpdateMachineDetails(_machinesWorkspace.SelectedMachine);
-    }
-
-    private void UpdateMachineActionButtons()
-    {
-        var hasSelection = _machinesWorkspace.SelectedMachine is not null;
-        var canRunActions = hasSelection && !_machinesWorkspace.IsMachineActionRunning;
-        _machinesWorkspace.CanRunSelectedMachineActions = canRunActions;
-        _machinesWorkspace.CanOpenRdp = canRunActions && _machinesWorkspace.SelectedRdpReadiness.State == MachineRdpReadinessState.Ready;
-        _machinesWorkspace.CanApplyEdits = _machinesWorkspace.SelectedMachine is not null &&
-            !_machinesWorkspace.IsMachineActionRunning &&
-            !_machinesWorkspace.IsMachineEditLoading &&
-            !_machinesWorkspace.IsMachineEditApplying &&
-            HasMachineEditChanges();
-        _machinesWorkspace.RdpTooltipText = _machinesWorkspace.SelectedRdpReadiness.Message;
-        MachinesOverviewViewHost.UpdateActionState(
-            _machinesWorkspace.IsInventoryRefreshing,
-            canRunActions,
-            _machinesWorkspace.CanOpenRdp,
-            _machinesWorkspace.RdpTooltipText,
-            _machinesWorkspace.CanApplyEdits);
-    }
-
-    private void SetMachinesStatus(string message)
-    {
-        _machinesWorkspace.StatusText = message;
-        MachinesOverviewViewHost.SetStatusText(message);
-    }
-
-    private async void RefreshMachinesButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);
-    }
-
     private async void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
     {
         await EnsureStructuredLogsLoadedAsync(forceReload: true);
@@ -5600,218 +5533,6 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         }
     }
 
-    private async void StartVmButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.StartSelectedMachineAsync();
-    }
-
-    private async void StopVmButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.StopSelectedMachineAsync();
-    }
-
-    private async void RestartVmButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.RestartSelectedMachineAsync();
-    }
-
-    private async void OpenConsoleButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.OpenSelectedMachineConsoleAsync();
-    }
-
-    private async void OpenRdpButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.OpenSelectedMachineRdpAsync();
-    }
-
-    private async void DeleteVmButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.DeleteSelectedMachineAsync();
-    }
-
-    private void DiscardMachineEditDraft()
-    {
-        _machinesWorkspace.DiscardEditDraft();
-        UpdateMachineEditDirtyIndicator();
-    }
-
-    private void ClearMachineEditControls()
-    {
-        _machinesWorkspace.IsUpdatingMachineEditControls = true;
-        MachinesOverviewViewHost.ClearEditControls();
-        _machinesWorkspace.IsUpdatingMachineEditControls = false;
-        UpdateMachineEditDirtyIndicator();
-    }
-
-    private void ApplyMachineEditDraftToControls()
-    {
-        if (_machinesWorkspace.EditDraft is null)
-        {
-            ClearMachineEditControls();
-            return;
-        }
-
-        _machinesWorkspace.IsUpdatingMachineEditControls = true;
-        MachinesOverviewViewHost.ApplyEditDraft(_machinesWorkspace.EditDraft, _machinesWorkspace.AvailableSwitches);
-        _machinesWorkspace.IsUpdatingMachineEditControls = false;
-        UpdateMachineEditDirtyIndicator();
-    }
-
-    private void UpdateMachineEditDraftFromControls()
-    {
-        if (_machinesWorkspace.IsUpdatingMachineEditControls ||
-            _machinesWorkspace.EditDraft is null ||
-            _machinesWorkspace.LoadedEditSnapshot is null)
-        {
-            return;
-        }
-
-        var formValues = MachinesOverviewViewHost.CaptureEditFormValues();
-        if (!TryParseLong(formValues.CpuCountText, out var cpu) ||
-            !TryParseLong(formValues.StartupMemoryText, out var startupMb) ||
-            !TryParseLong(formValues.MinimumMemoryText, out var minMb) ||
-            !TryParseLong(formValues.MaximumMemoryText, out var maxMb) ||
-            !TryParseInt(formValues.MemoryBufferText, out var buffer))
-        {
-            UpdateMachineEditDirtyIndicator();
-            return;
-        }
-
-        var draft = new MachineEditDraft
-        {
-            CpuCount = (int)cpu,
-            StartupMemoryMb = startupMb,
-            DynamicMemoryEnabled = formValues.DynamicMemoryEnabled,
-            MinimumMemoryMb = minMb,
-            MaximumMemoryMb = maxMb,
-            MemoryBufferPercent = buffer,
-            NetworkAdapters = formValues.NetworkAdapters
-                .Select(adapter => new MachineNetworkAdapterConfig
-                {
-                    AdapterName = adapter.AdapterName,
-                    SwitchName = adapter.SwitchName
-                })
-                .ToList()
-        };
-
-        _machinesWorkspace.EditDraft = CreateDraft(draft, ComputeChangedFields(_machinesWorkspace.LoadedEditSnapshot, draft));
-        UpdateMachineEditDirtyIndicator();
-    }
-
-    private static MachineEditDraft CreateDraft(MachineEditSnapshot snapshot, IReadOnlyList<string> changedFields)
-    {
-        return new MachineEditDraft
-        {
-            CpuCount = snapshot.CpuCount,
-            StartupMemoryMb = snapshot.StartupMemoryMb,
-            DynamicMemoryEnabled = snapshot.DynamicMemoryEnabled,
-            MinimumMemoryMb = snapshot.MinimumMemoryMb,
-            MaximumMemoryMb = snapshot.MaximumMemoryMb,
-            MemoryBufferPercent = snapshot.MemoryBufferPercent,
-            NetworkAdapters = snapshot.NetworkAdapters
-                .Select(adapter => new MachineNetworkAdapterConfig
-                {
-                    AdapterName = adapter.AdapterName,
-                    SwitchName = adapter.SwitchName
-                })
-                .ToList(),
-            ChangedFieldKeys = changedFields
-        };
-    }
-
-    private static MachineEditDraft CreateDraft(MachineEditDraft draft, IReadOnlyList<string> changedFields)
-    {
-        return new MachineEditDraft
-        {
-            CpuCount = draft.CpuCount,
-            StartupMemoryMb = draft.StartupMemoryMb,
-            DynamicMemoryEnabled = draft.DynamicMemoryEnabled,
-            MinimumMemoryMb = draft.MinimumMemoryMb,
-            MaximumMemoryMb = draft.MaximumMemoryMb,
-            MemoryBufferPercent = draft.MemoryBufferPercent,
-            NetworkAdapters = draft.NetworkAdapters,
-            ChangedFieldKeys = changedFields
-        };
-    }
-
-    private static IReadOnlyList<string> ComputeChangedFields(MachineEditSnapshot baseline, MachineEditDraft draft)
-    {
-        var changed = new List<string>();
-        if (baseline.CpuCount != draft.CpuCount)
-        {
-            changed.Add("cpuCount");
-        }
-
-        if (baseline.StartupMemoryMb != draft.StartupMemoryMb)
-        {
-            changed.Add("startupMemoryMb");
-        }
-
-        if (baseline.DynamicMemoryEnabled != draft.DynamicMemoryEnabled)
-        {
-            changed.Add("dynamicMemoryEnabled");
-        }
-
-        if (baseline.MinimumMemoryMb != draft.MinimumMemoryMb)
-        {
-            changed.Add("minimumMemoryMb");
-        }
-
-        if (baseline.MaximumMemoryMb != draft.MaximumMemoryMb)
-        {
-            changed.Add("maximumMemoryMb");
-        }
-
-        if (baseline.MemoryBufferPercent != draft.MemoryBufferPercent)
-        {
-            changed.Add("memoryBufferPercent");
-        }
-
-        foreach (var adapter in draft.NetworkAdapters)
-        {
-            var baselineAdapter = baseline.NetworkAdapters.FirstOrDefault(a =>
-                string.Equals(a.AdapterName, adapter.AdapterName, StringComparison.OrdinalIgnoreCase));
-            if (!string.Equals(baselineAdapter?.SwitchName ?? string.Empty, adapter.SwitchName ?? string.Empty, StringComparison.OrdinalIgnoreCase))
-            {
-                changed.Add($"switch:{adapter.AdapterName}");
-            }
-        }
-
-        return changed;
-    }
-
-    private bool HasMachineEditChanges()
-    {
-        return _machinesWorkspace.HasEditChanges;
-    }
-
-    private void UpdateMachineEditDirtyIndicator()
-    {
-        MachinesOverviewViewHost.SetEditDirtyIndicator(HasMachineEditChanges());
-        UpdateMachineActionButtons();
-    }
-
-    private async void ApplyMachineEditsButton_Click(object? sender, EventArgs e)
-    {
-        await _machinesWorkspaceController.ApplySelectedMachineEditsAsync();
-    }
-
-    private void MachinesOverviewView_MachineEditChanged(object? sender, EventArgs e)
-    {
-        UpdateMachineEditDraftFromControls();
-    }
-
-    private static bool TryParseLong(string? text, out long value)
-    {
-        return long.TryParse(text, out value);
-    }
-
-    private static bool TryParseInt(string? text, out int value)
-    {
-        return int.TryParse(text, out value);
-    }
-
     private async Task LoadMachinesDeletionPolicyAsync()
     {
         if (!IsSettingsMachinesActive || _isSavingDeletionPolicy)
@@ -5834,48 +5555,14 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         }
     }
 
-    private void UpdateRdpReadinessUi()
-    {
-        MachinesOverviewViewHost.UpdateRdpReadiness(_machinesWorkspace.SelectedRdpReadiness);
-    }
+    bool IMachinesWorkspaceShellBridge.IsMachinesOverviewActive => IsMachinesOverviewActive;
 
-    bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => IsMachinesOverviewActive;
+    void IMachinesWorkspaceShellBridge.UpdateReadinessPollingState() => UpdateReadinessPollingState();
 
-    void IMachinesWorkspaceControllerHost.SetMachinesStatus(string message) => SetMachinesStatus(message);
-
-    void IMachinesWorkspaceControllerHost.SetSelectedMachineInView(MachineInventoryItem? selectedMachine)
-    {
-        _isUpdatingMachineSelection = true;
-        try
-        {
-            MachinesOverviewViewHost.SetSelectedMachine(selectedMachine);
-        }
-        finally
-        {
-            _isUpdatingMachineSelection = false;
-        }
-    }
-
-    void IMachinesWorkspaceControllerHost.UpdateMachineDetails() => UpdateMachineDetails();
-
-    void IMachinesWorkspaceControllerHost.UpdateRdpReadinessUi() => UpdateRdpReadinessUi();
-
-    void IMachinesWorkspaceControllerHost.UpdateMachineActionButtons()
-    {
-        UpdateReadinessPollingState();
-        UpdateMachineActionButtons();
-    }
-
-    void IMachinesWorkspaceControllerHost.ClearMachineEditControls() => ClearMachineEditControls();
-
-    void IMachinesWorkspaceControllerHost.ApplyMachineEditDraftToControls() => ApplyMachineEditDraftToControls();
-
-    void IMachinesWorkspaceControllerHost.UpdateMachineEditDirtyIndicator() => UpdateMachineEditDirtyIndicator();
-
-    Task<MachineDeleteScope?> IMachinesWorkspaceControllerHost.ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview) =>
+    Task<MachineDeleteScope?> IMachinesWorkspaceShellBridge.ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview) =>
         ShowDeleteScopeDialogAsync(vm, preview);
 
-    Task<bool> IMachinesWorkspaceControllerHost.ShowDeleteConfirmationDialogAsync(
+    Task<bool> IMachinesWorkspaceShellBridge.ShowDeleteConfirmationDialogAsync(
         MachineInventoryItem vm,
         MachineDeletePreview preview,
         MachineDeleteScope effectiveScope) =>

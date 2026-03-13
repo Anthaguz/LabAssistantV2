@@ -6,19 +6,26 @@ namespace LabAssistant.UI.Tests.Tests;
 public sealed class MilestoneAMScenarioMatrixTests
 {
     [Fact]
-    public void MainWindow_UsesMachinesWorkspaceSeams_WithoutOwningPrimaryMachinesStateOrOrchestration()
+    public void MainWindow_UsesMachinesWorkspaceComposition_WithoutOwningPrimaryMachinesLocalWiring()
     {
         var source = LoadMainWindowSource();
 
-        Assert.Contains("private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();", source);
-        Assert.Contains("private readonly MachinesWorkspaceController _machinesWorkspaceController;", source);
-        Assert.Contains("_machinesWorkspaceController = new MachinesWorkspaceController(_machinesCapabilityService, _machinesWorkspace, this);", source);
-        Assert.Contains("MachinesOverviewViewHost.SetInventorySource(_machinesWorkspace.Inventory);", source);
-        Assert.Contains("MachinesOverviewViewHost.SetStatusText(_machinesWorkspace.StatusText);", source);
-        Assert.Contains("MachinesOverviewViewHost.RefreshRequested += RefreshMachinesButton_Click;", source);
-        Assert.Contains("MachinesOverviewViewHost.SelectedMachineChanged += MachinesOverviewView_SelectedMachineChanged;", source);
-        Assert.Contains("MachinesOverviewViewHost.MachineEditChanged += MachinesOverviewView_MachineEditChanged;", source);
+        Assert.Contains("private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;", source);
+        Assert.Contains("_machinesWorkspaceComposition = new MachinesWorkspaceComposition(_machinesCapabilityService, MachinesOverviewViewHost, this);", source);
+        Assert.Contains("await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", source);
+        Assert.Contains("_machinesWorkspaceComposition.ApplyShellState();", source);
+        Assert.Contains("_machinesWorkspaceComposition.DiscardEditDraft();", source);
+        Assert.Contains("_ = _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: false);", source);
+        Assert.Contains("await _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);", source);
 
+        Assert.DoesNotContain("private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();", source);
+        Assert.DoesNotContain("private readonly MachinesWorkspaceController _machinesWorkspaceController;", source);
+        Assert.DoesNotContain("new MachinesWorkspaceController(_machinesCapabilityService, _machinesWorkspace, this)", source);
+        Assert.DoesNotContain("MachinesOverviewViewHost.SetInventorySource(_machinesWorkspace.Inventory);", source);
+        Assert.DoesNotContain("MachinesOverviewViewHost.SetStatusText(_machinesWorkspace.StatusText);", source);
+        Assert.DoesNotContain("MachinesOverviewViewHost.RefreshRequested +=", source);
+        Assert.DoesNotContain("MachinesOverviewViewHost.SelectedMachineChanged +=", source);
+        Assert.DoesNotContain("MachinesOverviewViewHost.MachineEditChanged +=", source);
         Assert.DoesNotContain("private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];", source);
         Assert.DoesNotContain("private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey", source);
         Assert.DoesNotContain("private MachineInventoryItem? _selectedMachine;", source);
@@ -39,10 +46,38 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void MachinesWorkspaceComposition_OwnsMachinesViewControllerAndViewModelComposition()
+    {
+        var source = LoadMachinesWorkspaceCompositionSource();
+        var mainWindowSource = LoadMainWindowSource();
+
+        Assert.Contains("internal sealed class MachinesWorkspaceComposition : IMachinesWorkspaceControllerHost", source);
+        Assert.Contains("private readonly MachinesOverviewView _view;", source);
+        Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace = new();", source);
+        Assert.Contains("private readonly MachinesWorkspaceController _controller;", source);
+        Assert.Contains("private readonly IMachinesWorkspaceShellBridge _shellBridge;", source);
+        Assert.Contains("_controller = new MachinesWorkspaceController(machinesCapabilityService, _workspace, this);", source);
+        Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", source);
+        Assert.Contains("_view.SetStatusText(_workspace.StatusText);", source);
+        Assert.Contains("_view.RefreshRequested += RefreshRequested;", source);
+        Assert.Contains("_view.SelectedMachineChanged += SelectedMachineChanged;", source);
+        Assert.Contains("_view.MachineEditChanged += MachineEditChanged;", source);
+        Assert.Contains("public void ApplyShellState()", source);
+        Assert.Contains("public void DiscardEditDraft()", source);
+        Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh)", source);
+        Assert.Contains("public Task RefreshRdpReadinessAsync(bool selectedOnly)", source);
+        Assert.Contains("bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => _shellBridge.IsMachinesOverviewActive;", source);
+        Assert.Contains("_shellBridge.UpdateReadinessPollingState();", source);
+        Assert.Contains("_shellBridge.ShowDeleteScopeDialogAsync", source);
+        Assert.Contains("_shellBridge.ShowDeleteConfirmationDialogAsync", source);
+
+        Assert.Contains("public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge", mainWindowSource);
+    }
+
+    [Fact]
     public void MachinesWorkspaceController_OwnsMachinesActionAndReadinessOrchestration()
     {
         var source = LoadMachinesWorkspaceControllerSource();
-        var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("internal sealed class MachinesWorkspaceController", source);
         Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace;", source);
@@ -58,17 +93,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public async Task RefreshRdpReadinessAsync(bool selectedOnly)", source);
         Assert.Contains("_host.ShowDeleteScopeDialogAsync", source);
         Assert.Contains("_host.ShowDeleteConfirmationDialogAsync", source);
-
-        Assert.Contains("await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
-        Assert.Contains("_ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesOverviewViewHost.SelectedMachine);", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.StartSelectedMachineAsync();", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.StopSelectedMachineAsync();", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.RestartSelectedMachineAsync();", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.OpenSelectedMachineConsoleAsync();", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.OpenSelectedMachineRdpAsync();", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.DeleteSelectedMachineAsync();", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.ApplySelectedMachineEditsAsync();", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceController.RefreshRdpReadinessAsync(selectedOnly: false);", mainWindowSource);
     }
 
     [Fact]
@@ -99,12 +123,19 @@ public sealed class MilestoneAMScenarioMatrixTests
     public void MachinesWorkspaceExtraction_PreservesShellBoundaryAndMachinesBehaviorAnchors()
     {
         var mainWindowSource = LoadMainWindowSource();
+        var compositionSource = LoadMachinesWorkspaceCompositionSource();
         var machinesXaml = LoadMachinesOverviewXaml();
         var machinesCodeBehindSource = LoadMachinesOverviewCodeBehindSource();
 
         Assert.Contains("private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;", mainWindowSource);
         Assert.Contains("private bool IsMachinesOverviewActive =>", mainWindowSource);
-        Assert.Contains("bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => IsMachinesOverviewActive;", mainWindowSource);
+        Assert.Contains("bool IMachinesWorkspaceShellBridge.IsMachinesOverviewActive => IsMachinesOverviewActive;", mainWindowSource);
+        Assert.Contains("void IMachinesWorkspaceShellBridge.UpdateReadinessPollingState() => UpdateReadinessPollingState();", mainWindowSource);
+        Assert.Contains("public void ApplyShellState()", compositionSource);
+        Assert.Contains("public bool HasInventory => _workspace.Inventory.Count > 0;", compositionSource);
+        Assert.Contains("public DateTimeOffset LastRdpReadinessRefreshUtc => _workspace.LastRdpReadinessRefreshUtc;", compositionSource);
+        Assert.Contains("private void UpdateMachineActionButtons()", compositionSource);
+        Assert.Contains("private void UpdateMachineEditDraftFromControls()", compositionSource);
 
         Assert.NotNull(FindByName(machinesXaml, "MachinesInventoryRegion"));
         Assert.NotNull(FindByName(machinesXaml, "MachinesDetailsRegion"));
@@ -138,6 +169,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadMachinesWorkspaceControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Machines", "MachinesWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadMachinesWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Machines", "MachinesWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
