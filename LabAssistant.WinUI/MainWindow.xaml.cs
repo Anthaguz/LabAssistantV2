@@ -5561,7 +5561,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /* private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)
+    /* obsolete_machines_delete_scope_dialog_signature
     {
         var vmOnlyRadio = new RadioButton
         {
@@ -5635,7 +5635,7 @@ public sealed partial class MainWindow : Window
             : MachineDeleteScope.VmRegistrationOnly;
     }
 
-    private async Task<bool> ShowDeleteConfirmationDialogAsync(
+    obsolete_machines_delete_confirmation_dialog_signature(
         MachineInventoryItem vm,
         MachineDeletePreview preview,
         MachineDeleteScope effectiveScope)
