@@ -346,17 +346,18 @@ public sealed partial class MainWindow : Window
             _assetsBaseDiskRows,
             _assetsSwitchRows,
             _assetsSwitchAttachedVmNames,
+            new AssetsWorkspaceHost(
+                EnsureAssetsBaseDisksAsync,
+                EnsureAssetsSwitchesAsync,
+                UpdateAssetsOverviewUi,
+                UpdateAssetsBaseDisksUi,
+                UpdateAssetsSwitchesUi),
             new AssetsWorkspaceShellBridge(
                 () => IsAssetsCapabilityActive,
                 () => IsAssetsOverviewActive,
                 () => IsAssetsBaseDisksActive,
                 () => IsAssetsSwitchesActive,
-                NavigateToRoute,
-                EnsureAssetsBaseDisksAsync,
-                EnsureAssetsSwitchesAsync,
-                UpdateAssetsOverviewUi,
-                UpdateAssetsBaseDisksUi,
-                UpdateAssetsSwitchesUi));
+                NavigateToRoute));
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
