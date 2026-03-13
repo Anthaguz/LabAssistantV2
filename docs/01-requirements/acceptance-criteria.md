@@ -2597,3 +2597,83 @@ Each readiness result shall include, at minimum:
 - [ ] refined capability-composition target is explicit and traceable
 - [ ] Base Disks and Switches behavior-preservation constraints are explicit and traceable
 - [ ] long-lived Assets workspace lifetime is explicit and traceable
+
+---
+
+# AC-029 - WinUI Assets Shared Composition Cleanup Target (AM10)
+
+**Related FRs:** FR-134, FR-135, FR-136, FR-131, FR-132, FR-133, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) MainWindow remains shell-only while shared Assets composition moves behind an Assets-local owner
+**Given**
+- `Assets` already has an approved extraction seam from AM9
+
+**When**
+- the shared Assets cleanup target is defined
+
+**Then**
+- `MainWindow` remains responsible only for:
+  - shell route switching
+  - shell title/description
+  - shell compact/drawer behavior
+  - shell host visibility
+  - right-panel infrastructure
+  - app-level workspace lifetime
+- shared Assets-local composition does not terminate in `MainWindow`
+- an Assets-local composition owner becomes the target home for shared Assets-local composition and wiring
+
+### 2) Shared Assets responsibilities converge behind the Assets-local composition owner
+**Given**
+- `Assets` includes `assets.overview`, `assets.base_disks`, and `assets.switches`
+
+**When**
+- the shared ownership boundary is reviewed
+
+**Then**
+- the Assets-local composition owner is explicitly responsible for:
+  - Assets-local composition and wiring
+  - shared Assets route-activation handling
+  - shared workspace lifetime participation
+  - shared local interaction boundaries across Overview, Base Disks, and Switches
+- Base Disks-specific, Switches-specific, and Overview-specific runtime extraction details remain deferred to later narrow issues
+
+### 3) Temporary shell bridges and direct MainWindow view coupling are explicitly rejected as the final target
+**Given**
+- some capability-specific host interfaces may still exist temporarily during migration
+
+**When**
+- the cleanup target is applied
+
+**Then**
+- capability-specific host interfaces implemented by `MainWindow` are explicitly treated as temporary bridges only
+- views must not depend on or receive `MainWindow` directly
+- narrow abstractions or Assets-local seams are the required alternative for shell-owned behavior
+- temporary host-bridge patterns are distinguished from unacceptable permanent shell-centric composition
+
+### 4) Assets remains long-lived with route-activation refresh and no silent behavior redesign
+**Given**
+- AM33 established long-lived capability workspaces by default
+
+**When**
+- the Assets cleanup target is defined
+
+**Then**
+- Assets remains long-lived while the app session is open
+- navigation between `assets.overview`, `assets.base_disks`, and `assets.switches` activates and reconciles shared state rather than recreating the workspace every route change
+- no new Base Disks, Switches, or Overview behavior is introduced by this cleanup target
+- runtime implementation and performance redesign remain out of scope
+
+## Expected Boundary
+- shell continues to host Assets workspace lifetime, route visibility, and shell infrastructure
+- an Assets-local composition owner becomes the target home for shared Assets-local composition across Overview, Base Disks, and Switches
+- temporary shell-host bridges are allowed only as migration scaffolding and are not the long-term architecture
+- Assets remains long-lived with route-activation refresh rather than per-navigation recreation
+
+## Definition of Done
+- [ ] shell-vs-Assets ownership is explicit and traceable
+- [ ] shared Assets-local composition-owner target is explicit and traceable
+- [ ] temporary-bridge-vs-final-target rule is explicit and traceable
+- [ ] no-direct-`MainWindow`-injection rule is explicit and traceable
+- [ ] long-lived Assets workspace and route-activation refresh rule is explicit and traceable

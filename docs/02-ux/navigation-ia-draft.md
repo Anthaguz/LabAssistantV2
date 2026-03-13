@@ -443,6 +443,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: AM workspace refinement defines capability-local workspace composition, treats shell host interfaces as temporary bridges, and keeps workspaces long-lived by default in `docs/02-ux/winui-capability-workspace-composition-contract-am.md`.
 - Resolved: Machines now has a post-AM33 cleanup target before broader rollout continues in `docs/02-ux/winui-machines-composition-cleanup-target-am.md`.
 - Resolved: Assets now has an extraction seam that starts from the refined AM33 composition target in `docs/02-ux/winui-assets-workspace-extraction-seam-am.md`.
+- Resolved: Assets now has a shared composition cleanup target that makes shell-vs-Assets ownership explicit before runtime extraction proceeds in `docs/02-ux/winui-assets-composition-cleanup-target-am.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?
