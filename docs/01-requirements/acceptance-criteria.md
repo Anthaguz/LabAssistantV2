@@ -2445,3 +2445,79 @@ Each readiness result shall include, at minimum:
 - [ ] no-direct-MainWindow-injection rule is explicit and traceable
 - [ ] long-lived-workspace lifetime rule is explicit and traceable
 - [ ] Machines re-evaluation requirement before broader rollout is explicit and traceable
+
+---
+
+# AC-027 - WinUI Machines Workspace Composition Cleanup Target (AM34)
+
+**Related FRs:** FR-128, FR-129, FR-130, FR-125, FR-126, FR-127, FR-122, FR-123, FR-124
+
+## Scenarios
+
+### 1) Machines gains a capability-local composition owner beyond the initial state/controller seams
+**Given**
+- Machines already has `MachinesWorkspaceViewModel` and `MachinesWorkspaceController`
+
+**When**
+- the post-AM33 cleanup target is defined
+
+**Then**
+- a Machines-local workspace composition owner is explicitly required as the long-term target
+- that target is defined as the home for Machines-specific view/controller/state composition
+- `MainWindow` is no longer treated as the intended long-term Machines composition hub
+
+### 2) MainWindow host-bridge responsibilities are explicitly marked for reduction
+**Given**
+- current Machines extraction still leaves capability-local host responsibilities in `MainWindow`
+
+**When**
+- the cleanup target is reviewed
+
+**Then**
+- Machines-specific host-bridge responsibilities are explicitly identified as temporary
+- follow-up issues are expected to reduce `MainWindow` responsibility for:
+  - Machines-specific view refresh
+  - selection synchronization
+  - edit-control coordination
+  - controller-host bridging
+
+### 3) Machines cleanup preserves all approved user-visible behavior
+**Given**
+- Machines is already functional under AM5-AM7
+
+**When**
+- the cleanup target is defined
+
+**Then**
+- no change is introduced to:
+  - `machines.overview` route continuity
+  - single-surface master/detail behavior
+  - list-first compact behavior
+  - draft/apply workflow
+  - separate Console and RDP actions
+  - delete safety behavior
+  - current RDP disabled-state reasoning
+
+### 4) Long-lived workspace lifetime remains the explicit target
+**Given**
+- AM33 established long-lived capability workspaces by default
+
+**When**
+- Machines-specific cleanup is defined
+
+**Then**
+- the cleanup target explicitly keeps Machines long-lived within the app session
+- route activation continues to refresh/reconcile state rather than recreating the Machines workspace per navigation
+- any future lifetime change remains a documented `TBD`
+
+## Expected Boundary
+- shell continues to host the Machines workspace lifetime and route visibility
+- a Machines-local composition owner becomes the target for Machines-specific UI composition
+- shell-local Machines bridge responsibilities reduce over the next follow-up slices
+- user-visible Machines behavior remains unchanged while ownership improves
+
+## Definition of Done
+- [ ] Machines-local composition-owner target is explicit and traceable
+- [ ] temporary shell-bridge reduction target is explicit and traceable
+- [ ] preserved user-visible Machines behavior is explicit and traceable
+- [ ] long-lived Machines workspace lifetime is explicit and traceable
