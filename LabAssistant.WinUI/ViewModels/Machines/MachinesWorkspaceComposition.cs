@@ -61,7 +61,7 @@ internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBrid
         });
         content.Children.Add(new TextBlock
         {
-            Text = $"Policy: {preview.PolicyMode} â€” {preview.PolicyMessage}",
+            Text = $"Policy: {preview.PolicyMode} - {preview.PolicyMessage}",
             TextWrapping = TextWrapping.Wrap,
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
         });
@@ -129,7 +129,7 @@ internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBrid
         });
         content.Children.Add(new TextBlock
         {
-            Text = $"Policy: {preview.PolicyMode} â€” {preview.PolicyMessage}",
+            Text = $"Policy: {preview.PolicyMode} - {preview.PolicyMessage}",
             TextWrapping = TextWrapping.Wrap,
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
         });
