@@ -132,7 +132,6 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
-    private MachinesOverviewView MachinesOverviewView => MachinesOverviewViewHost;
     private DeployOverviewView DeployOverviewView => DeployOverviewViewHost;
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
     private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
@@ -157,94 +156,6 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
     private FrameworkElement DiagnosticsLocalNavPanel => DiagnosticsLocalNavigationPanel;
     private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
-    private Button RefreshMachinesButton => MachinesOverviewView.RefreshMachinesButton;
-    private ListView MachinesListView => MachinesOverviewView.MachinesListView;
-    private TextBlock SelectedVmNameTextBlock => MachinesOverviewView.SelectedVmNameTextBlock;
-    private TextBlock SelectedVmStateTextBlock => MachinesOverviewView.SelectedVmStateTextBlock;
-    private TextBlock SelectedVmOriginTextBlock => MachinesOverviewView.SelectedVmOriginTextBlock;
-    private TextBlock SelectedVmIdTextBlock => MachinesOverviewView.SelectedVmIdTextBlock;
-    private TextBlock SelectedVmPathTextBlock => MachinesOverviewView.SelectedVmPathTextBlock;
-    private TextBox CpuCountTextBox => MachinesOverviewView.CpuCountTextBox;
-    private TextBox StartupMemoryTextBox => MachinesOverviewView.StartupMemoryTextBox;
-    private ToggleSwitch DynamicMemoryToggle => MachinesOverviewView.DynamicMemoryToggle;
-    private Grid DynamicMemoryPanel => MachinesOverviewView.DynamicMemoryPanel;
-    private TextBox MinimumMemoryTextBox => MachinesOverviewView.MinimumMemoryTextBox;
-    private TextBox MaximumMemoryTextBox => MachinesOverviewView.MaximumMemoryTextBox;
-    private TextBox MemoryBufferTextBox => MachinesOverviewView.MemoryBufferTextBox;
-    private StackPanel NetworkAdapterEditorPanel => MachinesOverviewView.NetworkAdapterEditorPanel;
-    private Button ApplyMachineEditsButton => MachinesOverviewView.ApplyMachineEditsButton;
-    private TextBlock MachineEditDirtyTextBlock => MachinesOverviewView.MachineEditDirtyTextBlock;
-    private Button StartVmButton => MachinesOverviewView.StartVmButton;
-    private Button StopVmButton => MachinesOverviewView.StopVmButton;
-    private Button RestartVmButton => MachinesOverviewView.RestartVmButton;
-    private Button OpenConsoleButton => MachinesOverviewView.OpenConsoleButton;
-    private Button DeleteVmButton => MachinesOverviewView.DeleteVmButton;
-    private Button OpenRdpButton => MachinesOverviewView.OpenRdpButton;
-    private TextBlock RdpReadinessTextBlock => MachinesOverviewView.RdpReadinessTextBlock;
-    private TextBlock MachinesStatusTextBlock => MachinesOverviewView.MachinesStatusTextBlock;
-    private ObservableCollection<MachineInventoryItem> _machineInventory => _machinesWorkspace.Inventory;
-    private Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey => _machinesWorkspace.RdpReadinessByVmKey;
-    private IReadOnlyList<string> _availableSwitches
-    {
-        get => _machinesWorkspace.AvailableSwitches;
-        set => _machinesWorkspace.AvailableSwitches = value;
-    }
-    private MachineInventoryItem? _selectedMachine
-    {
-        get => _machinesWorkspace.SelectedMachine;
-        set => _machinesWorkspace.SelectedMachine = value;
-    }
-    private MachineRdpReadinessResult _selectedRdpReadiness
-    {
-        get => _machinesWorkspace.SelectedRdpReadiness;
-        set => _machinesWorkspace.SelectedRdpReadiness = value;
-    }
-    private MachineEditSnapshot? _loadedEditSnapshot
-    {
-        get => _machinesWorkspace.LoadedEditSnapshot;
-        set => _machinesWorkspace.LoadedEditSnapshot = value;
-    }
-    private MachineEditDraft? _editDraft
-    {
-        get => _machinesWorkspace.EditDraft;
-        set => _machinesWorkspace.EditDraft = value;
-    }
-    private bool _isMachineActionRunning
-    {
-        get => _machinesWorkspace.IsMachineActionRunning;
-        set => _machinesWorkspace.IsMachineActionRunning = value;
-    }
-    private bool _isRdpReadinessRefreshRunning
-    {
-        get => _machinesWorkspace.IsRdpReadinessRefreshRunning;
-        set => _machinesWorkspace.IsRdpReadinessRefreshRunning = value;
-    }
-    private bool _isMachineEditLoading
-    {
-        get => _machinesWorkspace.IsMachineEditLoading;
-        set => _machinesWorkspace.IsMachineEditLoading = value;
-    }
-    private bool _isMachineEditApplying
-    {
-        get => _machinesWorkspace.IsMachineEditApplying;
-        set => _machinesWorkspace.IsMachineEditApplying = value;
-    }
-    private bool _isUpdatingMachineEditControls
-    {
-        get => _machinesWorkspace.IsUpdatingMachineEditControls;
-        set => _machinesWorkspace.IsUpdatingMachineEditControls = value;
-    }
-    private DateTimeOffset _lastRdpReadinessRefreshUtc
-    {
-        get => _machinesWorkspace.LastRdpReadinessRefreshUtc;
-        set => _machinesWorkspace.LastRdpReadinessRefreshUtc = value;
-    }
-    private DateTimeOffset _lastOnDemandRdpRefreshUtc
-    {
-        get => _machinesWorkspace.LastOnDemandRdpRefreshUtc;
-        set => _machinesWorkspace.LastOnDemandRdpRefreshUtc = value;
-    }
-
     private FrameworkElement DiagnosticsLogsPanel => DiagnosticsLogsViewHost;
     private TextBox LogFilterOperationIdTextBox => DiagnosticsLogsView.LogFilterOperationIdTextBox;
     private TextBox LogFilterLevelTextBox => DiagnosticsLogsView.LogFilterLevelTextBox;
@@ -423,8 +334,8 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         _machinesWorkspaceController = new MachinesWorkspaceController(_machinesCapabilityService, _machinesWorkspace, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
-        MachinesListView.ItemsSource = _machinesWorkspace.Inventory;
-        MachinesStatusTextBlock.Text = _machinesWorkspace.StatusText;
+        MachinesOverviewViewHost.SetInventorySource(_machinesWorkspace.Inventory);
+        MachinesOverviewViewHost.SetStatusText(_machinesWorkspace.StatusText);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
         AssetsBaseDisksListView.ItemsSource = _assetsBaseDiskRows;
         AssetsSwitchesListView.ItemsSource = _assetsSwitchRows;
@@ -469,21 +380,16 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
 
     private void WireMachinesHandlers()
     {
-        RefreshMachinesButton.Click += RefreshMachinesButton_Click;
-        MachinesListView.SelectionChanged += MachinesListView_SelectionChanged;
-        CpuCountTextBox.TextChanged += CpuCountTextBox_TextChanged;
-        StartupMemoryTextBox.TextChanged += StartupMemoryTextBox_TextChanged;
-        MinimumMemoryTextBox.TextChanged += MinimumMemoryTextBox_TextChanged;
-        MaximumMemoryTextBox.TextChanged += MaximumMemoryTextBox_TextChanged;
-        MemoryBufferTextBox.TextChanged += MemoryBufferTextBox_TextChanged;
-        DynamicMemoryToggle.Toggled += DynamicMemoryToggle_Toggled;
-        ApplyMachineEditsButton.Click += ApplyMachineEditsButton_Click;
-        StartVmButton.Click += StartVmButton_Click;
-        StopVmButton.Click += StopVmButton_Click;
-        RestartVmButton.Click += RestartVmButton_Click;
-        OpenConsoleButton.Click += OpenConsoleButton_Click;
-        DeleteVmButton.Click += DeleteVmButton_Click;
-        OpenRdpButton.Click += OpenRdpButton_Click;
+        MachinesOverviewViewHost.RefreshRequested += RefreshMachinesButton_Click;
+        MachinesOverviewViewHost.SelectedMachineChanged += MachinesOverviewView_SelectedMachineChanged;
+        MachinesOverviewViewHost.MachineEditChanged += MachinesOverviewView_MachineEditChanged;
+        MachinesOverviewViewHost.ApplyMachineEditsRequested += ApplyMachineEditsButton_Click;
+        MachinesOverviewViewHost.StartMachineRequested += StartVmButton_Click;
+        MachinesOverviewViewHost.StopMachineRequested += StopVmButton_Click;
+        MachinesOverviewViewHost.RestartMachineRequested += RestartVmButton_Click;
+        MachinesOverviewViewHost.OpenConsoleRequested += OpenConsoleButton_Click;
+        MachinesOverviewViewHost.DeleteMachineRequested += DeleteVmButton_Click;
+        MachinesOverviewViewHost.OpenRdpRequested += OpenRdpButton_Click;
     }
 
     private void WireDiagnosticsLogsHandlers()
@@ -5431,14 +5337,14 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
             return;
         }
 
-        if (IsMachinesOverviewActive && _machineInventory.Count > 0)
+        if (IsMachinesOverviewActive && _machinesWorkspace.Inventory.Count > 0)
         {
             if (!_rdpReadinessTimer.IsRunning)
             {
                 _rdpReadinessTimer.Start();
 
                 // Run one pass when Machines becomes active, then fall back to periodic checks.
-                if (DateTimeOffset.UtcNow - _lastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
+                if (DateTimeOffset.UtcNow - _machinesWorkspace.LastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
                 {
                     _ = _machinesWorkspaceController.RefreshRdpReadinessAsync(selectedOnly: false);
                 }
@@ -5581,66 +5487,48 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         }
     }
 
-    private void MachinesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void MachinesOverviewView_SelectedMachineChanged(object? sender, EventArgs e)
     {
         if (_isUpdatingMachineSelection)
         {
             return;
         }
 
-        _ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesListView.SelectedItem as MachineInventoryItem);
+        _ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesOverviewViewHost.SelectedMachine);
     }
 
     private void UpdateMachineDetails()
     {
-        if (_selectedMachine is null)
-        {
-            SelectedVmNameTextBlock.Text = "Name: (none)";
-            SelectedVmStateTextBlock.Text = "State: -";
-            SelectedVmOriginTextBlock.Text = "Origin: -";
-            SelectedVmIdTextBlock.Text = "VM Id: -";
-            SelectedVmPathTextBlock.Text = "Path: -";
-            ClearMachineEditControls();
-            return;
-        }
-
-        SelectedVmNameTextBlock.Text = $"Name: {_selectedMachine.VmName}";
-        SelectedVmStateTextBlock.Text = $"State: {_selectedMachine.State}";
-        SelectedVmOriginTextBlock.Text = $"Origin: {_selectedMachine.OriginLabel}";
-        SelectedVmIdTextBlock.Text = $"VM Id: {_selectedMachine.VmId}";
-        SelectedVmPathTextBlock.Text = $"Path: {(_selectedMachine.VmPath ?? "-")}";
+        MachinesOverviewViewHost.UpdateMachineDetails(_machinesWorkspace.SelectedMachine);
     }
 
     private void UpdateMachineActionButtons()
     {
-        var hasSelection = _selectedMachine is not null;
-        var canRunActions = hasSelection && !_isMachineActionRunning;
-        RefreshMachinesButton.IsEnabled = !_machinesWorkspace.IsInventoryRefreshing;
+        var hasSelection = _machinesWorkspace.SelectedMachine is not null;
+        var canRunActions = hasSelection && !_machinesWorkspace.IsMachineActionRunning;
         _machinesWorkspace.CanRunSelectedMachineActions = canRunActions;
-        _machinesWorkspace.CanOpenRdp = canRunActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
-        _machinesWorkspace.CanApplyEdits = _selectedMachine is not null &&
-            !_isMachineActionRunning &&
-            !_isMachineEditLoading &&
-            !_isMachineEditApplying &&
+        _machinesWorkspace.CanOpenRdp = canRunActions && _machinesWorkspace.SelectedRdpReadiness.State == MachineRdpReadinessState.Ready;
+        _machinesWorkspace.CanApplyEdits = _machinesWorkspace.SelectedMachine is not null &&
+            !_machinesWorkspace.IsMachineActionRunning &&
+            !_machinesWorkspace.IsMachineEditLoading &&
+            !_machinesWorkspace.IsMachineEditApplying &&
             HasMachineEditChanges();
-        _machinesWorkspace.RdpTooltipText = _selectedRdpReadiness.Message;
-        StartVmButton.IsEnabled = canRunActions;
-        StopVmButton.IsEnabled = canRunActions;
-        RestartVmButton.IsEnabled = canRunActions;
-        OpenConsoleButton.IsEnabled = canRunActions;
-        DeleteVmButton.IsEnabled = canRunActions;
-        OpenRdpButton.IsEnabled = _machinesWorkspace.CanOpenRdp;
-        ToolTipService.SetToolTip(OpenRdpButton, _machinesWorkspace.RdpTooltipText);
-        ApplyMachineEditsButton.IsEnabled = _machinesWorkspace.CanApplyEdits;
+        _machinesWorkspace.RdpTooltipText = _machinesWorkspace.SelectedRdpReadiness.Message;
+        MachinesOverviewViewHost.UpdateActionState(
+            _machinesWorkspace.IsInventoryRefreshing,
+            canRunActions,
+            _machinesWorkspace.CanOpenRdp,
+            _machinesWorkspace.RdpTooltipText,
+            _machinesWorkspace.CanApplyEdits);
     }
 
     private void SetMachinesStatus(string message)
     {
         _machinesWorkspace.StatusText = message;
-        MachinesStatusTextBlock.Text = message;
+        MachinesOverviewViewHost.SetStatusText(message);
     }
 
-    private async void RefreshMachinesButton_Click(object sender, RoutedEventArgs e)
+    private async void RefreshMachinesButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);
     }
@@ -5712,32 +5600,32 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         }
     }
 
-    private async void StartVmButton_Click(object sender, RoutedEventArgs e)
+    private async void StartVmButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.StartSelectedMachineAsync();
     }
 
-    private async void StopVmButton_Click(object sender, RoutedEventArgs e)
+    private async void StopVmButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.StopSelectedMachineAsync();
     }
 
-    private async void RestartVmButton_Click(object sender, RoutedEventArgs e)
+    private async void RestartVmButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.RestartSelectedMachineAsync();
     }
 
-    private async void OpenConsoleButton_Click(object sender, RoutedEventArgs e)
+    private async void OpenConsoleButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.OpenSelectedMachineConsoleAsync();
     }
 
-    private async void OpenRdpButton_Click(object sender, RoutedEventArgs e)
+    private async void OpenRdpButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.OpenSelectedMachineRdpAsync();
     }
 
-    private async void DeleteVmButton_Click(object sender, RoutedEventArgs e)
+    private async void DeleteVmButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.DeleteSelectedMachineAsync();
     }
@@ -5750,123 +5638,64 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
 
     private void ClearMachineEditControls()
     {
-        _isUpdatingMachineEditControls = true;
-        CpuCountTextBox.Text = string.Empty;
-        StartupMemoryTextBox.Text = string.Empty;
-        DynamicMemoryToggle.IsOn = false;
-        MinimumMemoryTextBox.Text = string.Empty;
-        MaximumMemoryTextBox.Text = string.Empty;
-        MemoryBufferTextBox.Text = string.Empty;
-        NetworkAdapterEditorPanel.Children.Clear();
-        DynamicMemoryPanel.IsHitTestVisible = false;
-        DynamicMemoryPanel.Opacity = 0.65;
-        _isUpdatingMachineEditControls = false;
+        _machinesWorkspace.IsUpdatingMachineEditControls = true;
+        MachinesOverviewViewHost.ClearEditControls();
+        _machinesWorkspace.IsUpdatingMachineEditControls = false;
         UpdateMachineEditDirtyIndicator();
     }
 
     private void ApplyMachineEditDraftToControls()
     {
-        if (_editDraft is null)
+        if (_machinesWorkspace.EditDraft is null)
         {
             ClearMachineEditControls();
             return;
         }
 
-        _isUpdatingMachineEditControls = true;
-        CpuCountTextBox.Text = _editDraft.CpuCount.ToString();
-        StartupMemoryTextBox.Text = _editDraft.StartupMemoryMb.ToString();
-        DynamicMemoryToggle.IsOn = _editDraft.DynamicMemoryEnabled;
-        MinimumMemoryTextBox.Text = _editDraft.MinimumMemoryMb.ToString();
-        MaximumMemoryTextBox.Text = _editDraft.MaximumMemoryMb.ToString();
-        MemoryBufferTextBox.Text = _editDraft.MemoryBufferPercent.ToString();
-        DynamicMemoryPanel.IsHitTestVisible = _editDraft.DynamicMemoryEnabled;
-        DynamicMemoryPanel.Opacity = _editDraft.DynamicMemoryEnabled ? 1.0 : 0.65;
-        RenderNetworkAdapterEditors();
-        _isUpdatingMachineEditControls = false;
+        _machinesWorkspace.IsUpdatingMachineEditControls = true;
+        MachinesOverviewViewHost.ApplyEditDraft(_machinesWorkspace.EditDraft, _machinesWorkspace.AvailableSwitches);
+        _machinesWorkspace.IsUpdatingMachineEditControls = false;
         UpdateMachineEditDirtyIndicator();
-    }
-
-    private void RenderNetworkAdapterEditors()
-    {
-        NetworkAdapterEditorPanel.Children.Clear();
-        if (_editDraft is null)
-        {
-            return;
-        }
-
-        foreach (var adapter in _editDraft.NetworkAdapters)
-        {
-            var row = new Grid { ColumnSpacing = 8 };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var name = new TextBlock
-            {
-                Text = adapter.AdapterName,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
-            };
-            Grid.SetColumn(name, 0);
-            row.Children.Add(name);
-
-            var combo = new ComboBox
-            {
-                Width = 200,
-                Tag = adapter.AdapterName
-            };
-            combo.Items.Add("(Disconnected)");
-            foreach (var switchName in _availableSwitches)
-            {
-                combo.Items.Add(switchName);
-            }
-
-            var selectedSwitch = string.IsNullOrWhiteSpace(adapter.SwitchName) ? "(Disconnected)" : adapter.SwitchName;
-            combo.SelectedItem = selectedSwitch;
-            combo.SelectionChanged += AdapterSwitchCombo_SelectionChanged;
-            Grid.SetColumn(combo, 1);
-            row.Children.Add(combo);
-
-            NetworkAdapterEditorPanel.Children.Add(row);
-        }
     }
 
     private void UpdateMachineEditDraftFromControls()
     {
-        if (_isUpdatingMachineEditControls || _editDraft is null || _loadedEditSnapshot is null)
+        if (_machinesWorkspace.IsUpdatingMachineEditControls ||
+            _machinesWorkspace.EditDraft is null ||
+            _machinesWorkspace.LoadedEditSnapshot is null)
         {
             return;
         }
 
-        if (!TryParseLong(CpuCountTextBox.Text, out var cpu) ||
-            !TryParseLong(StartupMemoryTextBox.Text, out var startupMb) ||
-            !TryParseLong(MinimumMemoryTextBox.Text, out var minMb) ||
-            !TryParseLong(MaximumMemoryTextBox.Text, out var maxMb) ||
-            !TryParseInt(MemoryBufferTextBox.Text, out var buffer))
+        var formValues = MachinesOverviewViewHost.CaptureEditFormValues();
+        if (!TryParseLong(formValues.CpuCountText, out var cpu) ||
+            !TryParseLong(formValues.StartupMemoryText, out var startupMb) ||
+            !TryParseLong(formValues.MinimumMemoryText, out var minMb) ||
+            !TryParseLong(formValues.MaximumMemoryText, out var maxMb) ||
+            !TryParseInt(formValues.MemoryBufferText, out var buffer))
         {
             UpdateMachineEditDirtyIndicator();
             return;
         }
 
-        var normalizedAdapters = _editDraft.NetworkAdapters
-            .Select(adapter => new MachineNetworkAdapterConfig
-            {
-                AdapterName = adapter.AdapterName,
-                SwitchName = adapter.SwitchName
-            })
-            .ToList();
-
         var draft = new MachineEditDraft
         {
             CpuCount = (int)cpu,
             StartupMemoryMb = startupMb,
-            DynamicMemoryEnabled = DynamicMemoryToggle.IsOn,
+            DynamicMemoryEnabled = formValues.DynamicMemoryEnabled,
             MinimumMemoryMb = minMb,
             MaximumMemoryMb = maxMb,
             MemoryBufferPercent = buffer,
-            NetworkAdapters = normalizedAdapters
+            NetworkAdapters = formValues.NetworkAdapters
+                .Select(adapter => new MachineNetworkAdapterConfig
+                {
+                    AdapterName = adapter.AdapterName,
+                    SwitchName = adapter.SwitchName
+                })
+                .ToList()
         };
 
-        _editDraft = CreateDraft(draft, ComputeChangedFields(_loadedEditSnapshot, draft));
+        _machinesWorkspace.EditDraft = CreateDraft(draft, ComputeChangedFields(_machinesWorkspace.LoadedEditSnapshot, draft));
         UpdateMachineEditDirtyIndicator();
     }
 
@@ -5959,64 +5788,17 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
 
     private void UpdateMachineEditDirtyIndicator()
     {
-        MachineEditDirtyTextBlock.Visibility = HasMachineEditChanges() ? Visibility.Visible : Visibility.Collapsed;
+        MachinesOverviewViewHost.SetEditDirtyIndicator(HasMachineEditChanges());
         UpdateMachineActionButtons();
     }
 
-    private async void ApplyMachineEditsButton_Click(object sender, RoutedEventArgs e)
+    private async void ApplyMachineEditsButton_Click(object? sender, EventArgs e)
     {
         await _machinesWorkspaceController.ApplySelectedMachineEditsAsync();
     }
 
-    private void CpuCountTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
-    private void StartupMemoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
-    private void MinimumMemoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
-    private void MaximumMemoryTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
-    private void MemoryBufferTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateMachineEditDraftFromControls();
-
-    private void DynamicMemoryToggle_Toggled(object sender, RoutedEventArgs e)
+    private void MachinesOverviewView_MachineEditChanged(object? sender, EventArgs e)
     {
-        DynamicMemoryPanel.IsHitTestVisible = DynamicMemoryToggle.IsOn;
-        DynamicMemoryPanel.Opacity = DynamicMemoryToggle.IsOn ? 1.0 : 0.65;
-        UpdateMachineEditDraftFromControls();
-    }
-
-    private void AdapterSwitchCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUpdatingMachineEditControls || _editDraft is null)
-        {
-            return;
-        }
-
-        if (sender is not ComboBox combo || combo.Tag is not string adapterName)
-        {
-            return;
-        }
-
-        var selectedSwitch = combo.SelectedItem?.ToString();
-        if (string.Equals(selectedSwitch, "(Disconnected)", StringComparison.Ordinal))
-        {
-            selectedSwitch = null;
-        }
-
-        var updatedAdapters = _editDraft.NetworkAdapters
-            .Select(adapter => string.Equals(adapter.AdapterName, adapterName, StringComparison.OrdinalIgnoreCase)
-                ? new MachineNetworkAdapterConfig { AdapterName = adapter.AdapterName, SwitchName = selectedSwitch }
-                : adapter)
-            .ToList();
-
-        var draft = CreateDraft(_editDraft, _editDraft.ChangedFieldKeys);
-        _editDraft = new MachineEditDraft
-        {
-            CpuCount = draft.CpuCount,
-            StartupMemoryMb = draft.StartupMemoryMb,
-            DynamicMemoryEnabled = draft.DynamicMemoryEnabled,
-            MinimumMemoryMb = draft.MinimumMemoryMb,
-            MaximumMemoryMb = draft.MaximumMemoryMb,
-            MemoryBufferPercent = draft.MemoryBufferPercent,
-            NetworkAdapters = updatedAdapters,
-            ChangedFieldKeys = draft.ChangedFieldKeys
-        };
         UpdateMachineEditDraftFromControls();
     }
 
@@ -6054,13 +5836,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
 
     private void UpdateRdpReadinessUi()
     {
-        if (_selectedRdpReadiness.State == MachineRdpReadinessState.Ready)
-        {
-            RdpReadinessTextBlock.Text = _selectedRdpReadiness.Message;
-            return;
-        }
-
-        RdpReadinessTextBlock.Text = $"{_selectedRdpReadiness.Message} ({_selectedRdpReadiness.ReasonCode})";
+        MachinesOverviewViewHost.UpdateRdpReadiness(_machinesWorkspace.SelectedRdpReadiness);
     }
 
     bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => IsMachinesOverviewActive;
@@ -6072,7 +5848,7 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceControllerHos
         _isUpdatingMachineSelection = true;
         try
         {
-            MachinesListView.SelectedItem = selectedMachine;
+            MachinesOverviewViewHost.SetSelectedMachine(selectedMachine);
         }
         finally
         {

@@ -13,8 +13,11 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();", source);
         Assert.Contains("private readonly MachinesWorkspaceController _machinesWorkspaceController;", source);
         Assert.Contains("_machinesWorkspaceController = new MachinesWorkspaceController(_machinesCapabilityService, _machinesWorkspace, this);", source);
-        Assert.Contains("MachinesListView.ItemsSource = _machinesWorkspace.Inventory;", source);
-        Assert.Contains("MachinesStatusTextBlock.Text = _machinesWorkspace.StatusText;", source);
+        Assert.Contains("MachinesOverviewViewHost.SetInventorySource(_machinesWorkspace.Inventory);", source);
+        Assert.Contains("MachinesOverviewViewHost.SetStatusText(_machinesWorkspace.StatusText);", source);
+        Assert.Contains("MachinesOverviewViewHost.RefreshRequested += RefreshMachinesButton_Click;", source);
+        Assert.Contains("MachinesOverviewViewHost.SelectedMachineChanged += MachinesOverviewView_SelectedMachineChanged;", source);
+        Assert.Contains("MachinesOverviewViewHost.MachineEditChanged += MachinesOverviewView_MachineEditChanged;", source);
 
         Assert.DoesNotContain("private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];", source);
         Assert.DoesNotContain("private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey", source);
@@ -29,6 +32,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private async Task RunMachineOperationAsync(", source);
         Assert.DoesNotContain("private async Task LoadMachineEditStateAsync()", source);
         Assert.DoesNotContain("private async Task RefreshRdpReadinessAsync(bool selectedOnly)", source);
+        Assert.DoesNotContain("private Button RefreshMachinesButton =>", source);
+        Assert.DoesNotContain("private ListView MachinesListView =>", source);
+        Assert.DoesNotContain("private TextBox CpuCountTextBox =>", source);
+        Assert.DoesNotContain("private Button OpenRdpButton =>", source);
     }
 
     [Fact]
@@ -53,7 +60,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_host.ShowDeleteConfirmationDialogAsync", source);
 
         Assert.Contains("await _machinesWorkspaceController.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
-        Assert.Contains("_ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesListView.SelectedItem as MachineInventoryItem);", mainWindowSource);
+        Assert.Contains("_ = _machinesWorkspaceController.HandleSelectionChangedAsync(MachinesOverviewViewHost.SelectedMachine);", mainWindowSource);
         Assert.Contains("await _machinesWorkspaceController.StartSelectedMachineAsync();", mainWindowSource);
         Assert.Contains("await _machinesWorkspaceController.StopSelectedMachineAsync();", mainWindowSource);
         Assert.Contains("await _machinesWorkspaceController.RestartSelectedMachineAsync();", mainWindowSource);
@@ -107,7 +114,13 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.NotNull(FindByName(machinesXaml, "DeleteVmButton"));
 
         Assert.Contains("CompactLayoutThreshold = 1024", machinesCodeBehindSource);
+        Assert.Contains("public event EventHandler? RefreshRequested;", machinesCodeBehindSource);
+        Assert.Contains("public event EventHandler? SelectedMachineChanged;", machinesCodeBehindSource);
+        Assert.Contains("public event EventHandler? MachineEditChanged;", machinesCodeBehindSource);
+        Assert.Contains("public void UpdateActionState(", machinesCodeBehindSource);
+        Assert.Contains("public MachineEditFormValues CaptureEditFormValues()", machinesCodeBehindSource);
         Assert.Contains("UpdateLayoutMode(", machinesCodeBehindSource);
+        Assert.DoesNotContain("x:FieldModifier=\"public\"", machinesXaml.ToString());
     }
 
     private static string LoadMainWindowSource()
