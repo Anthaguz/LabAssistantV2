@@ -6,150 +6,157 @@ namespace LabAssistant.UI.Tests.Tests;
 public sealed class MilestoneAMScenarioMatrixTests
 {
     [Fact]
-    public void MainWindow_UsesMachinesWorkspaceComposition_WithoutOwningPrimaryMachinesLocalWiring()
+    public void MainWindow_PreservesShellBoundary_WhileHostingLongLivedMachinesWorkspace()
     {
-        var source = LoadMainWindowSource();
-
-        Assert.Contains("private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;", source);
-        Assert.Contains("_machinesWorkspaceComposition = new MachinesWorkspaceComposition(", source);
-        Assert.Contains("new MachinesWorkspaceShellBridge(", source);
-        Assert.Contains("() => IsMachinesOverviewActive,", source);
-        Assert.Contains("UpdateReadinessPollingState,", source);
-        Assert.Contains("() => RootLayout.XamlRoot));", source);
-        Assert.Contains("await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", source);
-        Assert.Contains("_machinesWorkspaceComposition.ApplyShellState();", source);
-        Assert.Contains("_machinesWorkspaceComposition.DiscardEditDraft();", source);
-        Assert.Contains("_ = _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: false);", source);
-        Assert.Contains("await _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);", source);
-        Assert.DoesNotContain("public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge", source);
-
-        Assert.DoesNotContain("private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();", source);
-        Assert.DoesNotContain("private readonly MachinesWorkspaceController _machinesWorkspaceController;", source);
-        Assert.DoesNotContain("new MachinesWorkspaceController(_machinesCapabilityService, _machinesWorkspace, this)", source);
-        Assert.DoesNotContain("MachinesOverviewViewHost.SetInventorySource(_machinesWorkspace.Inventory);", source);
-        Assert.DoesNotContain("MachinesOverviewViewHost.SetStatusText(_machinesWorkspace.StatusText);", source);
-        Assert.DoesNotContain("MachinesOverviewViewHost.RefreshRequested +=", source);
-        Assert.DoesNotContain("MachinesOverviewViewHost.SelectedMachineChanged +=", source);
-        Assert.DoesNotContain("MachinesOverviewViewHost.MachineEditChanged +=", source);
-        Assert.DoesNotContain("private readonly ObservableCollection<MachineInventoryItem> _machineInventory = [];", source);
-        Assert.DoesNotContain("private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey", source);
-        Assert.DoesNotContain("private MachineInventoryItem? _selectedMachine;", source);
-        Assert.DoesNotContain("private MachineEditSnapshot? _loadedEditSnapshot;", source);
-        Assert.DoesNotContain("private MachineEditDraft? _editDraft;", source);
-        Assert.DoesNotContain("private bool _isMachineActionRunning;", source);
-        Assert.DoesNotContain("private bool _isMachineEditLoading;", source);
-        Assert.DoesNotContain("private bool _isMachineEditApplying;", source);
-        Assert.DoesNotContain("private DateTimeOffset _lastRdpReadinessRefreshUtc;", source);
-        Assert.DoesNotContain("private async Task<bool> EnsureMachinesInventoryAsync(bool forceRefresh)", source);
-        Assert.DoesNotContain("private async Task RunMachineOperationAsync(", source);
-        Assert.DoesNotContain("private async Task LoadMachineEditStateAsync()", source);
-        Assert.DoesNotContain("private async Task RefreshRdpReadinessAsync(bool selectedOnly)", source);
-        Assert.DoesNotContain("private Button RefreshMachinesButton =>", source);
-        Assert.DoesNotContain("private ListView MachinesListView =>", source);
-        Assert.DoesNotContain("private TextBox CpuCountTextBox =>", source);
-        Assert.DoesNotContain("private Button OpenRdpButton =>", source);
-    }
-
-    [Fact]
-    public void MachinesWorkspaceComposition_OwnsMachinesViewControllerAndViewModelComposition()
-    {
-        var source = LoadMachinesWorkspaceCompositionSource();
         var mainWindowSource = LoadMainWindowSource();
-
-        Assert.Contains("internal sealed class MachinesWorkspaceComposition : IMachinesWorkspaceControllerHost", source);
-        Assert.Contains("private readonly MachinesOverviewView _view;", source);
-        Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace = new();", source);
-        Assert.Contains("private readonly MachinesWorkspaceController _controller;", source);
-        Assert.Contains("private readonly IMachinesWorkspaceShellBridge _shellBridge;", source);
-        Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", source);
-        Assert.Contains("private readonly Func<bool> _isMachinesOverviewActive;", source);
-        Assert.Contains("private readonly Action _updateReadinessPollingState;", source);
-        Assert.Contains("private readonly Func<XamlRoot?> _getXamlRoot;", source);
-        Assert.Contains("_controller = new MachinesWorkspaceController(machinesCapabilityService, _workspace, this);", source);
-        Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", source);
-        Assert.Contains("_view.SetStatusText(_workspace.StatusText);", source);
-        Assert.Contains("_view.RefreshRequested += RefreshRequested;", source);
-        Assert.Contains("_view.SelectedMachineChanged += SelectedMachineChanged;", source);
-        Assert.Contains("_view.MachineEditChanged += MachineEditChanged;", source);
-        Assert.Contains("public void ApplyShellState()", source);
-        Assert.Contains("public void DiscardEditDraft()", source);
-        Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh)", source);
-        Assert.Contains("public Task RefreshRdpReadinessAsync(bool selectedOnly)", source);
-        Assert.Contains("bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => _shellBridge.IsMachinesOverviewActive;", source);
-        Assert.Contains("_shellBridge.UpdateReadinessPollingState();", source);
-        Assert.Contains("public async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)", source);
-        Assert.Contains("public async Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope)", source);
+        var shellViewModelSource = LoadShellViewModelSource();
 
         Assert.Contains("public sealed partial class MainWindow : Window", mainWindowSource);
-        Assert.DoesNotContain("IMachinesWorkspaceShellBridge", mainWindowSource);
+        Assert.Contains("private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_machinesWorkspaceComposition = new MachinesWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("new MachinesWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("() => IsMachinesOverviewActive,", mainWindowSource);
+        Assert.Contains("UpdateReadinessPollingState,", mainWindowSource);
+        Assert.Contains("() => RootLayout.XamlRoot));", mainWindowSource);
+        Assert.Contains("await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
+        Assert.Contains("_ = _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: false);", mainWindowSource);
+        Assert.Contains("await _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);", mainWindowSource);
+        Assert.Contains("_machinesWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("_machinesWorkspaceComposition.DiscardEditDraft();", mainWindowSource);
+        Assert.Contains("private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;", mainWindowSource);
+        Assert.Contains("private bool IsMachinesOverviewActive =>", mainWindowSource);
+        Assert.Contains("MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+
+        Assert.DoesNotContain("public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge", mainWindowSource);
+        Assert.DoesNotContain("private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();", mainWindowSource);
+        Assert.DoesNotContain("private readonly MachinesWorkspaceController _machinesWorkspaceController;", mainWindowSource);
+        Assert.DoesNotContain("private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(", mainWindowSource);
+        Assert.DoesNotContain("private async Task<bool> ShowDeleteConfirmationDialogAsync(", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateMachineDetails()", mainWindowSource);
+        Assert.DoesNotContain("private void ClearMachineEditControls()", mainWindowSource);
+        Assert.DoesNotContain("private void ApplyMachineEditDraftToControls()", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateMachineEditDirtyIndicator()", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateMachineEditDraftFromControls()", mainWindowSource);
+
+        Assert.Contains("public const string MachinesOverview = \"machines.overview\";", shellViewModelSource);
+        Assert.Contains("public string StartupRoute => ShellRouteKeys.MachinesOverview;", shellViewModelSource);
     }
 
     [Fact]
-    public void MachinesWorkspaceController_OwnsMachinesActionAndReadinessOrchestration()
+    public void MachinesWorkspaceComposition_IsTheEffectiveMachinesLocalCompositionOwner()
     {
-        var source = LoadMachinesWorkspaceControllerSource();
+        var compositionSource = LoadMachinesWorkspaceCompositionSource();
 
-        Assert.Contains("internal sealed class MachinesWorkspaceController", source);
-        Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace;", source);
-        Assert.Contains("public async Task<bool> EnsureInventoryAsync(bool forceRefresh)", source);
-        Assert.Contains("public async Task HandleSelectionChangedAsync(MachineInventoryItem? selectedMachine)", source);
-        Assert.Contains("public async Task StartSelectedMachineAsync()", source);
-        Assert.Contains("public async Task StopSelectedMachineAsync()", source);
-        Assert.Contains("public async Task RestartSelectedMachineAsync()", source);
-        Assert.Contains("public async Task OpenSelectedMachineConsoleAsync()", source);
-        Assert.Contains("public async Task OpenSelectedMachineRdpAsync()", source);
-        Assert.Contains("public async Task DeleteSelectedMachineAsync()", source);
-        Assert.Contains("public async Task ApplySelectedMachineEditsAsync()", source);
-        Assert.Contains("public async Task RefreshRdpReadinessAsync(bool selectedOnly)", source);
-        Assert.Contains("_host.ShowDeleteScopeDialogAsync", source);
-        Assert.Contains("_host.ShowDeleteConfirmationDialogAsync", source);
+        Assert.Contains("internal sealed class MachinesWorkspaceComposition : IMachinesWorkspaceControllerHost", compositionSource);
+        Assert.Contains("private readonly MachinesOverviewView _view;", compositionSource);
+        Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace = new();", compositionSource);
+        Assert.Contains("private readonly MachinesWorkspaceController _controller;", compositionSource);
+        Assert.Contains("private readonly IMachinesWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("_controller = new MachinesWorkspaceController(machinesCapabilityService, _workspace, this);", compositionSource);
+        Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", compositionSource);
+        Assert.Contains("_view.SetStatusText(_workspace.StatusText);", compositionSource);
+        Assert.Contains("_view.RefreshRequested += RefreshRequested;", compositionSource);
+        Assert.Contains("_view.SelectedMachineChanged += SelectedMachineChanged;", compositionSource);
+        Assert.Contains("_view.MachineEditChanged += MachineEditChanged;", compositionSource);
+        Assert.Contains("_view.ApplyMachineEditsRequested += ApplyMachineEditsRequested;", compositionSource);
+        Assert.Contains("_view.StartMachineRequested += StartMachineRequested;", compositionSource);
+        Assert.Contains("_view.StopMachineRequested += StopMachineRequested;", compositionSource);
+        Assert.Contains("_view.RestartMachineRequested += RestartMachineRequested;", compositionSource);
+        Assert.Contains("_view.OpenConsoleRequested += OpenConsoleRequested;", compositionSource);
+        Assert.Contains("_view.DeleteMachineRequested += DeleteMachineRequested;", compositionSource);
+        Assert.Contains("_view.OpenRdpRequested += OpenRdpRequested;", compositionSource);
+        Assert.Contains("public bool HasInventory => _workspace.Inventory.Count > 0;", compositionSource);
+        Assert.Contains("public DateTimeOffset LastRdpReadinessRefreshUtc => _workspace.LastRdpReadinessRefreshUtc;", compositionSource);
+        Assert.Contains("public void ApplyShellState()", compositionSource);
+        Assert.Contains("public void DiscardEditDraft()", compositionSource);
+        Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh)", compositionSource);
+        Assert.Contains("public Task RefreshRdpReadinessAsync(bool selectedOnly)", compositionSource);
+        Assert.Contains("private void UpdateMachineDetails()", compositionSource);
+        Assert.Contains("private void ClearMachineEditControls()", compositionSource);
+        Assert.Contains("private void ApplyMachineEditDraftToControls()", compositionSource);
+        Assert.Contains("private void UpdateMachineEditDraftFromControls()", compositionSource);
+        Assert.Contains("private void UpdateMachineEditDirtyIndicator()", compositionSource);
+        Assert.Contains("private void UpdateMachineActionButtons()", compositionSource);
+        Assert.Contains("bool IMachinesWorkspaceControllerHost.IsMachinesOverviewActive => _shellBridge.IsMachinesOverviewActive;", compositionSource);
     }
 
     [Fact]
-    public void MachinesWorkspaceViewModel_OwnsInventorySelectionDraftAndReadinessState()
+    public void MachinesShellBridge_RemainsNarrowAndShellOwned()
     {
-        var source = LoadMachinesWorkspaceSource();
+        var compositionSource = LoadMachinesWorkspaceCompositionSource();
+        var shellBridgeInterfaceBlock = ExtractSection(
+            compositionSource,
+            "internal interface IMachinesWorkspaceShellBridge",
+            "internal sealed class MachinesWorkspaceShellBridge");
+        var shellBridgeClassBlock = ExtractSection(
+            compositionSource,
+            "internal sealed class MachinesWorkspaceShellBridge",
+            "internal sealed class MachinesWorkspaceComposition");
 
-        Assert.Contains("public ObservableCollection<MachineInventoryItem> Inventory { get; } = [];", source);
-        Assert.Contains("public Dictionary<string, MachineRdpReadinessResult> RdpReadinessByVmKey { get; } = new(StringComparer.OrdinalIgnoreCase);", source);
-        Assert.Contains("public IReadOnlyList<string> AvailableSwitches { get; set; } = Array.Empty<string>();", source);
-        Assert.Contains("public MachineInventoryItem? SelectedMachine { get; set; }", source);
-        Assert.Contains("public MachineEditSnapshot? LoadedEditSnapshot { get; set; }", source);
-        Assert.Contains("public MachineEditDraft? EditDraft { get; set; }", source);
-        Assert.Contains("public MachineRdpReadinessResult SelectedRdpReadiness { get; set; }", source);
-        Assert.Contains("public bool IsMachineActionRunning { get; set; }", source);
-        Assert.Contains("public bool IsInventoryRefreshing { get; set; }", source);
-        Assert.Contains("public bool IsRdpReadinessRefreshRunning { get; set; }", source);
-        Assert.Contains("public string StatusText { get; set; } = \"Select a VM to run actions.\"", source);
-        Assert.Contains("public bool CanRunSelectedMachineActions { get; set; }", source);
-        Assert.Contains("public bool CanOpenRdp { get; set; }", source);
-        Assert.Contains("public bool CanApplyEdits { get; set; }", source);
-        Assert.Contains("public bool HasEditChanges =>", source);
-        Assert.Contains("public void DiscardEditDraft()", source);
-        Assert.Contains("private static MachineRdpReadinessResult CreateUnknownReadiness(string message)", source);
+        Assert.Contains("bool IsMachinesOverviewActive { get; }", shellBridgeInterfaceBlock);
+        Assert.Contains("void UpdateReadinessPollingState();", shellBridgeInterfaceBlock);
+        Assert.Contains("Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync", shellBridgeInterfaceBlock);
+        Assert.Contains("Task<bool> ShowDeleteConfirmationDialogAsync", shellBridgeInterfaceBlock);
+
+        Assert.DoesNotContain("UpdateMachineDetails", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("ClearMachineEditControls", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("ApplyMachineEditDraftToControls", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("UpdateMachineEditDirtyIndicator", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("SetSelectedMachineInView", shellBridgeInterfaceBlock);
+
+        Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", shellBridgeClassBlock);
+        Assert.Contains("private readonly Func<bool> _isMachinesOverviewActive;", shellBridgeClassBlock);
+        Assert.Contains("private readonly Action _updateReadinessPollingState;", shellBridgeClassBlock);
+        Assert.Contains("private readonly Func<XamlRoot?> _getXamlRoot;", shellBridgeClassBlock);
+        Assert.Contains("public async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)", shellBridgeClassBlock);
+        Assert.Contains("public async Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope)", shellBridgeClassBlock);
+        Assert.Contains("Title = \"Delete VM\"", shellBridgeClassBlock);
+        Assert.Contains("Text = $\"Policy: {preview.PolicyMode} - {preview.PolicyMessage}\"", shellBridgeClassBlock);
     }
 
     [Fact]
-    public void MachinesWorkspaceExtraction_PreservesShellBoundaryAndMachinesBehaviorAnchors()
+    public void MachinesControllerAndWorkspaceViewModel_PreserveWorkflowAndStateSeams()
     {
-        var mainWindowSource = LoadMainWindowSource();
+        var controllerSource = LoadMachinesWorkspaceControllerSource();
+        var workspaceSource = LoadMachinesWorkspaceSource();
+
+        Assert.Contains("internal sealed class MachinesWorkspaceController", controllerSource);
+        Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace;", controllerSource);
+        Assert.Contains("public async Task<bool> EnsureInventoryAsync(bool forceRefresh)", controllerSource);
+        Assert.Contains("public async Task HandleSelectionChangedAsync(MachineInventoryItem? selectedMachine)", controllerSource);
+        Assert.Contains("public async Task StartSelectedMachineAsync()", controllerSource);
+        Assert.Contains("public async Task StopSelectedMachineAsync()", controllerSource);
+        Assert.Contains("public async Task RestartSelectedMachineAsync()", controllerSource);
+        Assert.Contains("public async Task OpenSelectedMachineConsoleAsync()", controllerSource);
+        Assert.Contains("public async Task OpenSelectedMachineRdpAsync()", controllerSource);
+        Assert.Contains("public async Task DeleteSelectedMachineAsync()", controllerSource);
+        Assert.Contains("public async Task ApplySelectedMachineEditsAsync()", controllerSource);
+        Assert.Contains("public async Task RefreshRdpReadinessAsync(bool selectedOnly)", controllerSource);
+        Assert.Contains("_host.ShowDeleteScopeDialogAsync", controllerSource);
+        Assert.Contains("_host.ShowDeleteConfirmationDialogAsync", controllerSource);
+
+        Assert.Contains("public ObservableCollection<MachineInventoryItem> Inventory { get; } = [];", workspaceSource);
+        Assert.Contains("public Dictionary<string, MachineRdpReadinessResult> RdpReadinessByVmKey { get; } = new(StringComparer.OrdinalIgnoreCase);", workspaceSource);
+        Assert.Contains("public MachineInventoryItem? SelectedMachine { get; set; }", workspaceSource);
+        Assert.Contains("public MachineRdpReadinessResult SelectedRdpReadiness { get; set; }", workspaceSource);
+        Assert.Contains("public MachineEditSnapshot? LoadedEditSnapshot { get; set; }", workspaceSource);
+        Assert.Contains("public MachineEditDraft? EditDraft { get; set; }", workspaceSource);
+        Assert.Contains("public bool IsMachineActionRunning { get; set; }", workspaceSource);
+        Assert.Contains("public bool IsInventoryRefreshing { get; set; }", workspaceSource);
+        Assert.Contains("public bool IsRdpReadinessRefreshRunning { get; set; }", workspaceSource);
+        Assert.Contains("public bool CanRunSelectedMachineActions { get; set; }", workspaceSource);
+        Assert.Contains("public bool CanOpenRdp { get; set; }", workspaceSource);
+        Assert.Contains("public bool CanApplyEdits { get; set; }", workspaceSource);
+        Assert.Contains("public bool HasEditChanges =>", workspaceSource);
+        Assert.Contains("public void DiscardEditDraft()", workspaceSource);
+    }
+
+    [Fact]
+    public void MachinesExtraction_StillProtectsStableRouteLifetimeAndBehaviorAnchors()
+    {
         var compositionSource = LoadMachinesWorkspaceCompositionSource();
         var machinesXaml = LoadMachinesOverviewXaml();
         var machinesCodeBehindSource = LoadMachinesOverviewCodeBehindSource();
-
-        Assert.Contains("private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;", mainWindowSource);
-        Assert.Contains("private bool IsMachinesOverviewActive =>", mainWindowSource);
-        Assert.Contains("new MachinesWorkspaceShellBridge(", mainWindowSource);
-        Assert.Contains("() => RootLayout.XamlRoot));", mainWindowSource);
-        Assert.DoesNotContain("ShowDeleteScopeDialogAsync,", mainWindowSource);
-        Assert.DoesNotContain("ShowDeleteConfirmationDialogAsync));", mainWindowSource);
-        Assert.Contains("public void ApplyShellState()", compositionSource);
-        Assert.Contains("public bool HasInventory => _workspace.Inventory.Count > 0;", compositionSource);
-        Assert.Contains("public DateTimeOffset LastRdpReadinessRefreshUtc => _workspace.LastRdpReadinessRefreshUtc;", compositionSource);
-        Assert.Contains("private void UpdateMachineActionButtons()", compositionSource);
-        Assert.Contains("private void UpdateMachineEditDraftFromControls()", compositionSource);
-        Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", compositionSource);
-        Assert.Contains("Title = \"Delete VM\"", compositionSource);
 
         Assert.NotNull(FindByName(machinesXaml, "MachinesInventoryRegion"));
         Assert.NotNull(FindByName(machinesXaml, "MachinesDetailsRegion"));
@@ -162,10 +169,21 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public event EventHandler? RefreshRequested;", machinesCodeBehindSource);
         Assert.Contains("public event EventHandler? SelectedMachineChanged;", machinesCodeBehindSource);
         Assert.Contains("public event EventHandler? MachineEditChanged;", machinesCodeBehindSource);
+        Assert.Contains("public event EventHandler? ApplyMachineEditsRequested;", machinesCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenConsoleRequested;", machinesCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenRdpRequested;", machinesCodeBehindSource);
+        Assert.Contains("public event EventHandler? DeleteMachineRequested;", machinesCodeBehindSource);
         Assert.Contains("public void UpdateActionState(", machinesCodeBehindSource);
         Assert.Contains("public MachineEditFormValues CaptureEditFormValues()", machinesCodeBehindSource);
         Assert.Contains("UpdateLayoutMode(", machinesCodeBehindSource);
         Assert.DoesNotContain("x:FieldModifier=\"public\"", machinesXaml.ToString());
+
+        Assert.Contains("public bool HasInventory => _workspace.Inventory.Count > 0;", compositionSource);
+        Assert.Contains("public DateTimeOffset LastRdpReadinessRefreshUtc => _workspace.LastRdpReadinessRefreshUtc;", compositionSource);
+        Assert.Contains("UpdateReadinessPollingState()", compositionSource);
+        Assert.Contains("OpenConsoleRequested", compositionSource);
+        Assert.Contains("OpenRdpRequested", compositionSource);
+        Assert.Contains("DeleteMachineRequested", compositionSource);
     }
 
     private static string LoadMainWindowSource()
@@ -192,6 +210,12 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
+    private static string LoadShellViewModelSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "ShellViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
     private static XDocument LoadMachinesOverviewXaml()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Machines", "MachinesOverviewView.xaml");
@@ -209,5 +233,14 @@ public sealed class MilestoneAMScenarioMatrixTests
         return xaml
             .Descendants()
             .Single(element => element.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == name);
+    }
+
+    private static string ExtractSection(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        var end = source.IndexOf(endMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Start marker not found: {startMarker}");
+        Assert.True(end > start, $"End marker not found after start marker: {endMarker}");
+        return source[start..end];
     }
 }
