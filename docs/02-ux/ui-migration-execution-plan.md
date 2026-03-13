@@ -383,6 +383,11 @@ Gate expectations:
 - Assets extraction must preserve Overview-first routing plus the existing AJ/AK Base Disks and Switches behavior contracts
 - Assets extraction should treat local navigation, Overview state, Base Disks state/orchestration, and Switches state/orchestration as capability-local ownership
 
+**Assets shared cleanup target checkpoint**
+- before Assets runtime extraction proceeds, define the shared Assets composition cleanup target against the refined AM33/AM34 model
+- make shell-vs-Assets ownership explicit so shared Assets composition converges into an Assets-local composition owner rather than stopping in `MainWindow`
+- treat any `MainWindow` Assets host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`

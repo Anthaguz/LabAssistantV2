@@ -580,6 +580,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** Assets cleanup must keep long-lived workspace lifetime, route-bound local navigation, Base Disks validation/remove guardrails, Switches delete guardrails, and the approved Assets Overview-first behavior while reducing shell-local ownership over time.
   - **Priority:** P1
 
+- **FR-134:** WinUI `Assets` shared composition cleanup shall converge shared `Assets Overview`, `Base Disks`, and `Switches` composition into an Assets-local composition owner instead of leaving shared capability composition responsibilities in `MainWindow`.
+  - **Acceptance details:** `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact or drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime; the Assets-local composition owner becomes the long-term home for shared Assets-local composition and interaction boundaries.
+  - **Priority:** P1
+
+- **FR-135:** WinUI `Assets` shared composition cleanup shall treat capability-specific host interfaces implemented by `MainWindow` as temporary migration bridges only, and views shall not depend on or receive `MainWindow` directly.
+  - **Acceptance details:** shared Assets route activation handling, shared workspace lifetime participation, and shared local interaction boundaries must converge behind the Assets-local composition owner or narrow abstractions rather than direct `MainWindow` injection or permanent shell-host interface accumulation.
+  - **Priority:** P1
+
+- **FR-136:** WinUI `Assets` shared composition cleanup shall preserve the long-lived Assets workspace/session model so navigation activates and reconciles shared Assets state rather than recreating the Assets workspace on every route change.
+  - **Acceptance details:** cleanup-target definition must preserve `assets.overview`, `assets.base_disks`, and `assets.switches` route continuity and must remain explicit that Base Disks-specific extraction details, Switches-specific extraction details, Overview-specific extraction details, runtime implementation, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -597,6 +609,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-capability-workspace-composition-contract-am.md` for Milestone AM capability-local workspace composition refinement after the first Machines extraction slices.
 - See `docs/02-ux/winui-machines-composition-cleanup-target-am.md` for the post-AM33 Machines-specific cleanup target before broader capability rollout continues.
 - See `docs/02-ux/winui-assets-workspace-extraction-seam-am.md` for the AM Assets-specific extraction seam and composition target after the Machines proof point.
+- See `docs/02-ux/winui-assets-composition-cleanup-target-am.md` for the AM shared Assets composition cleanup target that narrows shell-vs-Assets ownership before Assets runtime extraction proceeds.
 
 ---
 
