@@ -14,6 +14,36 @@ internal interface IMachinesWorkspaceShellBridge
     Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope);
 }
 
+internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge
+{
+    private readonly Func<bool> _isMachinesOverviewActive;
+    private readonly Action _updateReadinessPollingState;
+    private readonly Func<MachineInventoryItem, MachineDeletePreview, Task<MachineDeleteScope?>> _showDeleteScopeDialogAsync;
+    private readonly Func<MachineInventoryItem, MachineDeletePreview, MachineDeleteScope, Task<bool>> _showDeleteConfirmationDialogAsync;
+
+    public MachinesWorkspaceShellBridge(
+        Func<bool> isMachinesOverviewActive,
+        Action updateReadinessPollingState,
+        Func<MachineInventoryItem, MachineDeletePreview, Task<MachineDeleteScope?>> showDeleteScopeDialogAsync,
+        Func<MachineInventoryItem, MachineDeletePreview, MachineDeleteScope, Task<bool>> showDeleteConfirmationDialogAsync)
+    {
+        _isMachinesOverviewActive = isMachinesOverviewActive;
+        _updateReadinessPollingState = updateReadinessPollingState;
+        _showDeleteScopeDialogAsync = showDeleteScopeDialogAsync;
+        _showDeleteConfirmationDialogAsync = showDeleteConfirmationDialogAsync;
+    }
+
+    public bool IsMachinesOverviewActive => _isMachinesOverviewActive();
+
+    public void UpdateReadinessPollingState() => _updateReadinessPollingState();
+
+    public Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview) =>
+        _showDeleteScopeDialogAsync(vm, preview);
+
+    public Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope) =>
+        _showDeleteConfirmationDialogAsync(vm, preview, effectiveScope);
+}
+
 internal sealed class MachinesWorkspaceComposition : IMachinesWorkspaceControllerHost
 {
     private readonly MachinesOverviewView _view;

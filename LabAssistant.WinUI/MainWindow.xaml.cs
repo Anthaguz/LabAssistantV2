@@ -31,7 +31,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge
+public sealed partial class MainWindow : Window
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -329,7 +329,14 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge
         _structuredLogViewerService = App.Services.GetRequiredService<IStructuredLogViewerService>();
         _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
-        _machinesWorkspaceComposition = new MachinesWorkspaceComposition(_machinesCapabilityService, MachinesOverviewViewHost, this);
+        _machinesWorkspaceComposition = new MachinesWorkspaceComposition(
+            _machinesCapabilityService,
+            MachinesOverviewViewHost,
+            new MachinesWorkspaceShellBridge(
+                () => IsMachinesOverviewActive,
+                UpdateReadinessPollingState,
+                ShowDeleteScopeDialogAsync,
+                ShowDeleteConfirmationDialogAsync));
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
@@ -5554,19 +5561,6 @@ public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge
             MachinesDeletionPolicyStatusTextBlock.Text = $"Failed to load policy. {ex.Message}";
         }
     }
-
-    bool IMachinesWorkspaceShellBridge.IsMachinesOverviewActive => IsMachinesOverviewActive;
-
-    void IMachinesWorkspaceShellBridge.UpdateReadinessPollingState() => UpdateReadinessPollingState();
-
-    Task<MachineDeleteScope?> IMachinesWorkspaceShellBridge.ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview) =>
-        ShowDeleteScopeDialogAsync(vm, preview);
-
-    Task<bool> IMachinesWorkspaceShellBridge.ShowDeleteConfirmationDialogAsync(
-        MachineInventoryItem vm,
-        MachineDeletePreview preview,
-        MachineDeleteScope effectiveScope) =>
-        ShowDeleteConfirmationDialogAsync(vm, preview, effectiveScope);
 
     private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)
     {
