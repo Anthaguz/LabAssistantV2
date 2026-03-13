@@ -11,12 +11,18 @@ public sealed class MilestoneAMScenarioMatrixTests
         var source = LoadMainWindowSource();
 
         Assert.Contains("private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;", source);
-        Assert.Contains("_machinesWorkspaceComposition = new MachinesWorkspaceComposition(_machinesCapabilityService, MachinesOverviewViewHost, this);", source);
+        Assert.Contains("_machinesWorkspaceComposition = new MachinesWorkspaceComposition(", source);
+        Assert.Contains("new MachinesWorkspaceShellBridge(", source);
+        Assert.Contains("() => IsMachinesOverviewActive,", source);
+        Assert.Contains("UpdateReadinessPollingState,", source);
+        Assert.Contains("ShowDeleteScopeDialogAsync,", source);
+        Assert.Contains("ShowDeleteConfirmationDialogAsync));", source);
         Assert.Contains("await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", source);
         Assert.Contains("_machinesWorkspaceComposition.ApplyShellState();", source);
         Assert.Contains("_machinesWorkspaceComposition.DiscardEditDraft();", source);
         Assert.Contains("_ = _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: false);", source);
         Assert.Contains("await _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);", source);
+        Assert.DoesNotContain("public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge", source);
 
         Assert.DoesNotContain("private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();", source);
         Assert.DoesNotContain("private readonly MachinesWorkspaceController _machinesWorkspaceController;", source);
@@ -56,6 +62,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace = new();", source);
         Assert.Contains("private readonly MachinesWorkspaceController _controller;", source);
         Assert.Contains("private readonly IMachinesWorkspaceShellBridge _shellBridge;", source);
+        Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", source);
+        Assert.Contains("private readonly Func<bool> _isMachinesOverviewActive;", source);
+        Assert.Contains("private readonly Action _updateReadinessPollingState;", source);
         Assert.Contains("_controller = new MachinesWorkspaceController(machinesCapabilityService, _workspace, this);", source);
         Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", source);
         Assert.Contains("_view.SetStatusText(_workspace.StatusText);", source);
@@ -71,7 +80,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_shellBridge.ShowDeleteScopeDialogAsync", source);
         Assert.Contains("_shellBridge.ShowDeleteConfirmationDialogAsync", source);
 
-        Assert.Contains("public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge", mainWindowSource);
+        Assert.Contains("public sealed partial class MainWindow : Window", mainWindowSource);
+        Assert.DoesNotContain("IMachinesWorkspaceShellBridge", mainWindowSource);
     }
 
     [Fact]
@@ -129,13 +139,15 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;", mainWindowSource);
         Assert.Contains("private bool IsMachinesOverviewActive =>", mainWindowSource);
-        Assert.Contains("bool IMachinesWorkspaceShellBridge.IsMachinesOverviewActive => IsMachinesOverviewActive;", mainWindowSource);
-        Assert.Contains("void IMachinesWorkspaceShellBridge.UpdateReadinessPollingState() => UpdateReadinessPollingState();", mainWindowSource);
+        Assert.Contains("new MachinesWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)", mainWindowSource);
+        Assert.Contains("private async Task<bool> ShowDeleteConfirmationDialogAsync(", mainWindowSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("public bool HasInventory => _workspace.Inventory.Count > 0;", compositionSource);
         Assert.Contains("public DateTimeOffset LastRdpReadinessRefreshUtc => _workspace.LastRdpReadinessRefreshUtc;", compositionSource);
         Assert.Contains("private void UpdateMachineActionButtons()", compositionSource);
         Assert.Contains("private void UpdateMachineEditDraftFromControls()", compositionSource);
+        Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", compositionSource);
 
         Assert.NotNull(FindByName(machinesXaml, "MachinesInventoryRegion"));
         Assert.NotNull(FindByName(machinesXaml, "MachinesDetailsRegion"));
