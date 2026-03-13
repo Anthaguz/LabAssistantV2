@@ -378,6 +378,11 @@ Gate expectations:
 - use Machines as the proof point for reducing shell-side host bridges and remaining Machines-local UI coordination in `MainWindow`
 - only after that cleanup target is explicit should broader rollout continue into `Assets`
 
+**Assets seam checkpoint**
+- `Assets` is the first capability after Machines that should start from the refined AM33 composition target rather than repeating the earlier shell-heavy pattern
+- Assets extraction must preserve Overview-first routing plus the existing AJ/AK Base Disks and Switches behavior contracts
+- Assets extraction should treat local navigation, Overview state, Base Disks state/orchestration, and Switches state/orchestration as capability-local ownership
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`

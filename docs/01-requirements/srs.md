@@ -568,6 +568,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** the refined Machines target must keep `machines.overview` long-lived and route-activated without reverting to per-navigation recreation, and must preserve current compact/layout/action semantics while reducing shell-local Machines coordination.
   - **Priority:** P1
 
+- **FR-131:** WinUI `Assets` shall expose an explicit workspace extraction seam so `Assets Overview`, `Base Disks`, and `Switches` state and orchestration can move out of `MainWindow` without changing approved Assets behavior.
+  - **Acceptance details:** the Assets extraction seam must preserve `Assets` as an Overview-first capability with canonical child routes `assets.overview`, `assets.base_disks`, and `assets.switches`, while keeping Base Disks and Switches semantics from AJ/AK intact.
+  - **Priority:** P1
+
+- **FR-132:** WinUI `Assets` extraction shall target capability-local workspace composition from the start, so `MainWindow` does not become the long-term composition hub for Assets local navigation, overview summaries, Base Disks, and Switches coordination.
+  - **Acceptance details:** Assets follow-up extraction must treat shell-owned host bridges as temporary only, must keep `MainWindow` limited to shell composition and workspace lifetime, and must use the AM33 composition model rather than repeating the pre-refinement Machines pattern.
+  - **Priority:** P1
+
+- **FR-133:** WinUI `Assets` extraction shall preserve the current long-lived workspace/session model with route-activation refresh and must not silently redesign Overview-first navigation, Base Disks behavior, or Switches behavior during seam definition.
+  - **Acceptance details:** Assets cleanup must keep long-lived workspace lifetime, route-bound local navigation, Base Disks validation/remove guardrails, Switches delete guardrails, and the approved Assets Overview-first behavior while reducing shell-local ownership over time.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -584,6 +596,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
 - See `docs/02-ux/winui-capability-workspace-composition-contract-am.md` for Milestone AM capability-local workspace composition refinement after the first Machines extraction slices.
 - See `docs/02-ux/winui-machines-composition-cleanup-target-am.md` for the post-AM33 Machines-specific cleanup target before broader capability rollout continues.
+- See `docs/02-ux/winui-assets-workspace-extraction-seam-am.md` for the AM Assets-specific extraction seam and composition target after the Machines proof point.
 
 ---
 

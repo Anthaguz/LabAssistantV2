@@ -2521,3 +2521,79 @@ Each readiness result shall include, at minimum:
 - [ ] temporary shell-bridge reduction target is explicit and traceable
 - [ ] preserved user-visible Machines behavior is explicit and traceable
 - [ ] long-lived Machines workspace lifetime is explicit and traceable
+
+---
+
+# AC-028 - WinUI Assets Workspace Extraction Seam (AM9)
+
+**Related FRs:** FR-131, FR-132, FR-133, FR-100, FR-101, FR-102, FR-103, FR-104, FR-105, FR-106, FR-107, FR-108, FR-110, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Assets state and orchestration can move out of MainWindow without changing Overview-first behavior
+**Given**
+- `Assets` is the next capability selected for AM extraction after Machines
+
+**When**
+- the Assets workspace seam is defined
+
+**Then**
+- Assets-local ownership is explicitly identified for:
+  - Overview summary/navigation state
+  - Base Disks workspace state and orchestration
+  - Switches workspace state and orchestration
+- `assets.overview`, `assets.base_disks`, and `assets.switches` route continuity remains preserved
+- `Assets` remains an Overview-first capability
+
+### 2) Assets seam uses the refined capability-workspace target from the start
+**Given**
+- Machines exposed a softer god-file risk before AM33/AM34 refinement
+
+**When**
+- the Assets seam is reviewed
+
+**Then**
+- the seam explicitly targets capability-local workspace composition
+- `MainWindow` is not treated as the intended long-term Assets composition hub
+- shell-owned host bridges are explicitly treated as temporary if needed at all
+
+### 3) Base Disks and Switches contracts remain preserved during extraction
+**Given**
+- Assets currently includes approved AJ and AK contracts
+
+**When**
+- the extraction seam is defined
+
+**Then**
+- Base Disks behavior remains preserved, including:
+  - current validation/readiness contract
+  - remove guardrails
+  - in-context operational surface
+- Switches behavior remains preserved, including:
+  - current CRUD and validation contract
+  - delete blocked when any VM is attached
+  - current in-context operational surface
+
+### 4) Assets workspace lifetime remains long-lived with route-activation refresh
+**Given**
+- AM33 established long-lived capability workspaces by default
+
+**When**
+- Assets-specific extraction is defined
+
+**Then**
+- Assets remains long-lived within the app session
+- route activation refreshes/reconciles state rather than recreating the Assets workspace per navigation
+- any future lifetime change remains a documented `TBD`
+
+## Expected Boundary
+- shell continues to host Assets workspace lifetime and route visibility
+- Assets-local workspace composition becomes the target home for Overview/Base Disks/Switches local coordination
+- Base Disks and Switches semantics remain unchanged while ownership improves
+- long-lived Assets workspace lifetime remains the default model
+
+## Definition of Done
+- [ ] Assets-local state/orchestration ownership is explicit and traceable
+- [ ] refined capability-composition target is explicit and traceable
+- [ ] Base Disks and Switches behavior-preservation constraints are explicit and traceable
+- [ ] long-lived Assets workspace lifetime is explicit and traceable
