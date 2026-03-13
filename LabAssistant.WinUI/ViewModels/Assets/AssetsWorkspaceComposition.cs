@@ -16,7 +16,10 @@ internal interface IAssetsWorkspaceShellBridge
     bool IsAssetsSwitchesActive { get; }
 
     void NavigateToRoute(string routeKey);
+}
 
+internal interface IAssetsWorkspaceHost
+{
     Task EnsureAssetsBaseDisksAsync(bool forceRefresh);
 
     Task EnsureAssetsSwitchesAsync(bool forceRefresh);
@@ -35,34 +38,19 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
     private readonly Func<bool> _isAssetsBaseDisksActive;
     private readonly Func<bool> _isAssetsSwitchesActive;
     private readonly Action<string> _navigateToRoute;
-    private readonly Func<bool, Task> _ensureAssetsBaseDisksAsync;
-    private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;
-    private readonly Action _updateAssetsOverviewUi;
-    private readonly Action _updateAssetsBaseDisksUi;
-    private readonly Action _updateAssetsSwitchesUi;
 
     public AssetsWorkspaceShellBridge(
         Func<bool> isAssetsCapabilityActive,
         Func<bool> isAssetsOverviewActive,
         Func<bool> isAssetsBaseDisksActive,
         Func<bool> isAssetsSwitchesActive,
-        Action<string> navigateToRoute,
-        Func<bool, Task> ensureAssetsBaseDisksAsync,
-        Func<bool, Task> ensureAssetsSwitchesAsync,
-        Action updateAssetsOverviewUi,
-        Action updateAssetsBaseDisksUi,
-        Action updateAssetsSwitchesUi)
+        Action<string> navigateToRoute)
     {
         _isAssetsCapabilityActive = isAssetsCapabilityActive;
         _isAssetsOverviewActive = isAssetsOverviewActive;
         _isAssetsBaseDisksActive = isAssetsBaseDisksActive;
         _isAssetsSwitchesActive = isAssetsSwitchesActive;
         _navigateToRoute = navigateToRoute;
-        _ensureAssetsBaseDisksAsync = ensureAssetsBaseDisksAsync;
-        _ensureAssetsSwitchesAsync = ensureAssetsSwitchesAsync;
-        _updateAssetsOverviewUi = updateAssetsOverviewUi;
-        _updateAssetsBaseDisksUi = updateAssetsBaseDisksUi;
-        _updateAssetsSwitchesUi = updateAssetsSwitchesUi;
     }
 
     public bool IsAssetsCapabilityActive => _isAssetsCapabilityActive();
@@ -74,6 +62,29 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
     public bool IsAssetsSwitchesActive => _isAssetsSwitchesActive();
 
     public void NavigateToRoute(string routeKey) => _navigateToRoute(routeKey);
+}
+
+internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
+{
+    private readonly Func<bool, Task> _ensureAssetsBaseDisksAsync;
+    private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;
+    private readonly Action _updateAssetsOverviewUi;
+    private readonly Action _updateAssetsBaseDisksUi;
+    private readonly Action _updateAssetsSwitchesUi;
+
+    public AssetsWorkspaceHost(
+        Func<bool, Task> ensureAssetsBaseDisksAsync,
+        Func<bool, Task> ensureAssetsSwitchesAsync,
+        Action updateAssetsOverviewUi,
+        Action updateAssetsBaseDisksUi,
+        Action updateAssetsSwitchesUi)
+    {
+        _ensureAssetsBaseDisksAsync = ensureAssetsBaseDisksAsync;
+        _ensureAssetsSwitchesAsync = ensureAssetsSwitchesAsync;
+        _updateAssetsOverviewUi = updateAssetsOverviewUi;
+        _updateAssetsBaseDisksUi = updateAssetsBaseDisksUi;
+        _updateAssetsSwitchesUi = updateAssetsSwitchesUi;
+    }
 
     public Task EnsureAssetsBaseDisksAsync(bool forceRefresh) => _ensureAssetsBaseDisksAsync(forceRefresh);
 
@@ -95,6 +106,7 @@ internal sealed class AssetsWorkspaceComposition
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _baseDisksTabViewItem;
     private readonly TabViewItem _switchesTabViewItem;
+    private readonly IAssetsWorkspaceHost _host;
     private readonly IAssetsWorkspaceShellBridge _shellBridge;
     private bool _isUpdatingAssetsSubviewSelection;
 
@@ -109,6 +121,7 @@ internal sealed class AssetsWorkspaceComposition
         ObservableCollection<AssetsBaseDiskListRow> baseDiskRows,
         ObservableCollection<AssetsSwitchListRow> switchRows,
         ObservableCollection<string> attachedVmNames,
+        IAssetsWorkspaceHost host,
         IAssetsWorkspaceShellBridge shellBridge)
     {
         _overviewView = overviewView;
@@ -118,6 +131,7 @@ internal sealed class AssetsWorkspaceComposition
         _overviewTabViewItem = overviewTabViewItem;
         _baseDisksTabViewItem = baseDisksTabViewItem;
         _switchesTabViewItem = switchesTabViewItem;
+        _host = host;
         _shellBridge = shellBridge;
 
         _baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDiskRows;
@@ -132,19 +146,19 @@ internal sealed class AssetsWorkspaceComposition
 
         if (_shellBridge.IsAssetsOverviewActive)
         {
-            _shellBridge.UpdateAssetsOverviewUi();
+            _host.UpdateAssetsOverviewUi();
         }
 
         if (_shellBridge.IsAssetsBaseDisksActive)
         {
-            _ = _shellBridge.EnsureAssetsBaseDisksAsync(forceRefresh: false);
-            _shellBridge.UpdateAssetsBaseDisksUi();
+            _ = _host.EnsureAssetsBaseDisksAsync(forceRefresh: false);
+            _host.UpdateAssetsBaseDisksUi();
         }
 
         if (_shellBridge.IsAssetsSwitchesActive)
         {
-            _ = _shellBridge.EnsureAssetsSwitchesAsync(forceRefresh: false);
-            _shellBridge.UpdateAssetsSwitchesUi();
+            _ = _host.EnsureAssetsSwitchesAsync(forceRefresh: false);
+            _host.UpdateAssetsSwitchesUi();
         }
     }
 
