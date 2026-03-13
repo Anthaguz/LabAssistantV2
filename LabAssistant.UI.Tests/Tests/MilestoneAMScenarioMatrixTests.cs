@@ -186,6 +186,81 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("DeleteMachineRequested", compositionSource);
     }
 
+    [Fact]
+    public void MainWindow_PreservesShellBoundary_WhileHostingLongLivedAssetsWorkspace()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var shellViewModelSource = LoadShellViewModelSource();
+
+        Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("new AssetsWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("() => IsAssetsCapabilityActive,", mainWindowSource);
+        Assert.Contains("() => IsAssetsOverviewActive,", mainWindowSource);
+        Assert.Contains("() => IsAssetsBaseDisksActive,", mainWindowSource);
+        Assert.Contains("() => IsAssetsSwitchesActive,", mainWindowSource);
+        Assert.Contains("NavigateToRoute,", mainWindowSource);
+        Assert.Contains("EnsureAssetsBaseDisksAsync,", mainWindowSource);
+        Assert.Contains("EnsureAssetsSwitchesAsync,", mainWindowSource);
+        Assert.Contains("UpdateAssetsOverviewUi,", mainWindowSource);
+        Assert.Contains("UpdateAssetsBaseDisksUi,", mainWindowSource);
+        Assert.Contains("UpdateAssetsSwitchesUi));", mainWindowSource);
+        Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;", mainWindowSource);
+        Assert.Contains("private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;", mainWindowSource);
+        Assert.Contains("private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;", mainWindowSource);
+        Assert.Contains("private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;", mainWindowSource);
+        Assert.Contains("AssetsLocalNavPanel.Visibility = IsAssetsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("AssetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+
+        Assert.DoesNotContain("private bool _isUpdatingAssetsSubviewSelection;", mainWindowSource);
+        Assert.DoesNotContain("private void AssetsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)", mainWindowSource);
+        Assert.DoesNotContain("private void SyncAssetsSubviewSelection()", mainWindowSource);
+        Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", mainWindowSource);
+        Assert.DoesNotContain("AssetsOverviewOpenSwitchesButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsSwitches);", mainWindowSource);
+
+        Assert.Contains("public const string AssetsOverview = \"assets.overview\";", shellViewModelSource);
+        Assert.Contains("public const string AssetsBaseDisks = \"assets.base_disks\";", shellViewModelSource);
+        Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", shellViewModelSource);
+    }
+
+    [Fact]
+    public void AssetsWorkspaceComposition_IsTheEffectiveAssetsLocalCompositionOwner()
+    {
+        var compositionSource = LoadAssetsWorkspaceCompositionSource();
+
+        Assert.Contains("internal sealed class AssetsWorkspaceComposition", compositionSource);
+        Assert.Contains("private readonly AssetsOverviewView _overviewView;", compositionSource);
+        Assert.Contains("private readonly AssetsBaseDisksView _baseDisksView;", compositionSource);
+        Assert.Contains("private readonly AssetsSwitchesView _switchesView;", compositionSource);
+        Assert.Contains("private readonly TabView _subviewTabView;", compositionSource);
+        Assert.Contains("private readonly IAssetsWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("private bool _isUpdatingAssetsSubviewSelection;", compositionSource);
+        Assert.Contains("_baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDiskRows;", compositionSource);
+        Assert.Contains("_switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;", compositionSource);
+        Assert.Contains("_switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = attachedVmNames;", compositionSource);
+        Assert.Contains("_overviewView.AssetsOverviewOpenBaseDisksButtonControl.Click += OpenBaseDisksRequested;", compositionSource);
+        Assert.Contains("_overviewView.AssetsOverviewOpenSwitchesButtonControl.Click += OpenSwitchesRequested;", compositionSource);
+        Assert.Contains("_subviewTabView.SelectionChanged += AssetsSubviewTabView_SelectionChanged;", compositionSource);
+        Assert.Contains("public void ApplyShellState()", compositionSource);
+        Assert.Contains("SyncAssetsSubviewSelection();", compositionSource);
+        Assert.Contains("_ = _shellBridge.EnsureAssetsBaseDisksAsync(forceRefresh: false);", compositionSource);
+        Assert.Contains("_ = _shellBridge.EnsureAssetsSwitchesAsync(forceRefresh: false);", compositionSource);
+        Assert.Contains("_shellBridge.UpdateAssetsOverviewUi();", compositionSource);
+        Assert.Contains("_shellBridge.UpdateAssetsBaseDisksUi();", compositionSource);
+        Assert.Contains("_shellBridge.UpdateAssetsSwitchesUi();", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsSwitches);", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsOverview);", compositionSource);
+        Assert.Contains("if (!_shellBridge.IsAssetsCapabilityActive)", compositionSource);
+        Assert.Contains("var selectedTab = _shellBridge.IsAssetsOverviewActive", compositionSource);
+        Assert.Contains(": _shellBridge.IsAssetsBaseDisksActive", compositionSource);
+
+        Assert.DoesNotContain("MainWindow", compositionSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -207,6 +282,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadMachinesWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Machines", "MachinesWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

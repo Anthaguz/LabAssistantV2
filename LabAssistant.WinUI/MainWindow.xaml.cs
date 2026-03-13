@@ -19,6 +19,7 @@ using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.ViewModels;
+using LabAssistant.WinUI.ViewModels.Assets;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.Views.Assets;
 using LabAssistant.WinUI.Views.Deploy;
@@ -47,6 +48,7 @@ public sealed partial class MainWindow : Window
     private readonly IAssetsBaseDisksCapabilityService _assetsBaseDisksCapabilityService;
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
     private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
+    private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
@@ -100,7 +102,6 @@ public sealed partial class MainWindow : Window
     private int _assetsSwitchesAssessmentRequestVersion;
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingDeploySubviewSelection;
-    private bool _isUpdatingAssetsSubviewSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
     private bool _isUpdatingTemplateVmEditorControls;
     private bool _isUpdatingTemplateVmSwitchRows;
@@ -175,8 +176,6 @@ public sealed partial class MainWindow : Window
     private TextBlock DiagnosticsOverviewLogsSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewLogsSummaryTextBlockControl;
     private Button DiagnosticsOverviewOpenSupportExportButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenSupportExportButtonControl;
     private TextBlock DiagnosticsOverviewSupportSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewSupportSummaryTextBlockControl;
-    private Button AssetsOverviewOpenBaseDisksButton => AssetsOverviewView.AssetsOverviewOpenBaseDisksButtonControl;
-    private Button AssetsOverviewOpenSwitchesButton => AssetsOverviewView.AssetsOverviewOpenSwitchesButtonControl;
     private TextBlock AssetsOverviewBaseDisksSummaryTextBlock => AssetsOverviewView.AssetsOverviewBaseDisksSummaryTextBlockControl;
     private TextBlock AssetsOverviewSwitchesSummaryTextBlock => AssetsOverviewView.AssetsOverviewSwitchesSummaryTextBlockControl;
     private ListView AssetsBaseDisksListView => AssetsBaseDisksView.AssetsBaseDisksListViewControl;
@@ -336,12 +335,31 @@ public sealed partial class MainWindow : Window
                 () => IsMachinesOverviewActive,
                 UpdateReadinessPollingState,
                 () => RootLayout.XamlRoot));
+        _assetsWorkspaceComposition = new AssetsWorkspaceComposition(
+            AssetsOverviewViewHost,
+            AssetsBaseDisksViewHost,
+            AssetsSwitchesViewHost,
+            AssetsSubviewTabView,
+            AssetsOverviewTabViewItem,
+            AssetsBaseDisksTabViewItem,
+            AssetsSwitchesTabViewItem,
+            _assetsBaseDiskRows,
+            _assetsSwitchRows,
+            _assetsSwitchAttachedVmNames,
+            new AssetsWorkspaceShellBridge(
+                () => IsAssetsCapabilityActive,
+                () => IsAssetsOverviewActive,
+                () => IsAssetsBaseDisksActive,
+                () => IsAssetsSwitchesActive,
+                NavigateToRoute,
+                EnsureAssetsBaseDisksAsync,
+                EnsureAssetsSwitchesAsync,
+                UpdateAssetsOverviewUi,
+                UpdateAssetsBaseDisksUi,
+                UpdateAssetsSwitchesUi));
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
-        AssetsBaseDisksListView.ItemsSource = _assetsBaseDiskRows;
-        AssetsSwitchesListView.ItemsSource = _assetsSwitchRows;
-        AssetsSwitchesAttachedVmsListView.ItemsSource = _assetsSwitchAttachedVmNames;
         TemplateLibraryListView.ItemsSource = _templateLibraryItems;
         TemplateVmListView.ItemsSource = _templateVmEntries;
         WireAssetsBaseDisksHandlers();
@@ -480,8 +498,6 @@ public sealed partial class MainWindow : Window
 
     private void WireOverviewHandlers()
     {
-        AssetsOverviewOpenBaseDisksButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);
-        AssetsOverviewOpenSwitchesButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsSwitches);
         DeployOverviewOpenQuickDeployButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
         DeployOverviewOpenFromTemplateButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
         DiagnosticsOverviewOpenLogsButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
@@ -597,7 +613,6 @@ public sealed partial class MainWindow : Window
         DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         SyncDeploySubviewSelection();
-        SyncAssetsSubviewSelection();
         SyncDiagnosticsSubviewSelection();
         UpdateTemplatesUi();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
@@ -607,6 +622,7 @@ public sealed partial class MainWindow : Window
         QueueNavigationSelectionUpdate();
 
         _machinesWorkspaceComposition.ApplyShellState();
+        _assetsWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)
         {
             _ = LoadMachinesDeletionPolicyAsync();
@@ -625,23 +641,6 @@ public sealed partial class MainWindow : Window
         if (IsTemplatesLibraryActive)
         {
             _ = EnsureTemplatesLibraryAsync(forceRefresh: false);
-        }
-
-        if (IsAssetsOverviewActive)
-        {
-            UpdateAssetsOverviewUi();
-        }
-
-        if (IsAssetsBaseDisksActive)
-        {
-            _ = EnsureAssetsBaseDisksAsync(forceRefresh: false);
-            UpdateAssetsBaseDisksUi();
-        }
-
-        if (IsAssetsSwitchesActive)
-        {
-            _ = EnsureAssetsSwitchesAsync(forceRefresh: false);
-            UpdateAssetsSwitchesUi();
         }
 
         if (IsDeployOverviewActive)
@@ -918,27 +917,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void AssetsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUpdatingAssetsSubviewSelection || AssetsSubviewTabView.SelectedItem is not TabViewItem selectedTab)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(selectedTab, AssetsOverviewTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.AssetsOverview);
-        }
-        else if (ReferenceEquals(selectedTab, AssetsBaseDisksTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);
-        }
-        else if (ReferenceEquals(selectedTab, AssetsSwitchesTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.AssetsSwitches);
-        }
-    }
-
     private void DiagnosticsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isUpdatingDiagnosticsSubviewSelection || DiagnosticsSubviewTabView.SelectedItem is not TabViewItem selectedTab)
@@ -982,35 +960,6 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isUpdatingDeploySubviewSelection = false;
-        }
-    }
-
-    private void SyncAssetsSubviewSelection()
-    {
-        if (!IsAssetsCapabilityActive)
-        {
-            return;
-        }
-
-        var selectedTab = IsAssetsOverviewActive
-            ? AssetsOverviewTabViewItem
-            : IsAssetsBaseDisksActive
-                ? AssetsBaseDisksTabViewItem
-                : AssetsSwitchesTabViewItem;
-
-        if (ReferenceEquals(AssetsSubviewTabView.SelectedItem, selectedTab))
-        {
-            return;
-        }
-
-        _isUpdatingAssetsSubviewSelection = true;
-        try
-        {
-            AssetsSubviewTabView.SelectedItem = selectedTab;
-        }
-        finally
-        {
-            _isUpdatingAssetsSubviewSelection = false;
         }
     }
 

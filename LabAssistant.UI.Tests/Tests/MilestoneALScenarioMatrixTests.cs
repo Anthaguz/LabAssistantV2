@@ -50,6 +50,7 @@ public sealed class MilestoneALScenarioMatrixTests
     {
         var xaml = LoadMainWindowXaml();
         var source = LoadMainWindowSource();
+        var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployLocalNavigationPanel"));
         Assert.NotNull(FindByName(xaml, "DeploySubviewTabView"));
@@ -72,7 +73,8 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", source);
         Assert.Contains("if (capability.HasOverview && string.Equals(subview.RouteKey, capability.DefaultSubview.RouteKey, StringComparison.Ordinal))", source);
         Assert.Contains("SyncDeploySubviewSelection();", source);
-        Assert.Contains("SyncAssetsSubviewSelection();", source);
+        Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", source);
+        Assert.Contains("SyncAssetsSubviewSelection();", assetsCompositionSource);
         Assert.Contains("SyncDiagnosticsSubviewSelection();", source);
     }
 
@@ -108,11 +110,12 @@ public sealed class MilestoneALScenarioMatrixTests
         var deployOverviewSource = LoadDeployOverviewViewXamlSource();
         var diagnosticsOverviewSource = LoadDiagnosticsOverviewViewXamlSource();
         var mainWindowSource = LoadMainWindowSource();
+        var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
 
         Assert.Contains("x:Name=\"AssetsOverviewOpenBaseDisksButton\"", assetsOverviewSource);
         Assert.Contains("x:Name=\"AssetsOverviewOpenSwitchesButton\"", assetsOverviewSource);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", mainWindowSource);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.AssetsSwitches);", mainWindowSource);
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", assetsCompositionSource);
+        Assert.Contains("NavigateToRoute(ShellRouteKeys.AssetsSwitches);", assetsCompositionSource);
 
         Assert.Contains("x:Name=\"DeployOverviewOpenQuickDeployButton\"", deployOverviewSource);
         Assert.Contains("x:Name=\"DeployOverviewOpenFromTemplateButton\"", deployOverviewSource);
@@ -361,6 +364,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadShellViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "ShellViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

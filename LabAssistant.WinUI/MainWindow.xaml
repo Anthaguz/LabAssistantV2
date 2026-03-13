@@ -174,7 +174,7 @@
                                 <TabView
                                     x:Name="AssetsSubviewTabView"
                                     IsAddTabButtonVisible="False"
-                                    SelectionChanged="AssetsSubviewTabView_SelectionChanged">
+                                    >
                                     <TabViewItem x:Name="AssetsOverviewTabViewItem" Header="Overview" IsClosable="False">
                                         <assetsViews:AssetsOverviewView x:Name="AssetsOverviewViewHost" />
                                     </TabViewItem>
