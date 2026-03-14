@@ -592,6 +592,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** cleanup-target definition must preserve `assets.overview`, `assets.base_disks`, and `assets.switches` route continuity and must remain explicit that Base Disks-specific extraction details, Switches-specific extraction details, Overview-specific extraction details, runtime implementation, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-137:** WinUI `Assets Overview` cleanup shall remain under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Overview-specific state and UI coordination behind an Overview-local seam.
+  - **Acceptance details:** the Overview cleanup target must explicitly keep shared Assets composition responsible only for capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Overview-local seam the target owner for Overview summary/navigation state and Overview-local interaction coordination.
+  - **Priority:** P1
+
+- **FR-138:** WinUI `Assets Overview` cleanup shall preserve current Overview behavior and boundaries while making Overview participation in the long-lived Assets workspace explicit.
+  - **Acceptance details:** the Overview cleanup target must preserve `assets.overview` as the route-entry and index surface for `Assets`, must keep the Overview summary/navigation role intact, must avoid taking semantic ownership of Base Disks or Switches behavior, and must keep route activation refresh within the long-lived Assets workspace rather than per-navigation recreation.
+  - **Priority:** P1
+
+- **FR-139:** WinUI `Assets Overview` cleanup shall reject direct `MainWindow` view dependency, Overview-owned shared god-object growth, and unapproved runtime or performance redesign during seam definition.
+  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Assets composition must not be widened into an Overview-centric shared owner; and the cleanup target must stay explicit that Base Disks extraction details, Switches extraction details, runtime implementation, overview redesign beyond ownership cleanup, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.

@@ -2677,3 +2677,76 @@ Each readiness result shall include, at minimum:
 - [ ] temporary-bridge-vs-final-target rule is explicit and traceable
 - [ ] no-direct-`MainWindow`-injection rule is explicit and traceable
 - [ ] long-lived Assets workspace and route-activation refresh rule is explicit and traceable
+
+---
+
+# AC-030 - WinUI Assets Overview Extraction Cleanup Target (AM39)
+
+**Related FRs:** FR-137, FR-138, FR-139, FR-134, FR-135, FR-136, FR-131, FR-132, FR-133, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Assets Overview stays under shared Assets workspace composition but gains an Overview-local seam
+**Given**
+- the shared Assets composition cleanup target is already defined
+
+**When**
+- the narrow `Assets Overview` cleanup target is reviewed
+
+**Then**
+- `Assets Overview` remains under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Assets composition remains responsible only for shared capability-level composition concerns
+- an Overview-local seam becomes the target home for Overview-specific state and UI coordination
+
+### 2) Overview-local ownership is explicit without widening Overview into a new shared god object
+**Given**
+- `Assets Overview` is the route-entry and summary surface for the capability
+
+**When**
+- Overview-local ownership is defined
+
+**Then**
+- Overview-local ownership explicitly includes:
+  - Overview summary state
+  - Overview-local navigation coordination
+  - Overview-local interaction boundaries needed by the Overview surface
+- Overview does not become the owner of shared Base Disks or Switches composition concerns
+- Overview does not become a new shared Assets god object
+
+### 3) MainWindow and route-activation boundaries remain explicit
+**Given**
+- AM33 and AM10 keep `MainWindow` limited to shell ownership and keep Assets long-lived by default
+
+**When**
+- the Overview cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Assets Overview` continues to participate in long-lived Assets workspace lifetime rather than per-navigation recreation
+- route activation of `assets.overview` refreshes or reconciles Overview state within the existing Assets workspace
+
+### 4) Overview remains behavior-preserving and does not absorb Base Disks or Switches semantics
+**Given**
+- `Assets` is an approved Overview-first capability with canonical child routes
+
+**When**
+- the Overview cleanup target is defined
+
+**Then**
+- `assets.overview` remains the route entry and index surface for `Assets`
+- Overview remains primarily a summary and navigation surface
+- no Base Disks or Switches semantic ownership is moved into Overview
+- runtime implementation, overview redesign beyond ownership cleanup, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `AssetsWorkspaceComposition` remains the owner for shared capability-level composition only
+- an Overview-local seam becomes the target home for Overview-specific state, composition, and interaction coordination
+- `MainWindow` remains shell-only and is not injected into Overview views
+- `Assets Overview` remains long-lived with route-activation refresh inside the existing Assets workspace
+- Base Disks and Switches keep their own future narrow extraction slices
+
+## Definition of Done
+- [ ] shared Assets vs Overview-local ownership is explicit and traceable
+- [ ] Overview-local state/composition and interaction-boundary expectations are explicit and traceable
+- [ ] long-lived Assets workspace participation and `assets.overview` route-activation refresh expectations are explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable
