@@ -4,26 +4,28 @@ namespace LabAssistant.WinUI.Views.Assets;
 
 public sealed partial class AssetsOverviewView : UserControl
 {
+    public event EventHandler? OpenBaseDisksRequested;
+
+    public event EventHandler? OpenSwitchesRequested;
+
     public AssetsOverviewView()
     {
         InitializeComponent();
     }
 
-    public Button AssetsOverviewOpenBaseDisksButtonControl => AssetsOverviewOpenBaseDisksButton;
-
-    public Button AssetsOverviewOpenSwitchesButtonControl => AssetsOverviewOpenSwitchesButton;
-
-    public TextBlock AssetsOverviewBaseDisksSummaryTextBlockControl => AssetsOverviewBaseDisksSummaryTextBlock;
-
-    public TextBlock AssetsOverviewSwitchesSummaryTextBlockControl => AssetsOverviewSwitchesSummaryTextBlock;
-
-    public void SetBaseDisksSummary(string text)
+    public void UpdateSummary(string baseDisksSummaryText, string switchesSummaryText)
     {
-        AssetsOverviewBaseDisksSummaryTextBlock.Text = text;
+        AssetsOverviewBaseDisksSummaryTextBlock.Text = baseDisksSummaryText;
+        AssetsOverviewSwitchesSummaryTextBlock.Text = switchesSummaryText;
     }
 
-    public void SetSwitchesSummary(string text)
+    private void AssetsOverviewOpenBaseDisksButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        AssetsOverviewSwitchesSummaryTextBlock.Text = text;
+        OpenBaseDisksRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void AssetsOverviewOpenSwitchesButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        OpenSwitchesRequested?.Invoke(this, EventArgs.Empty);
     }
 }

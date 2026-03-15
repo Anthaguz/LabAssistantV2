@@ -40,6 +40,7 @@
                     <Button
                         x:Name="AssetsOverviewOpenBaseDisksButton"
                         HorizontalAlignment="Left"
+                        Click="AssetsOverviewOpenBaseDisksButton_Click"
                         Content="Open Base Disks" />
                 </StackPanel>
             </Border>
@@ -64,6 +65,7 @@
                     <Button
                         x:Name="AssetsOverviewOpenSwitchesButton"
                         HorizontalAlignment="Left"
+                        Click="AssetsOverviewOpenSwitchesButton_Click"
                         Content="Open Switches" />
                 </StackPanel>
             </Border>
