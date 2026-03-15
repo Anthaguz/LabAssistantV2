@@ -312,6 +312,14 @@ Consolidation rules:
 - Do not replace these headers with bold labels, top-level list items, or other ad hoc formatting.
 - Keep PR body wording concise and issue-scoped.
 
+### PR Body Drafting
+- Agents must draft every PR body in a local temporary Markdown file before creating or editing the PR through GitHub CLI.
+- PR body draft files must live under `.local/` rather than as ad hoc files in the repo root.
+- PR body draft files are local workflow artifacts only and must not be committed unless the user explicitly asks.
+- Agents should use the draft file as the source when running `gh pr create` or `gh pr edit` so Markdown formatting is preserved without shell-escaping issues.
+- After creating or updating the PR, agents should remove the temporary PR body draft if it is no longer needed.
+- Temporary PR body drafts from unrelated issues are not part of issue scope and must not be included in commits or PRs.
+
 ---
 
 ## 9) Build Commands (Canonical)
