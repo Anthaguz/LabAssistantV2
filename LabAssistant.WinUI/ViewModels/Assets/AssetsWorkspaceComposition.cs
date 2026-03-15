@@ -120,13 +120,13 @@ internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
 
 internal sealed class AssetsWorkspaceComposition
 {
-    private readonly AssetsOverviewView _overviewView;
     private readonly AssetsBaseDisksView _baseDisksView;
     private readonly AssetsSwitchesView _switchesView;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _baseDisksTabViewItem;
     private readonly TabViewItem _switchesTabViewItem;
+    private readonly AssetsOverviewWorkspaceComposition _overviewWorkspaceComposition;
     private readonly IAssetsWorkspaceHost _host;
     private readonly IAssetsWorkspaceShellBridge _shellBridge;
     private bool _isUpdatingAssetsSubviewSelection;
@@ -145,7 +145,6 @@ internal sealed class AssetsWorkspaceComposition
         IAssetsWorkspaceHost host,
         IAssetsWorkspaceShellBridge shellBridge)
     {
-        _overviewView = overviewView;
         _baseDisksView = baseDisksView;
         _switchesView = switchesView;
         _subviewTabView = subviewTabView;
@@ -154,6 +153,16 @@ internal sealed class AssetsWorkspaceComposition
         _switchesTabViewItem = switchesTabViewItem;
         _host = host;
         _shellBridge = shellBridge;
+        _overviewWorkspaceComposition = new AssetsOverviewWorkspaceComposition(
+            overviewView,
+            new AssetsOverviewWorkspaceHost(
+                () => _host.IsAssetsBaseDisksLoading,
+                () => _host.IsAssetsSwitchesLoading,
+                () => _host.AssetsBaseDiskCount,
+                () => _host.AssetsSwitchCount),
+            new AssetsOverviewWorkspaceShellBridge(
+                () => _shellBridge.IsAssetsOverviewActive,
+                _shellBridge.NavigateToRoute));
 
         _baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDiskRows;
         _switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;
@@ -167,7 +176,7 @@ internal sealed class AssetsWorkspaceComposition
 
         if (_shellBridge.IsAssetsOverviewActive)
         {
-            UpdateAssetsOverviewUi();
+            _overviewWorkspaceComposition.ApplyShellState();
         }
 
         if (_shellBridge.IsAssetsBaseDisksActive)
@@ -185,19 +194,7 @@ internal sealed class AssetsWorkspaceComposition
 
     private void WireSharedHandlers()
     {
-        _overviewView.AssetsOverviewOpenBaseDisksButtonControl.Click += OpenBaseDisksRequested;
-        _overviewView.AssetsOverviewOpenSwitchesButtonControl.Click += OpenSwitchesRequested;
         _subviewTabView.SelectionChanged += AssetsSubviewTabView_SelectionChanged;
-    }
-
-    private void OpenBaseDisksRequested(object? sender, object e)
-    {
-        _shellBridge.NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);
-    }
-
-    private void OpenSwitchesRequested(object? sender, object e)
-    {
-        _shellBridge.NavigateToRoute(ShellRouteKeys.AssetsSwitches);
     }
 
     private void AssetsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -248,19 +245,5 @@ internal sealed class AssetsWorkspaceComposition
         {
             _isUpdatingAssetsSubviewSelection = false;
         }
-    }
-
-    private void UpdateAssetsOverviewUi()
-    {
-        _overviewView.SetBaseDisksSummary(_host.IsAssetsBaseDisksLoading
-            ? "Base disk inventory is loading."
-            : _host.AssetsBaseDiskCount > 0
-                ? $"{_host.AssetsBaseDiskCount} base disks currently loaded."
-                : "Open Base Disks to inspect imported VHDX inventory.");
-        _overviewView.SetSwitchesSummary(_host.IsAssetsSwitchesLoading
-            ? "Switch inventory is loading."
-            : _host.AssetsSwitchCount > 0
-                ? $"{_host.AssetsSwitchCount} virtual switches currently loaded."
-                : "Open Switches to inspect host virtual switch inventory.");
     }
 }
