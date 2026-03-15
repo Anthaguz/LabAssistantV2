@@ -98,8 +98,8 @@ internal sealed class AssetsOverviewWorkspaceComposition
 
     private void WireHandlers()
     {
-        _view.AssetsOverviewOpenBaseDisksButtonControl.Click += OpenBaseDisksRequested;
-        _view.AssetsOverviewOpenSwitchesButtonControl.Click += OpenSwitchesRequested;
+        _view.OpenBaseDisksRequested += OpenBaseDisksRequested;
+        _view.OpenSwitchesRequested += OpenSwitchesRequested;
     }
 
     private void OpenBaseDisksRequested(object? sender, object e)
@@ -123,7 +123,6 @@ internal sealed class AssetsOverviewWorkspaceComposition
 
     private void ApplyWorkspaceState()
     {
-        _view.SetBaseDisksSummary(_workspace.BaseDisksSummaryText);
-        _view.SetSwitchesSummary(_workspace.SwitchesSummaryText);
+        _view.UpdateSummary(_workspace.BaseDisksSummaryText, _workspace.SwitchesSummaryText);
     }
 }

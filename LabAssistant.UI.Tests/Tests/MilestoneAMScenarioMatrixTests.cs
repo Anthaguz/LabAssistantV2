@@ -231,6 +231,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var overviewWorkspaceSource = LoadAssetsOverviewWorkspaceViewModelSource();
+        var overviewXaml = LoadAssetsOverviewXaml();
         var overviewCodeBehindSource = LoadAssetsOverviewCodeBehindSource();
 
         Assert.Contains("internal sealed class AssetsWorkspaceComposition", compositionSource);
@@ -261,8 +262,21 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("OpenSwitchesRequested", compositionSource);
         Assert.DoesNotContain("_overviewView.SetBaseDisksSummary(", compositionSource);
         Assert.DoesNotContain("_overviewView.SetSwitchesSummary(", compositionSource);
-        Assert.Contains("SetBaseDisksSummary(string text)", overviewCodeBehindSource);
-        Assert.Contains("SetSwitchesSummary(string text)", overviewCodeBehindSource);
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewBaseDisksSummaryTextBlock"));
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewOpenBaseDisksButton"));
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewSwitchesSummaryTextBlock"));
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewOpenSwitchesButton"));
+        Assert.Contains("public event EventHandler? OpenBaseDisksRequested;", overviewCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenSwitchesRequested;", overviewCodeBehindSource);
+        Assert.Contains("public void UpdateSummary(string baseDisksSummaryText, string switchesSummaryText)", overviewCodeBehindSource);
+        Assert.Contains("AssetsOverviewOpenBaseDisksButton_Click", overviewCodeBehindSource);
+        Assert.Contains("AssetsOverviewOpenSwitchesButton_Click", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewOpenSwitchesButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewBaseDisksSummaryTextBlockControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewSwitchesSummaryTextBlockControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("SetBaseDisksSummary(string text)", overviewCodeBehindSource);
+        Assert.DoesNotContain("SetSwitchesSummary(string text)", overviewCodeBehindSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsOverview);", compositionSource);
         Assert.Contains("if (!_shellBridge.IsAssetsCapabilityActive)", compositionSource);
         Assert.Contains("var selectedTab = _shellBridge.IsAssetsOverviewActive", compositionSource);
@@ -278,13 +292,16 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void ApplyShellState()", overviewCompositionSource);
         Assert.Contains("if (!_shellBridge.IsAssetsOverviewActive)", overviewCompositionSource);
         Assert.Contains("RefreshSummary();", overviewCompositionSource);
-        Assert.Contains("_view.AssetsOverviewOpenBaseDisksButtonControl.Click += OpenBaseDisksRequested;", overviewCompositionSource);
-        Assert.Contains("_view.AssetsOverviewOpenSwitchesButtonControl.Click += OpenSwitchesRequested;", overviewCompositionSource);
+        Assert.Contains("_view.OpenBaseDisksRequested += OpenBaseDisksRequested;", overviewCompositionSource);
+        Assert.Contains("_view.OpenSwitchesRequested += OpenSwitchesRequested;", overviewCompositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", overviewCompositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsSwitches);", overviewCompositionSource);
         Assert.Contains("_workspace.RefreshSummary(", overviewCompositionSource);
-        Assert.Contains("_view.SetBaseDisksSummary(_workspace.BaseDisksSummaryText);", overviewCompositionSource);
-        Assert.Contains("_view.SetSwitchesSummary(_workspace.SwitchesSummaryText);", overviewCompositionSource);
+        Assert.Contains("_view.UpdateSummary(_workspace.BaseDisksSummaryText, _workspace.SwitchesSummaryText);", overviewCompositionSource);
+        Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButtonControl", overviewCompositionSource);
+        Assert.DoesNotContain("AssetsOverviewOpenSwitchesButtonControl", overviewCompositionSource);
+        Assert.DoesNotContain("SetBaseDisksSummary", overviewCompositionSource);
+        Assert.DoesNotContain("SetSwitchesSummary", overviewCompositionSource);
 
         Assert.Contains("internal sealed class AssetsOverviewWorkspaceViewModel", overviewWorkspaceSource);
         Assert.Contains("public string BaseDisksSummaryText { get; private set; }", overviewWorkspaceSource);
@@ -445,6 +462,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsOverviewView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadAssetsOverviewXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsOverviewView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
     }
 
     private static string LoadShellViewModelSource()
