@@ -310,6 +310,7 @@ should become one coherent Templates workflow.
 - Overview:
   - summary and navigation into child asset types
   - inventory counts and attention/health summary
+  - remains the `assets.overview` entry/index surface inside the long-lived Assets workspace rather than a shell-owned surface
 - route-bound asset type selector (Base Disks / Switches / future ISOs)
 - asset list
 - selected asset details / actions
@@ -444,6 +445,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: Machines now has a post-AM33 cleanup target before broader rollout continues in `docs/02-ux/winui-machines-composition-cleanup-target-am.md`.
 - Resolved: Assets now has an extraction seam that starts from the refined AM33 composition target in `docs/02-ux/winui-assets-workspace-extraction-seam-am.md`.
 - Resolved: Assets now has a shared composition cleanup target that makes shell-vs-Assets ownership explicit before runtime extraction proceeds in `docs/02-ux/winui-assets-composition-cleanup-target-am.md`.
+- Resolved: Assets Overview now has a narrow cleanup target that keeps Overview under shared Assets composition while moving Overview-specific state and interaction coordination behind an Overview-local seam in `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?

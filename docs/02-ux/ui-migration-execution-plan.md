@@ -388,6 +388,11 @@ Gate expectations:
 - make shell-vs-Assets ownership explicit so shared Assets composition converges into an Assets-local composition owner rather than stopping in `MainWindow`
 - treat any `MainWindow` Assets host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
 
+**Assets Overview cleanup target checkpoint**
+- before Overview runtime extraction proceeds, define the narrow `Assets Overview` cleanup target under the shared Assets composition boundary
+- make shared Assets vs Overview-local ownership explicit so Overview-specific state and UI coordination converge behind an Overview-local seam without widening shared Assets composition
+- preserve `assets.overview` as the route-entry summary/navigation surface, keep Overview inside the long-lived Assets workspace, and keep Base Disks/Switches extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
