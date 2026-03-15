@@ -299,6 +299,19 @@ Consolidation rules:
 - [ ] Tests added/updated (unit tests for logic, mocks for Hyper-V if needed)
 - [ ] Docs updated if behavior or architecture changed
 
+### PR Body Format
+- PR bodies must use the repository-standard section layout with these exact Markdown level-2 headers:
+  - `## What`
+  - `## Why`
+  - `## Scope`
+  - `## Out of scope`
+  - `## Validation`
+  - `## Traceability`
+- Each section must use bullet points for its content.
+- `## Scope` may use nested bullets when listing touched files, tests, or traceability artifacts.
+- Do not replace these headers with bold labels, top-level list items, or other ad hoc formatting.
+- Keep PR body wording concise and issue-scoped.
+
 ---
 
 ## 9) Build Commands (Canonical)
