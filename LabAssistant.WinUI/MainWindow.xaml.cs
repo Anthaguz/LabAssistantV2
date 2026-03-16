@@ -537,7 +537,7 @@ public sealed partial class MainWindow : Window
         DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         SyncDeploySubviewSelection();
         SyncDiagnosticsSubviewSelection();
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
         NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployCapabilityActive || IsAssetsCapabilityActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsCapabilityActive) ? Visibility.Collapsed : Visibility.Visible;
@@ -2344,49 +2344,43 @@ public sealed partial class MainWindow : Window
         return rows;
     }
 
-    private void UpdateTemplatesUi()
+    private void ApplyTemplatesWorkspaceUiState()
     {
-        OpenTemplateInEditorButton.IsEnabled = _selectedTemplateLibraryItem is not null && !_isTemplatesLoading;
-        DeleteTemplateButton.IsEnabled = _selectedTemplateLibraryItem is not null && !_isTemplatesLoading;
-        ExportTemplateButton.IsEnabled = _selectedTemplateLibraryItem is not null && !_isTemplatesLoading;
-        ApplyTemplateSearchButton.IsEnabled = !_isTemplatesLoading;
-        ClearTemplateSearchButton.IsEnabled = !_isTemplatesLoading;
-        ReloadTemplatesButton.IsEnabled = !_isTemplatesLoading;
-        ImportTemplateButton.IsEnabled = !_isTemplatesLoading;
-        CreateTemplateButton.IsEnabled = !_isTemplatesLoading;
-        SaveTemplateButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
-        SaveTemplateAsButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
-        ValidateTemplateButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
-        BackToLibraryButton.IsEnabled = !_isTemplatesLoading;
-        AddTemplateVmButton.IsEnabled = _activeTemplateEditorDocument is not null && !_isTemplatesLoading;
-        RemoveTemplateVmButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
-        AddTemplateVmSwitchRowButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
-        TemplateVmVhdxCatalogComboBox.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
-        ApplyTemplateVmChangesButton.IsEnabled = _selectedTemplateVmEntry is not null && !_isTemplatesLoading;
-
-        if (_activeTemplateEditorDocument is null)
-        {
-            TemplateEditorContextTextBlock.Text = "No template selected.";
-            TemplateIdTextBlock.Text = "Template ID: -";
-            TemplateFilePathTextBlock.Text = "File path: new template (not saved)";
-            TemplateVmCountTextBlock.Text = "VMs: 0";
-            TemplateNameTextBox.Text = string.Empty;
-            TemplateDescriptionTextBox.Text = string.Empty;
-            _templateVmEntries.Clear();
-            _selectedTemplateVmEntry = null;
-            UpdateTemplateVmEditorPanel();
-            UpdateTemplateSwitchGuidanceText();
-            return;
-        }
-
-        TemplateEditorContextTextBlock.Text = string.IsNullOrWhiteSpace(_activeTemplateEditorDocument.SourceFilePath)
-            ? "Editing new template draft."
-            : "Editing existing template.";
-        TemplateIdTextBlock.Text = $"Template ID: {_activeTemplateEditorDocument.Template.Id}";
-        TemplateFilePathTextBlock.Text = $"File path: {_activeTemplateEditorDocument.SourceFilePath ?? "new template (not saved)"}";
-        TemplateVmCountTextBlock.Text = $"VMs: {_activeTemplateEditorDocument.Template.VmTemplates.Count}";
+        _templatesWorkspaceComposition.ApplyUiState(CreateTemplatesWorkspaceUiState());
         UpdateTemplateVmEditorPanel();
         UpdateTemplateSwitchGuidanceText();
+    }
+
+    private TemplatesWorkspaceUiState CreateTemplatesWorkspaceUiState()
+    {
+        if (_activeTemplateEditorDocument is null)
+        {
+            return new TemplatesWorkspaceUiState(
+                IsLoading: _isTemplatesLoading,
+                HasSelectedLibraryItem: _selectedTemplateLibraryItem is not null,
+                HasActiveTemplateEditorDocument: false,
+                HasSelectedTemplateVmEntry: _selectedTemplateVmEntry is not null,
+                TemplateEditorContextText: "No template selected.",
+                TemplateIdText: "Template ID: -",
+                TemplateFilePathText: "File path: new template (not saved)",
+                TemplateVmCountText: "VMs: 0",
+                TemplateName: string.Empty,
+                TemplateDescription: string.Empty);
+        }
+
+        return new TemplatesWorkspaceUiState(
+            IsLoading: _isTemplatesLoading,
+            HasSelectedLibraryItem: _selectedTemplateLibraryItem is not null,
+            HasActiveTemplateEditorDocument: true,
+            HasSelectedTemplateVmEntry: _selectedTemplateVmEntry is not null,
+            TemplateEditorContextText: string.IsNullOrWhiteSpace(_activeTemplateEditorDocument.SourceFilePath)
+                ? "Editing new template draft."
+                : "Editing existing template.",
+            TemplateIdText: $"Template ID: {_activeTemplateEditorDocument.Template.Id}",
+            TemplateFilePathText: $"File path: {_activeTemplateEditorDocument.SourceFilePath ?? "new template (not saved)"}",
+            TemplateVmCountText: $"VMs: {_activeTemplateEditorDocument.Template.VmTemplates.Count}",
+            TemplateName: _activeTemplateEditorDocument.Template.Name,
+            TemplateDescription: _activeTemplateEditorDocument.Template.Description ?? string.Empty);
     }
 
     private void UpdateDeployUi()
@@ -3199,7 +3193,7 @@ public sealed partial class MainWindow : Window
         TemplateLibraryListView.SelectedItem = templateItem;
 
         _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         try
         {
             _activeTemplateEditorDocument = await _templatesCapabilityService.LoadForEditorAsync(templateItem.FilePath);
@@ -3224,7 +3218,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
             UpdateDeployUi();
         }
     }
@@ -3245,7 +3239,7 @@ public sealed partial class MainWindow : Window
         if (ownsLoadingState)
         {
             _isTemplatesLoading = true;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
         }
         TemplatesLibraryStatusTextBlock.Text = "Loading templates...";
 
@@ -3294,7 +3288,7 @@ public sealed partial class MainWindow : Window
             if (ownsLoadingState)
             {
                 _isTemplatesLoading = false;
-                UpdateTemplatesUi();
+                ApplyTemplatesWorkspaceUiState();
             }
         }
     }
@@ -3314,14 +3308,14 @@ public sealed partial class MainWindow : Window
     {
         if (_activeTemplateEditorDocument is null)
         {
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
             return;
         }
 
         RefreshTemplateVmEntriesFromDocument();
         TemplateNameTextBox.Text = _activeTemplateEditorDocument.Template.Name;
         TemplateDescriptionTextBox.Text = _activeTemplateEditorDocument.Template.Description ?? string.Empty;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
     }
 
     private async Task EnsureTemplateSwitchesAsync(bool forceRefresh)
@@ -3948,14 +3942,14 @@ public sealed partial class MainWindow : Window
     private void TemplateLibraryListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedTemplateLibraryItem = TemplateLibraryListView.SelectedItem as TemplateLibraryItem;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
     }
 
     private void TemplateVmListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedTemplateVmEntry = TemplateVmListView.SelectedItem as VmTemplate;
         UpdateTemplateVmEditorPanel();
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
     }
 
     private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
@@ -3979,7 +3973,7 @@ public sealed partial class MainWindow : Window
         SyncTemplateVmEntriesToDocument();
         UpdateTemplateVmEditorPanel();
         TemplateEditorStatusTextBlock.Text = $"Added VM entry '{vmEntry.Name}'.";
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
     }
 
     private async void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
@@ -4012,7 +4006,7 @@ public sealed partial class MainWindow : Window
         SyncTemplateVmEntriesToDocument();
         UpdateTemplateVmEditorPanel();
         TemplateEditorStatusTextBlock.Text = $"Removed VM entry '{vmName}'.";
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
     }
 
     private void ApplyTemplateVmChangesButton_Click(object sender, RoutedEventArgs e)
@@ -4024,7 +4018,7 @@ public sealed partial class MainWindow : Window
         }
 
         TryApplySelectedTemplateVmFields(showSuccessStatus: true);
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
     }
 
     private async void ApplyTemplateSearchButton_Click(object sender, RoutedEventArgs e)
@@ -4051,7 +4045,7 @@ public sealed partial class MainWindow : Window
     private async void CreateTemplateButton_Click(object sender, RoutedEventArgs e)
     {
         _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         try
         {
             _activeTemplateEditorDocument = await _templatesCapabilityService.CreateDraftAsync();
@@ -4064,7 +4058,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
         }
     }
 
@@ -4092,7 +4086,7 @@ public sealed partial class MainWindow : Window
         }
 
         _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         try
         {
             var result = await _templatesCapabilityService.DeleteAsync(_selectedTemplateLibraryItem.FilePath);
@@ -4106,7 +4100,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
         }
     }
 
@@ -4120,7 +4114,7 @@ public sealed partial class MainWindow : Window
         }
 
         _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         try
         {
             var result = await _templatesCapabilityService.ImportAsync(sourcePath);
@@ -4133,7 +4127,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
         }
     }
 
@@ -4154,7 +4148,7 @@ public sealed partial class MainWindow : Window
         }
 
         _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         try
         {
             var result = await _templatesCapabilityService.ExportAsync(_selectedTemplateLibraryItem.FilePath, destinationPath);
@@ -4163,7 +4157,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
         }
     }
 
@@ -4180,7 +4174,7 @@ public sealed partial class MainWindow : Window
             return;
         }
         _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         try
         {
             var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument);
@@ -4199,7 +4193,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
         }
     }
 
@@ -4226,7 +4220,7 @@ public sealed partial class MainWindow : Window
         }
 
         _isTemplatesLoading = true;
-        UpdateTemplatesUi();
+        ApplyTemplatesWorkspaceUiState();
         try
         {
             var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument, destinationPath, saveAs: true);
@@ -4245,7 +4239,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isTemplatesLoading = false;
-            UpdateTemplatesUi();
+            ApplyTemplatesWorkspaceUiState();
         }
     }
 

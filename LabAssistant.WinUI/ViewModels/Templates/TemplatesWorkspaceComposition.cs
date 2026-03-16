@@ -68,4 +68,43 @@ internal sealed class TemplatesWorkspaceComposition
             _ensureTemplatesLibraryLoaded();
         }
     }
+
+    public void ApplyUiState(TemplatesWorkspaceUiState state)
+    {
+        _libraryView.OpenTemplateInEditorButtonControl.IsEnabled = state.HasSelectedLibraryItem && !state.IsLoading;
+        _libraryView.DeleteTemplateButtonControl.IsEnabled = state.HasSelectedLibraryItem && !state.IsLoading;
+        _libraryView.ExportTemplateButtonControl.IsEnabled = state.HasSelectedLibraryItem && !state.IsLoading;
+        _libraryView.ApplyTemplateSearchButtonControl.IsEnabled = !state.IsLoading;
+        _libraryView.ClearTemplateSearchButtonControl.IsEnabled = !state.IsLoading;
+        _libraryView.ReloadTemplatesButtonControl.IsEnabled = !state.IsLoading;
+        _libraryView.ImportTemplateButtonControl.IsEnabled = !state.IsLoading;
+        _libraryView.CreateTemplateButtonControl.IsEnabled = !state.IsLoading;
+        _editorView.SaveTemplateButtonControl.IsEnabled = state.HasActiveTemplateEditorDocument && !state.IsLoading;
+        _editorView.SaveTemplateAsButtonControl.IsEnabled = state.HasActiveTemplateEditorDocument && !state.IsLoading;
+        _editorView.ValidateTemplateButtonControl.IsEnabled = state.HasActiveTemplateEditorDocument && !state.IsLoading;
+        _editorView.BackToLibraryButtonControl.IsEnabled = !state.IsLoading;
+        _editorView.AddTemplateVmButtonControl.IsEnabled = state.HasActiveTemplateEditorDocument && !state.IsLoading;
+        _editorView.RemoveTemplateVmButtonControl.IsEnabled = state.HasSelectedTemplateVmEntry && !state.IsLoading;
+        _editorView.AddTemplateVmSwitchRowButtonControl.IsEnabled = state.HasSelectedTemplateVmEntry && !state.IsLoading;
+        _editorView.TemplateVmVhdxCatalogComboBoxControl.IsEnabled = state.HasSelectedTemplateVmEntry && !state.IsLoading;
+        _editorView.ApplyTemplateVmChangesButtonControl.IsEnabled = state.HasSelectedTemplateVmEntry && !state.IsLoading;
+        _editorView.TemplateEditorContextTextBlockControl.Text = state.TemplateEditorContextText;
+        _editorView.TemplateIdTextBlockControl.Text = state.TemplateIdText;
+        _editorView.TemplateFilePathTextBlockControl.Text = state.TemplateFilePathText;
+        _editorView.TemplateVmCountTextBlockControl.Text = state.TemplateVmCountText;
+        _editorView.TemplateNameTextBoxControl.Text = state.TemplateName;
+        _editorView.TemplateDescriptionTextBoxControl.Text = state.TemplateDescription;
+    }
 }
+
+internal readonly record struct TemplatesWorkspaceUiState(
+    bool IsLoading,
+    bool HasSelectedLibraryItem,
+    bool HasActiveTemplateEditorDocument,
+    bool HasSelectedTemplateVmEntry,
+    string TemplateEditorContextText,
+    string TemplateIdText,
+    string TemplateFilePathText,
+    string TemplateVmCountText,
+    string TemplateName,
+    string TemplateDescription);

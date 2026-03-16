@@ -910,6 +910,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
         Assert.DoesNotContain("if (IsTemplatesLibraryActive)", mainWindowSource);
         Assert.DoesNotContain("_ = EnsureTemplatesLibraryAsync(forceRefresh: false);", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateTemplatesUi()", mainWindowSource);
 
         Assert.Contains("public const string TemplatesLibrary = \"templates.library\";", shellViewModelSource);
         Assert.Contains("public const string TemplatesEditor = \"templates.editor\";", shellViewModelSource);
@@ -936,6 +937,11 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("if (_shellBridge.IsTemplatesLibraryActive)", compositionSource);
         Assert.Contains("_ensureTemplatesLibraryLoaded();", compositionSource);
+        Assert.Contains("internal readonly record struct TemplatesWorkspaceUiState(", compositionSource);
+        Assert.Contains("public void ApplyUiState(TemplatesWorkspaceUiState state)", compositionSource);
+        Assert.Contains("_libraryView.OpenTemplateInEditorButtonControl.IsEnabled = state.HasSelectedLibraryItem && !state.IsLoading;", compositionSource);
+        Assert.Contains("_editorView.SaveTemplateButtonControl.IsEnabled = state.HasActiveTemplateEditorDocument && !state.IsLoading;", compositionSource);
+        Assert.Contains("_editorView.TemplateEditorContextTextBlockControl.Text = state.TemplateEditorContextText;", compositionSource);
         Assert.DoesNotContain("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", compositionSource);
         Assert.DoesNotContain("TemplatesSubviewTabView", compositionSource);
         Assert.DoesNotContain("internal interface ITemplatesWorkspaceHost", compositionSource);
