@@ -56,6 +56,7 @@ public sealed class MilestoneAKScenarioMatrixTests
         var viewSource = LoadAssetsSwitchesViewXamlSource();
         var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
+        var controllerSource = LoadAssetsSwitchesControllerSource();
 
         Assert.Contains("EnsureAssetsSwitchesAsync", source);
         Assert.Contains("UpdateAssetsSwitchesUi", source);
@@ -65,8 +66,11 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("AssetsSwitchesDeleteButton_Click", source);
         Assert.Contains("ShowAssetsSwitchDeleteConfirmationDialogAsync", source);
         Assert.Contains("IAssetsSwitchesCapabilityService", source);
-        Assert.Contains("_assetsSwitchesWorkspace.HasErrorState", source);
-        Assert.Contains("AssetsSwitchesErrorStatePanel.Visibility = _assetsSwitchesWorkspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("_assetsSwitchesController = new AssetsSwitchesWorkspaceController(", source);
+        Assert.Contains("HandleSelectionChangedAsync", controllerSource);
+        Assert.Contains("SaveDraftAsync", controllerSource);
+        Assert.Contains("DeleteSelectedAsync", controllerSource);
+        Assert.Contains("ApplyDeleteAssessment", controllerSource);
         Assert.Contains("public bool HasErrorState { get; set; }", workspaceSource);
         Assert.Contains("Delete is allowed only when no Hyper-V VM is attached to the switch.", source);
         Assert.Contains("Delete is blocked because at least one VM is attached to this switch.", capabilitySource);
@@ -81,22 +85,24 @@ public sealed class MilestoneAKScenarioMatrixTests
         var source = LoadMainWindowSource();
         var viewSource = LoadAssetsSwitchesViewXamlSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
+        var controllerSource = LoadAssetsSwitchesControllerSource();
 
         Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();", source);
         Assert.Contains("CaptureAssetsSwitchDraftFromEditor", source);
-        Assert.Contains("ApplyAssetsSwitchValidationResult", source);
-        Assert.Contains("ApplyAssetsSwitchDeleteAssessment", source);
-        Assert.Contains("RefreshAssetsSwitchValidationAsync", source);
-        Assert.Contains("LoadAssetsSwitchAttachedVmNamesAsync", source);
-        Assert.Contains("SetAssetsSwitchAttachedVmState", source);
-        Assert.Contains("ClearAssetsSwitchesErrorState", source);
-        Assert.Contains("AssetsSwitchesErrorStatePanel.Visibility = _assetsSwitchesWorkspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("ApplyAssetsSwitchesEditorDraft", source);
+        Assert.Contains("ApplyAssetsSwitchesWorkspaceState", source);
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceController", controllerSource);
+        Assert.Contains("RefreshValidationAsync", controllerSource);
+        Assert.Contains("LoadAttachedVmNamesAsync", controllerSource);
+        Assert.Contains("SetAttachedVmState", controllerSource);
+        Assert.Contains("ClearErrorState", controllerSource);
+        Assert.Contains("AssetsSwitchesErrorStatePanel.Visibility = workspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
         Assert.Contains("public AssetsSwitchDraft? PendingDraft { get; set; }", workspaceSource);
         Assert.Contains("public int ValidationRequestVersion { get; set; }", workspaceSource);
         Assert.Contains("public int AssessmentRequestVersion { get; set; }", workspaceSource);
-        Assert.Contains("Virtual switch inventory refreshed. The current new-switch draft was preserved.", source);
-        Assert.Contains("Delete blocked. Disconnect the attached VMs from this switch and refresh before trying again.", source);
-        Assert.Contains("Attached VMs currently using this switch.", source);
+        Assert.Contains("The current new-switch draft was preserved.", controllerSource);
+        Assert.Contains("Delete blocked. Disconnect the attached VMs from this switch and refresh before trying again.", controllerSource);
+        Assert.Contains("Attached VMs currently using this switch.", controllerSource);
         Assert.Contains("Select a switch or click New to begin.", viewSource);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", viewSource);
         Assert.DoesNotContain("AssetsSwitchesActionsRegion", viewSource);
@@ -111,6 +117,7 @@ public sealed class MilestoneAKScenarioMatrixTests
         var viewSource = LoadAssetsSwitchesViewXamlSource();
         var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
+        var controllerSource = LoadAssetsSwitchesControllerSource();
 
         Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", LoadShellViewModelSource());
         Assert.Contains("private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;", source);
@@ -129,15 +136,19 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("AssetsSwitchesApplyButton_Click", source);
         Assert.Contains("AssetsSwitchesDeleteButton_Click", source);
         Assert.Contains("IAssetsSwitchesCapabilityService", source);
+        Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", controllerSource);
+        Assert.Contains("public async Task BeginCreateAsync()", controllerSource);
+        Assert.Contains("public async Task SaveDraftAsync()", controllerSource);
+        Assert.Contains("public async Task DeleteSelectedAsync()", controllerSource);
         Assert.Contains("Delete is blocked because at least one VM is attached to this switch.", capabilitySource);
         Assert.Contains("Switch type changes are not supported. Create a new switch instead.", capabilitySource);
         Assert.Contains("External adapter rebinding is not supported here. Create a new switch instead.", capabilitySource);
 
         Assert.Contains("public AssetsSwitchDraft? PendingDraft { get; set; }", workspaceSource);
-        Assert.Contains("RefreshAssetsSwitchValidationAsync", source);
-        Assert.Contains("LoadAssetsSwitchAttachedVmNamesAsync", source);
+        Assert.Contains("RefreshValidationAsync", controllerSource);
+        Assert.Contains("LoadAttachedVmNamesAsync", controllerSource);
         Assert.Contains("public bool HasErrorState { get; set; }", workspaceSource);
-        Assert.Contains("Attached VMs currently using this switch.", source);
+        Assert.Contains("Attached VMs currently using this switch.", controllerSource);
         Assert.DoesNotContain("Delete eligibility is checked when you click Delete.", source);
         Assert.Contains("ContentTitleTextBlock.Text = _activeCapability.DisplayName;", source);
         Assert.Contains("Manage shared Hyper-V assets, inventory, and compatibility state from one capability surface.", source);
@@ -183,6 +194,12 @@ public sealed class MilestoneAKScenarioMatrixTests
     private static string LoadAssetsSwitchesWorkspaceSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesControllerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
