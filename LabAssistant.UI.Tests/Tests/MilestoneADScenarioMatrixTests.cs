@@ -50,13 +50,10 @@ public sealed class MilestoneADScenarioMatrixTests
     public void MainWindow_WiresTemplatesOperations_ForLibraryAndEditorFlows()
     {
         var source = LoadMainWindowSource();
+        var compositionSource = LoadTemplatesWorkspaceCompositionSource();
+        var libraryViewSource = LoadTemplatesLibraryViewCodeBehindSource();
 
         Assert.Contains("WireTemplatesHandlers()", source);
-        Assert.Contains("OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;", source);
-        Assert.Contains("CreateTemplateButton.Click += CreateTemplateButton_Click;", source);
-        Assert.Contains("DeleteTemplateButton.Click += DeleteTemplateButton_Click;", source);
-        Assert.Contains("ImportTemplateButton.Click += ImportTemplateButton_Click;", source);
-        Assert.Contains("ExportTemplateButton.Click += ExportTemplateButton_Click;", source);
         Assert.Contains("SaveTemplateButton.Click += SaveTemplateButton_Click;", source);
         Assert.Contains("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", source);
         Assert.Contains("ValidateTemplateButton.Click += ValidateTemplateButton_Click;", source);
@@ -65,20 +62,29 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", source);
         Assert.Contains("RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;", source);
         Assert.Contains("ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;", source);
+        Assert.Contains("_libraryView.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;", compositionSource);
+        Assert.Contains("_libraryView.DeleteTemplateRequested += TemplatesLibraryView_DeleteTemplateRequested;", compositionSource);
+        Assert.Contains("OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;", libraryViewSource);
+        Assert.Contains("CreateTemplateButton.Click += CreateTemplateButton_Click;", libraryViewSource);
+        Assert.Contains("DeleteTemplateButton.Click += DeleteTemplateButton_Click;", libraryViewSource);
+        Assert.Contains("ImportTemplateButton.Click += ImportTemplateButton_Click;", libraryViewSource);
+        Assert.Contains("ExportTemplateButton.Click += ExportTemplateButton_Click;", libraryViewSource);
         Assert.Contains("_templatesCapabilityService.SaveAsync", source);
-        Assert.Contains("_templatesCapabilityService.ImportAsync", source);
-        Assert.Contains("_templatesCapabilityService.ExportAsync", source);
-        Assert.Contains("_templatesCapabilityService.DeleteAsync", source);
+        Assert.DoesNotContain("_templatesCapabilityService.ImportAsync", source);
+        Assert.DoesNotContain("_templatesCapabilityService.ExportAsync", source);
+        Assert.DoesNotContain("_templatesCapabilityService.DeleteAsync", source);
     }
 
     [Fact]
     public void MainWindow_PreservesLibraryEditorContinuity_WithoutFilesystemFirstFallback()
     {
         var source = LoadMainWindowSource();
+        var controllerSource = LoadTemplatesLibraryWorkspaceControllerSource();
 
-        Assert.Contains("OpenSelectedTemplateInEditorAsync()", source);
-        Assert.Contains("await OpenTemplateInEditorAsync(_templatesWorkspaceComposition.SelectedLibraryItem, fromDeploy: false);", source);
-        Assert.Contains("_templatesWorkspaceComposition.UpdateSelectedLibraryItem(templateItem);", source);
+        Assert.Contains("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", source);
+        Assert.Contains("await ShowTemplateEditorAsync(document, \"Template loaded.\");", source);
+        Assert.Contains("public async Task OpenSelectedTemplateInEditorAsync()", controllerSource);
+        Assert.Contains("await _host.ShowTemplateEditorAsync(document, \"Template loaded.\");", controllerSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
     }
@@ -219,6 +225,18 @@ public sealed class MilestoneADScenarioMatrixTests
     private static string LoadTemplatesWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesLibraryWorkspaceControllerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesLibraryWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesLibraryViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Templates", "TemplatesLibraryView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
