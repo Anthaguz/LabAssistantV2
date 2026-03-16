@@ -311,13 +311,16 @@ Use a small fixed taxonomy unless the user explicitly approves changes:
 - `chore` — repository maintenance, tooling, dependency, CI, or other support work that is not primarily feature/bug/refactor/docs/test
 
 Rules:
-- Apply the **dominant reason to change** label when more than one label could fit.
-- Do not stack multiple type labels unless the repository explicitly adopts that policy later.
+- Apply the **dominant reason to change** label at minimum.
+- Additional labels are allowed when they describe real secondary aspects of the same work item.
+- Do not add labels casually; every applied label should be defensible from the issue or PR scope.
 - If a change mixes multiple dominant reasons, the issue is probably too large and should be split.
 
 ### 8.2 How To Classify Issues
 
-- Every implementation issue should have exactly one primary type label from section 8.1.
+- Every implementation issue should have at least one type label from section 8.1.
+- Issues may carry multiple type labels when the scope genuinely spans more than one category and the extra labels improve triage or reporting.
+- Every issue should be assigned to a milestone when the work belongs to a planned delivery slice and the mapping is clear.
 - Issues that define or adjust product behavior should also map to a user story and acceptance criteria.
 - Use the title prefix and the label together; the prefix is not a replacement for the label.
 - If the issue only resolves uncertainty, mismatch, or a `TBD`, classify it by its real deliverable:
@@ -327,15 +330,22 @@ Rules:
 - If the correct label is unclear, do not guess silently:
   - add `TBD` in docs when appropriate
   - open or update an issue describing the ambiguity
+- If milestone membership is unclear, resolve the ambiguity or leave a brief note; do not silently leave milestone assignment undone for active milestone work.
 
 ### 8.3 How To Classify PRs
 
+- Every PR must link to its driving issue when the PR is created.
+- Use explicit closing linkage in the PR body when appropriate, for example `Closes #123`, so merge state and issue state stay synchronized.
+- If a PR is intentionally not closing the linked issue, the PR body should say so explicitly and still reference the issue.
 - Every PR should carry the same primary type label as its driving issue unless scope drift forced a split.
-- PRs should reference the issue, acceptance criteria, and milestone when those exist.
+- PRs may carry multiple labels when that better reflects the actual scope and matches the linked issue classification.
+- Every PR should be assigned to the same milestone as its driving issue when the mapping is clear.
+- PRs should reference the issue, acceptance criteria, and milestone in the PR body when those exist.
 - A PR should normally map to one issue and one dominant reason to change.
 - If a PR contains both behavior change and incidental cleanup, classify by the behavior change, not the incidental cleanup.
 - Pure renames, extraction, or structural cleanup with no intended behavior change -> `refactor`.
 - Test-only or docs-only PRs should use `test` or `docs` rather than inheriting a nearby implementation label.
+- If the linked issue has labels or a milestone and the PR does not, agents must add them before handoff unless there is a documented reason not to.
 
 ### 8.4 Milestone Rules
 
@@ -368,6 +378,9 @@ Rules:
 - [ ] Logs added/updated with operationId (canonical structured field) and required context
 - [ ] Tests added/updated (unit tests for logic, mocks for Hyper-V if needed)
 - [ ] Docs updated if behavior or architecture changed
+- [ ] PR links to its driving issue
+- [ ] PR and issue labels are applied appropriately
+- [ ] PR and issue milestones are aligned when the work belongs to a milestone
 
 ### PR Body Format
 - PR bodies must use the repository-standard section layout with these exact Markdown level-2 headers:
@@ -381,6 +394,8 @@ Rules:
 - `## Scope` may use nested bullets when listing touched files, tests, or traceability artifacts.
 - Do not replace these headers with bold labels, top-level list items, or other ad hoc formatting.
 - Keep PR body wording concise and issue-scoped.
+- PR bodies must include explicit issue linkage in `## Traceability`.
+- When the PR should close the issue on merge, include a GitHub closing keyword such as `Closes #123`.
 
 ### PR Body Drafting
 - Agents must draft every PR body in a local temporary Markdown file before creating or editing the PR through GitHub CLI.
