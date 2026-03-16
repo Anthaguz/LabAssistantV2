@@ -2750,3 +2750,77 @@ Each readiness result shall include, at minimum:
 - [ ] Overview-local state/composition and interaction-boundary expectations are explicit and traceable
 - [ ] long-lived Assets workspace participation and `assets.overview` route-activation refresh expectations are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+---
+
+# AC-031 - WinUI Assets Base Disks Extraction Cleanup Target (AM43)
+
+**Related FRs:** FR-140, FR-141, FR-142, FR-134, FR-135, FR-136, FR-131, FR-132, FR-133, FR-100, FR-101, FR-102, FR-103, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Assets Base Disks stays under shared Assets workspace composition but gains a Base Disks-local seam
+**Given**
+- the shared Assets composition cleanup target and the Overview cleanup target are already defined
+
+**When**
+- the narrow `Assets Base Disks` cleanup target is reviewed
+
+**Then**
+- `Assets Base Disks` remains under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Assets composition remains responsible only for shared capability-level composition concerns
+- a Base Disks-local seam becomes the target home for Base Disks-specific state, orchestration, composition, and UI coordination
+
+### 2) Base Disks-local ownership is explicit without widening shared Assets composition into the workflow owner
+**Given**
+- `assets.base_disks` is the operational Base Disks management surface inside `Assets`
+
+**When**
+- Base Disks-local ownership is defined
+
+**Then**
+- Base Disks-local ownership explicitly includes:
+  - Base Disks list, selection, draft, and feedback state
+  - Base Disks-specific orchestration for refresh, import/register, edit/save, validate, and remove flows
+  - Base Disks-local composition and interaction coordination for the `assets.base_disks` surface
+  - cleanup or reduction of temporary Base Disks-specific host bridges or control exposure behind the Base Disks-local seam
+- shared `AssetsWorkspaceComposition` does not become the Base Disks workflow owner
+- shared Assets composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
+
+### 3) MainWindow and route-activation boundaries remain explicit for assets.base_disks
+**Given**
+- AM33 and AM10 keep `MainWindow` limited to shell ownership and keep Assets long-lived by default
+
+**When**
+- the Base Disks cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Assets Base Disks` continues to participate in long-lived Assets workspace lifetime rather than per-navigation recreation
+- route activation of `assets.base_disks` refreshes or reconciles Base Disks state within the existing Assets workspace
+
+### 4) Base Disks remains behavior-preserving and does not absorb Overview or Switches semantics
+**Given**
+- `Assets` is an approved Overview-first capability with canonical child routes
+
+**When**
+- the Base Disks cleanup target is defined
+
+**Then**
+- `assets.base_disks` remains the operational Base Disks management surface
+- no Overview ownership is moved into Base Disks
+- no Switches ownership is moved into Base Disks
+- runtime implementation, Base Disks behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `AssetsWorkspaceComposition` remains the owner for shared capability-level composition only
+- a Base Disks-local seam becomes the target home for Base Disks-specific state, orchestration, composition, and interaction coordination
+- `MainWindow` remains shell-only and is not injected into Base Disks views
+- `Assets Base Disks` remains long-lived with route-activation refresh inside the existing Assets workspace
+- Base Disks remains behavior-preserving and does not absorb shared Assets, Overview, or Switches concerns
+
+## Definition of Done
+- [ ] shared Assets vs Base Disks-local ownership is explicit and traceable
+- [ ] Base Disks-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
+- [ ] long-lived Assets workspace participation and `assets.base_disks` route-activation refresh expectations are explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable
