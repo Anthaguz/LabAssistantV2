@@ -54,7 +54,6 @@ public sealed partial class MainWindow : Window
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
-    private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
@@ -163,6 +162,7 @@ public sealed partial class MainWindow : Window
     private TextBlock DiagnosticsOverviewSupportSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewSupportSummaryTextBlockControl;
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
+    private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
     private Button DeployOverviewOpenQuickDeployButton => DeployOverviewView.DeployOverviewOpenQuickDeployButtonControl;
     private Button DeployOverviewOpenFromTemplateButton => DeployOverviewView.DeployOverviewOpenFromTemplateButtonControl;
     private TextBlock DeployOverviewQuickDeploySummaryTextBlock => DeployOverviewView.DeployOverviewQuickDeploySummaryTextBlockControl;
@@ -214,7 +214,6 @@ public sealed partial class MainWindow : Window
     private Button DeployOnTheFlyStartButton => DeployOnTheFlyView.DeployOnTheFlyStartButtonControl;
     private TextBlock DeployOnTheFlyStatusTextBlock => DeployOnTheFlyView.DeployOnTheFlyStatusTextBlockControl;
     private ListView TemplateLibraryListView => TemplatesLibraryView.TemplateLibraryListViewControl;
-    private TextBox TemplateSearchTextBox => TemplatesLibraryView.TemplateSearchTextBoxControl;
     private Button ApplyTemplateSearchButton => TemplatesLibraryView.ApplyTemplateSearchButtonControl;
     private Button ClearTemplateSearchButton => TemplatesLibraryView.ClearTemplateSearchButtonControl;
     private Button ReloadTemplatesButton => TemplatesLibraryView.ReloadTemplatesButtonControl;
@@ -223,7 +222,6 @@ public sealed partial class MainWindow : Window
     private Button DeleteTemplateButton => TemplatesLibraryView.DeleteTemplateButtonControl;
     private Button ImportTemplateButton => TemplatesLibraryView.ImportTemplateButtonControl;
     private Button ExportTemplateButton => TemplatesLibraryView.ExportTemplateButtonControl;
-    private TextBlock TemplatesLibraryStatusTextBlock => TemplatesLibraryView.TemplatesLibraryStatusTextBlockControl;
     private TextBox TemplateNameTextBox => TemplatesEditorView.TemplateNameTextBoxControl;
     private TextBox TemplateDescriptionTextBox => TemplatesEditorView.TemplateDescriptionTextBoxControl;
     private TextBlock TemplateEditorContextTextBlock => TemplatesEditorView.TemplateEditorContextTextBlockControl;
@@ -315,7 +313,6 @@ public sealed partial class MainWindow : Window
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
-        TemplateLibraryListView.ItemsSource = _templateLibraryItems;
         TemplateVmListView.ItemsSource = _templateVmEntries;
         WireDiagnosticsLogsHandlers();
         WireTemplatesHandlers();
@@ -362,6 +359,7 @@ public sealed partial class MainWindow : Window
     private void WireTemplatesHandlers()
     {
         TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;
+        TemplatesLibraryView.SearchTextChanged += TemplatesLibraryView_SearchTextChanged;
         TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;
         ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;
         ClearTemplateSearchButton.Click += ClearTemplateSearchButton_Click;
@@ -391,7 +389,7 @@ public sealed partial class MainWindow : Window
         DeployStartButton.Click += DeployStartButton_Click;
         DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
         DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
-        DeployTemplateSelectorComboBox.ItemsSource = _templateLibraryItems;
+        DeployTemplateSelectorComboBox.ItemsSource = TemplatesLibraryItems;
         DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
         DeployVmResultsListView.ItemsSource = _deployVmResultRows;
         DeployGlobalIssuesListView.ItemsSource = _deployIssueRows;
@@ -916,8 +914,8 @@ public sealed partial class MainWindow : Window
             : "Open Quick Deploy to configure VM entries and run deployment.";
         DeployOverviewFromTemplateSummaryTextBlock.Text = _isDeployLoadingTemplates
             ? "Template inventory is loading."
-            : _templateLibraryItems.Count > 0
-                ? $"{_templateLibraryItems.Count} templates currently available for From Template."
+            : TemplatesLibraryItems.Count > 0
+                ? $"{TemplatesLibraryItems.Count} templates currently available for From Template."
                 : "Open From Template to load template inventory and review readiness.";
     }
 
@@ -2745,7 +2743,7 @@ public sealed partial class MainWindow : Window
 
     private async Task EnsureDeployTemplatesLoadedAsync(bool forceRefresh)
     {
-        if (!forceRefresh && _templateLibraryItems.Count > 0)
+        if (!forceRefresh && TemplatesLibraryItems.Count > 0)
         {
             DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
             UpdateDeployUi();
@@ -2763,7 +2761,7 @@ public sealed partial class MainWindow : Window
         {
             await EnsureTemplatesLibraryAsync(forceRefresh: forceRefresh);
 
-            if (_templateLibraryItems.Count == 0)
+            if (TemplatesLibraryItems.Count == 0)
             {
                 _selectedDeployTemplateLibraryItem = null;
                 _activeDeployTemplateDocument = null;
@@ -2776,12 +2774,12 @@ public sealed partial class MainWindow : Window
             }
             else
             {
-                _selectedDeployTemplateLibraryItem ??= _templateLibraryItems[0];
+                _selectedDeployTemplateLibraryItem ??= TemplatesLibraryItems[0];
                 DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
                 _deployLifecycleState = "Idle";
                 _deployProgressPercent = 0;
                 _deployProgressSummary = "Template list loaded.";
-                DeployActionStatusTextBlock.Text = $"Loaded {_templateLibraryItems.Count} template(s) for deploy.";
+                DeployActionStatusTextBlock.Text = $"Loaded {TemplatesLibraryItems.Count} template(s) for deploy.";
             }
         }
         catch (Exception ex)
@@ -3230,7 +3228,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (!forceRefresh && _templateLibraryItems.Count > 0)
+        if (!forceRefresh && TemplatesLibraryItems.Count > 0)
         {
             return;
         }
@@ -3241,47 +3239,37 @@ public sealed partial class MainWindow : Window
             _isTemplatesLoading = true;
             ApplyTemplatesWorkspaceUiState();
         }
-        TemplatesLibraryStatusTextBlock.Text = "Loading templates...";
+        _templatesWorkspaceComposition.BeginLibraryLoad();
 
         try
         {
-            var result = await _templatesCapabilityService.LoadLibraryAsync(TemplateSearchTextBox.Text);
-            _templateLibraryItems.Clear();
-            foreach (var item in result.Items)
-            {
-                _templateLibraryItems.Add(item);
-            }
-
-            if (_templateLibraryItems.Count == 0)
-            {
-                TemplatesLibraryStatusTextBlock.Text = result.Errors.Count == 0
+            var result = await _templatesCapabilityService.LoadLibraryAsync(_templatesWorkspaceComposition.LibrarySearchQuery);
+            var libraryStatusText = result.Items.Count == 0
+                ? result.Errors.Count == 0
                     ? "No templates found in configured template folder."
-                    : $"No templates loaded. {result.Errors[0]}";
-            }
-            else
-            {
-                TemplatesLibraryStatusTextBlock.Text = result.Errors.Count == 0
-                    ? $"Loaded {_templateLibraryItems.Count} template(s)."
-                    : $"Loaded {_templateLibraryItems.Count} template(s) with warnings.";
-            }
+                    : $"No templates loaded. {result.Errors[0]}"
+                : result.Errors.Count == 0
+                    ? $"Loaded {result.Items.Count} template(s)."
+                    : $"Loaded {result.Items.Count} template(s) with warnings.";
+            _templatesWorkspaceComposition.ApplyLibraryInventory(result.Items, libraryStatusText);
 
             if (_selectedTemplateLibraryItem is not null)
             {
-                _selectedTemplateLibraryItem = _templateLibraryItems
+                _selectedTemplateLibraryItem = TemplatesLibraryItems
                     .FirstOrDefault(item => string.Equals(item.FilePath, _selectedTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
                 TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;
             }
 
             if (_selectedDeployTemplateLibraryItem is not null)
             {
-                _selectedDeployTemplateLibraryItem = _templateLibraryItems
+                _selectedDeployTemplateLibraryItem = TemplatesLibraryItems
                     .FirstOrDefault(item => string.Equals(item.FilePath, _selectedDeployTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
                 DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
             }
         }
         catch (Exception ex)
         {
-            TemplatesLibraryStatusTextBlock.Text = $"Failed to load templates. {ex.Message}";
+            _templatesWorkspaceComposition.SetLibraryFailure($"Failed to load templates. {ex.Message}");
         }
         finally
         {
@@ -3297,7 +3285,7 @@ public sealed partial class MainWindow : Window
     {
         if (_selectedTemplateLibraryItem is null)
         {
-            TemplatesLibraryStatusTextBlock.Text = "Select a template first.";
+            _templatesWorkspaceComposition.SetLibraryStatus("Select a template first.");
             return;
         }
 
@@ -3945,6 +3933,11 @@ public sealed partial class MainWindow : Window
         ApplyTemplatesWorkspaceUiState();
     }
 
+    private void TemplatesLibraryView_SearchTextChanged(object? sender, EventArgs e)
+    {
+        _templatesWorkspaceComposition.UpdateLibrarySearchQuery(TemplatesLibraryView.SearchText);
+    }
+
     private void TemplateVmListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedTemplateVmEntry = TemplateVmListView.SelectedItem as VmTemplate;
@@ -4028,7 +4021,7 @@ public sealed partial class MainWindow : Window
 
     private async void ClearTemplateSearchButton_Click(object sender, RoutedEventArgs e)
     {
-        TemplateSearchTextBox.Text = string.Empty;
+        _templatesWorkspaceComposition.ClearLibrarySearchQuery();
         await EnsureTemplatesLibraryAsync(forceRefresh: true);
     }
 
@@ -4066,7 +4059,7 @@ public sealed partial class MainWindow : Window
     {
         if (_selectedTemplateLibraryItem is null)
         {
-            TemplatesLibraryStatusTextBlock.Text = "Select a template first.";
+            _templatesWorkspaceComposition.SetLibraryStatus("Select a template first.");
             return;
         }
 
@@ -4090,7 +4083,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.DeleteAsync(_selectedTemplateLibraryItem.FilePath);
-            TemplatesLibraryStatusTextBlock.Text = result.UserMessage;
+            _templatesWorkspaceComposition.SetLibraryStatus(result.UserMessage);
             if (result.Success)
             {
                 _selectedTemplateLibraryItem = null;
@@ -4109,7 +4102,7 @@ public sealed partial class MainWindow : Window
         var sourcePath = await PickTemplateFileForOpenAsync();
         if (string.IsNullOrWhiteSpace(sourcePath))
         {
-            TemplatesLibraryStatusTextBlock.Text = "Import cancelled.";
+            _templatesWorkspaceComposition.SetLibraryStatus("Import cancelled.");
             return;
         }
 
@@ -4118,7 +4111,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.ImportAsync(sourcePath);
-            TemplatesLibraryStatusTextBlock.Text = result.UserMessage;
+            _templatesWorkspaceComposition.SetLibraryStatus(result.UserMessage);
             if (result.Success)
             {
                 await EnsureTemplatesLibraryAsync(forceRefresh: true);
@@ -4135,7 +4128,7 @@ public sealed partial class MainWindow : Window
     {
         if (_selectedTemplateLibraryItem is null)
         {
-            TemplatesLibraryStatusTextBlock.Text = "Select a template first.";
+            _templatesWorkspaceComposition.SetLibraryStatus("Select a template first.");
             return;
         }
 
@@ -4143,7 +4136,7 @@ public sealed partial class MainWindow : Window
         var destinationPath = await PickTemplateFileForSaveAsync(suggestedName);
         if (string.IsNullOrWhiteSpace(destinationPath))
         {
-            TemplatesLibraryStatusTextBlock.Text = "Export cancelled.";
+            _templatesWorkspaceComposition.SetLibraryStatus("Export cancelled.");
             return;
         }
 
@@ -4152,7 +4145,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _templatesCapabilityService.ExportAsync(_selectedTemplateLibraryItem.FilePath, destinationPath);
-            TemplatesLibraryStatusTextBlock.Text = result.UserMessage;
+            _templatesWorkspaceComposition.SetLibraryStatus(result.UserMessage);
         }
         finally
         {

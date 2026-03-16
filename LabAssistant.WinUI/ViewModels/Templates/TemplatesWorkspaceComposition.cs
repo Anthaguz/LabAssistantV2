@@ -1,3 +1,4 @@
+using LabAssistant.Business.Templates;
 using LabAssistant.WinUI.Views.Templates;
 using Microsoft.UI.Xaml;
 
@@ -42,6 +43,7 @@ internal sealed class TemplatesWorkspaceComposition
     private readonly TemplatesEditorView _editorView;
     private readonly ITemplatesWorkspaceShellBridge _shellBridge;
     private readonly Action _ensureTemplatesLibraryLoaded;
+    private readonly TemplatesLibraryWorkspaceViewModel _libraryWorkspace = new();
 
     public TemplatesWorkspaceComposition(
         FrameworkElement workspaceHost,
@@ -55,6 +57,48 @@ internal sealed class TemplatesWorkspaceComposition
         _editorView = editorView;
         _ensureTemplatesLibraryLoaded = ensureTemplatesLibraryLoaded;
         _shellBridge = shellBridge;
+        _libraryView.SetInventorySource(_libraryWorkspace.Items);
+        ApplyLibraryState();
+    }
+
+    public IList<TemplateLibraryItem> LibraryItems => _libraryWorkspace.Items;
+
+    public string LibrarySearchQuery => _libraryWorkspace.SearchQuery;
+
+    public void UpdateLibrarySearchQuery(string? searchQuery)
+    {
+        _libraryWorkspace.SetSearchQuery(searchQuery);
+        ApplyLibraryState();
+    }
+
+    public void ClearLibrarySearchQuery()
+    {
+        _libraryWorkspace.SetSearchQuery(string.Empty);
+        ApplyLibraryState();
+    }
+
+    public void BeginLibraryLoad()
+    {
+        _libraryWorkspace.BeginLoading();
+        ApplyLibraryState();
+    }
+
+    public void ApplyLibraryInventory(IReadOnlyList<TemplateLibraryItem> items, string statusText)
+    {
+        _libraryWorkspace.ApplyInventory(items, statusText);
+        ApplyLibraryState();
+    }
+
+    public void SetLibraryStatus(string statusText)
+    {
+        _libraryWorkspace.SetStatus(statusText);
+        ApplyLibraryState();
+    }
+
+    public void SetLibraryFailure(string statusText)
+    {
+        _libraryWorkspace.SetFailure(statusText);
+        ApplyLibraryState();
     }
 
     public void ApplyShellState()
@@ -94,6 +138,12 @@ internal sealed class TemplatesWorkspaceComposition
         _editorView.TemplateVmCountTextBlockControl.Text = state.TemplateVmCountText;
         _editorView.TemplateNameTextBoxControl.Text = state.TemplateName;
         _editorView.TemplateDescriptionTextBoxControl.Text = state.TemplateDescription;
+    }
+
+    private void ApplyLibraryState()
+    {
+        _libraryView.SetSearchText(_libraryWorkspace.SearchQuery);
+        _libraryView.SetStatusText(_libraryWorkspace.StatusText);
     }
 }
 
