@@ -195,11 +195,14 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", mainWindowSource);
         Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();", mainWindowSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceController _assetsSwitchesController;", mainWindowSource);
         Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
         Assert.Contains("_assetsBaseDisksWorkspaceComposition,", mainWindowSource);
         Assert.Contains("_assetsSwitchesWorkspace,", mainWindowSource);
+        Assert.Contains("_assetsSwitchesController = new AssetsSwitchesWorkspaceController(", mainWindowSource);
         Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", mainWindowSource);
         Assert.Contains("new AssetsBaseDisksCompositionHost(", mainWindowSource);
+        Assert.Contains("new AssetsSwitchesWorkspaceHost(", mainWindowSource);
         Assert.Contains("new AssetsWorkspaceHost(", mainWindowSource);
         Assert.Contains("EnsureAssetsSwitchesAsync,", mainWindowSource);
         Assert.Contains("UpdateAssetsSwitchesUi),", mainWindowSource);
@@ -242,6 +245,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private bool _isAssetsSwitchesDeleting;", mainWindowSource);
         Assert.DoesNotContain("private bool _isUpdatingAssetsSwitchesEditor;", mainWindowSource);
         Assert.DoesNotContain("private bool _hasAssetsSwitchesErrorState;", mainWindowSource);
+        Assert.DoesNotContain("private async Task RefreshAssetsSwitchValidationAsync()", mainWindowSource);
+        Assert.DoesNotContain("private async Task LoadAssetsSwitchAttachedVmNamesAsync(string switchName)", mainWindowSource);
+        Assert.DoesNotContain("private void ApplyAssetsSwitchValidationResult(AssetsSwitchValidationResult validation)", mainWindowSource);
+        Assert.DoesNotContain("private void ApplyAssetsSwitchDeleteAssessment(AssetsSwitchDeleteAssessment assessment)", mainWindowSource);
         Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", mainWindowSource);
         Assert.DoesNotContain("AssetsOverviewOpenSwitchesButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsSwitches);", mainWindowSource);
 
@@ -260,6 +267,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var baseDisksWorkspaceSource = LoadAssetsBaseDisksWorkspaceViewModelSource();
         var switchesWorkspaceSource = LoadAssetsSwitchesWorkspaceViewModelSource();
+        var switchesControllerSource = LoadAssetsSwitchesWorkspaceControllerSource();
         var overviewWorkspaceSource = LoadAssetsOverviewWorkspaceViewModelSource();
         var overviewXaml = LoadAssetsOverviewXaml();
         var overviewCodeBehindSource = LoadAssetsOverviewCodeBehindSource();
@@ -371,6 +379,23 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public string DeleteConstraintText { get; set; }", switchesWorkspaceSource);
         Assert.Contains("public string ErrorStateText { get; set; }", switchesWorkspaceSource);
         Assert.Contains("public string AttachedVmHintText { get; set; }", switchesWorkspaceSource);
+
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceController", switchesControllerSource);
+        Assert.Contains("private readonly IAssetsSwitchesCapabilityService _capabilityService;", switchesControllerSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _workspace;", switchesControllerSource);
+        Assert.Contains("private readonly IAssetsSwitchesWorkspaceHost _host;", switchesControllerSource);
+        Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", switchesControllerSource);
+        Assert.Contains("public async Task HandleSelectionChangedAsync(AssetsSwitchListRow? selectedRow)", switchesControllerSource);
+        Assert.Contains("public async Task BeginCreateAsync()", switchesControllerSource);
+        Assert.Contains("public async Task SaveDraftAsync()", switchesControllerSource);
+        Assert.Contains("public async Task DeleteSelectedAsync()", switchesControllerSource);
+        Assert.Contains("public async Task HandleEditorChangedAsync()", switchesControllerSource);
+        Assert.Contains("public void ApplyWorkspaceState()", switchesControllerSource);
+        Assert.Contains("LoadEditorFromRow", switchesControllerSource);
+        Assert.Contains("LoadEditorFromDraft", switchesControllerSource);
+        Assert.Contains("LoadAttachedVmNamesAsync", switchesControllerSource);
+        Assert.Contains("RefreshValidationAsync", switchesControllerSource);
+        Assert.Contains("ApplyDeleteAssessment", switchesControllerSource);
 
         Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceComposition : IAssetsBaseDisksWorkspaceHost", baseDisksCompositionSource);
         Assert.Contains("private readonly AssetsBaseDisksView _view;", baseDisksCompositionSource);
@@ -501,6 +526,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
         var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
+        var switchesControllerSource = LoadAssetsSwitchesWorkspaceControllerSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var shellBridgeInterfaceBlock = ExtractSection(
             compositionSource,
@@ -632,6 +658,33 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public bool IsAssetsSwitchesLoading =>", overviewHostClassBlock);
         Assert.Contains("public int AssetsBaseDiskCount =>", overviewHostClassBlock);
         Assert.Contains("public int AssetsSwitchCount =>", overviewHostClassBlock);
+
+        var switchesHostInterfaceBlock = ExtractSection(
+            switchesControllerSource,
+            "internal interface IAssetsSwitchesWorkspaceHost",
+            "internal sealed class AssetsSwitchesWorkspaceHost");
+        var switchesHostClassBlock = ExtractSection(
+            switchesControllerSource,
+            "internal sealed class AssetsSwitchesWorkspaceHost",
+            "internal sealed class AssetsSwitchesWorkspaceController");
+
+        Assert.Contains("AssetsSwitchDraft? CaptureDraft(bool isNewOverride);", switchesHostInterfaceBlock);
+        Assert.Contains("string GetSelectedSwitchType();", switchesHostInterfaceBlock);
+        Assert.Contains("void ApplyEditorDraft(AssetsSwitchDraft draft);", switchesHostInterfaceBlock);
+        Assert.Contains("void ClearEditorFields();", switchesHostInterfaceBlock);
+        Assert.Contains("void SetSelectedRow(AssetsSwitchListRow? row);", switchesHostInterfaceBlock);
+        Assert.Contains("void ApplyWorkspaceState(AssetsSwitchesWorkspaceViewModel workspace, bool canValidateOrApply, bool isExternalSwitchTypeSelected);", switchesHostInterfaceBlock);
+        Assert.Contains("Task<bool> ShowDeleteConfirmationDialogAsync", switchesHostInterfaceBlock);
+        Assert.DoesNotContain("NavigateToRoute", switchesHostInterfaceBlock);
+
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceHost : IAssetsSwitchesWorkspaceHost", switchesHostClassBlock);
+        Assert.Contains("public AssetsSwitchDraft? CaptureDraft(bool isNewOverride) =>", switchesHostClassBlock);
+        Assert.Contains("public string GetSelectedSwitchType() =>", switchesHostClassBlock);
+        Assert.Contains("public void ApplyEditorDraft(AssetsSwitchDraft draft) =>", switchesHostClassBlock);
+        Assert.Contains("public void ClearEditorFields() =>", switchesHostClassBlock);
+        Assert.Contains("public void SetSelectedRow(AssetsSwitchListRow? row) =>", switchesHostClassBlock);
+        Assert.Contains("public void ApplyWorkspaceState(AssetsSwitchesWorkspaceViewModel workspace, bool canValidateOrApply, bool isExternalSwitchTypeSelected)", switchesHostClassBlock);
+        Assert.Contains("public Task<bool> ShowDeleteConfirmationDialogAsync", switchesHostClassBlock);
     }
 
     private static string LoadMainWindowSource()
@@ -685,6 +738,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadAssetsSwitchesWorkspaceViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesWorkspaceControllerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
