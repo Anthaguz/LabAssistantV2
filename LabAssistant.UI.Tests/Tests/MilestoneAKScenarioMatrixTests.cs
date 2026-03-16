@@ -57,16 +57,17 @@ public sealed class MilestoneAKScenarioMatrixTests
         var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
         var controllerSource = LoadAssetsSwitchesControllerSource();
+        var compositionSource = LoadAssetsSwitchesCompositionSource();
 
-        Assert.Contains("EnsureAssetsSwitchesAsync", source);
-        Assert.Contains("UpdateAssetsSwitchesUi", source);
-        Assert.Contains("AssetsSwitchesRefreshButton_Click", source);
-        Assert.Contains("AssetsSwitchesCreateButton_Click", source);
-        Assert.Contains("AssetsSwitchesApplyButton_Click", source);
-        Assert.Contains("AssetsSwitchesDeleteButton_Click", source);
         Assert.Contains("ShowAssetsSwitchDeleteConfirmationDialogAsync", source);
         Assert.Contains("IAssetsSwitchesCapabilityService", source);
-        Assert.Contains("_assetsSwitchesController = new AssetsSwitchesWorkspaceController(", source);
+        Assert.Contains("_assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(", source);
+        Assert.Contains("RefreshRequested += AssetsSwitchesRefreshRequested;", compositionSource);
+        Assert.Contains("CreateRequested += AssetsSwitchesCreateRequested;", compositionSource);
+        Assert.Contains("ApplyRequested += AssetsSwitchesApplyRequested;", compositionSource);
+        Assert.Contains("DeleteRequested += AssetsSwitchesDeleteRequested;", compositionSource);
+        Assert.Contains("SelectedSwitchChanged += AssetsSwitchesListView_SelectionChanged;", compositionSource);
+        Assert.Contains("EditorChanged += AssetsSwitchesEditorChanged;", compositionSource);
         Assert.Contains("HandleSelectionChangedAsync", controllerSource);
         Assert.Contains("SaveDraftAsync", controllerSource);
         Assert.Contains("DeleteSelectedAsync", controllerSource);
@@ -86,17 +87,21 @@ public sealed class MilestoneAKScenarioMatrixTests
         var viewSource = LoadAssetsSwitchesViewXamlSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
         var controllerSource = LoadAssetsSwitchesControllerSource();
+        var compositionSource = LoadAssetsSwitchesCompositionSource();
 
-        Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();", source);
-        Assert.Contains("CaptureAssetsSwitchDraftFromEditor", source);
-        Assert.Contains("ApplyAssetsSwitchesEditorDraft", source);
-        Assert.Contains("ApplyAssetsSwitchesWorkspaceState", source);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;", source);
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceComposition : IAssetsSwitchesWorkspaceHost", compositionSource);
+        Assert.Contains("private readonly AssetsSwitchesView _view;", compositionSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _workspace = new();", compositionSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceController _controller;", compositionSource);
+        Assert.Contains("CaptureDraft(bool isNewOverride)", compositionSource);
+        Assert.Contains("_view.UpdateWorkspaceState(BuildViewState(workspace, canValidateOrApply, isExternalSwitchTypeSelected));", compositionSource);
         Assert.Contains("internal sealed class AssetsSwitchesWorkspaceController", controllerSource);
         Assert.Contains("RefreshValidationAsync", controllerSource);
         Assert.Contains("LoadAttachedVmNamesAsync", controllerSource);
         Assert.Contains("SetAttachedVmState", controllerSource);
         Assert.Contains("ClearErrorState", controllerSource);
-        Assert.Contains("AssetsSwitchesErrorStatePanel.Visibility = workspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("AssetsSwitchesErrorStatePanel.Visibility = state.IsErrorVisible ? Visibility.Visible : Visibility.Collapsed;", LoadAssetsSwitchesViewCodeBehindSource());
         Assert.Contains("public AssetsSwitchDraft? PendingDraft { get; set; }", workspaceSource);
         Assert.Contains("public int ValidationRequestVersion { get; set; }", workspaceSource);
         Assert.Contains("public int AssessmentRequestVersion { get; set; }", workspaceSource);
@@ -118,6 +123,7 @@ public sealed class MilestoneAKScenarioMatrixTests
         var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
         var controllerSource = LoadAssetsSwitchesControllerSource();
+        var compositionSource = LoadAssetsSwitchesCompositionSource();
 
         Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", LoadShellViewModelSource());
         Assert.Contains("private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;", source);
@@ -130,12 +136,9 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesEmptyStatePanel"));
         Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesErrorStatePanel"));
 
-        Assert.Contains("EnsureAssetsSwitchesAsync", source);
-        Assert.Contains("AssetsSwitchesRefreshButton_Click", source);
-        Assert.Contains("AssetsSwitchesCreateButton_Click", source);
-        Assert.Contains("AssetsSwitchesApplyButton_Click", source);
-        Assert.Contains("AssetsSwitchesDeleteButton_Click", source);
         Assert.Contains("IAssetsSwitchesCapabilityService", source);
+        Assert.Contains("public void ApplyShellState()", compositionSource);
+        Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh)", compositionSource);
         Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", controllerSource);
         Assert.Contains("public async Task BeginCreateAsync()", controllerSource);
         Assert.Contains("public async Task SaveDraftAsync()", controllerSource);
@@ -200,6 +203,18 @@ public sealed class MilestoneAKScenarioMatrixTests
     private static string LoadAssetsSwitchesControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsSwitchesView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

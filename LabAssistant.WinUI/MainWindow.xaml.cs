@@ -50,8 +50,7 @@ public sealed partial class MainWindow : Window
     private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
     private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
-    private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();
-    private readonly AssetsSwitchesWorkspaceController _assetsSwitchesController;
+    private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
@@ -160,25 +159,6 @@ public sealed partial class MainWindow : Window
     private TextBlock DiagnosticsOverviewLogsSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewLogsSummaryTextBlockControl;
     private Button DiagnosticsOverviewOpenSupportExportButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenSupportExportButtonControl;
     private TextBlock DiagnosticsOverviewSupportSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewSupportSummaryTextBlockControl;
-    private ListView AssetsSwitchesListView => AssetsSwitchesView.AssetsSwitchesListViewControl;
-    private Button AssetsSwitchesRefreshButton => AssetsSwitchesView.AssetsSwitchesRefreshButtonControl;
-    private Button AssetsSwitchesCreateButton => AssetsSwitchesView.AssetsSwitchesCreateButtonControl;
-    private Button AssetsSwitchesApplyButton => AssetsSwitchesView.AssetsSwitchesApplyButtonControl;
-    private Button AssetsSwitchesDeleteButton => AssetsSwitchesView.AssetsSwitchesDeleteButtonControl;
-    private TextBlock AssetsSwitchesStatusTextBlock => AssetsSwitchesView.AssetsSwitchesStatusTextBlockControl;
-    private TextBlock AssetsSwitchesSelectedSwitchValidationTextBlock => AssetsSwitchesView.AssetsSwitchesSelectedSwitchValidationTextBlockControl;
-    private TextBlock AssetsSwitchesDeleteConstraintTextBlock => AssetsSwitchesView.AssetsSwitchesDeleteConstraintTextBlockControl;
-    private TextBox AssetsSwitchesNameTextBox => AssetsSwitchesView.AssetsSwitchesNameTextBoxControl;
-    private ComboBox AssetsSwitchesTypeComboBox => AssetsSwitchesView.AssetsSwitchesTypeComboBoxControl;
-    private TextBox AssetsSwitchesAdapterTextBox => AssetsSwitchesView.AssetsSwitchesAdapterTextBoxControl;
-    private TextBlock AssetsSwitchesAttachedVmsHintTextBlock => AssetsSwitchesView.AssetsSwitchesAttachedVmsHintTextBlockControl;
-    private ListView AssetsSwitchesAttachedVmsListView => AssetsSwitchesView.AssetsSwitchesAttachedVmsListViewControl;
-    private Border AssetsSwitchesLoadingStatePanel => AssetsSwitchesView.AssetsSwitchesLoadingStatePanelControl;
-    private Border AssetsSwitchesEmptyStatePanel => AssetsSwitchesView.AssetsSwitchesEmptyStatePanelControl;
-    private Border AssetsSwitchesErrorStatePanel => AssetsSwitchesView.AssetsSwitchesErrorStatePanelControl;
-    private TextBlock AssetsSwitchesLoadingStateTextBlock => AssetsSwitchesView.AssetsSwitchesLoadingStateTextBlockControl;
-    private TextBlock AssetsSwitchesEmptyStateTextBlock => AssetsSwitchesView.AssetsSwitchesEmptyStateTextBlockControl;
-    private TextBox AssetsSwitchesErrorStateTextBox => AssetsSwitchesView.AssetsSwitchesErrorStateTextBoxControl;
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
     private Button DeployOverviewOpenQuickDeployButton => DeployOverviewView.DeployOverviewOpenQuickDeployButtonControl;
@@ -301,29 +281,20 @@ public sealed partial class MainWindow : Window
             new AssetsBaseDisksCompositionHost(
                 PickBaseDiskFilePath,
                 ShowAssetsBaseDiskRemoveConfirmationDialogAsync));
-        _assetsSwitchesController = new AssetsSwitchesWorkspaceController(
+        _assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(
             _assetsSwitchesCapabilityService,
-            _assetsSwitchesWorkspace,
-            new AssetsSwitchesWorkspaceHost(
-                CaptureAssetsSwitchDraftFromEditor,
-                GetSelectedAssetsSwitchType,
-                ApplyAssetsSwitchesEditorDraft,
-                ClearAssetsSwitchesEditorFields,
-                SetSelectedAssetsSwitchRow,
-                ApplyAssetsSwitchesWorkspaceState,
+            AssetsSwitchesViewHost,
+            new AssetsSwitchesCompositionHost(
                 ShowAssetsSwitchDeleteConfirmationDialogAsync));
         _assetsWorkspaceComposition = new AssetsWorkspaceComposition(
             AssetsOverviewViewHost,
             _assetsBaseDisksWorkspaceComposition,
-            _assetsSwitchesWorkspace,
-            AssetsSwitchesViewHost,
+            _assetsSwitchesWorkspaceComposition,
             AssetsSubviewTabView,
             AssetsOverviewTabViewItem,
             AssetsBaseDisksTabViewItem,
             AssetsSwitchesTabViewItem,
-            new AssetsWorkspaceHost(
-                EnsureAssetsSwitchesAsync,
-                UpdateAssetsSwitchesUi),
+            new AssetsWorkspaceHost(),
             new AssetsWorkspaceShellBridge(
                 () => IsAssetsCapabilityActive,
                 () => IsAssetsOverviewActive,
@@ -335,7 +306,6 @@ public sealed partial class MainWindow : Window
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
         TemplateLibraryListView.ItemsSource = _templateLibraryItems;
         TemplateVmListView.ItemsSource = _templateVmEntries;
-        WireAssetsSwitchesHandlers();
         WireDiagnosticsLogsHandlers();
         WireTemplatesHandlers();
         WireDeployHandlers();
@@ -376,18 +346,6 @@ public sealed partial class MainWindow : Window
         ReloadLogsButton.Click += ReloadLogsButton_Click;
         OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
         StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
-    }
-
-    private void WireAssetsSwitchesHandlers()
-    {
-        AssetsSwitchesListView.SelectionChanged += AssetsSwitchesListView_SelectionChanged;
-        AssetsSwitchesRefreshButton.Click += AssetsSwitchesRefreshButton_Click;
-        AssetsSwitchesCreateButton.Click += AssetsSwitchesCreateButton_Click;
-        AssetsSwitchesApplyButton.Click += AssetsSwitchesApplyButton_Click;
-        AssetsSwitchesDeleteButton.Click += AssetsSwitchesDeleteButton_Click;
-        AssetsSwitchesNameTextBox.TextChanged += AssetsSwitchesEditorControl_Changed;
-        AssetsSwitchesTypeComboBox.SelectionChanged += AssetsSwitchesEditorControl_Changed;
-        AssetsSwitchesAdapterTextBox.TextChanged += AssetsSwitchesEditorControl_Changed;
     }
 
     private void WireTemplatesHandlers()
@@ -1759,60 +1717,6 @@ public sealed partial class MainWindow : Window
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
-    private Task EnsureAssetsSwitchesAsync(bool forceRefresh)
-        => _assetsSwitchesController.EnsureInventoryAsync(forceRefresh);
-
-    private void UpdateAssetsSwitchesUi()
-        => _assetsSwitchesController.ApplyWorkspaceState();
-
-    private async void AssetsSwitchesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        => await _assetsSwitchesController.HandleSelectionChangedAsync(AssetsSwitchesListView.SelectedItem as AssetsSwitchListRow);
-
-    private async void AssetsSwitchesRefreshButton_Click(object sender, RoutedEventArgs e)
-    {
-        await EnsureAssetsSwitchesAsync(forceRefresh: true);
-    }
-
-    private async void AssetsSwitchesCreateButton_Click(object sender, RoutedEventArgs e)
-        => await _assetsSwitchesController.BeginCreateAsync();
-
-    private async void AssetsSwitchesApplyButton_Click(object sender, RoutedEventArgs e)
-        => await _assetsSwitchesController.SaveDraftAsync();
-
-    private async void AssetsSwitchesDeleteButton_Click(object sender, RoutedEventArgs e)
-        => await _assetsSwitchesController.DeleteSelectedAsync();
-
-    private async void AssetsSwitchesEditorControl_Changed(object sender, object e)
-        => await _assetsSwitchesController.HandleEditorChangedAsync();
-
-    private AssetsSwitchDraft CaptureAssetsSwitchDraftFromEditor(bool isNewOverride)
-    {
-        return new AssetsSwitchDraft
-        {
-            IsNew = isNewOverride,
-            OriginalName = isNewOverride ? null : _assetsSwitchesWorkspace.SelectedRow?.Name,
-            Name = AssetsSwitchesNameTextBox.Text.Trim(),
-            SwitchType = GetSelectedAssetsSwitchType(),
-            AdapterName = AssetsSwitchesAdapterTextBox.Text
-        };
-    }
-
-    private void SetAssetsSwitchTypeSelection(string switchType)
-    {
-        var match = AssetsSwitchesTypeComboBox.Items
-            .OfType<ComboBoxItem>()
-            .FirstOrDefault(item => string.Equals(item.Content?.ToString(), switchType, StringComparison.OrdinalIgnoreCase));
-        AssetsSwitchesTypeComboBox.SelectedItem = match;
-    }
-
-    private string GetSelectedAssetsSwitchType()
-    {
-        return AssetsSwitchesTypeComboBox.SelectedItem is ComboBoxItem item
-            ? item.Content?.ToString() ?? string.Empty
-            : string.Empty;
-    }
-
-
     private async Task<bool> ShowAssetsSwitchDeleteConfirmationDialogAsync(
         AssetsSwitchListRow row,
         AssetsSwitchDeleteAssessment assessment)
@@ -1853,55 +1757,6 @@ public sealed partial class MainWindow : Window
 
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
-
-    private void ApplyAssetsSwitchesEditorDraft(AssetsSwitchDraft draft)
-    {
-        AssetsSwitchesNameTextBox.Text = draft.Name;
-        SetAssetsSwitchTypeSelection(draft.SwitchType);
-        AssetsSwitchesAdapterTextBox.Text = draft.AdapterName ?? string.Empty;
-    }
-
-    private void ClearAssetsSwitchesEditorFields()
-    {
-        AssetsSwitchesNameTextBox.Text = string.Empty;
-        SetAssetsSwitchTypeSelection(string.Empty);
-        AssetsSwitchesAdapterTextBox.Text = string.Empty;
-    }
-
-    private void SetSelectedAssetsSwitchRow(AssetsSwitchListRow? row)
-    {
-        AssetsSwitchesListView.SelectedItem = row;
-    }
-
-    private void ApplyAssetsSwitchesWorkspaceState(AssetsSwitchesWorkspaceViewModel workspace, bool canValidateOrApply, bool isExternalSwitchTypeSelected)
-    {
-        AssetsSwitchesRefreshButton.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting;
-        AssetsSwitchesCreateButton.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting;
-        AssetsSwitchesApplyButton.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting && canValidateOrApply;
-        AssetsSwitchesDeleteButton.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting && workspace.SelectedRow is not null;
-
-        var isEditingExisting = workspace.SelectedRow is not null && workspace.PendingDraft is null;
-        AssetsSwitchesTypeComboBox.IsEnabled = !isEditingExisting && !workspace.IsSaving && !workspace.IsDeleting;
-        AssetsSwitchesAdapterTextBox.IsEnabled =
-            !isEditingExisting &&
-            !workspace.IsSaving &&
-            !workspace.IsDeleting &&
-            isExternalSwitchTypeSelected;
-
-        AssetsSwitchesStatusTextBlock.Text = workspace.StatusText;
-        AssetsSwitchesSelectedSwitchValidationTextBlock.Text = workspace.SelectedSwitchValidationText;
-        AssetsSwitchesDeleteConstraintTextBlock.Text = workspace.DeleteConstraintText;
-        AssetsSwitchesAttachedVmsHintTextBlock.Text = workspace.AttachedVmHintText;
-        AssetsSwitchesErrorStateTextBox.Text = workspace.ErrorStateText;
-        AssetsSwitchesLoadingStatePanel.Visibility = workspace.IsLoading ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesEmptyStatePanel.Visibility = !workspace.IsLoading && workspace.Inventory.Count == 0 && !workspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesErrorStatePanel.Visibility = workspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesLoadingStateTextBlock.Text = workspace.IsLoading
-            ? "Loading current Hyper-V virtual switches. Current details remain visible until refresh completes."
-            : "Virtual switch inventory is idle.";
-        AssetsSwitchesEmptyStateTextBlock.Text = "No virtual switches were found on this host. Click Create to prepare a new switch.";
-    }
-
     private bool IsTemplatesLibraryActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesLibrary, StringComparison.Ordinal);
 

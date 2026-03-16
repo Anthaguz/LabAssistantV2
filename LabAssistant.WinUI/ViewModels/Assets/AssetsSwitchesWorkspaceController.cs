@@ -20,51 +20,6 @@ internal interface IAssetsSwitchesWorkspaceHost
     Task<bool> ShowDeleteConfirmationDialogAsync(AssetsSwitchListRow row, AssetsSwitchDeleteAssessment assessment);
 }
 
-internal sealed class AssetsSwitchesWorkspaceHost : IAssetsSwitchesWorkspaceHost
-{
-    private readonly Func<bool, AssetsSwitchDraft> _captureDraft;
-    private readonly Func<string> _getSelectedSwitchType;
-    private readonly Action<AssetsSwitchDraft> _applyEditorDraft;
-    private readonly Action _clearEditorFields;
-    private readonly Action<AssetsSwitchListRow?> _setSelectedRow;
-    private readonly Action<AssetsSwitchesWorkspaceViewModel, bool, bool> _applyWorkspaceState;
-    private readonly Func<AssetsSwitchListRow, AssetsSwitchDeleteAssessment, Task<bool>> _showDeleteConfirmationDialogAsync;
-
-    public AssetsSwitchesWorkspaceHost(
-        Func<bool, AssetsSwitchDraft> captureDraft,
-        Func<string> getSelectedSwitchType,
-        Action<AssetsSwitchDraft> applyEditorDraft,
-        Action clearEditorFields,
-        Action<AssetsSwitchListRow?> setSelectedRow,
-        Action<AssetsSwitchesWorkspaceViewModel, bool, bool> applyWorkspaceState,
-        Func<AssetsSwitchListRow, AssetsSwitchDeleteAssessment, Task<bool>> showDeleteConfirmationDialogAsync)
-    {
-        _captureDraft = captureDraft;
-        _getSelectedSwitchType = getSelectedSwitchType;
-        _applyEditorDraft = applyEditorDraft;
-        _clearEditorFields = clearEditorFields;
-        _setSelectedRow = setSelectedRow;
-        _applyWorkspaceState = applyWorkspaceState;
-        _showDeleteConfirmationDialogAsync = showDeleteConfirmationDialogAsync;
-    }
-
-    public AssetsSwitchDraft? CaptureDraft(bool isNewOverride) => _captureDraft(isNewOverride);
-
-    public string GetSelectedSwitchType() => _getSelectedSwitchType();
-
-    public void ApplyEditorDraft(AssetsSwitchDraft draft) => _applyEditorDraft(draft);
-
-    public void ClearEditorFields() => _clearEditorFields();
-
-    public void SetSelectedRow(AssetsSwitchListRow? row) => _setSelectedRow(row);
-
-    public void ApplyWorkspaceState(AssetsSwitchesWorkspaceViewModel workspace, bool canValidateOrApply, bool isExternalSwitchTypeSelected)
-        => _applyWorkspaceState(workspace, canValidateOrApply, isExternalSwitchTypeSelected);
-
-    public Task<bool> ShowDeleteConfirmationDialogAsync(AssetsSwitchListRow row, AssetsSwitchDeleteAssessment assessment)
-        => _showDeleteConfirmationDialogAsync(row, assessment);
-}
-
 internal sealed class AssetsSwitchesWorkspaceController
 {
     private readonly IAssetsSwitchesCapabilityService _capabilityService;
