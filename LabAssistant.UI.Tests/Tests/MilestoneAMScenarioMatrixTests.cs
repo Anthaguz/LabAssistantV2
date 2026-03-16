@@ -894,12 +894,13 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition = new TemplatesWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("() => _ = EnsureTemplatesLibraryAsync(forceRefresh: false),", mainWindowSource);
         Assert.Contains("new TemplatesWorkspaceShellBridge(", mainWindowSource);
         Assert.Contains("() => IsTemplatesCapabilityActive,", mainWindowSource);
         Assert.Contains("() => IsTemplatesLibraryActive,", mainWindowSource);
         Assert.Contains("() => IsTemplatesEditorActive));", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("ApplyTemplatesWorkspaceUiState();", mainWindowSource);
+        Assert.Contains("private TemplatesWorkspaceUiState CreateTemplatesWorkspaceUiState()", mainWindowSource);
         Assert.Contains("private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;", mainWindowSource);
         Assert.Contains("private bool IsTemplatesLibraryActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesEditorActive =>", mainWindowSource);
@@ -939,6 +940,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_ensureTemplatesLibraryLoaded();", compositionSource);
         Assert.Contains("internal readonly record struct TemplatesWorkspaceUiState(", compositionSource);
         Assert.Contains("public void ApplyUiState(TemplatesWorkspaceUiState state)", compositionSource);
+        Assert.Contains("bool HasSelectedLibraryItem,", compositionSource);
+        Assert.Contains("bool HasActiveTemplateEditorDocument,", compositionSource);
+        Assert.Contains("bool HasSelectedTemplateVmEntry,", compositionSource);
+        Assert.Contains("string TemplateEditorContextText,", compositionSource);
         Assert.Contains("_libraryView.OpenTemplateInEditorButtonControl.IsEnabled = state.HasSelectedLibraryItem && !state.IsLoading;", compositionSource);
         Assert.Contains("_editorView.SaveTemplateButtonControl.IsEnabled = state.HasActiveTemplateEditorDocument && !state.IsLoading;", compositionSource);
         Assert.Contains("_editorView.TemplateEditorContextTextBlockControl.Text = state.TemplateEditorContextText;", compositionSource);
@@ -946,6 +951,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("TemplatesSubviewTabView", compositionSource);
         Assert.DoesNotContain("internal interface ITemplatesWorkspaceHost", compositionSource);
         Assert.DoesNotContain("internal sealed class TemplatesWorkspaceHost", compositionSource);
+        Assert.DoesNotContain("TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;", compositionSource);
     }
 
     private static string LoadMainWindowSource()
