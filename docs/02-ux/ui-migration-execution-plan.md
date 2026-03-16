@@ -398,6 +398,11 @@ Gate expectations:
 - make shared Assets vs Base Disks-local ownership explicit so Base Disks-specific state, orchestration, and UI coordination converge behind a Base Disks-local seam without widening shared Assets composition into the Base Disks workflow owner
 - preserve `assets.base_disks` as the operational Base Disks management surface, keep Base Disks inside the long-lived Assets workspace with route-activation refresh, and keep Overview/Switches extraction details out of scope
 
+**Assets Switches cleanup target checkpoint**
+- before Switches runtime extraction proceeds, define the narrow `Assets Switches` cleanup target under the shared Assets composition boundary
+- make shared Assets vs Switches-local ownership explicit so Switches-specific state, orchestration, and UI coordination converge behind a Switches-local seam without widening shared Assets composition into the Switches workflow owner
+- preserve `assets.switches` as the operational Switches management surface, keep Switches inside the long-lived Assets workspace with route-activation refresh, and keep Overview/Base Disks extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
