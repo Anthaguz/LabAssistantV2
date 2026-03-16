@@ -11,6 +11,10 @@ internal sealed class TemplatesLibraryWorkspaceViewModel
 
     public string StatusText { get; private set; } = "No templates loaded.";
 
+    public TemplateLibraryItem? SelectedItem { get; private set; }
+
+    public string? SelectedTemplateFilePath { get; private set; }
+
     public bool IsLoading { get; private set; }
 
     public bool HasErrorState { get; private set; }
@@ -35,9 +39,19 @@ internal sealed class TemplatesLibraryWorkspaceViewModel
             Items.Add(item);
         }
 
+        SelectedItem = string.IsNullOrWhiteSpace(SelectedTemplateFilePath)
+            ? null
+            : Items.FirstOrDefault(item => string.Equals(item.FilePath, SelectedTemplateFilePath, StringComparison.OrdinalIgnoreCase));
+        SelectedTemplateFilePath = SelectedItem?.FilePath;
         IsLoading = false;
         HasErrorState = false;
         StatusText = statusText;
+    }
+
+    public void SetSelectedItem(TemplateLibraryItem? selectedItem)
+    {
+        SelectedItem = selectedItem;
+        SelectedTemplateFilePath = selectedItem?.FilePath;
     }
 
     public void SetStatus(string statusText)
