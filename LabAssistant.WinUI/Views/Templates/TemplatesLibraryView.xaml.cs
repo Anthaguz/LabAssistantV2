@@ -1,3 +1,4 @@
+using LabAssistant.Business.Templates;
 using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Views.Templates;
@@ -5,16 +6,21 @@ namespace LabAssistant.WinUI.Views.Templates;
 public sealed partial class TemplatesLibraryView : UserControl
 {
     private bool _isUpdatingSearchText;
+    private bool _isUpdatingSelection;
 
     public event EventHandler? SearchTextChanged;
+    public event EventHandler? SelectedTemplateChanged;
 
     public TemplatesLibraryView()
     {
         InitializeComponent();
         TemplateSearchTextBox.TextChanged += TemplateSearchTextBox_TextChanged;
+        TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;
     }
 
     public ListView TemplateLibraryListViewControl => TemplateLibraryListView;
+
+    public TemplateLibraryItem? SelectedTemplate => TemplateLibraryListView.SelectedItem as TemplateLibraryItem;
 
     public TextBox TemplateSearchTextBoxControl => TemplateSearchTextBox;
 
@@ -41,6 +47,24 @@ public sealed partial class TemplatesLibraryView : UserControl
     public void SetInventorySource(object? itemsSource)
     {
         TemplateLibraryListView.ItemsSource = itemsSource;
+    }
+
+    public void SetSelectedTemplate(TemplateLibraryItem? selectedTemplate)
+    {
+        if (ReferenceEquals(TemplateLibraryListView.SelectedItem, selectedTemplate))
+        {
+            return;
+        }
+
+        _isUpdatingSelection = true;
+        try
+        {
+            TemplateLibraryListView.SelectedItem = selectedTemplate;
+        }
+        finally
+        {
+            _isUpdatingSelection = false;
+        }
     }
 
     public void SetSearchText(string searchText)
@@ -74,5 +98,15 @@ public sealed partial class TemplatesLibraryView : UserControl
         }
 
         SearchTextChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void TemplateLibraryListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingSelection)
+        {
+            return;
+        }
+
+        SelectedTemplateChanged?.Invoke(this, EventArgs.Empty);
     }
 }

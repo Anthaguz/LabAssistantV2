@@ -65,6 +65,8 @@ internal sealed class TemplatesWorkspaceComposition
 
     public string LibrarySearchQuery => _libraryWorkspace.SearchQuery;
 
+    public TemplateLibraryItem? SelectedLibraryItem => _libraryWorkspace.SelectedItem;
+
     public void UpdateLibrarySearchQuery(string? searchQuery)
     {
         _libraryWorkspace.SetSearchQuery(searchQuery);
@@ -98,6 +100,12 @@ internal sealed class TemplatesWorkspaceComposition
     public void SetLibraryFailure(string statusText)
     {
         _libraryWorkspace.SetFailure(statusText);
+        ApplyLibraryState();
+    }
+
+    public void UpdateSelectedLibraryItem(TemplateLibraryItem? selectedItem)
+    {
+        _libraryWorkspace.SetSelectedItem(selectedItem);
         ApplyLibraryState();
     }
 
@@ -143,6 +151,7 @@ internal sealed class TemplatesWorkspaceComposition
     private void ApplyLibraryState()
     {
         _libraryView.SetSearchText(_libraryWorkspace.SearchQuery);
+        _libraryView.SetSelectedTemplate(_libraryWorkspace.SelectedItem);
         _libraryView.SetStatusText(_libraryWorkspace.StatusText);
     }
 }

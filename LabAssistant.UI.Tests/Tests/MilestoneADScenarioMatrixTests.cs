@@ -77,8 +77,8 @@ public sealed class MilestoneADScenarioMatrixTests
         var source = LoadMainWindowSource();
 
         Assert.Contains("OpenSelectedTemplateInEditorAsync()", source);
-        Assert.Contains("await OpenTemplateInEditorAsync(_selectedTemplateLibraryItem, fromDeploy: false);", source);
-        Assert.Contains("TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;", source);
+        Assert.Contains("await OpenTemplateInEditorAsync(_templatesWorkspaceComposition.SelectedLibraryItem, fromDeploy: false);", source);
+        Assert.Contains("_templatesWorkspaceComposition.UpdateSelectedLibraryItem(templateItem);", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
     }

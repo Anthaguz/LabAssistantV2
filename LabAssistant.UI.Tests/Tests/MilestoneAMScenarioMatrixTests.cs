@@ -908,6 +908,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private bool IsTemplatesCapabilityActive =>", mainWindowSource);
 
         Assert.DoesNotContain("private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];", mainWindowSource);
+        Assert.DoesNotContain("private TemplateLibraryItem? _selectedTemplateLibraryItem;", mainWindowSource);
         Assert.DoesNotContain("TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
         Assert.DoesNotContain("TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
         Assert.DoesNotContain("TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
@@ -944,10 +945,13 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_ensureTemplatesLibraryLoaded();", compositionSource);
         Assert.Contains("public IList<TemplateLibraryItem> LibraryItems => _libraryWorkspace.Items;", compositionSource);
         Assert.Contains("public string LibrarySearchQuery => _libraryWorkspace.SearchQuery;", compositionSource);
+        Assert.Contains("public TemplateLibraryItem? SelectedLibraryItem => _libraryWorkspace.SelectedItem;", compositionSource);
         Assert.Contains("public void UpdateLibrarySearchQuery(string? searchQuery)", compositionSource);
+        Assert.Contains("public void UpdateSelectedLibraryItem(TemplateLibraryItem? selectedItem)", compositionSource);
         Assert.Contains("public void BeginLibraryLoad()", compositionSource);
         Assert.Contains("public void ApplyLibraryInventory(IReadOnlyList<TemplateLibraryItem> items, string statusText)", compositionSource);
         Assert.Contains("_libraryView.SetSearchText(_libraryWorkspace.SearchQuery);", compositionSource);
+        Assert.Contains("_libraryView.SetSelectedTemplate(_libraryWorkspace.SelectedItem);", compositionSource);
         Assert.Contains("_libraryView.SetStatusText(_libraryWorkspace.StatusText);", compositionSource);
         Assert.Contains("internal readonly record struct TemplatesWorkspaceUiState(", compositionSource);
         Assert.Contains("public void ApplyUiState(TemplatesWorkspaceUiState state)", compositionSource);
@@ -970,27 +974,40 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var mainWindowSource = LoadMainWindowSource();
         var libraryWorkspaceSource = LoadTemplatesLibraryWorkspaceSource();
+        var libraryViewSource = LoadTemplatesLibraryViewCodeBehindSource();
 
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceViewModel", libraryWorkspaceSource);
         Assert.Contains("public ObservableCollection<TemplateLibraryItem> Items { get; } = [];", libraryWorkspaceSource);
         Assert.Contains("public string SearchQuery { get; private set; } = string.Empty;", libraryWorkspaceSource);
         Assert.Contains("public string StatusText { get; private set; } = \"No templates loaded.\";", libraryWorkspaceSource);
+        Assert.Contains("public TemplateLibraryItem? SelectedItem { get; private set; }", libraryWorkspaceSource);
+        Assert.Contains("public string? SelectedTemplateFilePath { get; private set; }", libraryWorkspaceSource);
         Assert.Contains("public bool IsLoading { get; private set; }", libraryWorkspaceSource);
         Assert.Contains("public bool HasErrorState { get; private set; }", libraryWorkspaceSource);
         Assert.Contains("public void SetSearchQuery(string? searchQuery)", libraryWorkspaceSource);
         Assert.Contains("public void BeginLoading()", libraryWorkspaceSource);
         Assert.Contains("public void ApplyInventory(IReadOnlyList<TemplateLibraryItem> items, string statusText)", libraryWorkspaceSource);
+        Assert.Contains("SelectedItem = string.IsNullOrWhiteSpace(SelectedTemplateFilePath)", libraryWorkspaceSource);
+        Assert.Contains("public void SetSelectedItem(TemplateLibraryItem? selectedItem)", libraryWorkspaceSource);
         Assert.Contains("public void SetFailure(string statusText)", libraryWorkspaceSource);
 
+        Assert.Contains("TemplatesLibraryView.SelectedTemplateChanged += TemplatesLibraryView_SelectedTemplateChanged;", mainWindowSource);
         Assert.Contains("TemplatesLibraryView.SearchTextChanged += TemplatesLibraryView_SearchTextChanged;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.BeginLibraryLoad();", mainWindowSource);
         Assert.Contains("await _templatesCapabilityService.LoadLibraryAsync(_templatesWorkspaceComposition.LibrarySearchQuery);", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.ApplyLibraryInventory(result.Items, libraryStatusText);", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.ClearLibrarySearchQuery();", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.SetLibraryStatus(\"Select a template first.\");", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.UpdateSelectedLibraryItem(templateItem);", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.UpdateSelectedLibraryItem(TemplatesLibraryView.SelectedTemplate);", mainWindowSource);
 
         Assert.DoesNotContain("TemplateLibraryListView.ItemsSource = _templateLibraryItems;", mainWindowSource);
         Assert.DoesNotContain("LoadLibraryAsync(TemplateSearchTextBox.Text)", mainWindowSource);
+
+        Assert.Contains("public event EventHandler? SelectedTemplateChanged;", libraryViewSource);
+        Assert.Contains("public TemplateLibraryItem? SelectedTemplate => TemplateLibraryListView.SelectedItem as TemplateLibraryItem;", libraryViewSource);
+        Assert.Contains("public void SetSelectedTemplate(TemplateLibraryItem? selectedTemplate)", libraryViewSource);
+        Assert.Contains("TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;", libraryViewSource);
     }
 
     private static string LoadMainWindowSource()
@@ -1032,6 +1049,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadTemplatesLibraryWorkspaceSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesLibraryWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesLibraryViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Templates", "TemplatesLibraryView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

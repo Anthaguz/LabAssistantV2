@@ -73,7 +73,6 @@ public sealed partial class MainWindow : Window
     private ShellSubview _activeSubview;
     private string _activeRouteKey = string.Empty;
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
-    private TemplateLibraryItem? _selectedTemplateLibraryItem;
     private TemplateEditorDocument? _activeTemplateEditorDocument;
     private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;
     private TemplateEditorDocument? _activeDeployTemplateDocument;
@@ -358,7 +357,7 @@ public sealed partial class MainWindow : Window
 
     private void WireTemplatesHandlers()
     {
-        TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;
+        TemplatesLibraryView.SelectedTemplateChanged += TemplatesLibraryView_SelectedTemplateChanged;
         TemplatesLibraryView.SearchTextChanged += TemplatesLibraryView_SearchTextChanged;
         TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;
         ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;
@@ -2355,7 +2354,7 @@ public sealed partial class MainWindow : Window
         {
             return new TemplatesWorkspaceUiState(
                 IsLoading: _isTemplatesLoading,
-                HasSelectedLibraryItem: _selectedTemplateLibraryItem is not null,
+                HasSelectedLibraryItem: _templatesWorkspaceComposition.SelectedLibraryItem is not null,
                 HasActiveTemplateEditorDocument: false,
                 HasSelectedTemplateVmEntry: _selectedTemplateVmEntry is not null,
                 TemplateEditorContextText: "No template selected.",
@@ -2368,7 +2367,7 @@ public sealed partial class MainWindow : Window
 
         return new TemplatesWorkspaceUiState(
             IsLoading: _isTemplatesLoading,
-            HasSelectedLibraryItem: _selectedTemplateLibraryItem is not null,
+            HasSelectedLibraryItem: _templatesWorkspaceComposition.SelectedLibraryItem is not null,
             HasActiveTemplateEditorDocument: true,
             HasSelectedTemplateVmEntry: _selectedTemplateVmEntry is not null,
             TemplateEditorContextText: string.IsNullOrWhiteSpace(_activeTemplateEditorDocument.SourceFilePath)
@@ -3187,8 +3186,7 @@ public sealed partial class MainWindow : Window
 
     private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)
     {
-        _selectedTemplateLibraryItem = templateItem;
-        TemplateLibraryListView.SelectedItem = templateItem;
+        _templatesWorkspaceComposition.UpdateSelectedLibraryItem(templateItem);
 
         _isTemplatesLoading = true;
         ApplyTemplatesWorkspaceUiState();
@@ -3253,13 +3251,6 @@ public sealed partial class MainWindow : Window
                     : $"Loaded {result.Items.Count} template(s) with warnings.";
             _templatesWorkspaceComposition.ApplyLibraryInventory(result.Items, libraryStatusText);
 
-            if (_selectedTemplateLibraryItem is not null)
-            {
-                _selectedTemplateLibraryItem = TemplatesLibraryItems
-                    .FirstOrDefault(item => string.Equals(item.FilePath, _selectedTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
-                TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;
-            }
-
             if (_selectedDeployTemplateLibraryItem is not null)
             {
                 _selectedDeployTemplateLibraryItem = TemplatesLibraryItems
@@ -3283,13 +3274,13 @@ public sealed partial class MainWindow : Window
 
     private async Task OpenSelectedTemplateInEditorAsync()
     {
-        if (_selectedTemplateLibraryItem is null)
+        if (_templatesWorkspaceComposition.SelectedLibraryItem is not null)
         {
-            _templatesWorkspaceComposition.SetLibraryStatus("Select a template first.");
+            await OpenTemplateInEditorAsync(_templatesWorkspaceComposition.SelectedLibraryItem, fromDeploy: false);
             return;
         }
 
-        await OpenTemplateInEditorAsync(_selectedTemplateLibraryItem, fromDeploy: false);
+        _templatesWorkspaceComposition.SetLibraryStatus("Select a template first.");
     }
 
     private void BindTemplateEditorDocument()
@@ -3927,9 +3918,9 @@ public sealed partial class MainWindow : Window
         return Task.FromResult(selectedPath);
     }
 
-    private void TemplateLibraryListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void TemplatesLibraryView_SelectedTemplateChanged(object? sender, EventArgs e)
     {
-        _selectedTemplateLibraryItem = TemplateLibraryListView.SelectedItem as TemplateLibraryItem;
+        _templatesWorkspaceComposition.UpdateSelectedLibraryItem(TemplatesLibraryView.SelectedTemplate);
         ApplyTemplatesWorkspaceUiState();
     }
 
@@ -4057,19 +4048,20 @@ public sealed partial class MainWindow : Window
 
     private async void DeleteTemplateButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedTemplateLibraryItem is null)
+        if (_templatesWorkspaceComposition.SelectedLibraryItem is null)
         {
             _templatesWorkspaceComposition.SetLibraryStatus("Select a template first.");
             return;
         }
 
+        var selectedTemplate = _templatesWorkspaceComposition.SelectedLibraryItem;
         var dialog = new ContentDialog
         {
             XamlRoot = RootLayout.XamlRoot,
             Title = "Delete Template",
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
-            Content = $"Delete '{_selectedTemplateLibraryItem.Name}'? This removes the template file.",
+            Content = $"Delete '{selectedTemplate.Name}'? This removes the template file.",
             DefaultButton = ContentDialogButton.Close
         };
 
@@ -4082,11 +4074,11 @@ public sealed partial class MainWindow : Window
         ApplyTemplatesWorkspaceUiState();
         try
         {
-            var result = await _templatesCapabilityService.DeleteAsync(_selectedTemplateLibraryItem.FilePath);
+            var result = await _templatesCapabilityService.DeleteAsync(selectedTemplate.FilePath);
             _templatesWorkspaceComposition.SetLibraryStatus(result.UserMessage);
             if (result.Success)
             {
-                _selectedTemplateLibraryItem = null;
+                _templatesWorkspaceComposition.UpdateSelectedLibraryItem(null);
                 await EnsureTemplatesLibraryAsync(forceRefresh: true);
             }
         }
@@ -4126,13 +4118,14 @@ public sealed partial class MainWindow : Window
 
     private async void ExportTemplateButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedTemplateLibraryItem is null)
+        if (_templatesWorkspaceComposition.SelectedLibraryItem is null)
         {
             _templatesWorkspaceComposition.SetLibraryStatus("Select a template first.");
             return;
         }
 
-        var suggestedName = Path.GetFileName(_selectedTemplateLibraryItem.FilePath);
+        var selectedTemplate = _templatesWorkspaceComposition.SelectedLibraryItem;
+        var suggestedName = Path.GetFileName(selectedTemplate.FilePath);
         var destinationPath = await PickTemplateFileForSaveAsync(suggestedName);
         if (string.IsNullOrWhiteSpace(destinationPath))
         {
@@ -4144,7 +4137,7 @@ public sealed partial class MainWindow : Window
         ApplyTemplatesWorkspaceUiState();
         try
         {
-            var result = await _templatesCapabilityService.ExportAsync(_selectedTemplateLibraryItem.FilePath, destinationPath);
+            var result = await _templatesCapabilityService.ExportAsync(selectedTemplate.FilePath, destinationPath);
             _templatesWorkspaceComposition.SetLibraryStatus(result.UserMessage);
         }
         finally
