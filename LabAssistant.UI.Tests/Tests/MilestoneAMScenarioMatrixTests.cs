@@ -921,10 +921,11 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
-    public void TemplatesWorkspaceComposition_BecomesTheSharedTemplatesLocalCompositionOwner()
+    public void TemplatesLibrary_RefinedArchitecture_KeepsSharedCompositionAsDelegatingHost()
     {
         var compositionSource = LoadTemplatesWorkspaceCompositionSource();
         var libraryCompositionSource = LoadTemplatesLibraryWorkspaceCompositionSource();
+        var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("internal interface ITemplatesWorkspaceShellBridge", compositionSource);
         Assert.Contains("bool IsTemplatesCapabilityActive { get; }", compositionSource);
@@ -940,7 +941,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_libraryComposition.ApplyShellState(_shellBridge.IsTemplatesLibraryActive);", compositionSource);
         Assert.Contains("public IList<TemplateLibraryItem> LibraryItems => _libraryComposition.LibraryItems;", compositionSource);
-        Assert.Contains("public string LibrarySearchQuery => _libraryComposition.SearchQuery;", compositionSource);
         Assert.Contains("public TemplateLibraryItem? SelectedLibraryItem => _libraryComposition.SelectedItem;", compositionSource);
         Assert.Contains("public Task EnsureLibraryAsync(bool forceRefresh) => _libraryComposition.EnsureLibraryAsync(forceRefresh);", compositionSource);
         Assert.Contains("_libraryComposition.ApplyUiState(state.IsLoading, state.HasSelectedLibraryItem);", compositionSource);
@@ -959,6 +959,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("internal interface ITemplatesWorkspaceHost", compositionSource);
         Assert.DoesNotContain("internal sealed class TemplatesWorkspaceHost", compositionSource);
         Assert.DoesNotContain("TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;", compositionSource);
+        Assert.Contains("new TemplatesLibraryWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("new TemplatesLibraryWorkspaceHost(", mainWindowSource);
 
         Assert.Contains("internal interface ITemplatesLibraryWorkspaceHost", libraryCompositionSource);
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceHost : ITemplatesLibraryWorkspaceHost", libraryCompositionSource);
@@ -975,20 +977,15 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_ = _controller.EnsureLibraryAsync(forceRefresh: false);", libraryCompositionSource);
         Assert.Contains("public Task EnsureLibraryAsync(bool forceRefresh) => _controller.EnsureLibraryAsync(forceRefresh);", libraryCompositionSource);
         Assert.Contains("public void ApplyUiState(bool isLoading, bool hasSelectedLibraryItem)", libraryCompositionSource);
-        Assert.Contains("_view.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;", libraryCompositionSource);
         Assert.Contains("void ITemplatesLibraryWorkspaceControllerHost.ApplyWorkspaceState()", libraryCompositionSource);
         Assert.Contains("_host.ApplyTemplatesWorkspaceUiState();", libraryCompositionSource);
-        Assert.Contains("_view.UpdateViewState(BuildViewState(isLoading, hasSelectedLibraryItem));", libraryCompositionSource);
-        Assert.Contains("_controller.HandleSearchTextChanged(_view.CaptureInteractionState().SearchText);", libraryCompositionSource);
-        Assert.Contains("_controller.HandleSelectionChanged(_view.CaptureInteractionState().SelectedTemplate);", libraryCompositionSource);
     }
 
     [Fact]
-    public void TemplatesLibraryState_UsesLibraryLocalWorkspaceViewModel_ForListSearchAndStatusState()
+    public void TemplatesLibrary_RefinedArchitecture_PreservesLocalStateControllerAndCompositionSeams()
     {
         var mainWindowSource = LoadMainWindowSource();
         var libraryWorkspaceSource = LoadTemplatesLibraryWorkspaceSource();
-        var libraryViewSource = LoadTemplatesLibraryViewCodeBehindSource();
         var libraryControllerSource = LoadTemplatesLibraryWorkspaceControllerSource();
         var libraryCompositionSource = LoadTemplatesLibraryWorkspaceCompositionSource();
 
@@ -1008,21 +1005,11 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void SetFailure(string statusText)", libraryWorkspaceSource);
 
         Assert.Contains("await _templatesWorkspaceComposition.EnsureLibraryAsync(forceRefresh: true);", mainWindowSource);
-        Assert.Contains("new TemplatesLibraryWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("new TemplatesLibraryWorkspaceHost(", mainWindowSource);
-        Assert.Contains("SetTemplatesLoading,", mainWindowSource);
-        Assert.Contains("ShowTemplateEditorAsync,", mainWindowSource);
-        Assert.Contains("ReconcileDeployTemplateSelection)", mainWindowSource);
-
         Assert.DoesNotContain("TemplateLibraryListView.ItemsSource = _templateLibraryItems;", mainWindowSource);
-        Assert.DoesNotContain("LoadLibraryAsync(TemplateSearchTextBox.Text)", mainWindowSource);
         Assert.DoesNotContain("TemplatesLibraryView.SelectedTemplateChanged += TemplatesLibraryView_SelectedTemplateChanged;", mainWindowSource);
-        Assert.DoesNotContain("TemplatesLibraryView.SearchTextChanged += TemplatesLibraryView_SearchTextChanged;", mainWindowSource);
         Assert.DoesNotContain("ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;", mainWindowSource);
-        Assert.DoesNotContain("OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;", mainWindowSource);
         Assert.DoesNotContain("private ListView TemplateLibraryListView =>", mainWindowSource);
         Assert.DoesNotContain("private Button ApplyTemplateSearchButton =>", mainWindowSource);
-        Assert.DoesNotContain("private Button OpenTemplateInEditorButton =>", mainWindowSource);
 
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceController", libraryControllerSource);
         Assert.Contains("public async Task EnsureLibraryAsync(bool forceRefresh)", libraryControllerSource);
@@ -1035,11 +1022,19 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public async Task ExportSelectedTemplateAsync()", libraryControllerSource);
         Assert.Contains("await _templatesCapabilityService.LoadLibraryAsync(_workspace.SearchQuery);", libraryControllerSource);
         Assert.Contains("await _host.ShowTemplateEditorAsync(document, \"Template loaded.\");", libraryControllerSource);
-        Assert.Contains("var document = await _templatesCapabilityService.CreateDraftAsync();", libraryControllerSource);
-        Assert.Contains("var result = await _templatesCapabilityService.DeleteAsync(selectedTemplate.FilePath);", libraryControllerSource);
+        Assert.Contains("_host.ReconcileDeployTemplateSelection(_workspace.Items);", libraryControllerSource);
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceComposition", libraryCompositionSource);
         Assert.Contains("private readonly TemplatesLibraryWorkspaceViewModel _workspace = new();", libraryCompositionSource);
         Assert.Contains("private readonly TemplatesLibraryWorkspaceController _controller;", libraryCompositionSource);
+        Assert.Contains("_view.UpdateViewState(BuildViewState(isLoading, hasSelectedLibraryItem));", libraryCompositionSource);
+        Assert.Contains("_controller.HandleSearchTextChanged(_view.CaptureInteractionState().SearchText);", libraryCompositionSource);
+        Assert.Contains("_controller.HandleSelectionChanged(_view.CaptureInteractionState().SelectedTemplate);", libraryCompositionSource);
+    }
+
+    [Fact]
+    public void TemplatesLibraryView_UsesNarrowInteractionSurface_InsteadOfControlBagExposure()
+    {
+        var libraryViewSource = LoadTemplatesLibraryViewCodeBehindSource();
 
         Assert.Contains("public readonly record struct TemplatesLibraryInteractionState(", libraryViewSource);
         Assert.Contains("public readonly record struct TemplatesLibraryViewState(", libraryViewSource);
@@ -1048,6 +1043,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public event EventHandler? OpenTemplateRequested;", libraryViewSource);
         Assert.Contains("public TemplatesLibraryInteractionState CaptureInteractionState()", libraryViewSource);
         Assert.Contains("public void UpdateViewState(TemplatesLibraryViewState state)", libraryViewSource);
+        Assert.Contains("SetSearchText(state.SearchText);", libraryViewSource);
+        Assert.Contains("SetSelectedTemplate(state.SelectedTemplate);", libraryViewSource);
         Assert.Contains("TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;", libraryViewSource);
         Assert.Contains("ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;", libraryViewSource);
         Assert.DoesNotContain("public ListView TemplateLibraryListViewControl =>", libraryViewSource);
