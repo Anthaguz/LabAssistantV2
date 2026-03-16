@@ -209,6 +209,7 @@ Consolidation rules:
 - Add/update tests
 - Update docs if behavior/architecture changed
 - Ensure logs are emitted at key steps with operationId (canonical structured field)
+- Prepare the final handoff using the handoff rules in section 7.6
 
 ### 7.1 Context Budget & Issue Sizing Rules
 
@@ -293,6 +294,112 @@ Consolidation rules:
 - PRs should contain only issue-scoped changes plus any unavoidable prerequisite baseline sync required to make the branch coherent against current `origin/master`.
 - If an issue depends on an earlier issue that is already merged, agents must check whether that earlier issue is still open and close it before finishing the current slice, or explicitly note that it was already closed.
 - If validation uses `--no-build` and the result appears stale, inconsistent with the current source, or likely to be using an older assembly/test host, agents must rebuild and rerun until the validation result is trustworthy before handoff.
+
+### 7.6 Handoff Rules
+
+#### Link-first references
+- Handoffs must use fully linked, one-click references for the active work item, not bare issue or PR numbers.
+- This handoff rule applies to agent handoff text returned in chat or stored in local workflow notes.
+- At minimum, every final handoff for an issue-driven slice must include clickable links for:
+  - the issue
+  - the PR, if one exists
+  - the milestone, if one exists and is relevant to the slice
+- Acceptable examples:
+  - `Issue [#424](https://github.com/<org>/<repo>/issues/424)`
+  - `PR [#560](https://github.com/<org>/<repo>/pull/560)`
+  - `[Milestone AM - WinUI Composition and Workspace Extraction](https://github.com/<org>/<repo>/milestone/39)`
+- Do not assume `#424` by itself is sufficient in a handoff.
+- This rule matters especially for later Dev/PM handoffs where the next agent needs one-click navigation.
+- This does **not** mean Markdown links should replace native GitHub issue references everywhere:
+  - in handoffs, direct links are preferred for clarity and one-click navigation
+  - in GitHub issue/PR bodies or comments, native references such as `#424` should still be used where GitHub cross-linking and hover behavior are valuable
+  - milestone references may still use direct links because GitHub does not provide an equivalent lightweight native mention syntax
+
+#### Dev handoff minimum content
+- A Dev completion handoff must include, in compact form:
+  - issue link
+  - PR link
+  - branch name
+  - commit hash if committed
+  - milestone link when milestone-scoped
+  - labels applied to the issue and PR
+  - validation run and result
+  - stale prior-issue closure status when applicable
+- The handoff must clearly state whether the slice was:
+  - runtime
+  - docs-only
+  - tests-only
+  - or another narrow category relevant to the issue
+- Default Dev handoff structure should use the Dev template in `#### Template consistency`.
+
+#### PM handoff format
+- When handing off to PM or preparing a reusable handoff for a future Dev/PM, use a stable structure rather than ad hoc prose.
+- PM handoffs should preserve the existing structure/style the PM is already using in this repository rather than inventing a new layout.
+- PM handoffs are issue briefs for the next slice, not implementation-result summaries.
+- Preferred PM handoff sections are:
+  - `## Dev Session Handoff — Issue #<n> (<milestone code>)`
+  - `### Issue`
+  - `### Goal`
+  - `### Why this issue exists`
+  - `### In Scope`
+  - `### Expected outcome after <milestone code>`
+  - `### Constraints`
+  - `### What should still be protected` when the issue is a convergence/alignment slice or the PM brief uses that structure
+  - `### Important boundary`
+  - `### Out of Scope`
+  - `### Likely files`
+  - `### Tests` or `### Test direction`
+  - `### Validation required`
+  - `### Repo hygiene requirement`
+  - `### Required workflow`
+  - `### PR Requirements`
+  - `### Definition of Done`
+- PM handoffs should keep the current PM level of detail unless the user explicitly asks for a shorter issue brief.
+- The `### Issue` section should preserve the PM’s existing issue-brief style and should normally include:
+  - issue number and title
+  - milestone name/code
+  - dependency baseline
+  - status target
+- When the PM uses a richer issue brief structure already established in the repo, agents should preserve that structure instead of compressing or renaming sections.
+- If the user asks for “the HO” in a planning or PM context, default to this PM issue-brief format.
+
+#### Metadata expectations in handoff
+- If the work item belongs to a milestone, handoff text must say whether:
+  - the issue is on the correct milestone
+  - the PR is on the correct milestone
+- If labels were applied, handoff text must say which labels were used and why when not obvious.
+- If labels or milestone were missing and could not be applied, the handoff must say that explicitly.
+
+#### Template consistency
+- PM and Dev handoffs are intentionally different and must not be collapsed into one shared template.
+
+##### PM template
+- Use the PM issue-brief structure from `#### PM handoff format`.
+- This is the template for planning the next slice and handing work to a Dev.
+
+##### Dev template
+- Dev handoffs are implementation-result summaries and should use this structure by default:
+  - `## Dev Session Handoff — Issue #<n> (<milestone code>)`
+  - `### Status`
+  - `### What landed`
+  - `### Outcome`
+  - `### Validation`
+  - `### Boundary preserved`
+  - `### Suggested next slice`
+  - `### Notes`
+- Dev handoffs should usually be more detailed than a minimal close-out message and should be reusable by PMs and future Devs.
+- The `### Status` section should include:
+  - linked issue
+  - linked PR
+  - linked milestone when relevant
+  - branch name
+  - commit hash if committed
+  - labels applied to issue and PR
+  - stale predecessor issue closure status when applicable
+- The `### What landed` section should list touched files or major artifacts.
+- The `### Outcome` section should explain the architectural or behavioral result and explicitly call out important non-goals that remained untouched when relevant.
+- The `### Notes` section should mention repo hygiene, leftover local artifacts, and any follow-up guidance that matters for the next slice.
+- If a shorter Dev handoff is needed, shorten within this structure rather than replacing it with loose prose.
 
 ---
 
@@ -395,7 +502,16 @@ Rules:
 - Do not replace these headers with bold labels, top-level list items, or other ad hoc formatting.
 - Keep PR body wording concise and issue-scoped.
 - PR bodies must include explicit issue linkage in `## Traceability`.
+- In GitHub PR bodies, issue linkage must use **native GitHub issue references**, not just plain text or only a Markdown URL.
+- Preferred pattern in `## Traceability`:
+  - `- Issue: #123`
+  - `- Closes #123`
+  - `- Milestone: [Milestone Name](https://github.com/<org>/<repo>/milestone/<n>)` when milestone-scoped
 - When the PR should close the issue on merge, include a GitHub closing keyword such as `Closes #123`.
+- Do not assume writing `Issue 123`, `Issue #123` as plain prose, or only `[Issue #123](https://...)` is enough for PR traceability.
+- If one-click milestone navigation is useful, a direct milestone Markdown link is still appropriate because GitHub does not provide an equivalent native milestone mention syntax.
+- If the issue title already includes the slice code (for example `AM67`), do not add a redundant `Milestone slice: AM67` line unless the user explicitly wants it.
+- This PR traceability format applies to all GitHub PR bodies in this repo, regardless of whether the slice originated from a PM handoff or a Dev-owned follow-up.
 
 ### PR Body Drafting
 - Agents must draft every PR body in a local temporary Markdown file before creating or editing the PR through GitHub CLI.
