@@ -51,28 +51,36 @@ public sealed class MilestoneAJScenarioMatrixTests
     public void Aj4_HardensAssetsBaseDisksStateContinuity_AndActionableMessaging()
     {
         var source = LoadMainWindowSource();
+        var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
         var nativeFileDialogsSource = LoadNativeFileDialogsSource();
         var capabilitySource = LoadAssetsBaseDisksCapabilityServiceSource();
         var xamlSource = LoadAssetsBaseDisksViewXamlSource();
 
         Assert.Contains("private bool IsAssetsBaseDisksActive =>", source);
-        Assert.Contains("EnsureAssetsBaseDisksAsync", source);
-        Assert.Contains("_assetsBaseDisksWorkspace.PendingDraft", source);
-        Assert.Contains("_assetsBaseDisksWorkspace.HasErrorState", source);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceController _assetsBaseDisksController;", source);
+        Assert.Contains("_assetsBaseDisksController = new AssetsBaseDisksWorkspaceController(", source);
+        Assert.Contains("_assetsBaseDisksController.BeginImport();", source);
+        Assert.Contains("await _assetsBaseDisksController.ValidateAsync();", source);
+        Assert.Contains("await _assetsBaseDisksController.SaveDraftAsync();", source);
+        Assert.Contains("await _assetsBaseDisksController.RemoveSelectedAsync();", source);
+        Assert.Contains("_assetsBaseDisksController.HandleMetadataChanged();", source);
         Assert.Contains("AssetsBaseDisksRefreshButton_Click", source);
         Assert.Contains("AssetsBaseDisksImportButton_Click", source);
         Assert.Contains("AssetsBaseDisksValidateButton_Click", source);
         Assert.Contains("AssetsBaseDisksSaveMetadataButton_Click", source);
         Assert.Contains("AssetsBaseDisksRemoveButton_Click", source);
-        Assert.Contains("ShowAssetsBaseDiskRemoveConfirmationDialogAsync", source);
-        Assert.Contains("FormatAssetsBaseDiskValidationText", source);
-        Assert.Contains("AssetsBaseDisksErrorStatePanel.Visibility = _assetsBaseDisksWorkspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.DoesNotContain("private async Task EnsureAssetsBaseDisksAsync(bool forceRefresh)", source);
+        Assert.DoesNotContain("private void UpdateAssetsBaseDisksUi()", source);
+        Assert.Contains("ShowRemoveConfirmationDialogAsync", controllerSource);
+        Assert.Contains("FormatValidationText", controllerSource);
+        Assert.Contains("_workspace.PendingDraft", controllerSource);
+        Assert.Contains("_workspace.HasErrorState", controllerSource);
         Assert.Contains("IAssetsBaseDisksCapabilityService", source);
         Assert.Contains("ShowOpenVhdxDialog", nativeFileDialogsSource);
         Assert.Contains("Active runtime consumer detection is not currently implemented.", capabilitySource);
         Assert.Contains("Base disk removed from the registry.", capabilitySource);
         Assert.Contains("Registry-only removal.", xamlSource);
-        Assert.Contains("Validate and Save Metadata", source);
+        Assert.Contains("Validate and Save Metadata", controllerSource);
     }
 
     private static string LoadShellViewModelSource()
@@ -108,6 +116,12 @@ public sealed class MilestoneAJScenarioMatrixTests
     private static string LoadAssetsBaseDisksCapabilityServiceSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.Business", "Assets", "AssetsBaseDisksCapabilityService.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksWorkspaceControllerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
