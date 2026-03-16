@@ -279,6 +279,10 @@ Consolidation rules:
 
 ### 7.5 Git Branch and Base Sync Rules
 - Every issue must use its own dedicated branch.
+- Preferred branch naming pattern is:
+  - `milestone-<code>/issue-<number>-<short-slug>`
+  - If no milestone code exists, use:
+    - `issue-<number>-<short-slug>`
 - Issue branches must be created from the current `origin/master` state, not from a potentially stale local `master`.
 - Before starting issue work, agents must fetch `origin/master` and confirm the branch base reflects the current remote baseline.
 - If the issue depends on earlier merged work, agents must verify that required docs/code are present on `origin/master` before editing.
@@ -287,6 +291,8 @@ Consolidation rules:
 - Unrelated tracked or untracked worktree state must not be pulled into an issue branch or commit just because it exists locally.
 - If issue work starts on the wrong branch, agents must move the issue-specific changes onto a fresh dedicated branch from updated `origin/master` before committing or opening a PR.
 - PRs should contain only issue-scoped changes plus any unavoidable prerequisite baseline sync required to make the branch coherent against current `origin/master`.
+- If an issue depends on an earlier issue that is already merged, agents must check whether that earlier issue is still open and close it before finishing the current slice, or explicitly note that it was already closed.
+- If validation uses `--no-build` and the result appears stale, inconsistent with the current source, or likely to be using an older assembly/test host, agents must rebuild and rerun until the validation result is trustworthy before handoff.
 
 ---
 
