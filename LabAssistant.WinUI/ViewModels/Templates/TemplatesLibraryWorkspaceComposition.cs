@@ -118,21 +118,12 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
 
     public void ApplyUiState(bool isLoading, bool hasSelectedLibraryItem)
     {
-        _view.OpenTemplateInEditorButtonControl.IsEnabled = hasSelectedLibraryItem && !isLoading;
-        _view.DeleteTemplateButtonControl.IsEnabled = hasSelectedLibraryItem && !isLoading;
-        _view.ExportTemplateButtonControl.IsEnabled = hasSelectedLibraryItem && !isLoading;
-        _view.ApplyTemplateSearchButtonControl.IsEnabled = !isLoading;
-        _view.ClearTemplateSearchButtonControl.IsEnabled = !isLoading;
-        _view.ReloadTemplatesButtonControl.IsEnabled = !isLoading;
-        _view.ImportTemplateButtonControl.IsEnabled = !isLoading;
-        _view.CreateTemplateButtonControl.IsEnabled = !isLoading;
+        _view.UpdateViewState(BuildViewState(isLoading, hasSelectedLibraryItem));
     }
 
     private void ApplyViewState()
     {
-        _view.SetSearchText(_workspace.SearchQuery);
-        _view.SetSelectedTemplate(_workspace.SelectedItem);
-        _view.SetStatusText(_workspace.StatusText);
+        _view.UpdateViewState(BuildViewState(_host.IsTemplatesLoading, _workspace.SelectedItem is not null));
     }
 
     private void WireHandlers()
@@ -173,12 +164,12 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
 
     private void TemplatesLibraryView_SearchTextChanged(object? sender, EventArgs e)
     {
-        _controller.HandleSearchTextChanged(_view.SearchText);
+        _controller.HandleSearchTextChanged(_view.CaptureInteractionState().SearchText);
     }
 
     private void TemplatesLibraryView_SelectedTemplateChanged(object? sender, EventArgs e)
     {
-        _controller.HandleSelectionChanged(_view.SelectedTemplate);
+        _controller.HandleSelectionChanged(_view.CaptureInteractionState().SelectedTemplate);
     }
 
     private async void TemplatesLibraryView_ApplySearchRequested(object? sender, EventArgs e)
@@ -219,5 +210,21 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
     private async void TemplatesLibraryView_ExportTemplateRequested(object? sender, EventArgs e)
     {
         await _controller.ExportSelectedTemplateAsync();
+    }
+
+    private TemplatesLibraryViewState BuildViewState(bool isLoading, bool hasSelectedLibraryItem)
+    {
+        return new TemplatesLibraryViewState(
+            SearchText: _workspace.SearchQuery,
+            StatusText: _workspace.StatusText,
+            SelectedTemplate: _workspace.SelectedItem,
+            CanApplySearch: !isLoading,
+            CanClearSearch: !isLoading,
+            CanReload: !isLoading,
+            CanOpenTemplate: hasSelectedLibraryItem && !isLoading,
+            CanCreateTemplate: !isLoading,
+            CanDeleteTemplate: hasSelectedLibraryItem && !isLoading,
+            CanImportTemplate: !isLoading,
+            CanExportTemplate: hasSelectedLibraryItem && !isLoading);
     }
 }

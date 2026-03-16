@@ -3,6 +3,23 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Views.Templates;
 
+public readonly record struct TemplatesLibraryInteractionState(
+    string SearchText,
+    TemplateLibraryItem? SelectedTemplate);
+
+public readonly record struct TemplatesLibraryViewState(
+    string SearchText,
+    string StatusText,
+    TemplateLibraryItem? SelectedTemplate,
+    bool CanApplySearch,
+    bool CanClearSearch,
+    bool CanReload,
+    bool CanOpenTemplate,
+    bool CanCreateTemplate,
+    bool CanDeleteTemplate,
+    bool CanImportTemplate,
+    bool CanExportTemplate);
+
 public sealed partial class TemplatesLibraryView : UserControl
 {
     private bool _isUpdatingSearchText;
@@ -34,76 +51,31 @@ public sealed partial class TemplatesLibraryView : UserControl
         ExportTemplateButton.Click += ExportTemplateButton_Click;
     }
 
-    public ListView TemplateLibraryListViewControl => TemplateLibraryListView;
-
-    public TemplateLibraryItem? SelectedTemplate => TemplateLibraryListView.SelectedItem as TemplateLibraryItem;
-
-    public TextBox TemplateSearchTextBoxControl => TemplateSearchTextBox;
-
-    public string SearchText => TemplateSearchTextBox.Text;
-
-    public Button ApplyTemplateSearchButtonControl => ApplyTemplateSearchButton;
-
-    public Button ClearTemplateSearchButtonControl => ClearTemplateSearchButton;
-
-    public Button ReloadTemplatesButtonControl => ReloadTemplatesButton;
-
-    public Button OpenTemplateInEditorButtonControl => OpenTemplateInEditorButton;
-
-    public Button CreateTemplateButtonControl => CreateTemplateButton;
-
-    public Button DeleteTemplateButtonControl => DeleteTemplateButton;
-
-    public Button ImportTemplateButtonControl => ImportTemplateButton;
-
-    public Button ExportTemplateButtonControl => ExportTemplateButton;
-
-    public TextBlock TemplatesLibraryStatusTextBlockControl => TemplatesLibraryStatusTextBlock;
-
     public void SetInventorySource(object? itemsSource)
     {
         TemplateLibraryListView.ItemsSource = itemsSource;
     }
 
-    public void SetSelectedTemplate(TemplateLibraryItem? selectedTemplate)
+    public TemplatesLibraryInteractionState CaptureInteractionState()
     {
-        if (ReferenceEquals(TemplateLibraryListView.SelectedItem, selectedTemplate))
-        {
-            return;
-        }
-
-        _isUpdatingSelection = true;
-        try
-        {
-            TemplateLibraryListView.SelectedItem = selectedTemplate;
-        }
-        finally
-        {
-            _isUpdatingSelection = false;
-        }
+        return new TemplatesLibraryInteractionState(
+            TemplateSearchTextBox.Text,
+            TemplateLibraryListView.SelectedItem as TemplateLibraryItem);
     }
 
-    public void SetSearchText(string searchText)
+    public void UpdateViewState(TemplatesLibraryViewState state)
     {
-        if (string.Equals(TemplateSearchTextBox.Text, searchText, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        _isUpdatingSearchText = true;
-        try
-        {
-            TemplateSearchTextBox.Text = searchText;
-        }
-        finally
-        {
-            _isUpdatingSearchText = false;
-        }
-    }
-
-    public void SetStatusText(string statusText)
-    {
-        TemplatesLibraryStatusTextBlock.Text = statusText;
+        SetSearchText(state.SearchText);
+        SetSelectedTemplate(state.SelectedTemplate);
+        TemplatesLibraryStatusTextBlock.Text = state.StatusText;
+        ApplyTemplateSearchButton.IsEnabled = state.CanApplySearch;
+        ClearTemplateSearchButton.IsEnabled = state.CanClearSearch;
+        ReloadTemplatesButton.IsEnabled = state.CanReload;
+        OpenTemplateInEditorButton.IsEnabled = state.CanOpenTemplate;
+        CreateTemplateButton.IsEnabled = state.CanCreateTemplate;
+        DeleteTemplateButton.IsEnabled = state.CanDeleteTemplate;
+        ImportTemplateButton.IsEnabled = state.CanImportTemplate;
+        ExportTemplateButton.IsEnabled = state.CanExportTemplate;
     }
 
     private void TemplateSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -164,5 +136,41 @@ public sealed partial class TemplatesLibraryView : UserControl
     private void ExportTemplateButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         ExportTemplateRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SetSelectedTemplate(TemplateLibraryItem? selectedTemplate)
+    {
+        if (ReferenceEquals(TemplateLibraryListView.SelectedItem, selectedTemplate))
+        {
+            return;
+        }
+
+        _isUpdatingSelection = true;
+        try
+        {
+            TemplateLibraryListView.SelectedItem = selectedTemplate;
+        }
+        finally
+        {
+            _isUpdatingSelection = false;
+        }
+    }
+
+    private void SetSearchText(string searchText)
+    {
+        if (string.Equals(TemplateSearchTextBox.Text, searchText, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _isUpdatingSearchText = true;
+        try
+        {
+            TemplateSearchTextBox.Text = searchText;
+        }
+        finally
+        {
+            _isUpdatingSearchText = false;
+        }
     }
 }

@@ -74,6 +74,8 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("DeleteTemplateButton.Click += DeleteTemplateButton_Click;", libraryViewSource);
         Assert.Contains("ImportTemplateButton.Click += ImportTemplateButton_Click;", libraryViewSource);
         Assert.Contains("ExportTemplateButton.Click += ExportTemplateButton_Click;", libraryViewSource);
+        Assert.Contains("public void UpdateViewState(TemplatesLibraryViewState state)", libraryViewSource);
+        Assert.DoesNotContain("public Button OpenTemplateInEditorButtonControl =>", libraryViewSource);
         Assert.Contains("_templatesCapabilityService.SaveAsync", source);
         Assert.DoesNotContain("_templatesCapabilityService.ImportAsync", source);
         Assert.DoesNotContain("_templatesCapabilityService.ExportAsync", source);
