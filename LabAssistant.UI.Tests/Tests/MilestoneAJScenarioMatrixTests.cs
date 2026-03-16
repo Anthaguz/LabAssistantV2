@@ -52,25 +52,27 @@ public sealed class MilestoneAJScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
+        var compositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var nativeFileDialogsSource = LoadNativeFileDialogsSource();
         var capabilitySource = LoadAssetsBaseDisksCapabilityServiceSource();
         var xamlSource = LoadAssetsBaseDisksViewXamlSource();
 
         Assert.Contains("private bool IsAssetsBaseDisksActive =>", source);
-        Assert.Contains("private readonly AssetsBaseDisksWorkspaceController _assetsBaseDisksController;", source);
-        Assert.Contains("_assetsBaseDisksController = new AssetsBaseDisksWorkspaceController(", source);
-        Assert.Contains("_assetsBaseDisksController.BeginImport();", source);
-        Assert.Contains("await _assetsBaseDisksController.ValidateAsync();", source);
-        Assert.Contains("await _assetsBaseDisksController.SaveDraftAsync();", source);
-        Assert.Contains("await _assetsBaseDisksController.RemoveSelectedAsync();", source);
-        Assert.Contains("_assetsBaseDisksController.HandleMetadataChanged();", source);
-        Assert.Contains("AssetsBaseDisksRefreshButton_Click", source);
-        Assert.Contains("AssetsBaseDisksImportButton_Click", source);
-        Assert.Contains("AssetsBaseDisksValidateButton_Click", source);
-        Assert.Contains("AssetsBaseDisksSaveMetadataButton_Click", source);
-        Assert.Contains("AssetsBaseDisksRemoveButton_Click", source);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", source);
+        Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", source);
+        Assert.Contains("new AssetsBaseDisksCompositionHost(", source);
+        Assert.DoesNotContain("AssetsBaseDisksRefreshButton_Click", source);
+        Assert.DoesNotContain("AssetsBaseDisksImportButton_Click", source);
+        Assert.DoesNotContain("AssetsBaseDisksValidateButton_Click", source);
+        Assert.DoesNotContain("AssetsBaseDisksSaveMetadataButton_Click", source);
+        Assert.DoesNotContain("AssetsBaseDisksRemoveButton_Click", source);
         Assert.DoesNotContain("private async Task EnsureAssetsBaseDisksAsync(bool forceRefresh)", source);
         Assert.DoesNotContain("private void UpdateAssetsBaseDisksUi()", source);
+        Assert.Contains("_view.AssetsBaseDisksRefreshButtonControl.Click += AssetsBaseDisksRefreshButton_Click;", compositionSource);
+        Assert.Contains("_view.AssetsBaseDisksImportButtonControl.Click += AssetsBaseDisksImportButton_Click;", compositionSource);
+        Assert.Contains("_view.AssetsBaseDisksValidateButtonControl.Click += AssetsBaseDisksValidateButton_Click;", compositionSource);
+        Assert.Contains("_view.AssetsBaseDisksSaveMetadataButtonControl.Click += AssetsBaseDisksSaveMetadataButton_Click;", compositionSource);
+        Assert.Contains("_view.AssetsBaseDisksRemoveButtonControl.Click += AssetsBaseDisksRemoveButton_Click;", compositionSource);
         Assert.Contains("ShowRemoveConfirmationDialogAsync", controllerSource);
         Assert.Contains("FormatValidationText", controllerSource);
         Assert.Contains("_workspace.PendingDraft", controllerSource);
@@ -122,6 +124,12 @@ public sealed class MilestoneAJScenarioMatrixTests
     private static string LoadAssetsBaseDisksWorkspaceControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

@@ -24,11 +24,7 @@ internal interface IAssetsWorkspaceHost
 
     int AssetsSwitchCount { get; }
 
-    Task EnsureAssetsBaseDisksAsync(bool forceRefresh);
-
     Task EnsureAssetsSwitchesAsync(bool forceRefresh);
-
-    void UpdateAssetsBaseDisksUi();
 
     void UpdateAssetsSwitchesUi();
 }
@@ -70,24 +66,18 @@ internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
 {
     private readonly Func<bool> _isAssetsSwitchesLoading;
     private readonly Func<int> _getAssetsSwitchCount;
-    private readonly Func<bool, Task> _ensureAssetsBaseDisksAsync;
     private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;
-    private readonly Action _updateAssetsBaseDisksUi;
     private readonly Action _updateAssetsSwitchesUi;
 
     public AssetsWorkspaceHost(
         Func<bool> isAssetsSwitchesLoading,
         Func<int> getAssetsSwitchCount,
-        Func<bool, Task> ensureAssetsBaseDisksAsync,
         Func<bool, Task> ensureAssetsSwitchesAsync,
-        Action updateAssetsBaseDisksUi,
         Action updateAssetsSwitchesUi)
     {
         _isAssetsSwitchesLoading = isAssetsSwitchesLoading;
         _getAssetsSwitchCount = getAssetsSwitchCount;
-        _ensureAssetsBaseDisksAsync = ensureAssetsBaseDisksAsync;
         _ensureAssetsSwitchesAsync = ensureAssetsSwitchesAsync;
-        _updateAssetsBaseDisksUi = updateAssetsBaseDisksUi;
         _updateAssetsSwitchesUi = updateAssetsSwitchesUi;
     }
 
@@ -95,18 +85,14 @@ internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
 
     public int AssetsSwitchCount => _getAssetsSwitchCount();
 
-    public Task EnsureAssetsBaseDisksAsync(bool forceRefresh) => _ensureAssetsBaseDisksAsync(forceRefresh);
-
     public Task EnsureAssetsSwitchesAsync(bool forceRefresh) => _ensureAssetsSwitchesAsync(forceRefresh);
-
-    public void UpdateAssetsBaseDisksUi() => _updateAssetsBaseDisksUi();
 
     public void UpdateAssetsSwitchesUi() => _updateAssetsSwitchesUi();
 }
 
 internal sealed class AssetsWorkspaceComposition
 {
-    private readonly AssetsBaseDisksView _baseDisksView;
+    private readonly AssetsBaseDisksWorkspaceComposition _baseDisksWorkspaceComposition;
     private readonly AssetsSwitchesView _switchesView;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
@@ -119,19 +105,18 @@ internal sealed class AssetsWorkspaceComposition
 
     public AssetsWorkspaceComposition(
         AssetsOverviewView overviewView,
-        AssetsBaseDisksView baseDisksView,
+        AssetsBaseDisksWorkspaceComposition baseDisksWorkspaceComposition,
         AssetsSwitchesView switchesView,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem baseDisksTabViewItem,
         TabViewItem switchesTabViewItem,
-        AssetsBaseDisksWorkspaceViewModel baseDisksWorkspace,
         ObservableCollection<AssetsSwitchListRow> switchRows,
         ObservableCollection<string> attachedVmNames,
         IAssetsWorkspaceHost host,
         IAssetsWorkspaceShellBridge shellBridge)
     {
-        _baseDisksView = baseDisksView;
+        _baseDisksWorkspaceComposition = baseDisksWorkspaceComposition;
         _switchesView = switchesView;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
@@ -142,15 +127,14 @@ internal sealed class AssetsWorkspaceComposition
         _overviewWorkspaceComposition = new AssetsOverviewWorkspaceComposition(
             overviewView,
             new AssetsOverviewWorkspaceHost(
-                () => baseDisksWorkspace.IsLoading,
+                () => _baseDisksWorkspaceComposition.IsLoading,
                 () => _host.IsAssetsSwitchesLoading,
-                () => baseDisksWorkspace.Inventory.Count,
+                () => _baseDisksWorkspaceComposition.InventoryCount,
                 () => switchRows.Count),
             new AssetsOverviewWorkspaceShellBridge(
                 () => _shellBridge.IsAssetsOverviewActive,
                 _shellBridge.NavigateToRoute));
 
-        _baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDisksWorkspace.Inventory;
         _switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;
         _switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = attachedVmNames;
         WireSharedHandlers();
@@ -167,8 +151,7 @@ internal sealed class AssetsWorkspaceComposition
 
         if (_shellBridge.IsAssetsBaseDisksActive)
         {
-            _ = _host.EnsureAssetsBaseDisksAsync(forceRefresh: false);
-            _host.UpdateAssetsBaseDisksUi();
+            _baseDisksWorkspaceComposition.ApplyShellState();
         }
 
         if (_shellBridge.IsAssetsSwitchesActive)
