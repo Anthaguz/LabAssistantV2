@@ -33,14 +33,17 @@ public sealed class MilestoneADScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
         var compositionSource = LoadTemplatesWorkspaceCompositionSource();
+        var libraryCompositionSource = LoadTemplatesLibraryWorkspaceCompositionSource();
 
         Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", source);
         Assert.Contains("_templatesWorkspaceComposition = new TemplatesWorkspaceComposition(", source);
         Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", source);
         Assert.Contains("internal sealed class TemplatesWorkspaceComposition", compositionSource);
         Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
-        Assert.Contains("_libraryView.Visibility = _shellBridge.IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_libraryComposition.ApplyShellState(_shellBridge.IsTemplatesLibraryActive);", compositionSource);
         Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("internal sealed class TemplatesLibraryWorkspaceComposition", libraryCompositionSource);
+        Assert.Contains("_view.Visibility = isLibraryActive ? Visibility.Visible : Visibility.Collapsed;", libraryCompositionSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("if (!capability.ShowChildRoutesInShell)", source);
@@ -51,6 +54,7 @@ public sealed class MilestoneADScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
         var compositionSource = LoadTemplatesWorkspaceCompositionSource();
+        var libraryCompositionSource = LoadTemplatesLibraryWorkspaceCompositionSource();
         var libraryViewSource = LoadTemplatesLibraryViewCodeBehindSource();
 
         Assert.Contains("WireTemplatesHandlers()", source);
@@ -62,8 +66,9 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", source);
         Assert.Contains("RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;", source);
         Assert.Contains("ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;", source);
-        Assert.Contains("_libraryView.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;", compositionSource);
-        Assert.Contains("_libraryView.DeleteTemplateRequested += TemplatesLibraryView_DeleteTemplateRequested;", compositionSource);
+        Assert.DoesNotContain("TemplatesLibraryView_OpenTemplateRequested", compositionSource);
+        Assert.Contains("_view.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;", libraryCompositionSource);
+        Assert.Contains("_view.DeleteTemplateRequested += TemplatesLibraryView_DeleteTemplateRequested;", libraryCompositionSource);
         Assert.Contains("OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;", libraryViewSource);
         Assert.Contains("CreateTemplateButton.Click += CreateTemplateButton_Click;", libraryViewSource);
         Assert.Contains("DeleteTemplateButton.Click += DeleteTemplateButton_Click;", libraryViewSource);
@@ -231,6 +236,12 @@ public sealed class MilestoneADScenarioMatrixTests
     private static string LoadTemplatesLibraryWorkspaceControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesLibraryWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesLibraryWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesLibraryWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
