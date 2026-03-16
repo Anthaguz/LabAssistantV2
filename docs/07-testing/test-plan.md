@@ -321,6 +321,26 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Compact-mode and scroll ownership remain bounded and workspace-preserving without domain/workflow redesign.
   - AL closure evidence includes both automated structural checks and repeatable manual runtime verification.
 
+## TC-020: Milestone AM Assets Extraction Closure Verification
+- **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
+- **Type:** Manual (real Windows machine / Hyper-V host where Switches flows are exercised) + automated coverage
+- **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#407`, `#408`, `#409`, `#410`, `#411`, `#412`, `#439`, `#441`, `#453`, `#454`, `#455`, `#456`, `#457`, `#458`, `#459`, `#460`, `#461`, `#462`, `#463`, `#464`, `#465`, `#466`, `#467`, `#468`, `#469`)
+- **Steps:**
+  1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
+  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-assets-extraction-checklist.md`.
+  3. Verify the shared Assets foundation remains overview-first, route-stable, and host/delegation only.
+  4. Verify Overview lane summary/navigation sanity plus shared-host non-ownership.
+  5. Verify Base Disks route, selection, edit, import/register, validation, and remove flow sanity.
+  6. Verify Switches route, selection, create/edit/delete, attached-VM display, validation, and blocked-delete sanity.
+  7. Verify route switching preserves the long-lived Assets workspace model and refresh/reconcile behavior rather than per-navigation recreation.
+- **Expected:**
+  - Shared `AssetsWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of local Assets workflow/state ownership.
+  - `AssetsOverviewWorkspaceComposition` and `AssetsOverviewWorkspaceViewModel` continue to own Overview-local summary behavior.
+  - `AssetsBaseDisksWorkspaceViewModel`, `AssetsBaseDisksWorkspaceController`, and `AssetsBaseDisksWorkspaceComposition` remain the Base Disks-local seams, with the narrowed Base Disks view surface still represented.
+  - `AssetsSwitchesWorkspaceViewModel`, `AssetsSwitchesWorkspaceController`, and `AssetsSwitchesWorkspaceComposition` remain the Switches-local seams, with the narrowed Switches presentation/view surface still represented.
+  - Assets remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
+  - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Assets changes.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.
