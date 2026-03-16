@@ -886,6 +886,63 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void UpdateWorkspaceState(AssetsSwitchesViewState state)", switchesViewSource);
     }
 
+    [Fact]
+    public void MainWindow_PreservesShellBoundary_WhileHostingLongLivedTemplatesWorkspace()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var shellViewModelSource = LoadShellViewModelSource();
+
+        Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition = new TemplatesWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("new TemplatesWorkspaceHost(() => _ = EnsureTemplatesLibraryAsync(forceRefresh: false))", mainWindowSource);
+        Assert.Contains("new TemplatesWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("() => IsTemplatesCapabilityActive,", mainWindowSource);
+        Assert.Contains("() => IsTemplatesLibraryActive,", mainWindowSource);
+        Assert.Contains("() => IsTemplatesEditorActive));", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;", mainWindowSource);
+        Assert.Contains("private bool IsTemplatesLibraryActive =>", mainWindowSource);
+        Assert.Contains("private bool IsTemplatesEditorActive =>", mainWindowSource);
+        Assert.Contains("private bool IsTemplatesCapabilityActive =>", mainWindowSource);
+
+        Assert.DoesNotContain("TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("if (IsTemplatesLibraryActive)", mainWindowSource);
+        Assert.DoesNotContain("_ = EnsureTemplatesLibraryAsync(forceRefresh: false);", mainWindowSource);
+
+        Assert.Contains("public const string TemplatesLibrary = \"templates.library\";", shellViewModelSource);
+        Assert.Contains("public const string TemplatesEditor = \"templates.editor\";", shellViewModelSource);
+    }
+
+    [Fact]
+    public void TemplatesWorkspaceComposition_BecomesTheSharedTemplatesLocalCompositionOwner()
+    {
+        var compositionSource = LoadTemplatesWorkspaceCompositionSource();
+
+        Assert.Contains("internal interface ITemplatesWorkspaceShellBridge", compositionSource);
+        Assert.Contains("bool IsTemplatesCapabilityActive { get; }", compositionSource);
+        Assert.Contains("bool IsTemplatesLibraryActive { get; }", compositionSource);
+        Assert.Contains("bool IsTemplatesEditorActive { get; }", compositionSource);
+        Assert.Contains("internal interface ITemplatesWorkspaceHost", compositionSource);
+        Assert.Contains("void EnsureTemplatesLibraryLoaded();", compositionSource);
+        Assert.Contains("internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBridge", compositionSource);
+        Assert.Contains("internal sealed class TemplatesWorkspaceHost : ITemplatesWorkspaceHost", compositionSource);
+        Assert.Contains("internal sealed class TemplatesWorkspaceComposition", compositionSource);
+        Assert.Contains("private readonly FrameworkElement _workspaceHost;", compositionSource);
+        Assert.Contains("private readonly TemplatesLibraryView _libraryView;", compositionSource);
+        Assert.Contains("private readonly TemplatesEditorView _editorView;", compositionSource);
+        Assert.Contains("private readonly ITemplatesWorkspaceHost _host;", compositionSource);
+        Assert.Contains("private readonly ITemplatesWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_libraryView.Visibility = _shellBridge.IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("if (_shellBridge.IsTemplatesLibraryActive)", compositionSource);
+        Assert.Contains("_host.EnsureTemplatesLibraryLoaded();", compositionSource);
+        Assert.DoesNotContain("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", compositionSource);
+        Assert.DoesNotContain("TemplatesSubviewTabView", compositionSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -913,6 +970,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadAssetsWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

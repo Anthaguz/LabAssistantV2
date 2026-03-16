@@ -21,6 +21,7 @@ using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.ViewModels.Assets;
 using LabAssistant.WinUI.ViewModels.Machines;
+using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.Views.Assets;
 using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Diagnostics;
@@ -51,6 +52,7 @@ public sealed partial class MainWindow : Window
     private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
+    private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
@@ -301,6 +303,15 @@ public sealed partial class MainWindow : Window
                 () => IsAssetsBaseDisksActive,
                 () => IsAssetsSwitchesActive,
                 NavigateToRoute));
+        _templatesWorkspaceComposition = new TemplatesWorkspaceComposition(
+            TemplatesWorkspacePanel,
+            TemplatesLibraryViewHost,
+            TemplatesEditorViewHost,
+            new TemplatesWorkspaceHost(() => _ = EnsureTemplatesLibraryAsync(forceRefresh: false)),
+            new TemplatesWorkspaceShellBridge(
+                () => IsTemplatesCapabilityActive,
+                () => IsTemplatesLibraryActive,
+                () => IsTemplatesEditorActive));
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
@@ -522,9 +533,6 @@ public sealed partial class MainWindow : Window
         AssetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;
-        TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         SyncDeploySubviewSelection();
@@ -538,6 +546,7 @@ public sealed partial class MainWindow : Window
 
         _machinesWorkspaceComposition.ApplyShellState();
         _assetsWorkspaceComposition.ApplyShellState();
+        _templatesWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)
         {
             _ = LoadMachinesDeletionPolicyAsync();
@@ -551,11 +560,6 @@ public sealed partial class MainWindow : Window
         if (IsDiagnosticsLogsActive)
         {
             _ = EnsureStructuredLogsLoadedAsync(forceReload: false);
-        }
-
-        if (IsTemplatesLibraryActive)
-        {
-            _ = EnsureTemplatesLibraryAsync(forceRefresh: false);
         }
 
         if (IsDeployOverviewActive)

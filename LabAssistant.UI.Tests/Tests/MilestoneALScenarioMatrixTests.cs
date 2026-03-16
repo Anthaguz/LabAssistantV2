@@ -84,6 +84,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var xaml = LoadMainWindowXaml();
         var mainWindowSource = LoadMainWindowSource();
         var shellSource = LoadShellViewModelSource();
+        var compositionSource = LoadTemplatesWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "TemplatesWorkspacePanel"));
         Assert.NotNull(FindByName(xaml, "TemplatesLibraryViewHost"));
@@ -95,9 +96,11 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("new ShellSubview(ShellRouteKeys.TemplatesEditor, \"Editor\"", shellSource);
 
         Assert.Contains("if (!capability.ShowChildRoutesInShell)", mainWindowSource);
-        Assert.Contains("TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
-        Assert.Contains("TemplatesLibraryViewHost.Visibility = IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
-        Assert.Contains("TemplatesEditorViewHost.Visibility = IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_libraryView.Visibility = _shellBridge.IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", mainWindowSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", mainWindowSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", mainWindowSource);
@@ -334,7 +337,8 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("new ShellSubview(ShellRouteKeys.DeployOverview", shellSource);
         Assert.Contains("new ShellSubview(ShellRouteKeys.DiagnosticsOverview", shellSource);
         Assert.Contains("showChildRoutesInShell: false", shellSource);
-        Assert.Contains("TemplatesWorkspaceHost.Visibility = IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
         Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
         Assert.Contains("UpdateDeploySharedIssueSummaries();", mainWindowSource);
@@ -370,6 +374,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadAssetsWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
