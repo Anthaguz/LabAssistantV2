@@ -604,6 +604,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Assets composition must not be widened into an Overview-centric shared owner; and the cleanup target must stay explicit that Base Disks extraction details, Switches extraction details, runtime implementation, overview redesign beyond ownership cleanup, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-140:** WinUI `Assets Base Disks` cleanup shall remain under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Base Disks-specific state, orchestration, and UI coordination behind a Base Disks-local seam.
+  - **Acceptance details:** the Base Disks cleanup target must explicitly keep shared Assets composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Base Disks-local seam the target owner for Base Disks-specific state, orchestration, composition, and interaction coordination.
+  - **Priority:** P1
+
+- **FR-141:** WinUI `Assets Base Disks` cleanup shall preserve current `assets.base_disks` behavior and boundaries while making Base Disks participation in the long-lived Assets workspace explicit.
+  - **Acceptance details:** the Base Disks cleanup target must preserve `assets.base_disks` as the operational Base Disks management surface, must keep Base Disks outside Overview and Switches semantic ownership, must keep route activation refresh within the long-lived Assets workspace rather than per-navigation recreation, and must preserve AJ and AL Base Disks behavior contracts while narrowing ownership.
+  - **Priority:** P1
+
+- **FR-142:** WinUI `Assets Base Disks` cleanup shall reject direct `MainWindow` view dependency, shared Assets composition widening into the Base Disks workflow owner, and unapproved runtime or performance redesign during seam definition.
+  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Assets composition must not become the Base Disks workflow owner; Base Disks-specific host bridges or control exposure remain temporary migration cleanup targets behind the Base Disks-local seam; and the cleanup target must stay explicit that Switches extraction details, Overview extraction details, runtime implementation, Base Disks behavior redesign, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -622,6 +634,8 @@ Detailed capability contract:
 - See `docs/02-ux/winui-machines-composition-cleanup-target-am.md` for the post-AM33 Machines-specific cleanup target before broader capability rollout continues.
 - See `docs/02-ux/winui-assets-workspace-extraction-seam-am.md` for the AM Assets-specific extraction seam and composition target after the Machines proof point.
 - See `docs/02-ux/winui-assets-composition-cleanup-target-am.md` for the AM shared Assets composition cleanup target that narrows shell-vs-Assets ownership before Assets runtime extraction proceeds.
+- See `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md` for the AM Assets Overview cleanup target inside the shared Assets composition boundary.
+- See `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md` for the AM Assets Base Disks cleanup target inside the shared Assets composition boundary.
 
 ---
 
