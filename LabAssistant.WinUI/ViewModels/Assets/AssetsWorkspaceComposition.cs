@@ -18,9 +18,6 @@ internal interface IAssetsWorkspaceShellBridge
 
 internal interface IAssetsWorkspaceHost
 {
-    Task EnsureAssetsSwitchesAsync(bool forceRefresh);
-
-    void UpdateAssetsSwitchesUi();
 }
 
 internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
@@ -58,26 +55,12 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
 
 internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
 {
-    private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;
-    private readonly Action _updateAssetsSwitchesUi;
-
-    public AssetsWorkspaceHost(
-        Func<bool, Task> ensureAssetsSwitchesAsync,
-        Action updateAssetsSwitchesUi)
-    {
-        _ensureAssetsSwitchesAsync = ensureAssetsSwitchesAsync;
-        _updateAssetsSwitchesUi = updateAssetsSwitchesUi;
-    }
-
-    public Task EnsureAssetsSwitchesAsync(bool forceRefresh) => _ensureAssetsSwitchesAsync(forceRefresh);
-
-    public void UpdateAssetsSwitchesUi() => _updateAssetsSwitchesUi();
 }
 
 internal sealed class AssetsWorkspaceComposition
 {
     private readonly AssetsBaseDisksWorkspaceComposition _baseDisksWorkspaceComposition;
-    private readonly AssetsSwitchesView _switchesView;
+    private readonly AssetsSwitchesWorkspaceComposition _switchesWorkspaceComposition;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _baseDisksTabViewItem;
@@ -90,8 +73,7 @@ internal sealed class AssetsWorkspaceComposition
     public AssetsWorkspaceComposition(
         AssetsOverviewView overviewView,
         AssetsBaseDisksWorkspaceComposition baseDisksWorkspaceComposition,
-        AssetsSwitchesWorkspaceViewModel switchesWorkspace,
-        AssetsSwitchesView switchesView,
+        AssetsSwitchesWorkspaceComposition switchesWorkspaceComposition,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem baseDisksTabViewItem,
@@ -100,7 +82,7 @@ internal sealed class AssetsWorkspaceComposition
         IAssetsWorkspaceShellBridge shellBridge)
     {
         _baseDisksWorkspaceComposition = baseDisksWorkspaceComposition;
-        _switchesView = switchesView;
+        _switchesWorkspaceComposition = switchesWorkspaceComposition;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
         _baseDisksTabViewItem = baseDisksTabViewItem;
@@ -111,15 +93,12 @@ internal sealed class AssetsWorkspaceComposition
             overviewView,
             new AssetsOverviewWorkspaceHost(
                 () => _baseDisksWorkspaceComposition.IsLoading,
-                () => switchesWorkspace.IsLoading,
+                () => _switchesWorkspaceComposition.IsLoading,
                 () => _baseDisksWorkspaceComposition.InventoryCount,
-                () => switchesWorkspace.Inventory.Count),
+                () => _switchesWorkspaceComposition.InventoryCount),
             new AssetsOverviewWorkspaceShellBridge(
                 () => _shellBridge.IsAssetsOverviewActive,
                 _shellBridge.NavigateToRoute));
-
-        _switchesView.AssetsSwitchesListViewControl.ItemsSource = switchesWorkspace.Inventory;
-        _switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = switchesWorkspace.AttachedVmNames;
         WireSharedHandlers();
     }
 
@@ -139,8 +118,7 @@ internal sealed class AssetsWorkspaceComposition
 
         if (_shellBridge.IsAssetsSwitchesActive)
         {
-            _ = _host.EnsureAssetsSwitchesAsync(forceRefresh: false);
-            _host.UpdateAssetsSwitchesUi();
+            _switchesWorkspaceComposition.ApplyShellState();
         }
     }
 
