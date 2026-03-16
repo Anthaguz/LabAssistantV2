@@ -45,7 +45,7 @@ internal sealed class AssetsBaseDisksWorkspaceComposition : IAssetsBaseDisksWork
         _view = view;
         _host = host;
         _controller = new AssetsBaseDisksWorkspaceController(capabilityService, _workspace, this);
-        _view.AssetsBaseDisksListViewControl.ItemsSource = _workspace.Inventory;
+        _view.SetInventorySource(_workspace.Inventory);
         WireHandlers();
         _controller.ApplyWorkspaceState();
     }
@@ -64,45 +64,43 @@ internal sealed class AssetsBaseDisksWorkspaceComposition : IAssetsBaseDisksWork
 
     AssetsBaseDiskDraft? IAssetsBaseDisksWorkspaceHost.CaptureDraft(bool isNewOverride) => CaptureDraft(isNewOverride);
 
-    void IAssetsBaseDisksWorkspaceHost.ApplyEditorDraft(AssetsBaseDiskDraft draft) => ApplyEditorDraft(draft);
+    void IAssetsBaseDisksWorkspaceHost.ApplyEditorDraft(AssetsBaseDiskDraft draft) => _view.ApplyEditorDraft(draft);
 
-    void IAssetsBaseDisksWorkspaceHost.ClearEditorFields() => ClearEditorFields();
+    void IAssetsBaseDisksWorkspaceHost.ClearEditorFields() => _view.ClearEditor();
 
-    void IAssetsBaseDisksWorkspaceHost.SetSelectedRow(AssetsBaseDiskListRow? row) => _view.AssetsBaseDisksListViewControl.SelectedItem = row;
+    void IAssetsBaseDisksWorkspaceHost.SetSelectedRow(AssetsBaseDiskListRow? row) => _view.SetSelectedBaseDisk(row);
 
     void IAssetsBaseDisksWorkspaceHost.ApplyWorkspaceState(AssetsBaseDisksWorkspaceViewModel workspace, bool canSaveDraft) => ApplyWorkspaceState(workspace, canSaveDraft);
 
     string? IAssetsBaseDisksWorkspaceHost.PickBaseDiskFilePath() => _host.PickBaseDiskFilePath();
 
-    void IAssetsBaseDisksWorkspaceHost.SetDraftPath(string path) => _view.AssetsBaseDisksPathTextBoxControl.Text = path;
+    void IAssetsBaseDisksWorkspaceHost.SetDraftPath(string path) => _view.SetDraftPath(path);
 
     Task<bool> IAssetsBaseDisksWorkspaceHost.ShowRemoveConfirmationDialogAsync(AssetsBaseDiskListRow row, AssetsBaseDiskRemovalAssessment assessment) => _host.ShowRemoveConfirmationDialogAsync(row, assessment);
 
     private void WireHandlers()
     {
-        _view.AssetsBaseDisksListViewControl.SelectionChanged += AssetsBaseDisksListView_SelectionChanged;
-        _view.AssetsBaseDisksRefreshButtonControl.Click += AssetsBaseDisksRefreshButton_Click;
-        _view.AssetsBaseDisksImportButtonControl.Click += AssetsBaseDisksImportButton_Click;
-        _view.AssetsBaseDisksValidateButtonControl.Click += AssetsBaseDisksValidateButton_Click;
-        _view.AssetsBaseDisksRemoveButtonControl.Click += AssetsBaseDisksRemoveButton_Click;
-        _view.AssetsBaseDisksBrowsePathButtonControl.Click += AssetsBaseDisksBrowsePathButton_Click;
-        _view.AssetsBaseDisksSaveMetadataButtonControl.Click += AssetsBaseDisksSaveMetadataButton_Click;
-        _view.AssetsBaseDisksOsNameTextBoxControl.TextChanged += AssetsBaseDisksMetadataTextBox_TextChanged;
-        _view.AssetsBaseDisksOsVersionTextBoxControl.TextChanged += AssetsBaseDisksMetadataTextBox_TextChanged;
-        _view.AssetsBaseDisksGenerationTextBoxControl.TextChanged += AssetsBaseDisksMetadataTextBox_TextChanged;
-        _view.AssetsBaseDisksNotesTextBoxControl.TextChanged += AssetsBaseDisksMetadataTextBox_TextChanged;
+        _view.SelectedBaseDiskChanged += AssetsBaseDisksListView_SelectionChanged;
+        _view.RefreshRequested += AssetsBaseDisksRefreshRequested;
+        _view.ImportRequested += AssetsBaseDisksImportRequested;
+        _view.ValidateRequested += AssetsBaseDisksValidateRequested;
+        _view.RemoveRequested += AssetsBaseDisksRemoveRequested;
+        _view.BrowsePathRequested += AssetsBaseDisksBrowsePathRequested;
+        _view.SaveMetadataRequested += AssetsBaseDisksSaveMetadataRequested;
+        _view.MetadataChanged += AssetsBaseDisksMetadataChanged;
     }
 
     private AssetsBaseDiskDraft? CaptureDraft(bool isNewOverride)
     {
-        if (!int.TryParse(_view.AssetsBaseDisksGenerationTextBoxControl.Text.Trim(), out var generation) || generation <= 0)
+        var formValues = _view.CaptureFormValues();
+        if (!int.TryParse(formValues.GenerationText?.Trim(), out var generation) || generation <= 0)
         {
             return null;
         }
 
-        var path = _view.AssetsBaseDisksPathTextBoxControl.Text.Trim();
-        var osName = _view.AssetsBaseDisksOsNameTextBoxControl.Text.Trim();
-        var osVersion = _view.AssetsBaseDisksOsVersionTextBoxControl.Text.Trim();
+        var path = formValues.PathText?.Trim() ?? string.Empty;
+        var osName = formValues.OsNameText?.Trim() ?? string.Empty;
+        var osVersion = formValues.OsVersionText?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(osName) || string.IsNullOrWhiteSpace(osVersion))
         {
             return null;
@@ -115,106 +113,77 @@ internal sealed class AssetsBaseDisksWorkspaceComposition : IAssetsBaseDisksWork
             OsName = osName,
             OsVersion = osVersion,
             Generation = generation,
-            Notes = _view.AssetsBaseDisksNotesTextBoxControl.Text,
+            Notes = formValues.NotesText,
             IsNew = isNewOverride
         };
     }
 
-    private void ApplyEditorDraft(AssetsBaseDiskDraft draft)
-    {
-        _workspace.IsUpdatingEditor = true;
-        try
-        {
-            _view.AssetsBaseDisksOsNameTextBoxControl.Text = draft.OsName;
-            _view.AssetsBaseDisksOsVersionTextBoxControl.Text = draft.OsVersion;
-            _view.AssetsBaseDisksPathTextBoxControl.Text = draft.Path;
-            _view.AssetsBaseDisksGenerationTextBoxControl.Text = draft.Generation > 0 ? draft.Generation.ToString() : string.Empty;
-            _view.AssetsBaseDisksNotesTextBoxControl.Text = draft.Notes ?? string.Empty;
-        }
-        finally
-        {
-            _workspace.IsUpdatingEditor = false;
-        }
-    }
-
-    private void ClearEditorFields()
-    {
-        _workspace.IsUpdatingEditor = true;
-        try
-        {
-            _view.AssetsBaseDisksOsNameTextBoxControl.Text = string.Empty;
-            _view.AssetsBaseDisksOsVersionTextBoxControl.Text = string.Empty;
-            _view.AssetsBaseDisksPathTextBoxControl.Text = string.Empty;
-            _view.AssetsBaseDisksGenerationTextBoxControl.Text = string.Empty;
-            _view.AssetsBaseDisksNotesTextBoxControl.Text = string.Empty;
-        }
-        finally
-        {
-            _workspace.IsUpdatingEditor = false;
-        }
-    }
-
     private void ApplyWorkspaceState(AssetsBaseDisksWorkspaceViewModel workspace, bool canSaveDraft)
     {
-        _view.AssetsBaseDisksRefreshButtonControl.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving;
-        _view.AssetsBaseDisksImportButtonControl.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving;
-        _view.AssetsBaseDisksValidateButtonControl.IsEnabled = !workspace.IsLoading && workspace.SelectedRow is not null;
-        _view.AssetsBaseDisksRemoveButtonControl.IsEnabled = !workspace.IsLoading && !workspace.IsRemoving && workspace.SelectedRow is not null;
-        _view.AssetsBaseDisksBrowsePathButtonControl.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving;
-        _view.AssetsBaseDisksSaveMetadataButtonControl.IsEnabled = !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving && canSaveDraft;
-        _view.AssetsBaseDisksLoadingStatePanelControl.Visibility = workspace.IsLoading ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
-        _view.AssetsBaseDisksEmptyStatePanelControl.Visibility = !workspace.IsLoading && workspace.Inventory.Count == 0 ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
-        _view.AssetsBaseDisksErrorStatePanelControl.Visibility = workspace.HasErrorState ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
-        _view.AssetsBaseDisksStatusTextBlockControl.Text = workspace.StatusText;
-        _view.AssetsBaseDisksSelectedDiskSummaryTextBlockControl.Text = workspace.SelectedDiskSummaryText;
-        _view.AssetsBaseDisksSelectedDiskValidationTextBlockControl.Text = workspace.SelectedDiskValidationText;
-        _view.AssetsBaseDisksReferenceWarningTextBlockControl.Text = workspace.ReferenceWarningText;
-        _view.AssetsBaseDisksErrorStateTextBlockControl.Text = workspace.ErrorStateText;
-        _view.AssetsBaseDisksLoadingStateTextBlockControl.Text = workspace.IsLoading
-            ? "Loading base disk catalog. Current details remain visible until refresh completes."
-            : "Base disk catalog is idle.";
-        _view.AssetsBaseDisksEmptyStateTextBlockControl.Text = "No base disks are registered. Use Import / Register to choose a VHDX and then save its metadata.";
-        var showDetailsMessages = workspace.SelectedRow is not null || workspace.PendingDraft is not null;
-        _view.AssetsBaseDisksSelectedDiskValidationTextBlockControl.Visibility = showDetailsMessages ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
-        _view.AssetsBaseDisksReferenceWarningTextBlockControl.Visibility = showDetailsMessages ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+        _view.UpdateWorkspaceState(BuildViewState(workspace, canSaveDraft));
     }
 
-    private void AssetsBaseDisksListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private static AssetsBaseDisksViewState BuildViewState(AssetsBaseDisksWorkspaceViewModel workspace, bool canSaveDraft)
     {
-        _controller.HandleSelectionChanged(_view.AssetsBaseDisksListViewControl.SelectedItem as AssetsBaseDiskListRow);
+        var showDetailsMessages = workspace.SelectedRow is not null || workspace.PendingDraft is not null;
+        return new AssetsBaseDisksViewState(
+            CanRefresh: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving,
+            CanImport: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving,
+            CanValidate: !workspace.IsLoading && workspace.SelectedRow is not null,
+            CanRemove: !workspace.IsLoading && !workspace.IsRemoving && workspace.SelectedRow is not null,
+            CanBrowsePath: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving,
+            CanSaveMetadata: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsRemoving && canSaveDraft,
+            IsLoadingVisible: workspace.IsLoading,
+            IsEmptyVisible: !workspace.IsLoading && workspace.Inventory.Count == 0,
+            IsErrorVisible: workspace.HasErrorState,
+            ShowDetailsMessages: showDetailsMessages,
+            StatusText: workspace.StatusText,
+            SelectedDiskSummaryText: workspace.SelectedDiskSummaryText,
+            SelectedDiskValidationText: workspace.SelectedDiskValidationText,
+            ReferenceWarningText: workspace.ReferenceWarningText,
+            ErrorStateText: workspace.ErrorStateText,
+            LoadingStateText: workspace.IsLoading
+                ? "Loading base disk catalog. Current details remain visible until refresh completes."
+                : "Base disk catalog is idle.",
+            EmptyStateText: "No base disks are registered. Use Import / Register to choose a VHDX and then save its metadata.");
     }
 
-    private async void AssetsBaseDisksRefreshButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void AssetsBaseDisksListView_SelectionChanged(object? sender, EventArgs e)
+    {
+        _controller.HandleSelectionChanged(_view.SelectedBaseDisk);
+    }
+
+    private async void AssetsBaseDisksRefreshRequested(object? sender, EventArgs e)
     {
         await _controller.EnsureInventoryAsync(forceRefresh: true);
     }
 
-    private void AssetsBaseDisksImportButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void AssetsBaseDisksImportRequested(object? sender, EventArgs e)
     {
         _controller.BeginImport();
     }
 
-    private async void AssetsBaseDisksValidateButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void AssetsBaseDisksValidateRequested(object? sender, EventArgs e)
     {
         await _controller.ValidateAsync();
     }
 
-    private async void AssetsBaseDisksRemoveButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void AssetsBaseDisksRemoveRequested(object? sender, EventArgs e)
     {
         await _controller.RemoveSelectedAsync();
     }
 
-    private void AssetsBaseDisksBrowsePathButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void AssetsBaseDisksBrowsePathRequested(object? sender, EventArgs e)
     {
         _controller.HandleBrowsePath();
     }
 
-    private async void AssetsBaseDisksSaveMetadataButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void AssetsBaseDisksSaveMetadataRequested(object? sender, EventArgs e)
     {
         await _controller.SaveDraftAsync();
     }
 
-    private void AssetsBaseDisksMetadataTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void AssetsBaseDisksMetadataChanged(object? sender, EventArgs e)
     {
         _controller.HandleMetadataChanged();
     }
