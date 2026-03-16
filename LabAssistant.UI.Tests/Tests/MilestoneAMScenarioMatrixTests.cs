@@ -801,6 +801,91 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh)", switchesCompositionSource);
     }
 
+    [Fact]
+    public void AssetsExtraction_ClosureMatrix_ProtectsFullSharedAndLaneArchitecture()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var shellViewModelSource = LoadShellViewModelSource();
+        var sharedCompositionSource = LoadAssetsWorkspaceCompositionSource();
+        var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
+        var overviewWorkspaceSource = LoadAssetsOverviewWorkspaceViewModelSource();
+        var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
+        var baseDisksControllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
+        var baseDisksWorkspaceSource = LoadAssetsBaseDisksWorkspaceViewModelSource();
+        var baseDisksViewSource = LoadAssetsBaseDisksViewCodeBehindSource();
+        var switchesCompositionSource = LoadAssetsSwitchesWorkspaceCompositionSource();
+        var switchesControllerSource = LoadAssetsSwitchesWorkspaceControllerSource();
+        var switchesWorkspaceSource = LoadAssetsSwitchesWorkspaceViewModelSource();
+        var switchesViewSource = LoadAssetsSwitchesViewCodeBehindSource();
+
+        Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("_assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
+        Assert.DoesNotContain("private readonly AssetsBaseDisksWorkspaceViewModel _assetsBaseDisksWorkspace = new();", mainWindowSource);
+        Assert.DoesNotContain("private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();", mainWindowSource);
+        Assert.DoesNotContain("private readonly AssetsSwitchesWorkspaceController _assetsSwitchesController;", mainWindowSource);
+
+        Assert.Contains("public const string AssetsOverview = \"assets.overview\";", shellViewModelSource);
+        Assert.Contains("public const string AssetsBaseDisks = \"assets.base_disks\";", shellViewModelSource);
+        Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", shellViewModelSource);
+
+        Assert.Contains("internal sealed class AssetsWorkspaceComposition", sharedCompositionSource);
+        Assert.Contains("private readonly AssetsOverviewWorkspaceComposition _overviewWorkspaceComposition;", sharedCompositionSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _baseDisksWorkspaceComposition;", sharedCompositionSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _switchesWorkspaceComposition;", sharedCompositionSource);
+        Assert.Contains("private readonly IAssetsWorkspaceHost _host;", sharedCompositionSource);
+        Assert.Contains("private readonly IAssetsWorkspaceShellBridge _shellBridge;", sharedCompositionSource);
+        Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", sharedCompositionSource);
+        Assert.Contains("_baseDisksWorkspaceComposition.ApplyShellState();", sharedCompositionSource);
+        Assert.Contains("_switchesWorkspaceComposition.ApplyShellState();", sharedCompositionSource);
+        Assert.DoesNotContain("LoadAsync(isRefresh: forceRefresh)", sharedCompositionSource);
+        Assert.DoesNotContain("ValidateAsync(draft)", sharedCompositionSource);
+        Assert.DoesNotContain("RemoveAsync(", sharedCompositionSource);
+
+        Assert.Contains("internal sealed class AssetsOverviewWorkspaceComposition", overviewCompositionSource);
+        Assert.Contains("private readonly AssetsOverviewWorkspaceViewModel _workspace = new();", overviewCompositionSource);
+        Assert.Contains("private readonly IAssetsOverviewWorkspaceHost _host;", overviewCompositionSource);
+        Assert.Contains("private readonly IAssetsOverviewWorkspaceShellBridge _shellBridge;", overviewCompositionSource);
+        Assert.Contains("RefreshSummary();", overviewCompositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", overviewCompositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsSwitches);", overviewCompositionSource);
+
+        Assert.Contains("internal sealed class AssetsOverviewWorkspaceViewModel", overviewWorkspaceSource);
+        Assert.Contains("public void RefreshSummary(bool isBaseDisksLoading, bool isSwitchesLoading, int assetsBaseDiskCount, int assetsSwitchCount)", overviewWorkspaceSource);
+
+        Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceViewModel", baseDisksWorkspaceSource);
+        Assert.Contains("public ObservableCollection<AssetsBaseDiskListRow> Inventory { get; } = [];", baseDisksWorkspaceSource);
+        Assert.Contains("public AssetsBaseDiskDraft? PendingDraft { get; set; }", baseDisksWorkspaceSource);
+        Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceController", baseDisksControllerSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceViewModel _workspace;", baseDisksControllerSource);
+        Assert.Contains("private readonly IAssetsBaseDisksWorkspaceHost _host;", baseDisksControllerSource);
+        Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", baseDisksControllerSource);
+        Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceComposition : IAssetsBaseDisksWorkspaceHost", baseDisksCompositionSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceController _controller;", baseDisksCompositionSource);
+        Assert.Contains("public void ApplyShellState()", baseDisksCompositionSource);
+        Assert.Contains("_ = _controller.EnsureInventoryAsync(forceRefresh: false);", baseDisksCompositionSource);
+        Assert.Contains("public void UpdateWorkspaceState(AssetsBaseDisksViewState state)", baseDisksViewSource);
+
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceViewModel", switchesWorkspaceSource);
+        Assert.Contains("public ObservableCollection<AssetsSwitchListRow> Inventory { get; } = [];", switchesWorkspaceSource);
+        Assert.Contains("public ObservableCollection<string> AttachedVmNames { get; } = [];", switchesWorkspaceSource);
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceController", switchesControllerSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _workspace;", switchesControllerSource);
+        Assert.Contains("private readonly IAssetsSwitchesWorkspaceHost _host;", switchesControllerSource);
+        Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", switchesControllerSource);
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceComposition : IAssetsSwitchesWorkspaceHost", switchesCompositionSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceController _controller;", switchesCompositionSource);
+        Assert.Contains("public void ApplyShellState()", switchesCompositionSource);
+        Assert.Contains("_ = _controller.EnsureInventoryAsync(forceRefresh: false);", switchesCompositionSource);
+        Assert.Contains("internal sealed class AssetsSwitchesViewPresentationModel : INotifyPropertyChanged", switchesViewSource);
+        Assert.Contains("public void UpdateWorkspaceState(AssetsSwitchesViewState state)", switchesViewSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
