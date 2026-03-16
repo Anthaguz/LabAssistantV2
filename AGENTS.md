@@ -296,7 +296,71 @@ Consolidation rules:
 
 ---
 
-## 8) PR Checklist (Dev Agent must follow)
+## 8) Work Item Classification Rules
+
+Agents must classify issues, PRs, and milestones consistently enough that repo history remains operationally useful for planning, release notes, and traceability. Classification should be lightweight and stable, not perfect or overly granular.
+
+### 8.1 Core Label Set
+
+Use a small fixed taxonomy unless the user explicitly approves changes:
+- `bug` — fixes incorrect behavior, regressions, missing cleanup, validation gaps, or reliability defects
+- `feature` — introduces new user-visible behavior or a newly supported workflow
+- `refactor` — restructures code without intended behavior change
+- `docs` — changes documentation or contracts without changing runtime behavior
+- `test` — adds or reshapes tests without changing runtime behavior
+- `chore` — repository maintenance, tooling, dependency, CI, or other support work that is not primarily feature/bug/refactor/docs/test
+
+Rules:
+- Apply the **dominant reason to change** label when more than one label could fit.
+- Do not stack multiple type labels unless the repository explicitly adopts that policy later.
+- If a change mixes multiple dominant reasons, the issue is probably too large and should be split.
+
+### 8.2 How To Classify Issues
+
+- Every implementation issue should have exactly one primary type label from section 8.1.
+- Issues that define or adjust product behavior should also map to a user story and acceptance criteria.
+- Use the title prefix and the label together; the prefix is not a replacement for the label.
+- If the issue only resolves uncertainty, mismatch, or a `TBD`, classify it by its real deliverable:
+  - contract clarification with doc-only change -> `docs`
+  - behavior fix after clarification -> `bug`
+  - new approved capability slice -> `feature`
+- If the correct label is unclear, do not guess silently:
+  - add `TBD` in docs when appropriate
+  - open or update an issue describing the ambiguity
+
+### 8.3 How To Classify PRs
+
+- Every PR should carry the same primary type label as its driving issue unless scope drift forced a split.
+- PRs should reference the issue, acceptance criteria, and milestone when those exist.
+- A PR should normally map to one issue and one dominant reason to change.
+- If a PR contains both behavior change and incidental cleanup, classify by the behavior change, not the incidental cleanup.
+- Pure renames, extraction, or structural cleanup with no intended behavior change -> `refactor`.
+- Test-only or docs-only PRs should use `test` or `docs` rather than inheriting a nearby implementation label.
+
+### 8.4 Milestone Rules
+
+- Milestones represent planned delivery slices, not generic buckets for every kind of work.
+- Create or use milestones only when there is a concrete delivery objective, testable definition of done, and an identifiable user or product outcome.
+- A work item should belong to at most one milestone.
+- Do not force a milestone onto backlog grooming, repo maintenance, or historical cleanup work unless that work is itself the milestone deliverable.
+- If a PR merges work for a milestone, its issue and PR should both point to that milestone when the mapping is clear.
+- If milestone membership is ambiguous, leave it unassigned and note the ambiguity instead of inventing a mapping.
+
+### 8.5 Backfill Policy For Existing History
+
+- Backfill classification only when it provides current operational value:
+  - open PRs/issues
+  - recently merged work
+  - active milestone work
+  - items needed for release notes, audits, or traceability
+- Prefer “good enough and consistent” over perfect historical reconstruction.
+- For older mixed-scope PRs, choose the dominant user-facing or repo-impacting reason to change.
+- If an old PR cannot be classified confidently from its title, body, and diff, leave milestone blank and apply only the most defensible type label.
+- Do not spend time decomposing ancient mixed PRs into ideal categories unless the user explicitly asks for a historical audit.
+
+---
+
+## 9) PR Checklist (Dev Agent must follow)
 
 - [ ] Matches Acceptance Criteria exactly
 - [ ] No new scope added
@@ -328,7 +392,7 @@ Consolidation rules:
 
 ---
 
-## 9) Build Commands (Canonical)
+## 10) Build Commands (Canonical)
 
 From repo root:
 - `dotnet restore LabAssistant.sln`
@@ -340,7 +404,7 @@ Notes:
 
 ---
 
-## 10) Issue Naming Conventions (Recommended)
+## 11) Issue Naming Conventions (Recommended)
 
 - `US-###: <title>` — implementation for a user story
 - `AC-###: <title>` — acceptance criteria updates
