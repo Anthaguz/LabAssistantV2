@@ -344,19 +344,20 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceViewModel _workspace = new();", baseDisksCompositionSource);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceController _controller;", baseDisksCompositionSource);
         Assert.Contains("private readonly IAssetsBaseDisksCompositionHost _host;", baseDisksCompositionSource);
-        Assert.Contains("_view.AssetsBaseDisksListViewControl.ItemsSource = _workspace.Inventory;", baseDisksCompositionSource);
+        Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", baseDisksCompositionSource);
         Assert.Contains("WireHandlers();", baseDisksCompositionSource);
         Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh) => _controller.EnsureInventoryAsync(forceRefresh);", baseDisksCompositionSource);
         Assert.Contains("public void ApplyShellState()", baseDisksCompositionSource);
         Assert.Contains("_ = _controller.EnsureInventoryAsync(forceRefresh: false);", baseDisksCompositionSource);
         Assert.Contains("_controller.ApplyWorkspaceState();", baseDisksCompositionSource);
         Assert.Contains("AssetsBaseDisksListView_SelectionChanged", baseDisksCompositionSource);
-        Assert.Contains("AssetsBaseDisksRefreshButton_Click", baseDisksCompositionSource);
-        Assert.Contains("AssetsBaseDisksImportButton_Click", baseDisksCompositionSource);
-        Assert.Contains("AssetsBaseDisksValidateButton_Click", baseDisksCompositionSource);
-        Assert.Contains("AssetsBaseDisksSaveMetadataButton_Click", baseDisksCompositionSource);
-        Assert.Contains("AssetsBaseDisksRemoveButton_Click", baseDisksCompositionSource);
-        Assert.Contains("AssetsBaseDisksMetadataTextBox_TextChanged", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksRefreshRequested", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksImportRequested", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksValidateRequested", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksSaveMetadataRequested", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksRemoveRequested", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksMetadataChanged", baseDisksCompositionSource);
+        Assert.Contains("BuildViewState", baseDisksCompositionSource);
         Assert.DoesNotContain("MainWindow", baseDisksCompositionSource);
 
         Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceController", controllerSource);
@@ -407,6 +408,52 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("AssetsOverviewOpenSwitchesButtonControl", overviewCompositionSource);
         Assert.DoesNotContain("SetBaseDisksSummary", overviewCompositionSource);
         Assert.DoesNotContain("SetSwitchesSummary", overviewCompositionSource);
+    }
+
+    [Fact]
+    public void AssetsBaseDisksView_ExposesNarrowInteractionSurface_InsteadOfControlBagAccess()
+    {
+        var baseDisksXaml = LoadAssetsBaseDisksViewXaml();
+        var baseDisksViewSource = LoadAssetsBaseDisksViewCodeBehindSource();
+        var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
+
+        Assert.NotNull(FindByName(baseDisksXaml, "AssetsBaseDisksListView"));
+        Assert.NotNull(FindByName(baseDisksXaml, "AssetsBaseDisksRefreshButton"));
+        Assert.NotNull(FindByName(baseDisksXaml, "AssetsBaseDisksImportButton"));
+        Assert.NotNull(FindByName(baseDisksXaml, "AssetsBaseDisksSaveMetadataButton"));
+
+        Assert.Contains("public event EventHandler? RefreshRequested;", baseDisksViewSource);
+        Assert.Contains("public event EventHandler? ImportRequested;", baseDisksViewSource);
+        Assert.Contains("public event EventHandler? ValidateRequested;", baseDisksViewSource);
+        Assert.Contains("public event EventHandler? SaveMetadataRequested;", baseDisksViewSource);
+        Assert.Contains("public event EventHandler? RemoveRequested;", baseDisksViewSource);
+        Assert.Contains("public event EventHandler? BrowsePathRequested;", baseDisksViewSource);
+        Assert.Contains("public event EventHandler? SelectedBaseDiskChanged;", baseDisksViewSource);
+        Assert.Contains("public event EventHandler? MetadataChanged;", baseDisksViewSource);
+        Assert.Contains("public AssetsBaseDiskListRow? SelectedBaseDisk =>", baseDisksViewSource);
+        Assert.Contains("public void SetInventorySource(object? itemsSource)", baseDisksViewSource);
+        Assert.Contains("public AssetsBaseDiskFormValues CaptureFormValues()", baseDisksViewSource);
+        Assert.Contains("public void ApplyEditorDraft(AssetsBaseDiskDraft draft)", baseDisksViewSource);
+        Assert.Contains("public void UpdateWorkspaceState(AssetsBaseDisksViewState state)", baseDisksViewSource);
+        Assert.DoesNotContain("public Button", baseDisksViewSource);
+        Assert.DoesNotContain("public TextBox", baseDisksViewSource);
+        Assert.DoesNotContain("public ListView", baseDisksViewSource);
+        Assert.DoesNotContain("public Border", baseDisksViewSource);
+        Assert.DoesNotContain("AssetsBaseDisksRefreshButtonControl", baseDisksViewSource);
+        Assert.DoesNotContain("AssetsBaseDisksListViewControl", baseDisksViewSource);
+
+        Assert.Contains("_view.RefreshRequested += AssetsBaseDisksRefreshRequested;", baseDisksCompositionSource);
+        Assert.Contains("_view.ImportRequested += AssetsBaseDisksImportRequested;", baseDisksCompositionSource);
+        Assert.Contains("_view.ValidateRequested += AssetsBaseDisksValidateRequested;", baseDisksCompositionSource);
+        Assert.Contains("_view.SaveMetadataRequested += AssetsBaseDisksSaveMetadataRequested;", baseDisksCompositionSource);
+        Assert.Contains("_view.RemoveRequested += AssetsBaseDisksRemoveRequested;", baseDisksCompositionSource);
+        Assert.Contains("_view.BrowsePathRequested += AssetsBaseDisksBrowsePathRequested;", baseDisksCompositionSource);
+        Assert.Contains("_view.SelectedBaseDiskChanged += AssetsBaseDisksListView_SelectionChanged;", baseDisksCompositionSource);
+        Assert.Contains("_view.MetadataChanged += AssetsBaseDisksMetadataChanged;", baseDisksCompositionSource);
+        Assert.Contains("_view.UpdateWorkspaceState(BuildViewState(workspace, canSaveDraft));", baseDisksCompositionSource);
+        Assert.DoesNotContain("AssetsBaseDisksRefreshButtonControl", baseDisksCompositionSource);
+        Assert.DoesNotContain("AssetsBaseDisksListViewControl", baseDisksCompositionSource);
+        Assert.DoesNotContain("AssetsBaseDisksOsNameTextBoxControl", baseDisksCompositionSource);
     }
 
     [Fact]
@@ -620,6 +667,18 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsOverviewView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadAssetsBaseDisksViewXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
     }
 
     private static XDocument LoadAssetsOverviewXaml()

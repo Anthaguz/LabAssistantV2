@@ -53,6 +53,7 @@ public sealed class MilestoneAJScenarioMatrixTests
         var source = LoadMainWindowSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
         var compositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
+        var viewSource = LoadAssetsBaseDisksViewCodeBehindSource();
         var nativeFileDialogsSource = LoadNativeFileDialogsSource();
         var capabilitySource = LoadAssetsBaseDisksCapabilityServiceSource();
         var xamlSource = LoadAssetsBaseDisksViewXamlSource();
@@ -68,11 +69,19 @@ public sealed class MilestoneAJScenarioMatrixTests
         Assert.DoesNotContain("AssetsBaseDisksRemoveButton_Click", source);
         Assert.DoesNotContain("private async Task EnsureAssetsBaseDisksAsync(bool forceRefresh)", source);
         Assert.DoesNotContain("private void UpdateAssetsBaseDisksUi()", source);
-        Assert.Contains("_view.AssetsBaseDisksRefreshButtonControl.Click += AssetsBaseDisksRefreshButton_Click;", compositionSource);
-        Assert.Contains("_view.AssetsBaseDisksImportButtonControl.Click += AssetsBaseDisksImportButton_Click;", compositionSource);
-        Assert.Contains("_view.AssetsBaseDisksValidateButtonControl.Click += AssetsBaseDisksValidateButton_Click;", compositionSource);
-        Assert.Contains("_view.AssetsBaseDisksSaveMetadataButtonControl.Click += AssetsBaseDisksSaveMetadataButton_Click;", compositionSource);
-        Assert.Contains("_view.AssetsBaseDisksRemoveButtonControl.Click += AssetsBaseDisksRemoveButton_Click;", compositionSource);
+        Assert.Contains("public event EventHandler? RefreshRequested;", viewSource);
+        Assert.Contains("public event EventHandler? ImportRequested;", viewSource);
+        Assert.Contains("public event EventHandler? ValidateRequested;", viewSource);
+        Assert.Contains("public event EventHandler? SaveMetadataRequested;", viewSource);
+        Assert.Contains("public event EventHandler? RemoveRequested;", viewSource);
+        Assert.Contains("public event EventHandler? BrowsePathRequested;", viewSource);
+        Assert.Contains("public event EventHandler? SelectedBaseDiskChanged;", viewSource);
+        Assert.Contains("public event EventHandler? MetadataChanged;", viewSource);
+        Assert.Contains("_view.RefreshRequested += AssetsBaseDisksRefreshRequested;", compositionSource);
+        Assert.Contains("_view.ImportRequested += AssetsBaseDisksImportRequested;", compositionSource);
+        Assert.Contains("_view.ValidateRequested += AssetsBaseDisksValidateRequested;", compositionSource);
+        Assert.Contains("_view.SaveMetadataRequested += AssetsBaseDisksSaveMetadataRequested;", compositionSource);
+        Assert.Contains("_view.RemoveRequested += AssetsBaseDisksRemoveRequested;", compositionSource);
         Assert.Contains("ShowRemoveConfirmationDialogAsync", controllerSource);
         Assert.Contains("FormatValidationText", controllerSource);
         Assert.Contains("_workspace.PendingDraft", controllerSource);
@@ -83,6 +92,10 @@ public sealed class MilestoneAJScenarioMatrixTests
         Assert.Contains("Base disk removed from the registry.", capabilitySource);
         Assert.Contains("Registry-only removal.", xamlSource);
         Assert.Contains("Validate and Save Metadata", controllerSource);
+        Assert.DoesNotContain("public Button", viewSource);
+        Assert.DoesNotContain("public TextBox", viewSource);
+        Assert.DoesNotContain("public ListView", viewSource);
+        Assert.DoesNotContain("public Border", viewSource);
     }
 
     private static string LoadShellViewModelSource()
@@ -142,6 +155,12 @@ public sealed class MilestoneAJScenarioMatrixTests
     private static string LoadAssetsBaseDisksViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

@@ -1,3 +1,5 @@
+using LabAssistant.Business.Assets;
+using LabAssistant.WinUI.Models.Assets;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -6,17 +8,135 @@ namespace LabAssistant.WinUI.Views.Assets;
 public sealed partial class AssetsBaseDisksView : UserControl
 {
     private const double CompactLayoutThreshold = 1040;
+    private bool _isUpdatingSelection;
+    private bool _isUpdatingEditor;
+
+    public event EventHandler? RefreshRequested;
+    public event EventHandler? ImportRequested;
+    public event EventHandler? ValidateRequested;
+    public event EventHandler? SaveMetadataRequested;
+    public event EventHandler? RemoveRequested;
+    public event EventHandler? BrowsePathRequested;
+    public event EventHandler? SelectedBaseDiskChanged;
+    public event EventHandler? MetadataChanged;
 
     public AssetsBaseDisksView()
     {
         InitializeComponent();
         SizeChanged += AssetsBaseDisksView_SizeChanged;
+        WireHandlers();
         UpdateLayoutMode(CompactLayoutThreshold + 1);
+    }
+
+    public AssetsBaseDiskListRow? SelectedBaseDisk => AssetsBaseDisksListView.SelectedItem as AssetsBaseDiskListRow;
+
+    public void SetInventorySource(object? itemsSource)
+    {
+        AssetsBaseDisksListView.ItemsSource = itemsSource;
+    }
+
+    public void SetSelectedBaseDisk(AssetsBaseDiskListRow? selectedBaseDisk)
+    {
+        _isUpdatingSelection = true;
+        try
+        {
+            AssetsBaseDisksListView.SelectedItem = selectedBaseDisk;
+        }
+        finally
+        {
+            _isUpdatingSelection = false;
+        }
+    }
+
+    public AssetsBaseDiskFormValues CaptureFormValues()
+    {
+        return new AssetsBaseDiskFormValues(
+            AssetsBaseDisksOsNameTextBox.Text,
+            AssetsBaseDisksOsVersionTextBox.Text,
+            AssetsBaseDisksPathTextBox.Text,
+            AssetsBaseDisksGenerationTextBox.Text,
+            AssetsBaseDisksNotesTextBox.Text);
+    }
+
+    public void ApplyEditorDraft(AssetsBaseDiskDraft draft)
+    {
+        _isUpdatingEditor = true;
+        try
+        {
+            AssetsBaseDisksOsNameTextBox.Text = draft.OsName;
+            AssetsBaseDisksOsVersionTextBox.Text = draft.OsVersion;
+            AssetsBaseDisksPathTextBox.Text = draft.Path;
+            AssetsBaseDisksGenerationTextBox.Text = draft.Generation > 0 ? draft.Generation.ToString() : string.Empty;
+            AssetsBaseDisksNotesTextBox.Text = draft.Notes ?? string.Empty;
+        }
+        finally
+        {
+            _isUpdatingEditor = false;
+        }
+    }
+
+    public void ClearEditor()
+    {
+        _isUpdatingEditor = true;
+        try
+        {
+            AssetsBaseDisksOsNameTextBox.Text = string.Empty;
+            AssetsBaseDisksOsVersionTextBox.Text = string.Empty;
+            AssetsBaseDisksPathTextBox.Text = string.Empty;
+            AssetsBaseDisksGenerationTextBox.Text = string.Empty;
+            AssetsBaseDisksNotesTextBox.Text = string.Empty;
+        }
+        finally
+        {
+            _isUpdatingEditor = false;
+        }
+    }
+
+    public void SetDraftPath(string path)
+    {
+        AssetsBaseDisksPathTextBox.Text = path;
+    }
+
+    public void UpdateWorkspaceState(AssetsBaseDisksViewState state)
+    {
+        AssetsBaseDisksRefreshButton.IsEnabled = state.CanRefresh;
+        AssetsBaseDisksImportButton.IsEnabled = state.CanImport;
+        AssetsBaseDisksValidateButton.IsEnabled = state.CanValidate;
+        AssetsBaseDisksRemoveButton.IsEnabled = state.CanRemove;
+        AssetsBaseDisksBrowsePathButton.IsEnabled = state.CanBrowsePath;
+        AssetsBaseDisksSaveMetadataButton.IsEnabled = state.CanSaveMetadata;
+        AssetsBaseDisksLoadingStatePanel.Visibility = state.IsLoadingVisible ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksEmptyStatePanel.Visibility = state.IsEmptyVisible ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksErrorStatePanel.Visibility = state.IsErrorVisible ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksStatusTextBlock.Text = state.StatusText;
+        AssetsBaseDisksSelectedDiskSummaryTextBlock.Text = state.SelectedDiskSummaryText;
+        AssetsBaseDisksSelectedDiskValidationTextBlock.Text = state.SelectedDiskValidationText;
+        AssetsBaseDisksReferenceWarningTextBlock.Text = state.ReferenceWarningText;
+        AssetsBaseDisksErrorStateTextBlock.Text = state.ErrorStateText;
+        AssetsBaseDisksLoadingStateTextBlock.Text = state.LoadingStateText;
+        AssetsBaseDisksEmptyStateTextBlock.Text = state.EmptyStateText;
+        AssetsBaseDisksSelectedDiskValidationTextBlock.Visibility = state.ShowDetailsMessages ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksReferenceWarningTextBlock.Visibility = state.ShowDetailsMessages ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void AssetsBaseDisksView_SizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs e)
     {
         UpdateLayoutMode(e.NewSize.Width);
+    }
+
+    private void WireHandlers()
+    {
+        AssetsBaseDisksRefreshButton.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
+        AssetsBaseDisksImportButton.Click += (_, _) => ImportRequested?.Invoke(this, EventArgs.Empty);
+        AssetsBaseDisksValidateButton.Click += (_, _) => ValidateRequested?.Invoke(this, EventArgs.Empty);
+        AssetsBaseDisksSaveMetadataButton.Click += (_, _) => SaveMetadataRequested?.Invoke(this, EventArgs.Empty);
+        AssetsBaseDisksRemoveButton.Click += (_, _) => RemoveRequested?.Invoke(this, EventArgs.Empty);
+        AssetsBaseDisksBrowsePathButton.Click += (_, _) => BrowsePathRequested?.Invoke(this, EventArgs.Empty);
+        AssetsBaseDisksListView.SelectionChanged += AssetsBaseDisksListView_SelectionChanged;
+        AssetsBaseDisksOsNameTextBox.TextChanged += AssetsBaseDisksMetadataInput_TextChanged;
+        AssetsBaseDisksOsVersionTextBox.TextChanged += AssetsBaseDisksMetadataInput_TextChanged;
+        AssetsBaseDisksGenerationTextBox.TextChanged += AssetsBaseDisksMetadataInput_TextChanged;
+        AssetsBaseDisksNotesTextBox.TextChanged += AssetsBaseDisksMetadataInput_TextChanged;
     }
 
     private void UpdateLayoutMode(double width)
@@ -39,57 +159,49 @@ public sealed partial class AssetsBaseDisksView : UserControl
         Grid.SetColumnSpan(AssetsBaseDisksStateRegion, useStackedLayout ? 1 : 2);
     }
 
-    public Border AssetsBaseDisksActionsRegionControl => AssetsBaseDisksActionsRegion;
+    private void AssetsBaseDisksListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingSelection)
+        {
+            return;
+        }
 
-    public Button AssetsBaseDisksRefreshButtonControl => AssetsBaseDisksRefreshButton;
+        SelectedBaseDiskChanged?.Invoke(this, EventArgs.Empty);
+    }
 
-    public Button AssetsBaseDisksImportButtonControl => AssetsBaseDisksImportButton;
+    private void AssetsBaseDisksMetadataInput_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isUpdatingEditor)
+        {
+            return;
+        }
 
-    public Button AssetsBaseDisksValidateButtonControl => AssetsBaseDisksValidateButton;
-
-    public Button AssetsBaseDisksRemoveButtonControl => AssetsBaseDisksRemoveButton;
-
-    public Border AssetsBaseDisksStatusRegionControl => AssetsBaseDisksStatusRegion;
-
-    public TextBlock AssetsBaseDisksStatusTextBlockControl => AssetsBaseDisksStatusTextBlock;
-
-    public Border AssetsBaseDisksListRegionControl => AssetsBaseDisksListRegion;
-
-    public ListView AssetsBaseDisksListViewControl => AssetsBaseDisksListView;
-
-    public Border AssetsBaseDisksDetailsRegionControl => AssetsBaseDisksDetailsRegion;
-
-    public Border AssetsBaseDisksMetadataEditRegionControl => AssetsBaseDisksMetadataEditRegion;
-
-    public TextBlock AssetsBaseDisksSelectedDiskSummaryTextBlockControl => AssetsBaseDisksSelectedDiskSummaryTextBlock;
-
-    public TextBlock AssetsBaseDisksSelectedDiskValidationTextBlockControl => AssetsBaseDisksSelectedDiskValidationTextBlock;
-
-    public TextBlock AssetsBaseDisksReferenceWarningTextBlockControl => AssetsBaseDisksReferenceWarningTextBlock;
-
-    public TextBox AssetsBaseDisksOsNameTextBoxControl => AssetsBaseDisksOsNameTextBox;
-
-    public TextBox AssetsBaseDisksOsVersionTextBoxControl => AssetsBaseDisksOsVersionTextBox;
-
-    public TextBox AssetsBaseDisksPathTextBoxControl => AssetsBaseDisksPathTextBox;
-
-    public Button AssetsBaseDisksBrowsePathButtonControl => AssetsBaseDisksBrowsePathButton;
-
-    public TextBox AssetsBaseDisksGenerationTextBoxControl => AssetsBaseDisksGenerationTextBox;
-
-    public TextBox AssetsBaseDisksNotesTextBoxControl => AssetsBaseDisksNotesTextBox;
-
-    public Button AssetsBaseDisksSaveMetadataButtonControl => AssetsBaseDisksSaveMetadataButton;
-
-    public Border AssetsBaseDisksLoadingStatePanelControl => AssetsBaseDisksLoadingStatePanel;
-
-    public Border AssetsBaseDisksEmptyStatePanelControl => AssetsBaseDisksEmptyStatePanel;
-
-    public Border AssetsBaseDisksErrorStatePanelControl => AssetsBaseDisksErrorStatePanel;
-
-    public TextBlock AssetsBaseDisksLoadingStateTextBlockControl => AssetsBaseDisksLoadingStateTextBlock;
-
-    public TextBlock AssetsBaseDisksEmptyStateTextBlockControl => AssetsBaseDisksEmptyStateTextBlock;
-
-    public TextBlock AssetsBaseDisksErrorStateTextBlockControl => AssetsBaseDisksErrorStateTextBlock;
+        MetadataChanged?.Invoke(this, EventArgs.Empty);
+    }
 }
+
+public sealed record AssetsBaseDiskFormValues(
+    string? OsNameText,
+    string? OsVersionText,
+    string? PathText,
+    string? GenerationText,
+    string? NotesText);
+
+public sealed record AssetsBaseDisksViewState(
+    bool CanRefresh,
+    bool CanImport,
+    bool CanValidate,
+    bool CanRemove,
+    bool CanBrowsePath,
+    bool CanSaveMetadata,
+    bool IsLoadingVisible,
+    bool IsEmptyVisible,
+    bool IsErrorVisible,
+    bool ShowDetailsMessages,
+    string StatusText,
+    string SelectedDiskSummaryText,
+    string SelectedDiskValidationText,
+    string ReferenceWarningText,
+    string ErrorStateText,
+    string LoadingStateText,
+    string EmptyStateText);
