@@ -978,6 +978,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_view.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;", libraryCompositionSource);
         Assert.Contains("void ITemplatesLibraryWorkspaceControllerHost.ApplyWorkspaceState()", libraryCompositionSource);
         Assert.Contains("_host.ApplyTemplatesWorkspaceUiState();", libraryCompositionSource);
+        Assert.Contains("_view.UpdateViewState(BuildViewState(isLoading, hasSelectedLibraryItem));", libraryCompositionSource);
+        Assert.Contains("_controller.HandleSearchTextChanged(_view.CaptureInteractionState().SearchText);", libraryCompositionSource);
+        Assert.Contains("_controller.HandleSelectionChanged(_view.CaptureInteractionState().SelectedTemplate);", libraryCompositionSource);
     }
 
     [Fact]
@@ -1017,6 +1020,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("TemplatesLibraryView.SearchTextChanged += TemplatesLibraryView_SearchTextChanged;", mainWindowSource);
         Assert.DoesNotContain("ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;", mainWindowSource);
         Assert.DoesNotContain("OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;", mainWindowSource);
+        Assert.DoesNotContain("private ListView TemplateLibraryListView =>", mainWindowSource);
+        Assert.DoesNotContain("private Button ApplyTemplateSearchButton =>", mainWindowSource);
+        Assert.DoesNotContain("private Button OpenTemplateInEditorButton =>", mainWindowSource);
 
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceController", libraryControllerSource);
         Assert.Contains("public async Task EnsureLibraryAsync(bool forceRefresh)", libraryControllerSource);
@@ -1035,13 +1041,19 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly TemplatesLibraryWorkspaceViewModel _workspace = new();", libraryCompositionSource);
         Assert.Contains("private readonly TemplatesLibraryWorkspaceController _controller;", libraryCompositionSource);
 
+        Assert.Contains("public readonly record struct TemplatesLibraryInteractionState(", libraryViewSource);
+        Assert.Contains("public readonly record struct TemplatesLibraryViewState(", libraryViewSource);
         Assert.Contains("public event EventHandler? SelectedTemplateChanged;", libraryViewSource);
         Assert.Contains("public event EventHandler? ApplySearchRequested;", libraryViewSource);
         Assert.Contains("public event EventHandler? OpenTemplateRequested;", libraryViewSource);
-        Assert.Contains("public TemplateLibraryItem? SelectedTemplate => TemplateLibraryListView.SelectedItem as TemplateLibraryItem;", libraryViewSource);
-        Assert.Contains("public void SetSelectedTemplate(TemplateLibraryItem? selectedTemplate)", libraryViewSource);
+        Assert.Contains("public TemplatesLibraryInteractionState CaptureInteractionState()", libraryViewSource);
+        Assert.Contains("public void UpdateViewState(TemplatesLibraryViewState state)", libraryViewSource);
         Assert.Contains("TemplateLibraryListView.SelectionChanged += TemplateLibraryListView_SelectionChanged;", libraryViewSource);
         Assert.Contains("ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;", libraryViewSource);
+        Assert.DoesNotContain("public ListView TemplateLibraryListViewControl =>", libraryViewSource);
+        Assert.DoesNotContain("public TextBox TemplateSearchTextBoxControl =>", libraryViewSource);
+        Assert.DoesNotContain("public Button ApplyTemplateSearchButtonControl =>", libraryViewSource);
+        Assert.DoesNotContain("public Button OpenTemplateInEditorButtonControl =>", libraryViewSource);
     }
 
     private static string LoadMainWindowSource()

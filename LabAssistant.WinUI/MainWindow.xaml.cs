@@ -212,15 +212,6 @@ public sealed partial class MainWindow : Window
     private Button DeployOnTheFlyOpenTemplateEditorButton => DeployOnTheFlyView.DeployOnTheFlyOpenTemplateEditorButtonControl;
     private Button DeployOnTheFlyStartButton => DeployOnTheFlyView.DeployOnTheFlyStartButtonControl;
     private TextBlock DeployOnTheFlyStatusTextBlock => DeployOnTheFlyView.DeployOnTheFlyStatusTextBlockControl;
-    private ListView TemplateLibraryListView => TemplatesLibraryView.TemplateLibraryListViewControl;
-    private Button ApplyTemplateSearchButton => TemplatesLibraryView.ApplyTemplateSearchButtonControl;
-    private Button ClearTemplateSearchButton => TemplatesLibraryView.ClearTemplateSearchButtonControl;
-    private Button ReloadTemplatesButton => TemplatesLibraryView.ReloadTemplatesButtonControl;
-    private Button OpenTemplateInEditorButton => TemplatesLibraryView.OpenTemplateInEditorButtonControl;
-    private Button CreateTemplateButton => TemplatesLibraryView.CreateTemplateButtonControl;
-    private Button DeleteTemplateButton => TemplatesLibraryView.DeleteTemplateButtonControl;
-    private Button ImportTemplateButton => TemplatesLibraryView.ImportTemplateButtonControl;
-    private Button ExportTemplateButton => TemplatesLibraryView.ExportTemplateButtonControl;
     private TextBox TemplateNameTextBox => TemplatesEditorView.TemplateNameTextBoxControl;
     private TextBox TemplateDescriptionTextBox => TemplatesEditorView.TemplateDescriptionTextBoxControl;
     private TextBlock TemplateEditorContextTextBlock => TemplatesEditorView.TemplateEditorContextTextBlockControl;
