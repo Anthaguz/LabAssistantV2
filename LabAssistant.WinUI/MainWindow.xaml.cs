@@ -301,20 +301,21 @@ public sealed partial class MainWindow : Window
                 () => IsAssetsSwitchesActive,
                 NavigateToRoute));
         _templatesWorkspaceComposition = new TemplatesWorkspaceComposition(
-            _templatesCapabilityService,
             TemplatesWorkspacePanel,
-            TemplatesLibraryViewHost,
+            new TemplatesLibraryWorkspaceComposition(
+                _templatesCapabilityService,
+                TemplatesLibraryViewHost,
+                new TemplatesLibraryWorkspaceHost(
+                    () => _isTemplatesLoading,
+                    SetTemplatesLoading,
+                    ApplyTemplatesWorkspaceUiState,
+                    ShowTemplateEditorAsync,
+                    SetTemplateEditorStatus,
+                    PickTemplateFileForOpenAsync,
+                    PickTemplateFileForSaveAsync,
+                    ShowDeleteTemplateConfirmationDialogAsync,
+                    ReconcileDeployTemplateSelection)),
             TemplatesEditorViewHost,
-            new TemplatesWorkspaceCompositionHost(
-                () => _isTemplatesLoading,
-                SetTemplatesLoading,
-                ApplyTemplatesWorkspaceUiState,
-                ShowTemplateEditorAsync,
-                SetTemplateEditorStatus,
-                PickTemplateFileForOpenAsync,
-                PickTemplateFileForSaveAsync,
-                ShowDeleteTemplateConfirmationDialogAsync,
-                ReconcileDeployTemplateSelection),
             new TemplatesWorkspaceShellBridge(
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,

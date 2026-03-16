@@ -85,6 +85,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var mainWindowSource = LoadMainWindowSource();
         var shellSource = LoadShellViewModelSource();
         var compositionSource = LoadTemplatesWorkspaceCompositionSource();
+        var libraryCompositionSource = LoadTemplatesLibraryWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "TemplatesWorkspacePanel"));
         Assert.NotNull(FindByName(xaml, "TemplatesLibraryViewHost"));
@@ -99,7 +100,8 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
         Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
-        Assert.Contains("_libraryView.Visibility = _shellBridge.IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_libraryComposition.ApplyShellState(_shellBridge.IsTemplatesLibraryActive);", compositionSource);
+        Assert.Contains("_view.Visibility = isLibraryActive ? Visibility.Visible : Visibility.Collapsed;", libraryCompositionSource);
         Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", mainWindowSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", mainWindowSource);
@@ -380,6 +382,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadTemplatesWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesLibraryWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesLibraryWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
