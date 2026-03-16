@@ -3,7 +3,14 @@ name: ci
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   pull_request:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 jobs:
   build:
@@ -11,12 +18,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.x
+
       - name: Restore
         run: dotnet restore LabAssistant.sln
+
       - name: Build
-        run: dotnet build LabAssistant.sln -c Release
+        run: dotnet build LabAssistant.sln -c Release --no-restore
+
       - name: Test
-        run: dotnet test LabAssistant.sln -c Release
+        run: dotnet test LabAssistant.sln -c Release --no-build --no-restore

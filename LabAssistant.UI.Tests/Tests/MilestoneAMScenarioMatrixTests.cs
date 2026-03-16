@@ -193,20 +193,17 @@ public sealed class MilestoneAMScenarioMatrixTests
         var shellViewModelSource = LoadShellViewModelSource();
 
         Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
-        Assert.Contains("private readonly AssetsBaseDisksWorkspaceViewModel _assetsBaseDisksWorkspace = new();", mainWindowSource);
-        Assert.Contains("private readonly AssetsBaseDisksWorkspaceController _assetsBaseDisksController;", mainWindowSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", mainWindowSource);
         Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("_assetsBaseDisksWorkspace,", mainWindowSource);
-        Assert.Contains("_assetsBaseDisksController = new AssetsBaseDisksWorkspaceController(", mainWindowSource);
-        Assert.Contains("new AssetsBaseDisksWorkspaceHost(", mainWindowSource);
+        Assert.Contains("_assetsBaseDisksWorkspaceComposition,", mainWindowSource);
+        Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("new AssetsBaseDisksCompositionHost(", mainWindowSource);
         Assert.Contains("new AssetsWorkspaceHost(", mainWindowSource);
-        Assert.Contains("_assetsBaseDisksController.EnsureInventoryAsync,", mainWindowSource);
         Assert.Contains("EnsureAssetsSwitchesAsync,", mainWindowSource);
-        Assert.Contains("_assetsBaseDisksController.ApplyWorkspaceState,", mainWindowSource);
         Assert.Contains("UpdateAssetsSwitchesUi),", mainWindowSource);
         Assert.Contains("new AssetsWorkspaceShellBridge(", mainWindowSource);
         Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", mainWindowSource);
-        Assert.Contains("await _assetsBaseDisksController.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
+        Assert.Contains("await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
         Assert.Contains("private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;", mainWindowSource);
         Assert.Contains("private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;", mainWindowSource);
         Assert.Contains("private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;", mainWindowSource);
@@ -224,6 +221,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private void UpdateAssetsOverviewUi()", mainWindowSource);
         Assert.DoesNotContain("private async Task EnsureAssetsBaseDisksAsync(bool forceRefresh)", mainWindowSource);
         Assert.DoesNotContain("private void UpdateAssetsBaseDisksUi()", mainWindowSource);
+        Assert.DoesNotContain("private readonly AssetsBaseDisksWorkspaceViewModel _assetsBaseDisksWorkspace = new();", mainWindowSource);
+        Assert.DoesNotContain("private readonly AssetsBaseDisksWorkspaceController _assetsBaseDisksController;", mainWindowSource);
         Assert.DoesNotContain("private readonly ObservableCollection<AssetsBaseDiskListRow> _assetsBaseDiskRows = [];", mainWindowSource);
         Assert.DoesNotContain("private AssetsBaseDiskListRow? _selectedAssetsBaseDiskRow;", mainWindowSource);
         Assert.DoesNotContain("private AssetsBaseDiskDraft? _pendingAssetsBaseDiskDraft;", mainWindowSource);
@@ -245,6 +244,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     public void AssetsOverview_ProtectsRefinedLocalOwnershipModel()
     {
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
+        var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var baseDisksWorkspaceSource = LoadAssetsBaseDisksWorkspaceViewModelSource();
@@ -253,35 +253,35 @@ public sealed class MilestoneAMScenarioMatrixTests
         var overviewCodeBehindSource = LoadAssetsOverviewCodeBehindSource();
 
         Assert.Contains("internal sealed class AssetsWorkspaceComposition", compositionSource);
-        Assert.Contains("private readonly AssetsBaseDisksView _baseDisksView;", compositionSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _baseDisksWorkspaceComposition;", compositionSource);
         Assert.Contains("private readonly AssetsSwitchesView _switchesView;", compositionSource);
         Assert.Contains("private readonly TabView _subviewTabView;", compositionSource);
         Assert.Contains("private readonly AssetsOverviewWorkspaceComposition _overviewWorkspaceComposition;", compositionSource);
         Assert.Contains("private readonly IAssetsWorkspaceHost _host;", compositionSource);
         Assert.Contains("private readonly IAssetsWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingAssetsSubviewSelection;", compositionSource);
-        Assert.Contains("AssetsBaseDisksWorkspaceViewModel baseDisksWorkspace,", compositionSource);
+        Assert.Contains("AssetsBaseDisksWorkspaceComposition baseDisksWorkspaceComposition,", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition = new AssetsOverviewWorkspaceComposition(", compositionSource);
         Assert.Contains("new AssetsOverviewWorkspaceHost(", compositionSource);
         Assert.Contains("new AssetsOverviewWorkspaceShellBridge(", compositionSource);
-        Assert.Contains("() => baseDisksWorkspace.IsLoading,", compositionSource);
-        Assert.Contains("() => baseDisksWorkspace.Inventory.Count,", compositionSource);
-        Assert.Contains("_baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDisksWorkspace.Inventory;", compositionSource);
+        Assert.Contains("() => _baseDisksWorkspaceComposition.IsLoading,", compositionSource);
+        Assert.Contains("() => _baseDisksWorkspaceComposition.InventoryCount,", compositionSource);
         Assert.Contains("_switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;", compositionSource);
         Assert.Contains("_switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = attachedVmNames;", compositionSource);
         Assert.Contains("_subviewTabView.SelectionChanged += AssetsSubviewTabView_SelectionChanged;", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("SyncAssetsSubviewSelection();", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
-        Assert.Contains("_ = _host.EnsureAssetsBaseDisksAsync(forceRefresh: false);", compositionSource);
+        Assert.Contains("_baseDisksWorkspaceComposition.ApplyShellState();", compositionSource);
         Assert.Contains("_ = _host.EnsureAssetsSwitchesAsync(forceRefresh: false);", compositionSource);
-        Assert.Contains("_host.UpdateAssetsBaseDisksUi();", compositionSource);
         Assert.Contains("_host.UpdateAssetsSwitchesUi();", compositionSource);
         Assert.DoesNotContain("private readonly AssetsOverviewView _overviewView;", compositionSource);
         Assert.DoesNotContain("private void UpdateAssetsOverviewUi()", compositionSource);
         Assert.DoesNotContain("OpenBaseDisksRequested", compositionSource);
         Assert.DoesNotContain("OpenSwitchesRequested", compositionSource);
         Assert.DoesNotContain("ObservableCollection<AssetsBaseDiskListRow> baseDiskRows", compositionSource);
+        Assert.DoesNotContain("_host.EnsureAssetsBaseDisksAsync", compositionSource);
+        Assert.DoesNotContain("_host.UpdateAssetsBaseDisksUi()", compositionSource);
         Assert.DoesNotContain("LoadAsync(isRefresh: forceRefresh)", compositionSource);
         Assert.DoesNotContain("ValidateAsync(draft)", compositionSource);
         Assert.DoesNotContain("RemoveAsync(", compositionSource);
@@ -339,6 +339,26 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public string SelectedDiskValidationText { get; set; }", baseDisksWorkspaceSource);
         Assert.Contains("public string ReferenceWarningText { get; set; }", baseDisksWorkspaceSource);
 
+        Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceComposition : IAssetsBaseDisksWorkspaceHost", baseDisksCompositionSource);
+        Assert.Contains("private readonly AssetsBaseDisksView _view;", baseDisksCompositionSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceViewModel _workspace = new();", baseDisksCompositionSource);
+        Assert.Contains("private readonly AssetsBaseDisksWorkspaceController _controller;", baseDisksCompositionSource);
+        Assert.Contains("private readonly IAssetsBaseDisksCompositionHost _host;", baseDisksCompositionSource);
+        Assert.Contains("_view.AssetsBaseDisksListViewControl.ItemsSource = _workspace.Inventory;", baseDisksCompositionSource);
+        Assert.Contains("WireHandlers();", baseDisksCompositionSource);
+        Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh) => _controller.EnsureInventoryAsync(forceRefresh);", baseDisksCompositionSource);
+        Assert.Contains("public void ApplyShellState()", baseDisksCompositionSource);
+        Assert.Contains("_ = _controller.EnsureInventoryAsync(forceRefresh: false);", baseDisksCompositionSource);
+        Assert.Contains("_controller.ApplyWorkspaceState();", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksListView_SelectionChanged", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksRefreshButton_Click", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksImportButton_Click", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksValidateButton_Click", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksSaveMetadataButton_Click", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksRemoveButton_Click", baseDisksCompositionSource);
+        Assert.Contains("AssetsBaseDisksMetadataTextBox_TextChanged", baseDisksCompositionSource);
+        Assert.DoesNotContain("MainWindow", baseDisksCompositionSource);
+
         Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceController", controllerSource);
         Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", controllerSource);
         Assert.Contains("public void HandleSelectionChanged(AssetsBaseDiskListRow? selectedRow)", controllerSource);
@@ -393,6 +413,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     public void AssetsShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
+        var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var shellBridgeInterfaceBlock = ExtractSection(
@@ -432,26 +453,44 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("_ensureAssetsBaseDisksAsync", shellBridgeClassBlock);
         Assert.DoesNotContain("_updateAssetsOverviewUi", shellBridgeClassBlock);
 
-        Assert.Contains("Task EnsureAssetsBaseDisksAsync(bool forceRefresh);", hostInterfaceBlock);
         Assert.Contains("Task EnsureAssetsSwitchesAsync(bool forceRefresh);", hostInterfaceBlock);
         Assert.Contains("bool IsAssetsSwitchesLoading { get; }", hostInterfaceBlock);
         Assert.Contains("int AssetsSwitchCount { get; }", hostInterfaceBlock);
         Assert.DoesNotContain("UpdateAssetsOverviewUi", hostInterfaceBlock);
-        Assert.Contains("void UpdateAssetsBaseDisksUi();", hostInterfaceBlock);
         Assert.Contains("void UpdateAssetsSwitchesUi();", hostInterfaceBlock);
+        Assert.DoesNotContain("Task EnsureAssetsBaseDisksAsync(bool forceRefresh);", hostInterfaceBlock);
+        Assert.DoesNotContain("void UpdateAssetsBaseDisksUi();", hostInterfaceBlock);
         Assert.DoesNotContain("bool IsAssetsBaseDisksLoading { get; }", hostInterfaceBlock);
         Assert.DoesNotContain("int AssetsBaseDiskCount { get; }", hostInterfaceBlock);
 
         Assert.Contains("internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost", hostClassBlock);
         Assert.Contains("public bool IsAssetsSwitchesLoading =>", hostClassBlock);
         Assert.Contains("public int AssetsSwitchCount =>", hostClassBlock);
-        Assert.Contains("public Task EnsureAssetsBaseDisksAsync(bool forceRefresh) =>", hostClassBlock);
         Assert.Contains("public Task EnsureAssetsSwitchesAsync(bool forceRefresh) =>", hostClassBlock);
         Assert.DoesNotContain("_updateAssetsOverviewUi", hostClassBlock);
-        Assert.Contains("public void UpdateAssetsBaseDisksUi() =>", hostClassBlock);
         Assert.Contains("public void UpdateAssetsSwitchesUi() =>", hostClassBlock);
+        Assert.DoesNotContain("public Task EnsureAssetsBaseDisksAsync(bool forceRefresh) =>", hostClassBlock);
+        Assert.DoesNotContain("public void UpdateAssetsBaseDisksUi() =>", hostClassBlock);
         Assert.DoesNotContain("public bool IsAssetsBaseDisksLoading =>", hostClassBlock);
         Assert.DoesNotContain("public int AssetsBaseDiskCount =>", hostClassBlock);
+
+        var baseDisksCompositionHostInterfaceBlock = ExtractSection(
+            baseDisksCompositionSource,
+            "internal interface IAssetsBaseDisksCompositionHost",
+            "internal sealed class AssetsBaseDisksCompositionHost");
+        var baseDisksCompositionHostClassBlock = ExtractSection(
+            baseDisksCompositionSource,
+            "internal sealed class AssetsBaseDisksCompositionHost",
+            "internal sealed class AssetsBaseDisksWorkspaceComposition");
+
+        Assert.Contains("string? PickBaseDiskFilePath();", baseDisksCompositionHostInterfaceBlock);
+        Assert.Contains("Task<bool> ShowRemoveConfirmationDialogAsync", baseDisksCompositionHostInterfaceBlock);
+        Assert.DoesNotContain("CaptureDraft", baseDisksCompositionHostInterfaceBlock);
+        Assert.DoesNotContain("ApplyWorkspaceState", baseDisksCompositionHostInterfaceBlock);
+
+        Assert.Contains("internal sealed class AssetsBaseDisksCompositionHost : IAssetsBaseDisksCompositionHost", baseDisksCompositionHostClassBlock);
+        Assert.Contains("public string? PickBaseDiskFilePath() =>", baseDisksCompositionHostClassBlock);
+        Assert.Contains("public Task<bool> ShowRemoveConfirmationDialogAsync", baseDisksCompositionHostClassBlock);
 
         var baseDisksHostInterfaceBlock = ExtractSection(
             controllerSource,
@@ -568,6 +607,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadAssetsBaseDisksWorkspaceControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
