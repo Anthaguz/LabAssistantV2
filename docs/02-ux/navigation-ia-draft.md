@@ -127,6 +127,18 @@ For Templates extraction planning after AD convergence and AM refinement:
 Behavioral contract source:
 - `docs/02-ux/winui-templates-composition-cleanup-target-am.md`
 
+## 2.9 Milestone AM Templates Library Cleanup Target (Approved)
+
+For Templates Library extraction planning after the shared Templates cleanup target:
+- `Templates Library` remains under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Templates composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `templates.library` and `templates.editor`
+- a Library-local seam is the target home for Library-specific state, orchestration, composition, and UI coordination on `templates.library`
+- `templates.library` remains the stable/default Templates surface and continues to use route-activation refresh within the existing long-lived Templates workspace rather than per-navigation recreation
+- Library does not become the owner of Editor-specific workflow concerns, and Library views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-templates-library-extraction-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)

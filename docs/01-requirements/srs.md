@@ -640,6 +640,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** cleanup-target definition must preserve `templates.library` as the stable/default Templates surface, keep `templates.editor` as a workflow-state destination entered from explicit actions rather than a peer tab, and remain explicit that Templates Library extraction details, Templates Editor extraction details, runtime implementation, editor behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-149:** WinUI `Templates Library` cleanup shall remain under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface, while converging Library-specific state, orchestration, composition, and UI coordination behind a Library-local seam.
+  - **Acceptance details:** the Library cleanup target must explicitly keep shared Templates composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Library-local seam the target owner for Library-specific state, orchestration, composition, and interaction coordination.
+  - **Priority:** P1
+
+- **FR-150:** WinUI `Templates Library` cleanup shall preserve current `templates.library` behavior and boundaries while making Library participation in the long-lived Templates workspace explicit.
+  - **Acceptance details:** the Library cleanup target must preserve `templates.library` as the stable/default Templates surface, must keep Editor-specific ownership outside the Library seam, must keep route activation refresh within the long-lived Templates workspace rather than per-navigation recreation, and must preserve AD and AL7 Templates behavior contracts while narrowing ownership.
+  - **Priority:** P1
+
+- **FR-151:** WinUI `Templates Library` cleanup shall reject direct `MainWindow` view dependency, shared Templates composition widening into the Library workflow owner, and unapproved runtime or performance redesign during seam definition.
+  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Templates composition must not become the Library workflow owner; Library-specific host bridges or control exposure remain temporary migration cleanup targets behind the Library-local seam; and the cleanup target must stay explicit that Templates Editor extraction details, runtime implementation, Library behavior redesign, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -659,6 +671,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-assets-workspace-extraction-seam-am.md` for the AM Assets-specific extraction seam and composition target after the Machines proof point.
 - See `docs/02-ux/winui-assets-composition-cleanup-target-am.md` for the AM shared Assets composition cleanup target that narrows shell-vs-Assets ownership before Assets runtime extraction proceeds.
 - See `docs/02-ux/winui-templates-composition-cleanup-target-am.md` for the AM shared Templates composition cleanup target that narrows shell-vs-Templates ownership before Templates runtime extraction proceeds.
+- See `docs/02-ux/winui-templates-library-extraction-cleanup-target-am.md` for the AM Templates Library cleanup target inside the shared Templates composition boundary.
 - See `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md` for the AM Assets Overview cleanup target inside the shared Assets composition boundary.
 - See `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md` for the AM Assets Base Disks cleanup target inside the shared Assets composition boundary.
 - See `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md` for the AM Assets Switches cleanup target inside the shared Assets composition boundary.

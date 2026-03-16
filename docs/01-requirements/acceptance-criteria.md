@@ -2978,3 +2978,78 @@ Each readiness result shall include, at minimum:
 - [ ] shared Templates-local composition-owner target is explicit and traceable
 - [ ] Templates navigation exception preservation is explicit and traceable
 - [ ] temporary-bridge-vs-final-target rule and no-direct-`MainWindow`-injection rule are explicit and traceable
+- [ ] long-lived Templates workspace and route-activation refresh rule are explicit and traceable
+
+---
+
+# AC-034 - WinUI Templates Library Extraction Cleanup Target (AM61)
+
+**Related FRs:** FR-149, FR-150, FR-151, FR-146, FR-147, FR-148, FR-077, FR-078, FR-079, FR-122, FR-123, FR-124, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Templates Library stays under shared Templates workspace composition but gains a Library-local seam
+**Given**
+- the shared Templates composition cleanup target is already defined
+
+**When**
+- the narrow `Templates Library` cleanup target is reviewed
+
+**Then**
+- `Templates Library` remains under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Templates composition remains responsible only for shared capability-level composition concerns
+- a Library-local seam becomes the target home for Library-specific state, orchestration, composition, and UI coordination
+
+### 2) Library-local ownership is explicit without widening shared Templates composition into the workflow owner
+**Given**
+- `templates.library` is the stable/default Templates surface inside `Templates`
+
+**When**
+- Library-local ownership is defined
+
+**Then**
+- Library-local ownership explicitly includes:
+  - Library list, selection, filter, and feedback state
+  - Library-specific orchestration for refresh, load/open, create-entry, import, export, delete, and library-surface selection flows
+  - Library-local composition and interaction coordination for the `templates.library` surface
+  - cleanup or reduction of temporary Library-specific host bridges or control exposure behind the Library-local seam
+- shared `TemplatesWorkspaceComposition` does not become the Library workflow owner
+- shared Templates composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
+
+### 3) MainWindow and route-activation boundaries remain explicit for templates.library
+**Given**
+- AM33 and AM56 keep `MainWindow` limited to shell ownership and keep Templates long-lived by default
+
+**When**
+- the Library cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Templates Library` continues to participate in long-lived Templates workspace lifetime rather than per-navigation recreation
+- route activation of `templates.library` refreshes or reconciles Library state within the existing Templates workspace
+
+### 4) Templates Library remains behavior-preserving and does not absorb Editor semantics
+**Given**
+- `Templates` is an approved Library-first capability with Editor as workflow-state entry
+
+**When**
+- the Library cleanup target is defined
+
+**Then**
+- `templates.library` remains the stable/default Templates surface
+- no Editor-specific ownership is moved into Library
+- no shared Templates ownership is moved into Library
+- runtime implementation, Templates Editor extraction details, Library behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `TemplatesWorkspaceComposition` remains the owner for shared capability-level composition only
+- a Library-local seam becomes the target home for Library-specific state, orchestration, composition, and interaction coordination
+- `MainWindow` remains shell-only and is not injected into Library views
+- `Templates Library` remains long-lived with route-activation refresh inside the existing Templates workspace
+- Templates Library remains behavior-preserving and does not absorb shared Templates or Editor concerns
+
+## Definition of Done
+- [ ] shared Templates vs Library-local ownership is explicit and traceable
+- [ ] Library-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
+- [ ] long-lived Templates workspace participation and `templates.library` route-activation refresh expectations are explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable
