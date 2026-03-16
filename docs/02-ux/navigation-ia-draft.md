@@ -115,6 +115,18 @@ For cross-view shell and capability consistency planning:
 Behavioral contract source:
 - `docs/02-ux/winui-shell-view-consistency-contract-al.md`
 
+## 2.8 Milestone AM Templates Shared Composition Cleanup Target (Approved)
+
+For Templates extraction planning after AD convergence and AM refinement:
+- `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact/drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime
+- shared Templates composition must converge behind a Templates-local composition owner rather than terminating in `MainWindow`
+- the Templates-local composition owner is responsible for shared Templates-local composition, shared route activation handling, shared workspace lifetime participation, and shared local interaction boundaries across `templates.library` and `templates.editor`
+- Templates remains a special navigation case: `templates.library` is the stable/default surface and `templates.editor` is a workflow-state destination entered from explicit actions rather than a peer-tab model
+- capability-specific host interfaces implemented by `MainWindow` are temporary bridges only, and Templates views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-templates-composition-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -276,6 +288,12 @@ should become one coherent Templates workflow.
 - `templates.editor` remains a canonical route for workflow-state entry and deep-linking
 - `templates.editor` is not treated as a permanent peer tab under AL consistency rules
 - `templates.details` deferred (not required for AD2/AD3)
+
+### Shared composition cleanup target
+- shell ownership stays in `MainWindow`, but shared Templates composition should not terminate there as the long-term architecture
+- a Templates-local composition owner is the target home for shared composition, route activation handling, workspace lifetime participation, and Library/Editor interaction boundaries
+- Templates remains long-lived while the app session is open; route activation refreshes/reconciles state rather than recreating the workspace on every route change
+- this shared composition target preserves the Library-first exception rather than normalizing Templates into an Overview-first or peer-tab model
 
 ### Model note (current reality)
 - Templates are lab-level (`LabTemplate`) and contain per-VM definitions (`VmTemplate`).
@@ -445,6 +463,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: Machines now has a post-AM33 cleanup target before broader rollout continues in `docs/02-ux/winui-machines-composition-cleanup-target-am.md`.
 - Resolved: Assets now has an extraction seam that starts from the refined AM33 composition target in `docs/02-ux/winui-assets-workspace-extraction-seam-am.md`.
 - Resolved: Assets now has a shared composition cleanup target that makes shell-vs-Assets ownership explicit before runtime extraction proceeds in `docs/02-ux/winui-assets-composition-cleanup-target-am.md`.
+- Resolved: Templates now has a shared composition cleanup target that makes shell-vs-Templates ownership explicit before Templates runtime extraction proceeds in `docs/02-ux/winui-templates-composition-cleanup-target-am.md`.
 - Resolved: Assets Overview now has a narrow cleanup target that keeps Overview under shared Assets composition while moving Overview-specific state and interaction coordination behind an Overview-local seam in `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md`.
 - Resolved: Assets Base Disks now has a narrow cleanup target that keeps Base Disks under shared Assets composition while moving Base Disks-specific state, orchestration, and UI coordination behind a Base Disks-local seam in `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md`.
 - Resolved: Assets Switches now has a narrow cleanup target that keeps Switches under shared Assets composition while moving Switches-specific state, orchestration, and UI coordination behind a Switches-local seam in `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md`.
