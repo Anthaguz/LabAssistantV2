@@ -411,6 +411,11 @@ Gate expectations:
 - preserve the AL7 Templates navigation exception by keeping `templates.library` as the stable/default surface and `templates.editor` as workflow-state entry rather than a peer-tab model
 - treat any `MainWindow` Templates host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
 
+**Templates Library cleanup target checkpoint**
+- before Templates Library runtime extraction proceeds, define the narrow `Templates Library` cleanup target under the shared Templates composition boundary
+- make shared Templates vs Library-local ownership explicit so Library-specific state, orchestration, and UI coordination converge behind a Library-local seam without widening shared Templates composition into the Library workflow owner
+- preserve `templates.library` as the stable/default Templates surface, keep Library inside the long-lived Templates workspace with route-activation refresh, and keep Editor extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
