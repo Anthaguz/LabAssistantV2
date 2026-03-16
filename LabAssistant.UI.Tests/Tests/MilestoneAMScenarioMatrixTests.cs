@@ -194,8 +194,10 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();", mainWindowSource);
         Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
         Assert.Contains("_assetsBaseDisksWorkspaceComposition,", mainWindowSource);
+        Assert.Contains("_assetsSwitchesWorkspace,", mainWindowSource);
         Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", mainWindowSource);
         Assert.Contains("new AssetsBaseDisksCompositionHost(", mainWindowSource);
         Assert.Contains("new AssetsWorkspaceHost(", mainWindowSource);
@@ -231,6 +233,15 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private bool _isAssetsBaseDisksRemoving;", mainWindowSource);
         Assert.DoesNotContain("private bool _isUpdatingAssetsBaseDisksEditor;", mainWindowSource);
         Assert.DoesNotContain("private bool _hasAssetsBaseDisksErrorState;", mainWindowSource);
+        Assert.DoesNotContain("private readonly ObservableCollection<AssetsSwitchListRow> _assetsSwitchRows = [];", mainWindowSource);
+        Assert.DoesNotContain("private readonly ObservableCollection<string> _assetsSwitchAttachedVmNames = [];", mainWindowSource);
+        Assert.DoesNotContain("private AssetsSwitchListRow? _selectedAssetsSwitchRow;", mainWindowSource);
+        Assert.DoesNotContain("private AssetsSwitchDraft? _pendingAssetsSwitchDraft;", mainWindowSource);
+        Assert.DoesNotContain("private bool _isAssetsSwitchesLoading;", mainWindowSource);
+        Assert.DoesNotContain("private bool _isAssetsSwitchesSaving;", mainWindowSource);
+        Assert.DoesNotContain("private bool _isAssetsSwitchesDeleting;", mainWindowSource);
+        Assert.DoesNotContain("private bool _isUpdatingAssetsSwitchesEditor;", mainWindowSource);
+        Assert.DoesNotContain("private bool _hasAssetsSwitchesErrorState;", mainWindowSource);
         Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);", mainWindowSource);
         Assert.DoesNotContain("AssetsOverviewOpenSwitchesButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.AssetsSwitches);", mainWindowSource);
 
@@ -248,6 +259,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var baseDisksWorkspaceSource = LoadAssetsBaseDisksWorkspaceViewModelSource();
+        var switchesWorkspaceSource = LoadAssetsSwitchesWorkspaceViewModelSource();
         var overviewWorkspaceSource = LoadAssetsOverviewWorkspaceViewModelSource();
         var overviewXaml = LoadAssetsOverviewXaml();
         var overviewCodeBehindSource = LoadAssetsOverviewCodeBehindSource();
@@ -261,13 +273,16 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly IAssetsWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingAssetsSubviewSelection;", compositionSource);
         Assert.Contains("AssetsBaseDisksWorkspaceComposition baseDisksWorkspaceComposition,", compositionSource);
+        Assert.Contains("AssetsSwitchesWorkspaceViewModel switchesWorkspace,", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition = new AssetsOverviewWorkspaceComposition(", compositionSource);
         Assert.Contains("new AssetsOverviewWorkspaceHost(", compositionSource);
         Assert.Contains("new AssetsOverviewWorkspaceShellBridge(", compositionSource);
         Assert.Contains("() => _baseDisksWorkspaceComposition.IsLoading,", compositionSource);
         Assert.Contains("() => _baseDisksWorkspaceComposition.InventoryCount,", compositionSource);
-        Assert.Contains("_switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;", compositionSource);
-        Assert.Contains("_switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = attachedVmNames;", compositionSource);
+        Assert.Contains("() => switchesWorkspace.IsLoading,", compositionSource);
+        Assert.Contains("() => switchesWorkspace.Inventory.Count),", compositionSource);
+        Assert.Contains("_switchesView.AssetsSwitchesListViewControl.ItemsSource = switchesWorkspace.Inventory;", compositionSource);
+        Assert.Contains("_switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = switchesWorkspace.AttachedVmNames;", compositionSource);
         Assert.Contains("_subviewTabView.SelectionChanged += AssetsSubviewTabView_SelectionChanged;", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("SyncAssetsSubviewSelection();", compositionSource);
@@ -338,6 +353,24 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public string SelectedDiskSummaryText { get; set; }", baseDisksWorkspaceSource);
         Assert.Contains("public string SelectedDiskValidationText { get; set; }", baseDisksWorkspaceSource);
         Assert.Contains("public string ReferenceWarningText { get; set; }", baseDisksWorkspaceSource);
+
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceViewModel", switchesWorkspaceSource);
+        Assert.Contains("public ObservableCollection<AssetsSwitchListRow> Inventory { get; } = [];", switchesWorkspaceSource);
+        Assert.Contains("public ObservableCollection<string> AttachedVmNames { get; } = [];", switchesWorkspaceSource);
+        Assert.Contains("public AssetsSwitchListRow? SelectedRow { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public AssetsSwitchDraft? PendingDraft { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public bool IsLoading { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public bool IsSaving { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public bool IsDeleting { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public bool IsUpdatingEditor { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public bool HasErrorState { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public int ValidationRequestVersion { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public int AssessmentRequestVersion { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public string StatusText { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public string SelectedSwitchValidationText { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public string DeleteConstraintText { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public string ErrorStateText { get; set; }", switchesWorkspaceSource);
+        Assert.Contains("public string AttachedVmHintText { get; set; }", switchesWorkspaceSource);
 
         Assert.Contains("internal sealed class AssetsBaseDisksWorkspaceComposition : IAssetsBaseDisksWorkspaceHost", baseDisksCompositionSource);
         Assert.Contains("private readonly AssetsBaseDisksView _view;", baseDisksCompositionSource);
@@ -507,9 +540,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("_updateAssetsOverviewUi", shellBridgeClassBlock);
 
         Assert.Contains("Task EnsureAssetsSwitchesAsync(bool forceRefresh);", hostInterfaceBlock);
-        Assert.Contains("bool IsAssetsSwitchesLoading { get; }", hostInterfaceBlock);
-        Assert.Contains("int AssetsSwitchCount { get; }", hostInterfaceBlock);
         Assert.DoesNotContain("UpdateAssetsOverviewUi", hostInterfaceBlock);
+        Assert.DoesNotContain("IsAssetsSwitchesLoading", hostInterfaceBlock);
+        Assert.DoesNotContain("AssetsSwitchCount", hostInterfaceBlock);
         Assert.Contains("void UpdateAssetsSwitchesUi();", hostInterfaceBlock);
         Assert.DoesNotContain("Task EnsureAssetsBaseDisksAsync(bool forceRefresh);", hostInterfaceBlock);
         Assert.DoesNotContain("void UpdateAssetsBaseDisksUi();", hostInterfaceBlock);
@@ -517,10 +550,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("int AssetsBaseDiskCount { get; }", hostInterfaceBlock);
 
         Assert.Contains("internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost", hostClassBlock);
-        Assert.Contains("public bool IsAssetsSwitchesLoading =>", hostClassBlock);
-        Assert.Contains("public int AssetsSwitchCount =>", hostClassBlock);
         Assert.Contains("public Task EnsureAssetsSwitchesAsync(bool forceRefresh) =>", hostClassBlock);
         Assert.DoesNotContain("_updateAssetsOverviewUi", hostClassBlock);
+        Assert.DoesNotContain("public bool IsAssetsSwitchesLoading =>", hostClassBlock);
+        Assert.DoesNotContain("public int AssetsSwitchCount =>", hostClassBlock);
         Assert.Contains("public void UpdateAssetsSwitchesUi() =>", hostClassBlock);
         Assert.DoesNotContain("public Task EnsureAssetsBaseDisksAsync(bool forceRefresh) =>", hostClassBlock);
         Assert.DoesNotContain("public void UpdateAssetsBaseDisksUi() =>", hostClassBlock);
@@ -646,6 +679,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadAssetsBaseDisksWorkspaceViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesWorkspaceViewModelSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

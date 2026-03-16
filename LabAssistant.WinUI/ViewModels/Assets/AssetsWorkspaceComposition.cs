@@ -1,5 +1,3 @@
-using System.Collections.ObjectModel;
-using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.Views.Assets;
 using Microsoft.UI.Xaml.Controls;
 
@@ -20,10 +18,6 @@ internal interface IAssetsWorkspaceShellBridge
 
 internal interface IAssetsWorkspaceHost
 {
-    bool IsAssetsSwitchesLoading { get; }
-
-    int AssetsSwitchCount { get; }
-
     Task EnsureAssetsSwitchesAsync(bool forceRefresh);
 
     void UpdateAssetsSwitchesUi();
@@ -64,26 +58,16 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
 
 internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
 {
-    private readonly Func<bool> _isAssetsSwitchesLoading;
-    private readonly Func<int> _getAssetsSwitchCount;
     private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;
     private readonly Action _updateAssetsSwitchesUi;
 
     public AssetsWorkspaceHost(
-        Func<bool> isAssetsSwitchesLoading,
-        Func<int> getAssetsSwitchCount,
         Func<bool, Task> ensureAssetsSwitchesAsync,
         Action updateAssetsSwitchesUi)
     {
-        _isAssetsSwitchesLoading = isAssetsSwitchesLoading;
-        _getAssetsSwitchCount = getAssetsSwitchCount;
         _ensureAssetsSwitchesAsync = ensureAssetsSwitchesAsync;
         _updateAssetsSwitchesUi = updateAssetsSwitchesUi;
     }
-
-    public bool IsAssetsSwitchesLoading => _isAssetsSwitchesLoading();
-
-    public int AssetsSwitchCount => _getAssetsSwitchCount();
 
     public Task EnsureAssetsSwitchesAsync(bool forceRefresh) => _ensureAssetsSwitchesAsync(forceRefresh);
 
@@ -106,13 +90,12 @@ internal sealed class AssetsWorkspaceComposition
     public AssetsWorkspaceComposition(
         AssetsOverviewView overviewView,
         AssetsBaseDisksWorkspaceComposition baseDisksWorkspaceComposition,
+        AssetsSwitchesWorkspaceViewModel switchesWorkspace,
         AssetsSwitchesView switchesView,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem baseDisksTabViewItem,
         TabViewItem switchesTabViewItem,
-        ObservableCollection<AssetsSwitchListRow> switchRows,
-        ObservableCollection<string> attachedVmNames,
         IAssetsWorkspaceHost host,
         IAssetsWorkspaceShellBridge shellBridge)
     {
@@ -128,15 +111,15 @@ internal sealed class AssetsWorkspaceComposition
             overviewView,
             new AssetsOverviewWorkspaceHost(
                 () => _baseDisksWorkspaceComposition.IsLoading,
-                () => _host.IsAssetsSwitchesLoading,
+                () => switchesWorkspace.IsLoading,
                 () => _baseDisksWorkspaceComposition.InventoryCount,
-                () => switchRows.Count),
+                () => switchesWorkspace.Inventory.Count),
             new AssetsOverviewWorkspaceShellBridge(
                 () => _shellBridge.IsAssetsOverviewActive,
                 _shellBridge.NavigateToRoute));
 
-        _switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;
-        _switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = attachedVmNames;
+        _switchesView.AssetsSwitchesListViewControl.ItemsSource = switchesWorkspace.Inventory;
+        _switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = switchesWorkspace.AttachedVmNames;
         WireSharedHandlers();
     }
 

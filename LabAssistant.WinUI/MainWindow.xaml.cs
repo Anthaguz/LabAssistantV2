@@ -50,11 +50,10 @@ public sealed partial class MainWindow : Window
     private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
     private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
+    private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
-    private readonly ObservableCollection<AssetsSwitchListRow> _assetsSwitchRows = [];
-    private readonly ObservableCollection<string> _assetsSwitchAttachedVmNames = [];
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
@@ -78,21 +77,12 @@ public sealed partial class MainWindow : Window
     private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;
     private TemplateEditorDocument? _activeDeployTemplateDocument;
     private VmTemplate? _selectedDeployOnTheFlyVmEntry;
-    private AssetsSwitchListRow? _selectedAssetsSwitchRow;
-    private AssetsSwitchDraft? _pendingAssetsSwitchDraft;
     private DeploymentReadinessReport? _deployReadinessReport;
     private DeploymentReadinessReport? _deployOnTheFlyReadinessReport;
     private VmTemplate? _selectedTemplateVmEntry;
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
-    private bool _isAssetsSwitchesLoading;
-    private bool _isAssetsSwitchesSaving;
-    private bool _isAssetsSwitchesDeleting;
-    private bool _isUpdatingAssetsSwitchesEditor;
-    private bool _hasAssetsSwitchesErrorState;
-    private int _assetsSwitchesValidationRequestVersion;
-    private int _assetsSwitchesAssessmentRequestVersion;
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingDeploySubviewSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
@@ -313,16 +303,13 @@ public sealed partial class MainWindow : Window
         _assetsWorkspaceComposition = new AssetsWorkspaceComposition(
             AssetsOverviewViewHost,
             _assetsBaseDisksWorkspaceComposition,
+            _assetsSwitchesWorkspace,
             AssetsSwitchesViewHost,
             AssetsSubviewTabView,
             AssetsOverviewTabViewItem,
             AssetsBaseDisksTabViewItem,
             AssetsSwitchesTabViewItem,
-            _assetsSwitchRows,
-            _assetsSwitchAttachedVmNames,
             new AssetsWorkspaceHost(
-                () => _isAssetsSwitchesLoading,
-                () => _assetsSwitchRows.Count,
                 EnsureAssetsSwitchesAsync,
                 UpdateAssetsSwitchesUi),
             new AssetsWorkspaceShellBridge(
@@ -1762,66 +1749,66 @@ public sealed partial class MainWindow : Window
 
     private async Task EnsureAssetsSwitchesAsync(bool forceRefresh)
     {
-        if (_isAssetsSwitchesLoading)
+        if (_assetsSwitchesWorkspace.IsLoading)
         {
             return;
         }
 
-        if (!forceRefresh && (_assetsSwitchRows.Count > 0 || _pendingAssetsSwitchDraft is not null))
+        if (!forceRefresh && (_assetsSwitchesWorkspace.Inventory.Count > 0 || _assetsSwitchesWorkspace.PendingDraft is not null))
         {
             UpdateAssetsSwitchesUi();
             return;
         }
 
-        _isAssetsSwitchesLoading = true;
-        AssetsSwitchesStatusTextBlock.Text = forceRefresh ? "Refreshing virtual switches..." : "Loading virtual switches...";
+        _assetsSwitchesWorkspace.IsLoading = true;
+        _assetsSwitchesWorkspace.StatusText = forceRefresh ? "Refreshing virtual switches..." : "Loading virtual switches...";
         UpdateAssetsSwitchesUi();
 
         try
         {
-            var previousSelectionName = _selectedAssetsSwitchRow?.Name;
+            var previousSelectionName = _assetsSwitchesWorkspace.SelectedRow?.Name;
             var result = await _assetsSwitchesCapabilityService.LoadAsync(isRefresh: forceRefresh);
 
-            _assetsSwitchRows.Clear();
+            _assetsSwitchesWorkspace.Inventory.Clear();
             foreach (var item in result.Items)
             {
-                _assetsSwitchRows.Add(new AssetsSwitchListRow(item));
+                _assetsSwitchesWorkspace.Inventory.Add(new AssetsSwitchListRow(item));
             }
 
             if (result.Errors.Count > 0)
             {
-                _hasAssetsSwitchesErrorState = true;
-                AssetsSwitchesErrorStateTextBox.Text = $"Switch inventory load completed with issues:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", result.Errors)}";
-                AssetsSwitchesStatusTextBlock.Text = $"Loaded {_assetsSwitchRows.Count} switch(es) with {result.Errors.Count} issue(s). Review the error panel and refresh after correcting the host state.";
+                _assetsSwitchesWorkspace.HasErrorState = true;
+                _assetsSwitchesWorkspace.ErrorStateText = $"Switch inventory load completed with issues:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", result.Errors)}";
+                _assetsSwitchesWorkspace.StatusText = $"Loaded {_assetsSwitchesWorkspace.Inventory.Count} switch(es) with {result.Errors.Count} issue(s). Review the error panel and refresh after correcting the host state.";
             }
             else
             {
                 ClearAssetsSwitchesErrorState();
             }
 
-            if (_pendingAssetsSwitchDraft is null)
+            if (_assetsSwitchesWorkspace.PendingDraft is null)
             {
                 var matchedSelection = !string.IsNullOrWhiteSpace(previousSelectionName)
-                    ? _assetsSwitchRows.FirstOrDefault(row => string.Equals(row.Name, previousSelectionName, StringComparison.OrdinalIgnoreCase))
+                    ? _assetsSwitchesWorkspace.Inventory.FirstOrDefault(row => string.Equals(row.Name, previousSelectionName, StringComparison.OrdinalIgnoreCase))
                     : null;
-                _selectedAssetsSwitchRow = matchedSelection ?? _assetsSwitchRows.FirstOrDefault();
+                _assetsSwitchesWorkspace.SelectedRow = matchedSelection ?? _assetsSwitchesWorkspace.Inventory.FirstOrDefault();
 
-                AssetsSwitchesListView.SelectedItem = _selectedAssetsSwitchRow;
-                if (_selectedAssetsSwitchRow is not null)
+                AssetsSwitchesListView.SelectedItem = _assetsSwitchesWorkspace.SelectedRow;
+                if (_assetsSwitchesWorkspace.SelectedRow is not null)
                 {
-                    LoadAssetsSwitchesEditorFromRow(_selectedAssetsSwitchRow);
-                    AssetsSwitchesStatusTextBlock.Text = forceRefresh
+                    LoadAssetsSwitchesEditorFromRow(_assetsSwitchesWorkspace.SelectedRow);
+                    _assetsSwitchesWorkspace.StatusText = forceRefresh
                         ? "Virtual switch inventory refreshed."
-                        : $"Loaded {_assetsSwitchRows.Count} switch(es).";
+                        : $"Loaded {_assetsSwitchesWorkspace.Inventory.Count} switch(es).";
                     if (!string.IsNullOrWhiteSpace(previousSelectionName) && matchedSelection is null)
                     {
-                        AssetsSwitchesStatusTextBlock.Text = $"Previously selected switch '{previousSelectionName}' is no longer available. Review the refreshed inventory.";
+                        _assetsSwitchesWorkspace.StatusText = $"Previously selected switch '{previousSelectionName}' is no longer available. Review the refreshed inventory.";
                     }
                 }
                 else
                 {
                     ClearAssetsSwitchesEditor();
-                    AssetsSwitchesStatusTextBlock.Text = _assetsSwitchRows.Count == 0
+                    _assetsSwitchesWorkspace.StatusText = _assetsSwitchesWorkspace.Inventory.Count == 0
                         ? "No virtual switches were found on this host. Click Create to prepare a new switch."
                         : "Select a virtual switch or click New to prepare a new switch draft.";
                 }
@@ -1829,18 +1816,18 @@ public sealed partial class MainWindow : Window
             else
             {
                 AssetsSwitchesListView.SelectedItem = null;
-                LoadAssetsSwitchesEditorFromDraft(_pendingAssetsSwitchDraft);
-                AssetsSwitchesSelectedSwitchValidationTextBlock.Text = "Enter a switch name, choose a type, and provide an adapter for External switches.";
-                AssetsSwitchesDeleteConstraintTextBlock.Text = string.Empty;
+                LoadAssetsSwitchesEditorFromDraft(_assetsSwitchesWorkspace.PendingDraft);
+                _assetsSwitchesWorkspace.SelectedSwitchValidationText = "Enter a switch name, choose a type, and provide an adapter for External switches.";
+                _assetsSwitchesWorkspace.DeleteConstraintText = string.Empty;
                 SetAssetsSwitchAttachedVmState(Array.Empty<string>(), "Attached VMs are shown for existing switches.");
-                AssetsSwitchesStatusTextBlock.Text = forceRefresh
+                _assetsSwitchesWorkspace.StatusText = forceRefresh
                     ? "Virtual switch inventory refreshed. The current new-switch draft was preserved."
                     : "Virtual switch inventory loaded. The current new-switch draft was preserved.";
             }
         }
         finally
         {
-            _isAssetsSwitchesLoading = false;
+            _assetsSwitchesWorkspace.IsLoading = false;
             UpdateAssetsSwitchesUi();
         }
     }
@@ -1849,23 +1836,28 @@ public sealed partial class MainWindow : Window
     {
         var canValidateOrApply = TryBuildAssetsSwitchDraft() is not null;
 
-        AssetsSwitchesRefreshButton.IsEnabled = !_isAssetsSwitchesLoading && !_isAssetsSwitchesSaving && !_isAssetsSwitchesDeleting;
-        AssetsSwitchesCreateButton.IsEnabled = !_isAssetsSwitchesLoading && !_isAssetsSwitchesSaving && !_isAssetsSwitchesDeleting;
-        AssetsSwitchesApplyButton.IsEnabled = !_isAssetsSwitchesLoading && !_isAssetsSwitchesSaving && !_isAssetsSwitchesDeleting && canValidateOrApply;
-        AssetsSwitchesDeleteButton.IsEnabled = !_isAssetsSwitchesLoading && !_isAssetsSwitchesSaving && !_isAssetsSwitchesDeleting && _selectedAssetsSwitchRow is not null;
+        AssetsSwitchesRefreshButton.IsEnabled = !_assetsSwitchesWorkspace.IsLoading && !_assetsSwitchesWorkspace.IsSaving && !_assetsSwitchesWorkspace.IsDeleting;
+        AssetsSwitchesCreateButton.IsEnabled = !_assetsSwitchesWorkspace.IsLoading && !_assetsSwitchesWorkspace.IsSaving && !_assetsSwitchesWorkspace.IsDeleting;
+        AssetsSwitchesApplyButton.IsEnabled = !_assetsSwitchesWorkspace.IsLoading && !_assetsSwitchesWorkspace.IsSaving && !_assetsSwitchesWorkspace.IsDeleting && canValidateOrApply;
+        AssetsSwitchesDeleteButton.IsEnabled = !_assetsSwitchesWorkspace.IsLoading && !_assetsSwitchesWorkspace.IsSaving && !_assetsSwitchesWorkspace.IsDeleting && _assetsSwitchesWorkspace.SelectedRow is not null;
 
-        var isEditingExisting = _selectedAssetsSwitchRow is not null && _pendingAssetsSwitchDraft is null;
-        AssetsSwitchesTypeComboBox.IsEnabled = !isEditingExisting && !_isAssetsSwitchesSaving && !_isAssetsSwitchesDeleting;
+        var isEditingExisting = _assetsSwitchesWorkspace.SelectedRow is not null && _assetsSwitchesWorkspace.PendingDraft is null;
+        AssetsSwitchesTypeComboBox.IsEnabled = !isEditingExisting && !_assetsSwitchesWorkspace.IsSaving && !_assetsSwitchesWorkspace.IsDeleting;
         AssetsSwitchesAdapterTextBox.IsEnabled =
             !isEditingExisting &&
-            !_isAssetsSwitchesSaving &&
-            !_isAssetsSwitchesDeleting &&
+            !_assetsSwitchesWorkspace.IsSaving &&
+            !_assetsSwitchesWorkspace.IsDeleting &&
             string.Equals(GetSelectedAssetsSwitchType(), "External", StringComparison.OrdinalIgnoreCase);
 
-        AssetsSwitchesLoadingStatePanel.Visibility = _isAssetsSwitchesLoading ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesEmptyStatePanel.Visibility = !_isAssetsSwitchesLoading && _assetsSwitchRows.Count == 0 && !_hasAssetsSwitchesErrorState ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesErrorStatePanel.Visibility = _hasAssetsSwitchesErrorState ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesLoadingStateTextBlock.Text = _isAssetsSwitchesLoading
+        AssetsSwitchesStatusTextBlock.Text = _assetsSwitchesWorkspace.StatusText;
+        AssetsSwitchesSelectedSwitchValidationTextBlock.Text = _assetsSwitchesWorkspace.SelectedSwitchValidationText;
+        AssetsSwitchesDeleteConstraintTextBlock.Text = _assetsSwitchesWorkspace.DeleteConstraintText;
+        AssetsSwitchesAttachedVmsHintTextBlock.Text = _assetsSwitchesWorkspace.AttachedVmHintText;
+        AssetsSwitchesErrorStateTextBox.Text = _assetsSwitchesWorkspace.ErrorStateText;
+        AssetsSwitchesLoadingStatePanel.Visibility = _assetsSwitchesWorkspace.IsLoading ? Visibility.Visible : Visibility.Collapsed;
+        AssetsSwitchesEmptyStatePanel.Visibility = !_assetsSwitchesWorkspace.IsLoading && _assetsSwitchesWorkspace.Inventory.Count == 0 && !_assetsSwitchesWorkspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;
+        AssetsSwitchesErrorStatePanel.Visibility = _assetsSwitchesWorkspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;
+        AssetsSwitchesLoadingStateTextBlock.Text = _assetsSwitchesWorkspace.IsLoading
             ? "Loading current Hyper-V virtual switches. Current details remain visible until refresh completes."
             : "Virtual switch inventory is idle.";
         AssetsSwitchesEmptyStateTextBlock.Text = "No virtual switches were found on this host. Click Create to prepare a new switch.";
@@ -1875,8 +1867,8 @@ public sealed partial class MainWindow : Window
     {
         if (AssetsSwitchesListView.SelectedItem is AssetsSwitchListRow row)
         {
-            _selectedAssetsSwitchRow = row;
-            _pendingAssetsSwitchDraft = null;
+            _assetsSwitchesWorkspace.SelectedRow = row;
+            _assetsSwitchesWorkspace.PendingDraft = null;
             ClearAssetsSwitchesErrorState();
             LoadAssetsSwitchesEditorFromRow(row);
             _ = LoadAssetsSwitchAttachedVmNamesAsync(row.Name);
@@ -1884,8 +1876,8 @@ public sealed partial class MainWindow : Window
         }
         else
         {
-            _selectedAssetsSwitchRow = null;
-            if (_pendingAssetsSwitchDraft is null)
+            _assetsSwitchesWorkspace.SelectedRow = null;
+            if (_assetsSwitchesWorkspace.PendingDraft is null)
             {
                 ClearAssetsSwitchesEditor();
             }
@@ -1901,18 +1893,18 @@ public sealed partial class MainWindow : Window
 
     private void AssetsSwitchesCreateButton_Click(object sender, RoutedEventArgs e)
     {
-        _selectedAssetsSwitchRow = null;
+        _assetsSwitchesWorkspace.SelectedRow = null;
         AssetsSwitchesListView.SelectedItem = null;
         ClearAssetsSwitchesErrorState();
-        _pendingAssetsSwitchDraft = new AssetsSwitchDraft
+        _assetsSwitchesWorkspace.PendingDraft = new AssetsSwitchDraft
         {
             IsNew = true,
             SwitchType = "External"
         };
-        LoadAssetsSwitchesEditorFromDraft(_pendingAssetsSwitchDraft);
-        AssetsSwitchesStatusTextBlock.Text = "Preparing a new virtual switch draft. Complete the fields and apply when the inline validation state is ready.";
-        AssetsSwitchesSelectedSwitchValidationTextBlock.Text = "Enter a switch name, choose a type, and provide an adapter for External switches.";
-        AssetsSwitchesDeleteConstraintTextBlock.Text = string.Empty;
+        LoadAssetsSwitchesEditorFromDraft(_assetsSwitchesWorkspace.PendingDraft);
+        _assetsSwitchesWorkspace.StatusText = "Preparing a new virtual switch draft. Complete the fields and apply when the inline validation state is ready.";
+        _assetsSwitchesWorkspace.SelectedSwitchValidationText = "Enter a switch name, choose a type, and provide an adapter for External switches.";
+        _assetsSwitchesWorkspace.DeleteConstraintText = string.Empty;
         SetAssetsSwitchAttachedVmState(Array.Empty<string>(), "Attached VMs are shown for existing switches.");
         _ = RefreshAssetsSwitchValidationAsync();
         UpdateAssetsSwitchesUi();
@@ -1923,111 +1915,113 @@ public sealed partial class MainWindow : Window
         var draft = TryBuildAssetsSwitchDraft();
         if (draft is null)
         {
-            AssetsSwitchesStatusTextBlock.Text = "Complete required switch fields before applying.";
+            _assetsSwitchesWorkspace.StatusText = "Complete required switch fields before applying.";
+            UpdateAssetsSwitchesUi();
             return;
         }
 
-        _isAssetsSwitchesSaving = true;
-        AssetsSwitchesStatusTextBlock.Text = draft.IsNew ? "Creating virtual switch..." : "Updating virtual switch...";
+        _assetsSwitchesWorkspace.IsSaving = true;
+        _assetsSwitchesWorkspace.StatusText = draft.IsNew ? "Creating virtual switch..." : "Updating virtual switch...";
         UpdateAssetsSwitchesUi();
 
         try
         {
             var result = await _assetsSwitchesCapabilityService.SaveAsync(draft);
-            AssetsSwitchesStatusTextBlock.Text = result.UserMessage;
+            _assetsSwitchesWorkspace.StatusText = result.UserMessage;
             if (!result.Success)
             {
-                _hasAssetsSwitchesErrorState = true;
-                AssetsSwitchesErrorStateTextBox.Text = $"Switch save failed. Review the message below, correct the configuration, and try Apply again.{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", result.Errors.DefaultIfEmpty(result.UserMessage))}";
+                _assetsSwitchesWorkspace.HasErrorState = true;
+                _assetsSwitchesWorkspace.ErrorStateText = $"Switch save failed. Review the message below, correct the configuration, and try Apply again.{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", result.Errors.DefaultIfEmpty(result.UserMessage))}";
                 UpdateAssetsSwitchesUi();
                 return;
             }
 
             ClearAssetsSwitchesErrorState();
-            _pendingAssetsSwitchDraft = null;
+            _assetsSwitchesWorkspace.PendingDraft = null;
             await EnsureAssetsSwitchesAsync(forceRefresh: true);
             if (result.Item is not null)
             {
-                _selectedAssetsSwitchRow = _assetsSwitchRows.FirstOrDefault(row => string.Equals(row.Name, result.Item.Name, StringComparison.OrdinalIgnoreCase));
-                AssetsSwitchesListView.SelectedItem = _selectedAssetsSwitchRow;
-                if (_selectedAssetsSwitchRow is not null)
+                _assetsSwitchesWorkspace.SelectedRow = _assetsSwitchesWorkspace.Inventory.FirstOrDefault(row => string.Equals(row.Name, result.Item.Name, StringComparison.OrdinalIgnoreCase));
+                AssetsSwitchesListView.SelectedItem = _assetsSwitchesWorkspace.SelectedRow;
+                if (_assetsSwitchesWorkspace.SelectedRow is not null)
                 {
-                    LoadAssetsSwitchesEditorFromRow(_selectedAssetsSwitchRow);
+                    LoadAssetsSwitchesEditorFromRow(_assetsSwitchesWorkspace.SelectedRow);
                 }
             }
         }
         finally
         {
-            _isAssetsSwitchesSaving = false;
+            _assetsSwitchesWorkspace.IsSaving = false;
             UpdateAssetsSwitchesUi();
         }
     }
 
     private async void AssetsSwitchesDeleteButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedAssetsSwitchRow is null)
+        if (_assetsSwitchesWorkspace.SelectedRow is null)
         {
-            AssetsSwitchesStatusTextBlock.Text = "Select a virtual switch to delete.";
+            _assetsSwitchesWorkspace.StatusText = "Select a virtual switch to delete.";
+            UpdateAssetsSwitchesUi();
             return;
         }
 
-        _isAssetsSwitchesDeleting = true;
+        _assetsSwitchesWorkspace.IsDeleting = true;
         UpdateAssetsSwitchesUi();
 
         try
         {
-            var assessment = await _assetsSwitchesCapabilityService.AssessDeleteAsync(_selectedAssetsSwitchRow.Name);
+            var assessment = await _assetsSwitchesCapabilityService.AssessDeleteAsync(_assetsSwitchesWorkspace.SelectedRow.Name);
             ApplyAssetsSwitchDeleteAssessment(assessment);
 
             if (!assessment.CanDelete)
             {
-                AssetsSwitchesStatusTextBlock.Text = "Delete blocked. Disconnect the attached VMs from this switch and refresh before trying again.";
-                _hasAssetsSwitchesErrorState = true;
-                AssetsSwitchesErrorStateTextBox.Text = $"Delete is blocked for '{_selectedAssetsSwitchRow.Name}'.{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", assessment.BlockingReasons.DefaultIfEmpty("At least one VM is attached to this switch."))}";
+                _assetsSwitchesWorkspace.StatusText = "Delete blocked. Disconnect the attached VMs from this switch and refresh before trying again.";
+                _assetsSwitchesWorkspace.HasErrorState = true;
+                _assetsSwitchesWorkspace.ErrorStateText = $"Delete is blocked for '{_assetsSwitchesWorkspace.SelectedRow.Name}'.{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", assessment.BlockingReasons.DefaultIfEmpty("At least one VM is attached to this switch."))}";
                 UpdateAssetsSwitchesUi();
                 return;
             }
 
-            if (!await ShowAssetsSwitchDeleteConfirmationDialogAsync(_selectedAssetsSwitchRow, assessment))
+            if (!await ShowAssetsSwitchDeleteConfirmationDialogAsync(_assetsSwitchesWorkspace.SelectedRow, assessment))
             {
-                AssetsSwitchesStatusTextBlock.Text = "Virtual switch delete canceled.";
+                _assetsSwitchesWorkspace.StatusText = "Virtual switch delete canceled.";
+                UpdateAssetsSwitchesUi();
                 return;
             }
 
-            var result = await _assetsSwitchesCapabilityService.DeleteAsync(_selectedAssetsSwitchRow.Name);
-            AssetsSwitchesStatusTextBlock.Text = result.UserMessage;
+            var result = await _assetsSwitchesCapabilityService.DeleteAsync(_assetsSwitchesWorkspace.SelectedRow.Name);
+            _assetsSwitchesWorkspace.StatusText = result.UserMessage;
             if (!result.Success)
             {
-                _hasAssetsSwitchesErrorState = true;
-                AssetsSwitchesErrorStateTextBox.Text = $"Delete failed. Review the details below before trying again.{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", result.Errors.DefaultIfEmpty(result.UserMessage))}";
+                _assetsSwitchesWorkspace.HasErrorState = true;
+                _assetsSwitchesWorkspace.ErrorStateText = $"Delete failed. Review the details below before trying again.{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", result.Errors.DefaultIfEmpty(result.UserMessage))}";
             }
             else
             {
                 ClearAssetsSwitchesErrorState();
-                _selectedAssetsSwitchRow = null;
-                _pendingAssetsSwitchDraft = null;
+                _assetsSwitchesWorkspace.SelectedRow = null;
+                _assetsSwitchesWorkspace.PendingDraft = null;
             }
 
             await EnsureAssetsSwitchesAsync(forceRefresh: true);
         }
         finally
         {
-            _isAssetsSwitchesDeleting = false;
+            _assetsSwitchesWorkspace.IsDeleting = false;
             UpdateAssetsSwitchesUi();
         }
     }
 
     private void AssetsSwitchesEditorControl_Changed(object sender, object e)
     {
-        if (_isUpdatingAssetsSwitchesEditor)
+        if (_assetsSwitchesWorkspace.IsUpdatingEditor)
         {
             return;
         }
 
-        var draft = TryBuildAssetsSwitchDraft();
-        if (_selectedAssetsSwitchRow is null)
+        if (_assetsSwitchesWorkspace.SelectedRow is null)
         {
-            _pendingAssetsSwitchDraft = CaptureAssetsSwitchDraftFromEditor(isNewOverride: true);
+            _assetsSwitchesWorkspace.PendingDraft = CaptureAssetsSwitchDraftFromEditor(isNewOverride: true);
         }
 
         _ = RefreshAssetsSwitchValidationAsync();
@@ -2044,14 +2038,14 @@ public sealed partial class MainWindow : Window
             SwitchType = row.SwitchType,
             AdapterName = row.AdapterName
         });
-        AssetsSwitchesSelectedSwitchValidationTextBlock.Text = row.ValidationSummary;
-        AssetsSwitchesDeleteConstraintTextBlock.Text = string.Empty;
+        _assetsSwitchesWorkspace.SelectedSwitchValidationText = row.ValidationSummary;
+        _assetsSwitchesWorkspace.DeleteConstraintText = string.Empty;
         SetAssetsSwitchAttachedVmState(Array.Empty<string>(), "Loading attached VMs...");
     }
 
     private void LoadAssetsSwitchesEditorFromDraft(AssetsSwitchDraft draft)
     {
-        _isUpdatingAssetsSwitchesEditor = true;
+        _assetsSwitchesWorkspace.IsUpdatingEditor = true;
         try
         {
             AssetsSwitchesNameTextBox.Text = draft.Name;
@@ -2060,13 +2054,13 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            _isUpdatingAssetsSwitchesEditor = false;
+            _assetsSwitchesWorkspace.IsUpdatingEditor = false;
         }
     }
 
     private void ClearAssetsSwitchesEditor()
     {
-        _isUpdatingAssetsSwitchesEditor = true;
+        _assetsSwitchesWorkspace.IsUpdatingEditor = true;
         try
         {
             AssetsSwitchesNameTextBox.Text = string.Empty;
@@ -2076,16 +2070,16 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            _isUpdatingAssetsSwitchesEditor = false;
+            _assetsSwitchesWorkspace.IsUpdatingEditor = false;
         }
 
-        AssetsSwitchesSelectedSwitchValidationTextBlock.Text = "Select a switch or click New to begin.";
-        AssetsSwitchesDeleteConstraintTextBlock.Text = string.Empty;
+        _assetsSwitchesWorkspace.SelectedSwitchValidationText = "Select a switch or click New to begin.";
+        _assetsSwitchesWorkspace.DeleteConstraintText = string.Empty;
     }
 
     private AssetsSwitchDraft? TryBuildAssetsSwitchDraft()
     {
-        var draft = CaptureAssetsSwitchDraftFromEditor(isNewOverride: _selectedAssetsSwitchRow is null);
+        var draft = CaptureAssetsSwitchDraftFromEditor(isNewOverride: _assetsSwitchesWorkspace.SelectedRow is null);
         var name = draft.Name;
         var type = draft.SwitchType;
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(type))
@@ -2101,7 +2095,7 @@ public sealed partial class MainWindow : Window
         return new AssetsSwitchDraft
         {
             IsNew = isNewOverride,
-            OriginalName = isNewOverride ? null : _selectedAssetsSwitchRow?.Name,
+            OriginalName = isNewOverride ? null : _assetsSwitchesWorkspace.SelectedRow?.Name,
             Name = AssetsSwitchesNameTextBox.Text.Trim(),
             SwitchType = GetSelectedAssetsSwitchType(),
             AdapterName = AssetsSwitchesAdapterTextBox.Text
@@ -2141,10 +2135,10 @@ public sealed partial class MainWindow : Window
     private void ApplyAssetsSwitchValidationResult(AssetsSwitchValidationResult validation)
     {
         var validationText = FormatAssetsSwitchValidationText(validation);
-        AssetsSwitchesSelectedSwitchValidationTextBlock.Text = validationText;
-        if (_selectedAssetsSwitchRow is not null)
+        _assetsSwitchesWorkspace.SelectedSwitchValidationText = validationText;
+        if (_assetsSwitchesWorkspace.SelectedRow is not null)
         {
-            _selectedAssetsSwitchRow.ValidationSummary = validationText;
+            _assetsSwitchesWorkspace.SelectedRow.ValidationSummary = validationText;
         }
     }
 
@@ -2155,52 +2149,54 @@ public sealed partial class MainWindow : Window
             assessment.AttachedVmNames.Count > 0
                 ? "Attached VMs currently using this switch."
                 : "No attached VMs.");
-        AssetsSwitchesDeleteConstraintTextBlock.Text = assessment.CanDelete
+        _assetsSwitchesWorkspace.DeleteConstraintText = assessment.CanDelete
             ? string.Empty
             : $"Delete blocked. {assessment.Summary}";
-        if (_selectedAssetsSwitchRow is not null)
+        if (_assetsSwitchesWorkspace.SelectedRow is not null)
         {
-            _selectedAssetsSwitchRow.DeleteSummary = AssetsSwitchesDeleteConstraintTextBlock.Text;
+            _assetsSwitchesWorkspace.SelectedRow.DeleteSummary = _assetsSwitchesWorkspace.DeleteConstraintText;
         }
     }
 
     private async Task RefreshAssetsSwitchValidationAsync()
     {
-        var requestVersion = ++_assetsSwitchesValidationRequestVersion;
+        var requestVersion = ++_assetsSwitchesWorkspace.ValidationRequestVersion;
         var draft = TryBuildAssetsSwitchDraft();
         if (draft is null)
         {
-            if (requestVersion != _assetsSwitchesValidationRequestVersion)
+            if (requestVersion != _assetsSwitchesWorkspace.ValidationRequestVersion)
             {
                 return;
             }
 
-            AssetsSwitchesSelectedSwitchValidationTextBlock.Text = _selectedAssetsSwitchRow is null
+            _assetsSwitchesWorkspace.SelectedSwitchValidationText = _assetsSwitchesWorkspace.SelectedRow is null
                 ? "Complete the switch name, choose a type, and provide an adapter for External switches."
                 : "Edit the switch name to validate changes. Type and adapter changes require creating a new switch.";
+            UpdateAssetsSwitchesUi();
 
             return;
         }
 
         var validation = await _assetsSwitchesCapabilityService.ValidateAsync(draft);
-        if (requestVersion != _assetsSwitchesValidationRequestVersion)
+        if (requestVersion != _assetsSwitchesWorkspace.ValidationRequestVersion)
         {
             return;
         }
 
         ApplyAssetsSwitchValidationResult(validation);
+        UpdateAssetsSwitchesUi();
     }
 
     private async Task LoadAssetsSwitchAttachedVmNamesAsync(string switchName)
     {
-        var requestVersion = ++_assetsSwitchesAssessmentRequestVersion;
+        var requestVersion = ++_assetsSwitchesWorkspace.AssessmentRequestVersion;
         var vmNames = await _assetsSwitchesCapabilityService.GetAttachedVmNamesAsync(switchName);
-        if (requestVersion != _assetsSwitchesAssessmentRequestVersion)
+        if (requestVersion != _assetsSwitchesWorkspace.AssessmentRequestVersion)
         {
             return;
         }
 
-        if (_selectedAssetsSwitchRow is null || !string.Equals(_selectedAssetsSwitchRow.Name, switchName, StringComparison.OrdinalIgnoreCase))
+        if (_assetsSwitchesWorkspace.SelectedRow is null || !string.Equals(_assetsSwitchesWorkspace.SelectedRow.Name, switchName, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
@@ -2214,19 +2210,19 @@ public sealed partial class MainWindow : Window
 
     private void SetAssetsSwitchAttachedVmState(IEnumerable<string> vmNames, string hintText)
     {
-        _assetsSwitchAttachedVmNames.Clear();
+        _assetsSwitchesWorkspace.AttachedVmNames.Clear();
         foreach (var vmName in vmNames.Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
         {
-            _assetsSwitchAttachedVmNames.Add(vmName);
+            _assetsSwitchesWorkspace.AttachedVmNames.Add(vmName);
         }
 
-        AssetsSwitchesAttachedVmsHintTextBlock.Text = hintText;
+        _assetsSwitchesWorkspace.AttachedVmHintText = hintText;
     }
 
     private void ClearAssetsSwitchesErrorState()
     {
-        _hasAssetsSwitchesErrorState = false;
-        AssetsSwitchesErrorStateTextBox.Text = "No switch load or action errors.";
+        _assetsSwitchesWorkspace.HasErrorState = false;
+        _assetsSwitchesWorkspace.ErrorStateText = "No switch load or action errors.";
     }
 
     private async Task<bool> ShowAssetsSwitchDeleteConfirmationDialogAsync(
