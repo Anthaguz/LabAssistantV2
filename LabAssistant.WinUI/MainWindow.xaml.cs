@@ -49,10 +49,10 @@ public sealed partial class MainWindow : Window
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
     private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
     private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
+    private readonly AssetsBaseDisksWorkspaceViewModel _assetsBaseDisksWorkspace = new();
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<TemplateLibraryItem> _templateLibraryItems = [];
     private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
-    private readonly ObservableCollection<AssetsBaseDiskListRow> _assetsBaseDiskRows = [];
     private readonly ObservableCollection<AssetsSwitchListRow> _assetsSwitchRows = [];
     private readonly ObservableCollection<string> _assetsSwitchAttachedVmNames = [];
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
@@ -78,8 +78,6 @@ public sealed partial class MainWindow : Window
     private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;
     private TemplateEditorDocument? _activeDeployTemplateDocument;
     private VmTemplate? _selectedDeployOnTheFlyVmEntry;
-    private AssetsBaseDiskListRow? _selectedAssetsBaseDiskRow;
-    private AssetsBaseDiskDraft? _pendingAssetsBaseDiskDraft;
     private AssetsSwitchListRow? _selectedAssetsSwitchRow;
     private AssetsSwitchDraft? _pendingAssetsSwitchDraft;
     private DeploymentReadinessReport? _deployReadinessReport;
@@ -88,11 +86,6 @@ public sealed partial class MainWindow : Window
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
-    private bool _isAssetsBaseDisksLoading;
-    private bool _isAssetsBaseDisksSaving;
-    private bool _isAssetsBaseDisksRemoving;
-    private bool _isUpdatingAssetsBaseDisksEditor;
-    private bool _hasAssetsBaseDisksErrorState;
     private bool _isAssetsSwitchesLoading;
     private bool _isAssetsSwitchesSaving;
     private bool _isAssetsSwitchesDeleting;
@@ -341,13 +334,11 @@ public sealed partial class MainWindow : Window
             AssetsOverviewTabViewItem,
             AssetsBaseDisksTabViewItem,
             AssetsSwitchesTabViewItem,
-            _assetsBaseDiskRows,
+            _assetsBaseDisksWorkspace,
             _assetsSwitchRows,
             _assetsSwitchAttachedVmNames,
             new AssetsWorkspaceHost(
-                () => _isAssetsBaseDisksLoading,
                 () => _isAssetsSwitchesLoading,
-                () => _assetsBaseDiskRows.Count,
                 () => _assetsSwitchRows.Count,
                 EnsureAssetsBaseDisksAsync,
                 EnsureAssetsSwitchesAsync,
@@ -1747,19 +1738,19 @@ public sealed partial class MainWindow : Window
 
     private async Task EnsureAssetsBaseDisksAsync(bool forceRefresh)
     {
-        if (_isAssetsBaseDisksLoading)
+        if (_assetsBaseDisksWorkspace.IsLoading)
         {
             return;
         }
 
-        if (!forceRefresh && (_assetsBaseDiskRows.Count > 0 || _pendingAssetsBaseDiskDraft is not null))
+        if (!forceRefresh && (_assetsBaseDisksWorkspace.Inventory.Count > 0 || _assetsBaseDisksWorkspace.PendingDraft is not null))
         {
             UpdateAssetsBaseDisksUi();
             return;
         }
 
-        _isAssetsBaseDisksLoading = true;
-        AssetsBaseDisksStatusTextBlock.Text = forceRefresh
+        _assetsBaseDisksWorkspace.IsLoading = true;
+        _assetsBaseDisksWorkspace.StatusText = forceRefresh
             ? "Refreshing base disks..."
             : "Loading base disks...";
         UpdateAssetsBaseDisksUi();
@@ -1767,43 +1758,43 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _assetsBaseDisksCapabilityService.LoadAsync(isRefresh: forceRefresh);
-            var previouslySelectedId = _selectedAssetsBaseDiskRow?.Id;
-            _assetsBaseDiskRows.Clear();
+            var previouslySelectedId = _assetsBaseDisksWorkspace.SelectedRow?.Id;
+            _assetsBaseDisksWorkspace.Inventory.Clear();
             foreach (var item in result.Items)
             {
-                _assetsBaseDiskRows.Add(new AssetsBaseDiskListRow(item));
+                _assetsBaseDisksWorkspace.Inventory.Add(new AssetsBaseDiskListRow(item));
             }
 
-            if (_pendingAssetsBaseDiskDraft is null)
+            if (_assetsBaseDisksWorkspace.PendingDraft is null)
             {
-                _selectedAssetsBaseDiskRow = _assetsBaseDiskRows.FirstOrDefault(row => string.Equals(row.Id, previouslySelectedId, StringComparison.OrdinalIgnoreCase))
-                    ?? _assetsBaseDiskRows.FirstOrDefault();
-                AssetsBaseDisksListView.SelectedItem = _selectedAssetsBaseDiskRow;
+                _assetsBaseDisksWorkspace.SelectedRow = _assetsBaseDisksWorkspace.Inventory.FirstOrDefault(row => string.Equals(row.Id, previouslySelectedId, StringComparison.OrdinalIgnoreCase))
+                    ?? _assetsBaseDisksWorkspace.Inventory.FirstOrDefault();
+                AssetsBaseDisksListView.SelectedItem = _assetsBaseDisksWorkspace.SelectedRow;
             }
             else
             {
-                _selectedAssetsBaseDiskRow = null;
+                _assetsBaseDisksWorkspace.SelectedRow = null;
                 AssetsBaseDisksListView.SelectedItem = null;
             }
 
-            AssetsBaseDisksStatusTextBlock.Text = result.Errors.Count > 0
-                ? $"Loaded {_assetsBaseDiskRows.Count} base disk(s) with {result.Errors.Count} issue(s). Review the error panel and use Refresh after correcting the catalog."
-                : $"Loaded {_assetsBaseDiskRows.Count} base disk(s).";
-            _hasAssetsBaseDisksErrorState = result.Errors.Count > 0;
-            AssetsBaseDisksErrorStateTextBlock.Text = result.Errors.Count > 0
+            _assetsBaseDisksWorkspace.StatusText = result.Errors.Count > 0
+                ? $"Loaded {_assetsBaseDisksWorkspace.Inventory.Count} base disk(s) with {result.Errors.Count} issue(s). Review the error panel and use Refresh after correcting the catalog."
+                : $"Loaded {_assetsBaseDisksWorkspace.Inventory.Count} base disk(s).";
+            _assetsBaseDisksWorkspace.HasErrorState = result.Errors.Count > 0;
+            _assetsBaseDisksWorkspace.ErrorStateText = result.Errors.Count > 0
                 ? $"Catalog load completed with issues:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", result.Errors)}"
                 : "No catalog load errors.";
 
-            if (_selectedAssetsBaseDiskRow is not null)
+            if (_assetsBaseDisksWorkspace.SelectedRow is not null)
             {
-                LoadAssetsBaseDisksEditorFromRow(_selectedAssetsBaseDiskRow);
+                LoadAssetsBaseDisksEditorFromRow(_assetsBaseDisksWorkspace.SelectedRow);
             }
-            else if (_pendingAssetsBaseDiskDraft is not null)
+            else if (_assetsBaseDisksWorkspace.PendingDraft is not null)
             {
-                LoadAssetsBaseDisksEditorFromDraft(_pendingAssetsBaseDiskDraft);
-                AssetsBaseDisksSelectedDiskSummaryTextBlock.Text = "New base disk draft. Review metadata, validate, then save to register it.";
-                AssetsBaseDisksSelectedDiskValidationTextBlock.Text = "Validation has not been evaluated for this draft yet.";
-                AssetsBaseDisksReferenceWarningTextBlock.Text = "Removal assessment is only available for registered base disks.";
+                LoadAssetsBaseDisksEditorFromDraft(_assetsBaseDisksWorkspace.PendingDraft);
+                _assetsBaseDisksWorkspace.SelectedDiskSummaryText = "New base disk draft. Review metadata, validate, then save to register it.";
+                _assetsBaseDisksWorkspace.SelectedDiskValidationText = "Validation has not been evaluated for this draft yet.";
+                _assetsBaseDisksWorkspace.ReferenceWarningText = "Removal assessment is only available for registered base disks.";
             }
             else
             {
@@ -1812,37 +1803,42 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            _isAssetsBaseDisksLoading = false;
+            _assetsBaseDisksWorkspace.IsLoading = false;
             UpdateAssetsBaseDisksUi();
         }
     }
 
     private void UpdateAssetsBaseDisksUi()
     {
-        AssetsBaseDisksRefreshButton.IsEnabled = !_isAssetsBaseDisksLoading && !_isAssetsBaseDisksSaving && !_isAssetsBaseDisksRemoving;
-        AssetsBaseDisksImportButton.IsEnabled = !_isAssetsBaseDisksLoading && !_isAssetsBaseDisksSaving && !_isAssetsBaseDisksRemoving;
-        AssetsBaseDisksValidateButton.IsEnabled = !_isAssetsBaseDisksLoading && _selectedAssetsBaseDiskRow is not null;
-        AssetsBaseDisksRemoveButton.IsEnabled = !_isAssetsBaseDisksLoading && !_isAssetsBaseDisksRemoving && _selectedAssetsBaseDiskRow is not null;
-        AssetsBaseDisksBrowsePathButton.IsEnabled = !_isAssetsBaseDisksLoading && !_isAssetsBaseDisksSaving && !_isAssetsBaseDisksRemoving;
-        AssetsBaseDisksSaveMetadataButton.IsEnabled = !_isAssetsBaseDisksLoading && !_isAssetsBaseDisksSaving && !_isAssetsBaseDisksRemoving && CanSaveAssetsBaseDiskDraft();
-        AssetsBaseDisksLoadingStatePanel.Visibility = _isAssetsBaseDisksLoading ? Visibility.Visible : Visibility.Collapsed;
-        AssetsBaseDisksEmptyStatePanel.Visibility = !_isAssetsBaseDisksLoading && _assetsBaseDiskRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        AssetsBaseDisksErrorStatePanel.Visibility = _hasAssetsBaseDisksErrorState ? Visibility.Visible : Visibility.Collapsed;
-        AssetsBaseDisksLoadingStateTextBlock.Text = _isAssetsBaseDisksLoading
+        AssetsBaseDisksRefreshButton.IsEnabled = !_assetsBaseDisksWorkspace.IsLoading && !_assetsBaseDisksWorkspace.IsSaving && !_assetsBaseDisksWorkspace.IsRemoving;
+        AssetsBaseDisksImportButton.IsEnabled = !_assetsBaseDisksWorkspace.IsLoading && !_assetsBaseDisksWorkspace.IsSaving && !_assetsBaseDisksWorkspace.IsRemoving;
+        AssetsBaseDisksValidateButton.IsEnabled = !_assetsBaseDisksWorkspace.IsLoading && _assetsBaseDisksWorkspace.SelectedRow is not null;
+        AssetsBaseDisksRemoveButton.IsEnabled = !_assetsBaseDisksWorkspace.IsLoading && !_assetsBaseDisksWorkspace.IsRemoving && _assetsBaseDisksWorkspace.SelectedRow is not null;
+        AssetsBaseDisksBrowsePathButton.IsEnabled = !_assetsBaseDisksWorkspace.IsLoading && !_assetsBaseDisksWorkspace.IsSaving && !_assetsBaseDisksWorkspace.IsRemoving;
+        AssetsBaseDisksSaveMetadataButton.IsEnabled = !_assetsBaseDisksWorkspace.IsLoading && !_assetsBaseDisksWorkspace.IsSaving && !_assetsBaseDisksWorkspace.IsRemoving && CanSaveAssetsBaseDiskDraft();
+        AssetsBaseDisksLoadingStatePanel.Visibility = _assetsBaseDisksWorkspace.IsLoading ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksEmptyStatePanel.Visibility = !_assetsBaseDisksWorkspace.IsLoading && _assetsBaseDisksWorkspace.Inventory.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksErrorStatePanel.Visibility = _assetsBaseDisksWorkspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;
+        AssetsBaseDisksStatusTextBlock.Text = _assetsBaseDisksWorkspace.StatusText;
+        AssetsBaseDisksSelectedDiskSummaryTextBlock.Text = _assetsBaseDisksWorkspace.SelectedDiskSummaryText;
+        AssetsBaseDisksSelectedDiskValidationTextBlock.Text = _assetsBaseDisksWorkspace.SelectedDiskValidationText;
+        AssetsBaseDisksReferenceWarningTextBlock.Text = _assetsBaseDisksWorkspace.ReferenceWarningText;
+        AssetsBaseDisksErrorStateTextBlock.Text = _assetsBaseDisksWorkspace.ErrorStateText;
+        AssetsBaseDisksLoadingStateTextBlock.Text = _assetsBaseDisksWorkspace.IsLoading
             ? "Loading base disk catalog. Current details remain visible until refresh completes."
             : "Base disk catalog is idle.";
         AssetsBaseDisksEmptyStateTextBlock.Text = "No base disks are registered. Use Import / Register to choose a VHDX and then save its metadata.";
-        var showDetailsMessages = _selectedAssetsBaseDiskRow is not null || _pendingAssetsBaseDiskDraft is not null;
+        var showDetailsMessages = _assetsBaseDisksWorkspace.SelectedRow is not null || _assetsBaseDisksWorkspace.PendingDraft is not null;
         AssetsBaseDisksSelectedDiskValidationTextBlock.Visibility = showDetailsMessages ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksReferenceWarningTextBlock.Visibility = showDetailsMessages ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void AssetsBaseDisksListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        _selectedAssetsBaseDiskRow = AssetsBaseDisksListView.SelectedItem as AssetsBaseDiskListRow;
-        if (_selectedAssetsBaseDiskRow is not null)
+        _assetsBaseDisksWorkspace.SelectedRow = AssetsBaseDisksListView.SelectedItem as AssetsBaseDiskListRow;
+        if (_assetsBaseDisksWorkspace.SelectedRow is not null)
         {
-            LoadAssetsBaseDisksEditorFromRow(_selectedAssetsBaseDiskRow);
+            LoadAssetsBaseDisksEditorFromRow(_assetsBaseDisksWorkspace.SelectedRow);
         }
         else
         {
@@ -1865,8 +1861,8 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _selectedAssetsBaseDiskRow = null;
-        _pendingAssetsBaseDiskDraft = null;
+        _assetsBaseDisksWorkspace.SelectedRow = null;
+        _assetsBaseDisksWorkspace.PendingDraft = null;
         AssetsBaseDisksListView.SelectedItem = null;
         LoadAssetsBaseDisksEditorFromDraft(new AssetsBaseDiskDraft
         {
@@ -1877,78 +1873,83 @@ public sealed partial class MainWindow : Window
             Generation = 1,
             Notes = null
         });
-        _pendingAssetsBaseDiskDraft = TryBuildAssetsBaseDiskDraft(isNewOverride: true);
-        AssetsBaseDisksStatusTextBlock.Text = "Selected VHDX path. Review metadata, validate, and click Save Metadata to register the base disk.";
-        AssetsBaseDisksSelectedDiskValidationTextBlock.Text = "Validation has not been evaluated for this new draft yet.";
-        AssetsBaseDisksReferenceWarningTextBlock.Text = "New base disk draft. Removal assessment is not applicable.";
+        _assetsBaseDisksWorkspace.PendingDraft = TryBuildAssetsBaseDiskDraft(isNewOverride: true);
+        _assetsBaseDisksWorkspace.StatusText = "Selected VHDX path. Review metadata, validate, and click Save Metadata to register the base disk.";
+        _assetsBaseDisksWorkspace.SelectedDiskValidationText = "Validation has not been evaluated for this new draft yet.";
+        _assetsBaseDisksWorkspace.ReferenceWarningText = "New base disk draft. Removal assessment is not applicable.";
         UpdateAssetsBaseDisksUi();
     }
 
     private async void AssetsBaseDisksValidateButton_Click(object sender, RoutedEventArgs e)
     {
-        var draft = TryBuildAssetsBaseDiskDraft(isNewOverride: _selectedAssetsBaseDiskRow is null);
+        var draft = TryBuildAssetsBaseDiskDraft(isNewOverride: _assetsBaseDisksWorkspace.SelectedRow is null);
         if (draft is null)
         {
-            AssetsBaseDisksStatusTextBlock.Text = "Select or prepare a base disk draft before validating.";
+            _assetsBaseDisksWorkspace.StatusText = "Select or prepare a base disk draft before validating.";
+            UpdateAssetsBaseDisksUi();
             return;
         }
 
         var validation = await _assetsBaseDisksCapabilityService.ValidateAsync(draft);
         ApplyAssetsBaseDiskValidationResult(validation);
-        AssetsBaseDisksStatusTextBlock.Text = string.Equals(validation.Severity, "Pass", StringComparison.OrdinalIgnoreCase)
+        _assetsBaseDisksWorkspace.StatusText = string.Equals(validation.Severity, "Pass", StringComparison.OrdinalIgnoreCase)
             ? "Validation passed. The base disk is ready to use."
             : $"Validation blocked. Review the details and correct the metadata or path before saving.";
+        UpdateAssetsBaseDisksUi();
     }
 
     private async void AssetsBaseDisksRemoveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedAssetsBaseDiskRow is null)
+        if (_assetsBaseDisksWorkspace.SelectedRow is null)
         {
-            AssetsBaseDisksStatusTextBlock.Text = "Select a base disk to remove.";
+            _assetsBaseDisksWorkspace.StatusText = "Select a base disk to remove.";
+            UpdateAssetsBaseDisksUi();
             return;
         }
 
-        _isAssetsBaseDisksRemoving = true;
+        _assetsBaseDisksWorkspace.IsRemoving = true;
         UpdateAssetsBaseDisksUi();
 
         try
         {
-            var assessment = await _assetsBaseDisksCapabilityService.AssessRemoveAsync(_selectedAssetsBaseDiskRow.Id);
-            _selectedAssetsBaseDiskRow.ReferenceSummary = assessment.ReferenceSignalSummary;
-            AssetsBaseDisksReferenceWarningTextBlock.Text = string.Join(Environment.NewLine, assessment.WarningReasons.DefaultIfEmpty(assessment.ReferenceSignalSummary));
+            var assessment = await _assetsBaseDisksCapabilityService.AssessRemoveAsync(_assetsBaseDisksWorkspace.SelectedRow.Id);
+            _assetsBaseDisksWorkspace.SelectedRow.ReferenceSummary = assessment.ReferenceSignalSummary;
+            _assetsBaseDisksWorkspace.ReferenceWarningText = string.Join(Environment.NewLine, assessment.WarningReasons.DefaultIfEmpty(assessment.ReferenceSignalSummary));
             if (!assessment.Exists || !assessment.CanRemove)
             {
-                AssetsBaseDisksStatusTextBlock.Text = assessment.BlockingReasons.FirstOrDefault() ?? "Base disk removal is blocked. Resolve the issue and try again.";
-                _hasAssetsBaseDisksErrorState = true;
-                AssetsBaseDisksErrorStateTextBlock.Text = string.Join(Environment.NewLine, assessment.BlockingReasons.DefaultIfEmpty("Base disk removal is blocked."));
+                _assetsBaseDisksWorkspace.StatusText = assessment.BlockingReasons.FirstOrDefault() ?? "Base disk removal is blocked. Resolve the issue and try again.";
+                _assetsBaseDisksWorkspace.HasErrorState = true;
+                _assetsBaseDisksWorkspace.ErrorStateText = string.Join(Environment.NewLine, assessment.BlockingReasons.DefaultIfEmpty("Base disk removal is blocked."));
+                UpdateAssetsBaseDisksUi();
                 return;
             }
 
-            if (!await ShowAssetsBaseDiskRemoveConfirmationDialogAsync(_selectedAssetsBaseDiskRow, assessment))
+            if (!await ShowAssetsBaseDiskRemoveConfirmationDialogAsync(_assetsBaseDisksWorkspace.SelectedRow, assessment))
             {
-                AssetsBaseDisksStatusTextBlock.Text = "Base disk removal canceled.";
+                _assetsBaseDisksWorkspace.StatusText = "Base disk removal canceled.";
+                UpdateAssetsBaseDisksUi();
                 return;
             }
 
-            var result = await _assetsBaseDisksCapabilityService.RemoveAsync(_selectedAssetsBaseDiskRow.Id);
-            AssetsBaseDisksStatusTextBlock.Text = result.UserMessage;
+            var result = await _assetsBaseDisksCapabilityService.RemoveAsync(_assetsBaseDisksWorkspace.SelectedRow.Id);
+            _assetsBaseDisksWorkspace.StatusText = result.UserMessage;
             if (!result.Success)
             {
-                _hasAssetsBaseDisksErrorState = true;
-                AssetsBaseDisksErrorStateTextBlock.Text = $"Remove failed. {string.Join(Environment.NewLine, result.Errors.DefaultIfEmpty(result.UserMessage))}";
+                _assetsBaseDisksWorkspace.HasErrorState = true;
+                _assetsBaseDisksWorkspace.ErrorStateText = $"Remove failed. {string.Join(Environment.NewLine, result.Errors.DefaultIfEmpty(result.UserMessage))}";
             }
             else
             {
-                _hasAssetsBaseDisksErrorState = false;
-                AssetsBaseDisksErrorStateTextBlock.Text = "No catalog load errors.";
-                _pendingAssetsBaseDiskDraft = null;
+                _assetsBaseDisksWorkspace.HasErrorState = false;
+                _assetsBaseDisksWorkspace.ErrorStateText = "No catalog load errors.";
+                _assetsBaseDisksWorkspace.PendingDraft = null;
             }
 
             await EnsureAssetsBaseDisksAsync(forceRefresh: true);
         }
         finally
         {
-            _isAssetsBaseDisksRemoving = false;
+            _assetsBaseDisksWorkspace.IsRemoving = false;
             UpdateAssetsBaseDisksUi();
         }
     }
@@ -1962,26 +1963,27 @@ public sealed partial class MainWindow : Window
         }
 
         AssetsBaseDisksPathTextBox.Text = selectedPath;
-        if (_selectedAssetsBaseDiskRow is null)
+        if (_assetsBaseDisksWorkspace.SelectedRow is null)
         {
-            _pendingAssetsBaseDiskDraft = TryBuildAssetsBaseDiskDraft(isNewOverride: true);
+            _assetsBaseDisksWorkspace.PendingDraft = TryBuildAssetsBaseDiskDraft(isNewOverride: true);
         }
 
-        AssetsBaseDisksStatusTextBlock.Text = "Updated base disk path. Validate and save metadata to persist the change.";
+        _assetsBaseDisksWorkspace.StatusText = "Updated base disk path. Validate and save metadata to persist the change.";
         UpdateAssetsBaseDisksUi();
     }
 
     private async void AssetsBaseDisksSaveMetadataButton_Click(object sender, RoutedEventArgs e)
     {
-        var draft = TryBuildAssetsBaseDiskDraft(isNewOverride: _selectedAssetsBaseDiskRow is null);
+        var draft = TryBuildAssetsBaseDiskDraft(isNewOverride: _assetsBaseDisksWorkspace.SelectedRow is null);
         if (draft is null)
         {
-            AssetsBaseDisksStatusTextBlock.Text = "Complete required metadata before saving.";
+            _assetsBaseDisksWorkspace.StatusText = "Complete required metadata before saving.";
+            UpdateAssetsBaseDisksUi();
             return;
         }
 
-        _isAssetsBaseDisksSaving = true;
-        AssetsBaseDisksStatusTextBlock.Text = draft.IsNew
+        _assetsBaseDisksWorkspace.IsSaving = true;
+        _assetsBaseDisksWorkspace.StatusText = draft.IsNew
             ? "Registering base disk..."
             : "Saving base disk metadata...";
         UpdateAssetsBaseDisksUi();
@@ -1989,23 +1991,23 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await _assetsBaseDisksCapabilityService.SaveAsync(draft);
-            AssetsBaseDisksStatusTextBlock.Text = result.UserMessage;
+            _assetsBaseDisksWorkspace.StatusText = result.UserMessage;
             if (!result.Success)
             {
-                _hasAssetsBaseDisksErrorState = true;
-                AssetsBaseDisksErrorStateTextBlock.Text = $"Save failed. {string.Join(Environment.NewLine, result.Errors.DefaultIfEmpty(result.UserMessage))}";
+                _assetsBaseDisksWorkspace.HasErrorState = true;
+                _assetsBaseDisksWorkspace.ErrorStateText = $"Save failed. {string.Join(Environment.NewLine, result.Errors.DefaultIfEmpty(result.UserMessage))}";
                 UpdateAssetsBaseDisksUi();
                 return;
             }
 
-            _hasAssetsBaseDisksErrorState = false;
-            AssetsBaseDisksErrorStateTextBlock.Text = "No catalog load errors.";
-            _pendingAssetsBaseDiskDraft = null;
+            _assetsBaseDisksWorkspace.HasErrorState = false;
+            _assetsBaseDisksWorkspace.ErrorStateText = "No catalog load errors.";
+            _assetsBaseDisksWorkspace.PendingDraft = null;
             await EnsureAssetsBaseDisksAsync(forceRefresh: true);
             if (result.Item is not null)
             {
-                _selectedAssetsBaseDiskRow = _assetsBaseDiskRows.FirstOrDefault(row => string.Equals(row.Id, result.Item.Id, StringComparison.OrdinalIgnoreCase));
-                AssetsBaseDisksListView.SelectedItem = _selectedAssetsBaseDiskRow;
+                _assetsBaseDisksWorkspace.SelectedRow = _assetsBaseDisksWorkspace.Inventory.FirstOrDefault(row => string.Equals(row.Id, result.Item.Id, StringComparison.OrdinalIgnoreCase));
+                AssetsBaseDisksListView.SelectedItem = _assetsBaseDisksWorkspace.SelectedRow;
             }
 
             var validationDraft = new AssetsBaseDiskDraft
@@ -2023,24 +2025,24 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            _isAssetsBaseDisksSaving = false;
+            _assetsBaseDisksWorkspace.IsSaving = false;
             UpdateAssetsBaseDisksUi();
         }
     }
 
     private void AssetsBaseDisksMetadataTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_isUpdatingAssetsBaseDisksEditor)
+        if (_assetsBaseDisksWorkspace.IsUpdatingEditor)
         {
             return;
         }
 
-        AssetsBaseDisksStatusTextBlock.Text = _selectedAssetsBaseDiskRow is null
+        _assetsBaseDisksWorkspace.StatusText = _assetsBaseDisksWorkspace.SelectedRow is null
             ? "Base disk draft changed. Validate and Save Metadata to register it."
             : "Base disk metadata changed. Validate and Save Metadata to persist changes.";
-        if (_selectedAssetsBaseDiskRow is null)
+        if (_assetsBaseDisksWorkspace.SelectedRow is null)
         {
-            _pendingAssetsBaseDiskDraft = TryBuildAssetsBaseDiskDraft(isNewOverride: true);
+            _assetsBaseDisksWorkspace.PendingDraft = TryBuildAssetsBaseDiskDraft(isNewOverride: true);
         }
 
         UpdateAssetsBaseDisksUi();
@@ -2058,15 +2060,15 @@ public sealed partial class MainWindow : Window
             Notes = row.Notes,
             IsNew = false
         });
-        _pendingAssetsBaseDiskDraft = null;
-        AssetsBaseDisksSelectedDiskSummaryTextBlock.Text = $"Catalog id: {row.Id}{Environment.NewLine}{row.Path}";
-        AssetsBaseDisksSelectedDiskValidationTextBlock.Text = row.ValidationSummary;
-        AssetsBaseDisksReferenceWarningTextBlock.Text = row.ReferenceSummary;
+        _assetsBaseDisksWorkspace.PendingDraft = null;
+        _assetsBaseDisksWorkspace.SelectedDiskSummaryText = $"Catalog id: {row.Id}{Environment.NewLine}{row.Path}";
+        _assetsBaseDisksWorkspace.SelectedDiskValidationText = row.ValidationSummary;
+        _assetsBaseDisksWorkspace.ReferenceWarningText = row.ReferenceSummary;
     }
 
     private void LoadAssetsBaseDisksEditorFromDraft(AssetsBaseDiskDraft draft)
     {
-        _isUpdatingAssetsBaseDisksEditor = true;
+        _assetsBaseDisksWorkspace.IsUpdatingEditor = true;
         try
         {
             AssetsBaseDisksOsNameTextBox.Text = draft.OsName;
@@ -2077,15 +2079,15 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            _isUpdatingAssetsBaseDisksEditor = false;
+            _assetsBaseDisksWorkspace.IsUpdatingEditor = false;
         }
     }
 
     private void ClearAssetsBaseDisksEditor()
     {
-        _selectedAssetsBaseDiskRow = null;
-        _pendingAssetsBaseDiskDraft = null;
-        _isUpdatingAssetsBaseDisksEditor = true;
+        _assetsBaseDisksWorkspace.SelectedRow = null;
+        _assetsBaseDisksWorkspace.PendingDraft = null;
+        _assetsBaseDisksWorkspace.IsUpdatingEditor = true;
         try
         {
             AssetsBaseDisksOsNameTextBox.Text = string.Empty;
@@ -2096,12 +2098,12 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            _isUpdatingAssetsBaseDisksEditor = false;
+            _assetsBaseDisksWorkspace.IsUpdatingEditor = false;
         }
 
-        AssetsBaseDisksSelectedDiskSummaryTextBlock.Text = "Select a base disk or import a VHDX to begin.";
-        AssetsBaseDisksSelectedDiskValidationTextBlock.Text = "Validation has not been evaluated.";
-        AssetsBaseDisksReferenceWarningTextBlock.Text = "No removal assessment has been performed.";
+        _assetsBaseDisksWorkspace.SelectedDiskSummaryText = "Select a base disk or import a VHDX to begin.";
+        _assetsBaseDisksWorkspace.SelectedDiskValidationText = "Validation has not been evaluated.";
+        _assetsBaseDisksWorkspace.ReferenceWarningText = "No removal assessment has been performed.";
     }
 
     private AssetsBaseDiskDraft? TryBuildAssetsBaseDiskDraft(bool isNewOverride)
@@ -2121,7 +2123,7 @@ public sealed partial class MainWindow : Window
 
         return new AssetsBaseDiskDraft
         {
-            Id = isNewOverride ? null : _selectedAssetsBaseDiskRow?.Id,
+            Id = isNewOverride ? null : _assetsBaseDisksWorkspace.SelectedRow?.Id,
             Path = path,
             OsName = osName,
             OsVersion = osVersion,
@@ -2133,16 +2135,16 @@ public sealed partial class MainWindow : Window
 
     private bool CanSaveAssetsBaseDiskDraft()
     {
-        return TryBuildAssetsBaseDiskDraft(isNewOverride: _selectedAssetsBaseDiskRow is null) is not null;
+        return TryBuildAssetsBaseDiskDraft(isNewOverride: _assetsBaseDisksWorkspace.SelectedRow is null) is not null;
     }
 
     private void ApplyAssetsBaseDiskValidationResult(AssetsBaseDiskValidationResult validation)
     {
         var validationText = FormatAssetsBaseDiskValidationText(validation);
-        AssetsBaseDisksSelectedDiskValidationTextBlock.Text = validationText;
-        if (_selectedAssetsBaseDiskRow is not null)
+        _assetsBaseDisksWorkspace.SelectedDiskValidationText = validationText;
+        if (_assetsBaseDisksWorkspace.SelectedRow is not null)
         {
-            _selectedAssetsBaseDiskRow.ValidationSummary = validationText;
+            _assetsBaseDisksWorkspace.SelectedRow.ValidationSummary = validationText;
         }
     }
 

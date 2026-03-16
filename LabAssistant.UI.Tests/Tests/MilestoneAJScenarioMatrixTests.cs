@@ -57,8 +57,8 @@ public sealed class MilestoneAJScenarioMatrixTests
 
         Assert.Contains("private bool IsAssetsBaseDisksActive =>", source);
         Assert.Contains("EnsureAssetsBaseDisksAsync", source);
-        Assert.Contains("_pendingAssetsBaseDiskDraft", source);
-        Assert.Contains("_hasAssetsBaseDisksErrorState", source);
+        Assert.Contains("_assetsBaseDisksWorkspace.PendingDraft", source);
+        Assert.Contains("_assetsBaseDisksWorkspace.HasErrorState", source);
         Assert.Contains("AssetsBaseDisksRefreshButton_Click", source);
         Assert.Contains("AssetsBaseDisksImportButton_Click", source);
         Assert.Contains("AssetsBaseDisksValidateButton_Click", source);
@@ -66,7 +66,7 @@ public sealed class MilestoneAJScenarioMatrixTests
         Assert.Contains("AssetsBaseDisksRemoveButton_Click", source);
         Assert.Contains("ShowAssetsBaseDiskRemoveConfirmationDialogAsync", source);
         Assert.Contains("FormatAssetsBaseDiskValidationText", source);
-        Assert.Contains("AssetsBaseDisksErrorStatePanel.Visibility = _hasAssetsBaseDisksErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("AssetsBaseDisksErrorStatePanel.Visibility = _assetsBaseDisksWorkspace.HasErrorState ? Visibility.Visible : Visibility.Collapsed;", source);
         Assert.Contains("IAssetsBaseDisksCapabilityService", source);
         Assert.Contains("ShowOpenVhdxDialog", nativeFileDialogsSource);
         Assert.Contains("Active runtime consumer detection is not currently implemented.", capabilitySource);

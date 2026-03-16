@@ -20,11 +20,7 @@ internal interface IAssetsWorkspaceShellBridge
 
 internal interface IAssetsWorkspaceHost
 {
-    bool IsAssetsBaseDisksLoading { get; }
-
     bool IsAssetsSwitchesLoading { get; }
-
-    int AssetsBaseDiskCount { get; }
 
     int AssetsSwitchCount { get; }
 
@@ -72,9 +68,7 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
 
 internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
 {
-    private readonly Func<bool> _isAssetsBaseDisksLoading;
     private readonly Func<bool> _isAssetsSwitchesLoading;
-    private readonly Func<int> _getAssetsBaseDiskCount;
     private readonly Func<int> _getAssetsSwitchCount;
     private readonly Func<bool, Task> _ensureAssetsBaseDisksAsync;
     private readonly Func<bool, Task> _ensureAssetsSwitchesAsync;
@@ -82,18 +76,14 @@ internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
     private readonly Action _updateAssetsSwitchesUi;
 
     public AssetsWorkspaceHost(
-        Func<bool> isAssetsBaseDisksLoading,
         Func<bool> isAssetsSwitchesLoading,
-        Func<int> getAssetsBaseDiskCount,
         Func<int> getAssetsSwitchCount,
         Func<bool, Task> ensureAssetsBaseDisksAsync,
         Func<bool, Task> ensureAssetsSwitchesAsync,
         Action updateAssetsBaseDisksUi,
         Action updateAssetsSwitchesUi)
     {
-        _isAssetsBaseDisksLoading = isAssetsBaseDisksLoading;
         _isAssetsSwitchesLoading = isAssetsSwitchesLoading;
-        _getAssetsBaseDiskCount = getAssetsBaseDiskCount;
         _getAssetsSwitchCount = getAssetsSwitchCount;
         _ensureAssetsBaseDisksAsync = ensureAssetsBaseDisksAsync;
         _ensureAssetsSwitchesAsync = ensureAssetsSwitchesAsync;
@@ -101,11 +91,7 @@ internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
         _updateAssetsSwitchesUi = updateAssetsSwitchesUi;
     }
 
-    public bool IsAssetsBaseDisksLoading => _isAssetsBaseDisksLoading();
-
     public bool IsAssetsSwitchesLoading => _isAssetsSwitchesLoading();
-
-    public int AssetsBaseDiskCount => _getAssetsBaseDiskCount();
 
     public int AssetsSwitchCount => _getAssetsSwitchCount();
 
@@ -139,7 +125,7 @@ internal sealed class AssetsWorkspaceComposition
         TabViewItem overviewTabViewItem,
         TabViewItem baseDisksTabViewItem,
         TabViewItem switchesTabViewItem,
-        ObservableCollection<AssetsBaseDiskListRow> baseDiskRows,
+        AssetsBaseDisksWorkspaceViewModel baseDisksWorkspace,
         ObservableCollection<AssetsSwitchListRow> switchRows,
         ObservableCollection<string> attachedVmNames,
         IAssetsWorkspaceHost host,
@@ -156,15 +142,15 @@ internal sealed class AssetsWorkspaceComposition
         _overviewWorkspaceComposition = new AssetsOverviewWorkspaceComposition(
             overviewView,
             new AssetsOverviewWorkspaceHost(
-                () => _host.IsAssetsBaseDisksLoading,
+                () => baseDisksWorkspace.IsLoading,
                 () => _host.IsAssetsSwitchesLoading,
-                () => _host.AssetsBaseDiskCount,
-                () => _host.AssetsSwitchCount),
+                () => baseDisksWorkspace.Inventory.Count,
+                () => switchRows.Count),
             new AssetsOverviewWorkspaceShellBridge(
                 () => _shellBridge.IsAssetsOverviewActive,
                 _shellBridge.NavigateToRoute));
 
-        _baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDiskRows;
+        _baseDisksView.AssetsBaseDisksListViewControl.ItemsSource = baseDisksWorkspace.Inventory;
         _switchesView.AssetsSwitchesListViewControl.ItemsSource = switchRows;
         _switchesView.AssetsSwitchesAttachedVmsListViewControl.ItemsSource = attachedVmNames;
         WireSharedHandlers();
