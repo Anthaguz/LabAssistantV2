@@ -58,6 +58,7 @@
                                 Width="32"
                                 Height="32"
                                 Padding="0"
+                                IsEnabled="{Binding CanRefresh, Mode=OneWay}"
                                 ToolTipService.ToolTip="Refresh switch inventory">
                                 <FontIcon Glyph="&#xE72C;" />
                             </Button>
@@ -114,6 +115,7 @@
                                     Height="32"
                                     Padding="0"
                                     Margin="0,0,8,0"
+                                    IsEnabled="{Binding CanCreate, Mode=OneWay}"
                                     ToolTipService.ToolTip="Create a new virtual switch">
                                     <FontIcon Glyph="&#xE710;" />
                                 </Button>
@@ -124,6 +126,7 @@
                                     Height="32"
                                     Padding="0"
                                     Margin="0,0,8,0"
+                                    IsEnabled="{Binding CanApply, Mode=OneWay}"
                                     ToolTipService.ToolTip="Apply switch changes">
                                     <FontIcon Glyph="&#xE74E;" />
                                 </Button>
@@ -133,6 +136,7 @@
                                     Width="32"
                                     Height="32"
                                     Padding="0"
+                                    IsEnabled="{Binding CanDelete, Mode=OneWay}"
                                     ToolTipService.ToolTip="Delete virtual switch">
                                     <FontIcon Glyph="&#xE74D;" />
                                 </Button>
@@ -140,17 +144,19 @@
                             <TextBlock
                                 x:Name="AssetsSwitchesStatusTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Visibility="Collapsed"
+                                Text="{Binding StatusText, Mode=OneWay}"
+                                Visibility="{Binding StatusVisibility, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                             <TextBlock
                                 x:Name="AssetsSwitchesSelectedSwitchValidationTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Select a switch or click New to begin."
+                                Text="{Binding SelectedSwitchValidationText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                             <TextBlock
                                 x:Name="AssetsSwitchesDeleteConstraintTextBlock"
                                 Foreground="{StaticResource ShellWarnBrush}"
-                                Visibility="Collapsed"
+                                Text="{Binding DeleteConstraintText, Mode=OneWay}"
+                                Visibility="{Binding DeleteConstraintVisibility, Mode=OneWay}"
                                 TextWrapping="Wrap" />
 
                             <Border
@@ -209,6 +215,7 @@
                                         x:Name="AssetsSwitchesTypeComboBox"
                                         Grid.Row="1"
                                         Grid.Column="1"
+                                        IsEnabled="{Binding CanEditSwitchType, Mode=OneWay}"
                                         PlaceholderText="Select type">
                                         <ComboBoxItem Content="External" />
                                         <ComboBoxItem Content="Internal" />
@@ -224,6 +231,7 @@
                                         x:Name="AssetsSwitchesAdapterTextBox"
                                         Grid.Row="2"
                                         Grid.Column="1"
+                                        IsEnabled="{Binding CanEditAdapter, Mode=OneWay}"
                                         PlaceholderText="Physical adapter or target guidance appears here." />
                                     <TextBlock
                                         Grid.Row="3"
@@ -238,7 +246,7 @@
                                         <TextBlock
                                             x:Name="AssetsSwitchesAttachedVmsHintTextBlock"
                                             Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="No attached VMs."
+                                            Text="{Binding AttachedVmHintText, Mode=OneWay}"
                                             TextWrapping="Wrap" />
                                         <ListView
                                             x:Name="AssetsSwitchesAttachedVmsListView"
@@ -271,6 +279,7 @@
                         x:Name="AssetsSwitchesLoadingStatePanel"
                         Grid.Column="0"
                         Padding="10"
+                        Visibility="{Binding LoadingStateVisibility, Mode=OneWay}"
                         Background="{StaticResource ShellContentBackgroundBrush}"
                         BorderBrush="{StaticResource ShellBorderBrush}"
                         BorderThickness="1"
@@ -283,7 +292,7 @@
                             <TextBlock
                                 x:Name="AssetsSwitchesLoadingStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Switch inventory loading guidance appears here." />
+                                Text="{Binding LoadingStateText, Mode=OneWay}" />
                         </StackPanel>
                     </Border>
 
@@ -291,6 +300,7 @@
                         x:Name="AssetsSwitchesEmptyStatePanel"
                         Grid.Column="1"
                         Padding="10"
+                        Visibility="{Binding EmptyStateVisibility, Mode=OneWay}"
                         Background="{StaticResource ShellContentBackgroundBrush}"
                         BorderBrush="{StaticResource ShellBorderBrush}"
                         BorderThickness="1"
@@ -303,7 +313,7 @@
                             <TextBlock
                                 x:Name="AssetsSwitchesEmptyStateTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="No virtual switches were found on this host. Click Create to prepare a new switch." />
+                                Text="{Binding EmptyStateText, Mode=OneWay}" />
                         </StackPanel>
                     </Border>
 
@@ -311,6 +321,7 @@
                         x:Name="AssetsSwitchesErrorStatePanel"
                         Grid.Column="2"
                         Padding="10"
+                        Visibility="{Binding ErrorStateVisibility, Mode=OneWay}"
                         Background="{StaticResource ShellContentBackgroundBrush}"
                         BorderBrush="{StaticResource ShellCriticalBrush}"
                         BorderThickness="1"
@@ -329,7 +340,7 @@
                                 Background="Transparent"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                Text="Switch load, save, and blocked-delete guidance appears here with recovery steps."
+                                Text="{Binding ErrorStateText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

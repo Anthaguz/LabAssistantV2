@@ -2,6 +2,8 @@ using LabAssistant.Business.Assets;
 using LabAssistant.WinUI.Models.Assets;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace LabAssistant.WinUI.Views.Assets;
 
@@ -10,6 +12,7 @@ public sealed partial class AssetsSwitchesView : UserControl
     private const double CompactLayoutThreshold = 1040;
     private bool _isUpdatingSelection;
     private bool _isUpdatingEditor;
+    private readonly AssetsSwitchesViewPresentationModel _presentation = new();
 
     public event EventHandler? RefreshRequested;
     public event EventHandler? CreateRequested;
@@ -21,6 +24,7 @@ public sealed partial class AssetsSwitchesView : UserControl
     public AssetsSwitchesView()
     {
         InitializeComponent();
+        DataContext = _presentation;
         SizeChanged += AssetsSwitchesView_SizeChanged;
         WireHandlers();
         UpdateLayoutMode(CompactLayoutThreshold + 1);
@@ -98,22 +102,7 @@ public sealed partial class AssetsSwitchesView : UserControl
 
     public void UpdateWorkspaceState(AssetsSwitchesViewState state)
     {
-        AssetsSwitchesRefreshButton.IsEnabled = state.CanRefresh;
-        AssetsSwitchesCreateButton.IsEnabled = state.CanCreate;
-        AssetsSwitchesApplyButton.IsEnabled = state.CanApply;
-        AssetsSwitchesDeleteButton.IsEnabled = state.CanDelete;
-        AssetsSwitchesTypeComboBox.IsEnabled = state.CanEditSwitchType;
-        AssetsSwitchesAdapterTextBox.IsEnabled = state.CanEditAdapter;
-        AssetsSwitchesStatusTextBlock.Text = state.StatusText;
-        AssetsSwitchesSelectedSwitchValidationTextBlock.Text = state.SelectedSwitchValidationText;
-        AssetsSwitchesDeleteConstraintTextBlock.Text = state.DeleteConstraintText;
-        AssetsSwitchesAttachedVmsHintTextBlock.Text = state.AttachedVmHintText;
-        AssetsSwitchesErrorStateTextBox.Text = state.ErrorStateText;
-        AssetsSwitchesLoadingStatePanel.Visibility = state.IsLoadingVisible ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesEmptyStatePanel.Visibility = state.IsEmptyVisible ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesErrorStatePanel.Visibility = state.IsErrorVisible ? Visibility.Visible : Visibility.Collapsed;
-        AssetsSwitchesLoadingStateTextBlock.Text = state.LoadingStateText;
-        AssetsSwitchesEmptyStateTextBlock.Text = state.EmptyStateText;
+        _presentation.Apply(state);
     }
 
     private void AssetsSwitchesView_SizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs e)
@@ -204,3 +193,168 @@ public sealed record AssetsSwitchesViewState(
     string ErrorStateText,
     string LoadingStateText,
     string EmptyStateText);
+
+internal sealed class AssetsSwitchesViewPresentationModel : INotifyPropertyChanged
+{
+    private bool _canRefresh;
+    private bool _canCreate;
+    private bool _canApply;
+    private bool _canDelete;
+    private bool _canEditSwitchType;
+    private bool _canEditAdapter;
+    private string _statusText = string.Empty;
+    private string _selectedSwitchValidationText = "Select a switch or click New to begin.";
+    private string _deleteConstraintText = string.Empty;
+    private string _attachedVmHintText = "No attached VMs.";
+    private string _errorStateText = "Switch load, save, and blocked-delete guidance appears here with recovery steps.";
+    private string _loadingStateText = "Switch inventory loading guidance appears here.";
+    private string _emptyStateText = "No virtual switches were found on this host. Click Create to prepare a new switch.";
+    private Visibility _statusVisibility = Visibility.Collapsed;
+    private Visibility _deleteConstraintVisibility = Visibility.Collapsed;
+    private Visibility _loadingStateVisibility = Visibility.Collapsed;
+    private Visibility _emptyStateVisibility = Visibility.Collapsed;
+    private Visibility _errorStateVisibility = Visibility.Collapsed;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public bool CanRefresh
+    {
+        get => _canRefresh;
+        set => SetProperty(ref _canRefresh, value);
+    }
+
+    public bool CanCreate
+    {
+        get => _canCreate;
+        set => SetProperty(ref _canCreate, value);
+    }
+
+    public bool CanApply
+    {
+        get => _canApply;
+        set => SetProperty(ref _canApply, value);
+    }
+
+    public bool CanDelete
+    {
+        get => _canDelete;
+        set => SetProperty(ref _canDelete, value);
+    }
+
+    public bool CanEditSwitchType
+    {
+        get => _canEditSwitchType;
+        set => SetProperty(ref _canEditSwitchType, value);
+    }
+
+    public bool CanEditAdapter
+    {
+        get => _canEditAdapter;
+        set => SetProperty(ref _canEditAdapter, value);
+    }
+
+    public string StatusText
+    {
+        get => _statusText;
+        set => SetProperty(ref _statusText, value);
+    }
+
+    public string SelectedSwitchValidationText
+    {
+        get => _selectedSwitchValidationText;
+        set => SetProperty(ref _selectedSwitchValidationText, value);
+    }
+
+    public string DeleteConstraintText
+    {
+        get => _deleteConstraintText;
+        set => SetProperty(ref _deleteConstraintText, value);
+    }
+
+    public string AttachedVmHintText
+    {
+        get => _attachedVmHintText;
+        set => SetProperty(ref _attachedVmHintText, value);
+    }
+
+    public string ErrorStateText
+    {
+        get => _errorStateText;
+        set => SetProperty(ref _errorStateText, value);
+    }
+
+    public string LoadingStateText
+    {
+        get => _loadingStateText;
+        set => SetProperty(ref _loadingStateText, value);
+    }
+
+    public string EmptyStateText
+    {
+        get => _emptyStateText;
+        set => SetProperty(ref _emptyStateText, value);
+    }
+
+    public Visibility StatusVisibility
+    {
+        get => _statusVisibility;
+        set => SetProperty(ref _statusVisibility, value);
+    }
+
+    public Visibility DeleteConstraintVisibility
+    {
+        get => _deleteConstraintVisibility;
+        set => SetProperty(ref _deleteConstraintVisibility, value);
+    }
+
+    public Visibility LoadingStateVisibility
+    {
+        get => _loadingStateVisibility;
+        set => SetProperty(ref _loadingStateVisibility, value);
+    }
+
+    public Visibility EmptyStateVisibility
+    {
+        get => _emptyStateVisibility;
+        set => SetProperty(ref _emptyStateVisibility, value);
+    }
+
+    public Visibility ErrorStateVisibility
+    {
+        get => _errorStateVisibility;
+        set => SetProperty(ref _errorStateVisibility, value);
+    }
+
+    public void Apply(AssetsSwitchesViewState state)
+    {
+        CanRefresh = state.CanRefresh;
+        CanCreate = state.CanCreate;
+        CanApply = state.CanApply;
+        CanDelete = state.CanDelete;
+        CanEditSwitchType = state.CanEditSwitchType;
+        CanEditAdapter = state.CanEditAdapter;
+        StatusText = state.StatusText;
+        SelectedSwitchValidationText = state.SelectedSwitchValidationText;
+        DeleteConstraintText = state.DeleteConstraintText;
+        AttachedVmHintText = state.AttachedVmHintText;
+        ErrorStateText = state.ErrorStateText;
+        LoadingStateText = state.LoadingStateText;
+        EmptyStateText = state.EmptyStateText;
+        StatusVisibility = string.IsNullOrWhiteSpace(state.StatusText) ? Visibility.Collapsed : Visibility.Visible;
+        DeleteConstraintVisibility = string.IsNullOrWhiteSpace(state.DeleteConstraintText) ? Visibility.Collapsed : Visibility.Visible;
+        LoadingStateVisibility = state.IsLoadingVisible ? Visibility.Visible : Visibility.Collapsed;
+        EmptyStateVisibility = state.IsEmptyVisible ? Visibility.Visible : Visibility.Collapsed;
+        ErrorStateVisibility = state.IsErrorVisible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(storage, value))
+        {
+            return;
+        }
+
+        storage = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}

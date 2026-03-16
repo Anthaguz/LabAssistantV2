@@ -499,6 +499,59 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void AssetsSwitchesView_ExposesNarrowInteractionSurface_InsteadOfControlBagAccess()
+    {
+        var switchesXaml = LoadAssetsSwitchesViewXaml();
+        var switchesXamlSource = LoadAssetsSwitchesViewXamlSource();
+        var switchesViewSource = LoadAssetsSwitchesViewCodeBehindSource();
+        var switchesCompositionSource = LoadAssetsSwitchesWorkspaceCompositionSource();
+
+        Assert.NotNull(FindByName(switchesXaml, "AssetsSwitchesListView"));
+        Assert.NotNull(FindByName(switchesXaml, "AssetsSwitchesRefreshButton"));
+        Assert.NotNull(FindByName(switchesXaml, "AssetsSwitchesCreateButton"));
+        Assert.NotNull(FindByName(switchesXaml, "AssetsSwitchesApplyButton"));
+        Assert.NotNull(FindByName(switchesXaml, "AssetsSwitchesDeleteButton"));
+
+        Assert.Contains("internal sealed class AssetsSwitchesViewPresentationModel : INotifyPropertyChanged", switchesViewSource);
+        Assert.Contains("private readonly AssetsSwitchesViewPresentationModel _presentation = new();", switchesViewSource);
+        Assert.Contains("DataContext = _presentation;", switchesViewSource);
+        Assert.Contains("public event EventHandler? RefreshRequested;", switchesViewSource);
+        Assert.Contains("public event EventHandler? CreateRequested;", switchesViewSource);
+        Assert.Contains("public event EventHandler? ApplyRequested;", switchesViewSource);
+        Assert.Contains("public event EventHandler? DeleteRequested;", switchesViewSource);
+        Assert.Contains("public event EventHandler? SelectedSwitchChanged;", switchesViewSource);
+        Assert.Contains("public event EventHandler? EditorChanged;", switchesViewSource);
+        Assert.Contains("public AssetsSwitchListRow? SelectedSwitch =>", switchesViewSource);
+        Assert.Contains("public void SetInventorySource(object? itemsSource)", switchesViewSource);
+        Assert.Contains("public void SetAttachedVmSource(object? itemsSource)", switchesViewSource);
+        Assert.Contains("public AssetsSwitchesFormValues CaptureFormValues()", switchesViewSource);
+        Assert.Contains("public void ApplyEditorDraft(AssetsSwitchDraft draft)", switchesViewSource);
+        Assert.Contains("public void UpdateWorkspaceState(AssetsSwitchesViewState state)", switchesViewSource);
+        Assert.Contains("_presentation.Apply(state);", switchesViewSource);
+        Assert.DoesNotContain("public Button", switchesViewSource);
+        Assert.DoesNotContain("public TextBox", switchesViewSource);
+        Assert.DoesNotContain("public ListView", switchesViewSource);
+        Assert.DoesNotContain("public Border", switchesViewSource);
+        Assert.DoesNotContain("AssetsSwitchesRefreshButtonControl", switchesViewSource);
+        Assert.DoesNotContain("AssetsSwitchesRefreshButton.IsEnabled =", switchesViewSource);
+        Assert.DoesNotContain("AssetsSwitchesStatusTextBlock.Text =", switchesViewSource);
+        Assert.DoesNotContain("AssetsSwitchesLoadingStatePanel.Visibility =", switchesViewSource);
+
+        Assert.Contains("IsEnabled=\"{Binding CanRefresh, Mode=OneWay}\"", switchesXamlSource);
+        Assert.Contains("Text=\"{Binding StatusText, Mode=OneWay}\"", switchesXamlSource);
+        Assert.Contains("Visibility=\"{Binding StatusVisibility, Mode=OneWay}\"", switchesXamlSource);
+        Assert.Contains("Text=\"{Binding ErrorStateText, Mode=OneWay}\"", switchesXamlSource);
+
+        Assert.Contains("_view.SelectedSwitchChanged += AssetsSwitchesListView_SelectionChanged;", switchesCompositionSource);
+        Assert.Contains("_view.RefreshRequested += AssetsSwitchesRefreshRequested;", switchesCompositionSource);
+        Assert.Contains("_view.CreateRequested += AssetsSwitchesCreateRequested;", switchesCompositionSource);
+        Assert.Contains("_view.ApplyRequested += AssetsSwitchesApplyRequested;", switchesCompositionSource);
+        Assert.Contains("_view.DeleteRequested += AssetsSwitchesDeleteRequested;", switchesCompositionSource);
+        Assert.Contains("_view.EditorChanged += AssetsSwitchesEditorChanged;", switchesCompositionSource);
+        Assert.Contains("_view.UpdateWorkspaceState(BuildViewState(workspace, canValidateOrApply, isExternalSwitchTypeSelected));", switchesCompositionSource);
+    }
+
+    [Fact]
     public void AssetsShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
@@ -781,6 +834,24 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsBaseDisksView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadAssetsSwitchesViewXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsSwitchesView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesViewXamlSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsSwitchesView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsSwitchesView.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static XDocument LoadAssetsOverviewXaml()
