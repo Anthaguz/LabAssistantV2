@@ -552,6 +552,65 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void AssetsSwitches_ControllerViewModelAndComposition_ProtectRefinedLocalArchitecture()
+    {
+        var workspaceSource = LoadAssetsSwitchesWorkspaceViewModelSource();
+        var controllerSource = LoadAssetsSwitchesWorkspaceControllerSource();
+        var compositionSource = LoadAssetsSwitchesWorkspaceCompositionSource();
+        var viewSource = LoadAssetsSwitchesViewCodeBehindSource();
+
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceViewModel", workspaceSource);
+        Assert.Contains("public ObservableCollection<AssetsSwitchListRow> Inventory { get; } = [];", workspaceSource);
+        Assert.Contains("public ObservableCollection<string> AttachedVmNames { get; } = [];", workspaceSource);
+        Assert.Contains("public AssetsSwitchListRow? SelectedRow { get; set; }", workspaceSource);
+        Assert.Contains("public AssetsSwitchDraft? PendingDraft { get; set; }", workspaceSource);
+        Assert.Contains("public bool IsLoading { get; set; }", workspaceSource);
+        Assert.Contains("public bool IsSaving { get; set; }", workspaceSource);
+        Assert.Contains("public bool IsDeleting { get; set; }", workspaceSource);
+        Assert.Contains("public bool IsUpdatingEditor { get; set; }", workspaceSource);
+        Assert.Contains("public bool HasErrorState { get; set; }", workspaceSource);
+        Assert.Contains("public int ValidationRequestVersion { get; set; }", workspaceSource);
+        Assert.Contains("public int AssessmentRequestVersion { get; set; }", workspaceSource);
+        Assert.Contains("public string StatusText { get; set; } = \"Select a virtual switch or click New to begin.\";", workspaceSource);
+        Assert.Contains("public string SelectedSwitchValidationText { get; set; } = \"Select a switch or click New to begin.\";", workspaceSource);
+
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceController", controllerSource);
+        Assert.Contains("private readonly IAssetsSwitchesCapabilityService _capabilityService;", controllerSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _workspace;", controllerSource);
+        Assert.Contains("private readonly IAssetsSwitchesWorkspaceHost _host;", controllerSource);
+        Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", controllerSource);
+        Assert.Contains("public async Task HandleSelectionChangedAsync(AssetsSwitchListRow? selectedRow)", controllerSource);
+        Assert.Contains("public async Task BeginCreateAsync()", controllerSource);
+        Assert.Contains("public async Task SaveDraftAsync()", controllerSource);
+        Assert.Contains("public async Task DeleteSelectedAsync()", controllerSource);
+        Assert.Contains("public async Task HandleEditorChangedAsync()", controllerSource);
+        Assert.Contains("public void ApplyWorkspaceState()", controllerSource);
+        Assert.Contains("LoadAttachedVmNamesAsync", controllerSource);
+        Assert.Contains("RefreshValidationAsync", controllerSource);
+        Assert.Contains("ApplyDeleteAssessment", controllerSource);
+        Assert.DoesNotContain("internal sealed class AssetsSwitchesWorkspaceHost", controllerSource);
+
+        Assert.Contains("internal sealed class AssetsSwitchesWorkspaceComposition : IAssetsSwitchesWorkspaceHost", compositionSource);
+        Assert.Contains("private readonly AssetsSwitchesView _view;", compositionSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _workspace = new();", compositionSource);
+        Assert.Contains("private readonly AssetsSwitchesWorkspaceController _controller;", compositionSource);
+        Assert.Contains("private readonly IAssetsSwitchesCompositionHost _host;", compositionSource);
+        Assert.Contains("_controller = new AssetsSwitchesWorkspaceController(capabilityService, _workspace, this);", compositionSource);
+        Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", compositionSource);
+        Assert.Contains("_view.SetAttachedVmSource(_workspace.AttachedVmNames);", compositionSource);
+        Assert.Contains("public bool IsLoading => _workspace.IsLoading;", compositionSource);
+        Assert.Contains("public int InventoryCount => _workspace.Inventory.Count;", compositionSource);
+        Assert.Contains("public Task EnsureInventoryAsync(bool forceRefresh)", compositionSource);
+        Assert.Contains("public void ApplyShellState()", compositionSource);
+
+        Assert.Contains("internal sealed class AssetsSwitchesViewPresentationModel : INotifyPropertyChanged", viewSource);
+        Assert.Contains("public void Apply(AssetsSwitchesViewState state)", viewSource);
+        Assert.DoesNotContain("public Button", viewSource);
+        Assert.DoesNotContain("public TextBox", viewSource);
+        Assert.DoesNotContain("public ListView", viewSource);
+    }
+
+    [Fact]
     public void AssetsShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
@@ -605,6 +664,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("void UpdateAssetsBaseDisksUi();", hostInterfaceBlock);
         Assert.DoesNotContain("bool IsAssetsBaseDisksLoading { get; }", hostInterfaceBlock);
         Assert.DoesNotContain("int AssetsBaseDiskCount { get; }", hostInterfaceBlock);
+        Assert.DoesNotContain("Task", hostInterfaceBlock);
 
         Assert.Contains("internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost", hostClassBlock);
         Assert.DoesNotContain("_updateAssetsOverviewUi", hostClassBlock);
@@ -616,6 +676,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("public void UpdateAssetsBaseDisksUi() =>", hostClassBlock);
         Assert.DoesNotContain("public bool IsAssetsBaseDisksLoading =>", hostClassBlock);
         Assert.DoesNotContain("public int AssetsBaseDiskCount =>", hostClassBlock);
+        Assert.DoesNotContain("public Task", hostClassBlock);
 
         var baseDisksCompositionHostInterfaceBlock = ExtractSection(
             baseDisksCompositionSource,
