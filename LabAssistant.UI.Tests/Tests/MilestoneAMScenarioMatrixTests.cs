@@ -226,7 +226,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
-    public void AssetsWorkspaceComposition_IsTheEffectiveAssetsLocalCompositionOwner()
+    public void AssetsOverview_ProtectsRefinedLocalOwnershipModel()
     {
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
@@ -266,17 +266,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewOpenBaseDisksButton"));
         Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewSwitchesSummaryTextBlock"));
         Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewOpenSwitchesButton"));
-        Assert.Contains("public event EventHandler? OpenBaseDisksRequested;", overviewCodeBehindSource);
-        Assert.Contains("public event EventHandler? OpenSwitchesRequested;", overviewCodeBehindSource);
-        Assert.Contains("public void UpdateSummary(string baseDisksSummaryText, string switchesSummaryText)", overviewCodeBehindSource);
-        Assert.Contains("AssetsOverviewOpenBaseDisksButton_Click", overviewCodeBehindSource);
-        Assert.Contains("AssetsOverviewOpenSwitchesButton_Click", overviewCodeBehindSource);
-        Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButtonControl", overviewCodeBehindSource);
-        Assert.DoesNotContain("AssetsOverviewOpenSwitchesButtonControl", overviewCodeBehindSource);
-        Assert.DoesNotContain("AssetsOverviewBaseDisksSummaryTextBlockControl", overviewCodeBehindSource);
-        Assert.DoesNotContain("AssetsOverviewSwitchesSummaryTextBlockControl", overviewCodeBehindSource);
-        Assert.DoesNotContain("SetBaseDisksSummary(string text)", overviewCodeBehindSource);
-        Assert.DoesNotContain("SetSwitchesSummary(string text)", overviewCodeBehindSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.AssetsOverview);", compositionSource);
         Assert.Contains("if (!_shellBridge.IsAssetsCapabilityActive)", compositionSource);
         Assert.Contains("var selectedTab = _shellBridge.IsAssetsOverviewActive", compositionSource);
@@ -311,6 +300,37 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("\"Switch inventory is loading.\"", overviewWorkspaceSource);
 
         Assert.DoesNotContain("MainWindow", compositionSource);
+    }
+
+    [Fact]
+    public void AssetsOverviewView_ExposesNarrowInteractionSurface_InsteadOfControlBagAccess()
+    {
+        var overviewXaml = LoadAssetsOverviewXaml();
+        var overviewCodeBehindSource = LoadAssetsOverviewCodeBehindSource();
+        var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
+
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewBaseDisksSummaryTextBlock"));
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewOpenBaseDisksButton"));
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewSwitchesSummaryTextBlock"));
+        Assert.NotNull(FindByName(overviewXaml, "AssetsOverviewOpenSwitchesButton"));
+
+        Assert.Contains("public event EventHandler? OpenBaseDisksRequested;", overviewCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenSwitchesRequested;", overviewCodeBehindSource);
+        Assert.Contains("public void UpdateSummary(string baseDisksSummaryText, string switchesSummaryText)", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewOpenSwitchesButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewBaseDisksSummaryTextBlockControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("AssetsOverviewSwitchesSummaryTextBlockControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("SetBaseDisksSummary(string text)", overviewCodeBehindSource);
+        Assert.DoesNotContain("SetSwitchesSummary(string text)", overviewCodeBehindSource);
+
+        Assert.Contains("_view.OpenBaseDisksRequested += OpenBaseDisksRequested;", overviewCompositionSource);
+        Assert.Contains("_view.OpenSwitchesRequested += OpenSwitchesRequested;", overviewCompositionSource);
+        Assert.Contains("_view.UpdateSummary(_workspace.BaseDisksSummaryText, _workspace.SwitchesSummaryText);", overviewCompositionSource);
+        Assert.DoesNotContain("AssetsOverviewOpenBaseDisksButtonControl", overviewCompositionSource);
+        Assert.DoesNotContain("AssetsOverviewOpenSwitchesButtonControl", overviewCompositionSource);
+        Assert.DoesNotContain("SetBaseDisksSummary", overviewCompositionSource);
+        Assert.DoesNotContain("SetSwitchesSummary", overviewCompositionSource);
     }
 
     [Fact]
