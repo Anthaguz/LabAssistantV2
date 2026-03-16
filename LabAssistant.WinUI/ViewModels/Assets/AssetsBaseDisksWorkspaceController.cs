@@ -22,54 +22,6 @@ internal interface IAssetsBaseDisksWorkspaceHost
     Task<bool> ShowRemoveConfirmationDialogAsync(AssetsBaseDiskListRow row, AssetsBaseDiskRemovalAssessment assessment);
 }
 
-internal sealed class AssetsBaseDisksWorkspaceHost : IAssetsBaseDisksWorkspaceHost
-{
-    private readonly Func<bool, AssetsBaseDiskDraft?> _captureDraft;
-    private readonly Action<AssetsBaseDiskDraft> _applyEditorDraft;
-    private readonly Action _clearEditorFields;
-    private readonly Action<AssetsBaseDiskListRow?> _setSelectedRow;
-    private readonly Action<AssetsBaseDisksWorkspaceViewModel, bool> _applyWorkspaceState;
-    private readonly Func<string?> _pickBaseDiskFilePath;
-    private readonly Action<string> _setDraftPath;
-    private readonly Func<AssetsBaseDiskListRow, AssetsBaseDiskRemovalAssessment, Task<bool>> _showRemoveConfirmationDialogAsync;
-
-    public AssetsBaseDisksWorkspaceHost(
-        Func<bool, AssetsBaseDiskDraft?> captureDraft,
-        Action<AssetsBaseDiskDraft> applyEditorDraft,
-        Action clearEditorFields,
-        Action<AssetsBaseDiskListRow?> setSelectedRow,
-        Action<AssetsBaseDisksWorkspaceViewModel, bool> applyWorkspaceState,
-        Func<string?> pickBaseDiskFilePath,
-        Action<string> setDraftPath,
-        Func<AssetsBaseDiskListRow, AssetsBaseDiskRemovalAssessment, Task<bool>> showRemoveConfirmationDialogAsync)
-    {
-        _captureDraft = captureDraft;
-        _applyEditorDraft = applyEditorDraft;
-        _clearEditorFields = clearEditorFields;
-        _setSelectedRow = setSelectedRow;
-        _applyWorkspaceState = applyWorkspaceState;
-        _pickBaseDiskFilePath = pickBaseDiskFilePath;
-        _setDraftPath = setDraftPath;
-        _showRemoveConfirmationDialogAsync = showRemoveConfirmationDialogAsync;
-    }
-
-    public AssetsBaseDiskDraft? CaptureDraft(bool isNewOverride) => _captureDraft(isNewOverride);
-
-    public void ApplyEditorDraft(AssetsBaseDiskDraft draft) => _applyEditorDraft(draft);
-
-    public void ClearEditorFields() => _clearEditorFields();
-
-    public void SetSelectedRow(AssetsBaseDiskListRow? row) => _setSelectedRow(row);
-
-    public void ApplyWorkspaceState(AssetsBaseDisksWorkspaceViewModel workspace, bool canSaveDraft) => _applyWorkspaceState(workspace, canSaveDraft);
-
-    public string? PickBaseDiskFilePath() => _pickBaseDiskFilePath();
-
-    public void SetDraftPath(string path) => _setDraftPath(path);
-
-    public Task<bool> ShowRemoveConfirmationDialogAsync(AssetsBaseDiskListRow row, AssetsBaseDiskRemovalAssessment assessment) => _showRemoveConfirmationDialogAsync(row, assessment);
-}
-
 internal sealed class AssetsBaseDisksWorkspaceController
 {
     private readonly IAssetsBaseDisksCapabilityService _capabilityService;
