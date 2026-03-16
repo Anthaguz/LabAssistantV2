@@ -307,7 +307,7 @@ public sealed partial class MainWindow : Window
             TemplatesWorkspacePanel,
             TemplatesLibraryViewHost,
             TemplatesEditorViewHost,
-            new TemplatesWorkspaceHost(() => _ = EnsureTemplatesLibraryAsync(forceRefresh: false)),
+            () => _ = EnsureTemplatesLibraryAsync(forceRefresh: false),
             new TemplatesWorkspaceShellBridge(
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,

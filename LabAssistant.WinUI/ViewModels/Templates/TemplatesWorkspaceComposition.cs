@@ -12,11 +12,6 @@ internal interface ITemplatesWorkspaceShellBridge
     bool IsTemplatesEditorActive { get; }
 }
 
-internal interface ITemplatesWorkspaceHost
-{
-    void EnsureTemplatesLibraryLoaded();
-}
-
 internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBridge
 {
     private readonly Func<bool> _isTemplatesCapabilityActive;
@@ -40,37 +35,25 @@ internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBr
     public bool IsTemplatesEditorActive => _isTemplatesEditorActive();
 }
 
-internal sealed class TemplatesWorkspaceHost : ITemplatesWorkspaceHost
-{
-    private readonly Action _ensureTemplatesLibraryLoaded;
-
-    public TemplatesWorkspaceHost(Action ensureTemplatesLibraryLoaded)
-    {
-        _ensureTemplatesLibraryLoaded = ensureTemplatesLibraryLoaded;
-    }
-
-    public void EnsureTemplatesLibraryLoaded() => _ensureTemplatesLibraryLoaded();
-}
-
 internal sealed class TemplatesWorkspaceComposition
 {
     private readonly FrameworkElement _workspaceHost;
     private readonly TemplatesLibraryView _libraryView;
     private readonly TemplatesEditorView _editorView;
-    private readonly ITemplatesWorkspaceHost _host;
     private readonly ITemplatesWorkspaceShellBridge _shellBridge;
+    private readonly Action _ensureTemplatesLibraryLoaded;
 
     public TemplatesWorkspaceComposition(
         FrameworkElement workspaceHost,
         TemplatesLibraryView libraryView,
         TemplatesEditorView editorView,
-        ITemplatesWorkspaceHost host,
+        Action ensureTemplatesLibraryLoaded,
         ITemplatesWorkspaceShellBridge shellBridge)
     {
         _workspaceHost = workspaceHost;
         _libraryView = libraryView;
         _editorView = editorView;
-        _host = host;
+        _ensureTemplatesLibraryLoaded = ensureTemplatesLibraryLoaded;
         _shellBridge = shellBridge;
     }
 
@@ -82,7 +65,7 @@ internal sealed class TemplatesWorkspaceComposition
 
         if (_shellBridge.IsTemplatesLibraryActive)
         {
-            _host.EnsureTemplatesLibraryLoaded();
+            _ensureTemplatesLibraryLoaded();
         }
     }
 }
