@@ -628,6 +628,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Assets composition must not become the Switches workflow owner; Switches-specific host bridges or control exposure remain temporary migration cleanup targets behind the Switches-local seam; and the cleanup target must stay explicit that Base Disks extraction details, Overview extraction details, runtime implementation, Switches behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-146:** WinUI `Templates` shared composition cleanup shall converge shared `Templates Library` and `Templates Editor` composition into a Templates-local composition owner instead of leaving shared capability composition responsibilities in `MainWindow`.
+  - **Acceptance details:** `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact or drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime; the Templates-local composition owner becomes the long-term home for shared Templates-local composition and interaction boundaries across `templates.library` and `templates.editor`.
+  - **Priority:** P1
+
+- **FR-147:** WinUI `Templates` shared composition cleanup shall treat capability-specific host interfaces implemented by `MainWindow` as temporary migration bridges only, and views shall not depend on or receive `MainWindow` directly.
+  - **Acceptance details:** shared Templates route activation handling, shared workspace lifetime participation, and shared local interaction boundaries for Library and Editor must converge behind the Templates-local composition owner or narrow abstractions rather than direct `MainWindow` injection or permanent shell-host interface accumulation.
+  - **Priority:** P1
+
+- **FR-148:** WinUI `Templates` shared composition cleanup shall preserve the long-lived Templates workspace/session model and the existing Library-first navigation exception so route activation reconciles shared Templates state rather than recreating the Templates workspace on every route change.
+  - **Acceptance details:** cleanup-target definition must preserve `templates.library` as the stable/default Templates surface, keep `templates.editor` as a workflow-state destination entered from explicit actions rather than a peer tab, and remain explicit that Templates Library extraction details, Templates Editor extraction details, runtime implementation, editor behavior redesign, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -646,6 +658,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-machines-composition-cleanup-target-am.md` for the post-AM33 Machines-specific cleanup target before broader capability rollout continues.
 - See `docs/02-ux/winui-assets-workspace-extraction-seam-am.md` for the AM Assets-specific extraction seam and composition target after the Machines proof point.
 - See `docs/02-ux/winui-assets-composition-cleanup-target-am.md` for the AM shared Assets composition cleanup target that narrows shell-vs-Assets ownership before Assets runtime extraction proceeds.
+- See `docs/02-ux/winui-templates-composition-cleanup-target-am.md` for the AM shared Templates composition cleanup target that narrows shell-vs-Templates ownership before Templates runtime extraction proceeds.
 - See `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md` for the AM Assets Overview cleanup target inside the shared Assets composition boundary.
 - See `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md` for the AM Assets Base Disks cleanup target inside the shared Assets composition boundary.
 - See `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md` for the AM Assets Switches cleanup target inside the shared Assets composition boundary.

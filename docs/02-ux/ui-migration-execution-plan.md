@@ -271,6 +271,7 @@ Gate expectations:
 - AD1 (docs-first): finalize Templates capability routing/workflow contract and FR/AC traceability.
 - AD2 (UI scaffolding only): implement Templates parent/child route surfaces and navigation transitions without adding new template domain behavior.
 - AD3 (operational wiring): connect existing template behaviors (library/editor/import/export/save paths) into unified Templates capability context without feature invention.
+- AM56 (docs-first follow-up): define the shared Templates composition cleanup target before Templates runtime extraction so shared capability composition no longer terminates in `MainWindow` as the long-term pattern.
 - Out of scope during AD sequencing:
   - Deploy/Assets capability behavior changes
   - template domain expansion beyond existing semantics
@@ -358,6 +359,7 @@ Gate expectations:
 - existing capability semantics across `Machines`, `Assets`, `Templates`, `Deploy`, and `Diagnostics`
 - AL shell/header/navigation/right-panel/compact-layout behavior
 - canonical route continuity and Templates Library-first exception model
+- post-AM33 capability-local composition ownership so shared Templates composition converges behind a Templates-local owner rather than terminating in `MainWindow`
 
 **AM sequencing contract**
 - AM1 (docs-first): define shell composition boundary contract
@@ -402,6 +404,12 @@ Gate expectations:
 - before Switches runtime extraction proceeds, define the narrow `Assets Switches` cleanup target under the shared Assets composition boundary
 - make shared Assets vs Switches-local ownership explicit so Switches-specific state, orchestration, and UI coordination converge behind a Switches-local seam without widening shared Assets composition into the Switches workflow owner
 - preserve `assets.switches` as the operational Switches management surface, keep Switches inside the long-lived Assets workspace with route-activation refresh, and keep Overview/Base Disks extraction details out of scope
+
+**Templates shared cleanup target checkpoint**
+- before Templates runtime extraction proceeds, define the shared Templates composition cleanup target against the refined AM33 plus post-Machines/post-Assets model
+- make shell-vs-Templates ownership explicit so shared Templates composition converges into a Templates-local composition owner rather than stopping in `MainWindow`
+- preserve the AL7 Templates navigation exception by keeping `templates.library` as the stable/default surface and `templates.editor` as workflow-state entry rather than a peer-tab model
+- treat any `MainWindow` Templates host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
 
 **Recommended capability order**
 1. `Machines`

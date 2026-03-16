@@ -2898,3 +2898,83 @@ Each readiness result shall include, at minimum:
 - [ ] Switches-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
 - [ ] long-lived Assets workspace participation and `assets.switches` route-activation refresh expectations are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+---
+
+# AC-033 - WinUI Templates Shared Composition Cleanup Target (AM56)
+
+**Related FRs:** FR-146, FR-147, FR-148, FR-077, FR-078, FR-079, FR-125, FR-126, FR-127, FR-122, FR-123, FR-124
+
+## Scenarios
+
+### 1) MainWindow remains shell-only while shared Templates composition moves behind a Templates-local owner
+**Given**
+- `Templates` already has an approved capability routing/workflow contract from AD
+
+**When**
+- the shared Templates cleanup target is defined
+
+**Then**
+- `MainWindow` remains responsible only for:
+  - shell route switching
+  - shell title/description
+  - shell compact/drawer behavior
+  - shell host visibility
+  - right-panel infrastructure
+  - app-level workspace lifetime
+- shared Templates-local composition does not terminate in `MainWindow`
+- a Templates-local composition owner becomes the target home for shared Templates-local composition and wiring
+
+### 2) Shared Templates responsibilities converge behind the Templates-local composition owner
+**Given**
+- `Templates` includes `templates.library` and `templates.editor`
+
+**When**
+- the shared ownership boundary is reviewed
+
+**Then**
+- the Templates-local composition owner is explicitly responsible for:
+  - Templates-local composition and wiring
+  - shared Templates route-activation handling
+  - shared workspace lifetime participation
+  - shared local interaction boundaries for Library and Editor
+- Templates Library extraction details and Templates Editor extraction details remain deferred to later narrow issues
+
+### 3) Templates preserves the Library-first navigation exception while rejecting shell-centric end-state patterns
+**Given**
+- AL defined `Templates` as a Library-first capability with Editor as workflow-state entry
+
+**When**
+- the cleanup target is applied
+
+**Then**
+- `templates.library` remains the stable/default Templates surface
+- `templates.editor` remains a workflow-state destination entered from explicit actions
+- shared Templates composition does not collapse back into a peer-tab or Overview-first model
+- capability-specific host interfaces implemented by `MainWindow` are explicitly treated as temporary bridges only
+
+### 4) Templates remains long-lived with route-activation refresh and no direct MainWindow view coupling
+**Given**
+- AM33 established long-lived capability workspaces by default
+
+**When**
+- the Templates cleanup target is defined
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- Templates remains long-lived while the app session is open
+- navigation between `templates.library` and `templates.editor` activates and reconciles shared Templates state rather than recreating the workspace every route change
+- runtime implementation, editor behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shell continues to host Templates workspace lifetime, route visibility, and shell infrastructure
+- a Templates-local composition owner becomes the target home for shared Templates-local composition across Library and Editor
+- temporary shell-host bridges are allowed only as migration scaffolding and are not the long-term architecture
+- Templates remains long-lived with route-activation refresh rather than per-navigation recreation
+- Templates preserves the Library-first / Editor workflow-state exception explicitly
+
+## Definition of Done
+- [ ] shell-vs-Templates ownership is explicit and traceable
+- [ ] shared Templates-local composition-owner target is explicit and traceable
+- [ ] Templates navigation exception preservation is explicit and traceable
+- [ ] temporary-bridge-vs-final-target rule and no-direct-`MainWindow`-injection rule are explicit and traceable
