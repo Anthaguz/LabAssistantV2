@@ -2824,3 +2824,77 @@ Each readiness result shall include, at minimum:
 - [ ] Base Disks-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
 - [ ] long-lived Assets workspace participation and `assets.base_disks` route-activation refresh expectations are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+---
+
+# AC-032 - WinUI Assets Switches Extraction Cleanup Target (AM49)
+
+**Related FRs:** FR-143, FR-144, FR-145, FR-134, FR-135, FR-136, FR-131, FR-132, FR-133, FR-104, FR-105, FR-106, FR-107, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Assets Switches stays under shared Assets workspace composition but gains a Switches-local seam
+**Given**
+- the shared Assets composition cleanup target, the Overview cleanup target, and the Base Disks cleanup target are already defined
+
+**When**
+- the narrow `Assets Switches` cleanup target is reviewed
+
+**Then**
+- `Assets Switches` remains under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Assets composition remains responsible only for shared capability-level composition concerns
+- a Switches-local seam becomes the target home for Switches-specific state, orchestration, composition, and UI coordination
+
+### 2) Switches-local ownership is explicit without widening shared Assets composition into the workflow owner
+**Given**
+- `assets.switches` is the operational Switches management surface inside `Assets`
+
+**When**
+- Switches-local ownership is defined
+
+**Then**
+- Switches-local ownership explicitly includes:
+  - Switches list, selection, draft, and feedback state
+  - Switches-specific orchestration for refresh, create, edit, validate, and delete flows
+  - Switches-local composition and interaction coordination for the `assets.switches` surface
+  - cleanup or reduction of temporary Switches-specific host bridges or control exposure behind the Switches-local seam
+- shared `AssetsWorkspaceComposition` does not become the Switches workflow owner
+- shared Assets composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
+
+### 3) MainWindow and route-activation boundaries remain explicit for assets.switches
+**Given**
+- AM33 and AM10 keep `MainWindow` limited to shell ownership and keep Assets long-lived by default
+
+**When**
+- the Switches cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Assets Switches` continues to participate in long-lived Assets workspace lifetime rather than per-navigation recreation
+- route activation of `assets.switches` refreshes or reconciles Switches state within the existing Assets workspace
+
+### 4) Switches remains behavior-preserving and does not absorb Overview or Base Disks semantics
+**Given**
+- `Assets` is an approved Overview-first capability with canonical child routes
+
+**When**
+- the Switches cleanup target is defined
+
+**Then**
+- `assets.switches` remains the operational Switches management surface
+- no Overview ownership is moved into Switches
+- no Base Disks ownership is moved into Switches
+- runtime implementation, Switches behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `AssetsWorkspaceComposition` remains the owner for shared capability-level composition only
+- a Switches-local seam becomes the target home for Switches-specific state, orchestration, composition, and interaction coordination
+- `MainWindow` remains shell-only and is not injected into Switches views
+- `Assets Switches` remains long-lived with route-activation refresh inside the existing Assets workspace
+- Switches remains behavior-preserving and does not absorb shared Assets, Overview, or Base Disks concerns
+
+## Definition of Done
+- [ ] shared Assets vs Switches-local ownership is explicit and traceable
+- [ ] Switches-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
+- [ ] long-lived Assets workspace participation and `assets.switches` route-activation refresh expectations are explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable
