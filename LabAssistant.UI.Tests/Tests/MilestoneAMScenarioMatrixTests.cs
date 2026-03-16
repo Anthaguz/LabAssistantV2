@@ -894,7 +894,7 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition = new TemplatesWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("new TemplatesWorkspaceHost(() => _ = EnsureTemplatesLibraryAsync(forceRefresh: false))", mainWindowSource);
+        Assert.Contains("() => _ = EnsureTemplatesLibraryAsync(forceRefresh: false),", mainWindowSource);
         Assert.Contains("new TemplatesWorkspaceShellBridge(", mainWindowSource);
         Assert.Contains("() => IsTemplatesCapabilityActive,", mainWindowSource);
         Assert.Contains("() => IsTemplatesLibraryActive,", mainWindowSource);
@@ -924,23 +924,22 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("bool IsTemplatesCapabilityActive { get; }", compositionSource);
         Assert.Contains("bool IsTemplatesLibraryActive { get; }", compositionSource);
         Assert.Contains("bool IsTemplatesEditorActive { get; }", compositionSource);
-        Assert.Contains("internal interface ITemplatesWorkspaceHost", compositionSource);
-        Assert.Contains("void EnsureTemplatesLibraryLoaded();", compositionSource);
         Assert.Contains("internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBridge", compositionSource);
-        Assert.Contains("internal sealed class TemplatesWorkspaceHost : ITemplatesWorkspaceHost", compositionSource);
         Assert.Contains("internal sealed class TemplatesWorkspaceComposition", compositionSource);
         Assert.Contains("private readonly FrameworkElement _workspaceHost;", compositionSource);
         Assert.Contains("private readonly TemplatesLibraryView _libraryView;", compositionSource);
         Assert.Contains("private readonly TemplatesEditorView _editorView;", compositionSource);
-        Assert.Contains("private readonly ITemplatesWorkspaceHost _host;", compositionSource);
         Assert.Contains("private readonly ITemplatesWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("private readonly Action _ensureTemplatesLibraryLoaded;", compositionSource);
         Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_libraryView.Visibility = _shellBridge.IsTemplatesLibraryActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("if (_shellBridge.IsTemplatesLibraryActive)", compositionSource);
-        Assert.Contains("_host.EnsureTemplatesLibraryLoaded();", compositionSource);
+        Assert.Contains("_ensureTemplatesLibraryLoaded();", compositionSource);
         Assert.DoesNotContain("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", compositionSource);
         Assert.DoesNotContain("TemplatesSubviewTabView", compositionSource);
+        Assert.DoesNotContain("internal interface ITemplatesWorkspaceHost", compositionSource);
+        Assert.DoesNotContain("internal sealed class TemplatesWorkspaceHost", compositionSource);
     }
 
     private static string LoadMainWindowSource()
