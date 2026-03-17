@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using LabAssistant.Models.Templates;
+using LabAssistant.WinUI.ViewModels.Templates;
 
 namespace LabAssistant.WinUI.Views.Templates;
 
@@ -32,13 +33,43 @@ public readonly record struct TemplatesEditorActionState(
 public readonly record struct TemplatesEditorVmListInteractionState(
     VmTemplate? SelectedVmEntry);
 
+internal readonly record struct TemplatesEditorVmDraftInteractionState(
+    string VmName,
+    string VmMemoryText,
+    string VmCpuText,
+    IReadOnlyList<string> SelectedSwitches,
+    TemplateVhdxCatalogOption? SelectedVhdxCatalogOption);
+
+internal readonly record struct TemplatesEditorVmDraftViewState(
+    string VmIdText,
+    string VmName,
+    string VmMemoryText,
+    string VmCpuText,
+    string VmVhdxIdText,
+    string VmVhdPathText,
+    string VmVhdxSignatureText,
+    IReadOnlyList<string> AvailableSwitches,
+    IReadOnlyList<string> SelectedSwitches,
+    IReadOnlyList<TemplateVhdxCatalogOption> VhdxCatalogOptions,
+    TemplateVhdxCatalogOption? SelectedVhdxCatalogOption,
+    string VmSwitchGuidanceText,
+    string VmVhdxGuidanceText,
+    bool UseUnresolvedVhdxSelection);
+
 public sealed partial class TemplatesEditorView : UserControl
 {
+    private const string TemplateSwitchPlaceholder = "(Select switch)";
+    private const string TemplateVhdxPlaceholder = "(Keep current / unresolved)";
+
     private bool _isUpdatingDocumentHeader;
     private bool _isUpdatingVmSelection;
+    private bool _isUpdatingVmDraft;
+    private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
+    private readonly List<ComboBox> _templateVmSwitchRowCombos = [];
 
     public event EventHandler? DocumentHeaderChanged;
     public event EventHandler? SelectedVmChanged;
+    public event EventHandler? VmDraftChanged;
 
     public TemplatesEditorView()
     {
@@ -46,6 +77,11 @@ public sealed partial class TemplatesEditorView : UserControl
         TemplateNameTextBox.TextChanged += TemplateDocumentHeaderTextBox_TextChanged;
         TemplateDescriptionTextBox.TextChanged += TemplateDocumentHeaderTextBox_TextChanged;
         TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;
+        TemplateVmNameTextBox.TextChanged += TemplateVmDraftControl_Changed;
+        TemplateVmMemoryTextBox.TextChanged += TemplateVmDraftControl_Changed;
+        TemplateVmCpuTextBox.TextChanged += TemplateVmDraftControl_Changed;
+        AddTemplateVmSwitchRowButton.Click += AddTemplateVmSwitchRowButton_Click;
+        TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;
     }
 
     public ListView TemplateVmListViewControl => TemplateVmListView;
@@ -101,6 +137,16 @@ public sealed partial class TemplatesEditorView : UserControl
             TemplateVmListView.SelectedItem as VmTemplate);
     }
 
+    internal TemplatesEditorVmDraftInteractionState CaptureVmDraftInteractionState()
+    {
+        return new TemplatesEditorVmDraftInteractionState(
+            TemplateVmNameTextBox.Text,
+            TemplateVmMemoryTextBox.Text,
+            TemplateVmCpuTextBox.Text,
+            CaptureSelectedSwitches(),
+            TemplateVmVhdxCatalogComboBox.SelectedItem as TemplateVhdxCatalogOption);
+    }
+
     public void SetVmEntriesSource(object? itemsSource)
     {
         TemplateVmListView.ItemsSource = itemsSource;
@@ -153,6 +199,38 @@ public sealed partial class TemplatesEditorView : UserControl
         }
     }
 
+    internal void UpdateVmDraftState(TemplatesEditorVmDraftViewState state)
+    {
+        _isUpdatingVmDraft = true;
+        try
+        {
+            _availableSwitches = state.AvailableSwitches ?? Array.Empty<string>();
+
+            SetTextIfChanged(TemplateVmIdTextBlock, state.VmIdText);
+            SetTextIfChanged(TemplateVmNameTextBox, state.VmName);
+            SetTextIfChanged(TemplateVmMemoryTextBox, state.VmMemoryText);
+            SetTextIfChanged(TemplateVmCpuTextBox, state.VmCpuText);
+            SetTextIfChanged(TemplateVmVhdxIdTextBox, state.VmVhdxIdText);
+            SetTextIfChanged(TemplateVmVhdPathTextBox, state.VmVhdPathText);
+            SetTextIfChanged(TemplateVmVhdxSignatureTextBox, state.VmVhdxSignatureText);
+            SetTextIfChanged(TemplateVmSwitchGuidanceTextBlock, state.VmSwitchGuidanceText);
+            SetTextIfChanged(TemplateVmVhdxGuidanceTextBlock, state.VmVhdxGuidanceText);
+
+            RenderTemplateSwitchRows(state.SelectedSwitches);
+
+            var vhdxItems = new List<object> { TemplateVhdxPlaceholder };
+            vhdxItems.AddRange(state.VhdxCatalogOptions);
+            TemplateVmVhdxCatalogComboBox.ItemsSource = vhdxItems;
+            TemplateVmVhdxCatalogComboBox.SelectedItem = state.UseUnresolvedVhdxSelection
+                ? TemplateVhdxPlaceholder
+                : (object?)state.SelectedVhdxCatalogOption ?? TemplateVhdxPlaceholder;
+        }
+        finally
+        {
+            _isUpdatingVmDraft = false;
+        }
+    }
+
     public void UpdateActionState(TemplatesEditorActionState state)
     {
         SaveTemplateButton.IsEnabled = state.CanSave;
@@ -184,6 +262,133 @@ public sealed partial class TemplatesEditorView : UserControl
         }
 
         SelectedVmChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void TemplateVmDraftControl_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (_isUpdatingVmDraft)
+        {
+            return;
+        }
+
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void AddTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdatingVmDraft)
+        {
+            return;
+        }
+
+        AddTemplateSwitchRow(null);
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void RemoveTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not ComboBox combo)
+        {
+            return;
+        }
+
+        _templateVmSwitchRowCombos.Remove(combo);
+
+        var rowToRemove = TemplateVmSwitchRowsPanel.Children
+            .OfType<Grid>()
+            .FirstOrDefault(grid => grid.Children.OfType<ComboBox>().Any(c => ReferenceEquals(c, combo)));
+        if (rowToRemove is not null)
+        {
+            TemplateVmSwitchRowsPanel.Children.Remove(rowToRemove);
+        }
+
+        if (_isUpdatingVmDraft)
+        {
+            return;
+        }
+
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void TemplateVmSwitchRowCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingVmDraft)
+        {
+            return;
+        }
+
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void TemplateVmVhdxCatalogComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingVmDraft)
+        {
+            return;
+        }
+
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private List<string> CaptureSelectedSwitches()
+    {
+        return _templateVmSwitchRowCombos
+            .Select(combo => combo.SelectedItem?.ToString())
+            .Where(value => !string.IsNullOrWhiteSpace(value) &&
+                            !string.Equals(value, TemplateSwitchPlaceholder, StringComparison.Ordinal))
+            .Select(value => value!.Trim())
+            .ToList();
+    }
+
+    private void RenderTemplateSwitchRows(IReadOnlyList<string> selectedSwitches)
+    {
+        TemplateVmSwitchRowsPanel.Children.Clear();
+        _templateVmSwitchRowCombos.Clear();
+
+        foreach (var switchName in selectedSwitches)
+        {
+            AddTemplateSwitchRow(switchName);
+        }
+    }
+
+    private void AddTemplateSwitchRow(string? selectedSwitch)
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 8
+        };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var combo = new ComboBox
+        {
+            MinWidth = 220
+        };
+        combo.Items.Add(TemplateSwitchPlaceholder);
+        foreach (var switchName in _availableSwitches)
+        {
+            combo.Items.Add(switchName);
+        }
+
+        var validSelection = !string.IsNullOrWhiteSpace(selectedSwitch) &&
+                             _availableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase);
+        combo.SelectedItem = validSelection ? selectedSwitch : TemplateSwitchPlaceholder;
+        combo.SelectionChanged += TemplateVmSwitchRowCombo_SelectionChanged;
+        _templateVmSwitchRowCombos.Add(combo);
+        Grid.SetColumn(combo, 0);
+        row.Children.Add(combo);
+
+        var removeButton = new Button
+        {
+            Content = "-",
+            Tag = combo
+        };
+        ToolTipService.SetToolTip(removeButton, "Remove switch");
+        removeButton.Click += RemoveTemplateVmSwitchRowButton_Click;
+        Grid.SetColumn(removeButton, 1);
+        row.Children.Add(removeButton);
+
+        TemplateVmSwitchRowsPanel.Children.Add(row);
     }
 
     private static void SetTextIfChanged(TextBox textBox, string value)

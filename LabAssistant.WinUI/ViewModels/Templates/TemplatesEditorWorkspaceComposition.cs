@@ -15,8 +15,10 @@ internal sealed class TemplatesEditorWorkspaceComposition
         _view = view;
         _view.DocumentHeaderChanged += TemplatesEditorView_DocumentHeaderChanged;
         _view.SelectedVmChanged += TemplatesEditorView_SelectedVmChanged;
+        _view.VmDraftChanged += TemplatesEditorView_VmDraftChanged;
         _view.SetVmEntriesSource(_workspace.VmEntries);
         ApplyViewState();
+        ApplyVmDraftState();
         ApplyActionState(isLoading: false);
     }
 
@@ -25,6 +27,8 @@ internal sealed class TemplatesEditorWorkspaceComposition
     public IReadOnlyList<VmTemplate> VmEntries => _workspace.VmEntries;
 
     public VmTemplate? SelectedVmEntry => _workspace.SelectedVmEntry;
+
+    public TemplatesEditorVmDraftSnapshot CaptureVmDraftState() => _workspace.CaptureVmDraftSnapshot();
 
     public void ApplyShellState(bool isEditorActive)
     {
@@ -43,6 +47,7 @@ internal sealed class TemplatesEditorWorkspaceComposition
         }
 
         ApplyViewState();
+        ApplyVmDraftState();
     }
 
     public void ReplaceVmEntries(IReadOnlyList<VmTemplate> vmEntries)
@@ -68,6 +73,14 @@ internal sealed class TemplatesEditorWorkspaceComposition
     {
         _view.RefreshVmEntries();
         ApplyVmListState();
+    }
+
+    public void SetVmReferenceData(
+        IReadOnlyList<string> availableVmSwitches,
+        IReadOnlyList<TemplateVhdxCatalogOption> vmVhdxCatalogOptions)
+    {
+        _workspace.SetVmReferenceData(availableVmSwitches, vmVhdxCatalogOptions);
+        ApplyVmDraftState();
     }
 
     public void SetStatus(string statusText)
@@ -116,6 +129,11 @@ internal sealed class TemplatesEditorWorkspaceComposition
         ApplyVmListState();
     }
 
+    private void TemplatesEditorView_VmDraftChanged(object? sender, EventArgs e)
+    {
+        ApplyVmDraftState(_view.CaptureVmDraftInteractionState());
+    }
+
     private void ApplyViewState()
     {
         _view.UpdateDocumentHeaderState(new TemplatesEditorDocumentHeaderViewState(
@@ -132,5 +150,292 @@ internal sealed class TemplatesEditorWorkspaceComposition
     private void ApplyVmListState()
     {
         _view.UpdateVmSelection(_workspace.SelectedVmEntry);
+        ApplyVmDraftState();
+    }
+
+    private void ApplyVmDraftState(TemplatesEditorVmDraftInteractionState? interactionState = null)
+    {
+        var draftState = BuildVmDraftState(interactionState);
+        _workspace.SetVmDraftState(draftState);
+        _view.UpdateVmDraftState(new TemplatesEditorVmDraftViewState(
+            VmIdText: draftState.VmIdText,
+            VmName: draftState.VmName,
+            VmMemoryText: draftState.VmMemoryText,
+            VmCpuText: draftState.VmCpuText,
+            VmVhdxIdText: draftState.VmVhdxIdText,
+            VmVhdPathText: draftState.VmVhdPathText,
+            VmVhdxSignatureText: draftState.VmVhdxSignatureText,
+            AvailableSwitches: _workspace.AvailableVmSwitches,
+            SelectedSwitches: draftState.SelectedSwitches,
+            VhdxCatalogOptions: _workspace.VmVhdxCatalogOptions,
+            SelectedVhdxCatalogOption: draftState.SelectedVhdxCatalogOption,
+            VmSwitchGuidanceText: draftState.VmSwitchGuidanceText,
+            VmVhdxGuidanceText: draftState.VmVhdxGuidanceText,
+            UseUnresolvedVhdxSelection: draftState.RequiresVhdxResolution || draftState.SelectedVhdxCatalogOption is null));
+    }
+
+    private TemplatesEditorVmDraftState BuildVmDraftState(TemplatesEditorVmDraftInteractionState? interactionState)
+    {
+        if (_workspace.SelectedVmEntry is null)
+        {
+            return new TemplatesEditorVmDraftState(
+                VmIdText: "VM ID: -",
+                VmName: string.Empty,
+                VmMemoryText: string.Empty,
+                VmCpuText: string.Empty,
+                VmVhdxIdText: string.Empty,
+                VmVhdPathText: string.Empty,
+                VmVhdxSignatureText: string.Empty,
+                SelectedSwitches: Array.Empty<string>(),
+                SelectedVhdxCatalogOption: null,
+                VmSwitchGuidanceText: "Select a VM entry to configure switch assignments.",
+                VmVhdxGuidanceText: "Select a VM entry to configure base disk.",
+                RequiresVhdxResolution: false,
+                IsEditingNewVmEntry: false,
+                HasChanges: false);
+        }
+
+        var selectedVmEntry = _workspace.SelectedVmEntry;
+        var selectedSwitches = interactionState?.SelectedSwitches?.ToList() ?? GetSelectedSwitches(selectedVmEntry);
+        var selectedCatalogOption = interactionState?.SelectedVhdxCatalogOption;
+        var normalization = selectedCatalogOption is null
+            ? EvaluateTemplateVhdxNormalization(selectedVmEntry)
+            : new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: selectedCatalogOption,
+                Message: "User selected replacement catalog entry.",
+                EffectiveSourceLabel: "Effective source: selected catalog.");
+
+        var switchGuidanceText = BuildSwitchGuidanceText(selectedSwitches);
+        var vhdxGuidanceText = BuildVhdxGuidanceText(selectedVmEntry, normalization, selectedCatalogOption is not null);
+        return new TemplatesEditorVmDraftState(
+            VmIdText: $"VM ID: {selectedVmEntry.VmId}",
+            VmName: interactionState?.VmName ?? selectedVmEntry.Name,
+            VmMemoryText: interactionState?.VmMemoryText ?? selectedVmEntry.MemoryMb.ToString(),
+            VmCpuText: interactionState?.VmCpuText ?? selectedVmEntry.CpuCount.ToString(),
+            VmVhdxIdText: selectedCatalogOption?.Id ?? (selectedVmEntry.VhdxId ?? string.Empty),
+            VmVhdPathText: selectedCatalogOption?.Path ?? (selectedVmEntry.VhdPath ?? string.Empty),
+            VmVhdxSignatureText: selectedCatalogOption?.Signature ?? (selectedVmEntry.VhdxSignature ?? string.Empty),
+            SelectedSwitches: selectedSwitches,
+            SelectedVhdxCatalogOption: normalization.EffectiveOption,
+            VmSwitchGuidanceText: switchGuidanceText,
+            VmVhdxGuidanceText: vhdxGuidanceText,
+            RequiresVhdxResolution: selectedCatalogOption is null && normalization.RequiresUserResolution,
+            IsEditingNewVmEntry: string.IsNullOrWhiteSpace(selectedVmEntry.VmId),
+            HasChanges: HasVmDraftChanges(
+                selectedVmEntry,
+                interactionState,
+                selectedSwitches,
+                selectedCatalogOption));
+    }
+
+    private List<string> GetSelectedSwitches(VmTemplate vmEntry)
+    {
+        var switches = vmEntry.SwitchNames?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .ToList() ?? [];
+
+        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(vmEntry.SwitchName))
+        {
+            switches.Add(vmEntry.SwitchName.Trim());
+        }
+
+        return switches;
+    }
+
+    private string BuildSwitchGuidanceText(IReadOnlyList<string> selectedSwitches)
+    {
+        if (_workspace.SelectedVmEntry is null)
+        {
+            return "Select a VM entry to configure switch assignments.";
+        }
+
+        if (_workspace.AvailableVmSwitches.Count == 0)
+        {
+            return "No host switches available. Add a host switch before assigning VM switch rows.";
+        }
+
+        if (selectedSwitches.Count == 0)
+        {
+            return "No switch rows. Optional for template VM.";
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var selectedSwitch in selectedSwitches)
+        {
+            if (string.IsNullOrWhiteSpace(selectedSwitch))
+            {
+                return "Each switch row must have a selected host switch or be removed.";
+            }
+
+            if (!_workspace.AvailableVmSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase))
+            {
+                return $"Switch '{selectedSwitch}' is not available on this host.";
+            }
+
+            if (!seen.Add(selectedSwitch))
+            {
+                return $"Duplicate switch '{selectedSwitch}' is not allowed.";
+            }
+        }
+
+        return "Switch rows configured.";
+    }
+
+    private string BuildVhdxGuidanceText(
+        VmTemplate selectedVmEntry,
+        TemplateVhdxNormalizationResult normalization,
+        bool hasUserSelectedCatalogOption)
+    {
+        if (_workspace.VmVhdxCatalogOptions.Count == 0)
+        {
+            return "No catalog entries available. Import base disks in Assets > Base Disks.";
+        }
+
+        if (normalization.RequiresUserResolution)
+        {
+            return normalization.Message;
+        }
+
+        if (hasUserSelectedCatalogOption && normalization.EffectiveOption is not null)
+        {
+            return $"{normalization.EffectiveSourceLabel} Catalog entry selected. Save to persist.";
+        }
+
+        if (normalization.EffectiveOption is not null)
+        {
+            return $"{normalization.EffectiveSourceLabel} Effective disk: {normalization.EffectiveOption.DisplayLabel} ({normalization.EffectiveOption.Id}).";
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedVmEntry.VhdPath))
+        {
+            return "Legacy path-based reference loaded. Select a catalog entry to normalize.";
+        }
+
+        return "Catalog-backed selection is preferred.";
+    }
+
+    private bool HasVmDraftChanges(
+        VmTemplate selectedVmEntry,
+        TemplatesEditorVmDraftInteractionState? interactionState,
+        IReadOnlyList<string> selectedSwitches,
+        TemplateVhdxCatalogOption? selectedCatalogOption)
+    {
+        if (interactionState is null)
+        {
+            return false;
+        }
+
+        if (!string.Equals(interactionState.Value.VmName, selectedVmEntry.Name, StringComparison.Ordinal) ||
+            !string.Equals(interactionState.Value.VmMemoryText, selectedVmEntry.MemoryMb.ToString(), StringComparison.Ordinal) ||
+            !string.Equals(interactionState.Value.VmCpuText, selectedVmEntry.CpuCount.ToString(), StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!selectedSwitches.SequenceEqual(GetSelectedSwitches(selectedVmEntry), StringComparer.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (selectedCatalogOption is null)
+        {
+            return false;
+        }
+
+        return !string.Equals(selectedVmEntry.VhdxId, selectedCatalogOption.Id, StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(selectedVmEntry.VhdPath, selectedCatalogOption.Path, StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(selectedVmEntry.VhdxSignature, selectedCatalogOption.Signature, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private TemplateVhdxNormalizationResult EvaluateTemplateVhdxNormalization(VmTemplate vmTemplate)
+    {
+        var idMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdxId)
+            ? null
+            : _workspace.VmVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Id, vmTemplate.VhdxId, StringComparison.OrdinalIgnoreCase));
+
+        var signatureMatches = string.IsNullOrWhiteSpace(vmTemplate.VhdxSignature)
+            ? []
+            : _workspace.VmVhdxCatalogOptions
+                .Where(option => !string.IsNullOrWhiteSpace(option.Signature) &&
+                                 string.Equals(option.Signature, vmTemplate.VhdxSignature, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        var pathMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdPath)
+            ? null
+            : _workspace.VmVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Path, vmTemplate.VhdPath, StringComparison.OrdinalIgnoreCase));
+
+        if (idMatch is not null)
+        {
+            if (pathMatch is not null && !string.Equals(pathMatch.Id, idMatch.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return new TemplateVhdxNormalizationResult(
+                    RequiresUserResolution: true,
+                    EffectiveOption: null,
+                    Message: "VHD identity conflict detected. Select a catalog entry to resolve before saving.",
+                    EffectiveSourceLabel: "Effective source: unresolved conflict.");
+            }
+
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: idMatch,
+                Message: "Resolved from vhdxId.",
+                EffectiveSourceLabel: "Effective source: vhdxId.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: true,
+                EffectiveOption: null,
+                Message: $"Catalog entry '{vmTemplate.VhdxId}' is missing. Select a replacement before saving.",
+                EffectiveSourceLabel: "Effective source: unresolved missing catalog.");
+        }
+
+        if (signatureMatches.Count > 1)
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: true,
+                EffectiveOption: null,
+                Message: "Multiple catalog entries match vhdxSignature. Select one entry before saving.",
+                EffectiveSourceLabel: "Effective source: unresolved signature.");
+        }
+
+        if (signatureMatches.Count == 1)
+        {
+            if (pathMatch is not null &&
+                !string.Equals(pathMatch.Id, signatureMatches[0].Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return new TemplateVhdxNormalizationResult(
+                    RequiresUserResolution: true,
+                    EffectiveOption: null,
+                    Message: "VHD identity conflict detected. Select a catalog entry to resolve before saving.",
+                    EffectiveSourceLabel: "Effective source: unresolved conflict.");
+            }
+
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: signatureMatches[0],
+                Message: "Resolved from vhdxSignature.",
+                EffectiveSourceLabel: "Effective source: vhdxSignature.");
+        }
+
+        if (pathMatch is not null)
+        {
+            return new TemplateVhdxNormalizationResult(
+                RequiresUserResolution: false,
+                EffectiveOption: pathMatch,
+                Message: $"Catalog entry '{pathMatch.Id}' resolves current vhdPath.",
+                EffectiveSourceLabel: "Effective source: vhdPath.");
+        }
+
+        return new TemplateVhdxNormalizationResult(
+            RequiresUserResolution: false,
+            EffectiveOption: null,
+            Message: "Catalog-backed selection is preferred.",
+            EffectiveSourceLabel: "Effective source: none.");
     }
 }
