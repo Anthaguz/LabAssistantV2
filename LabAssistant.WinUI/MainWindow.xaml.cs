@@ -60,8 +60,6 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
-    private readonly ObservableCollection<DeployIssueRow> _deployIssueRows = [];
-    private readonly ObservableCollection<string> _deploySharedIssueSummaries = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
     private readonly Dictionary<string, DeployVmProgressState> _deployProgressByVm = new(StringComparer.OrdinalIgnoreCase);
@@ -280,6 +278,7 @@ public sealed partial class MainWindow : Window
                 () => IsTemplatesEditorActive));
         _deployFromTemplateWorkspaceComposition = new DeployFromTemplateWorkspaceComposition(
             DeployFromTemplateViewHost,
+            DeployFromTemplateRightPanelViewHost,
             TemplatesLibraryItems);
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
@@ -353,8 +352,6 @@ public sealed partial class MainWindow : Window
         DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
         DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
         DeployVmResultsListView.ItemsSource = _deployVmResultRows;
-        DeployGlobalIssuesListView.ItemsSource = _deployIssueRows;
-        DeploySharedIssuesListView.ItemsSource = _deploySharedIssueSummaries;
         DeployGlobalIssuesExpander.IsExpanded = false;
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
@@ -2266,16 +2263,13 @@ public sealed partial class MainWindow : Window
 
         if (activeTemplateDocument is null)
         {
-            DeployReadinessSummaryTextBlock.Text = "Select a template to evaluate readiness and run deploy.";
-            _deploySharedIssueSummaries.Clear();
-            DeploySharedIssuesSummaryTextBlock.Text = "Shared review items appear here when multiple VMs need the same remediation.";
+            _deployFromTemplateWorkspaceComposition.SetReadinessSummary("Select a template to evaluate readiness and run deploy.");
+            _deployFromTemplateWorkspaceComposition.ClearGroupedIssueState();
             DeployOverallStateTextBlock.Text = _deployLifecycleState;
             DeployProgressBar.Value = _deployProgressPercent;
             DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
-            DeployGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployIssueRows.Count}";
             UpdateDeployResultRows();
             UpdateDeployIssueRows();
-            UpdateDeploySharedIssueSummaries();
             ApplyRightPanelState();
             return;
         }
@@ -2286,48 +2280,17 @@ public sealed partial class MainWindow : Window
                         (_deployReadinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn) ?? 0);
         var passCount = _deployReadinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Pass) ?? 0;
         var deployState = hasBlockingFailures ? "Blocked" : "Ready";
-        DeployReadinessSummaryTextBlock.Text =
+        _deployFromTemplateWorkspaceComposition.SetReadinessSummary(
             $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
-            $"Template: {activeTemplateDocument.Template.Name} ({activeTemplateDocument.Template.VmTemplates.Count} VMs).";
+            $"Template: {activeTemplateDocument.Template.Name} ({activeTemplateDocument.Template.VmTemplates.Count} VMs).");
 
         DeployOverallStateTextBlock.Text = _deployLifecycleState;
         DeployProgressBar.Value = _deployProgressPercent;
         DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
-        DeployGlobalIssuesBadgeTextBlock.Text = $"Issues: {_deployIssueRows.Count}";
 
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
-        UpdateDeploySharedIssueSummaries();
         ApplyRightPanelState();
-    }
-
-    private void UpdateDeploySharedIssueSummaries()
-    {
-        _deploySharedIssueSummaries.Clear();
-
-        var groupedIssues = _deployIssueRows
-            .Where(issue => !string.Equals(issue.Scope, "Global", StringComparison.OrdinalIgnoreCase))
-            .GroupBy(issue => $"{issue.Severity}|{issue.Message}", StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Select(issue => issue.Scope).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
-            .OrderByDescending(group => group.Key.StartsWith("Block|", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(group => group.Count())
-            .ToList();
-
-        foreach (var group in groupedIssues)
-        {
-            var scopes = group
-                .Select(issue => issue.Scope)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(scope => scope, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var message = group.First().Message;
-            var severity = group.First().Severity;
-            _deploySharedIssueSummaries.Add($"{severity}: {message} Shared across {scopes.Count} VM(s): {string.Join(", ", scopes)}");
-        }
-
-        DeploySharedIssuesSummaryTextBlock.Text = _deploySharedIssueSummaries.Count > 0
-            ? "Shared environment and compatibility issues detected across multiple VMs. Fix them here when safe, or open Templates Editor for structural changes."
-            : "No shared review items are currently grouped. Review the readiness summary, then use the main actions below.";
     }
 
     private void UpdateDeployResultRows()
@@ -2401,12 +2364,12 @@ public sealed partial class MainWindow : Window
 
     private void UpdateDeployIssueRows()
     {
-        _deployIssueRows.Clear();
+        var issueRows = new List<DeployIssueRow>();
 
         foreach (var issue in _deployCompatibilityIssues)
         {
             var scope = string.IsNullOrWhiteSpace(issue.VmName) ? "Global" : issue.VmName;
-            _deployIssueRows.Add(new DeployIssueRow(
+            issueRows.Add(new DeployIssueRow(
                 Scope: scope,
                 Severity: issue.IsBlocking ? "Block" : "Warn",
                 Message: $"{issue.Message} {issue.Guidance}".Trim()));
@@ -2417,12 +2380,14 @@ public sealed partial class MainWindow : Window
             foreach (var result in _deployReadinessReport.Results.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
             {
                 var scope = result.AffectedVmNames.Count == 0 ? "Global" : string.Join(", ", result.AffectedVmNames);
-                _deployIssueRows.Add(new DeployIssueRow(
+                issueRows.Add(new DeployIssueRow(
                     Scope: scope,
                     Severity: result.Status == DeploymentReadinessStatus.Fail ? "Block" : "Warn",
                     Message: $"{result.Message} {result.ActionableGuidance}".Trim()));
             }
         }
+
+        _deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);
     }
 
     private void UpdateDeployOnTheFlyResultRows()
@@ -2563,14 +2528,16 @@ public sealed partial class MainWindow : Window
             }
         }
 
-        _deployIssueRows.Clear();
+        var issueRows = new List<DeployIssueRow>();
         foreach (var residual in summary.Residuals)
         {
-            _deployIssueRows.Add(new DeployIssueRow(
+            issueRows.Add(new DeployIssueRow(
                 Scope: residual.VmName,
                 Severity: "Warn",
                 Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
         }
+
+        _deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);
     }
 
     private void UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)
@@ -3871,14 +3838,5 @@ public sealed partial class MainWindow : Window
 
         public Visibility ExpanderVisibility => IsExpandable ? Visibility.Visible : Visibility.Collapsed;
         public Visibility FlatCardVisibility => IsExpandable ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-
-    private sealed record DeployIssueRow(
-        string Scope,
-        string Severity,
-        string Message)
-    {
-        public override string ToString() => $"{Severity} [{Scope}] {Message}";
     }
 }

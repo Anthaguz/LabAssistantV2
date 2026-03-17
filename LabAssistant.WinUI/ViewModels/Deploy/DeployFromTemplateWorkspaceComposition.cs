@@ -1,5 +1,6 @@
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Templates;
+using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Views.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
@@ -7,20 +8,27 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 internal sealed class DeployFromTemplateWorkspaceComposition
 {
     private readonly DeployFromTemplateView _view;
+    private readonly DeployFromTemplateRightPanelView _rightPanelView;
     private readonly DeployFromTemplateWorkspaceViewModel _workspace = new();
 
     public DeployFromTemplateWorkspaceComposition(
         DeployFromTemplateView view,
+        DeployFromTemplateRightPanelView rightPanelView,
         object? templateItemsSource)
     {
         _view = view;
+        _rightPanelView = rightPanelView;
         _view.DeployTemplateSelectorComboBoxControl.ItemsSource = templateItemsSource;
+        _view.DeploySharedIssuesListViewControl.ItemsSource = _workspace.SharedIssueSummaries;
+        _rightPanelView.DeployGlobalIssuesListViewControl.ItemsSource = _workspace.IssueRows;
         ApplyWorkspaceState();
     }
 
     public TemplateLibraryItem? SelectedTemplateLibraryItem => _workspace.SelectedTemplateLibraryItem;
 
     public TemplateEditorDocument? ActiveTemplateDocument => _workspace.ActiveTemplateDocument;
+
+    public int IssueRowCount => _workspace.IssueRows.Count;
 
     public void ApplyShellState()
     {
@@ -57,6 +65,24 @@ internal sealed class DeployFromTemplateWorkspaceComposition
         ApplyWorkspaceState();
     }
 
+    public void SetReadinessSummary(string readinessSummaryText)
+    {
+        _workspace.SetReadinessSummary(readinessSummaryText);
+        ApplyWorkspaceState();
+    }
+
+    public void ClearGroupedIssueState()
+    {
+        _workspace.ClearGroupedIssueState();
+        ApplyWorkspaceState();
+    }
+
+    public void ReplaceIssueRows(IReadOnlyList<DeployIssueRow> issueRows)
+    {
+        _workspace.ReplaceIssueRows(issueRows);
+        ApplyWorkspaceState();
+    }
+
     public void RefreshReviewState(bool hasBlockingFailures)
     {
         _workspace.RefreshReviewState(hasBlockingFailures);
@@ -79,5 +105,8 @@ internal sealed class DeployFromTemplateWorkspaceComposition
         _view.DeployTemplateSummaryTextBlockControl.Text = _workspace.TemplateSummaryText;
         _view.DeployTemplateRemediationTextBlockControl.Text = _workspace.TemplateRemediationText;
         _view.DeployActionStatusTextBlockControl.Text = _workspace.ActionStatusText;
+        _view.DeployReadinessSummaryTextBlockControl.Text = _workspace.ReadinessSummaryText;
+        _view.DeploySharedIssuesSummaryTextBlockControl.Text = _workspace.SharedIssuesSummaryText;
+        _view.DeployGlobalIssuesBadgeTextBlockControl.Text = _workspace.GlobalIssuesBadgeText;
     }
 }
