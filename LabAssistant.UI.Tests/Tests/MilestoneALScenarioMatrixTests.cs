@@ -216,7 +216,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("Content=\"Review Readiness\"", fromTemplateSource);
         Assert.Contains("Content=\"Fix in Templates Editor\"", fromTemplateSource);
 
-        Assert.Contains("UpdateDeploySharedIssueSummaries();", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
         Assert.Contains("Template Review", fromTemplateSource);
         Assert.Contains("_deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);", mainWindowSource);
     }
@@ -354,7 +354,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
         Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
-        Assert.Contains("UpdateDeploySharedIssueSummaries();", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
         Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);
         Assert.Contains("x:Name=\"DeployOnTheFlyEditorIssueSummaryTextBlock\"", quickDeploySource);
         Assert.Contains("x:Name=\"DeploySharedIssuesListView\"", fromTemplateSource);

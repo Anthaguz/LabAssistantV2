@@ -82,7 +82,7 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("private static DeploySwitchResolution ResolveDeploySwitches", source);
         Assert.Contains("private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)", source);
         Assert.Contains("DeployProgressBar.Value = _deployProgressPercent;", source);
-        Assert.Contains("DeployGlobalIssuesBadgeTextBlock.Text = $\"Issues: {_deployIssueRows.Count}\";", source);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", source);
         Assert.Contains("Switch mapping partial/missing", source);
         Assert.Contains("Disk identity conflict detected.", source);
         Assert.Contains("DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures", source);

@@ -1485,6 +1485,41 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void DeployFromTemplate_UsesLocalGroupedIssueRemediationStateSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
+        var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
+
+        Assert.DoesNotContain("private readonly ObservableCollection<DeployIssueRow> _deployIssueRows = [];", mainWindowSource);
+        Assert.DoesNotContain("private readonly ObservableCollection<string> _deploySharedIssueSummaries = [];", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.SetReadinessSummary(", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.ClearGroupedIssueState();", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDeploySharedIssueSummaries()", mainWindowSource);
+
+        Assert.Contains("private readonly DeployFromTemplateRightPanelView _rightPanelView;", fromTemplateCompositionSource);
+        Assert.Contains("_view.DeploySharedIssuesListViewControl.ItemsSource = _workspace.SharedIssueSummaries;", fromTemplateCompositionSource);
+        Assert.Contains("_rightPanelView.DeployGlobalIssuesListViewControl.ItemsSource = _workspace.IssueRows;", fromTemplateCompositionSource);
+        Assert.Contains("public int IssueRowCount => _workspace.IssueRows.Count;", fromTemplateCompositionSource);
+        Assert.Contains("public void SetReadinessSummary(string readinessSummaryText)", fromTemplateCompositionSource);
+        Assert.Contains("public void ClearGroupedIssueState()", fromTemplateCompositionSource);
+        Assert.Contains("public void ReplaceIssueRows(IReadOnlyList<DeployIssueRow> issueRows)", fromTemplateCompositionSource);
+        Assert.Contains("_view.DeployReadinessSummaryTextBlockControl.Text = _workspace.ReadinessSummaryText;", fromTemplateCompositionSource);
+        Assert.Contains("_view.DeploySharedIssuesSummaryTextBlockControl.Text = _workspace.SharedIssuesSummaryText;", fromTemplateCompositionSource);
+        Assert.Contains("_view.DeployGlobalIssuesBadgeTextBlockControl.Text = _workspace.GlobalIssuesBadgeText;", fromTemplateCompositionSource);
+
+        Assert.Contains("public ObservableCollection<DeployIssueRow> IssueRows { get; } = [];", fromTemplateWorkspaceSource);
+        Assert.Contains("public ObservableCollection<string> SharedIssueSummaries { get; } = [];", fromTemplateWorkspaceSource);
+        Assert.Contains("public string ReadinessSummaryText { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string SharedIssuesSummaryText { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string GlobalIssuesBadgeText { get; private set; } = \"Issues: 0\";", fromTemplateWorkspaceSource);
+        Assert.Contains("public void ClearGroupedIssueState()", fromTemplateWorkspaceSource);
+        Assert.Contains("public void ReplaceIssueRows(IReadOnlyList<DeployIssueRow> issueRows)", fromTemplateWorkspaceSource);
+        Assert.Contains("private void RefreshSharedIssueSummaries()", fromTemplateWorkspaceSource);
+    }
+
+    [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
