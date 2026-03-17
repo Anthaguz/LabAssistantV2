@@ -175,6 +175,18 @@ For Deploy Overview extraction planning after the shared Deploy cleanup target:
 Behavioral contract source:
 - `docs/02-ux/winui-deploy-overview-extraction-cleanup-target-am.md`
 
+## 2.13 Milestone AM Deploy From Template Cleanup Target (Approved)
+
+For Deploy From Template extraction planning after the shared Deploy cleanup target and Deploy Overview cleanup target:
+- `Deploy From Template` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+- a From Template-local seam is the target home for From Template-specific state, orchestration, interaction boundaries, composition or host cleanup, and refresh or reconcile behavior on `deploy.from_template`
+- `deploy.from_template` remains the distinct template-driven review/remediation/deploy surface inside the long-lived Deploy workspace and continues to use route-activation refresh within the existing workspace rather than per-navigation recreation
+- From Template does not become the owner of Quick Deploy-specific or Deploy Overview-specific workflow concerns, and From Template views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-from-template-extraction-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -323,6 +335,12 @@ Examples:
 - an Overview-local seam is the target home for Overview-specific state, navigation coordination, interaction boundaries, and route-activation refresh behavior for `deploy.overview`
 - `deploy.overview` remains the route-entry summary/navigation surface inside the long-lived Deploy workspace
 - Overview must not absorb `Quick Deploy` or `From Template` ownership, and views must not depend on or receive `MainWindow` directly
+
+### Deploy From Template cleanup target
+- `Deploy From Template` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- a From Template-local seam is the target home for From Template-specific state, orchestration, interaction boundaries, composition or host cleanup, and route-activation refresh behavior for `deploy.from_template`
+- `deploy.from_template` remains the distinct template-driven review/remediation/deploy surface inside the long-lived Deploy workspace
+- From Template must not absorb `Quick Deploy` or `Deploy Overview` ownership, and views must not depend on or receive `MainWindow` directly
 
 ---
 
@@ -529,6 +547,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: Assets Base Disks now has a narrow cleanup target that keeps Base Disks under shared Assets composition while moving Base Disks-specific state, orchestration, and UI coordination behind a Base Disks-local seam in `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md`.
 - Resolved: Assets Switches now has a narrow cleanup target that keeps Switches under shared Assets composition while moving Switches-specific state, orchestration, and UI coordination behind a Switches-local seam in `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md`.
 - Resolved: Deploy Overview now has a narrow cleanup target that keeps Overview under shared Deploy composition while moving Overview-specific state and interaction coordination behind an Overview-local seam in `docs/02-ux/winui-deploy-overview-extraction-cleanup-target-am.md`.
+- Resolved: Deploy From Template now has a narrow cleanup target that keeps From Template under shared Deploy composition while moving From Template-specific state, orchestration, composition, and interaction coordination behind a From Template-local seam in `docs/02-ux/winui-from-template-extraction-cleanup-target-am.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?

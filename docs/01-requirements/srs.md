@@ -688,6 +688,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Deploy composition must not become the Overview workflow owner; Overview-specific host bridges or control exposure remain temporary migration cleanup targets behind the Overview-local seam; Overview must not absorb From Template or Quick Deploy ownership; and the cleanup target must stay explicit that runtime implementation, From Template extraction details, Quick Deploy extraction details, Deploy behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-161:** WinUI `Deploy From Template` cleanup shall remain under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface, while converging From Template-specific state, orchestration, composition, and UI coordination behind a From Template-local seam.
+  - **Acceptance details:** the From Template cleanup target must explicitly keep shared Deploy composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make a From Template-local seam the target owner for template-driven state, review/remediation/deploy orchestration, From Template-local interaction boundaries, and From Template-specific composition or host cleanup.
+  - **Priority:** P1
+
+- **FR-162:** WinUI `Deploy From Template` cleanup shall preserve current `deploy.from_template` behavior and boundaries while making From Template participation in the long-lived Deploy workspace explicit.
+  - **Acceptance details:** the From Template cleanup target must preserve `deploy.from_template` as a distinct template-driven review/remediation/deploy workflow surface rather than the route-entry Deploy surface, must keep route activation refresh or reconcile behavior within the existing long-lived Deploy workspace rather than per-navigation recreation, and must preserve AF, AG, AL, and AM78-AM86 Deploy behavior contracts while narrowing ownership.
+  - **Priority:** P1
+
+- **FR-163:** WinUI `Deploy From Template` cleanup shall reject direct `MainWindow` view dependency, shared Deploy composition widening into the From Template workflow owner, From Template absorption of Quick Deploy semantics, and unapproved runtime or performance redesign during seam definition.
+  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Deploy composition must not become the From Template workflow owner; From Template-specific host bridges or control exposure remain temporary migration cleanup targets behind the From Template-local seam; `deploy.from_template` must not absorb Quick Deploy semantics or Overview ownership; and the cleanup target must stay explicit that runtime implementation, Quick Deploy extraction details, Deploy Overview extraction details, Deploy behavior redesign, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -714,6 +726,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md` for the AM Assets Switches cleanup target inside the shared Assets composition boundary.
 - See `docs/02-ux/winui-deploy-composition-cleanup-target-am.md` for the AM shared Deploy composition cleanup target that narrows shell-vs-Deploy ownership before Deploy runtime extraction proceeds.
 - See `docs/02-ux/winui-deploy-overview-extraction-cleanup-target-am.md` for the AM Deploy Overview cleanup target inside the shared Deploy composition boundary.
+- See `docs/02-ux/winui-from-template-extraction-cleanup-target-am.md` for the AM Deploy From Template cleanup target inside the shared Deploy composition boundary.
 
 ---
 
