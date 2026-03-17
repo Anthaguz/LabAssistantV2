@@ -1339,13 +1339,23 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
-    public void DeployWorkspaceComposition_BecomesTheSharedDeployCompositionOwner_WithoutRuntimeLaneExtraction()
+    public void DeployOverview_ProtectsRefinedOverviewLocalArchitecture()
     {
+        var mainWindowSource = LoadMainWindowSource();
         var compositionSource = LoadDeployWorkspaceCompositionSource();
         var overviewCompositionSource = LoadDeployOverviewWorkspaceCompositionSource();
         var overviewWorkspaceSource = LoadDeployOverviewWorkspaceViewModelSource();
         var overviewCodeBehindSource = LoadDeployOverviewCodeBehindSource();
         var overviewXaml = LoadDeployOverviewXaml();
+
+        Assert.Contains("private readonly DeployWorkspaceComposition _deployWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_deployWorkspaceComposition = new DeployWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("DeployOverviewViewHost,", mainWindowSource);
+        Assert.Contains("_deployWorkspaceComposition.RefreshSharedUiState();", mainWindowSource);
+        Assert.Contains("_deployWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDeployOverviewUi()", mainWindowSource);
+        Assert.DoesNotContain("DeployOverviewOpenQuickDeployButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", mainWindowSource);
+        Assert.DoesNotContain("DeployOverviewOpenFromTemplateButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", mainWindowSource);
 
         Assert.Contains("internal sealed class DeployWorkspaceComposition", compositionSource);
         Assert.Contains("private readonly FrameworkElement _localNavigationHost;", compositionSource);
@@ -1356,11 +1366,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly IDeployWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingDeploySubviewSelection;", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition = new DeployOverviewWorkspaceComposition(", compositionSource);
-        Assert.Contains("new DeployOverviewWorkspaceHost(", compositionSource);
-        Assert.Contains("new DeployOverviewWorkspaceShellBridge(", compositionSource);
-        Assert.Contains("() => getUiState().QuickDeployDraftCount,", compositionSource);
-        Assert.Contains("() => getUiState().IsLoadingTemplates,", compositionSource);
-        Assert.Contains("() => getUiState().AvailableTemplateCount),", compositionSource);
         Assert.Contains("public void RefreshSharedUiState()", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
@@ -1373,7 +1378,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOverview);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
-        Assert.Contains("internal readonly record struct DeployWorkspaceUiState(", compositionSource);
 
         Assert.DoesNotContain("DeployTemplateSelectorComboBox", compositionSource);
         Assert.DoesNotContain("DeployOnTheFlyVmEntriesListView", compositionSource);
@@ -1394,6 +1398,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly DeployOverviewWorkspaceViewModel _workspace = new();", overviewCompositionSource);
         Assert.Contains("private readonly IDeployOverviewWorkspaceHost _host;", overviewCompositionSource);
         Assert.Contains("private readonly IDeployOverviewWorkspaceShellBridge _shellBridge;", overviewCompositionSource);
+        Assert.Contains("new DeployOverviewWorkspaceHost(", compositionSource);
+        Assert.Contains("new DeployOverviewWorkspaceShellBridge(", compositionSource);
         Assert.Contains("WireHandlers();", overviewCompositionSource);
         Assert.Contains("ApplyWorkspaceState();", overviewCompositionSource);
         Assert.Contains("public void RefreshUiState()", overviewCompositionSource);
@@ -1423,6 +1429,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public event EventHandler? OpenQuickDeployRequested;", overviewCodeBehindSource);
         Assert.Contains("public event EventHandler? OpenFromTemplateRequested;", overviewCodeBehindSource);
         Assert.Contains("public void UpdateSummary(string quickDeploySummaryText, string fromTemplateSummaryText)", overviewCodeBehindSource);
+        Assert.Contains("OpenQuickDeployRequested?.Invoke(this, EventArgs.Empty);", overviewCodeBehindSource);
+        Assert.Contains("OpenFromTemplateRequested?.Invoke(this, EventArgs.Empty);", overviewCodeBehindSource);
         Assert.DoesNotContain("DeployOverviewOpenQuickDeployButtonControl", overviewCodeBehindSource);
         Assert.DoesNotContain("DeployOverviewOpenFromTemplateButtonControl", overviewCodeBehindSource);
         Assert.DoesNotContain("DeployOverviewQuickDeploySummaryTextBlockControl", overviewCodeBehindSource);

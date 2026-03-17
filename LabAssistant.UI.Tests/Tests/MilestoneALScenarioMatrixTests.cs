@@ -116,10 +116,10 @@ public sealed class MilestoneALScenarioMatrixTests
     {
         var assetsOverviewSource = LoadAssetsOverviewViewXamlSource();
         var deployOverviewSource = LoadDeployOverviewViewXamlSource();
+        var deployOverviewCodeBehindSource = LoadDeployOverviewViewCodeBehindSource();
         var diagnosticsOverviewSource = LoadDiagnosticsOverviewViewXamlSource();
         var mainWindowSource = LoadMainWindowSource();
         var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
-        var deployOverviewCompositionSource = LoadDeployOverviewWorkspaceCompositionSource();
 
         Assert.Contains("x:Name=\"AssetsOverviewOpenBaseDisksButton\"", assetsOverviewSource);
         Assert.Contains("x:Name=\"AssetsOverviewOpenSwitchesButton\"", assetsOverviewSource);
@@ -128,8 +128,15 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("x:Name=\"DeployOverviewOpenQuickDeployButton\"", deployOverviewSource);
         Assert.Contains("x:Name=\"DeployOverviewOpenFromTemplateButton\"", deployOverviewSource);
-        Assert.Contains("_view.OpenQuickDeployRequested += OpenQuickDeployRequested;", deployOverviewCompositionSource);
-        Assert.Contains("_view.OpenFromTemplateRequested += OpenFromTemplateRequested;", deployOverviewCompositionSource);
+        Assert.Contains("Click=\"DeployOverviewOpenQuickDeployButton_Click\"", deployOverviewSource);
+        Assert.Contains("Click=\"DeployOverviewOpenFromTemplateButton_Click\"", deployOverviewSource);
+        Assert.Contains("public event EventHandler? OpenQuickDeployRequested;", deployOverviewCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenFromTemplateRequested;", deployOverviewCodeBehindSource);
+        Assert.Contains("public void UpdateSummary(string quickDeploySummaryText, string fromTemplateSummaryText)", deployOverviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewOpenQuickDeployButtonControl", deployOverviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewOpenFromTemplateButtonControl", deployOverviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewQuickDeploySummaryTextBlockControl", deployOverviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewFromTemplateSummaryTextBlockControl", deployOverviewCodeBehindSource);
 
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenLogsButton\"", diagnosticsOverviewSource);
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenSupportExportButton\"", diagnosticsOverviewSource);
@@ -389,12 +396,6 @@ public sealed class MilestoneALScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadDeployOverviewWorkspaceCompositionSource()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceComposition.cs");
-        return File.ReadAllText(Path.GetFullPath(path));
-    }
-
     private static string LoadTemplatesWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesWorkspaceComposition.cs");
@@ -458,6 +459,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDeployOverviewViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOverviewView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOverviewViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOverviewView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
