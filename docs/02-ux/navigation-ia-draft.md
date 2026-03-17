@@ -139,6 +139,18 @@ For Templates Library extraction planning after the shared Templates cleanup tar
 Behavioral contract source:
 - `docs/02-ux/winui-templates-library-extraction-cleanup-target-am.md`
 
+## 2.10 Milestone AM Templates Editor Cleanup Target (Approved)
+
+For Templates Editor extraction planning after the shared Templates cleanup target and Templates Library cleanup target:
+- `Templates Editor` remains under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Templates composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `templates.library` and `templates.editor`
+- an Editor-local seam is the target home for Editor-specific state, orchestration, composition, and UI coordination on `templates.editor`
+- `templates.editor` remains a workflow-state destination entered from explicit actions and continues to use route-activation refresh within the existing long-lived Templates workspace rather than per-navigation recreation
+- Editor does not become the owner of Library-specific workflow concerns, and Editor views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-templates-editor-extraction-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)

@@ -3053,3 +3053,79 @@ Each readiness result shall include, at minimum:
 - [ ] Library-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
 - [ ] long-lived Templates workspace participation and `templates.library` route-activation refresh expectations are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+---
+
+# AC-035 - WinUI Templates Editor Extraction Cleanup Target (AM68)
+
+**Related FRs:** FR-152, FR-153, FR-154, FR-146, FR-147, FR-148, FR-077, FR-078, FR-079, FR-080, FR-081, FR-082, FR-083, FR-122, FR-123, FR-124, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Templates Editor stays under shared Templates workspace composition but gains an Editor-local seam
+**Given**
+- the shared Templates composition cleanup target and Templates Library cleanup target are already defined
+
+**When**
+- the narrow `Templates Editor` cleanup target is reviewed
+
+**Then**
+- `Templates Editor` remains under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Templates composition remains responsible only for shared capability-level composition concerns
+- an Editor-local seam becomes the target home for Editor-specific state, orchestration, composition, and UI coordination
+
+### 2) Editor-local ownership is explicit without widening shared Templates composition into the workflow owner
+**Given**
+- `templates.editor` is the workflow-state editing surface inside `Templates`
+
+**When**
+- Editor-local ownership is defined
+
+**Then**
+- Editor-local ownership explicitly includes:
+  - selected template editing context, draft, validation, and feedback state for the editor surface
+  - Editor-specific orchestration for open/load, create-new, edit, save, save-as-needed, discard/reset, and editor-surface VM-entry editing flows
+  - Editor-local composition and interaction coordination for the `templates.editor` surface
+  - cleanup or reduction of temporary Editor-specific host bridges or control exposure behind the Editor-local seam
+- shared `TemplatesWorkspaceComposition` does not become the Editor workflow owner
+- shared Templates composition keeps only cross-surface capability concerns such as shared route activation, shared workspace participation, and shared coordination genuinely spanning Library and Editor
+
+### 3) MainWindow and route-activation boundaries remain explicit for templates.editor
+**Given**
+- AM33 and AM56 keep `MainWindow` limited to shell ownership and keep Templates long-lived by default
+
+**When**
+- the Editor cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Templates Editor` continues to participate in long-lived Templates workspace lifetime rather than per-navigation recreation
+- route activation of `templates.editor` refreshes or reconciles Editor state within the existing Templates workspace
+- `templates.editor` remains a workflow-state destination entered from explicit actions rather than becoming the default Templates route
+
+### 4) Templates Editor remains behavior-preserving and does not absorb Library semantics
+**Given**
+- `Templates` is an approved Library-first capability with Editor as workflow-state entry
+
+**When**
+- the Editor cleanup target is defined
+
+**Then**
+- no Library-specific ownership is moved into Editor
+- no shared Templates ownership is moved into Editor
+- `templates.library` remains the stable/default Templates surface
+- runtime implementation, Templates Library extraction details, Editor behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `TemplatesWorkspaceComposition` remains the owner for shared capability-level composition only
+- an Editor-local seam becomes the target home for Editor-specific state, orchestration, composition, and interaction coordination
+- `MainWindow` remains shell-only and is not injected into Editor views
+- `Templates Editor` remains long-lived with route-activation refresh inside the existing Templates workspace
+- Templates Editor remains behavior-preserving and does not absorb shared Templates or Library concerns
+
+## Definition of Done
+- [ ] shared Templates vs Editor-local ownership is explicit and traceable
+- [ ] Editor-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
+- [ ] long-lived Templates workspace participation and `templates.editor` route-activation refresh expectations are explicit and traceable
+- [ ] Templates Library-first / Editor workflow-state boundary is explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable
