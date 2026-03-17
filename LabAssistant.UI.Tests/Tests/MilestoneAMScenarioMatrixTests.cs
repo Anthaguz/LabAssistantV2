@@ -1381,6 +1381,50 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("internal sealed class DeployWorkspaceHost", compositionSource);
     }
 
+    [Fact]
+    public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
+    {
+        var compositionSource = LoadDeployWorkspaceCompositionSource();
+        var shellBridgeInterfaceBlock = ExtractSection(
+            compositionSource,
+            "internal interface IDeployWorkspaceShellBridge",
+            "internal sealed class DeployWorkspaceShellBridge");
+        var shellBridgeClassBlock = ExtractSection(
+            compositionSource,
+            "internal sealed class DeployWorkspaceShellBridge",
+            "internal sealed class DeployWorkspaceComposition");
+
+        Assert.Contains("bool IsDeployCapabilityActive { get; }", shellBridgeInterfaceBlock);
+        Assert.Contains("bool IsDeployOverviewActive { get; }", shellBridgeInterfaceBlock);
+        Assert.Contains("bool IsDeployOnTheFlyActive { get; }", shellBridgeInterfaceBlock);
+        Assert.Contains("bool IsDeployFromTemplateActive { get; }", shellBridgeInterfaceBlock);
+        Assert.Contains("void NavigateToRoute(string routeKey);", shellBridgeInterfaceBlock);
+
+        Assert.DoesNotContain("DeployWorkspaceUiState", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("RefreshSharedUiState", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("UpdateOverviewUi", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("QuickDeployDraftCount", shellBridgeInterfaceBlock);
+        Assert.DoesNotContain("AvailableTemplateCount", shellBridgeInterfaceBlock);
+
+        Assert.Contains("internal sealed class DeployWorkspaceShellBridge : IDeployWorkspaceShellBridge", shellBridgeClassBlock);
+        Assert.Contains("private readonly Func<bool> _isDeployCapabilityActive;", shellBridgeClassBlock);
+        Assert.Contains("private readonly Func<bool> _isDeployOverviewActive;", shellBridgeClassBlock);
+        Assert.Contains("private readonly Func<bool> _isDeployOnTheFlyActive;", shellBridgeClassBlock);
+        Assert.Contains("private readonly Func<bool> _isDeployFromTemplateActive;", shellBridgeClassBlock);
+        Assert.Contains("private readonly Action<string> _navigateToRoute;", shellBridgeClassBlock);
+        Assert.Contains("public bool IsDeployCapabilityActive => _isDeployCapabilityActive();", shellBridgeClassBlock);
+        Assert.Contains("public bool IsDeployOverviewActive => _isDeployOverviewActive();", shellBridgeClassBlock);
+        Assert.Contains("public bool IsDeployOnTheFlyActive => _isDeployOnTheFlyActive();", shellBridgeClassBlock);
+        Assert.Contains("public bool IsDeployFromTemplateActive => _isDeployFromTemplateActive();", shellBridgeClassBlock);
+        Assert.Contains("public void NavigateToRoute(string routeKey) => _navigateToRoute(routeKey);", shellBridgeClassBlock);
+
+        Assert.DoesNotContain("DeployOverviewView", shellBridgeClassBlock);
+        Assert.DoesNotContain("TabView", shellBridgeClassBlock);
+        Assert.DoesNotContain("DeployWorkspaceUiState", shellBridgeClassBlock);
+        Assert.DoesNotContain("RefreshSharedUiState", shellBridgeClassBlock);
+        Assert.DoesNotContain("UpdateOverviewUi", shellBridgeClassBlock);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
