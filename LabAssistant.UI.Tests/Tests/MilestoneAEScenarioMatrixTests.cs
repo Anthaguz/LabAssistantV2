@@ -36,15 +36,16 @@ public sealed class MilestoneAEScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
+        var editorControllerSource = LoadTemplatesEditorWorkspaceControllerSource();
         var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
 
-        Assert.Contains("TryValidateTemplateSelectedSwitches", source);
-        Assert.Contains("Duplicate switch", source);
+        Assert.Contains("TryValidateSelectedSwitches", editorControllerSource);
+        Assert.Contains("Duplicate switch", editorControllerSource);
         Assert.Contains("No host switches available", editorCompositionSource);
         Assert.Contains("private string BuildSwitchGuidanceText(IReadOnlyList<string> selectedSwitches)", editorCompositionSource);
         Assert.Contains("AddTemplateVmSwitchRowButton.Click += AddTemplateVmSwitchRowButton_Click;", editorViewSource);
         Assert.Contains("private void RemoveTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)", editorViewSource);
-        Assert.Contains("SelectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;", source);
+        Assert.Contains("selectedVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;", editorControllerSource);
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public sealed class MilestoneAEScenarioMatrixTests
     public void MainWindow_DefinesDeterministicNormalizationAndConflictBlockingPaths()
     {
         var source = LoadTemplatesEditorWorkspaceCompositionSource();
-        var mainWindowSource = LoadMainWindowSource();
+        var editorControllerSource = LoadTemplatesEditorWorkspaceControllerSource();
 
         Assert.Contains("EvaluateTemplateVhdxNormalization", source);
         Assert.Contains("if (idMatch is not null)", source);
@@ -92,7 +93,7 @@ public sealed class MilestoneAEScenarioMatrixTests
         Assert.Contains("Catalog entry '", source);
         Assert.Contains("VHD identity conflict detected. Select a catalog entry to resolve before saving.", source);
         Assert.Contains("Multiple catalog entries match vhdxSignature. Select one entry before saving.", source);
-        Assert.Contains("SetTemplateEditorStatus(vmDraftState.VhdxResolutionMessage);", mainWindowSource);
+        Assert.Contains("_workspace.SetStatusText(_workspace.VmVhdxGuidanceText);", editorControllerSource);
     }
 
     private static XDocument LoadTemplatesEditorViewXaml()
@@ -116,6 +117,12 @@ public sealed class MilestoneAEScenarioMatrixTests
     private static string LoadTemplatesEditorWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesEditorWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesEditorWorkspaceControllerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesEditorWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

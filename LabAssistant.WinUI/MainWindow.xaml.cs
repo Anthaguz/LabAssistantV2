@@ -71,7 +71,6 @@ public sealed partial class MainWindow : Window
     private ShellSubview _activeSubview;
     private string _activeRouteKey = string.Empty;
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
-    private TemplateEditorDocument? _activeTemplateEditorDocument;
     private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;
     private TemplateEditorDocument? _activeDeployTemplateDocument;
     private VmTemplate? _selectedDeployOnTheFlyVmEntry;
@@ -215,6 +214,7 @@ public sealed partial class MainWindow : Window
     private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
     private IReadOnlyList<VmTemplate> TemplateVmEntries => _templatesWorkspaceComposition.EditorVmEntries;
     private VmTemplate? SelectedTemplateVmEntry => _templatesWorkspaceComposition.SelectedEditorVmEntry;
+    private TemplateEditorDocument? ActiveTemplateEditorDocument => _templatesWorkspaceComposition.ActiveEditorDocument;
     private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
     private const string DeployOnTheFlyVhdxPlaceholder = "(Select base disk)";
     private const string DeployCapabilityKey = "deploy";
@@ -280,7 +280,15 @@ public sealed partial class MainWindow : Window
                     PickTemplateFileForSaveAsync,
                     ShowDeleteTemplateConfirmationDialogAsync,
                     ReconcileDeployTemplateSelection)),
-            new TemplatesEditorWorkspaceComposition(TemplatesEditorViewHost),
+            new TemplatesEditorWorkspaceComposition(
+                _templatesCapabilityService,
+                TemplatesEditorViewHost,
+                new TemplatesEditorWorkspaceHost(
+                    () => _isTemplatesLoading,
+                    SetTemplatesLoading,
+                    ApplyTemplatesWorkspaceUiState,
+                    EnsureTemplatesLibraryAsync,
+                    PickTemplateFileForSaveAsync)),
             new TemplatesWorkspaceShellBridge(
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
@@ -2041,11 +2049,11 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _activeTemplateEditorDocument = new TemplateEditorDocument
+        _templatesWorkspaceComposition.SetEditorDocument(new TemplateEditorDocument
         {
             Template = BuildOnTheFlyTemplate(),
             SourceFilePath = null
-        };
+        });
         BindTemplateEditorDocument();
         SetTemplateEditorStatus("Opened quick deploy configuration in Templates editor.");
         NavigateToRoute(ShellRouteKeys.TemplatesEditor);
@@ -3155,14 +3163,13 @@ public sealed partial class MainWindow : Window
 
     private void BindTemplateEditorDocument()
     {
-        _templatesWorkspaceComposition.SetEditorDocument(_activeTemplateEditorDocument);
-        if (_activeTemplateEditorDocument is null)
+        _templatesWorkspaceComposition.SetEditorDocument(ActiveTemplateEditorDocument);
+        if (ActiveTemplateEditorDocument is null)
         {
             ApplyTemplatesWorkspaceUiState();
             return;
         }
 
-        RefreshTemplateVmEntriesFromDocument();
         ApplyTemplatesWorkspaceUiState();
     }
 
@@ -3221,48 +3228,14 @@ public sealed partial class MainWindow : Window
         UpdateDeployOnTheFlyUi();
     }
 
-    private bool PullEditorFieldsIntoDocument()
-    {
-        if (_activeTemplateEditorDocument is null)
-        {
-            return false;
-        }
-
-        if (!TryApplySelectedTemplateVmFields(showSuccessStatus: false))
-        {
-            return false;
-        }
-
-        var template = _activeTemplateEditorDocument.Template;
-        var documentHeaderState = _templatesWorkspaceComposition.CaptureEditorDocumentHeaderState();
-        template.Name = documentHeaderState.TemplateName.Trim();
-        var trimmedDescription = documentHeaderState.TemplateDescription.Trim();
-        template.Description = string.IsNullOrWhiteSpace(trimmedDescription) ? null : trimmedDescription;
-        SyncTemplateVmEntriesToDocument();
-        _templatesWorkspaceComposition.SetEditorDocument(_activeTemplateEditorDocument);
-        return true;
-    }
-
-    private void RefreshTemplateVmEntriesFromDocument()
-    {
-        if (_activeTemplateEditorDocument is null)
-        {
-            _templatesWorkspaceComposition.ReplaceEditorVmEntries(Array.Empty<VmTemplate>());
-            return;
-        }
-
-        _templatesWorkspaceComposition.ReplaceEditorVmEntries(_activeTemplateEditorDocument.Template.VmTemplates);
-    }
-
     private void SyncTemplateVmEntriesToDocument()
     {
-        if (_activeTemplateEditorDocument is null)
+        if (ActiveTemplateEditorDocument is null)
         {
             return;
         }
 
-        _activeTemplateEditorDocument.Template.VmTemplates = TemplateVmEntries.ToList();
-        _templatesWorkspaceComposition.SetEditorVmCount(_activeTemplateEditorDocument.Template.VmTemplates.Count);
+        _templatesWorkspaceComposition.SyncEditorVmEntriesToDocument();
     }
 
     private void RefreshTemplateVmListView()
@@ -3270,100 +3243,6 @@ public sealed partial class MainWindow : Window
         _templatesWorkspaceComposition.RefreshEditorVmEntries();
     }
 
-    private bool TryApplySelectedTemplateVmFields(bool showSuccessStatus)
-    {
-        if (_activeTemplateEditorDocument is null || SelectedTemplateVmEntry is null)
-        {
-            return true;
-        }
-
-        var vmDraftState = _templatesWorkspaceComposition.CaptureEditorVmDraftState();
-        var vmName = vmDraftState.VmName.Trim();
-        if (string.IsNullOrWhiteSpace(vmName))
-        {
-            SetTemplateEditorStatus("VM name is required.");
-            return false;
-        }
-
-        if (!int.TryParse(vmDraftState.VmMemoryText, out var memoryMb) || memoryMb <= 0)
-        {
-            SetTemplateEditorStatus("Memory must be a positive integer.");
-            return false;
-        }
-
-        if (!int.TryParse(vmDraftState.VmCpuText, out var cpuCount) || cpuCount <= 0)
-        {
-            SetTemplateEditorStatus("CPU count must be a positive integer.");
-            return false;
-        }
-
-        SelectedTemplateVmEntry.Name = vmName;
-        SelectedTemplateVmEntry.MemoryMb = memoryMb;
-        SelectedTemplateVmEntry.CpuCount = cpuCount;
-        if (!TryValidateTemplateSelectedSwitches(vmDraftState.SelectedSwitches, out var switchValidationError))
-        {
-            SetTemplateEditorStatus(switchValidationError ?? "Switch validation failed.");
-            return false;
-        }
-
-        var selectedSwitches = vmDraftState.SelectedSwitches.ToList();
-        SelectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;
-        SelectedTemplateVmEntry.SwitchName = selectedSwitches.Count > 0 ? selectedSwitches[0] : null;
-
-        if (vmDraftState.SelectedVhdxCatalogOption is TemplateVhdxCatalogOption selectedCatalogOption)
-        {
-            SelectedTemplateVmEntry.VhdxId = selectedCatalogOption.Id;
-            SelectedTemplateVmEntry.VhdPath = selectedCatalogOption.Path;
-            SelectedTemplateVmEntry.VhdxSignature = selectedCatalogOption.Signature;
-        }
-        else
-        {
-            if (vmDraftState.RequiresVhdxResolution)
-            {
-                SetTemplateEditorStatus(vmDraftState.VhdxResolutionMessage);
-                return false;
-            }
-        }
-
-        RefreshTemplateVmListView();
-        SyncTemplateVmEntriesToDocument();
-        if (showSuccessStatus)
-        {
-            SetTemplateEditorStatus($"Updated VM entry '{vmName}'.");
-        }
-
-        return true;
-    }
-
-    private bool TryValidateTemplateSelectedSwitches(
-        IReadOnlyList<string> selectedSwitches,
-        out string? validationError)
-    {
-        validationError = null;
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var selectedSwitch in selectedSwitches)
-        {
-            if (string.IsNullOrWhiteSpace(selectedSwitch))
-            {
-                validationError = "Each switch row must have a selected host switch or be removed.";
-                return false;
-            }
-
-            if (!_templateAvailableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase))
-            {
-                validationError = $"Switch '{selectedSwitch}' is not available on this host.";
-                return false;
-            }
-
-            if (!seen.Add(selectedSwitch))
-            {
-                validationError = $"Duplicate switch '{selectedSwitch}' is not allowed.";
-                return false;
-            }
-        }
-
-        return true;
-    }
 
     private Task<string?> PickTemplateFileForOpenAsync()
     {
@@ -3396,7 +3275,7 @@ public sealed partial class MainWindow : Window
 
     private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeTemplateEditorDocument is null)
+        if (ActiveTemplateEditorDocument is null)
         {
             SetTemplateEditorStatus("Load or create a template first.");
             return;
@@ -3454,7 +3333,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        TryApplySelectedTemplateVmFields(showSuccessStatus: true);
+        _templatesWorkspaceComposition.ApplySelectedEditorVmDraft(showSuccessStatus: true);
         ApplyTemplatesWorkspaceUiState();
     }
 
@@ -3466,7 +3345,7 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText)
     {
-        _activeTemplateEditorDocument = document;
+        _templatesWorkspaceComposition.SetEditorDocument(document);
         await EnsureTemplateSwitchesAsync(forceRefresh: false);
         await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: false);
         BindTemplateEditorDocument();
@@ -3491,106 +3370,17 @@ public sealed partial class MainWindow : Window
 
     private async void SaveTemplateButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeTemplateEditorDocument is null)
-        {
-            SetTemplateEditorStatus("No template loaded.");
-            return;
-        }
-
-        if (!PullEditorFieldsIntoDocument())
-        {
-            return;
-        }
-        _isTemplatesLoading = true;
-        ApplyTemplatesWorkspaceUiState();
-        try
-        {
-            var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument);
-            SetTemplateEditorStatus(result.UserMessage);
-            if (result.Success)
-            {
-                _activeTemplateEditorDocument = new TemplateEditorDocument
-                {
-                    Template = _activeTemplateEditorDocument.Template,
-                    SourceFilePath = result.FilePath
-                };
-                BindTemplateEditorDocument();
-                await EnsureTemplatesLibraryAsync(forceRefresh: true);
-            }
-        }
-        finally
-        {
-            _isTemplatesLoading = false;
-            ApplyTemplatesWorkspaceUiState();
-        }
+        await _templatesWorkspaceComposition.SaveEditorAsync();
     }
 
     private async void SaveTemplateAsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeTemplateEditorDocument is null)
-        {
-            SetTemplateEditorStatus("No template loaded.");
-            return;
-        }
-
-        if (!PullEditorFieldsIntoDocument())
-        {
-            return;
-        }
-        var suggestedName = string.IsNullOrWhiteSpace(_activeTemplateEditorDocument.Template.Name)
-            ? "lab-template"
-            : _activeTemplateEditorDocument.Template.Name;
-        var destinationPath = await PickTemplateFileForSaveAsync(suggestedName);
-        if (string.IsNullOrWhiteSpace(destinationPath))
-        {
-            SetTemplateEditorStatus("Save As cancelled.");
-            return;
-        }
-
-        _isTemplatesLoading = true;
-        ApplyTemplatesWorkspaceUiState();
-        try
-        {
-            var result = await _templatesCapabilityService.SaveAsync(_activeTemplateEditorDocument, destinationPath, saveAs: true);
-            SetTemplateEditorStatus(result.UserMessage);
-            if (result.Success)
-            {
-                _activeTemplateEditorDocument = new TemplateEditorDocument
-                {
-                    Template = _activeTemplateEditorDocument.Template,
-                    SourceFilePath = result.FilePath
-                };
-                BindTemplateEditorDocument();
-                await EnsureTemplatesLibraryAsync(forceRefresh: true);
-            }
-        }
-        finally
-        {
-            _isTemplatesLoading = false;
-            ApplyTemplatesWorkspaceUiState();
-        }
+        await _templatesWorkspaceComposition.SaveEditorAsAsync();
     }
 
     private async void ValidateTemplateButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeTemplateEditorDocument is null)
-        {
-            SetTemplateEditorStatus("No template loaded.");
-            return;
-        }
-
-        if (!PullEditorFieldsIntoDocument())
-        {
-            return;
-        }
-        var result = await _templatesCapabilityService.ValidateAsync(_activeTemplateEditorDocument);
-        if (result.IsValid)
-        {
-            SetTemplateEditorStatus("Template validation passed.");
-            return;
-        }
-
-        SetTemplateEditorStatus("Validation failed: " + string.Join(" ", result.Errors));
+        await _templatesWorkspaceComposition.ValidateEditorAsync();
     }
 
     private void BackToLibraryButton_Click(object sender, RoutedEventArgs e)
