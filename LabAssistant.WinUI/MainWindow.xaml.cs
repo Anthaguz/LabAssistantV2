@@ -81,17 +81,12 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
     private bool _isDeployLoadingTemplates;
-    private bool _isDeployEvaluatingReadiness;
-    private bool _isDeployStarting;
     private bool _showDeployAllVmRows;
     private bool _isDeployOnTheFlyEvaluatingReadiness;
     private bool _isDeployOnTheFlyStarting;
     private bool _isUpdatingDeployOnTheFlyEditor;
     private int _deployOnTheFlyAutoEvaluateNonce;
     private bool _showDeployOnTheFlyAllVmRows;
-    private string _deployLifecycleState = "Idle";
-    private int _deployProgressPercent;
-    private string _deployProgressSummary = "No deployment started.";
     private string _deployOnTheFlyLifecycleState = "Idle";
     private int _deployOnTheFlyProgressPercent;
     private string _deployOnTheFlyProgressSummary = "No deployment started.";
@@ -279,7 +274,33 @@ public sealed partial class MainWindow : Window
         _deployFromTemplateWorkspaceComposition = new DeployFromTemplateWorkspaceComposition(
             DeployFromTemplateViewHost,
             DeployFromTemplateRightPanelViewHost,
-            TemplatesLibraryItems);
+            TemplatesLibraryItems,
+            new DeployFromTemplateWorkspaceHost(
+                () => _settingsStore.Settings,
+                () => _templateAvailableSwitches,
+                () => _deployFromTemplateWorkspaceComposition!.ActiveTemplateDocument,
+                LoadDeployCatalogItems,
+                EnsureTemplateSwitchesAsync,
+                (context, mode) => _deploymentPreflightService.RunAsync(context, mode),
+                issues =>
+                {
+                    _deployCompatibilityIssues.Clear();
+                    _deployCompatibilityIssues.AddRange(issues);
+                },
+                () => _deployReadinessReport,
+                report => _deployReadinessReport = report,
+                showAllVmRows => _showDeployAllVmRows = showAllVmRows,
+                () => _deployProgressByVm.Clear(),
+                context => InitializeDeployProgressRows(context, _deployProgressByVm),
+                context => AttachDeployProgressCallbacks(context, _deployProgressByVm, isOnTheFly: false),
+                UpdateDeployResultRows,
+                async context =>
+                {
+                    await _deploymentCoordinator.DeployAllAsync(context);
+                    return _deploymentOutcomeSummaryBuilder.Build(context);
+                },
+                UpdateDeployRowsFromSummary,
+                UpdateDeployUi));
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
             DeployOverviewViewHost,
@@ -593,9 +614,9 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
-        return _isDeployStarting ||
+        return _deployFromTemplateWorkspaceComposition.IsStarting ||
             _isDeployOnTheFlyStarting ||
-            string.Equals(_deployLifecycleState, "Running", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -642,7 +663,7 @@ public sealed partial class MainWindow : Window
     private void UpdateDeployRightPanelLaunchers(bool showPanel)
     {
         var panelUnavailable = _isShellRightPanelInCompactFallback;
-        var fromTemplateIsRunning = _isDeployStarting || string.Equals(_deployLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+        var fromTemplateIsRunning = _deployFromTemplateWorkspaceComposition.IsStarting || string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
         var quickDeployIsRunning = _isDeployOnTheFlyStarting || string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
 
         DeployOpenResultsPanelButton.Content = showPanel && IsDeployFromTemplateActive ? "Hide Progress / Results" : "Open Progress / Results";
@@ -1248,7 +1269,7 @@ public sealed partial class MainWindow : Window
         {
             await EnsureTemplateSwitchesAsync(forceRefresh: false);
             var template = BuildOnTheFlyTemplate();
-            var deployContext = BuildDeployContext(template);
+            var deployContext = DeployContextBuilder.Build(template, _settingsStore.Settings, LoadDeployCatalogItems(), _templateAvailableSwitches);
             _deployOnTheFlyCompatibilityIssues.Clear();
             _deployOnTheFlyCompatibilityIssues.AddRange(deployContext.CompatibilityIssues);
             _deployOnTheFlyReadinessReport = await _deploymentPreflightService.RunAsync(deployContext.MultiVmContext, mode);
@@ -1732,9 +1753,12 @@ public sealed partial class MainWindow : Window
             _deployFromTemplateWorkspaceComposition.ClearSelection("No template selected.");
             _deployReadinessReport = null;
             _deployCompatibilityIssues.Clear();
-            _deployLifecycleState = "Idle";
-            _deployProgressPercent = 0;
-            _deployProgressSummary = "No template selected.";
+            _deployFromTemplateWorkspaceComposition.SetWorkflowState(
+                isEvaluatingReadiness: false,
+                isStarting: false,
+                lifecycleState: "Idle",
+                progressPercent: 0,
+                progressSummary: "No template selected.");
             UpdateDeployUi();
             return;
         }
@@ -1746,9 +1770,12 @@ public sealed partial class MainWindow : Window
             _deployFromTemplateWorkspaceComposition.SetLoadedTemplateDocument(
                 document,
                 $"Loaded '{selectedTemplate.Name}' for deploy readiness.");
-            _deployLifecycleState = "Ready";
-            _deployProgressPercent = 0;
-            _deployProgressSummary = $"Template '{selectedTemplate.Name}' loaded.";
+            _deployFromTemplateWorkspaceComposition.SetWorkflowState(
+                isEvaluatingReadiness: false,
+                isStarting: false,
+                lifecycleState: "Ready",
+                progressPercent: 0,
+                progressSummary: $"Template '{selectedTemplate.Name}' loaded.");
             await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
         }
         catch (Exception ex)
@@ -1756,9 +1783,12 @@ public sealed partial class MainWindow : Window
             _deployFromTemplateWorkspaceComposition.SetSelectionLoadFailed($"Failed to load selected template. {ex.Message}");
             _deployReadinessReport = null;
             _deployCompatibilityIssues.Clear();
-            _deployLifecycleState = "Error";
-            _deployProgressPercent = 0;
-            _deployProgressSummary = "Template load failed.";
+            _deployFromTemplateWorkspaceComposition.SetWorkflowState(
+                isEvaluatingReadiness: false,
+                isStarting: false,
+                lifecycleState: "Error",
+                progressPercent: 0,
+                progressSummary: "Template load failed.");
             UpdateDeployUi();
         }
     }
@@ -2020,7 +2050,7 @@ public sealed partial class MainWindow : Window
             }
 
             var template = BuildOnTheFlyTemplate();
-            var deployContext = BuildDeployContext(template);
+            var deployContext = DeployContextBuilder.Build(template, _settingsStore.Settings, LoadDeployCatalogItems(), _templateAvailableSwitches);
             InitializeDeployOnTheFlyProgressRows(deployContext.MultiVmContext);
             AttachDeployOnTheFlyProgressCallbacks(deployContext.MultiVmContext);
             _deployOnTheFlyProgressPercent = 40;
@@ -2253,21 +2283,18 @@ public sealed partial class MainWindow : Window
         var hasBlockingFailures = _deployCompatibilityIssues.Any(issue => issue.IsBlocking) ||
                                   (_deployReadinessReport?.HasBlockingFailures ?? false);
 
-        DeployTemplateSelectorComboBox.IsEnabled = !_isDeployLoadingTemplates && !_isDeployStarting;
-        DeployReloadTemplatesButton.IsEnabled = !_isDeployLoadingTemplates && !_isDeployStarting;
-        DeployEvaluateReadinessButton.IsEnabled = hasTemplate && !_isDeployEvaluatingReadiness && !_isDeployStarting;
-        DeployResolveSuggestionsButton.IsEnabled = hasTemplate && !_isDeployEvaluatingReadiness && !_isDeployStarting;
-        DeployOpenTemplateEditorButton.IsEnabled = _deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem is not null && !_isDeployStarting;
-        DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures && !_isDeployEvaluatingReadiness && !_isDeployStarting;
+        DeployTemplateSelectorComboBox.IsEnabled = !_isDeployLoadingTemplates && !_deployFromTemplateWorkspaceComposition.IsStarting;
+        DeployReloadTemplatesButton.IsEnabled = !_isDeployLoadingTemplates && !_deployFromTemplateWorkspaceComposition.IsStarting;
+        DeployEvaluateReadinessButton.IsEnabled = hasTemplate && !_deployFromTemplateWorkspaceComposition.IsEvaluatingReadiness && !_deployFromTemplateWorkspaceComposition.IsStarting;
+        DeployResolveSuggestionsButton.IsEnabled = hasTemplate && !_deployFromTemplateWorkspaceComposition.IsEvaluatingReadiness && !_deployFromTemplateWorkspaceComposition.IsStarting;
+        DeployOpenTemplateEditorButton.IsEnabled = _deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem is not null && !_deployFromTemplateWorkspaceComposition.IsStarting;
+        DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures && !_deployFromTemplateWorkspaceComposition.IsEvaluatingReadiness && !_deployFromTemplateWorkspaceComposition.IsStarting;
         _deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);
 
         if (activeTemplateDocument is null)
         {
             _deployFromTemplateWorkspaceComposition.SetReadinessSummary("Select a template to evaluate readiness and run deploy.");
             _deployFromTemplateWorkspaceComposition.ClearGroupedIssueState();
-            DeployOverallStateTextBlock.Text = _deployLifecycleState;
-            DeployProgressBar.Value = _deployProgressPercent;
-            DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
             UpdateDeployResultRows();
             UpdateDeployIssueRows();
             ApplyRightPanelState();
@@ -2283,10 +2310,6 @@ public sealed partial class MainWindow : Window
         _deployFromTemplateWorkspaceComposition.SetReadinessSummary(
             $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
             $"Template: {activeTemplateDocument.Template.Name} ({activeTemplateDocument.Template.VmTemplates.Count} VMs).");
-
-        DeployOverallStateTextBlock.Text = _deployLifecycleState;
-        DeployProgressBar.Value = _deployProgressPercent;
-        DeployProgressSummaryTextBlock.Text = _deployProgressSummary;
 
         UpdateDeployResultRows();
         UpdateDeployIssueRows();
@@ -2582,9 +2605,12 @@ public sealed partial class MainWindow : Window
         }
 
         _isDeployLoadingTemplates = true;
-        _deployLifecycleState = "Loading";
-        _deployProgressPercent = 0;
-        _deployProgressSummary = "Loading templates...";
+        _deployFromTemplateWorkspaceComposition.SetWorkflowState(
+            isEvaluatingReadiness: false,
+            isStarting: false,
+            lifecycleState: "Loading",
+            progressPercent: 0,
+            progressSummary: "Loading templates...");
         _deployWorkspaceComposition.RefreshSharedUiState();
         UpdateDeployUi();
         _deployFromTemplateWorkspaceComposition.SetActionStatus("Loading templates for deploy...");
@@ -2598,9 +2624,12 @@ public sealed partial class MainWindow : Window
                 _deployFromTemplateWorkspaceComposition.ClearSelection("No templates available for deploy.");
                 _deployReadinessReport = null;
                 _deployCompatibilityIssues.Clear();
-                _deployLifecycleState = "Idle";
-                _deployProgressPercent = 0;
-                _deployProgressSummary = "No templates available.";
+                _deployFromTemplateWorkspaceComposition.SetWorkflowState(
+                    isEvaluatingReadiness: false,
+                    isStarting: false,
+                    lifecycleState: "Idle",
+                    progressPercent: 0,
+                    progressSummary: "No templates available.");
             }
             else
             {
@@ -2609,17 +2638,23 @@ public sealed partial class MainWindow : Window
                     _deployFromTemplateWorkspaceComposition.SetSelectedTemplateLibraryItem(TemplatesLibraryItems[0]);
                 }
 
-                _deployLifecycleState = "Idle";
-                _deployProgressPercent = 0;
-                _deployProgressSummary = "Template list loaded.";
+                _deployFromTemplateWorkspaceComposition.SetWorkflowState(
+                    isEvaluatingReadiness: false,
+                    isStarting: false,
+                    lifecycleState: "Idle",
+                    progressPercent: 0,
+                    progressSummary: "Template list loaded.");
                 _deployFromTemplateWorkspaceComposition.SetActionStatus($"Loaded {TemplatesLibraryItems.Count} template(s) for deploy.");
             }
         }
         catch (Exception ex)
         {
-            _deployLifecycleState = "Error";
-            _deployProgressPercent = 0;
-            _deployProgressSummary = "Template load failed.";
+            _deployFromTemplateWorkspaceComposition.SetWorkflowState(
+                isEvaluatingReadiness: false,
+                isStarting: false,
+                lifecycleState: "Error",
+                progressPercent: 0,
+                progressSummary: "Template load failed.");
             _deployFromTemplateWorkspaceComposition.SetActionStatus($"Failed to load deploy templates. {ex.Message}");
         }
         finally
@@ -2630,140 +2665,12 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode)
-    {
-        _showDeployAllVmRows = false;
-        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
-        if (activeTemplateDocument is null)
-        {
-            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
-            UpdateDeployUi();
-            return;
-        }
-
-        _isDeployEvaluatingReadiness = true;
-        _deployLifecycleState = "Evaluating";
-        _deployProgressPercent = 10;
-        _deployProgressSummary = mode == DeploymentPreflightMode.Full
-            ? "Running full readiness checks..."
-            : "Running quick readiness checks...";
-        _deployFromTemplateWorkspaceComposition.SetActionStatus(
-            mode == DeploymentPreflightMode.Full
-                ? "Running full deploy readiness evaluation..."
-                : "Running quick deploy readiness evaluation...");
-
-        try
-        {
-            await EnsureTemplateSwitchesAsync(forceRefresh: false);
-            var deployContext = BuildDeployContext(activeTemplateDocument.Template);
-            _deployCompatibilityIssues.Clear();
-            _deployCompatibilityIssues.AddRange(deployContext.CompatibilityIssues);
-
-            _deployReadinessReport = await _deploymentPreflightService.RunAsync(deployContext.MultiVmContext, mode);
-
-            var blockingCount = _deployCompatibilityIssues.Count(issue => issue.IsBlocking) +
-                                _deployReadinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Fail);
-            var warningCount = _deployCompatibilityIssues.Count(issue => !issue.IsBlocking) +
-                               _deployReadinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn);
-            _deployProgressPercent = 35;
-            _deployLifecycleState = blockingCount > 0 ? "Blocked" : warningCount > 0 ? "Warning" : "Ready";
-            _deployProgressSummary = blockingCount > 0
-                ? $"Readiness blocked ({blockingCount} fail, {warningCount} warn)."
-                : warningCount > 0
-                    ? $"Readiness passed with warnings ({warningCount})."
-                    : "Readiness passed.";
-            _deployFromTemplateWorkspaceComposition.SetActionStatus(
-                blockingCount > 0
-                    ? $"Readiness found {blockingCount} blocking issue(s) and {warningCount} warning(s)."
-                    : warningCount > 0
-                        ? $"Readiness passed with {warningCount} warning(s)."
-                        : "Readiness passed with no issues.");
-        }
-        catch (Exception ex)
-        {
-            _deployReadinessReport = null;
-            _deployCompatibilityIssues.Clear();
-            _deployLifecycleState = "Error";
-            _deployProgressPercent = 0;
-            _deployProgressSummary = "Readiness evaluation failed.";
-            _deployFromTemplateWorkspaceComposition.SetActionStatus($"Readiness evaluation failed. {ex.Message}");
-        }
-        finally
-        {
-            _isDeployEvaluatingReadiness = false;
-            UpdateDeployUi();
-        }
-    }
+    private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>
+        _deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);
 
     private async void DeployStartButton_Click(object sender, RoutedEventArgs e)
     {
-        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
-        if (activeTemplateDocument is null)
-        {
-            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
-            return;
-        }
-
-        _isDeployStarting = true;
-        _showDeployAllVmRows = true;
-        _deployProgressByVm.Clear();
-        _deployLifecycleState = "Running";
-        _deployProgressPercent = 45;
-        _deployProgressSummary = "Preparing deployment...";
-        UpdateDeployUi();
-        try
-        {
-            await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Full);
-            var hasBlockingFailures = _deployCompatibilityIssues.Any(issue => issue.IsBlocking) ||
-                                      (_deployReadinessReport?.HasBlockingFailures ?? false);
-            if (hasBlockingFailures)
-            {
-                _deployLifecycleState = "Blocked";
-                _deployProgressPercent = 35;
-                _deployProgressSummary = "Deployment blocked by readiness failures.";
-                _deployFromTemplateWorkspaceComposition.SetActionStatus("Deploy blocked by readiness failures. Resolve blocking items first.");
-                return;
-            }
-
-            var deployContext = BuildDeployContext(activeTemplateDocument.Template);
-            InitializeDeployProgressRows(deployContext.MultiVmContext, _deployProgressByVm);
-            AttachDeployProgressCallbacks(deployContext.MultiVmContext, _deployProgressByVm, isOnTheFly: false);
-            _deployProgressPercent = 60;
-            _deployProgressSummary = $"Deploying {deployContext.MultiVmContext.VmContexts.Count} VM(s)...";
-            _deployFromTemplateWorkspaceComposition.SetActionStatus("Starting deployment...");
-            UpdateDeployResultRows();
-            UpdateDeployUi();
-            await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);
-
-            var summary = _deploymentOutcomeSummaryBuilder.Build(deployContext.MultiVmContext);
-            UpdateDeployRowsFromSummary(summary);
-            _deployLifecycleState = summary.OperationState switch
-            {
-                DeploymentOperationState.Completed => "Completed",
-                DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "Cancelled",
-                DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
-                _ => "Completed"
-            };
-            _deployProgressPercent = 100;
-            _deployProgressSummary =
-                $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.";
-            _deployFromTemplateWorkspaceComposition.SetActionStatus(
-                $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, " +
-                $"Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Residuals={summary.ResidualVmCount}.");
-        }
-        catch (Exception ex)
-        {
-            _deployLifecycleState = "Failed";
-            _deployProgressPercent = 100;
-            _deployProgressSummary = "Deployment failed.";
-            _deployFromTemplateWorkspaceComposition.SetActionStatus($"Deploy failed. {ex.Message}");
-        }
-        finally
-        {
-            _showDeployAllVmRows = true;
-            _isDeployStarting = false;
-            UpdateDeployUi();
-        }
+        await _deployFromTemplateWorkspaceComposition.StartDeployAsync();
     }
 
     private async Task<int> ApplyDeployResolveSuggestionsAsync(LabTemplate template)
@@ -2835,192 +2742,6 @@ public sealed partial class MainWindow : Window
         }
 
         return applied;
-    }
-
-    private DeployContextBuildResult BuildDeployContext(LabTemplate template)
-    {
-        var compatibilityIssues = new List<DeployCompatibilityIssue>();
-        var settings = _settingsStore.Settings;
-        var catalogResult = _vhdxCatalogStore.Load(settings.CatalogPath);
-        var catalogItems = catalogResult.Items.ToList();
-        var availableSwitches = _templateAvailableSwitches.ToList();
-
-        var contexts = new List<VmDeploymentContext>();
-        foreach (var vmTemplate in template.VmTemplates)
-        {
-            var vmName = string.IsNullOrWhiteSpace(vmTemplate.Name) ? "Unnamed-VM" : vmTemplate.Name.Trim();
-            var vmId = Guid.TryParse(vmTemplate.VmId, out var parsedVmId) ? parsedVmId : Guid.NewGuid();
-
-            var diskResolution = ResolveDeployDiskIdentity(vmTemplate, catalogItems);
-            compatibilityIssues.AddRange(diskResolution.Issues.Select(issue => issue with { VmName = vmName }));
-
-            var switchResolution = ResolveDeploySwitches(vmTemplate, availableSwitches);
-            compatibilityIssues.AddRange(switchResolution.Issues.Select(issue => issue with { VmName = vmName }));
-
-            var vmPath = Path.Combine(settings.VmBasePath, vmName);
-            var vhdPath = Path.Combine(vmPath, $"{vmName}.vhdx");
-
-            var context = new VmDeploymentContext
-            {
-                VmId = vmId,
-                VmName = vmName,
-                MemoryMb = vmTemplate.MemoryMb > 0 ? vmTemplate.MemoryMb : settings.DefaultVmMemoryMb,
-                CpuCount = vmTemplate.CpuCount > 0 ? vmTemplate.CpuCount : settings.DefaultCpuCount,
-                VmPath = vmPath,
-                VhdPath = vhdPath,
-                BaseVhdPath = diskResolution.EffectiveBasePath,
-                VhdxId = diskResolution.EffectiveId,
-                VhdxSignature = diskResolution.EffectiveSignature,
-                VirtualSwitchName = switchResolution.EffectiveSwitch,
-                PerVmFailFast = settings.PerVmFailFast,
-                NonBlockingOptionalSteps = new List<string>(settings.NonBlockingOptionalSteps ?? []),
-                ConfigureTimeZone = vmTemplate.TimeZoneConfig?.Enabled == true,
-                InstallSoftware = vmTemplate.SoftwareConfig?.Enabled == true,
-                InstallRole = vmTemplate.RoleConfig?.Enabled == true,
-                ConfigureNetworkInformation = vmTemplate.GuestNetworkConfig?.Enabled == true,
-                TimeZoneConfig = vmTemplate.TimeZoneConfig,
-                SoftwareConfig = vmTemplate.SoftwareConfig,
-                RoleConfig = vmTemplate.RoleConfig,
-                GuestNetworkConfig = vmTemplate.GuestNetworkConfig
-            };
-            contexts.Add(context);
-        }
-
-        var multiVmContext = new MultiVmDeploymentContext
-        {
-            VmContexts = contexts,
-            StopAllOnAnyVmFailure = settings.StopAllOnAnyVmFailure
-        };
-
-        return new DeployContextBuildResult(multiVmContext, compatibilityIssues);
-    }
-
-    private static DeployDiskResolution ResolveDeployDiskIdentity(VmTemplate vmTemplate, IReadOnlyList<VhdxCatalogItem> catalogItems)
-    {
-        var issues = new List<DeployCompatibilityIssue>();
-        var idMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdxId)
-            ? null
-            : catalogItems.FirstOrDefault(item => string.Equals(item.Id, vmTemplate.VhdxId, StringComparison.OrdinalIgnoreCase));
-
-        var signatureMatches = string.IsNullOrWhiteSpace(vmTemplate.VhdxSignature)
-            ? []
-            : VhdxSignature.FindMatches(vmTemplate.VhdxSignature, catalogItems).ToList();
-
-        var pathMatch = string.IsNullOrWhiteSpace(vmTemplate.VhdPath)
-            ? null
-            : catalogItems.FirstOrDefault(item => string.Equals(item.Path, vmTemplate.VhdPath, StringComparison.OrdinalIgnoreCase));
-
-        if (idMatch is not null)
-        {
-            var pathConflict = !string.IsNullOrWhiteSpace(vmTemplate.VhdPath) &&
-                               !string.Equals(vmTemplate.VhdPath, idMatch.Path, StringComparison.OrdinalIgnoreCase);
-            var signatureConflict = !string.IsNullOrWhiteSpace(vmTemplate.VhdxSignature) &&
-                                    !string.IsNullOrWhiteSpace(idMatch.Signature) &&
-                                    !string.Equals(vmTemplate.VhdxSignature, idMatch.Signature, StringComparison.OrdinalIgnoreCase);
-            if (pathConflict || signatureConflict)
-            {
-                issues.Add(new DeployCompatibilityIssue(
-                    VmName: string.Empty,
-                    IsBlocking: true,
-                    Message: "Disk identity conflict detected. Resolve in Templates editor.",
-                    Guidance: "Select one catalog-backed identity and save template."));
-                return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
-            }
-
-            return new DeployDiskResolution(idMatch.Path, idMatch.Id, idMatch.Signature, issues);
-        }
-
-        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))
-        {
-            issues.Add(new DeployCompatibilityIssue(
-                VmName: string.Empty,
-                IsBlocking: true,
-                Message: $"Catalog entry '{vmTemplate.VhdxId}' is missing.",
-                Guidance: "Open in Templates editor and select a valid catalog disk."));
-            return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
-        }
-
-        if (signatureMatches.Count > 1)
-        {
-            issues.Add(new DeployCompatibilityIssue(
-                VmName: string.Empty,
-                IsBlocking: true,
-                Message: "Disk signature maps to multiple catalog entries.",
-                Guidance: "Resolve ambiguous disk selection in Templates editor."));
-            return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
-        }
-
-        if (signatureMatches.Count == 1)
-        {
-            var match = signatureMatches[0];
-            return new DeployDiskResolution(match.Path, match.Id, match.Signature, issues);
-        }
-
-        if (pathMatch is not null)
-        {
-            issues.Add(new DeployCompatibilityIssue(
-                VmName: string.Empty,
-                IsBlocking: false,
-                Message: "Using legacy path-based disk match.",
-                Guidance: "Use resolve suggestions or Templates editor to normalize to catalog id."));
-            return new DeployDiskResolution(pathMatch.Path, pathMatch.Id, pathMatch.Signature, issues);
-        }
-
-        if (!string.IsNullOrWhiteSpace(vmTemplate.VhdPath))
-        {
-            issues.Add(new DeployCompatibilityIssue(
-                VmName: string.Empty,
-                IsBlocking: true,
-                Message: "Disk path does not match catalog entries.",
-                Guidance: "Open in Templates editor and choose a valid catalog base disk."));
-            return new DeployDiskResolution(vmTemplate.VhdPath, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
-        }
-
-        issues.Add(new DeployCompatibilityIssue(
-            VmName: string.Empty,
-            IsBlocking: true,
-            Message: "No disk identity configured.",
-            Guidance: "Open in Templates editor and select a base disk."));
-        return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
-    }
-
-    private static DeploySwitchResolution ResolveDeploySwitches(VmTemplate vmTemplate, IReadOnlyList<string> availableSwitches)
-    {
-        var issues = new List<DeployCompatibilityIssue>();
-        var switches = vmTemplate.SwitchNames?
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList() ?? [];
-
-        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(vmTemplate.SwitchName))
-        {
-            switches.Add(vmTemplate.SwitchName);
-        }
-
-        if (switches.Count == 0)
-        {
-            issues.Add(new DeployCompatibilityIssue(
-                VmName: string.Empty,
-                IsBlocking: false,
-                Message: "No switch assigned.",
-                Guidance: "Assign a switch in Quick Deploy VM properties (or Templates editor) if networking is required."));
-            return new DeploySwitchResolution(string.Empty, issues);
-        }
-
-        var available = switches
-            .Where(name => availableSwitches.Contains(name, StringComparer.OrdinalIgnoreCase))
-            .ToList();
-        var missing = switches.Where(name => !available.Contains(name, StringComparer.OrdinalIgnoreCase)).ToList();
-        if (missing.Count > 0)
-        {
-            issues.Add(new DeployCompatibilityIssue(
-                VmName: string.Empty,
-                IsBlocking: false,
-                Message: $"Switch mapping partial/missing ({string.Join(", ", missing)}).",
-                Guidance: "Update switch mapping in Quick Deploy VM properties (or Templates editor)."));
-        }
-
-        return new DeploySwitchResolution(available.FirstOrDefault() ?? string.Empty, issues);
     }
 
     private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)
@@ -3109,6 +2830,12 @@ public sealed partial class MainWindow : Window
         }
 
         _templatesWorkspaceComposition.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+    }
+
+    private IReadOnlyList<VhdxCatalogItem> LoadDeployCatalogItems()
+    {
+        var catalogResult = _vhdxCatalogStore.Load(_settingsStore.Settings.CatalogPath);
+        return catalogResult.Items;
     }
 
     private async Task EnsureDeployOnTheFlyReferenceDataAsync(bool forceRefresh)
@@ -3583,27 +3310,6 @@ public sealed partial class MainWindow : Window
     }
 
     */
-    private sealed record DeployCompatibilityIssue(
-        string VmName,
-        bool IsBlocking,
-        string Message,
-        string Guidance);
-
-    private sealed record DeployDiskResolution(
-        string EffectiveBasePath,
-        string? EffectiveId,
-        string? EffectiveSignature,
-        IReadOnlyList<DeployCompatibilityIssue> Issues);
-
-    private sealed record DeploySwitchResolution(
-        string EffectiveSwitch,
-        IReadOnlyList<DeployCompatibilityIssue> Issues);
-
-    private sealed record DeployContextBuildResult(
-        MultiVmDeploymentContext MultiVmContext,
-        IReadOnlyList<DeployCompatibilityIssue> CompatibilityIssues);
-
-
     private sealed record DeployTimelineStepDefinition(
         string StepKey,
         string Label);

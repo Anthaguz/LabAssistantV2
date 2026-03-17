@@ -1468,7 +1468,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void SetActionStatus(string actionStatusText)", fromTemplateCompositionSource);
         Assert.Contains("public void RefreshReviewState(bool hasBlockingFailures)", fromTemplateCompositionSource);
         Assert.Contains("public void ReconcileSelection(IReadOnlyList<TemplateLibraryItem> items)", fromTemplateCompositionSource);
-        Assert.DoesNotContain("EvaluateDeployReadinessAsync", fromTemplateCompositionSource);
         Assert.DoesNotContain("BuildDeployContext", fromTemplateCompositionSource);
 
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceViewModel", fromTemplateWorkspaceSource);
@@ -1517,6 +1516,55 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void ClearGroupedIssueState()", fromTemplateWorkspaceSource);
         Assert.Contains("public void ReplaceIssueRows(IReadOnlyList<DeployIssueRow> issueRows)", fromTemplateWorkspaceSource);
         Assert.Contains("private void RefreshSharedIssueSummaries()", fromTemplateWorkspaceSource);
+    }
+
+    [Fact]
+    public void DeployFromTemplate_UsesLocalDeployOrchestrationSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
+        var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
+        var deployContextBuilderSource = LoadDeployContextBuilderSource();
+        var deployContextTypesSource = LoadDeployContextTypesSource();
+
+        Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition!.ActiveTemplateDocument", mainWindowSource);
+        Assert.Contains("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", mainWindowSource);
+        Assert.Contains("await _deployFromTemplateWorkspaceComposition.StartDeployAsync();", mainWindowSource);
+        Assert.DoesNotContain("private DeployContextBuildResult BuildDeployContext(LabTemplate template)", mainWindowSource);
+        Assert.DoesNotContain("private static DeployDiskResolution ResolveDeployDiskIdentity", mainWindowSource);
+        Assert.DoesNotContain("private static DeploySwitchResolution ResolveDeploySwitches", mainWindowSource);
+
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState();", deployWorkspaceCompositionSource);
+
+        Assert.Contains("internal interface IDeployFromTemplateWorkspaceHost", fromTemplateCompositionSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateWorkspaceHost", fromTemplateCompositionSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceController", fromTemplateCompositionSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceController _controller;", fromTemplateCompositionSource);
+        Assert.Contains("public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) => _controller.EvaluateReadinessAsync(mode);", fromTemplateCompositionSource);
+        Assert.Contains("public Task StartDeployAsync() => _controller.StartDeployAsync();", fromTemplateCompositionSource);
+        Assert.Contains("var deployContext = DeployContextBuilder.Build(", fromTemplateCompositionSource);
+        Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", fromTemplateCompositionSource);
+
+        Assert.Contains("public bool IsEvaluatingReadiness { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public bool IsStarting { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string LifecycleState { get; private set; } = \"Idle\";", fromTemplateWorkspaceSource);
+        Assert.Contains("public int ProgressPercent { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string ProgressSummary { get; private set; } = \"No deployment started.\";", fromTemplateWorkspaceSource);
+        Assert.Contains("public void SetWorkflowState(", fromTemplateWorkspaceSource);
+
+        Assert.Contains("internal static class DeployContextBuilder", deployContextBuilderSource);
+        Assert.Contains("public static DeployContextBuildResult Build(", deployContextBuilderSource);
+        Assert.Contains("private static DeployDiskResolution ResolveDeployDiskIdentity", deployContextBuilderSource);
+        Assert.Contains("private static DeploySwitchResolution ResolveDeploySwitches", deployContextBuilderSource);
+
+        Assert.Contains("internal sealed record DeployCompatibilityIssue(", deployContextTypesSource);
+        Assert.Contains("internal sealed record DeployDiskResolution(", deployContextTypesSource);
+        Assert.Contains("internal sealed record DeploySwitchResolution(", deployContextTypesSource);
+        Assert.Contains("internal sealed record DeployContextBuildResult(", deployContextTypesSource);
     }
 
     [Fact]
@@ -1626,6 +1674,18 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployFromTemplateWorkspaceViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployContextBuilderSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployContextBuilder.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployContextTypesSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployContextTypes.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
