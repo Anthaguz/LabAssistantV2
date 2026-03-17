@@ -1342,17 +1342,23 @@ public sealed class MilestoneAMScenarioMatrixTests
     public void DeployWorkspaceComposition_BecomesTheSharedDeployCompositionOwner_WithoutRuntimeLaneExtraction()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
+        var overviewCompositionSource = LoadDeployOverviewWorkspaceCompositionSource();
+        var overviewWorkspaceSource = LoadDeployOverviewWorkspaceViewModelSource();
 
         Assert.Contains("internal sealed class DeployWorkspaceComposition", compositionSource);
         Assert.Contains("private readonly FrameworkElement _localNavigationHost;", compositionSource);
         Assert.Contains("private readonly FrameworkElement _overviewHost;", compositionSource);
         Assert.Contains("private readonly FrameworkElement _onTheFlyHost;", compositionSource);
         Assert.Contains("private readonly FrameworkElement _fromTemplateHost;", compositionSource);
-        Assert.Contains("private readonly DeployOverviewView _overviewView;", compositionSource);
-        Assert.Contains("private readonly Func<DeployWorkspaceUiState> _getUiState;", compositionSource);
+        Assert.Contains("private readonly DeployOverviewWorkspaceComposition _overviewWorkspaceComposition;", compositionSource);
         Assert.Contains("private readonly IDeployWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingDeploySubviewSelection;", compositionSource);
-        Assert.Contains("private DeployWorkspaceUiState _uiState;", compositionSource);
+        Assert.Contains("_overviewWorkspaceComposition = new DeployOverviewWorkspaceComposition(", compositionSource);
+        Assert.Contains("new DeployOverviewWorkspaceHost(", compositionSource);
+        Assert.Contains("new DeployOverviewWorkspaceShellBridge(", compositionSource);
+        Assert.Contains("() => getUiState().QuickDeployDraftCount,", compositionSource);
+        Assert.Contains("() => getUiState().IsLoadingTemplates,", compositionSource);
+        Assert.Contains("() => getUiState().AvailableTemplateCount),", compositionSource);
         Assert.Contains("public void RefreshSharedUiState()", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
@@ -1360,12 +1366,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", compositionSource);
-        Assert.Contains("_uiState = _getUiState();", compositionSource);
-        Assert.Contains("RefreshSharedUiState();", compositionSource);
-        Assert.Contains("_overviewView.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
-        Assert.Contains("_overviewView.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
-        Assert.Contains("_overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _uiState.QuickDeployDraftCount > 0", compositionSource);
-        Assert.Contains("_overviewView.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _uiState.IsLoadingTemplates", compositionSource);
+        Assert.Contains("public void RefreshSharedUiState() => _overviewWorkspaceComposition.RefreshUiState();", compositionSource);
+        Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOverview);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
@@ -1379,6 +1381,33 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("public void ApplyUiState(DeployWorkspaceUiState state)", compositionSource);
         Assert.DoesNotContain("internal interface IDeployWorkspaceHost", compositionSource);
         Assert.DoesNotContain("internal sealed class DeployWorkspaceHost", compositionSource);
+        Assert.DoesNotContain("private readonly DeployOverviewView _overviewView;", compositionSource);
+        Assert.DoesNotContain("private readonly Func<DeployWorkspaceUiState> _getUiState;", compositionSource);
+        Assert.DoesNotContain("private DeployWorkspaceUiState _uiState;", compositionSource);
+        Assert.DoesNotContain("_overviewView.DeployOverviewOpenQuickDeployButtonControl", compositionSource);
+        Assert.DoesNotContain("_overviewView.DeployOverviewFromTemplateSummaryTextBlockControl", compositionSource);
+
+        Assert.Contains("internal sealed class DeployOverviewWorkspaceComposition", overviewCompositionSource);
+        Assert.Contains("private readonly DeployOverviewView _view;", overviewCompositionSource);
+        Assert.Contains("private readonly DeployOverviewWorkspaceViewModel _workspace = new();", overviewCompositionSource);
+        Assert.Contains("private readonly IDeployOverviewWorkspaceHost _host;", overviewCompositionSource);
+        Assert.Contains("private readonly IDeployOverviewWorkspaceShellBridge _shellBridge;", overviewCompositionSource);
+        Assert.Contains("WireHandlers();", overviewCompositionSource);
+        Assert.Contains("ApplyWorkspaceState();", overviewCompositionSource);
+        Assert.Contains("public void RefreshUiState()", overviewCompositionSource);
+        Assert.Contains("public void ApplyShellState()", overviewCompositionSource);
+        Assert.Contains("if (!_shellBridge.IsDeployOverviewActive)", overviewCompositionSource);
+        Assert.Contains("_view.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", overviewCompositionSource);
+        Assert.Contains("_view.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", overviewCompositionSource);
+        Assert.Contains("_workspace.RefreshSummary(", overviewCompositionSource);
+        Assert.Contains("_view.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _workspace.QuickDeploySummaryText;", overviewCompositionSource);
+        Assert.Contains("_view.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _workspace.FromTemplateSummaryText;", overviewCompositionSource);
+
+        Assert.Contains("internal sealed class DeployOverviewWorkspaceViewModel", overviewWorkspaceSource);
+        Assert.Contains("public string QuickDeploySummaryText { get; private set; }", overviewWorkspaceSource);
+        Assert.Contains("public string FromTemplateSummaryText { get; private set; }", overviewWorkspaceSource);
+        Assert.Contains("public void RefreshSummary(int quickDeployDraftCount, bool isLoadingTemplates, int availableTemplateCount)", overviewWorkspaceSource);
+        Assert.Contains("\"Template inventory is loading.\"", overviewWorkspaceSource);
     }
 
     [Fact]
@@ -1464,6 +1493,18 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOverviewWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOverviewWorkspaceViewModelSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
