@@ -10,7 +10,8 @@ public sealed class MilestoneAHScenarioMatrixTests
     {
         var stateSource = LoadTimelineStateSource();
         var deploymentStepStateSource = LoadDeploymentStepStateContractSource();
-        var mainWindowSource = LoadMainWindowSource();
+        var timelineDefinitionSource = LoadTimelineStepDefinitionSource();
+        var timelineRowSource = LoadTimelineStepRowSource();
 
         Assert.Contains("public enum DeployTimelineStepState", stateSource);
         Assert.Contains("public enum DeployStepState", deploymentStepStateSource);
@@ -20,15 +21,15 @@ public sealed class MilestoneAHScenarioMatrixTests
         Assert.Contains("Succeeded", stateSource);
         Assert.Contains("Failed", stateSource);
         Assert.Contains("Skipped", stateSource);
-        Assert.Contains("private sealed record DeployTimelineStepDefinition", mainWindowSource);
-        Assert.Contains("private sealed record DeployTimelineStepRow", mainWindowSource);
+        Assert.Contains("internal sealed record DeployTimelineStepDefinition", timelineDefinitionSource);
+        Assert.Contains("internal sealed record DeployTimelineStepRow", timelineRowSource);
     }
 
     [Fact]
     public void DeployTimeline_UsesStateDrivenIconCatalog()
     {
         var iconCatalogSource = LoadTimelineIconCatalogSource();
-        var mainWindowSource = LoadMainWindowSource();
+        var timelineRowSource = LoadTimelineStepRowSource();
 
         Assert.Contains("GlyphByState", iconCatalogSource);
         Assert.Contains("[DeployTimelineStepState.Pending]", iconCatalogSource);
@@ -36,19 +37,19 @@ public sealed class MilestoneAHScenarioMatrixTests
         Assert.Contains("[DeployTimelineStepState.Succeeded]", iconCatalogSource);
         Assert.Contains("[DeployTimelineStepState.Failed]", iconCatalogSource);
         Assert.Contains("[DeployTimelineStepState.Skipped]", iconCatalogSource);
-        Assert.Contains("DeployTimelineIconCatalog.GetGlyph(State)", mainWindowSource);
+        Assert.Contains("DeployTimelineIconCatalog.GetGlyph(State)", timelineRowSource);
     }
 
     [Fact]
     public void DeployTimeline_HidesSkippedRowsAndUsesDeterministicTransitions()
     {
-        var mainWindowSource = LoadMainWindowSource();
+        var progressStateSource = LoadDeployVmProgressStateSource();
 
-        Assert.Contains(".Where(step => step.State != DeployTimelineStepState.Skipped)", mainWindowSource);
-        Assert.Contains("state.ApplyStepStateUpdate(update);", mainWindowSource);
-        Assert.Contains("private static DeployTimelineStepState MapState(DeployStepState state)", mainWindowSource);
-        Assert.Contains("public void ApplyStepStateUpdate(DeployStepStateUpdate update)", mainWindowSource);
-        Assert.Contains("public void MarkCompleted(string status, string summary)", mainWindowSource);
+        Assert.Contains(".Where(step => step.State != DeployTimelineStepState.Skipped)", progressStateSource);
+        Assert.Contains("_stepStatesByKey[update.StepKey] = mappedState;", progressStateSource);
+        Assert.Contains("private static DeployTimelineStepState MapState(DeployStepState state)", progressStateSource);
+        Assert.Contains("public void ApplyStepStateUpdate(DeployStepStateUpdate update)", progressStateSource);
+        Assert.Contains("public void MarkCompleted(string status, string summary)", progressStateSource);
     }
 
     [Fact]
@@ -108,6 +109,24 @@ public sealed class MilestoneAHScenarioMatrixTests
     private static string LoadTimelineIconCatalogSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Theming", "DeployTimelineIconCatalog.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTimelineStepDefinitionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployTimelineStepDefinition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTimelineStepRowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployTimelineStepRow.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployVmProgressStateSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployVmProgressState.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

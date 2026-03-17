@@ -27,19 +27,12 @@ internal interface IDeployFromTemplateWorkspaceHost
 
     DeploymentReadinessReport? CurrentReadinessReport { get; set; }
 
-    void SetShowAllVmRows(bool showAllVmRows);
-
-    void ClearProgressRows();
-
-    void InitializeProgressRows(MultiVmDeploymentContext context);
-
-    void AttachProgressCallbacks(MultiVmDeploymentContext context);
-
-    void UpdateDeployResultRows();
-
     Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context);
 
-    void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary);
+    void AttachProgressCallbacks(
+        MultiVmDeploymentContext context,
+        Action<string, string?> onLogMessage,
+        Action<string, DeployStepStateUpdate> onStepStateUpdated);
 
     void UpdateUi();
 }
@@ -55,13 +48,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateWorks
     private readonly Action<IReadOnlyList<DeployCompatibilityIssue>> _replaceCompatibilityIssues;
     private readonly Func<DeploymentReadinessReport?> _getCurrentReadinessReport;
     private readonly Action<DeploymentReadinessReport?> _setCurrentReadinessReport;
-    private readonly Action<bool> _setShowAllVmRows;
-    private readonly Action _clearProgressRows;
-    private readonly Action<MultiVmDeploymentContext> _initializeProgressRows;
-    private readonly Action<MultiVmDeploymentContext> _attachProgressCallbacks;
-    private readonly Action _updateDeployResultRows;
     private readonly Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> _deployAllAsync;
-    private readonly Action<DeploymentOutcomeSummary> _updateDeployRowsFromSummary;
+    private readonly Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> _attachProgressCallbacks;
     private readonly Action _updateUi;
 
     public DeployFromTemplateWorkspaceHost(
@@ -74,13 +62,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateWorks
         Action<IReadOnlyList<DeployCompatibilityIssue>> replaceCompatibilityIssues,
         Func<DeploymentReadinessReport?> getCurrentReadinessReport,
         Action<DeploymentReadinessReport?> setCurrentReadinessReport,
-        Action<bool> setShowAllVmRows,
-        Action clearProgressRows,
-        Action<MultiVmDeploymentContext> initializeProgressRows,
-        Action<MultiVmDeploymentContext> attachProgressCallbacks,
-        Action updateDeployResultRows,
         Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> deployAllAsync,
-        Action<DeploymentOutcomeSummary> updateDeployRowsFromSummary,
+        Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> attachProgressCallbacks,
         Action updateUi)
     {
         _deploymentSettings = deploymentSettings;
@@ -92,13 +75,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateWorks
         _replaceCompatibilityIssues = replaceCompatibilityIssues;
         _getCurrentReadinessReport = getCurrentReadinessReport;
         _setCurrentReadinessReport = setCurrentReadinessReport;
-        _setShowAllVmRows = setShowAllVmRows;
-        _clearProgressRows = clearProgressRows;
-        _initializeProgressRows = initializeProgressRows;
         _attachProgressCallbacks = attachProgressCallbacks;
-        _updateDeployResultRows = updateDeployResultRows;
         _deployAllAsync = deployAllAsync;
-        _updateDeployRowsFromSummary = updateDeployRowsFromSummary;
         _updateUi = updateUi;
     }
 
@@ -122,19 +100,12 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateWorks
         set => _setCurrentReadinessReport(value);
     }
 
-    public void SetShowAllVmRows(bool showAllVmRows) => _setShowAllVmRows(showAllVmRows);
-
-    public void ClearProgressRows() => _clearProgressRows();
-
-    public void InitializeProgressRows(MultiVmDeploymentContext context) => _initializeProgressRows(context);
-
-    public void AttachProgressCallbacks(MultiVmDeploymentContext context) => _attachProgressCallbacks(context);
-
-    public void UpdateDeployResultRows() => _updateDeployResultRows();
-
     public Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context) => _deployAllAsync(context);
 
-    public void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary) => _updateDeployRowsFromSummary(summary);
+    public void AttachProgressCallbacks(
+        MultiVmDeploymentContext context,
+        Action<string, string?> onLogMessage,
+        Action<string, DeployStepStateUpdate> onStepStateUpdated) => _attachProgressCallbacks(context, onLogMessage, onStepStateUpdated);
 
     public void UpdateUi() => _updateUi();
 }
@@ -156,7 +127,7 @@ internal sealed class DeployFromTemplateWorkspaceController
     {
         if (!_workspace.IsStarting)
         {
-            _host.SetShowAllVmRows(false);
+            _workspace.SetShowAllVmRows(false);
         }
 
         var activeTemplateDocument = _host.ActiveTemplateDocument;
@@ -255,8 +226,8 @@ internal sealed class DeployFromTemplateWorkspaceController
             lifecycleState: "Running",
             progressPercent: 45,
             progressSummary: "Preparing deployment...");
-        _host.SetShowAllVmRows(true);
-        _host.ClearProgressRows();
+        _workspace.SetShowAllVmRows(true);
+        _workspace.ClearResultRows();
         _host.UpdateUi();
 
         try
@@ -282,8 +253,19 @@ internal sealed class DeployFromTemplateWorkspaceController
                 _host.DeploymentSettings,
                 _host.LoadCatalogItems(),
                 _host.AvailableSwitches);
-            _host.InitializeProgressRows(deployContext.MultiVmContext);
-            _host.AttachProgressCallbacks(deployContext.MultiVmContext);
+            _workspace.InitializeProgressRows(deployContext.MultiVmContext);
+            _host.AttachProgressCallbacks(
+                deployContext.MultiVmContext,
+                (vmName, message) =>
+                {
+                    _workspace.UpdateProgressMessage(vmName, message);
+                    _host.UpdateUi();
+                },
+                (vmName, update) =>
+                {
+                    _workspace.ApplyProgressUpdate(vmName, update);
+                    _host.UpdateUi();
+                });
             _workspace.SetWorkflowState(
                 isEvaluatingReadiness: false,
                 isStarting: true,
@@ -291,11 +273,10 @@ internal sealed class DeployFromTemplateWorkspaceController
                 progressPercent: 60,
                 progressSummary: $"Deploying {deployContext.MultiVmContext.VmContexts.Count} VM(s)...");
             _workspace.SetActionStatus("Starting deployment...");
-            _host.UpdateDeployResultRows();
             _host.UpdateUi();
 
             var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);
-            _host.UpdateDeployRowsFromSummary(summary);
+            _workspace.ApplyOutcomeSummary(summary);
             _workspace.SetWorkflowState(
                 isEvaluatingReadiness: false,
                 isStarting: true,
@@ -324,7 +305,7 @@ internal sealed class DeployFromTemplateWorkspaceController
         }
         finally
         {
-            _host.SetShowAllVmRows(true);
+            _workspace.SetShowAllVmRows(true);
             _workspace.SetWorkflowState(
                 isEvaluatingReadiness: false,
                 isStarting: false,
@@ -355,6 +336,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition
         _view.DeployTemplateSelectorComboBoxControl.ItemsSource = templateItemsSource;
         _view.DeploySharedIssuesListViewControl.ItemsSource = _workspace.SharedIssueSummaries;
         _rightPanelView.DeployGlobalIssuesListViewControl.ItemsSource = _workspace.IssueRows;
+        _rightPanelView.DeployVmResultsListViewControl.ItemsSource = _workspace.ResultRows;
         ApplyWorkspaceState();
     }
 
@@ -363,6 +345,8 @@ internal sealed class DeployFromTemplateWorkspaceComposition
     public TemplateEditorDocument? ActiveTemplateDocument => _workspace.ActiveTemplateDocument;
 
     public int IssueRowCount => _workspace.IssueRows.Count;
+
+    public int ResultRowCount => _workspace.ResultRows.Count;
 
     public bool IsEvaluatingReadiness => _workspace.IsEvaluatingReadiness;
 
@@ -439,6 +423,14 @@ internal sealed class DeployFromTemplateWorkspaceComposition
     public void ReplaceIssueRows(IReadOnlyList<DeployIssueRow> issueRows)
     {
         _workspace.ReplaceIssueRows(issueRows);
+        ApplyWorkspaceState();
+    }
+
+    public void RefreshResultRows(
+        IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
+        DeploymentReadinessReport? readinessReport)
+    {
+        _workspace.RefreshResultRows(compatibilityIssues, readinessReport);
         ApplyWorkspaceState();
     }
 

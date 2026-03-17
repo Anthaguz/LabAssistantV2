@@ -1568,6 +1568,43 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void DeployFromTemplate_UsesLocalProgressResultsStateSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
+        var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
+        var deployVmProgressStateSource = LoadDeployVmProgressStateSource();
+        var deployVmResultRowSource = LoadDeployVmResultRowSource();
+        var deployTimelineStepRowSource = LoadDeployTimelineStepRowSource();
+
+        Assert.DoesNotContain("private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];", mainWindowSource);
+        Assert.DoesNotContain("private readonly Dictionary<string, DeployVmProgressState> _deployProgressByVm = new(StringComparer.OrdinalIgnoreCase);", mainWindowSource);
+        Assert.DoesNotContain("private bool _showDeployAllVmRows;", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.RefreshResultRows(_deployCompatibilityIssues, _deployReadinessReport);", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.ResultRowCount", mainWindowSource);
+
+        Assert.Contains("_rightPanelView.DeployVmResultsListViewControl.ItemsSource = _workspace.ResultRows;", fromTemplateCompositionSource);
+        Assert.Contains("public int ResultRowCount => _workspace.ResultRows.Count;", fromTemplateCompositionSource);
+        Assert.Contains("public void RefreshResultRows(", fromTemplateCompositionSource);
+
+        Assert.Contains("public ObservableCollection<DeployVmResultRow> ResultRows { get; } = [];", fromTemplateWorkspaceSource);
+        Assert.Contains("private readonly Dictionary<string, DeployVmProgressState> _progressByVm = new(StringComparer.OrdinalIgnoreCase);", fromTemplateWorkspaceSource);
+        Assert.Contains("public bool ShowAllVmRows { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public void SetShowAllVmRows(bool showAllVmRows)", fromTemplateWorkspaceSource);
+        Assert.Contains("public void InitializeProgressRows(MultiVmDeploymentContext context)", fromTemplateWorkspaceSource);
+        Assert.Contains("public void UpdateProgressMessage(string vmName, string? message)", fromTemplateWorkspaceSource);
+        Assert.Contains("public void ApplyProgressUpdate(string vmName, DeployStepStateUpdate update)", fromTemplateWorkspaceSource);
+        Assert.Contains("public void RefreshResultRows(", fromTemplateWorkspaceSource);
+        Assert.Contains("public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)", fromTemplateWorkspaceSource);
+
+        Assert.Contains("internal sealed class DeployVmProgressState", deployVmProgressStateSource);
+        Assert.Contains("public void UpdateSummaryMessage(string? message)", deployVmProgressStateSource);
+        Assert.Contains("public DeployVmResultRow ToRow()", deployVmProgressStateSource);
+        Assert.Contains("internal sealed record DeployVmResultRow(", deployVmResultRowSource);
+        Assert.Contains("internal sealed record DeployTimelineStepRow(", deployTimelineStepRowSource);
+    }
+
+    [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
@@ -1686,6 +1723,24 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployContextTypesSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployContextTypes.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployVmProgressStateSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployVmProgressState.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployVmResultRowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployVmResultRow.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployTimelineStepRowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Models", "Deploy", "DeployTimelineStepRow.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
