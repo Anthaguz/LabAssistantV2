@@ -28,12 +28,12 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _rightPanelView = rightPanelView;
         _host = host;
         _controller = new DeployFromTemplateWorkspaceController(_workspace, this);
-        _view.DeployTemplateSelectorComboBoxControl.ItemsSource = templateItemsSource;
-        _view.DeployTemplateSelectorComboBoxControl.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
-        _view.DeploySharedIssuesListViewControl.ItemsSource = _workspace.SharedIssueSummaries;
-        _rightPanelView.DeployGlobalIssuesListViewControl.ItemsSource = _workspace.IssueRows;
-        _rightPanelView.DeployVmResultsListViewControl.ItemsSource = _workspace.ResultRows;
-        _rightPanelView.DeployGlobalIssuesExpanderControl.IsExpanded = false;
+        _view.SetTemplateItemsSource(templateItemsSource);
+        _view.SetTemplateSelectorDisplayMemberPath(nameof(TemplateLibraryItem.Name));
+        _view.SetSharedIssueSummariesItemsSource(_workspace.SharedIssueSummaries);
+        _rightPanelView.SetIssueRowsItemsSource(_workspace.IssueRows);
+        _rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);
+        _rightPanelView.ResetPanelState();
         ApplyWorkspaceState();
     }
 
@@ -66,7 +66,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     public void ResetPanelState()
     {
-        _rightPanelView.DeployGlobalIssuesExpanderControl.IsExpanded = false;
+        _rightPanelView.ResetPanelState();
     }
 
     public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) => _controller.EvaluateReadinessAsync(mode);
@@ -152,6 +152,23 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         ApplyWorkspaceState();
     }
 
+    public void SetInteractionState(bool isLoadingTemplates, bool hasBlockingFailures)
+    {
+        var hasTemplate = _workspace.ActiveTemplateDocument is not null;
+        _view.SetInteractionState(
+            isTemplateSelectorEnabled: !isLoadingTemplates && !_workspace.IsStarting,
+            isReloadEnabled: !isLoadingTemplates && !_workspace.IsStarting,
+            isEvaluateReadinessEnabled: hasTemplate && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting,
+            isResolveSuggestionsEnabled: hasTemplate && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting,
+            isOpenTemplateEditorEnabled: _workspace.SelectedTemplateLibraryItem is not null && !_workspace.IsStarting,
+            isStartDeployEnabled: hasTemplate && !hasBlockingFailures && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting);
+    }
+
+    public void SetResultsPanelLauncherState(string buttonText, bool isEnabled, string summaryText)
+    {
+        _view.SetResultsPanelLauncherState(buttonText, isEnabled, summaryText);
+    }
+
     AppSettings IDeployFromTemplateWorkspaceControllerHost.DeploymentSettings => _host.DeploymentSettings;
 
     IReadOnlyList<string> IDeployFromTemplateWorkspaceControllerHost.AvailableSwitches => _host.AvailableSwitches;
@@ -183,19 +200,20 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     private void ApplyWorkspaceState()
     {
-        if (!ReferenceEquals(_view.DeployTemplateSelectorComboBoxControl.SelectedItem, _workspace.SelectedTemplateLibraryItem))
+        if (!ReferenceEquals(_view.SelectedTemplateLibraryItem, _workspace.SelectedTemplateLibraryItem))
         {
-            _view.DeployTemplateSelectorComboBoxControl.SelectedItem = _workspace.SelectedTemplateLibraryItem;
+            _view.SelectedTemplateLibraryItem = _workspace.SelectedTemplateLibraryItem;
         }
 
-        _view.DeployTemplateSummaryTextBlockControl.Text = _workspace.TemplateSummaryText;
-        _view.DeployTemplateRemediationTextBlockControl.Text = _workspace.TemplateRemediationText;
-        _view.DeployActionStatusTextBlockControl.Text = _workspace.ActionStatusText;
-        _view.DeployReadinessSummaryTextBlockControl.Text = _workspace.ReadinessSummaryText;
-        _view.DeploySharedIssuesSummaryTextBlockControl.Text = _workspace.SharedIssuesSummaryText;
-        _view.DeployGlobalIssuesBadgeTextBlockControl.Text = _workspace.GlobalIssuesBadgeText;
-        _view.DeployOverallStateTextBlockControl.Text = _workspace.LifecycleState;
-        _view.DeployProgressBarControl.Value = _workspace.ProgressPercent;
-        _view.DeployProgressSummaryTextBlockControl.Text = _workspace.ProgressSummary;
+        _view.ApplyWorkspaceState(new DeployFromTemplateViewState(
+            _workspace.TemplateSummaryText,
+            _workspace.TemplateRemediationText,
+            _workspace.ActionStatusText,
+            _workspace.ReadinessSummaryText,
+            _workspace.SharedIssuesSummaryText,
+            _workspace.GlobalIssuesBadgeText,
+            _workspace.LifecycleState,
+            _workspace.ProgressPercent,
+            _workspace.ProgressSummary));
     }
 }

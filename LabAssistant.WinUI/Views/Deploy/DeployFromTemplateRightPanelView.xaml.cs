@@ -9,9 +9,18 @@ public sealed partial class DeployFromTemplateRightPanelView : UserControl
         InitializeComponent();
     }
 
-    public Expander DeployGlobalIssuesExpanderControl => DeployGlobalIssuesExpander;
+    public void SetIssueRowsItemsSource(object? itemsSource)
+    {
+        DeployGlobalIssuesListView.ItemsSource = itemsSource;
+    }
 
-    public ListView DeployGlobalIssuesListViewControl => DeployGlobalIssuesListView;
+    public void SetResultRowsItemsSource(object? itemsSource)
+    {
+        DeployVmResultsListView.ItemsSource = itemsSource;
+    }
 
-    public ListView DeployVmResultsListViewControl => DeployVmResultsListView;
+    public void ResetPanelState()
+    {
+        DeployGlobalIssuesExpander.IsExpanded = false;
+    }
 }
