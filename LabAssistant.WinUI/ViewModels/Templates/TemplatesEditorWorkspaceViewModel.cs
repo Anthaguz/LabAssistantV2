@@ -8,6 +8,10 @@ internal sealed class TemplatesEditorWorkspaceViewModel
 {
     public ObservableCollection<VmTemplate> VmEntries { get; } = [];
 
+    public IReadOnlyList<string> AvailableVmSwitches { get; private set; } = Array.Empty<string>();
+
+    public IReadOnlyList<TemplateVhdxCatalogOption> VmVhdxCatalogOptions { get; private set; } = Array.Empty<TemplateVhdxCatalogOption>();
+
     public string TemplateName { get; private set; } = string.Empty;
 
     public string TemplateDescription { get; private set; } = string.Empty;
@@ -30,6 +34,34 @@ internal sealed class TemplatesEditorWorkspaceViewModel
 
     public string? SelectedVmId { get; private set; }
 
+    public string VmIdText { get; private set; } = "VM ID: -";
+
+    public string VmNameDraft { get; private set; } = string.Empty;
+
+    public string VmMemoryDraft { get; private set; } = string.Empty;
+
+    public string VmCpuDraft { get; private set; } = string.Empty;
+
+    public string VmVhdxIdText { get; private set; } = string.Empty;
+
+    public string VmVhdPathText { get; private set; } = string.Empty;
+
+    public string VmVhdxSignatureText { get; private set; } = string.Empty;
+
+    public IReadOnlyList<string> SelectedVmSwitches { get; private set; } = Array.Empty<string>();
+
+    public TemplateVhdxCatalogOption? SelectedVmVhdxCatalogOption { get; private set; }
+
+    public string VmSwitchGuidanceText { get; private set; } = "Select a VM entry to configure switch assignments.";
+
+    public string VmVhdxGuidanceText { get; private set; } = "Select a VM entry to configure base disk.";
+
+    public bool RequiresVmVhdxResolution { get; private set; }
+
+    public bool IsEditingNewVmEntry { get; private set; }
+
+    public bool HasVmDraftChanges { get; private set; }
+
     public void ClearDocument()
     {
         HasActiveDocument = false;
@@ -42,6 +74,7 @@ internal sealed class TemplatesEditorWorkspaceViewModel
         TemplateIdText = "Template ID: -";
         TemplateFilePathText = "File path: new template (not saved)";
         TemplateVmCountText = "VMs: 0";
+        ClearVmDraft();
     }
 
     public void SetDocument(TemplateEditorDocument document)
@@ -112,6 +145,46 @@ internal sealed class TemplatesEditorWorkspaceViewModel
             : selectedVmEntry.VmId;
     }
 
+    public void SetVmReferenceData(
+        IReadOnlyList<string> availableVmSwitches,
+        IReadOnlyList<TemplateVhdxCatalogOption> vmVhdxCatalogOptions)
+    {
+        AvailableVmSwitches = availableVmSwitches ?? Array.Empty<string>();
+        VmVhdxCatalogOptions = vmVhdxCatalogOptions ?? Array.Empty<TemplateVhdxCatalogOption>();
+    }
+
+    public void SetVmDraftState(TemplatesEditorVmDraftState state)
+    {
+        VmIdText = state.VmIdText;
+        VmNameDraft = state.VmName;
+        VmMemoryDraft = state.VmMemoryText;
+        VmCpuDraft = state.VmCpuText;
+        VmVhdxIdText = state.VmVhdxIdText;
+        VmVhdPathText = state.VmVhdPathText;
+        VmVhdxSignatureText = state.VmVhdxSignatureText;
+        SelectedVmSwitches = state.SelectedSwitches;
+        SelectedVmVhdxCatalogOption = state.SelectedVhdxCatalogOption;
+        VmSwitchGuidanceText = state.VmSwitchGuidanceText;
+        VmVhdxGuidanceText = state.VmVhdxGuidanceText;
+        RequiresVmVhdxResolution = state.RequiresVhdxResolution;
+        IsEditingNewVmEntry = state.IsEditingNewVmEntry;
+        HasVmDraftChanges = state.HasChanges;
+    }
+
+    public TemplatesEditorVmDraftSnapshot CaptureVmDraftSnapshot()
+    {
+        return new TemplatesEditorVmDraftSnapshot(
+            VmNameDraft,
+            VmMemoryDraft,
+            VmCpuDraft,
+            SelectedVmSwitches,
+            SelectedVmVhdxCatalogOption,
+            RequiresVmVhdxResolution,
+            VmVhdxGuidanceText,
+            IsEditingNewVmEntry,
+            HasVmDraftChanges);
+    }
+
     public void SetDocumentHeaderDraft(string? templateName, string? templateDescription)
     {
         TemplateName = templateName ?? string.Empty;
@@ -127,6 +200,24 @@ internal sealed class TemplatesEditorWorkspaceViewModel
     {
         StatusText = statusText ?? string.Empty;
         HasStatusText = !string.IsNullOrWhiteSpace(StatusText);
+    }
+
+    private void ClearVmDraft()
+    {
+        VmIdText = "VM ID: -";
+        VmNameDraft = string.Empty;
+        VmMemoryDraft = string.Empty;
+        VmCpuDraft = string.Empty;
+        VmVhdxIdText = string.Empty;
+        VmVhdPathText = string.Empty;
+        VmVhdxSignatureText = string.Empty;
+        SelectedVmSwitches = Array.Empty<string>();
+        SelectedVmVhdxCatalogOption = null;
+        VmSwitchGuidanceText = "Select a VM entry to configure switch assignments.";
+        VmVhdxGuidanceText = "Select a VM entry to configure base disk.";
+        RequiresVmVhdxResolution = false;
+        IsEditingNewVmEntry = false;
+        HasVmDraftChanges = false;
     }
 
     private static VmTemplate? ResolveSelection(

@@ -68,6 +68,8 @@ internal sealed class TemplatesWorkspaceComposition
 
     public VmTemplate? SelectedEditorVmEntry => _editorComposition.SelectedVmEntry;
 
+    public TemplatesEditorVmDraftSnapshot CaptureEditorVmDraftState() => _editorComposition.CaptureVmDraftState();
+
     public Task EnsureLibraryAsync(bool forceRefresh) => _libraryComposition.EnsureLibraryAsync(forceRefresh);
 
     public void SetEditorDocument(TemplateEditorDocument? document) => _editorComposition.SetDocument(document);
@@ -85,6 +87,11 @@ internal sealed class TemplatesWorkspaceComposition
     public VmTemplate? RemoveSelectedEditorVmEntry() => _editorComposition.RemoveSelectedVmEntry();
 
     public void RefreshEditorVmEntries() => _editorComposition.RefreshVmEntries();
+
+    public void SetEditorVmReferenceData(
+        IReadOnlyList<string> availableVmSwitches,
+        IReadOnlyList<TemplateVhdxCatalogOption> vmVhdxCatalogOptions) =>
+        _editorComposition.SetVmReferenceData(availableVmSwitches, vmVhdxCatalogOptions);
 
     public void ApplyShellState()
     {

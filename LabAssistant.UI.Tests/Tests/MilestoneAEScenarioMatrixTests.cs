@@ -35,12 +35,15 @@ public sealed class MilestoneAEScenarioMatrixTests
     public void MainWindow_DefinesSwitchSelectorRows_ValidationAndGuidancePaths()
     {
         var source = LoadMainWindowSource();
+        var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
+        var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
 
-        Assert.Contains("AddTemplateVmSwitchRowButton_Click", source);
-        Assert.Contains("RemoveTemplateVmSwitchRowButton_Click", source);
-        Assert.Contains("TryGetTemplateSelectedSwitches", source);
+        Assert.Contains("TryValidateTemplateSelectedSwitches", source);
         Assert.Contains("Duplicate switch", source);
-        Assert.Contains("No host switches available", source);
+        Assert.Contains("No host switches available", editorCompositionSource);
+        Assert.Contains("private string BuildSwitchGuidanceText(IReadOnlyList<string> selectedSwitches)", editorCompositionSource);
+        Assert.Contains("AddTemplateVmSwitchRowButton.Click += AddTemplateVmSwitchRowButton_Click;", editorViewSource);
+        Assert.Contains("private void RemoveTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)", editorViewSource);
         Assert.Contains("SelectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;", source);
     }
 
@@ -63,28 +66,33 @@ public sealed class MilestoneAEScenarioMatrixTests
     public void MainWindow_DefinesCatalogFirstVhdxSelector_WithLegacyGuidance()
     {
         var source = LoadMainWindowSource();
+        var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
+        var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
 
         Assert.Contains("EnsureTemplateVhdxCatalogOptionsAsync", source);
-        Assert.Contains("TemplateVmVhdxCatalogComboBox_SelectionChanged", source);
-        Assert.Contains("Legacy path-based reference loaded. Select a catalog entry to normalize.", source);
-        Assert.Contains("No catalog entries available. Import base disks in Assets > Base Disks.", source);
+        Assert.Contains("SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);", source);
+        Assert.Contains("TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;", editorViewSource);
+        Assert.Contains("Legacy path-based reference loaded. Select a catalog entry to normalize.", editorCompositionSource);
+        Assert.Contains("No catalog entries available. Import base disks in Assets > Base Disks.", editorCompositionSource);
     }
 
     [Fact]
     public void MainWindow_DefinesDeterministicNormalizationAndConflictBlockingPaths()
     {
-        var source = LoadMainWindowSource();
+        var source = LoadTemplatesEditorWorkspaceCompositionSource();
+        var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("EvaluateTemplateVhdxNormalization", source);
         Assert.Contains("if (idMatch is not null)", source);
+        Assert.Contains("if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))", source);
         Assert.Contains("if (signatureMatches.Count == 1)", source);
         Assert.Contains("if (pathMatch is not null)", source);
         Assert.Contains("Resolved from vhdxId.", source);
         Assert.Contains("Resolved from vhdxSignature.", source);
-        Assert.Contains("Resolved from vhdPath.", source);
+        Assert.Contains("Catalog entry '", source);
         Assert.Contains("VHD identity conflict detected. Select a catalog entry to resolve before saving.", source);
         Assert.Contains("Multiple catalog entries match vhdxSignature. Select one entry before saving.", source);
-        Assert.Contains("SetTemplateEditorStatus(normalization.Message);", source);
+        Assert.Contains("SetTemplateEditorStatus(vmDraftState.VhdxResolutionMessage);", mainWindowSource);
     }
 
     private static XDocument LoadTemplatesEditorViewXaml()
@@ -102,6 +110,18 @@ public sealed class MilestoneAEScenarioMatrixTests
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesEditorWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesEditorWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesEditorViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Templates", "TemplatesEditorView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
