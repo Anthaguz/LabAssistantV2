@@ -41,7 +41,7 @@ public sealed class MilestoneAEScenarioMatrixTests
         Assert.Contains("TryGetTemplateSelectedSwitches", source);
         Assert.Contains("Duplicate switch", source);
         Assert.Contains("No host switches available", source);
-        Assert.Contains("_selectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;", source);
+        Assert.Contains("SelectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;", source);
     }
 
     [Fact]

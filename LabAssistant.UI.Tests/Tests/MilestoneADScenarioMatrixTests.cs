@@ -62,7 +62,6 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", source);
         Assert.Contains("ValidateTemplateButton.Click += ValidateTemplateButton_Click;", source);
         Assert.Contains("BackToLibraryButton.Click += BackToLibraryButton_Click;", source);
-        Assert.Contains("TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;", source);
         Assert.Contains("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", source);
         Assert.Contains("RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;", source);
         Assert.Contains("ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;", source);
@@ -101,11 +100,11 @@ public sealed class MilestoneADScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
 
-        Assert.Contains("_selectedTemplateVmEntry.SwitchName", source);
-        Assert.Contains("_selectedTemplateVmEntry.SwitchNames", source);
-        Assert.Contains("_selectedTemplateVmEntry.VhdxId", source);
-        Assert.Contains("_selectedTemplateVmEntry.VhdPath", source);
-        Assert.Contains("_selectedTemplateVmEntry.VhdxSignature", source);
+        Assert.Contains("SelectedTemplateVmEntry.SwitchName", source);
+        Assert.Contains("SelectedTemplateVmEntry.SwitchNames", source);
+        Assert.Contains("SelectedTemplateVmEntry.VhdxId", source);
+        Assert.Contains("SelectedTemplateVmEntry.VhdPath", source);
+        Assert.Contains("SelectedTemplateVmEntry.VhdxSignature", source);
         Assert.DoesNotContain("OperatingSystem", source);
         Assert.DoesNotContain("DomainName", source);
     }

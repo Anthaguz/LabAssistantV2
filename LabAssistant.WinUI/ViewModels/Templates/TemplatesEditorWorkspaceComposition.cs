@@ -1,4 +1,5 @@
 using LabAssistant.Business.Templates;
+using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Views.Templates;
 using Microsoft.UI.Xaml;
 
@@ -13,11 +14,17 @@ internal sealed class TemplatesEditorWorkspaceComposition
     {
         _view = view;
         _view.DocumentHeaderChanged += TemplatesEditorView_DocumentHeaderChanged;
+        _view.SelectedVmChanged += TemplatesEditorView_SelectedVmChanged;
+        _view.SetVmEntriesSource(_workspace.VmEntries);
         ApplyViewState();
-        ApplyActionState(isLoading: false, hasSelectedTemplateVmEntry: false);
+        ApplyActionState(isLoading: false);
     }
 
     public bool HasActiveDocument => _workspace.HasActiveDocument;
+
+    public IReadOnlyList<VmTemplate> VmEntries => _workspace.VmEntries;
+
+    public VmTemplate? SelectedVmEntry => _workspace.SelectedVmEntry;
 
     public void ApplyShellState(bool isEditorActive)
     {
@@ -36,6 +43,31 @@ internal sealed class TemplatesEditorWorkspaceComposition
         }
 
         ApplyViewState();
+    }
+
+    public void ReplaceVmEntries(IReadOnlyList<VmTemplate> vmEntries)
+    {
+        _workspace.ReplaceVmEntries(vmEntries);
+        ApplyVmListState();
+    }
+
+    public void AddVmEntry(VmTemplate vmEntry)
+    {
+        _workspace.AddVmEntry(vmEntry);
+        ApplyVmListState();
+    }
+
+    public VmTemplate? RemoveSelectedVmEntry()
+    {
+        var removedEntry = _workspace.RemoveSelectedVmEntry();
+        ApplyVmListState();
+        return removedEntry;
+    }
+
+    public void RefreshVmEntries()
+    {
+        _view.RefreshVmEntries();
+        ApplyVmListState();
     }
 
     public void SetStatus(string statusText)
@@ -57,7 +89,7 @@ internal sealed class TemplatesEditorWorkspaceComposition
             _workspace.TemplateDescription);
     }
 
-    public void ApplyActionState(bool isLoading, bool hasSelectedTemplateVmEntry)
+    public void ApplyActionState(bool isLoading)
     {
         _view.UpdateActionState(new TemplatesEditorActionState(
             CanSave: _workspace.HasActiveDocument && !isLoading,
@@ -65,16 +97,23 @@ internal sealed class TemplatesEditorWorkspaceComposition
             CanValidate: _workspace.HasActiveDocument && !isLoading,
             CanBackToLibrary: !isLoading,
             CanAddTemplateVm: _workspace.HasActiveDocument && !isLoading,
-            CanRemoveTemplateVm: hasSelectedTemplateVmEntry && !isLoading,
-            CanAddTemplateVmSwitchRow: hasSelectedTemplateVmEntry && !isLoading,
-            CanSelectTemplateVmVhdx: hasSelectedTemplateVmEntry && !isLoading,
-            CanApplyTemplateVmChanges: hasSelectedTemplateVmEntry && !isLoading));
+            CanRemoveTemplateVm: _workspace.SelectedVmEntry is not null && !isLoading,
+            CanAddTemplateVmSwitchRow: _workspace.SelectedVmEntry is not null && !isLoading,
+            CanSelectTemplateVmVhdx: _workspace.SelectedVmEntry is not null && !isLoading,
+            CanApplyTemplateVmChanges: _workspace.SelectedVmEntry is not null && !isLoading));
     }
 
     private void TemplatesEditorView_DocumentHeaderChanged(object? sender, EventArgs e)
     {
         var interactionState = _view.CaptureDocumentHeaderInteractionState();
         _workspace.SetDocumentHeaderDraft(interactionState.TemplateName, interactionState.TemplateDescription);
+    }
+
+    private void TemplatesEditorView_SelectedVmChanged(object? sender, EventArgs e)
+    {
+        var interactionState = _view.CaptureVmListInteractionState();
+        _workspace.SetSelectedVmEntry(interactionState.SelectedVmEntry);
+        ApplyVmListState();
     }
 
     private void ApplyViewState()
@@ -88,5 +127,10 @@ internal sealed class TemplatesEditorWorkspaceComposition
             TemplateDescription: _workspace.TemplateDescription,
             StatusText: _workspace.StatusText,
             IsStatusVisible: _workspace.HasStatusText));
+    }
+
+    private void ApplyVmListState()
+    {
+        _view.UpdateVmSelection(_workspace.SelectedVmEntry);
     }
 }

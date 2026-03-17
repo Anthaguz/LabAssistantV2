@@ -1,4 +1,5 @@
 using LabAssistant.Business.Templates;
+using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Views.Templates;
 using Microsoft.UI.Xaml;
 
@@ -63,6 +64,10 @@ internal sealed class TemplatesWorkspaceComposition
 
     public bool HasActiveEditorDocument => _editorComposition.HasActiveDocument;
 
+    public IReadOnlyList<VmTemplate> EditorVmEntries => _editorComposition.VmEntries;
+
+    public VmTemplate? SelectedEditorVmEntry => _editorComposition.SelectedVmEntry;
+
     public Task EnsureLibraryAsync(bool forceRefresh) => _libraryComposition.EnsureLibraryAsync(forceRefresh);
 
     public void SetEditorDocument(TemplateEditorDocument? document) => _editorComposition.SetDocument(document);
@@ -72,6 +77,14 @@ internal sealed class TemplatesWorkspaceComposition
     public void SetEditorVmCount(int vmCount) => _editorComposition.SetVmCount(vmCount);
 
     public TemplatesEditorDocumentHeaderInteractionState CaptureEditorDocumentHeaderState() => _editorComposition.CaptureDocumentHeaderState();
+
+    public void ReplaceEditorVmEntries(IReadOnlyList<VmTemplate> vmEntries) => _editorComposition.ReplaceVmEntries(vmEntries);
+
+    public void AddEditorVmEntry(VmTemplate vmEntry) => _editorComposition.AddVmEntry(vmEntry);
+
+    public VmTemplate? RemoveSelectedEditorVmEntry() => _editorComposition.RemoveSelectedVmEntry();
+
+    public void RefreshEditorVmEntries() => _editorComposition.RefreshVmEntries();
 
     public void ApplyShellState()
     {
@@ -83,13 +96,10 @@ internal sealed class TemplatesWorkspaceComposition
     public void ApplyUiState(TemplatesWorkspaceUiState state)
     {
         _libraryComposition.ApplyUiState(state.IsLoading, state.HasSelectedLibraryItem);
-        _editorComposition.ApplyActionState(
-            isLoading: state.IsLoading,
-            hasSelectedTemplateVmEntry: state.HasSelectedTemplateVmEntry);
+        _editorComposition.ApplyActionState(isLoading: state.IsLoading);
     }
 }
 
 internal readonly record struct TemplatesWorkspaceUiState(
     bool IsLoading,
-    bool HasSelectedLibraryItem,
-    bool HasSelectedTemplateVmEntry);
+    bool HasSelectedLibraryItem);

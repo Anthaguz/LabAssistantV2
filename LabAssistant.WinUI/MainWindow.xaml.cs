@@ -54,7 +54,6 @@ public sealed partial class MainWindow : Window
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
-    private readonly ObservableCollection<VmTemplate> _templateVmEntries = [];
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
@@ -79,7 +78,6 @@ public sealed partial class MainWindow : Window
     private VmTemplate? _selectedDeployOnTheFlyVmEntry;
     private DeploymentReadinessReport? _deployReadinessReport;
     private DeploymentReadinessReport? _deployOnTheFlyReadinessReport;
-    private VmTemplate? _selectedTemplateVmEntry;
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
@@ -212,7 +210,6 @@ public sealed partial class MainWindow : Window
     private Button DeployOnTheFlyOpenTemplateEditorButton => DeployOnTheFlyView.DeployOnTheFlyOpenTemplateEditorButtonControl;
     private Button DeployOnTheFlyStartButton => DeployOnTheFlyView.DeployOnTheFlyStartButtonControl;
     private TextBlock DeployOnTheFlyStatusTextBlock => DeployOnTheFlyView.DeployOnTheFlyStatusTextBlockControl;
-    private ListView TemplateVmListView => TemplatesEditorView.TemplateVmListViewControl;
     private Button AddTemplateVmButton => TemplatesEditorView.AddTemplateVmButtonControl;
     private Button RemoveTemplateVmButton => TemplatesEditorView.RemoveTemplateVmButtonControl;
     private TextBlock TemplateVmIdTextBlock => TemplatesEditorView.TemplateVmIdTextBlockControl;
@@ -232,6 +229,8 @@ public sealed partial class MainWindow : Window
     private Button SaveTemplateAsButton => TemplatesEditorView.SaveTemplateAsButtonControl;
     private Button ValidateTemplateButton => TemplatesEditorView.ValidateTemplateButtonControl;
     private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
+    private IReadOnlyList<VmTemplate> TemplateVmEntries => _templatesWorkspaceComposition.EditorVmEntries;
+    private VmTemplate? SelectedTemplateVmEntry => _templatesWorkspaceComposition.SelectedEditorVmEntry;
     private const string TemplateSwitchPlaceholder = "(Select switch)";
     private const string TemplateVhdxPlaceholder = "(Keep current / unresolved)";
     private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
@@ -307,7 +306,6 @@ public sealed partial class MainWindow : Window
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
-        TemplateVmListView.ItemsSource = _templateVmEntries;
         WireDiagnosticsLogsHandlers();
         WireTemplatesHandlers();
         WireDeployHandlers();
@@ -352,7 +350,6 @@ public sealed partial class MainWindow : Window
 
     private void WireTemplatesHandlers()
     {
-        TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;
         SaveTemplateButton.Click += SaveTemplateButton_Click;
         SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;
         ValidateTemplateButton.Click += ValidateTemplateButton_Click;
@@ -2337,8 +2334,7 @@ public sealed partial class MainWindow : Window
     {
         return new TemplatesWorkspaceUiState(
             IsLoading: _isTemplatesLoading,
-            HasSelectedLibraryItem: _templatesWorkspaceComposition.SelectedLibraryItem is not null,
-            HasSelectedTemplateVmEntry: _selectedTemplateVmEntry is not null);
+            HasSelectedLibraryItem: _templatesWorkspaceComposition.SelectedLibraryItem is not null);
     }
 
     private void UpdateDeployUi()
@@ -3276,27 +3272,13 @@ public sealed partial class MainWindow : Window
 
     private void RefreshTemplateVmEntriesFromDocument()
     {
-        _templateVmEntries.Clear();
-        _selectedTemplateVmEntry = null;
         if (_activeTemplateEditorDocument is null)
         {
+            _templatesWorkspaceComposition.ReplaceEditorVmEntries(Array.Empty<VmTemplate>());
             return;
         }
 
-        foreach (var vmTemplate in _activeTemplateEditorDocument.Template.VmTemplates)
-        {
-            _templateVmEntries.Add(vmTemplate);
-        }
-
-        if (_templateVmEntries.Count > 0)
-        {
-            _selectedTemplateVmEntry = _templateVmEntries[0];
-            TemplateVmListView.SelectedItem = _selectedTemplateVmEntry;
-        }
-        else
-        {
-            TemplateVmListView.SelectedItem = null;
-        }
+        _templatesWorkspaceComposition.ReplaceEditorVmEntries(_activeTemplateEditorDocument.Template.VmTemplates);
     }
 
     private void SyncTemplateVmEntriesToDocument()
@@ -3306,16 +3288,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _activeTemplateEditorDocument.Template.VmTemplates = _templateVmEntries.ToList();
+        _activeTemplateEditorDocument.Template.VmTemplates = TemplateVmEntries.ToList();
         _templatesWorkspaceComposition.SetEditorVmCount(_activeTemplateEditorDocument.Template.VmTemplates.Count);
     }
 
     private void RefreshTemplateVmListView()
     {
-        var selectedVm = _selectedTemplateVmEntry;
-        TemplateVmListView.ItemsSource = null;
-        TemplateVmListView.ItemsSource = _templateVmEntries;
-        TemplateVmListView.SelectedItem = selectedVm;
+        _templatesWorkspaceComposition.RefreshEditorVmEntries();
     }
 
     private void UpdateTemplateVmEditorPanel()
@@ -3323,7 +3302,7 @@ public sealed partial class MainWindow : Window
         _isUpdatingTemplateVmEditorControls = true;
         try
         {
-            if (_selectedTemplateVmEntry is null)
+            if (SelectedTemplateVmEntry is null)
             {
                 TemplateVmIdTextBlock.Text = "VM ID: -";
                 TemplateVmNameTextBox.Text = string.Empty;
@@ -3337,13 +3316,13 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            TemplateVmIdTextBlock.Text = $"VM ID: {_selectedTemplateVmEntry.VmId}";
-            TemplateVmNameTextBox.Text = _selectedTemplateVmEntry.Name;
-            TemplateVmMemoryTextBox.Text = _selectedTemplateVmEntry.MemoryMb.ToString();
-            TemplateVmCpuTextBox.Text = _selectedTemplateVmEntry.CpuCount.ToString();
-            TemplateVmVhdxIdTextBox.Text = _selectedTemplateVmEntry.VhdxId ?? string.Empty;
-            TemplateVmVhdPathTextBox.Text = _selectedTemplateVmEntry.VhdPath ?? string.Empty;
-            TemplateVmVhdxSignatureTextBox.Text = _selectedTemplateVmEntry.VhdxSignature ?? string.Empty;
+            TemplateVmIdTextBlock.Text = $"VM ID: {SelectedTemplateVmEntry.VmId}";
+            TemplateVmNameTextBox.Text = SelectedTemplateVmEntry.Name;
+            TemplateVmMemoryTextBox.Text = SelectedTemplateVmEntry.MemoryMb.ToString();
+            TemplateVmCpuTextBox.Text = SelectedTemplateVmEntry.CpuCount.ToString();
+            TemplateVmVhdxIdTextBox.Text = SelectedTemplateVmEntry.VhdxId ?? string.Empty;
+            TemplateVmVhdPathTextBox.Text = SelectedTemplateVmEntry.VhdPath ?? string.Empty;
+            TemplateVmVhdxSignatureTextBox.Text = SelectedTemplateVmEntry.VhdxSignature ?? string.Empty;
             RenderTemplateSwitchRowsFromVm();
             UpdateTemplateVhdxSelectorFromVm();
         }
@@ -3355,7 +3334,7 @@ public sealed partial class MainWindow : Window
 
     private bool TryApplySelectedTemplateVmFields(bool showSuccessStatus)
     {
-        if (_activeTemplateEditorDocument is null || _selectedTemplateVmEntry is null || _isUpdatingTemplateVmEditorControls)
+        if (_activeTemplateEditorDocument is null || SelectedTemplateVmEntry is null || _isUpdatingTemplateVmEditorControls)
         {
             return true;
         }
@@ -3379,27 +3358,27 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
-        _selectedTemplateVmEntry.Name = vmName;
-        _selectedTemplateVmEntry.MemoryMb = memoryMb;
-        _selectedTemplateVmEntry.CpuCount = cpuCount;
+        SelectedTemplateVmEntry.Name = vmName;
+        SelectedTemplateVmEntry.MemoryMb = memoryMb;
+        SelectedTemplateVmEntry.CpuCount = cpuCount;
         if (!TryGetTemplateSelectedSwitches(out var selectedSwitches, out var switchValidationError))
         {
             SetTemplateEditorStatus(switchValidationError ?? "Switch validation failed.");
             return false;
         }
 
-        _selectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;
-        _selectedTemplateVmEntry.SwitchName = selectedSwitches.Count > 0 ? selectedSwitches[0] : null;
+        SelectedTemplateVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;
+        SelectedTemplateVmEntry.SwitchName = selectedSwitches.Count > 0 ? selectedSwitches[0] : null;
 
         if (TemplateVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedCatalogOption)
         {
-            _selectedTemplateVmEntry.VhdxId = selectedCatalogOption.Id;
-            _selectedTemplateVmEntry.VhdPath = selectedCatalogOption.Path;
-            _selectedTemplateVmEntry.VhdxSignature = selectedCatalogOption.Signature;
+            SelectedTemplateVmEntry.VhdxId = selectedCatalogOption.Id;
+            SelectedTemplateVmEntry.VhdPath = selectedCatalogOption.Path;
+            SelectedTemplateVmEntry.VhdxSignature = selectedCatalogOption.Signature;
         }
         else
         {
-            var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry);
+            var normalization = EvaluateTemplateVhdxNormalization(SelectedTemplateVmEntry);
             if (normalization.RequiresUserResolution)
             {
                 SetTemplateEditorStatus(normalization.Message);
@@ -3408,9 +3387,9 @@ public sealed partial class MainWindow : Window
 
             if (normalization.EffectiveOption is not null)
             {
-                _selectedTemplateVmEntry.VhdxId = normalization.EffectiveOption.Id;
-                _selectedTemplateVmEntry.VhdPath = normalization.EffectiveOption.Path;
-                _selectedTemplateVmEntry.VhdxSignature = normalization.EffectiveOption.Signature;
+                SelectedTemplateVmEntry.VhdxId = normalization.EffectiveOption.Id;
+                SelectedTemplateVmEntry.VhdPath = normalization.EffectiveOption.Path;
+                SelectedTemplateVmEntry.VhdxSignature = normalization.EffectiveOption.Signature;
             }
         }
 
@@ -3426,14 +3405,14 @@ public sealed partial class MainWindow : Window
 
     private void RenderTemplateSwitchRowsFromVm()
     {
-        var switches = _selectedTemplateVmEntry?.SwitchNames?
+        var switches = SelectedTemplateVmEntry?.SwitchNames?
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Trim())
             .ToList() ?? [];
 
-        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(_selectedTemplateVmEntry?.SwitchName))
+        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(SelectedTemplateVmEntry?.SwitchName))
         {
-            switches.Add(_selectedTemplateVmEntry.SwitchName!.Trim());
+            switches.Add(SelectedTemplateVmEntry.SwitchName!.Trim());
         }
 
         RenderTemplateSwitchRows(switches);
@@ -3502,7 +3481,7 @@ public sealed partial class MainWindow : Window
 
     private void AddTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedTemplateVmEntry is null)
+        if (SelectedTemplateVmEntry is null)
         {
             SetTemplateEditorStatus("Select a VM entry first.");
             return;
@@ -3544,7 +3523,7 @@ public sealed partial class MainWindow : Window
 
     private void TemplateVmVhdxCatalogComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isUpdatingTemplateVhdxSelector || _selectedTemplateVmEntry is null)
+        if (_isUpdatingTemplateVhdxSelector || SelectedTemplateVmEntry is null)
         {
             return;
         }
@@ -3554,7 +3533,7 @@ public sealed partial class MainWindow : Window
             TemplateVmVhdxIdTextBox.Text = selectedCatalogOption.Id;
             TemplateVmVhdPathTextBox.Text = selectedCatalogOption.Path;
             TemplateVmVhdxSignatureTextBox.Text = selectedCatalogOption.Signature ?? string.Empty;
-            var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry, selectedCatalogOption);
+            var normalization = EvaluateTemplateVhdxNormalization(SelectedTemplateVmEntry, selectedCatalogOption);
             TemplateVmVhdxGuidanceTextBlock.Text = $"{normalization.EffectiveSourceLabel} Catalog entry selected. Save to persist.";
             return;
         }
@@ -3602,7 +3581,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateTemplateSwitchGuidanceText()
     {
-        if (_selectedTemplateVmEntry is null)
+        if (SelectedTemplateVmEntry is null)
         {
             TemplateVmSwitchGuidanceTextBlock.Text = "Select a VM entry to configure switch assignments.";
             return;
@@ -3639,14 +3618,14 @@ public sealed partial class MainWindow : Window
             options.AddRange(_templateVhdxCatalogOptions);
             TemplateVmVhdxCatalogComboBox.ItemsSource = options;
 
-            if (_selectedTemplateVmEntry is null)
+            if (SelectedTemplateVmEntry is null)
             {
                 TemplateVmVhdxCatalogComboBox.SelectedItem = TemplateVhdxPlaceholder;
                 TemplateVmVhdxGuidanceTextBlock.Text = "Select a VM entry to configure base disk.";
                 return;
             }
 
-            var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry);
+            var normalization = EvaluateTemplateVhdxNormalization(SelectedTemplateVmEntry);
             object selectedItem = normalization.RequiresUserResolution || normalization.EffectiveOption is null
                 ? TemplateVhdxPlaceholder
                 : normalization.EffectiveOption;
@@ -3661,19 +3640,19 @@ public sealed partial class MainWindow : Window
 
     private void UpdateTemplateVhdxSelectorGuidance()
     {
-        if (_selectedTemplateVmEntry is null)
+        if (SelectedTemplateVmEntry is null)
         {
             TemplateVmVhdxGuidanceTextBlock.Text = "Select a VM entry to configure base disk.";
             return;
         }
 
-        var normalization = EvaluateTemplateVhdxNormalization(_selectedTemplateVmEntry);
+        var normalization = EvaluateTemplateVhdxNormalization(SelectedTemplateVmEntry);
         UpdateTemplateVhdxSelectorGuidance(normalization);
     }
 
     private void UpdateTemplateVhdxSelectorGuidance(TemplateVhdxNormalizationResult normalization)
     {
-        if (_selectedTemplateVmEntry is null)
+        if (SelectedTemplateVmEntry is null)
         {
             TemplateVmVhdxGuidanceTextBlock.Text = "Select a VM entry to configure base disk.";
             return;
@@ -3697,7 +3676,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_selectedTemplateVmEntry.VhdPath))
+        if (!string.IsNullOrWhiteSpace(SelectedTemplateVmEntry.VhdPath))
         {
             TemplateVmVhdxGuidanceTextBlock.Text = "Legacy path-based reference loaded. Select a catalog entry to normalize.";
             return;
@@ -3831,13 +3810,6 @@ public sealed partial class MainWindow : Window
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
-    private void TemplateVmListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        _selectedTemplateVmEntry = TemplateVmListView.SelectedItem as VmTemplate;
-        UpdateTemplateVmEditorPanel();
-        ApplyTemplatesWorkspaceUiState();
-    }
-
     private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
     {
         if (_activeTemplateEditorDocument is null)
@@ -3846,16 +3818,14 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var nextVmNumber = _templateVmEntries.Count + 1;
+        var nextVmNumber = TemplateVmEntries.Count + 1;
         var vmEntry = new VmTemplate
         {
             Name = $"VM-{nextVmNumber}",
             MemoryMb = 2048,
             CpuCount = 2
         };
-        _templateVmEntries.Add(vmEntry);
-        _selectedTemplateVmEntry = vmEntry;
-        TemplateVmListView.SelectedItem = vmEntry;
+        _templatesWorkspaceComposition.AddEditorVmEntry(vmEntry);
         SyncTemplateVmEntriesToDocument();
         UpdateTemplateVmEditorPanel();
         SetTemplateEditorStatus($"Added VM entry '{vmEntry.Name}'.");
@@ -3864,13 +3834,14 @@ public sealed partial class MainWindow : Window
 
     private async void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedTemplateVmEntry is null)
+        var selectedVmEntry = SelectedTemplateVmEntry;
+        if (selectedVmEntry is null)
         {
             SetTemplateEditorStatus("Select a VM entry first.");
             return;
         }
 
-        var vmName = _selectedTemplateVmEntry.Name;
+        var vmName = selectedVmEntry.Name;
         var dialog = new ContentDialog
         {
             XamlRoot = RootLayout.XamlRoot,
@@ -3886,9 +3857,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _templateVmEntries.Remove(_selectedTemplateVmEntry);
-        _selectedTemplateVmEntry = _templateVmEntries.FirstOrDefault();
-        TemplateVmListView.SelectedItem = _selectedTemplateVmEntry;
+        _templatesWorkspaceComposition.RemoveSelectedEditorVmEntry();
         SyncTemplateVmEntriesToDocument();
         UpdateTemplateVmEditorPanel();
         SetTemplateEditorStatus($"Removed VM entry '{vmName}'.");
@@ -3897,7 +3866,7 @@ public sealed partial class MainWindow : Window
 
     private void ApplyTemplateVmChangesButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedTemplateVmEntry is null)
+        if (SelectedTemplateVmEntry is null)
         {
             SetTemplateEditorStatus("Select a VM entry first.");
             return;
