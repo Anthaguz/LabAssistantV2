@@ -341,6 +341,25 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Assets remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
   - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Assets changes.
 
+## TC-021: Milestone AM Templates Extraction Closure Verification
+- **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#413`, `#414`, `#415`, `#416`, `#417`, `#418`, `#419`, `#420`, `#421`, `#422`, `#423`, `#424`, `#425`, `#426`, `#427`, `#428`, `#429`, `#430`, `#439`, `#441`, `#497`, `#498`, `#499`, `#500`)
+- **Steps:**
+  1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
+  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-templates-extraction-checklist.md`.
+  3. Verify the shared Templates foundation remains Library-first, route-stable, and host/delegation only.
+  4. Verify Library search/filter/list/selection/action sanity plus shared-host non-ownership.
+  5. Verify Editor explicit-entry behavior, document/header state, VM list/selection/draft/apply, save/save-as/validate, and VM-entry add/remove sanity.
+  6. Verify route switching preserves the long-lived Templates workspace model and refresh/reconcile behavior rather than per-navigation recreation.
+- **Expected:**
+  - Shared `TemplatesWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of Templates-local workflow/state ownership.
+  - `templates.library` remains the stable/default Templates surface, while `templates.editor` remains an explicit workflow-state destination.
+  - `TemplatesLibraryWorkspaceViewModel`, `TemplatesLibraryWorkspaceController`, and `TemplatesLibraryWorkspaceComposition` remain the Library-local seams, with the narrowed Library interaction/view surface still represented.
+  - `TemplatesEditorWorkspaceViewModel`, `TemplatesEditorWorkspaceController`, and `TemplatesEditorWorkspaceComposition` remain the Editor-local seams, with the narrowed Editor interaction/view surface still represented.
+  - Templates remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
+  - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Templates changes.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.
