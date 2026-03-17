@@ -421,6 +421,12 @@ Gate expectations:
 - make shared Templates vs Editor-local ownership explicit so Editor-specific state, orchestration, composition, and UI coordination converge behind an Editor-local seam without widening shared Templates composition into the Editor workflow owner
 - preserve `templates.editor` as a workflow-state destination from explicit actions, keep Editor inside the long-lived Templates workspace with route-activation refresh, and keep Library extraction details out of scope
 
+**Deploy shared cleanup target checkpoint**
+- before Deploy runtime extraction proceeds, define the shared Deploy composition cleanup target against the refined AM33 plus post-Machines/post-Assets/post-Templates model
+- make shell-vs-Deploy ownership explicit so shared Deploy composition converges into a Deploy-local composition owner rather than stopping in `MainWindow`
+- preserve the AL Deploy route model by keeping `deploy.overview` as the route-entry surface, `deploy.on_the_fly` as the Quick Deploy workflow, and `deploy.from_template` as the review/remediation/deploy workflow rather than a duplicate editor surface
+- treat any `MainWindow` Deploy host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`

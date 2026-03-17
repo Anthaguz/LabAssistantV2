@@ -3129,3 +3129,87 @@ Each readiness result shall include, at minimum:
 - [ ] long-lived Templates workspace participation and `templates.editor` route-activation refresh expectations are explicit and traceable
 - [ ] Templates Library-first / Editor workflow-state boundary is explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+---
+
+# AC-036 - WinUI Deploy Shared Composition Cleanup Target (AM78)
+
+**Related FRs:** FR-155, FR-156, FR-157, FR-087, FR-088, FR-089, FR-090, FR-091, FR-092, FR-093, FR-094, FR-100, FR-101, FR-102, FR-103, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) MainWindow remains shell-only while shared Deploy composition moves behind a Deploy-local owner
+**Given**
+- `Deploy` already has approved AF, AG, and AL routing/workflow contracts
+
+**When**
+- the shared Deploy cleanup target is defined
+
+**Then**
+- `MainWindow` remains responsible only for:
+  - shell route switching
+  - shell title/description
+  - shell compact/drawer behavior
+  - shell host visibility
+  - right-panel infrastructure
+  - app-level workspace lifetime
+- shared Deploy-local composition does not terminate in `MainWindow`
+- a Deploy-local composition owner becomes the target home for shared Deploy-local composition and wiring
+
+### 2) Shared Deploy responsibilities converge behind the Deploy-local composition owner
+**Given**
+- `Deploy` includes `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+
+**When**
+- the shared ownership boundary is reviewed
+
+**Then**
+- the Deploy-local composition owner is explicitly responsible for:
+  - Deploy-local composition and wiring
+  - shared Deploy route-activation handling
+  - shared workspace lifetime participation
+  - shared local interaction boundaries for:
+    - Deploy Overview
+    - Quick Deploy
+    - From Template
+- Deploy Overview extraction details, From Template extraction details, and Quick Deploy extraction details remain deferred to later narrow issues
+
+### 3) Deploy preserves its approved route model while rejecting shell-centric end-state patterns
+**Given**
+- AL defined `Deploy` as an Overview-first capability with `Quick Deploy` and `From Template` child routes
+
+**When**
+- the cleanup target is applied
+
+**Then**
+- `deploy.overview` remains the route-entry and index surface for `Deploy`
+- `deploy.on_the_fly` remains the deep editor-oriented `Quick Deploy` workflow
+- `deploy.from_template` remains a review/remediation/deploy workflow and does not collapse into the Quick Deploy editor surface
+- capability-specific host interfaces implemented by `MainWindow` are explicitly treated as temporary bridges only
+
+### 4) Deploy remains long-lived with route-activation refresh and no direct MainWindow view coupling
+**Given**
+- AM33 established long-lived capability workspaces by default
+
+**When**
+- the Deploy cleanup target is defined
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- Deploy remains long-lived while the app session is open
+- navigation between `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template` activates and reconciles shared Deploy state rather than recreating the workspace every route change
+- runtime implementation, Deploy workflow redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shell continues to host Deploy workspace lifetime, route visibility, and shell infrastructure
+- a Deploy-local composition owner becomes the target home for shared Deploy-local composition across Overview, Quick Deploy, and From Template
+- temporary shell-host bridges are allowed only as migration scaffolding and are not the long-term architecture
+- Deploy remains long-lived with route-activation refresh rather than per-navigation recreation
+- Deploy preserves the Overview-first route model plus the distinct Quick Deploy and From Template workflow boundaries explicitly
+
+## Definition of Done
+- [ ] shell-vs-Deploy ownership is explicit and traceable
+- [ ] shared Deploy-local composition-owner target is explicit and traceable
+- [ ] Deploy route-model preservation is explicit and traceable
+- [ ] temporary-bridge-vs-final-target rule and no-direct-`MainWindow`-injection rule are explicit and traceable
+- [ ] long-lived Deploy workspace and route-activation refresh rule are explicit and traceable
