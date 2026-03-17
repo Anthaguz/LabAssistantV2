@@ -27,11 +27,11 @@ public sealed class MilestoneAFScenarioMatrixTests
     public void MainWindow_DefinesDeployFromTemplateHostAndRouteState()
     {
         var xaml = LoadMainWindowXaml();
-        var source = LoadMainWindowSource();
+        var source = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployFromTemplateViewHost"));
-        Assert.Contains("private bool IsDeployFromTemplateActive =>", source);
-        Assert.Contains("DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("_fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", source);
     }
 
     [Fact]
@@ -137,6 +137,12 @@ public sealed class MilestoneAFScenarioMatrixTests
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

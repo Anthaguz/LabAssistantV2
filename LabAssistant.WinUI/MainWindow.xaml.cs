@@ -20,6 +20,7 @@ using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.ViewModels.Assets;
+using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.Views.Assets;
@@ -53,6 +54,7 @@ public sealed partial class MainWindow : Window
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
+    private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
@@ -80,7 +82,6 @@ public sealed partial class MainWindow : Window
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
     private bool _isUpdatingNavigationSelection;
-    private bool _isUpdatingDeploySubviewSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
     private bool _isDeployLoadingTemplates;
     private bool _isDeployEvaluatingReadiness;
@@ -107,7 +108,6 @@ public sealed partial class MainWindow : Window
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
-    private DeployOverviewView DeployOverviewView => DeployOverviewViewHost;
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
     private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
     private DiagnosticsOverviewView DiagnosticsOverviewView => DiagnosticsOverviewViewHost;
@@ -118,15 +118,11 @@ public sealed partial class MainWindow : Window
     private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
     private DeployOnTheFlyRightPanelView DeployOnTheFlyRightPanelView => DeployOnTheFlyRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
-    private FrameworkElement DeployOverviewPanel => DeployOverviewViewHost;
-    private FrameworkElement DeployFromTemplatePanel => DeployFromTemplateViewHost;
-    private FrameworkElement DeployOnTheFlyPanel => DeployOnTheFlyViewHost;
     private FrameworkElement DiagnosticsOverviewPanel => DiagnosticsOverviewViewHost;
     private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
     private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
     private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;
-    private FrameworkElement DeployLocalNavPanel => DeployLocalNavigationPanel;
     private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
     private FrameworkElement DiagnosticsLocalNavPanel => DiagnosticsLocalNavigationPanel;
     private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
@@ -155,10 +151,6 @@ public sealed partial class MainWindow : Window
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
     private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
-    private Button DeployOverviewOpenQuickDeployButton => DeployOverviewView.DeployOverviewOpenQuickDeployButtonControl;
-    private Button DeployOverviewOpenFromTemplateButton => DeployOverviewView.DeployOverviewOpenFromTemplateButtonControl;
-    private TextBlock DeployOverviewQuickDeploySummaryTextBlock => DeployOverviewView.DeployOverviewQuickDeploySummaryTextBlockControl;
-    private TextBlock DeployOverviewFromTemplateSummaryTextBlock => DeployOverviewView.DeployOverviewFromTemplateSummaryTextBlockControl;
     private ComboBox DeployTemplateSelectorComboBox => DeployFromTemplateView.DeployTemplateSelectorComboBoxControl;
     private Button DeployReloadTemplatesButton => DeployFromTemplateView.DeployReloadTemplatesButtonControl;
     private Button DeployEvaluateReadinessButton => DeployFromTemplateView.DeployEvaluateReadinessButtonControl;
@@ -287,6 +279,25 @@ public sealed partial class MainWindow : Window
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
                 () => IsTemplatesEditorActive));
+        _deployWorkspaceComposition = new DeployWorkspaceComposition(
+            DeployLocalNavigationPanel,
+            DeployOverviewViewHost,
+            DeployOnTheFlyViewHost,
+            DeployFromTemplateViewHost,
+            DeploySubviewTabView,
+            DeployOverviewTabViewItem,
+            DeployQuickDeployTabViewItem,
+            DeployFromTemplateTabViewItem,
+            new DeployWorkspaceHost(
+                () => _deployOnTheFlyVmEntries.Count,
+                () => _isDeployLoadingTemplates,
+                () => TemplatesLibraryItems.Count),
+            new DeployWorkspaceShellBridge(
+                () => IsDeployCapabilityActive,
+                () => IsDeployOverviewActive,
+                () => IsDeployOnTheFlyActive,
+                () => IsDeployFromTemplateActive,
+                NavigateToRoute));
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
@@ -373,8 +384,6 @@ public sealed partial class MainWindow : Window
 
     private void WireOverviewHandlers()
     {
-        DeployOverviewOpenQuickDeployButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
-        DeployOverviewOpenFromTemplateButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
         DiagnosticsOverviewOpenLogsButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
         DiagnosticsOverviewOpenSupportExportButton.Click += (_, _) => OpenStructuredLogLocation();
     }
@@ -474,17 +483,12 @@ public sealed partial class MainWindow : Window
         RootLayout.RequestedTheme = _theme;
         ApplyRightPanelState();
         MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        DeployLocalNavPanel.Visibility = IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
-        DeployOverviewPanel.Visibility = IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
-        DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsLocalNavPanel.Visibility = IsAssetsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        SyncDeploySubviewSelection();
         SyncDiagnosticsSubviewSelection();
         ApplyTemplatesWorkspaceUiState();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
@@ -494,6 +498,7 @@ public sealed partial class MainWindow : Window
         QueueNavigationSelectionUpdate();
 
         _machinesWorkspaceComposition.ApplyShellState();
+        _deployWorkspaceComposition.ApplyShellState();
         _assetsWorkspaceComposition.ApplyShellState();
         _templatesWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)
@@ -509,11 +514,6 @@ public sealed partial class MainWindow : Window
         if (IsDiagnosticsLogsActive)
         {
             _ = EnsureStructuredLogsLoadedAsync(forceReload: false);
-        }
-
-        if (IsDeployOverviewActive)
-        {
-            UpdateDeployOverviewUi();
         }
 
         if (IsDeployFromTemplateActive)
@@ -764,27 +764,6 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    private void DeploySubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUpdatingDeploySubviewSelection || DeploySubviewTabView.SelectedItem is not TabViewItem selectedTab)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(selectedTab, DeployOverviewTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.DeployOverview);
-        }
-        else if (ReferenceEquals(selectedTab, DeployQuickDeployTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
-        }
-        else if (ReferenceEquals(selectedTab, DeployFromTemplateTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
-        }
-    }
-
     private void DiagnosticsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isUpdatingDiagnosticsSubviewSelection || DiagnosticsSubviewTabView.SelectedItem is not TabViewItem selectedTab)
@@ -799,35 +778,6 @@ public sealed partial class MainWindow : Window
         else if (ReferenceEquals(selectedTab, DiagnosticsLogsTabViewItem))
         {
             NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
-        }
-    }
-
-    private void SyncDeploySubviewSelection()
-    {
-        if (!IsDeployCapabilityActive)
-        {
-            return;
-        }
-
-        var selectedTab = IsDeployOverviewActive
-            ? DeployOverviewTabViewItem
-            : IsDeployOnTheFlyActive
-                ? DeployQuickDeployTabViewItem
-                : DeployFromTemplateTabViewItem;
-
-        if (ReferenceEquals(DeploySubviewTabView.SelectedItem, selectedTab))
-        {
-            return;
-        }
-
-        _isUpdatingDeploySubviewSelection = true;
-        try
-        {
-            DeploySubviewTabView.SelectedItem = selectedTab;
-        }
-        finally
-        {
-            _isUpdatingDeploySubviewSelection = false;
         }
     }
 
@@ -856,18 +806,6 @@ public sealed partial class MainWindow : Window
         {
             _isUpdatingDiagnosticsSubviewSelection = false;
         }
-    }
-
-    private void UpdateDeployOverviewUi()
-    {
-        DeployOverviewQuickDeploySummaryTextBlock.Text = _deployOnTheFlyVmEntries.Count > 0
-            ? $"{_deployOnTheFlyVmEntries.Count} VM entries currently staged in the Quick Deploy draft."
-            : "Open Quick Deploy to configure VM entries and run deployment.";
-        DeployOverviewFromTemplateSummaryTextBlock.Text = _isDeployLoadingTemplates
-            ? "Template inventory is loading."
-            : TemplatesLibraryItems.Count > 0
-                ? $"{TemplatesLibraryItems.Count} templates currently available for From Template."
-                : "Open From Template to load template inventory and review readiness.";
     }
 
     private void UpdateDiagnosticsOverviewUi()

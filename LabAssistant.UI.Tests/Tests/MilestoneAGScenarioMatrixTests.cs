@@ -18,11 +18,11 @@ public sealed class MilestoneAGScenarioMatrixTests
     public void MainWindow_DefinesDeployOnTheFlyHostAndVisibilityWiring()
     {
         var xaml = LoadMainWindowXaml();
-        var source = LoadMainWindowSource();
+        var source = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyViewHost"));
-        Assert.Contains("private bool IsDeployOnTheFlyActive =>", source);
-        Assert.Contains("DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("_onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", source);
     }
 
     [Fact]
@@ -97,11 +97,11 @@ public sealed class MilestoneAGScenarioMatrixTests
     public void Ag2_PreservesFromTemplateRouteAndHost()
     {
         var xaml = LoadMainWindowXaml();
-        var source = LoadMainWindowSource();
+        var source = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployFromTemplateViewHost"));
-        Assert.Contains("private bool IsDeployFromTemplateActive =>", source);
-        Assert.Contains("DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("_fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", source);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", source);
     }
 
     private static XDocument LoadMainWindowXaml()
@@ -131,6 +131,12 @@ public sealed class MilestoneAGScenarioMatrixTests
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
