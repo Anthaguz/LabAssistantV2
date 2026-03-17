@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using LabAssistant.Models.Templates;
 
 namespace LabAssistant.WinUI.Views.Templates;
 
@@ -28,17 +29,23 @@ public readonly record struct TemplatesEditorActionState(
     bool CanSelectTemplateVmVhdx,
     bool CanApplyTemplateVmChanges);
 
+public readonly record struct TemplatesEditorVmListInteractionState(
+    VmTemplate? SelectedVmEntry);
+
 public sealed partial class TemplatesEditorView : UserControl
 {
     private bool _isUpdatingDocumentHeader;
+    private bool _isUpdatingVmSelection;
 
     public event EventHandler? DocumentHeaderChanged;
+    public event EventHandler? SelectedVmChanged;
 
     public TemplatesEditorView()
     {
         InitializeComponent();
         TemplateNameTextBox.TextChanged += TemplateDocumentHeaderTextBox_TextChanged;
         TemplateDescriptionTextBox.TextChanged += TemplateDocumentHeaderTextBox_TextChanged;
+        TemplateVmListView.SelectionChanged += TemplateVmListView_SelectionChanged;
     }
 
     public ListView TemplateVmListViewControl => TemplateVmListView;
@@ -88,6 +95,44 @@ public sealed partial class TemplatesEditorView : UserControl
             TemplateDescriptionTextBox.Text);
     }
 
+    public TemplatesEditorVmListInteractionState CaptureVmListInteractionState()
+    {
+        return new TemplatesEditorVmListInteractionState(
+            TemplateVmListView.SelectedItem as VmTemplate);
+    }
+
+    public void SetVmEntriesSource(object? itemsSource)
+    {
+        TemplateVmListView.ItemsSource = itemsSource;
+    }
+
+    public void UpdateVmSelection(VmTemplate? selectedVmEntry)
+    {
+        if (ReferenceEquals(TemplateVmListView.SelectedItem, selectedVmEntry))
+        {
+            return;
+        }
+
+        _isUpdatingVmSelection = true;
+        try
+        {
+            TemplateVmListView.SelectedItem = selectedVmEntry;
+        }
+        finally
+        {
+            _isUpdatingVmSelection = false;
+        }
+    }
+
+    public void RefreshVmEntries()
+    {
+        var itemsSource = TemplateVmListView.ItemsSource;
+        var selectedItem = TemplateVmListView.SelectedItem;
+        TemplateVmListView.ItemsSource = null;
+        TemplateVmListView.ItemsSource = itemsSource;
+        UpdateVmSelection(selectedItem as VmTemplate);
+    }
+
     public void UpdateDocumentHeaderState(TemplatesEditorDocumentHeaderViewState state)
     {
         _isUpdatingDocumentHeader = true;
@@ -129,6 +174,16 @@ public sealed partial class TemplatesEditorView : UserControl
         }
 
         DocumentHeaderChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void TemplateVmListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingVmSelection)
+        {
+            return;
+        }
+
+        SelectedVmChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private static void SetTextIfChanged(TextBox textBox, string value)
