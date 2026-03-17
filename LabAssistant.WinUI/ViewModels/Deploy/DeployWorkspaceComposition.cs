@@ -57,15 +57,13 @@ internal sealed class DeployWorkspaceComposition
     private readonly FrameworkElement _overviewHost;
     private readonly FrameworkElement _onTheFlyHost;
     private readonly FrameworkElement _fromTemplateHost;
-    private readonly DeployOverviewView _overviewView;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _quickDeployTabViewItem;
     private readonly TabViewItem _fromTemplateTabViewItem;
-    private readonly Func<DeployWorkspaceUiState> _getUiState;
+    private readonly DeployOverviewWorkspaceComposition _overviewWorkspaceComposition;
     private readonly IDeployWorkspaceShellBridge _shellBridge;
     private bool _isUpdatingDeploySubviewSelection;
-    private DeployWorkspaceUiState _uiState;
 
     public DeployWorkspaceComposition(
         FrameworkElement localNavigationHost,
@@ -83,24 +81,24 @@ internal sealed class DeployWorkspaceComposition
         _overviewHost = overviewView;
         _onTheFlyHost = onTheFlyHost;
         _fromTemplateHost = fromTemplateHost;
-        _overviewView = overviewView;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
         _quickDeployTabViewItem = quickDeployTabViewItem;
         _fromTemplateTabViewItem = fromTemplateTabViewItem;
-        _getUiState = getUiState;
         _shellBridge = shellBridge;
+        _overviewWorkspaceComposition = new DeployOverviewWorkspaceComposition(
+            overviewView,
+            new DeployOverviewWorkspaceHost(
+                () => getUiState().QuickDeployDraftCount,
+                () => getUiState().IsLoadingTemplates,
+                () => getUiState().AvailableTemplateCount),
+            new DeployOverviewWorkspaceShellBridge(
+                () => _shellBridge.IsDeployOverviewActive,
+                _shellBridge.NavigateToRoute));
         WireSharedHandlers();
     }
 
-    public void RefreshSharedUiState()
-    {
-        _uiState = _getUiState();
-        if (_shellBridge.IsDeployOverviewActive)
-        {
-            UpdateOverviewUi();
-        }
-    }
+    public void RefreshSharedUiState() => _overviewWorkspaceComposition.RefreshUiState();
 
     public void ApplyShellState()
     {
@@ -110,14 +108,16 @@ internal sealed class DeployWorkspaceComposition
         _fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
 
         SyncDeploySubviewSelection();
-        RefreshSharedUiState();
+
+        if (_shellBridge.IsDeployOverviewActive)
+        {
+            _overviewWorkspaceComposition.ApplyShellState();
+        }
     }
 
     private void WireSharedHandlers()
     {
         _subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;
-        _overviewView.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
-        _overviewView.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
     }
 
     private void DeploySubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -170,17 +170,6 @@ internal sealed class DeployWorkspaceComposition
         }
     }
 
-    private void UpdateOverviewUi()
-    {
-        _overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _uiState.QuickDeployDraftCount > 0
-            ? $"{_uiState.QuickDeployDraftCount} VM entries currently staged in the Quick Deploy draft."
-            : "Open Quick Deploy to configure VM entries and run deployment.";
-        _overviewView.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _uiState.IsLoadingTemplates
-            ? "Template inventory is loading."
-            : _uiState.AvailableTemplateCount > 0
-                ? $"{_uiState.AvailableTemplateCount} templates currently available for From Template."
-                : "Open From Template to load template inventory and review readiness.";
-    }
 }
 
 internal readonly record struct DeployWorkspaceUiState(

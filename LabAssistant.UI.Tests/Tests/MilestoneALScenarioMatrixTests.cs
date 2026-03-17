@@ -119,7 +119,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var diagnosticsOverviewSource = LoadDiagnosticsOverviewViewXamlSource();
         var mainWindowSource = LoadMainWindowSource();
         var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
-        var deployCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var deployOverviewCompositionSource = LoadDeployOverviewWorkspaceCompositionSource();
 
         Assert.Contains("x:Name=\"AssetsOverviewOpenBaseDisksButton\"", assetsOverviewSource);
         Assert.Contains("x:Name=\"AssetsOverviewOpenSwitchesButton\"", assetsOverviewSource);
@@ -128,8 +128,8 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("x:Name=\"DeployOverviewOpenQuickDeployButton\"", deployOverviewSource);
         Assert.Contains("x:Name=\"DeployOverviewOpenFromTemplateButton\"", deployOverviewSource);
-        Assert.Contains("_overviewView.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", deployCompositionSource);
-        Assert.Contains("_overviewView.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", deployCompositionSource);
+        Assert.Contains("_view.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", deployOverviewCompositionSource);
+        Assert.Contains("_view.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", deployOverviewCompositionSource);
 
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenLogsButton\"", diagnosticsOverviewSource);
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenSupportExportButton\"", diagnosticsOverviewSource);
@@ -386,6 +386,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDeployWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOverviewWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
