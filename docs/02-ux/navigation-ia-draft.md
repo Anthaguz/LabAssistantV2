@@ -163,6 +163,18 @@ For Deploy extraction planning after AF, AG, AL, and the AM shared-capability re
 Behavioral contract source:
 - `docs/02-ux/winui-deploy-composition-cleanup-target-am.md`
 
+## 2.12 Milestone AM Deploy Overview Cleanup Target (Approved)
+
+For Deploy Overview extraction planning after the shared Deploy cleanup target:
+- `Deploy Overview` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+- an Overview-local seam is the target home for Overview-specific state, Overview-local navigation coordination, Overview-local interaction boundaries, and Overview-specific refresh or reconcile behavior on `deploy.overview`
+- `deploy.overview` remains the route-entry and index surface for `Deploy` and continues to use route-activation refresh within the existing long-lived Deploy workspace rather than per-navigation recreation
+- Overview does not become the owner of Quick Deploy-specific or From Template-specific workflow concerns, and Overview views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-deploy-overview-extraction-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -305,6 +317,12 @@ Examples:
 - a Deploy-local composition owner is the target home for shared composition, route activation handling, workspace lifetime participation, and Deploy Overview / Quick Deploy / From Template interaction boundaries
 - Deploy remains long-lived while the app session is open; route activation refreshes/reconciles state rather than recreating the workspace on every route change
 - this shared composition target preserves the approved Overview-first route model rather than collapsing Deploy back into shell-owned composition or flattening lane-specific workflow boundaries
+
+### Deploy Overview cleanup target
+- `Deploy Overview` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- an Overview-local seam is the target home for Overview-specific state, navigation coordination, interaction boundaries, and route-activation refresh behavior for `deploy.overview`
+- `deploy.overview` remains the route-entry summary/navigation surface inside the long-lived Deploy workspace
+- Overview must not absorb `Quick Deploy` or `From Template` ownership, and views must not depend on or receive `MainWindow` directly
 
 ---
 
@@ -506,9 +524,11 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: Assets now has an extraction seam that starts from the refined AM33 composition target in `docs/02-ux/winui-assets-workspace-extraction-seam-am.md`.
 - Resolved: Assets now has a shared composition cleanup target that makes shell-vs-Assets ownership explicit before runtime extraction proceeds in `docs/02-ux/winui-assets-composition-cleanup-target-am.md`.
 - Resolved: Templates now has a shared composition cleanup target that makes shell-vs-Templates ownership explicit before Templates runtime extraction proceeds in `docs/02-ux/winui-templates-composition-cleanup-target-am.md`.
+- Resolved: Deploy now has a shared composition cleanup target that makes shell-vs-Deploy ownership explicit before Deploy runtime extraction proceeds in `docs/02-ux/winui-deploy-composition-cleanup-target-am.md`.
 - Resolved: Assets Overview now has a narrow cleanup target that keeps Overview under shared Assets composition while moving Overview-specific state and interaction coordination behind an Overview-local seam in `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md`.
 - Resolved: Assets Base Disks now has a narrow cleanup target that keeps Base Disks under shared Assets composition while moving Base Disks-specific state, orchestration, and UI coordination behind a Base Disks-local seam in `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md`.
 - Resolved: Assets Switches now has a narrow cleanup target that keeps Switches under shared Assets composition while moving Switches-specific state, orchestration, and UI coordination behind a Switches-local seam in `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md`.
+- Resolved: Deploy Overview now has a narrow cleanup target that keeps Overview under shared Deploy composition while moving Overview-specific state and interaction coordination behind an Overview-local seam in `docs/02-ux/winui-deploy-overview-extraction-cleanup-target-am.md`.
 - How much Hyper-V VM editing should be native LabAssistant UI vs opening Hyper-V dialogs (if possible)?
 - Should Diagnostics include a lightweight "Recent Issues" history view using the existing error feed service, or stay focused on export/logs initially?
 - Should Assets eventually split into separate top-level items if scope grows significantly?

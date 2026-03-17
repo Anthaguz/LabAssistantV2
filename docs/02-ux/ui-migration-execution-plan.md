@@ -427,6 +427,11 @@ Gate expectations:
 - preserve the AL Deploy route model by keeping `deploy.overview` as the route-entry surface, `deploy.on_the_fly` as the Quick Deploy workflow, and `deploy.from_template` as the review/remediation/deploy workflow rather than a duplicate editor surface
 - treat any `MainWindow` Deploy host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
 
+**Deploy Overview cleanup target checkpoint**
+- before Deploy Overview runtime extraction proceeds, define the narrow `Deploy Overview` cleanup target under the shared Deploy composition boundary
+- make shared Deploy vs Overview-local ownership explicit so Overview-specific state and UI coordination converge behind an Overview-local seam without widening shared Deploy composition
+- preserve `deploy.overview` as the route-entry summary/navigation surface, keep Overview inside the long-lived Deploy workspace, and keep Quick Deploy and From Template extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`

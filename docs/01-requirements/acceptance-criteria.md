@@ -3213,3 +3213,79 @@ Each readiness result shall include, at minimum:
 - [ ] Deploy route-model preservation is explicit and traceable
 - [ ] temporary-bridge-vs-final-target rule and no-direct-`MainWindow`-injection rule are explicit and traceable
 - [ ] long-lived Deploy workspace and route-activation refresh rule are explicit and traceable
+
+---
+
+# AC-037 - WinUI Deploy Overview Extraction Cleanup Target (AM83)
+
+**Related FRs:** FR-158, FR-159, FR-160, FR-155, FR-156, FR-157, FR-087, FR-088, FR-089, FR-090, FR-091, FR-092, FR-093, FR-094, FR-100, FR-101, FR-102, FR-103, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Deploy Overview stays under shared Deploy workspace composition but gains an Overview-local seam
+**Given**
+- the shared Deploy composition cleanup target is already defined
+
+**When**
+- the narrow `Deploy Overview` cleanup target is reviewed
+
+**Then**
+- `Deploy Overview` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Deploy composition remains responsible only for shared capability-level composition concerns
+- an Overview-local seam becomes the target home for Overview-specific state and UI coordination
+
+### 2) Overview-local ownership is explicit without widening Overview into a new shared god object
+**Given**
+- `Deploy Overview` is the route-entry and summary/navigation surface for the capability
+
+**When**
+- Overview-local ownership is defined
+
+**Then**
+- Overview-local ownership explicitly includes:
+  - Overview summary state
+  - Overview-local navigation coordination
+  - Overview-local interaction boundaries used by the Overview surface
+  - Overview-specific refresh or reconcile behavior triggered by `deploy.overview` activation
+- shared `DeployWorkspaceComposition` does not become the Overview workflow owner
+- shared Deploy composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
+
+### 3) MainWindow and route-activation boundaries remain explicit for deploy.overview
+**Given**
+- AM33 and AM78 keep `MainWindow` limited to shell ownership and keep Deploy long-lived by default
+
+**When**
+- the Overview cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Deploy Overview` continues to participate in long-lived Deploy workspace lifetime rather than per-navigation recreation
+- route activation of `deploy.overview` refreshes or reconciles Overview state within the existing Deploy workspace
+
+### 4) Deploy Overview remains behavior-preserving and does not absorb Quick Deploy or From Template semantics
+**Given**
+- `Deploy` is an approved Overview-first capability with distinct Quick Deploy and From Template child routes
+
+**When**
+- the Overview cleanup target is defined
+
+**Then**
+- `deploy.overview` remains the route-entry and index surface for `Deploy`
+- Overview remains primarily a summary and navigation surface
+- no Quick Deploy ownership is moved into Overview
+- no From Template ownership is moved into Overview
+- runtime implementation, Quick Deploy extraction details, From Template extraction details, Deploy behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `DeployWorkspaceComposition` remains the owner for shared capability-level composition only
+- an Overview-local seam becomes the target home for Overview-specific state and interaction coordination
+- `MainWindow` remains shell-only and is not injected into Overview views
+- `Deploy Overview` remains long-lived with route-activation refresh inside the existing Deploy workspace
+- Deploy Overview remains behavior-preserving and does not absorb shared Deploy, Quick Deploy, or From Template concerns
+
+## Definition of Done
+- [ ] shared Deploy vs Overview-local ownership is explicit and traceable
+- [ ] Overview-local state/interaction and host-cleanup expectations are explicit and traceable
+- [ ] long-lived Deploy workspace participation and `deploy.overview` route-activation refresh expectations are explicit and traceable
+- [ ] Quick Deploy / From Template non-goals are explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable
