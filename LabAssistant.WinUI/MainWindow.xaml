@@ -145,8 +145,7 @@
                                 Visibility="Collapsed">
                                 <TabView
                                     x:Name="DeploySubviewTabView"
-                                    IsAddTabButtonVisible="False"
-                                    SelectionChanged="DeploySubviewTabView_SelectionChanged">
+                                    IsAddTabButtonVisible="False">
                                     <TabViewItem x:Name="DeployOverviewTabViewItem" Header="Overview" IsClosable="False">
                                         <deployViews:DeployOverviewView x:Name="DeployOverviewViewHost" />
                                     </TabViewItem>

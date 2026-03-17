@@ -1309,6 +1309,68 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", templatesWorkspaceCompositionSource);
     }
 
+    [Fact]
+    public void MainWindow_PreservesShellBoundary_WhileHostingLongLivedDeployWorkspace()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+
+        Assert.Contains("private readonly DeployWorkspaceComposition _deployWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_deployWorkspaceComposition = new DeployWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("DeployLocalNavigationPanel,", mainWindowSource);
+        Assert.Contains("DeployOverviewViewHost,", mainWindowSource);
+        Assert.Contains("DeployOnTheFlyViewHost,", mainWindowSource);
+        Assert.Contains("DeployFromTemplateViewHost,", mainWindowSource);
+        Assert.Contains("new DeployWorkspaceHost(", mainWindowSource);
+        Assert.Contains("new DeployWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("_deployWorkspaceComposition.ApplyShellState();", mainWindowSource);
+
+        Assert.DoesNotContain("private bool _isUpdatingDeploySubviewSelection;", mainWindowSource);
+        Assert.DoesNotContain("private void DeploySubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)", mainWindowSource);
+        Assert.DoesNotContain("private void SyncDeploySubviewSelection()", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDeployOverviewUi()", mainWindowSource);
+        Assert.DoesNotContain("DeployLocalNavPanel.Visibility = IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("DeployOverviewPanel.Visibility = IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("DeployOnTheFlyPanel.Visibility = IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("DeployOverviewOpenQuickDeployButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", mainWindowSource);
+        Assert.DoesNotContain("DeployOverviewOpenFromTemplateButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", mainWindowSource);
+    }
+
+    [Fact]
+    public void DeployWorkspaceComposition_BecomesTheSharedDeployCompositionOwner_WithoutRuntimeLaneExtraction()
+    {
+        var compositionSource = LoadDeployWorkspaceCompositionSource();
+
+        Assert.Contains("internal sealed class DeployWorkspaceComposition", compositionSource);
+        Assert.Contains("private readonly FrameworkElement _localNavigationHost;", compositionSource);
+        Assert.Contains("private readonly FrameworkElement _overviewHost;", compositionSource);
+        Assert.Contains("private readonly FrameworkElement _onTheFlyHost;", compositionSource);
+        Assert.Contains("private readonly FrameworkElement _fromTemplateHost;", compositionSource);
+        Assert.Contains("private readonly DeployOverviewView _overviewView;", compositionSource);
+        Assert.Contains("private readonly IDeployWorkspaceHost _host;", compositionSource);
+        Assert.Contains("private readonly IDeployWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("private bool _isUpdatingDeploySubviewSelection;", compositionSource);
+        Assert.Contains("public void ApplyShellState()", compositionSource);
+        Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_overviewHost.Visibility = _shellBridge.IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", compositionSource);
+        Assert.Contains("_overviewView.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
+        Assert.Contains("_overviewView.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
+        Assert.Contains("_overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _host.QuickDeployDraftCount > 0", compositionSource);
+        Assert.Contains("_overviewView.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _host.IsLoadingTemplates", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOverview);", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
+
+        Assert.DoesNotContain("DeployTemplateSelectorComboBox", compositionSource);
+        Assert.DoesNotContain("DeployOnTheFlyVmEntriesListView", compositionSource);
+        Assert.DoesNotContain("EvaluateDeployOnTheFlyReadinessAsync", compositionSource);
+        Assert.DoesNotContain("UpdateDeployUi()", compositionSource);
+        Assert.DoesNotContain("UpdateDeployOnTheFlyUi()", compositionSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -1342,6 +1404,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadTemplatesWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
