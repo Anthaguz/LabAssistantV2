@@ -288,7 +288,8 @@ public sealed partial class MainWindow : Window
                     SetTemplatesLoading,
                     ApplyTemplatesWorkspaceUiState,
                     EnsureTemplatesLibraryAsync,
-                    PickTemplateFileForSaveAsync)),
+                    PickTemplateFileForSaveAsync,
+                    ShowRemoveTemplateVmConfirmationDialogAsync)),
             new TemplatesWorkspaceShellBridge(
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
@@ -3273,37 +3274,8 @@ public sealed partial class MainWindow : Window
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
-    private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
+    private async Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName)
     {
-        if (ActiveTemplateEditorDocument is null)
-        {
-            SetTemplateEditorStatus("Load or create a template first.");
-            return;
-        }
-
-        var nextVmNumber = TemplateVmEntries.Count + 1;
-        var vmEntry = new VmTemplate
-        {
-            Name = $"VM-{nextVmNumber}",
-            MemoryMb = 2048,
-            CpuCount = 2
-        };
-        _templatesWorkspaceComposition.AddEditorVmEntry(vmEntry);
-        SyncTemplateVmEntriesToDocument();
-        SetTemplateEditorStatus($"Added VM entry '{vmEntry.Name}'.");
-        ApplyTemplatesWorkspaceUiState();
-    }
-
-    private async void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
-    {
-        var selectedVmEntry = SelectedTemplateVmEntry;
-        if (selectedVmEntry is null)
-        {
-            SetTemplateEditorStatus("Select a VM entry first.");
-            return;
-        }
-
-        var vmName = selectedVmEntry.Name;
         var dialog = new ContentDialog
         {
             XamlRoot = RootLayout.XamlRoot,
@@ -3314,14 +3286,18 @@ public sealed partial class MainWindow : Window
             DefaultButton = ContentDialogButton.Close
         };
 
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
-        {
-            return;
-        }
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
 
-        _templatesWorkspaceComposition.RemoveSelectedEditorVmEntry();
-        SyncTemplateVmEntriesToDocument();
-        SetTemplateEditorStatus($"Removed VM entry '{vmName}'.");
+    private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        _templatesWorkspaceComposition.AddEditorVmEntry();
+        ApplyTemplatesWorkspaceUiState();
+    }
+
+    private async void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        await _templatesWorkspaceComposition.RemoveSelectedEditorVmEntryAsync();
         ApplyTemplatesWorkspaceUiState();
     }
 
