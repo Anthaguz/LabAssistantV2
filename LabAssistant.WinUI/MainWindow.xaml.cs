@@ -151,7 +151,6 @@ public sealed partial class MainWindow : Window
     private TextBlock DeployTemplateRemediationTextBlock => DeployFromTemplateView.DeployTemplateRemediationTextBlockControl;
     private TextBlock DeploySharedIssuesSummaryTextBlock => DeployFromTemplateView.DeploySharedIssuesSummaryTextBlockControl;
     private ListView DeploySharedIssuesListView => DeployFromTemplateView.DeploySharedIssuesListViewControl;
-    private Expander DeployGlobalIssuesExpander => DeployFromTemplateRightPanelView.DeployGlobalIssuesExpanderControl;
     private ListView DeployGlobalIssuesListView => DeployFromTemplateRightPanelView.DeployGlobalIssuesListViewControl;
     private Button DeployResolveSuggestionsButton => DeployFromTemplateView.DeployResolveSuggestionsButtonControl;
     private Button DeployOpenTemplateEditorButton => DeployFromTemplateView.DeployOpenTemplateEditorButtonControl;
@@ -287,13 +286,11 @@ public sealed partial class MainWindow : Window
                     await _deploymentCoordinator.DeployAllAsync(context);
                     return _deploymentOutcomeSummaryBuilder.Build(context);
                 },
-                AttachDeployProgressCallbacks,
-                UpdateDeployUi));
+                AttachDeployProgressCallbacks));
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
             DeployOverviewViewHost,
             DeployOnTheFlyViewHost,
-            DeployFromTemplateViewHost,
             DeploySubviewTabView,
             DeployOverviewTabViewItem,
             DeployQuickDeployTabViewItem,
@@ -358,9 +355,7 @@ public sealed partial class MainWindow : Window
         DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;
         DeployStartButton.Click += DeployStartButton_Click;
         DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
-        DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
         DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
-        DeployGlobalIssuesExpander.IsExpanded = false;
         UpdateDeployIssueRows();
 
         DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyVmEntryRows;
@@ -578,7 +573,7 @@ public sealed partial class MainWindow : Window
     {
         _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(incomingCapabilityKey);
         _isShellRightPanelOpen = false;
-        DeployGlobalIssuesExpander.IsExpanded = false;
+        _deployFromTemplateWorkspaceComposition.ResetPanelState();
     }
 
     private string ResolveRightPanelOwnerCapabilityKey(string capabilityKey)

@@ -56,7 +56,6 @@ internal sealed class DeployWorkspaceComposition
     private readonly FrameworkElement _localNavigationHost;
     private readonly FrameworkElement _overviewHost;
     private readonly FrameworkElement _onTheFlyHost;
-    private readonly FrameworkElement _fromTemplateHost;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _quickDeployTabViewItem;
@@ -70,7 +69,6 @@ internal sealed class DeployWorkspaceComposition
         FrameworkElement localNavigationHost,
         DeployOverviewView overviewView,
         FrameworkElement onTheFlyHost,
-        DeployFromTemplateView fromTemplateView,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem quickDeployTabViewItem,
@@ -82,7 +80,6 @@ internal sealed class DeployWorkspaceComposition
         _localNavigationHost = localNavigationHost;
         _overviewHost = overviewView;
         _onTheFlyHost = onTheFlyHost;
-        _fromTemplateHost = fromTemplateView;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
         _quickDeployTabViewItem = quickDeployTabViewItem;
@@ -108,7 +105,6 @@ internal sealed class DeployWorkspaceComposition
         _localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         _overviewHost.Visibility = _shellBridge.IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         _onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
-        _fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
 
         SyncDeploySubviewSelection();
 
@@ -117,10 +113,7 @@ internal sealed class DeployWorkspaceComposition
             _overviewWorkspaceComposition.ApplyShellState();
         }
 
-        if (_shellBridge.IsDeployFromTemplateActive)
-        {
-            _fromTemplateWorkspaceComposition.ApplyShellState();
-        }
+        _fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);
     }
 
     private void WireSharedHandlers()
