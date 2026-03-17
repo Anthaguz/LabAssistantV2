@@ -151,6 +151,18 @@ For Templates Editor extraction planning after the shared Templates cleanup targ
 Behavioral contract source:
 - `docs/02-ux/winui-templates-editor-extraction-cleanup-target-am.md`
 
+## 2.11 Milestone AM Deploy Shared Composition Cleanup Target (Approved)
+
+For Deploy extraction planning after AF, AG, AL, and the AM shared-capability refinement work:
+- `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact/drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime
+- shared Deploy composition must converge behind a Deploy-local composition owner rather than terminating in `MainWindow`
+- the Deploy-local composition owner is responsible for shared Deploy-local composition, shared route activation handling, shared workspace lifetime participation, and shared local interaction boundaries across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+- Deploy remains an Overview-first capability: `deploy.overview` is the route-entry surface, `deploy.on_the_fly` remains the Quick Deploy workflow, and `deploy.from_template` remains a review/remediation/deploy workflow rather than a duplicate Quick Deploy editor
+- capability-specific host interfaces implemented by `MainWindow` are temporary bridges only, and Deploy views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-deploy-composition-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -287,6 +299,12 @@ Examples:
 - Child-route ordering is `Overview`, `Quick Deploy`, `From Template`.
 - `Quick Deploy` is the deep editor-oriented deploy workflow.
 - `From Template` is a review/remediation/deploy workflow and should not duplicate the Quick Deploy editor surface.
+
+### Shared composition cleanup target
+- shell ownership stays in `MainWindow`, but shared Deploy composition should not terminate there as the long-term architecture
+- a Deploy-local composition owner is the target home for shared composition, route activation handling, workspace lifetime participation, and Deploy Overview / Quick Deploy / From Template interaction boundaries
+- Deploy remains long-lived while the app session is open; route activation refreshes/reconciles state rather than recreating the workspace on every route change
+- this shared composition target preserves the approved Overview-first route model rather than collapsing Deploy back into shell-owned composition or flattening lane-specific workflow boundaries
 
 ---
 
