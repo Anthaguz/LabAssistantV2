@@ -4,16 +4,28 @@ namespace LabAssistant.WinUI.Views.Deploy;
 
 public sealed partial class DeployOverviewView : UserControl
 {
+    public event EventHandler? OpenQuickDeployRequested;
+
+    public event EventHandler? OpenFromTemplateRequested;
+
     public DeployOverviewView()
     {
         InitializeComponent();
     }
 
-    public Button DeployOverviewOpenQuickDeployButtonControl => DeployOverviewOpenQuickDeployButton;
+    public void UpdateSummary(string quickDeploySummaryText, string fromTemplateSummaryText)
+    {
+        DeployOverviewQuickDeploySummaryTextBlock.Text = quickDeploySummaryText;
+        DeployOverviewFromTemplateSummaryTextBlock.Text = fromTemplateSummaryText;
+    }
 
-    public Button DeployOverviewOpenFromTemplateButtonControl => DeployOverviewOpenFromTemplateButton;
+    private void DeployOverviewOpenQuickDeployButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        OpenQuickDeployRequested?.Invoke(this, EventArgs.Empty);
+    }
 
-    public TextBlock DeployOverviewQuickDeploySummaryTextBlockControl => DeployOverviewQuickDeploySummaryTextBlock;
-
-    public TextBlock DeployOverviewFromTemplateSummaryTextBlockControl => DeployOverviewFromTemplateSummaryTextBlock;
+    private void DeployOverviewOpenFromTemplateButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        OpenFromTemplateRequested?.Invoke(this, EventArgs.Empty);
+    }
 }

@@ -102,8 +102,8 @@ internal sealed class DeployOverviewWorkspaceComposition
 
     private void WireHandlers()
     {
-        _view.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
-        _view.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
+        _view.OpenQuickDeployRequested += OpenQuickDeployRequested;
+        _view.OpenFromTemplateRequested += OpenFromTemplateRequested;
     }
 
     private void RefreshSummary()
@@ -116,7 +116,16 @@ internal sealed class DeployOverviewWorkspaceComposition
 
     private void ApplyWorkspaceState()
     {
-        _view.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _workspace.QuickDeploySummaryText;
-        _view.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _workspace.FromTemplateSummaryText;
+        _view.UpdateSummary(_workspace.QuickDeploySummaryText, _workspace.FromTemplateSummaryText);
+    }
+
+    private void OpenQuickDeployRequested(object? sender, EventArgs e)
+    {
+        _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
+    }
+
+    private void OpenFromTemplateRequested(object? sender, EventArgs e)
+    {
+        _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);
     }
 }

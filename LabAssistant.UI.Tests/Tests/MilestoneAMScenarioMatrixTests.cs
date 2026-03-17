@@ -1344,6 +1344,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         var compositionSource = LoadDeployWorkspaceCompositionSource();
         var overviewCompositionSource = LoadDeployOverviewWorkspaceCompositionSource();
         var overviewWorkspaceSource = LoadDeployOverviewWorkspaceViewModelSource();
+        var overviewCodeBehindSource = LoadDeployOverviewCodeBehindSource();
+        var overviewXaml = LoadDeployOverviewXaml();
 
         Assert.Contains("internal sealed class DeployWorkspaceComposition", compositionSource);
         Assert.Contains("private readonly FrameworkElement _localNavigationHost;", compositionSource);
@@ -1397,17 +1399,34 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void RefreshUiState()", overviewCompositionSource);
         Assert.Contains("public void ApplyShellState()", overviewCompositionSource);
         Assert.Contains("if (!_shellBridge.IsDeployOverviewActive)", overviewCompositionSource);
-        Assert.Contains("_view.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", overviewCompositionSource);
-        Assert.Contains("_view.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", overviewCompositionSource);
+        Assert.Contains("_view.OpenQuickDeployRequested += OpenQuickDeployRequested;", overviewCompositionSource);
+        Assert.Contains("_view.OpenFromTemplateRequested += OpenFromTemplateRequested;", overviewCompositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", overviewCompositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", overviewCompositionSource);
         Assert.Contains("_workspace.RefreshSummary(", overviewCompositionSource);
-        Assert.Contains("_view.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _workspace.QuickDeploySummaryText;", overviewCompositionSource);
-        Assert.Contains("_view.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _workspace.FromTemplateSummaryText;", overviewCompositionSource);
+        Assert.Contains("_view.UpdateSummary(_workspace.QuickDeploySummaryText, _workspace.FromTemplateSummaryText);", overviewCompositionSource);
+        Assert.DoesNotContain("DeployOverviewOpenQuickDeployButtonControl", overviewCompositionSource);
+        Assert.DoesNotContain("DeployOverviewOpenFromTemplateButtonControl", overviewCompositionSource);
+        Assert.DoesNotContain("DeployOverviewQuickDeploySummaryTextBlockControl", overviewCompositionSource);
+        Assert.DoesNotContain("DeployOverviewFromTemplateSummaryTextBlockControl", overviewCompositionSource);
 
         Assert.Contains("internal sealed class DeployOverviewWorkspaceViewModel", overviewWorkspaceSource);
         Assert.Contains("public string QuickDeploySummaryText { get; private set; }", overviewWorkspaceSource);
         Assert.Contains("public string FromTemplateSummaryText { get; private set; }", overviewWorkspaceSource);
         Assert.Contains("public void RefreshSummary(int quickDeployDraftCount, bool isLoadingTemplates, int availableTemplateCount)", overviewWorkspaceSource);
         Assert.Contains("\"Template inventory is loading.\"", overviewWorkspaceSource);
+
+        Assert.NotNull(FindByName(overviewXaml, "DeployOverviewQuickDeploySummaryTextBlock"));
+        Assert.NotNull(FindByName(overviewXaml, "DeployOverviewOpenQuickDeployButton"));
+        Assert.NotNull(FindByName(overviewXaml, "DeployOverviewFromTemplateSummaryTextBlock"));
+        Assert.NotNull(FindByName(overviewXaml, "DeployOverviewOpenFromTemplateButton"));
+        Assert.Contains("public event EventHandler? OpenQuickDeployRequested;", overviewCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenFromTemplateRequested;", overviewCodeBehindSource);
+        Assert.Contains("public void UpdateSummary(string quickDeploySummaryText, string fromTemplateSummaryText)", overviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewOpenQuickDeployButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewOpenFromTemplateButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewQuickDeploySummaryTextBlockControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("DeployOverviewFromTemplateSummaryTextBlockControl", overviewCodeBehindSource);
     }
 
     [Fact]
@@ -1505,6 +1524,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployOverviewWorkspaceViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOverviewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOverviewView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
@@ -1643,6 +1668,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static XDocument LoadAssetsOverviewXaml()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Assets", "AssetsOverviewView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadDeployOverviewXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOverviewView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
     }
 
