@@ -33,6 +33,16 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
 
     public string GlobalIssuesBadgeText { get; private set; } = "Issues: 0";
 
+    public bool IsEvaluatingReadiness { get; private set; }
+
+    public bool IsStarting { get; private set; }
+
+    public string LifecycleState { get; private set; } = "Idle";
+
+    public int ProgressPercent { get; private set; }
+
+    public string ProgressSummary { get; private set; } = "No deployment started.";
+
     public void SetSelectedTemplateLibraryItem(TemplateLibraryItem? selectedTemplateLibraryItem)
     {
         SelectedTemplateLibraryItem = selectedTemplateLibraryItem;
@@ -70,6 +80,20 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
     public void SetReadinessSummary(string readinessSummaryText)
     {
         ReadinessSummaryText = readinessSummaryText;
+    }
+
+    public void SetWorkflowState(
+        bool isEvaluatingReadiness,
+        bool isStarting,
+        string lifecycleState,
+        int progressPercent,
+        string progressSummary)
+    {
+        IsEvaluatingReadiness = isEvaluatingReadiness;
+        IsStarting = isStarting;
+        LifecycleState = lifecycleState;
+        ProgressPercent = progressPercent;
+        ProgressSummary = progressSummary;
     }
 
     public void ClearGroupedIssueState()

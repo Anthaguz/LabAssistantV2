@@ -72,19 +72,16 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("DeployStartButton.Click += DeployStartButton_Click;", source);
         Assert.Contains("DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;", source);
         Assert.Contains("await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);", source);
-        Assert.Contains("await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Full);", source);
-        Assert.Contains("await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);", source);
+        Assert.Contains("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", source);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", source);
+        Assert.Contains("await _deployFromTemplateWorkspaceComposition.StartDeployAsync();", source);
+        Assert.Contains("new DeployFromTemplateWorkspaceHost(", source);
         Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", source);
         Assert.Contains("DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;", source);
         Assert.Contains("DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;", source);
         Assert.Contains("await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);", source);
-        Assert.Contains("private static DeployDiskResolution ResolveDeployDiskIdentity", source);
-        Assert.Contains("private static DeploySwitchResolution ResolveDeploySwitches", source);
         Assert.Contains("private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)", source);
-        Assert.Contains("DeployProgressBar.Value = _deployProgressPercent;", source);
         Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", source);
-        Assert.Contains("Switch mapping partial/missing", source);
-        Assert.Contains("Disk identity conflict detected.", source);
         Assert.Contains("DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures", source);
     }
 
