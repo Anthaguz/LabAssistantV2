@@ -3289,3 +3289,77 @@ Each readiness result shall include, at minimum:
 - [ ] long-lived Deploy workspace participation and `deploy.overview` route-activation refresh expectations are explicit and traceable
 - [ ] Quick Deploy / From Template non-goals are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+# AC-038 - WinUI Deploy From Template Extraction Cleanup Target (AM87)
+
+**Related FRs:** FR-161, FR-162, FR-163, FR-155, FR-156, FR-157, FR-087, FR-088, FR-089, FR-090, FR-091, FR-092, FR-093, FR-094, FR-100, FR-101, FR-102, FR-103, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Deploy From Template stays under shared Deploy workspace composition but gains a From Template-local seam
+**Given**
+- the shared Deploy composition cleanup target and Deploy Overview cleanup target are already defined
+
+**When**
+- the narrow `Deploy From Template` cleanup target is reviewed
+
+**Then**
+- `Deploy From Template` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Deploy composition remains responsible only for shared capability-level composition concerns
+- a From Template-local seam becomes the target home for From Template-specific state, orchestration, composition, and UI coordination
+
+### 2) From Template-local ownership is explicit without widening shared Deploy composition into the workflow owner
+**Given**
+- `deploy.from_template` is the template-driven review/remediation/deploy workflow surface for the capability
+
+**When**
+- From Template-local ownership is defined
+
+**Then**
+- From Template-local ownership explicitly includes:
+  - From Template-specific state
+  - From Template-specific orchestration
+  - From Template-specific interaction boundaries used by the From Template surface
+  - From Template-specific composition or host cleanup expectations
+  - From Template-specific refresh or reconcile behavior triggered by `deploy.from_template` activation
+- shared `DeployWorkspaceComposition` does not become the From Template workflow owner
+- shared Deploy composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
+
+### 3) MainWindow and route-activation boundaries remain explicit for deploy.from_template
+**Given**
+- AM33 and AM78 keep `MainWindow` limited to shell ownership and keep Deploy long-lived by default
+
+**When**
+- the From Template cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Deploy From Template` continues to participate in long-lived Deploy workspace lifetime rather than per-navigation recreation
+- route activation of `deploy.from_template` refreshes or reconciles From Template state within the existing Deploy workspace
+
+### 4) Deploy From Template remains behavior-preserving and does not absorb Quick Deploy or Overview semantics
+**Given**
+- `Deploy` is an approved Overview-first capability with distinct Quick Deploy and From Template child routes
+
+**When**
+- the From Template cleanup target is defined
+
+**Then**
+- `deploy.from_template` remains a distinct template-driven review/remediation/deploy workflow surface and not the route-entry Deploy surface
+- no Quick Deploy ownership is moved into From Template
+- no Deploy Overview ownership is moved into From Template
+- runtime implementation, Quick Deploy extraction details, Deploy Overview extraction details, Deploy behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `DeployWorkspaceComposition` remains the owner for shared capability-level composition only
+- a From Template-local seam becomes the target home for From Template-specific state, orchestration, composition, and interaction coordination
+- `MainWindow` remains shell-only and is not injected into From Template views
+- `Deploy From Template` remains long-lived with route-activation refresh inside the existing Deploy workspace
+- Deploy From Template remains behavior-preserving and does not absorb shared Deploy, Quick Deploy, or Overview concerns
+
+## Definition of Done
+- [ ] shared Deploy vs From Template-local ownership is explicit and traceable
+- [ ] From Template-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
+- [ ] long-lived Deploy workspace participation and `deploy.from_template` route-activation refresh expectations are explicit and traceable
+- [ ] Quick Deploy / Overview non-goals are explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable

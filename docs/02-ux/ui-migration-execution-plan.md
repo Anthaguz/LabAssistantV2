@@ -432,6 +432,11 @@ Gate expectations:
 - make shared Deploy vs Overview-local ownership explicit so Overview-specific state and UI coordination converge behind an Overview-local seam without widening shared Deploy composition
 - preserve `deploy.overview` as the route-entry summary/navigation surface, keep Overview inside the long-lived Deploy workspace, and keep Quick Deploy and From Template extraction details out of scope
 
+**Deploy From Template cleanup target checkpoint**
+- before Deploy From Template runtime extraction proceeds, define the narrow `Deploy From Template` cleanup target under the shared Deploy composition boundary
+- make shared Deploy vs From Template-local ownership explicit so From Template-specific state, orchestration, composition, and UI coordination converge behind a From Template-local seam without widening shared Deploy composition
+- preserve `deploy.from_template` as the template-driven review/remediation/deploy surface, keep From Template inside the long-lived Deploy workspace with route-activation refresh, and keep Quick Deploy and Deploy Overview extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
