@@ -16,6 +16,8 @@ internal interface ITemplatesEditorWorkspaceHost
     Task EnsureTemplatesLibraryAsync(bool forceRefresh);
 
     Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName);
+
+    Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName);
 }
 
 internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHost
@@ -25,19 +27,22 @@ internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHo
     private readonly Action _applyTemplatesWorkspaceUiState;
     private readonly Func<bool, Task> _ensureTemplatesLibraryAsync;
     private readonly Func<string, Task<string?>> _pickTemplateFileForSaveAsync;
+    private readonly Func<string, Task<bool>> _showRemoveTemplateVmConfirmationDialogAsync;
 
     public TemplatesEditorWorkspaceHost(
         Func<bool> isTemplatesLoading,
         Action<bool> setTemplatesLoading,
         Action applyTemplatesWorkspaceUiState,
         Func<bool, Task> ensureTemplatesLibraryAsync,
-        Func<string, Task<string?>> pickTemplateFileForSaveAsync)
+        Func<string, Task<string?>> pickTemplateFileForSaveAsync,
+        Func<string, Task<bool>> showRemoveTemplateVmConfirmationDialogAsync)
     {
         _isTemplatesLoading = isTemplatesLoading;
         _setTemplatesLoading = setTemplatesLoading;
         _applyTemplatesWorkspaceUiState = applyTemplatesWorkspaceUiState;
         _ensureTemplatesLibraryAsync = ensureTemplatesLibraryAsync;
         _pickTemplateFileForSaveAsync = pickTemplateFileForSaveAsync;
+        _showRemoveTemplateVmConfirmationDialogAsync = showRemoveTemplateVmConfirmationDialogAsync;
     }
 
     public bool IsTemplatesLoading => _isTemplatesLoading();
@@ -49,6 +54,8 @@ internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHo
     public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _ensureTemplatesLibraryAsync(forceRefresh);
 
     public Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName) => _pickTemplateFileForSaveAsync(suggestedFileName);
+
+    public Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName) => _showRemoveTemplateVmConfirmationDialogAsync(vmName);
 }
 
 internal sealed class TemplatesEditorWorkspaceComposition : ITemplatesEditorWorkspaceControllerHost
@@ -114,18 +121,9 @@ internal sealed class TemplatesEditorWorkspaceComposition : ITemplatesEditorWork
         ApplyVmListState();
     }
 
-    public void AddVmEntry(VmTemplate vmEntry)
-    {
-        _workspace.AddVmEntry(vmEntry);
-        ApplyVmListState();
-    }
+    public bool AddVmEntry() => _controller.AddVmEntry();
 
-    public VmTemplate? RemoveSelectedVmEntry()
-    {
-        var removedEntry = _workspace.RemoveSelectedVmEntry();
-        ApplyVmListState();
-        return removedEntry;
-    }
+    public Task RemoveSelectedVmEntryAsync() => _controller.RemoveSelectedVmEntryAsync();
 
     public void RefreshVmEntries()
     {
@@ -219,13 +217,15 @@ internal sealed class TemplatesEditorWorkspaceComposition : ITemplatesEditorWork
     void ITemplatesEditorWorkspaceControllerHost.ApplyWorkspaceState()
     {
         ApplyViewState();
-        ApplyVmDraftState();
+        ApplyVmListState();
         _host.ApplyTemplatesWorkspaceUiState();
     }
 
     Task ITemplatesEditorWorkspaceControllerHost.EnsureTemplatesLibraryAsync(bool forceRefresh) => _host.EnsureTemplatesLibraryAsync(forceRefresh);
 
     Task<string?> ITemplatesEditorWorkspaceControllerHost.PickTemplateFileForSaveAsync(string suggestedFileName) => _host.PickTemplateFileForSaveAsync(suggestedFileName);
+
+    Task<bool> ITemplatesEditorWorkspaceControllerHost.ShowRemoveTemplateVmConfirmationDialogAsync(string vmName) => _host.ShowRemoveTemplateVmConfirmationDialogAsync(vmName);
 
     private void ApplyViewState()
     {

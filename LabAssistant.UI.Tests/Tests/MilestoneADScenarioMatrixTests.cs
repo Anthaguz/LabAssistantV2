@@ -82,10 +82,14 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsync();", source);
         Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsAsync();", source);
         Assert.Contains("await _templatesWorkspaceComposition.ValidateEditorAsync();", source);
+        Assert.Contains("_templatesWorkspaceComposition.AddEditorVmEntry();", source);
+        Assert.Contains("await _templatesWorkspaceComposition.RemoveSelectedEditorVmEntryAsync();", source);
         Assert.Contains("internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHost", editorCompositionSource);
         Assert.Contains("private readonly TemplatesEditorWorkspaceController _controller;", editorCompositionSource);
         Assert.Contains("_controller = new TemplatesEditorWorkspaceController(templatesCapabilityService, _workspace, this);", editorCompositionSource);
         Assert.Contains("internal sealed class TemplatesEditorWorkspaceController", editorControllerSource);
+        Assert.Contains("public bool AddVmEntry()", editorControllerSource);
+        Assert.Contains("public async Task RemoveSelectedVmEntryAsync()", editorControllerSource);
         Assert.Contains("public async Task SaveAsync()", editorControllerSource);
         Assert.Contains("public async Task SaveAsAsync()", editorControllerSource);
         Assert.Contains("public async Task ValidateAsync()", editorControllerSource);
@@ -169,11 +173,13 @@ public sealed class MilestoneADScenarioMatrixTests
 
         Assert.Contains("SyncTemplateVmEntriesToDocument()", source);
         Assert.Contains("_templatesWorkspaceComposition.ApplySelectedEditorVmDraft(showSuccessStatus: true);", source);
+        Assert.Contains("public bool AddVmEntry()", editorControllerSource);
+        Assert.Contains("public async Task RemoveSelectedVmEntryAsync()", editorControllerSource);
         Assert.Contains("TryApplyEditorFieldsToDocument(showSuccessStatus: false)", editorControllerSource);
         Assert.Contains("private bool TryApplySelectedVmDraft(bool showSuccessStatus)", editorControllerSource);
         Assert.Contains("Remove VM Entry", source);
-        Assert.Contains("Added VM entry", source);
-        Assert.Contains("Removed VM entry", source);
+        Assert.Contains("Added VM entry", editorControllerSource);
+        Assert.Contains("Removed VM entry", editorControllerSource);
     }
 
     [Fact]

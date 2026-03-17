@@ -14,6 +14,8 @@ internal interface ITemplatesEditorWorkspaceControllerHost
     Task EnsureTemplatesLibraryAsync(bool forceRefresh);
 
     Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName);
+
+    Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName);
 }
 
 internal sealed class TemplatesEditorWorkspaceController
@@ -49,6 +51,51 @@ internal sealed class TemplatesEditorWorkspaceController
 
         _host.ApplyWorkspaceState();
         return true;
+    }
+
+    public bool AddVmEntry()
+    {
+        if (_workspace.ActiveDocument is null)
+        {
+            _workspace.SetStatusText("Load or create a template first.");
+            _host.ApplyWorkspaceState();
+            return false;
+        }
+
+        var nextVmNumber = _workspace.VmEntries.Count + 1;
+        var vmEntry = new VmTemplate
+        {
+            Name = $"VM-{nextVmNumber}",
+            MemoryMb = 2048,
+            CpuCount = 2
+        };
+
+        _workspace.AddVmEntry(vmEntry);
+        SyncVmEntriesToDocument();
+        _workspace.SetStatusText($"Added VM entry '{vmEntry.Name}'.");
+        _host.ApplyWorkspaceState();
+        return true;
+    }
+
+    public async Task RemoveSelectedVmEntryAsync()
+    {
+        if (_workspace.SelectedVmEntry is null)
+        {
+            _workspace.SetStatusText("Select a VM entry first.");
+            _host.ApplyWorkspaceState();
+            return;
+        }
+
+        var vmName = _workspace.SelectedVmEntry.Name;
+        if (!await _host.ShowRemoveTemplateVmConfirmationDialogAsync(vmName))
+        {
+            return;
+        }
+
+        _workspace.RemoveSelectedVmEntry();
+        SyncVmEntriesToDocument();
+        _workspace.SetStatusText($"Removed VM entry '{vmName}'.");
+        _host.ApplyWorkspaceState();
     }
 
     public async Task SaveAsync()
@@ -201,6 +248,17 @@ internal sealed class TemplatesEditorWorkspaceController
         _workspace.SetVmCount(template.VmTemplates.Count);
         _workspace.SetDocument(document);
         return true;
+    }
+
+    private void SyncVmEntriesToDocument()
+    {
+        if (_workspace.ActiveDocument is null)
+        {
+            return;
+        }
+
+        _workspace.ActiveDocument.Template.VmTemplates = _workspace.VmEntries.ToList();
+        _workspace.SetVmCount(_workspace.ActiveDocument.Template.VmTemplates.Count);
     }
 
     private bool TryApplySelectedVmDraft(bool showSuccessStatus)

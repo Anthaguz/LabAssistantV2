@@ -84,9 +84,9 @@ internal sealed class TemplatesWorkspaceComposition
 
     public void ReplaceEditorVmEntries(IReadOnlyList<VmTemplate> vmEntries) => _editorComposition.ReplaceVmEntries(vmEntries);
 
-    public void AddEditorVmEntry(VmTemplate vmEntry) => _editorComposition.AddVmEntry(vmEntry);
+    public bool AddEditorVmEntry() => _editorComposition.AddVmEntry();
 
-    public VmTemplate? RemoveSelectedEditorVmEntry() => _editorComposition.RemoveSelectedVmEntry();
+    public Task RemoveSelectedEditorVmEntryAsync() => _editorComposition.RemoveSelectedVmEntryAsync();
 
     public void RefreshEditorVmEntries() => _editorComposition.RefreshVmEntries();
 
