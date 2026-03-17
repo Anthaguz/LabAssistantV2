@@ -41,7 +41,7 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("internal sealed class TemplatesWorkspaceComposition", compositionSource);
         Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_libraryComposition.ApplyShellState(_shellBridge.IsTemplatesLibraryActive);", compositionSource);
-        Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_editorComposition.ApplyShellState(_shellBridge.IsTemplatesEditorActive);", compositionSource);
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceComposition", libraryCompositionSource);
         Assert.Contains("_view.Visibility = isLibraryActive ? Visibility.Visible : Visibility.Collapsed;", libraryCompositionSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);

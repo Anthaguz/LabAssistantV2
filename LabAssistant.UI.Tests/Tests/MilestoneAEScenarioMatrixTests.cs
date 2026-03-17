@@ -84,7 +84,7 @@ public sealed class MilestoneAEScenarioMatrixTests
         Assert.Contains("Resolved from vhdPath.", source);
         Assert.Contains("VHD identity conflict detected. Select a catalog entry to resolve before saving.", source);
         Assert.Contains("Multiple catalog entries match vhdxSignature. Select one entry before saving.", source);
-        Assert.Contains("TemplateEditorStatusTextBlock.Text = normalization.Message;", source);
+        Assert.Contains("SetTemplateEditorStatus(normalization.Message);", source);
     }
 
     private static XDocument LoadTemplatesEditorViewXaml()

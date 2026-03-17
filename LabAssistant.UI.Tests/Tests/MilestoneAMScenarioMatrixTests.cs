@@ -903,6 +903,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private TemplatesWorkspaceUiState CreateTemplatesWorkspaceUiState()", mainWindowSource);
         Assert.Contains("private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;", mainWindowSource);
         Assert.Contains("private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;", mainWindowSource);
+        Assert.Contains("new TemplatesEditorWorkspaceComposition(TemplatesEditorViewHost),", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.SetEditorDocument(_activeTemplateEditorDocument);", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.SetEditorStatus(statusText);", mainWindowSource);
+        Assert.Contains("_templatesWorkspaceComposition.CaptureEditorDocumentHeaderState();", mainWindowSource);
         Assert.Contains("private bool IsTemplatesLibraryActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesEditorActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesCapabilityActive =>", mainWindowSource);
@@ -915,6 +919,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("if (IsTemplatesLibraryActive)", mainWindowSource);
         Assert.DoesNotContain("_ = EnsureTemplatesLibraryAsync(forceRefresh: false);", mainWindowSource);
         Assert.DoesNotContain("private void UpdateTemplatesUi()", mainWindowSource);
+        Assert.DoesNotContain("private TextBox TemplateNameTextBox =>", mainWindowSource);
+        Assert.DoesNotContain("private TextBox TemplateDescriptionTextBox =>", mainWindowSource);
+        Assert.DoesNotContain("private TextBlock TemplateEditorStatusTextBlock =>", mainWindowSource);
 
         Assert.Contains("public const string TemplatesLibrary = \"templates.library\";", shellViewModelSource);
         Assert.Contains("public const string TemplatesEditor = \"templates.editor\";", shellViewModelSource);
@@ -935,23 +942,24 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("internal sealed class TemplatesWorkspaceComposition", compositionSource);
         Assert.Contains("private readonly FrameworkElement _workspaceHost;", compositionSource);
         Assert.Contains("private readonly TemplatesLibraryWorkspaceComposition _libraryComposition;", compositionSource);
-        Assert.Contains("private readonly TemplatesEditorView _editorView;", compositionSource);
+        Assert.Contains("private readonly TemplatesEditorWorkspaceComposition _editorComposition;", compositionSource);
         Assert.Contains("private readonly ITemplatesWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
-        Assert.Contains("_editorView.Visibility = _shellBridge.IsTemplatesEditorActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_editorComposition.ApplyShellState(_shellBridge.IsTemplatesEditorActive);", compositionSource);
         Assert.Contains("_libraryComposition.ApplyShellState(_shellBridge.IsTemplatesLibraryActive);", compositionSource);
         Assert.Contains("public IList<TemplateLibraryItem> LibraryItems => _libraryComposition.LibraryItems;", compositionSource);
         Assert.Contains("public TemplateLibraryItem? SelectedLibraryItem => _libraryComposition.SelectedItem;", compositionSource);
         Assert.Contains("public Task EnsureLibraryAsync(bool forceRefresh) => _libraryComposition.EnsureLibraryAsync(forceRefresh);", compositionSource);
+        Assert.Contains("public void SetEditorDocument(TemplateEditorDocument? document) => _editorComposition.SetDocument(document);", compositionSource);
+        Assert.Contains("public void SetEditorStatus(string statusText) => _editorComposition.SetStatus(statusText);", compositionSource);
+        Assert.Contains("public void SetEditorVmCount(int vmCount) => _editorComposition.SetVmCount(vmCount);", compositionSource);
+        Assert.Contains("public TemplatesEditorDocumentHeaderInteractionState CaptureEditorDocumentHeaderState() => _editorComposition.CaptureDocumentHeaderState();", compositionSource);
         Assert.Contains("_libraryComposition.ApplyUiState(state.IsLoading, state.HasSelectedLibraryItem);", compositionSource);
         Assert.Contains("internal readonly record struct TemplatesWorkspaceUiState(", compositionSource);
         Assert.Contains("public void ApplyUiState(TemplatesWorkspaceUiState state)", compositionSource);
         Assert.Contains("bool HasSelectedLibraryItem,", compositionSource);
-        Assert.Contains("bool HasActiveTemplateEditorDocument,", compositionSource);
-        Assert.Contains("bool HasSelectedTemplateVmEntry,", compositionSource);
-        Assert.Contains("string TemplateEditorContextText,", compositionSource);
-        Assert.Contains("_editorView.SaveTemplateButtonControl.IsEnabled = state.HasActiveTemplateEditorDocument && !state.IsLoading;", compositionSource);
-        Assert.Contains("_editorView.TemplateEditorContextTextBlockControl.Text = state.TemplateEditorContextText;", compositionSource);
+        Assert.Contains("bool HasSelectedTemplateVmEntry);", compositionSource);
+        Assert.Contains("_editorComposition.ApplyActionState(", compositionSource);
         Assert.DoesNotContain("WireLibraryHandlers()", compositionSource);
         Assert.DoesNotContain("TemplatesLibraryView_OpenTemplateRequested", compositionSource);
         Assert.DoesNotContain("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", compositionSource);
@@ -959,6 +967,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("internal interface ITemplatesWorkspaceHost", compositionSource);
         Assert.DoesNotContain("internal sealed class TemplatesWorkspaceHost", compositionSource);
         Assert.DoesNotContain("TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;", compositionSource);
+        Assert.DoesNotContain("private readonly TemplatesEditorView _editorView;", compositionSource);
+        Assert.DoesNotContain("_editorView.TemplateEditorContextTextBlockControl.Text = state.TemplateEditorContextText;", compositionSource);
         Assert.Contains("new TemplatesLibraryWorkspaceComposition(", mainWindowSource);
         Assert.Contains("new TemplatesLibraryWorkspaceHost(", mainWindowSource);
 
@@ -1053,6 +1063,57 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("public Button OpenTemplateInEditorButtonControl =>", libraryViewSource);
     }
 
+    [Fact]
+    public void TemplatesEditor_DocumentHeaderState_UsesEditorLocalWorkspaceSeam()
+    {
+        var editorWorkspaceSource = LoadTemplatesEditorWorkspaceSource();
+        var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
+        var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
+
+        Assert.Contains("internal sealed class TemplatesEditorWorkspaceViewModel", editorWorkspaceSource);
+        Assert.Contains("public string TemplateName { get; private set; } = string.Empty;", editorWorkspaceSource);
+        Assert.Contains("public string TemplateDescription { get; private set; } = string.Empty;", editorWorkspaceSource);
+        Assert.Contains("public string TemplateEditorContextText { get; private set; } = \"No template selected.\";", editorWorkspaceSource);
+        Assert.Contains("public string TemplateIdText { get; private set; } = \"Template ID: -\";", editorWorkspaceSource);
+        Assert.Contains("public string TemplateFilePathText { get; private set; } = \"File path: new template (not saved)\";", editorWorkspaceSource);
+        Assert.Contains("public string TemplateVmCountText { get; private set; } = \"VMs: 0\";", editorWorkspaceSource);
+        Assert.Contains("public string StatusText { get; private set; } = \"No template loaded.\";", editorWorkspaceSource);
+        Assert.Contains("public bool HasActiveDocument { get; private set; }", editorWorkspaceSource);
+        Assert.Contains("public void ClearDocument()", editorWorkspaceSource);
+        Assert.Contains("public void SetDocument(TemplateEditorDocument document)", editorWorkspaceSource);
+        Assert.Contains("public void SetDocumentHeaderDraft(string? templateName, string? templateDescription)", editorWorkspaceSource);
+        Assert.Contains("public void SetVmCount(int vmCount)", editorWorkspaceSource);
+        Assert.Contains("public void SetStatusText(string statusText)", editorWorkspaceSource);
+
+        Assert.Contains("internal sealed class TemplatesEditorWorkspaceComposition", editorCompositionSource);
+        Assert.Contains("private readonly TemplatesEditorView _view;", editorCompositionSource);
+        Assert.Contains("private readonly TemplatesEditorWorkspaceViewModel _workspace = new();", editorCompositionSource);
+        Assert.Contains("_view.DocumentHeaderChanged += TemplatesEditorView_DocumentHeaderChanged;", editorCompositionSource);
+        Assert.Contains("public void SetDocument(TemplateEditorDocument? document)", editorCompositionSource);
+        Assert.Contains("public void SetStatus(string statusText)", editorCompositionSource);
+        Assert.Contains("public void SetVmCount(int vmCount)", editorCompositionSource);
+        Assert.Contains("public TemplatesEditorDocumentHeaderInteractionState CaptureDocumentHeaderState()", editorCompositionSource);
+        Assert.Contains("public void ApplyActionState(bool isLoading, bool hasSelectedTemplateVmEntry)", editorCompositionSource);
+        Assert.Contains("_workspace.SetDocument(document);", editorCompositionSource);
+        Assert.Contains("_workspace.SetDocumentHeaderDraft(interactionState.TemplateName, interactionState.TemplateDescription);", editorCompositionSource);
+        Assert.Contains("_view.UpdateDocumentHeaderState(new TemplatesEditorDocumentHeaderViewState(", editorCompositionSource);
+        Assert.Contains("_view.UpdateActionState(new TemplatesEditorActionState(", editorCompositionSource);
+
+        Assert.Contains("public readonly record struct TemplatesEditorDocumentHeaderInteractionState(", editorViewSource);
+        Assert.Contains("public readonly record struct TemplatesEditorDocumentHeaderViewState(", editorViewSource);
+        Assert.Contains("public readonly record struct TemplatesEditorActionState(", editorViewSource);
+        Assert.Contains("public event EventHandler? DocumentHeaderChanged;", editorViewSource);
+        Assert.Contains("TemplateNameTextBox.TextChanged += TemplateDocumentHeaderTextBox_TextChanged;", editorViewSource);
+        Assert.Contains("TemplateDescriptionTextBox.TextChanged += TemplateDocumentHeaderTextBox_TextChanged;", editorViewSource);
+        Assert.Contains("public TemplatesEditorDocumentHeaderInteractionState CaptureDocumentHeaderInteractionState()", editorViewSource);
+        Assert.Contains("public void UpdateDocumentHeaderState(TemplatesEditorDocumentHeaderViewState state)", editorViewSource);
+        Assert.Contains("public void UpdateActionState(TemplatesEditorActionState state)", editorViewSource);
+        Assert.Contains("DocumentHeaderChanged?.Invoke(this, EventArgs.Empty);", editorViewSource);
+        Assert.DoesNotContain("public TextBox TemplateNameTextBoxControl =>", editorViewSource);
+        Assert.DoesNotContain("public TextBox TemplateDescriptionTextBoxControl =>", editorViewSource);
+        Assert.DoesNotContain("public TextBlock TemplateEditorStatusTextBlockControl =>", editorViewSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -1089,6 +1150,18 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
+    private static string LoadTemplatesEditorWorkspaceSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesEditorWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesEditorWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesEditorWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
     private static string LoadTemplatesLibraryWorkspaceSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesLibraryWorkspaceViewModel.cs");
@@ -1110,6 +1183,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadTemplatesLibraryViewCodeBehindSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Templates", "TemplatesLibraryView.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadTemplatesEditorViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Templates", "TemplatesEditorView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
