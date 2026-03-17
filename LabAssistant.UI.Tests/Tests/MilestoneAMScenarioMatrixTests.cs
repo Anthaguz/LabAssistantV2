@@ -1320,8 +1320,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("DeployOverviewViewHost,", mainWindowSource);
         Assert.Contains("DeployOnTheFlyViewHost,", mainWindowSource);
         Assert.Contains("DeployFromTemplateViewHost,", mainWindowSource);
-        Assert.Contains("new DeployWorkspaceHost(", mainWindowSource);
         Assert.Contains("new DeployWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("ApplyDeployWorkspaceUiState();", mainWindowSource);
         Assert.Contains("_deployWorkspaceComposition.ApplyShellState();", mainWindowSource);
 
         Assert.DoesNotContain("private bool _isUpdatingDeploySubviewSelection;", mainWindowSource);
@@ -1347,9 +1347,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly FrameworkElement _onTheFlyHost;", compositionSource);
         Assert.Contains("private readonly FrameworkElement _fromTemplateHost;", compositionSource);
         Assert.Contains("private readonly DeployOverviewView _overviewView;", compositionSource);
-        Assert.Contains("private readonly IDeployWorkspaceHost _host;", compositionSource);
         Assert.Contains("private readonly IDeployWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingDeploySubviewSelection;", compositionSource);
+        Assert.Contains("private DeployWorkspaceUiState _uiState;", compositionSource);
+        Assert.Contains("public void ApplyUiState(DeployWorkspaceUiState state)", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_overviewHost.Visibility = _shellBridge.IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
@@ -1358,17 +1359,20 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", compositionSource);
         Assert.Contains("_overviewView.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
         Assert.Contains("_overviewView.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
-        Assert.Contains("_overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _host.QuickDeployDraftCount > 0", compositionSource);
-        Assert.Contains("_overviewView.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _host.IsLoadingTemplates", compositionSource);
+        Assert.Contains("_overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _uiState.QuickDeployDraftCount > 0", compositionSource);
+        Assert.Contains("_overviewView.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _uiState.IsLoadingTemplates", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOverview);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
+        Assert.Contains("internal readonly record struct DeployWorkspaceUiState(", compositionSource);
 
         Assert.DoesNotContain("DeployTemplateSelectorComboBox", compositionSource);
         Assert.DoesNotContain("DeployOnTheFlyVmEntriesListView", compositionSource);
         Assert.DoesNotContain("EvaluateDeployOnTheFlyReadinessAsync", compositionSource);
         Assert.DoesNotContain("UpdateDeployUi()", compositionSource);
         Assert.DoesNotContain("UpdateDeployOnTheFlyUi()", compositionSource);
+        Assert.DoesNotContain("internal interface IDeployWorkspaceHost", compositionSource);
+        Assert.DoesNotContain("internal sealed class DeployWorkspaceHost", compositionSource);
     }
 
     private static string LoadMainWindowSource()
