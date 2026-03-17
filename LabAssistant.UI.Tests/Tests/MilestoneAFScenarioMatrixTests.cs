@@ -77,7 +77,7 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", source);
         Assert.Contains("DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;", source);
         Assert.Contains("DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;", source);
-        Assert.Contains("await OpenTemplateInEditorAsync(_selectedDeployTemplateLibraryItem, fromDeploy: true);", source);
+        Assert.Contains("await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);", source);
         Assert.Contains("private static DeployDiskResolution ResolveDeployDiskIdentity", source);
         Assert.Contains("private static DeploySwitchResolution ResolveDeploySwitches", source);
         Assert.Contains("private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)", source);

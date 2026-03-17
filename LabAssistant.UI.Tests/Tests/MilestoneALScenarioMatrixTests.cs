@@ -218,7 +218,7 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("UpdateDeploySharedIssueSummaries();", mainWindowSource);
         Assert.Contains("Template Review", fromTemplateSource);
-        Assert.Contains("This surface is for template review and remediation.", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);", mainWindowSource);
     }
 
     [Fact]

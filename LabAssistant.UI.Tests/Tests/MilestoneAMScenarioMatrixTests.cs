@@ -1438,6 +1438,53 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void DeployFromTemplate_UsesLocalSelectionReviewStateSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
+        var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
+
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition = new DeployFromTemplateWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.ActiveTemplateDocument", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem", mainWindowSource);
+        Assert.DoesNotContain("private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;", mainWindowSource);
+        Assert.DoesNotContain("private TemplateEditorDocument? _activeDeployTemplateDocument;", mainWindowSource);
+
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;", deployWorkspaceCompositionSource);
+        Assert.Contains("DeployFromTemplateWorkspaceComposition fromTemplateWorkspaceComposition,", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceComposition = fromTemplateWorkspaceComposition;", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState();", deployWorkspaceCompositionSource);
+
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition", fromTemplateCompositionSource);
+        Assert.Contains("private readonly DeployFromTemplateView _view;", fromTemplateCompositionSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceViewModel _workspace = new();", fromTemplateCompositionSource);
+        Assert.Contains("_view.DeployTemplateSelectorComboBoxControl.ItemsSource = templateItemsSource;", fromTemplateCompositionSource);
+        Assert.Contains("public TemplateLibraryItem? SelectedTemplateLibraryItem => _workspace.SelectedTemplateLibraryItem;", fromTemplateCompositionSource);
+        Assert.Contains("public TemplateEditorDocument? ActiveTemplateDocument => _workspace.ActiveTemplateDocument;", fromTemplateCompositionSource);
+        Assert.Contains("public void SetSelectedTemplateLibraryItem(TemplateLibraryItem? selectedTemplateLibraryItem)", fromTemplateCompositionSource);
+        Assert.Contains("public void SetLoadedTemplateDocument(TemplateEditorDocument document, string actionStatusText)", fromTemplateCompositionSource);
+        Assert.Contains("public void SetActionStatus(string actionStatusText)", fromTemplateCompositionSource);
+        Assert.Contains("public void RefreshReviewState(bool hasBlockingFailures)", fromTemplateCompositionSource);
+        Assert.Contains("public void ReconcileSelection(IReadOnlyList<TemplateLibraryItem> items)", fromTemplateCompositionSource);
+        Assert.DoesNotContain("EvaluateDeployReadinessAsync", fromTemplateCompositionSource);
+        Assert.DoesNotContain("BuildDeployContext", fromTemplateCompositionSource);
+
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceViewModel", fromTemplateWorkspaceSource);
+        Assert.Contains("public TemplateLibraryItem? SelectedTemplateLibraryItem { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string? SelectedTemplateFilePath { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public TemplateEditorDocument? ActiveTemplateDocument { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string TemplateSummaryText { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string TemplateRemediationText { get; private set; }", fromTemplateWorkspaceSource);
+        Assert.Contains("public string ActionStatusText { get; private set; } = \"No action selected.\";", fromTemplateWorkspaceSource);
+        Assert.Contains("public void ClearSelection(string actionStatusText)", fromTemplateWorkspaceSource);
+        Assert.Contains("public void SetLoadedTemplateDocument(TemplateEditorDocument document, string actionStatusText)", fromTemplateWorkspaceSource);
+        Assert.Contains("public void RefreshReviewState(bool hasBlockingFailures)", fromTemplateWorkspaceSource);
+        Assert.Contains("public void ReconcileSelection(IReadOnlyList<TemplateLibraryItem> items)", fromTemplateWorkspaceSource);
+    }
+
+    [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
@@ -1532,6 +1579,18 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployOverviewWorkspaceViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceViewModelSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
