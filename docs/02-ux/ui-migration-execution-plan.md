@@ -416,6 +416,11 @@ Gate expectations:
 - make shared Templates vs Library-local ownership explicit so Library-specific state, orchestration, and UI coordination converge behind a Library-local seam without widening shared Templates composition into the Library workflow owner
 - preserve `templates.library` as the stable/default Templates surface, keep Library inside the long-lived Templates workspace with route-activation refresh, and keep Editor extraction details out of scope
 
+**Templates Editor cleanup target checkpoint**
+- before Templates Editor runtime extraction proceeds, define the narrow `Templates Editor` cleanup target under the shared Templates composition boundary
+- make shared Templates vs Editor-local ownership explicit so Editor-specific state, orchestration, composition, and UI coordination converge behind an Editor-local seam without widening shared Templates composition into the Editor workflow owner
+- preserve `templates.editor` as a workflow-state destination from explicit actions, keep Editor inside the long-lived Templates workspace with route-activation refresh, and keep Library extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`

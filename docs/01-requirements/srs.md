@@ -652,6 +652,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Templates composition must not become the Library workflow owner; Library-specific host bridges or control exposure remain temporary migration cleanup targets behind the Library-local seam; and the cleanup target must stay explicit that Templates Editor extraction details, runtime implementation, Library behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-152:** WinUI `Templates Editor` cleanup shall remain under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface, while converging Editor-specific state, orchestration, composition, and UI coordination behind an Editor-local seam.
+  - **Acceptance details:** the Editor cleanup target must explicitly keep shared Templates composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Editor-local seam the target owner for Editor-specific state, orchestration, composition, and interaction coordination.
+  - **Priority:** P1
+
+- **FR-153:** WinUI `Templates Editor` cleanup shall preserve current `templates.editor` behavior and boundaries while making Editor participation in the long-lived Templates workspace explicit.
+  - **Acceptance details:** the Editor cleanup target must preserve `templates.editor` as a workflow-state destination entered from explicit actions rather than a stable/default peer route, must keep Editor inside the long-lived Templates workspace with route-activation refresh rather than per-navigation recreation, must keep Library-specific ownership outside the Editor seam, and must preserve AD and AL7 Templates behavior contracts while narrowing ownership.
+  - **Priority:** P1
+
+- **FR-154:** WinUI `Templates Editor` cleanup shall reject direct `MainWindow` view dependency, shared Templates composition widening into the Editor workflow owner, Editor-owned Library growth, and unapproved runtime or performance redesign during seam definition.
+  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Templates composition must not become the Editor workflow owner; Editor-specific host bridges or control exposure remain temporary migration cleanup targets behind the Editor-local seam; Editor must not absorb Library-specific ownership because it is a workflow-state destination; and the cleanup target must stay explicit that runtime implementation, Templates Library extraction details, Editor behavior redesign, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -672,6 +684,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-assets-composition-cleanup-target-am.md` for the AM shared Assets composition cleanup target that narrows shell-vs-Assets ownership before Assets runtime extraction proceeds.
 - See `docs/02-ux/winui-templates-composition-cleanup-target-am.md` for the AM shared Templates composition cleanup target that narrows shell-vs-Templates ownership before Templates runtime extraction proceeds.
 - See `docs/02-ux/winui-templates-library-extraction-cleanup-target-am.md` for the AM Templates Library cleanup target inside the shared Templates composition boundary.
+- See `docs/02-ux/winui-templates-editor-extraction-cleanup-target-am.md` for the AM Templates Editor cleanup target inside the shared Templates composition boundary.
 - See `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md` for the AM Assets Overview cleanup target inside the shared Assets composition boundary.
 - See `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md` for the AM Assets Base Disks cleanup target inside the shared Assets composition boundary.
 - See `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md` for the AM Assets Switches cleanup target inside the shared Assets composition boundary.

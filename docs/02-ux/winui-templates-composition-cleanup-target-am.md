@@ -178,4 +178,4 @@ Mapped acceptance criteria:
 
 - `TBD:` Exact Templates-local composition owner type name during implementation.
 - `TBD:` Whether any Templates-specific shell-hosted helper remains temporarily necessary during early shared Templates extraction slices.
-- `TBD:` Whether later narrow Templates issues need separate Library-local and Editor-local cleanup targets after the shared ownership boundary is in place.
+- Resolved by later AM cleanup targets: separate Library-local and Editor-local cleanup targets are required after the shared ownership boundary is in place.
