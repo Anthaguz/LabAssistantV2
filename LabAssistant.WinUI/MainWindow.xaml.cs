@@ -59,10 +59,8 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
     private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
-    private readonly ObservableCollection<DeployVmResultRow> _deployVmResultRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
-    private readonly Dictionary<string, DeployVmProgressState> _deployProgressByVm = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DeployVmProgressState> _deployOnTheFlyProgressByVm = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private readonly List<DeployCompatibilityIssue> _deployCompatibilityIssues = [];
@@ -81,7 +79,6 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
     private bool _isDeployLoadingTemplates;
-    private bool _showDeployAllVmRows;
     private bool _isDeployOnTheFlyEvaluatingReadiness;
     private bool _isDeployOnTheFlyStarting;
     private bool _isUpdatingDeployOnTheFlyEditor;
@@ -146,9 +143,6 @@ public sealed partial class MainWindow : Window
     private ComboBox DeployTemplateSelectorComboBox => DeployFromTemplateView.DeployTemplateSelectorComboBoxControl;
     private Button DeployReloadTemplatesButton => DeployFromTemplateView.DeployReloadTemplatesButtonControl;
     private Button DeployEvaluateReadinessButton => DeployFromTemplateView.DeployEvaluateReadinessButtonControl;
-    private TextBlock DeployOverallStateTextBlock => DeployFromTemplateView.DeployOverallStateTextBlockControl;
-    private ProgressBar DeployProgressBar => DeployFromTemplateView.DeployProgressBarControl;
-    private TextBlock DeployProgressSummaryTextBlock => DeployFromTemplateView.DeployProgressSummaryTextBlockControl;
     private Button DeployOpenResultsPanelButton => DeployFromTemplateView.DeployOpenResultsPanelButtonControl;
     private TextBlock DeployResultsPanelSummaryTextBlock => DeployFromTemplateView.DeployResultsPanelSummaryTextBlockControl;
     private TextBlock DeployGlobalIssuesBadgeTextBlock => DeployFromTemplateView.DeployGlobalIssuesBadgeTextBlockControl;
@@ -159,7 +153,6 @@ public sealed partial class MainWindow : Window
     private ListView DeploySharedIssuesListView => DeployFromTemplateView.DeploySharedIssuesListViewControl;
     private Expander DeployGlobalIssuesExpander => DeployFromTemplateRightPanelView.DeployGlobalIssuesExpanderControl;
     private ListView DeployGlobalIssuesListView => DeployFromTemplateRightPanelView.DeployGlobalIssuesListViewControl;
-    private ListView DeployVmResultsListView => DeployFromTemplateRightPanelView.DeployVmResultsListViewControl;
     private Button DeployResolveSuggestionsButton => DeployFromTemplateView.DeployResolveSuggestionsButtonControl;
     private Button DeployOpenTemplateEditorButton => DeployFromTemplateView.DeployOpenTemplateEditorButtonControl;
     private Button DeployStartButton => DeployFromTemplateView.DeployStartButtonControl;
@@ -289,17 +282,12 @@ public sealed partial class MainWindow : Window
                 },
                 () => _deployReadinessReport,
                 report => _deployReadinessReport = report,
-                showAllVmRows => _showDeployAllVmRows = showAllVmRows,
-                () => _deployProgressByVm.Clear(),
-                context => InitializeDeployProgressRows(context, _deployProgressByVm),
-                context => AttachDeployProgressCallbacks(context, _deployProgressByVm, isOnTheFly: false),
-                UpdateDeployResultRows,
                 async context =>
                 {
                     await _deploymentCoordinator.DeployAllAsync(context);
                     return _deploymentOutcomeSummaryBuilder.Build(context);
                 },
-                UpdateDeployRowsFromSummary,
+                AttachDeployProgressCallbacks,
                 UpdateDeployUi));
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
@@ -372,9 +360,7 @@ public sealed partial class MainWindow : Window
         DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
         DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
         DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
-        DeployVmResultsListView.ItemsSource = _deployVmResultRows;
         DeployGlobalIssuesExpander.IsExpanded = false;
-        UpdateDeployResultRows();
         UpdateDeployIssueRows();
 
         DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyVmEntryRows;
@@ -676,8 +662,8 @@ public sealed partial class MainWindow : Window
             ? "Expand the window to review the progress and results panel."
             : fromTemplateIsRunning
                 ? "The panel auto-opens while deployment runs and stays available for result review."
-                : _deployVmResultRows.Count > 0
-                    ? $"{_deployVmResultRows.Count} VM result row(s) are available for review."
+                : _deployFromTemplateWorkspaceComposition.ResultRowCount > 0
+                    ? $"{_deployFromTemplateWorkspaceComposition.ResultRowCount} VM result row(s) are available for review."
                     : "Use the side panel during or after deploy for progress, timeline, and results.";
 
         DeployOnTheFlyResultsPanelSummaryTextBlock.Text = panelUnavailable
@@ -2102,6 +2088,19 @@ public sealed partial class MainWindow : Window
         AttachDeployProgressCallbacks(context, _deployOnTheFlyProgressByVm, isOnTheFly: true);
     }
 
+    private void AttachDeployProgressCallbacks(
+        MultiVmDeploymentContext context,
+        Action<string, string?> onLogMessage,
+        Action<string, DeployStepStateUpdate> onStepStateUpdated)
+    {
+        foreach (var vmContext in context.VmContexts)
+        {
+            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
+            vmContext.LogCallback = message => DispatcherQueue.TryEnqueue(() => onLogMessage(vmName, message));
+            vmContext.StepStateEmitter = update => DispatcherQueue.TryEnqueue(() => onStepStateUpdated(vmName, update));
+        }
+    }
+
     private void InitializeDeployProgressRows(
         MultiVmDeploymentContext context,
         Dictionary<string, DeployVmProgressState> stateByVm)
@@ -2138,11 +2137,6 @@ public sealed partial class MainWindow : Window
                     UpdateDeployOnTheFlyResultRows();
                     UpdateDeployOnTheFlyUi();
                 }
-                else
-                {
-                    UpdateDeployResultRows();
-                    UpdateDeployUi();
-                }
             });
 
             vmContext.StepStateEmitter = update => DispatcherQueue.TryEnqueue(() =>
@@ -2157,11 +2151,6 @@ public sealed partial class MainWindow : Window
                 {
                     UpdateDeployOnTheFlyResultRows();
                     UpdateDeployOnTheFlyUi();
-                }
-                else
-                {
-                    UpdateDeployResultRows();
-                    UpdateDeployUi();
                 }
             });
         }
@@ -2295,7 +2284,7 @@ public sealed partial class MainWindow : Window
         {
             _deployFromTemplateWorkspaceComposition.SetReadinessSummary("Select a template to evaluate readiness and run deploy.");
             _deployFromTemplateWorkspaceComposition.ClearGroupedIssueState();
-            UpdateDeployResultRows();
+            _deployFromTemplateWorkspaceComposition.RefreshResultRows(_deployCompatibilityIssues, _deployReadinessReport);
             UpdateDeployIssueRows();
             ApplyRightPanelState();
             return;
@@ -2311,78 +2300,9 @@ public sealed partial class MainWindow : Window
             $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
             $"Template: {activeTemplateDocument.Template.Name} ({activeTemplateDocument.Template.VmTemplates.Count} VMs).");
 
-        UpdateDeployResultRows();
+        _deployFromTemplateWorkspaceComposition.RefreshResultRows(_deployCompatibilityIssues, _deployReadinessReport);
         UpdateDeployIssueRows();
         ApplyRightPanelState();
-    }
-
-    private void UpdateDeployResultRows()
-    {
-        _deployVmResultRows.Clear();
-
-        if (_showDeployAllVmRows && _deployProgressByVm.Count > 0)
-        {
-            foreach (var state in _deployProgressByVm.Values.OrderBy(value => value.VmName, StringComparer.OrdinalIgnoreCase))
-            {
-                _deployVmResultRows.Add(state.ToRow());
-            }
-
-            return;
-        }
-
-        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
-        if (activeTemplateDocument is null)
-        {
-            return;
-        }
-
-        var vmNames = activeTemplateDocument.Template.VmTemplates
-            .Select(vm => string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var compatibilityByVm = _deployCompatibilityIssues
-            .Where(issue => !string.IsNullOrWhiteSpace(issue.VmName))
-            .GroupBy(issue => issue.VmName, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
-
-        var readinessByVm = (_deployReadinessReport?.Results ?? [])
-            .SelectMany(result => result.AffectedVmNames.Select(vmName => (vmName, result)))
-            .Where(tuple => !string.IsNullOrWhiteSpace(tuple.vmName))
-            .GroupBy(tuple => tuple.vmName, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Select(item => item.result).ToList(), StringComparer.OrdinalIgnoreCase);
-
-        foreach (var vmName in vmNames)
-        {
-            compatibilityByVm.TryGetValue(vmName, out var vmCompatibilityIssues);
-            readinessByVm.TryGetValue(vmName, out var vmReadinessResults);
-
-            vmCompatibilityIssues ??= [];
-            vmReadinessResults ??= [];
-
-            var hasBlocking = vmCompatibilityIssues.Any(issue => issue.IsBlocking) ||
-                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Fail);
-            var hasWarnings = vmCompatibilityIssues.Any(issue => !issue.IsBlocking) ||
-                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Warn);
-            if (!hasBlocking && !hasWarnings)
-            {
-                continue;
-            }
-
-            var status = hasBlocking ? "Blocked" : hasWarnings ? "Warning" : "Ready";
-            var blockingCount = vmCompatibilityIssues.Count(issue => issue.IsBlocking) +
-                                vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Fail);
-            var warningCount = vmCompatibilityIssues.Count(issue => !issue.IsBlocking) +
-                               vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Warn);
-            var summary = $"Blocking: {blockingCount} | Warnings: {warningCount}";
-
-            _deployVmResultRows.Add(new DeployVmResultRow(
-                VmName: vmName,
-                Status: status,
-                Summary: summary,
-                ProgressPercent: hasBlocking ? 100 : 80,
-                TimelineSteps: CreateReadinessTimelineSteps(vmCompatibilityIssues, vmReadinessResults, hasBlocking)));
-        }
     }
 
     private void UpdateDeployIssueRows()
@@ -2527,40 +2447,6 @@ public sealed partial class MainWindow : Window
             VmCleanupOutcomeStatus.Residuals => $"Cleanup completed with residuals ({vmOutcome.Cleanup.ResidualCount}). Manual cleanup may be required.",
             _ => "Cleanup not needed"
         };
-    }
-
-    private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)
-    {
-        _deployVmResultRows.Clear();
-
-        foreach (var vmOutcome in summary.VmOutcomes)
-        {
-            if (_deployProgressByVm.TryGetValue(vmOutcome.VmName, out var liveState))
-            {
-                liveState.MarkCompleted(vmOutcome.Status.ToString(), BuildCleanupSummary(vmOutcome));
-                _deployVmResultRows.Add(liveState.ToRow());
-            }
-            else
-            {
-                _deployVmResultRows.Add(new DeployVmResultRow(
-                    VmName: vmOutcome.VmName,
-                    Status: vmOutcome.Status.ToString(),
-                    Summary: BuildCleanupSummary(vmOutcome),
-                    ProgressPercent: 100,
-                    TimelineSteps: CreateOutcomeTimelineSteps(vmOutcome)));
-            }
-        }
-
-        var issueRows = new List<DeployIssueRow>();
-        foreach (var residual in summary.Residuals)
-        {
-            issueRows.Add(new DeployIssueRow(
-                Scope: residual.VmName,
-                Severity: "Warn",
-                Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
-        }
-
-        _deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);
     }
 
     private void UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)
@@ -3310,239 +3196,4 @@ public sealed partial class MainWindow : Window
     }
 
     */
-    private sealed record DeployTimelineStepDefinition(
-        string StepKey,
-        string Label);
-
-    private sealed record DeployTimelineStepRow(
-        string Label,
-        DeployTimelineStepState State)
-    {
-        public bool IsRunning => State == DeployTimelineStepState.Running;
-
-        public Visibility RunningIndicatorVisibility => IsRunning ? Visibility.Visible : Visibility.Collapsed;
-
-        public Visibility StaticIconVisibility => IsRunning ? Visibility.Collapsed : Visibility.Visible;
-
-        public string IconGlyph => DeployTimelineIconCatalog.GetGlyph(State);
-    }
-
-    private sealed class DeployVmProgressState
-    {
-        private readonly Dictionary<string, DeployTimelineStepState> _stepStatesByKey;
-        private readonly Dictionary<string, string> _stepLabelsByKey;
-        private readonly List<string> _stepOrder;
-
-        public DeployVmProgressState(string vmName, IReadOnlyList<DeployTimelineStepDefinition> expectedSteps)
-        {
-            VmName = vmName;
-            _stepOrder = expectedSteps.Select(step => step.StepKey).ToList();
-            _stepLabelsByKey = expectedSteps.ToDictionary(
-                step => step.StepKey,
-                step => step.Label,
-                StringComparer.OrdinalIgnoreCase);
-            _stepStatesByKey = expectedSteps.ToDictionary(
-                step => step.StepKey,
-                _ => DeployTimelineStepState.Pending,
-                StringComparer.OrdinalIgnoreCase);
-            Status = "Queued";
-            Summary = "Queued for deployment.";
-            ProgressPercent = 0;
-        }
-
-        public string VmName { get; }
-
-        public string Status { get; private set; }
-
-        public string Summary { get; private set; }
-
-        public int ProgressPercent { get; private set; }
-
-        public void ApplyStepStateUpdate(DeployStepStateUpdate update)
-        {
-            if (string.IsNullOrWhiteSpace(update.StepKey))
-            {
-                return;
-            }
-
-            if (!_stepStatesByKey.ContainsKey(update.StepKey))
-            {
-                _stepStatesByKey[update.StepKey] = DeployTimelineStepState.Pending;
-                _stepOrder.Add(update.StepKey);
-            }
-
-            if (!string.IsNullOrWhiteSpace(update.StepLabel))
-            {
-                _stepLabelsByKey[update.StepKey] = update.StepLabel;
-            }
-
-            var mappedState = MapState(update.State);
-            var currentState = _stepStatesByKey[update.StepKey];
-            if (IsTerminal(currentState) && !IsTerminal(mappedState))
-            {
-                return;
-            }
-
-            _stepStatesByKey[update.StepKey] = mappedState;
-            Status = mappedState switch
-            {
-                DeployTimelineStepState.Pending => "Queued",
-                DeployTimelineStepState.Running => "Running",
-                DeployTimelineStepState.Succeeded => "Succeeded",
-                DeployTimelineStepState.Failed => "Failed",
-                DeployTimelineStepState.Skipped => "Skipped",
-                _ => Status
-            };
-            if (!string.IsNullOrWhiteSpace(update.Message))
-            {
-                Summary = update.Message.Trim();
-            }
-            else if (string.IsNullOrWhiteSpace(Summary) || Status == "Queued")
-            {
-                Summary = $"{ResolveStepLabel(update.StepKey)}: {Status}";
-            }
-
-            RefreshProgress();
-        }
-
-        public void UpdateSummaryMessage(string? message)
-        {
-            if (string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            Summary = message.Trim();
-        }
-
-        public void MarkCompleted(string status, string summary)
-        {
-            var isFailed = status.Contains("failed", StringComparison.OrdinalIgnoreCase);
-            var isCancelled = status.Contains("cancel", StringComparison.OrdinalIgnoreCase);
-            var hasStepFailure = _stepStatesByKey.Values.Any(state => state == DeployTimelineStepState.Failed);
-            var effectiveFailed = isFailed || hasStepFailure;
-
-            foreach (var stepKey in _stepStatesByKey.Keys.ToList())
-            {
-                var state = _stepStatesByKey[stepKey];
-                if (state == DeployTimelineStepState.Running)
-                {
-                    _stepStatesByKey[stepKey] = effectiveFailed ? DeployTimelineStepState.Failed : isCancelled ? DeployTimelineStepState.Skipped : DeployTimelineStepState.Succeeded;
-                }
-                else if (state == DeployTimelineStepState.Pending)
-                {
-                    _stepStatesByKey[stepKey] = isCancelled ? DeployTimelineStepState.Skipped : effectiveFailed ? DeployTimelineStepState.Failed : DeployTimelineStepState.Succeeded;
-                }
-            }
-
-            Status = effectiveFailed && !status.Contains("failed", StringComparison.OrdinalIgnoreCase)
-                ? "Failed"
-                : status;
-            Summary = summary;
-            ProgressPercent = 100;
-        }
-
-        public DeployVmResultRow ToRow()
-        {
-            var timelineSteps = _stepOrder
-                .Select(stepKey => new DeployTimelineStepRow(ResolveStepLabel(stepKey), _stepStatesByKey[stepKey]))
-                .Where(step => step.State != DeployTimelineStepState.Skipped)
-                .ToList();
-
-            return new DeployVmResultRow(
-                VmName: VmName,
-                Status: Status,
-                Summary: Summary,
-                ProgressPercent: ProgressPercent,
-                TimelineSteps: timelineSteps);
-        }
-
-        private void RefreshProgress()
-        {
-            if (Status == "Failed")
-            {
-                ProgressPercent = 100;
-                return;
-            }
-
-            var visibleStates = _stepStatesByKey.Values.Where(state => state != DeployTimelineStepState.Skipped).ToList();
-            if (visibleStates.Count == 0)
-            {
-                ProgressPercent = 50;
-                return;
-            }
-
-            var terminalSteps = visibleStates.Count(state =>
-                state == DeployTimelineStepState.Succeeded || state == DeployTimelineStepState.Failed);
-            var rawProgress = (int)Math.Round((double)terminalSteps / visibleStates.Count * 100d, MidpointRounding.AwayFromZero);
-            ProgressPercent = Math.Clamp(rawProgress, 5, 99);
-        }
-
-        private string ResolveStepLabel(string stepKey)
-        {
-            return _stepLabelsByKey.TryGetValue(stepKey, out var label) && !string.IsNullOrWhiteSpace(label)
-                ? label
-                : stepKey;
-        }
-
-        private static DeployTimelineStepState MapState(DeployStepState state)
-        {
-            return state switch
-            {
-                DeployStepState.Pending => DeployTimelineStepState.Pending,
-                DeployStepState.Running => DeployTimelineStepState.Running,
-                DeployStepState.Succeeded => DeployTimelineStepState.Succeeded,
-                DeployStepState.Failed => DeployTimelineStepState.Failed,
-                DeployStepState.Skipped => DeployTimelineStepState.Skipped,
-                _ => DeployTimelineStepState.Pending
-            };
-        }
-
-        private static bool IsTerminal(DeployTimelineStepState state)
-        {
-            return state is DeployTimelineStepState.Succeeded or DeployTimelineStepState.Failed or DeployTimelineStepState.Skipped;
-        }
-    }
-
-    private sealed record DeployVmResultRow(
-        string VmName,
-        string Status,
-        string Summary,
-        int ProgressPercent,
-        IReadOnlyList<DeployTimelineStepRow> TimelineSteps,
-        bool IsExpandable = true)
-    {
-        public string DisplaySummary
-        {
-            get
-            {
-                if (string.IsNullOrWhiteSpace(Summary))
-                {
-                    return string.Empty;
-                }
-
-                var normalizedStatus = Status.Trim();
-                var normalizedSummary = Summary.Trim();
-                if (string.Equals(normalizedSummary, normalizedStatus, StringComparison.OrdinalIgnoreCase))
-                {
-                    return string.Empty;
-                }
-
-                if ((string.Equals(normalizedStatus, "Succeeded", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(normalizedStatus, "Completed", StringComparison.OrdinalIgnoreCase)) &&
-                    normalizedSummary.StartsWith("Completed", StringComparison.OrdinalIgnoreCase))
-                {
-                    return string.Empty;
-                }
-
-                return normalizedSummary;
-            }
-        }
-
-        public Visibility SummaryVisibility =>
-            string.IsNullOrWhiteSpace(DisplaySummary) ? Visibility.Collapsed : Visibility.Visible;
-
-        public Visibility ExpanderVisibility => IsExpandable ? Visibility.Visible : Visibility.Collapsed;
-        public Visibility FlatCardVisibility => IsExpandable ? Visibility.Collapsed : Visibility.Visible;
-    }
 }

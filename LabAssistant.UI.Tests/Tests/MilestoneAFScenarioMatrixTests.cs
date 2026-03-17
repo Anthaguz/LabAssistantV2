@@ -80,7 +80,7 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;", source);
         Assert.Contains("DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;", source);
         Assert.Contains("await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);", source);
-        Assert.Contains("private void UpdateDeployRowsFromSummary(DeploymentOutcomeSummary summary)", source);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.RefreshResultRows(_deployCompatibilityIssues, _deployReadinessReport);", source);
         Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", source);
         Assert.Contains("DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures", source);
     }

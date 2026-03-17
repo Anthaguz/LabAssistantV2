@@ -1,4 +1,6 @@
 using LabAssistant.Business.Templates;
+using LabAssistant.Business.Deployment;
+using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
 using System.Collections.ObjectModel;
@@ -25,6 +27,8 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
 
     public ObservableCollection<string> SharedIssueSummaries { get; } = [];
 
+    public ObservableCollection<DeployVmResultRow> ResultRows { get; } = [];
+
     public string ReadinessSummaryText { get; private set; } =
         "Select a template to evaluate readiness and run deploy.";
 
@@ -42,6 +46,10 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
     public int ProgressPercent { get; private set; }
 
     public string ProgressSummary { get; private set; } = "No deployment started.";
+
+    public bool ShowAllVmRows { get; private set; }
+
+    private readonly Dictionary<string, DeployVmProgressState> _progressByVm = new(StringComparer.OrdinalIgnoreCase);
 
     public void SetSelectedTemplateLibraryItem(TemplateLibraryItem? selectedTemplateLibraryItem)
     {
@@ -96,6 +104,51 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
         ProgressSummary = progressSummary;
     }
 
+    public void SetShowAllVmRows(bool showAllVmRows)
+    {
+        ShowAllVmRows = showAllVmRows;
+    }
+
+    public void ClearResultRows()
+    {
+        ResultRows.Clear();
+    }
+
+    public void InitializeProgressRows(MultiVmDeploymentContext context)
+    {
+        _progressByVm.Clear();
+
+        foreach (var vmContext in context.VmContexts)
+        {
+            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
+            _progressByVm[vmName] = new DeployVmProgressState(vmName, BuildExpectedDeploySteps(vmContext));
+        }
+
+        RefreshResultRows(compatibilityIssues: [], readinessReport: null);
+    }
+
+    public void UpdateProgressMessage(string vmName, string? message)
+    {
+        if (!_progressByVm.TryGetValue(vmName, out var state))
+        {
+            return;
+        }
+
+        state.UpdateSummaryMessage(message);
+        RefreshResultRows(compatibilityIssues: [], readinessReport: null);
+    }
+
+    public void ApplyProgressUpdate(string vmName, DeployStepStateUpdate update)
+    {
+        if (!_progressByVm.TryGetValue(vmName, out var state))
+        {
+            return;
+        }
+
+        state.ApplyStepStateUpdate(update);
+        RefreshResultRows(compatibilityIssues: [], readinessReport: null);
+    }
+
     public void ClearGroupedIssueState()
     {
         IssueRows.Clear();
@@ -114,6 +167,110 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
 
         GlobalIssuesBadgeText = $"Issues: {IssueRows.Count}";
         RefreshSharedIssueSummaries();
+    }
+
+    public void RefreshResultRows(
+        IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
+        DeploymentReadinessReport? readinessReport)
+    {
+        ResultRows.Clear();
+
+        if (ShowAllVmRows && _progressByVm.Count > 0)
+        {
+            foreach (var state in _progressByVm.Values.OrderBy(value => value.VmName, StringComparer.OrdinalIgnoreCase))
+            {
+                ResultRows.Add(state.ToRow());
+            }
+
+            return;
+        }
+
+        if (ActiveTemplateDocument is null)
+        {
+            return;
+        }
+
+        var vmNames = ActiveTemplateDocument.Template.VmTemplates
+            .Select(vm => string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var compatibilityByVm = compatibilityIssues
+            .Where(issue => !string.IsNullOrWhiteSpace(issue.VmName))
+            .GroupBy(issue => issue.VmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var readinessByVm = (readinessReport?.Results ?? [])
+            .SelectMany(result => result.AffectedVmNames.Select(vmName => (vmName, result)))
+            .Where(tuple => !string.IsNullOrWhiteSpace(tuple.vmName))
+            .GroupBy(tuple => tuple.vmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.result).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var vmName in vmNames)
+        {
+            compatibilityByVm.TryGetValue(vmName, out var vmCompatibilityIssues);
+            readinessByVm.TryGetValue(vmName, out var vmReadinessResults);
+
+            vmCompatibilityIssues ??= [];
+            vmReadinessResults ??= [];
+
+            var hasBlocking = vmCompatibilityIssues.Any(issue => issue.IsBlocking) ||
+                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Fail);
+            var hasWarnings = vmCompatibilityIssues.Any(issue => !issue.IsBlocking) ||
+                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Warn);
+            if (!hasBlocking && !hasWarnings)
+            {
+                continue;
+            }
+
+            var status = hasBlocking ? "Blocked" : hasWarnings ? "Warning" : "Ready";
+            var blockingCount = vmCompatibilityIssues.Count(issue => issue.IsBlocking) +
+                                vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Fail);
+            var warningCount = vmCompatibilityIssues.Count(issue => !issue.IsBlocking) +
+                               vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Warn);
+            var summary = $"Blocking: {blockingCount} | Warnings: {warningCount}";
+
+            ResultRows.Add(new DeployVmResultRow(
+                VmName: vmName,
+                Status: status,
+                Summary: summary,
+                ProgressPercent: hasBlocking ? 100 : 80,
+                TimelineSteps: CreateReadinessTimelineSteps(vmCompatibilityIssues, vmReadinessResults, hasBlocking)));
+        }
+    }
+
+    public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)
+    {
+        ResultRows.Clear();
+
+        foreach (var vmOutcome in summary.VmOutcomes)
+        {
+            if (_progressByVm.TryGetValue(vmOutcome.VmName, out var liveState))
+            {
+                liveState.MarkCompleted(vmOutcome.Status.ToString(), BuildCleanupSummary(vmOutcome));
+                ResultRows.Add(liveState.ToRow());
+            }
+            else
+            {
+                ResultRows.Add(new DeployVmResultRow(
+                    VmName: vmOutcome.VmName,
+                    Status: vmOutcome.Status.ToString(),
+                    Summary: BuildCleanupSummary(vmOutcome),
+                    ProgressPercent: 100,
+                    TimelineSteps: CreateOutcomeTimelineSteps(vmOutcome)));
+            }
+        }
+
+        var issueRows = new List<DeployIssueRow>();
+        foreach (var residual in summary.Residuals)
+        {
+            issueRows.Add(new DeployIssueRow(
+                Scope: residual.VmName,
+                Severity: "Warn",
+                Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
+        }
+
+        ReplaceIssueRows(issueRows);
     }
 
     public void RefreshReviewState(bool hasBlockingFailures)
@@ -180,5 +337,118 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
         SharedIssuesSummaryText = SharedIssueSummaries.Count > 0
             ? "Shared environment and compatibility issues detected across multiple VMs. Fix them here when safe, or open Templates Editor for structural changes."
             : "No shared review items are currently grouped. Review the readiness summary, then use the main actions below.";
+    }
+
+    private static IReadOnlyList<DeployTimelineStepDefinition> BuildExpectedDeploySteps(VmDeploymentContext context)
+    {
+        var steps = new List<DeployTimelineStepDefinition>
+        {
+            new(DeploymentStepKeys.CheckHyperV, "Check Hyper-V"),
+            new(DeploymentStepKeys.CreateVmFolder, "Create VM folder"),
+            new(DeploymentStepKeys.CreateVhd, "Create differencing disk"),
+            new(DeploymentStepKeys.CreateVm, "Create VM"),
+            new(DeploymentStepKeys.AddNicToVm, "Add network adapter"),
+            new(DeploymentStepKeys.ConfigureVm, "Configure VM"),
+            new(DeploymentStepKeys.EnableGuestServices, "Enable guest services"),
+            new(DeploymentStepKeys.DisableVmCheckpoints, "Disable VM checkpoints"),
+            new(DeploymentStepKeys.StartVm, "Start VM")
+        };
+
+        if (context.ConfigureTimeZone)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.SetTimeZone, "Set Time Zone"));
+        }
+
+        if (context.InstallSoftware)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallSoftware, "Install Software"));
+        }
+
+        if (context.InstallRole)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallRole, "Install Role"));
+        }
+
+        if (context.ConfigureNetworkInformation)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.ConfigureNetworkInformation, "Configure Network Information"));
+        }
+
+        return steps;
+    }
+
+    private static IReadOnlyList<DeployTimelineStepRow> CreateReadinessTimelineSteps(
+        IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
+        IReadOnlyList<DeploymentReadinessCheckResult> readinessResults,
+        bool hasBlocking)
+    {
+        var state = hasBlocking ? DeployTimelineStepState.Failed : DeployTimelineStepState.Succeeded;
+        var rows = new List<DeployTimelineStepRow>
+        {
+            new("Readiness evaluation", state)
+        };
+
+        foreach (var issue in compatibilityIssues)
+        {
+            var issueState = issue.IsBlocking ? DeployTimelineStepState.Failed : DeployTimelineStepState.Pending;
+            rows.Add(new DeployTimelineStepRow($"{issue.Message} {issue.Guidance}".Trim(), issueState));
+        }
+
+        foreach (var result in readinessResults.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
+        {
+            var issueState = result.Status == DeploymentReadinessStatus.Fail ? DeployTimelineStepState.Failed : DeployTimelineStepState.Pending;
+            rows.Add(new DeployTimelineStepRow($"{result.Message} {result.ActionableGuidance}".Trim(), issueState));
+        }
+
+        return rows;
+    }
+
+    private static IReadOnlyList<DeployTimelineStepRow> CreateOutcomeTimelineSteps(VmDeploymentOutcomeSummary vmOutcome)
+    {
+        var outcomeState = vmOutcome.Status switch
+        {
+            VmDeploymentOutcomeStatus.Succeeded => DeployTimelineStepState.Succeeded,
+            VmDeploymentOutcomeStatus.Failed => DeployTimelineStepState.Failed,
+            VmDeploymentOutcomeStatus.Cancelled => DeployTimelineStepState.Skipped,
+            _ => DeployTimelineStepState.Pending
+        };
+
+        var rows = new List<DeployTimelineStepRow>
+        {
+            new("Deploy VM", outcomeState)
+        };
+
+        if (vmOutcome.Cleanup.CleanupRan)
+        {
+            var cleanupState = vmOutcome.Cleanup.Status switch
+            {
+                VmCleanupOutcomeStatus.Succeeded => DeployTimelineStepState.Succeeded,
+                VmCleanupOutcomeStatus.Residuals => DeployTimelineStepState.Failed,
+                _ => DeployTimelineStepState.Skipped
+            };
+
+            if (cleanupState != DeployTimelineStepState.Skipped)
+            {
+                rows.Add(new("Cleanup", cleanupState));
+            }
+        }
+
+        return rows;
+    }
+
+    private static string BuildCleanupSummary(VmDeploymentOutcomeSummary vmOutcome)
+    {
+        var cleanup = vmOutcome.Cleanup;
+        if (!cleanup.CleanupRan)
+        {
+            return "Completed";
+        }
+
+        return cleanup.Status switch
+        {
+            VmCleanupOutcomeStatus.Succeeded => "Cleanup completed",
+            VmCleanupOutcomeStatus.Residuals => $"Cleanup completed with residuals ({cleanup.ResidualCount}). Manual cleanup may be required.",
+            _ => "Cleanup not needed"
+        };
     }
 }
