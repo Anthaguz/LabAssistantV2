@@ -26,6 +26,8 @@ internal interface ITemplatesEditorWorkspaceHost
     Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName);
 
     void NavigateToEditor();
+
+    void NavigateToLibrary();
 }
 
 internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHost
@@ -38,6 +40,7 @@ internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHo
     private readonly Func<string, Task<string?>> _pickTemplateFileForSaveAsync;
     private readonly Func<string, Task<bool>> _showRemoveTemplateVmConfirmationDialogAsync;
     private readonly Action _navigateToEditor;
+    private readonly Action _navigateToLibrary;
 
     public TemplatesEditorWorkspaceHost(
         Func<bool> isTemplatesLoading,
@@ -47,7 +50,8 @@ internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHo
         Func<bool, Task<TemplatesEditorReferenceData>> loadReferenceDataAsync,
         Func<string, Task<string?>> pickTemplateFileForSaveAsync,
         Func<string, Task<bool>> showRemoveTemplateVmConfirmationDialogAsync,
-        Action navigateToEditor)
+        Action navigateToEditor,
+        Action navigateToLibrary)
     {
         _isTemplatesLoading = isTemplatesLoading;
         _setTemplatesLoading = setTemplatesLoading;
@@ -57,6 +61,7 @@ internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHo
         _pickTemplateFileForSaveAsync = pickTemplateFileForSaveAsync;
         _showRemoveTemplateVmConfirmationDialogAsync = showRemoveTemplateVmConfirmationDialogAsync;
         _navigateToEditor = navigateToEditor;
+        _navigateToLibrary = navigateToLibrary;
     }
 
     public bool IsTemplatesLoading => _isTemplatesLoading();
@@ -74,6 +79,8 @@ internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHo
     public Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName) => _showRemoveTemplateVmConfirmationDialogAsync(vmName);
 
     public void NavigateToEditor() => _navigateToEditor();
+
+    public void NavigateToLibrary() => _navigateToLibrary();
 }
 
 internal sealed class TemplatesEditorWorkspaceComposition : ITemplatesEditorWorkspaceControllerHost
@@ -94,6 +101,13 @@ internal sealed class TemplatesEditorWorkspaceComposition : ITemplatesEditorWork
         _view.DocumentHeaderChanged += TemplatesEditorView_DocumentHeaderChanged;
         _view.SelectedVmChanged += TemplatesEditorView_SelectedVmChanged;
         _view.VmDraftChanged += TemplatesEditorView_VmDraftChanged;
+        _view.AddVmRequested += TemplatesEditorView_AddVmRequested;
+        _view.RemoveVmRequested += TemplatesEditorView_RemoveVmRequested;
+        _view.ApplyVmChangesRequested += TemplatesEditorView_ApplyVmChangesRequested;
+        _view.SaveRequested += TemplatesEditorView_SaveRequested;
+        _view.SaveAsRequested += TemplatesEditorView_SaveAsRequested;
+        _view.ValidateRequested += TemplatesEditorView_ValidateRequested;
+        _view.BackToLibraryRequested += TemplatesEditorView_BackToLibraryRequested;
         _view.SetVmEntriesSource(_workspace.VmEntries);
         RefreshUiState();
     }
@@ -244,6 +258,49 @@ internal sealed class TemplatesEditorWorkspaceComposition : ITemplatesEditorWork
     private void TemplatesEditorView_VmDraftChanged(object? sender, EventArgs e)
     {
         ApplyVmDraftState(_view.CaptureVmDraftInteractionState());
+    }
+
+    private void TemplatesEditorView_AddVmRequested(object? sender, EventArgs e)
+    {
+        _controller.AddVmEntry();
+    }
+
+    private async void TemplatesEditorView_RemoveVmRequested(object? sender, EventArgs e)
+    {
+        await _controller.RemoveSelectedVmEntryAsync();
+    }
+
+    private void TemplatesEditorView_ApplyVmChangesRequested(object? sender, EventArgs e)
+    {
+        if (_workspace.SelectedVmEntry is null)
+        {
+            _workspace.SetStatusText("Select a VM entry first.");
+            RefreshUiState();
+            _host.ApplyTemplatesWorkspaceUiState();
+            return;
+        }
+
+        _controller.ApplySelectedVmDraft(showSuccessStatus: true);
+    }
+
+    private async void TemplatesEditorView_SaveRequested(object? sender, EventArgs e)
+    {
+        await _controller.SaveAsync();
+    }
+
+    private async void TemplatesEditorView_SaveAsRequested(object? sender, EventArgs e)
+    {
+        await _controller.SaveAsAsync();
+    }
+
+    private async void TemplatesEditorView_ValidateRequested(object? sender, EventArgs e)
+    {
+        await _controller.ValidateAsync();
+    }
+
+    private void TemplatesEditorView_BackToLibraryRequested(object? sender, EventArgs e)
+    {
+        _host.NavigateToLibrary();
     }
 
     bool ITemplatesEditorWorkspaceControllerHost.IsTemplatesLoading => _host.IsTemplatesLoading;
