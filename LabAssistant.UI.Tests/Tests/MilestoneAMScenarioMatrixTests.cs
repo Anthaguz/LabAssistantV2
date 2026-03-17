@@ -905,13 +905,11 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;", mainWindowSource);
         Assert.Contains("new TemplatesEditorWorkspaceComposition(", mainWindowSource);
         Assert.Contains("new TemplatesEditorWorkspaceHost(", mainWindowSource);
-        Assert.Contains("_templatesWorkspaceComposition.SetEditorDocument(ActiveTemplateEditorDocument);", mainWindowSource);
-        Assert.Contains("_templatesWorkspaceComposition.SetEditorStatus(statusText);", mainWindowSource);
-        Assert.Contains("private IReadOnlyList<VmTemplate> TemplateVmEntries => _templatesWorkspaceComposition.EditorVmEntries;", mainWindowSource);
         Assert.Contains("private VmTemplate? SelectedTemplateVmEntry => _templatesWorkspaceComposition.SelectedEditorVmEntry;", mainWindowSource);
-        Assert.Contains("private TemplateEditorDocument? ActiveTemplateEditorDocument => _templatesWorkspaceComposition.ActiveEditorDocument;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.AddEditorVmEntry();", mainWindowSource);
         Assert.Contains("await _templatesWorkspaceComposition.RemoveSelectedEditorVmEntryAsync();", mainWindowSource);
+        Assert.Contains("LoadTemplateEditorReferenceDataAsync,", mainWindowSource);
+        Assert.Contains("await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
         Assert.Contains("private bool IsTemplatesLibraryActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesEditorActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesCapabilityActive =>", mainWindowSource);
@@ -959,9 +957,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public IList<TemplateLibraryItem> LibraryItems => _libraryComposition.LibraryItems;", compositionSource);
         Assert.Contains("public TemplateLibraryItem? SelectedLibraryItem => _libraryComposition.SelectedItem;", compositionSource);
         Assert.Contains("public Task EnsureLibraryAsync(bool forceRefresh) => _libraryComposition.EnsureLibraryAsync(forceRefresh);", compositionSource);
-        Assert.Contains("public void SetEditorDocument(TemplateEditorDocument? document) => _editorComposition.SetDocument(document);", compositionSource);
+        Assert.Contains("public Task ShowEditorDocumentAsync(TemplateEditorDocument document, string statusText) => _editorComposition.ShowDocumentAsync(document, statusText);", compositionSource);
         Assert.Contains("public void SetEditorStatus(string statusText) => _editorComposition.SetStatus(statusText);", compositionSource);
-        Assert.Contains("public void SetEditorVmCount(int vmCount) => _editorComposition.SetVmCount(vmCount);", compositionSource);
         Assert.Contains("public TemplatesEditorDocumentHeaderInteractionState CaptureEditorDocumentHeaderState() => _editorComposition.CaptureDocumentHeaderState();", compositionSource);
         Assert.Contains("public IReadOnlyList<VmTemplate> EditorVmEntries => _editorComposition.VmEntries;", compositionSource);
         Assert.Contains("public VmTemplate? SelectedEditorVmEntry => _editorComposition.SelectedVmEntry;", compositionSource);
@@ -974,7 +971,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void ApplyUiState(TemplatesWorkspaceUiState state)", compositionSource);
         Assert.Contains("bool HasSelectedLibraryItem);", compositionSource);
         Assert.DoesNotContain("bool HasSelectedTemplateVmEntry", compositionSource);
-        Assert.Contains("_editorComposition.ApplyActionState(isLoading: state.IsLoading);", compositionSource);
+        Assert.Contains("_editorComposition.RefreshUiState();", compositionSource);
         Assert.DoesNotContain("WireLibraryHandlers()", compositionSource);
         Assert.DoesNotContain("TemplatesLibraryView_OpenTemplateRequested", compositionSource);
         Assert.DoesNotContain("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", compositionSource);
@@ -1146,6 +1143,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("await _templatesCapabilityService.ValidateAsync(_workspace.ActiveDocument);", editorControllerSource);
         Assert.Contains("Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName);", editorControllerSource);
 
+        Assert.Contains("internal readonly record struct TemplatesEditorReferenceData(", editorCompositionSource);
         Assert.Contains("internal interface ITemplatesEditorWorkspaceHost", editorCompositionSource);
         Assert.Contains("internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHost", editorCompositionSource);
         Assert.Contains("internal sealed class TemplatesEditorWorkspaceComposition", editorCompositionSource);
@@ -1164,6 +1162,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public VmTemplate? SelectedVmEntry => _workspace.SelectedVmEntry;", editorCompositionSource);
         Assert.Contains("public TemplateEditorDocument? ActiveDocument => _workspace.ActiveDocument;", editorCompositionSource);
         Assert.Contains("public TemplatesEditorVmDraftSnapshot CaptureVmDraftState() => _workspace.CaptureVmDraftSnapshot();", editorCompositionSource);
+        Assert.Contains("public async Task ShowDocumentAsync(TemplateEditorDocument document, string statusText)", editorCompositionSource);
         Assert.Contains("public void ReplaceVmEntries(IReadOnlyList<VmTemplate> vmEntries)", editorCompositionSource);
         Assert.Contains("public bool AddVmEntry() => _controller.AddVmEntry();", editorCompositionSource);
         Assert.Contains("public Task RemoveSelectedVmEntryAsync() => _controller.RemoveSelectedVmEntryAsync();", editorCompositionSource);
@@ -1175,7 +1174,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public Task SaveAsync() => _controller.SaveAsync();", editorCompositionSource);
         Assert.Contains("public Task SaveAsAsync() => _controller.SaveAsAsync();", editorCompositionSource);
         Assert.Contains("public Task ValidateAsync() => _controller.ValidateAsync();", editorCompositionSource);
-        Assert.Contains("public void ApplyActionState(bool isLoading)", editorCompositionSource);
+        Assert.Contains("public void RefreshUiState()", editorCompositionSource);
+        Assert.Contains("private void ApplyActionState()", editorCompositionSource);
         Assert.Contains("_workspace.SetDocument(document);", editorCompositionSource);
         Assert.Contains("_workspace.SetDocumentHeaderDraft(interactionState.TemplateName, interactionState.TemplateDescription);", editorCompositionSource);
         Assert.Contains("_workspace.ReplaceVmEntries(vmEntries);", editorCompositionSource);
@@ -1183,6 +1183,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_workspace.SetVmReferenceData(availableVmSwitches, vmVhdxCatalogOptions);", editorCompositionSource);
         Assert.Contains("ApplyVmDraftState(_view.CaptureVmDraftInteractionState());", editorCompositionSource);
         Assert.Contains("ApplyVmListState();", editorCompositionSource);
+        Assert.Contains("await _host.LoadReferenceDataAsync(forceRefresh: false);", editorCompositionSource);
+        Assert.Contains("_host.NavigateToEditor();", editorCompositionSource);
         Assert.Contains("private TemplatesEditorVmDraftState BuildVmDraftState(TemplatesEditorVmDraftInteractionState? interactionState)", editorCompositionSource);
         Assert.Contains("private TemplateVhdxNormalizationResult EvaluateTemplateVhdxNormalization(VmTemplate vmTemplate)", editorCompositionSource);
         Assert.Contains("private bool HasVmDraftChanges(", editorCompositionSource);
@@ -1231,19 +1233,21 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public bool ApplySelectedEditorVmDraft(bool showSuccessStatus) => _editorComposition.ApplySelectedVmDraft(showSuccessStatus);", templatesWorkspaceCompositionSource);
         Assert.Contains("public bool AddEditorVmEntry() => _editorComposition.AddVmEntry();", templatesWorkspaceCompositionSource);
         Assert.Contains("public Task RemoveSelectedEditorVmEntryAsync() => _editorComposition.RemoveSelectedVmEntryAsync();", templatesWorkspaceCompositionSource);
+        Assert.Contains("public Task ShowEditorDocumentAsync(TemplateEditorDocument document, string statusText) => _editorComposition.ShowDocumentAsync(document, statusText);", templatesWorkspaceCompositionSource);
         Assert.Contains("public Task SaveEditorAsync() => _editorComposition.SaveAsync();", templatesWorkspaceCompositionSource);
         Assert.Contains("public Task SaveEditorAsAsync() => _editorComposition.SaveAsAsync();", templatesWorkspaceCompositionSource);
         Assert.Contains("public Task ValidateEditorAsync() => _editorComposition.ValidateAsync();", templatesWorkspaceCompositionSource);
 
         Assert.Contains("_templatesWorkspaceComposition.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);", mainWindowSource);
-        Assert.Contains("private TemplateEditorDocument? ActiveTemplateEditorDocument => _templatesWorkspaceComposition.ActiveEditorDocument;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.AddEditorVmEntry();", mainWindowSource);
         Assert.Contains("await _templatesWorkspaceComposition.RemoveSelectedEditorVmEntryAsync();", mainWindowSource);
+        Assert.Contains("await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
         Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsync();", mainWindowSource);
         Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsAsync();", mainWindowSource);
         Assert.Contains("await _templatesWorkspaceComposition.ValidateEditorAsync();", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.ApplySelectedEditorVmDraft(showSuccessStatus: true);", mainWindowSource);
         Assert.Contains("new TemplatesEditorWorkspaceHost(", mainWindowSource);
+        Assert.DoesNotContain("private void BindTemplateEditorDocument()", mainWindowSource);
         Assert.DoesNotContain("private void UpdateTemplateVmEditorPanel()", mainWindowSource);
         Assert.DoesNotContain("private void RenderTemplateSwitchRowsFromVm()", mainWindowSource);
         Assert.DoesNotContain("private void UpdateTemplateVhdxSelectorFromVm()", mainWindowSource);
