@@ -54,6 +54,7 @@ public sealed partial class MainWindow : Window
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
+    private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
@@ -73,8 +74,6 @@ public sealed partial class MainWindow : Window
     private ShellSubview _activeSubview;
     private string _activeRouteKey = string.Empty;
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
-    private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;
-    private TemplateEditorDocument? _activeDeployTemplateDocument;
     private VmTemplate? _selectedDeployOnTheFlyVmEntry;
     private DeploymentReadinessReport? _deployReadinessReport;
     private DeploymentReadinessReport? _deployOnTheFlyReadinessReport;
@@ -279,6 +278,9 @@ public sealed partial class MainWindow : Window
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
                 () => IsTemplatesEditorActive));
+        _deployFromTemplateWorkspaceComposition = new DeployFromTemplateWorkspaceComposition(
+            DeployFromTemplateViewHost,
+            TemplatesLibraryItems);
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
             DeployOverviewViewHost,
@@ -289,6 +291,7 @@ public sealed partial class MainWindow : Window
             DeployQuickDeployTabViewItem,
             DeployFromTemplateTabViewItem,
             CreateDeployWorkspaceUiState,
+            _deployFromTemplateWorkspaceComposition,
             new DeployWorkspaceShellBridge(
                 () => IsDeployCapabilityActive,
                 () => IsDeployOverviewActive,
@@ -348,7 +351,6 @@ public sealed partial class MainWindow : Window
         DeployStartButton.Click += DeployStartButton_Click;
         DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
         DeployTemplateSelectorComboBox.DisplayMemberPath = nameof(TemplateLibraryItem.Name);
-        DeployTemplateSelectorComboBox.ItemsSource = TemplatesLibraryItems;
         DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
         DeployVmResultsListView.ItemsSource = _deployVmResultRows;
         DeployGlobalIssuesListView.ItemsSource = _deployIssueRows;
@@ -1693,28 +1695,31 @@ public sealed partial class MainWindow : Window
 
     private async void DeployResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeDeployTemplateDocument is null)
+        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
+        if (activeTemplateDocument is null)
         {
-            DeployActionStatusTextBlock.Text = "Select a template first.";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
             return;
         }
 
-        var applied = await ApplyDeployResolveSuggestionsAsync(_activeDeployTemplateDocument.Template);
-        DeployActionStatusTextBlock.Text = applied == 0
-            ? "No auto-resolve suggestions available for the current template state."
-            : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...";
+        var applied = await ApplyDeployResolveSuggestionsAsync(activeTemplateDocument.Template);
+        _deployFromTemplateWorkspaceComposition.SetActionStatus(
+            applied == 0
+                ? "No auto-resolve suggestions available for the current template state."
+                : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...");
         await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
     }
 
     private async void DeployOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedDeployTemplateLibraryItem is null)
+        var selectedTemplateLibraryItem = _deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem;
+        if (selectedTemplateLibraryItem is null)
         {
-            DeployActionStatusTextBlock.Text = "Select a template first.";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
             return;
         }
 
-        await OpenTemplateInEditorAsync(_selectedDeployTemplateLibraryItem, fromDeploy: true);
+        await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);
     }
 
     private async void DeployTemplateSelectorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1724,10 +1729,10 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _selectedDeployTemplateLibraryItem = DeployTemplateSelectorComboBox.SelectedItem as TemplateLibraryItem;
-        if (_selectedDeployTemplateLibraryItem is null)
+        _deployFromTemplateWorkspaceComposition.SetSelectedTemplateLibraryItem(DeployTemplateSelectorComboBox.SelectedItem as TemplateLibraryItem);
+        if (_deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem is null)
         {
-            _activeDeployTemplateDocument = null;
+            _deployFromTemplateWorkspaceComposition.ClearSelection("No template selected.");
             _deployReadinessReport = null;
             _deployCompatibilityIssues.Clear();
             _deployLifecycleState = "Idle";
@@ -1739,22 +1744,24 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            _activeDeployTemplateDocument = await _templatesCapabilityService.LoadForEditorAsync(_selectedDeployTemplateLibraryItem.FilePath);
+            var selectedTemplate = _deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem!;
+            var document = await _templatesCapabilityService.LoadForEditorAsync(selectedTemplate.FilePath);
+            _deployFromTemplateWorkspaceComposition.SetLoadedTemplateDocument(
+                document,
+                $"Loaded '{selectedTemplate.Name}' for deploy readiness.");
             _deployLifecycleState = "Ready";
             _deployProgressPercent = 0;
-            _deployProgressSummary = $"Template '{_selectedDeployTemplateLibraryItem.Name}' loaded.";
-            DeployActionStatusTextBlock.Text = $"Loaded '{_selectedDeployTemplateLibraryItem.Name}' for deploy readiness.";
+            _deployProgressSummary = $"Template '{selectedTemplate.Name}' loaded.";
             await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
         }
         catch (Exception ex)
         {
-            _activeDeployTemplateDocument = null;
+            _deployFromTemplateWorkspaceComposition.SetSelectionLoadFailed($"Failed to load selected template. {ex.Message}");
             _deployReadinessReport = null;
             _deployCompatibilityIssues.Clear();
             _deployLifecycleState = "Error";
             _deployProgressPercent = 0;
             _deployProgressSummary = "Template load failed.";
-            DeployActionStatusTextBlock.Text = $"Failed to load selected template. {ex.Message}";
             UpdateDeployUi();
         }
     }
@@ -2244,7 +2251,8 @@ public sealed partial class MainWindow : Window
 
     private void UpdateDeployUi()
     {
-        var hasTemplate = _activeDeployTemplateDocument is not null;
+        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
+        var hasTemplate = activeTemplateDocument is not null;
         var hasBlockingFailures = _deployCompatibilityIssues.Any(issue => issue.IsBlocking) ||
                                   (_deployReadinessReport?.HasBlockingFailures ?? false);
 
@@ -2252,14 +2260,13 @@ public sealed partial class MainWindow : Window
         DeployReloadTemplatesButton.IsEnabled = !_isDeployLoadingTemplates && !_isDeployStarting;
         DeployEvaluateReadinessButton.IsEnabled = hasTemplate && !_isDeployEvaluatingReadiness && !_isDeployStarting;
         DeployResolveSuggestionsButton.IsEnabled = hasTemplate && !_isDeployEvaluatingReadiness && !_isDeployStarting;
-        DeployOpenTemplateEditorButton.IsEnabled = _selectedDeployTemplateLibraryItem is not null && !_isDeployStarting;
+        DeployOpenTemplateEditorButton.IsEnabled = _deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem is not null && !_isDeployStarting;
         DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures && !_isDeployEvaluatingReadiness && !_isDeployStarting;
+        _deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);
 
-        if (_activeDeployTemplateDocument is null)
+        if (activeTemplateDocument is null)
         {
             DeployReadinessSummaryTextBlock.Text = "Select a template to evaluate readiness and run deploy.";
-            DeployTemplateSummaryTextBlock.Text = "Select a template to review what will be deployed, how many VMs it includes, and whether environment fixes are needed.";
-            DeployTemplateRemediationTextBlock.Text = "Use Resolve Suggestions for safe environment remaps, or open Templates Editor for structural fixes.";
             _deploySharedIssueSummaries.Clear();
             DeploySharedIssuesSummaryTextBlock.Text = "Shared review items appear here when multiple VMs need the same remediation.";
             DeployOverallStateTextBlock.Text = _deployLifecycleState;
@@ -2281,12 +2288,7 @@ public sealed partial class MainWindow : Window
         var deployState = hasBlockingFailures ? "Blocked" : "Ready";
         DeployReadinessSummaryTextBlock.Text =
             $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
-            $"Template: {_activeDeployTemplateDocument.Template.Name} ({_activeDeployTemplateDocument.Template.VmTemplates.Count} VMs).";
-        DeployTemplateSummaryTextBlock.Text =
-            $"Template '{_activeDeployTemplateDocument.Template.Name}' will deploy {_activeDeployTemplateDocument.Template.VmTemplates.Count} VM(s). Review shared environment blockers here before deciding whether to remediate or open the template editor.";
-        DeployTemplateRemediationTextBlock.Text = hasBlockingFailures
-            ? "Blocking issues are grouped below when possible. Use Resolve Suggestions for safe shared remaps, or Open in Templates Editor for structural fixes."
-            : "This surface is for template review and remediation. Use Open in Templates Editor only when the template itself needs structural changes.";
+            $"Template: {activeTemplateDocument.Template.Name} ({activeTemplateDocument.Template.VmTemplates.Count} VMs).";
 
         DeployOverallStateTextBlock.Text = _deployLifecycleState;
         DeployProgressBar.Value = _deployProgressPercent;
@@ -2342,12 +2344,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (_activeDeployTemplateDocument is null)
+        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
+        if (activeTemplateDocument is null)
         {
             return;
         }
 
-        var vmNames = _activeDeployTemplateDocument.Template.VmTemplates
+        var vmNames = activeTemplateDocument.Template.VmTemplates
             .Select(vm => string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -2606,7 +2609,6 @@ public sealed partial class MainWindow : Window
     {
         if (!forceRefresh && TemplatesLibraryItems.Count > 0)
         {
-            DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
             _deployWorkspaceComposition.RefreshSharedUiState();
             UpdateDeployUi();
             return;
@@ -2618,7 +2620,7 @@ public sealed partial class MainWindow : Window
         _deployProgressSummary = "Loading templates...";
         _deployWorkspaceComposition.RefreshSharedUiState();
         UpdateDeployUi();
-        DeployActionStatusTextBlock.Text = "Loading templates for deploy...";
+        _deployFromTemplateWorkspaceComposition.SetActionStatus("Loading templates for deploy...");
 
         try
         {
@@ -2626,23 +2628,24 @@ public sealed partial class MainWindow : Window
 
             if (TemplatesLibraryItems.Count == 0)
             {
-                _selectedDeployTemplateLibraryItem = null;
-                _activeDeployTemplateDocument = null;
+                _deployFromTemplateWorkspaceComposition.ClearSelection("No templates available for deploy.");
                 _deployReadinessReport = null;
                 _deployCompatibilityIssues.Clear();
                 _deployLifecycleState = "Idle";
                 _deployProgressPercent = 0;
                 _deployProgressSummary = "No templates available.";
-                DeployActionStatusTextBlock.Text = "No templates available for deploy.";
             }
             else
             {
-                _selectedDeployTemplateLibraryItem ??= TemplatesLibraryItems[0];
-                DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
+                if (_deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem is null)
+                {
+                    _deployFromTemplateWorkspaceComposition.SetSelectedTemplateLibraryItem(TemplatesLibraryItems[0]);
+                }
+
                 _deployLifecycleState = "Idle";
                 _deployProgressPercent = 0;
                 _deployProgressSummary = "Template list loaded.";
-                DeployActionStatusTextBlock.Text = $"Loaded {TemplatesLibraryItems.Count} template(s) for deploy.";
+                _deployFromTemplateWorkspaceComposition.SetActionStatus($"Loaded {TemplatesLibraryItems.Count} template(s) for deploy.");
             }
         }
         catch (Exception ex)
@@ -2650,7 +2653,7 @@ public sealed partial class MainWindow : Window
             _deployLifecycleState = "Error";
             _deployProgressPercent = 0;
             _deployProgressSummary = "Template load failed.";
-            DeployActionStatusTextBlock.Text = $"Failed to load deploy templates. {ex.Message}";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus($"Failed to load deploy templates. {ex.Message}");
         }
         finally
         {
@@ -2663,9 +2666,10 @@ public sealed partial class MainWindow : Window
     private async Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode)
     {
         _showDeployAllVmRows = false;
-        if (_activeDeployTemplateDocument is null)
+        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
+        if (activeTemplateDocument is null)
         {
-            DeployActionStatusTextBlock.Text = "Select a template first.";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
             UpdateDeployUi();
             return;
         }
@@ -2676,14 +2680,15 @@ public sealed partial class MainWindow : Window
         _deployProgressSummary = mode == DeploymentPreflightMode.Full
             ? "Running full readiness checks..."
             : "Running quick readiness checks...";
-        DeployActionStatusTextBlock.Text = mode == DeploymentPreflightMode.Full
-            ? "Running full deploy readiness evaluation..."
-            : "Running quick deploy readiness evaluation...";
+        _deployFromTemplateWorkspaceComposition.SetActionStatus(
+            mode == DeploymentPreflightMode.Full
+                ? "Running full deploy readiness evaluation..."
+                : "Running quick deploy readiness evaluation...");
 
         try
         {
             await EnsureTemplateSwitchesAsync(forceRefresh: false);
-            var deployContext = BuildDeployContext(_activeDeployTemplateDocument.Template);
+            var deployContext = BuildDeployContext(activeTemplateDocument.Template);
             _deployCompatibilityIssues.Clear();
             _deployCompatibilityIssues.AddRange(deployContext.CompatibilityIssues);
 
@@ -2700,11 +2705,12 @@ public sealed partial class MainWindow : Window
                 : warningCount > 0
                     ? $"Readiness passed with warnings ({warningCount})."
                     : "Readiness passed.";
-            DeployActionStatusTextBlock.Text = blockingCount > 0
-                ? $"Readiness found {blockingCount} blocking issue(s) and {warningCount} warning(s)."
-                : warningCount > 0
-                    ? $"Readiness passed with {warningCount} warning(s)."
-                    : "Readiness passed with no issues.";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus(
+                blockingCount > 0
+                    ? $"Readiness found {blockingCount} blocking issue(s) and {warningCount} warning(s)."
+                    : warningCount > 0
+                        ? $"Readiness passed with {warningCount} warning(s)."
+                        : "Readiness passed with no issues.");
         }
         catch (Exception ex)
         {
@@ -2713,7 +2719,7 @@ public sealed partial class MainWindow : Window
             _deployLifecycleState = "Error";
             _deployProgressPercent = 0;
             _deployProgressSummary = "Readiness evaluation failed.";
-            DeployActionStatusTextBlock.Text = $"Readiness evaluation failed. {ex.Message}";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus($"Readiness evaluation failed. {ex.Message}");
         }
         finally
         {
@@ -2724,9 +2730,10 @@ public sealed partial class MainWindow : Window
 
     private async void DeployStartButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeDeployTemplateDocument is null)
+        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
+        if (activeTemplateDocument is null)
         {
-            DeployActionStatusTextBlock.Text = "Select a template first.";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
             return;
         }
 
@@ -2747,16 +2754,16 @@ public sealed partial class MainWindow : Window
                 _deployLifecycleState = "Blocked";
                 _deployProgressPercent = 35;
                 _deployProgressSummary = "Deployment blocked by readiness failures.";
-                DeployActionStatusTextBlock.Text = "Deploy blocked by readiness failures. Resolve blocking items first.";
+                _deployFromTemplateWorkspaceComposition.SetActionStatus("Deploy blocked by readiness failures. Resolve blocking items first.");
                 return;
             }
 
-            var deployContext = BuildDeployContext(_activeDeployTemplateDocument.Template);
+            var deployContext = BuildDeployContext(activeTemplateDocument.Template);
             InitializeDeployProgressRows(deployContext.MultiVmContext, _deployProgressByVm);
             AttachDeployProgressCallbacks(deployContext.MultiVmContext, _deployProgressByVm, isOnTheFly: false);
             _deployProgressPercent = 60;
             _deployProgressSummary = $"Deploying {deployContext.MultiVmContext.VmContexts.Count} VM(s)...";
-            DeployActionStatusTextBlock.Text = "Starting deployment...";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus("Starting deployment...");
             UpdateDeployResultRows();
             UpdateDeployUi();
             await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);
@@ -2773,16 +2780,16 @@ public sealed partial class MainWindow : Window
             _deployProgressPercent = 100;
             _deployProgressSummary =
                 $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.";
-            DeployActionStatusTextBlock.Text =
+            _deployFromTemplateWorkspaceComposition.SetActionStatus(
                 $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, " +
-                $"Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Residuals={summary.ResidualVmCount}.";
+                $"Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Residuals={summary.ResidualVmCount}.");
         }
         catch (Exception ex)
         {
             _deployLifecycleState = "Failed";
             _deployProgressPercent = 100;
             _deployProgressSummary = "Deployment failed.";
-            DeployActionStatusTextBlock.Text = $"Deploy failed. {ex.Message}";
+            _deployFromTemplateWorkspaceComposition.SetActionStatus($"Deploy failed. {ex.Message}");
         }
         finally
         {
@@ -3059,7 +3066,7 @@ public sealed partial class MainWindow : Window
             await ShowTemplateEditorAsync(document, "Template loaded.");
             if (fromDeploy)
             {
-                DeployActionStatusTextBlock.Text = $"Opened '{templateItem.Name}' in Templates editor.";
+                _deployFromTemplateWorkspaceComposition.SetActionStatus($"Opened '{templateItem.Name}' in Templates editor.");
             }
         }
         catch (Exception ex)
@@ -3067,7 +3074,7 @@ public sealed partial class MainWindow : Window
             SetTemplateEditorStatus($"Failed to open template. {ex.Message}");
             if (fromDeploy)
             {
-                DeployActionStatusTextBlock.Text = $"Failed to open template in editor. {ex.Message}";
+                _deployFromTemplateWorkspaceComposition.SetActionStatus($"Failed to open template in editor. {ex.Message}");
             }
         }
         finally
@@ -3223,13 +3230,7 @@ public sealed partial class MainWindow : Window
 
     private void ReconcileDeployTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)
     {
-        if (_selectedDeployTemplateLibraryItem is not null)
-        {
-            _selectedDeployTemplateLibraryItem = items
-                .FirstOrDefault(item => string.Equals(item.FilePath, _selectedDeployTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
-            DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
-        }
-
+        _deployFromTemplateWorkspaceComposition.ReconcileSelection(items);
         _deployWorkspaceComposition.RefreshSharedUiState();
     }
 

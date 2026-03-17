@@ -62,6 +62,7 @@ internal sealed class DeployWorkspaceComposition
     private readonly TabViewItem _quickDeployTabViewItem;
     private readonly TabViewItem _fromTemplateTabViewItem;
     private readonly DeployOverviewWorkspaceComposition _overviewWorkspaceComposition;
+    private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;
     private readonly IDeployWorkspaceShellBridge _shellBridge;
     private bool _isUpdatingDeploySubviewSelection;
 
@@ -69,22 +70,24 @@ internal sealed class DeployWorkspaceComposition
         FrameworkElement localNavigationHost,
         DeployOverviewView overviewView,
         FrameworkElement onTheFlyHost,
-        FrameworkElement fromTemplateHost,
+        DeployFromTemplateView fromTemplateView,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem quickDeployTabViewItem,
         TabViewItem fromTemplateTabViewItem,
         Func<DeployWorkspaceUiState> getUiState,
+        DeployFromTemplateWorkspaceComposition fromTemplateWorkspaceComposition,
         IDeployWorkspaceShellBridge shellBridge)
     {
         _localNavigationHost = localNavigationHost;
         _overviewHost = overviewView;
         _onTheFlyHost = onTheFlyHost;
-        _fromTemplateHost = fromTemplateHost;
+        _fromTemplateHost = fromTemplateView;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
         _quickDeployTabViewItem = quickDeployTabViewItem;
         _fromTemplateTabViewItem = fromTemplateTabViewItem;
+        _fromTemplateWorkspaceComposition = fromTemplateWorkspaceComposition;
         _shellBridge = shellBridge;
         _overviewWorkspaceComposition = new DeployOverviewWorkspaceComposition(
             overviewView,
@@ -112,6 +115,11 @@ internal sealed class DeployWorkspaceComposition
         if (_shellBridge.IsDeployOverviewActive)
         {
             _overviewWorkspaceComposition.ApplyShellState();
+        }
+
+        if (_shellBridge.IsDeployFromTemplateActive)
+        {
+            _fromTemplateWorkspaceComposition.ApplyShellState();
         }
     }
 
