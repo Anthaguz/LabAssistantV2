@@ -8,6 +8,8 @@ internal sealed class TemplatesEditorWorkspaceViewModel
 {
     public ObservableCollection<VmTemplate> VmEntries { get; } = [];
 
+    public TemplateEditorDocument? ActiveDocument { get; private set; }
+
     public IReadOnlyList<string> AvailableVmSwitches { get; private set; } = Array.Empty<string>();
 
     public IReadOnlyList<TemplateVhdxCatalogOption> VmVhdxCatalogOptions { get; private set; } = Array.Empty<TemplateVhdxCatalogOption>();
@@ -64,6 +66,7 @@ internal sealed class TemplatesEditorWorkspaceViewModel
 
     public void ClearDocument()
     {
+        ActiveDocument = null;
         HasActiveDocument = false;
         VmEntries.Clear();
         SelectedVmEntry = null;
@@ -81,6 +84,7 @@ internal sealed class TemplatesEditorWorkspaceViewModel
     {
         ArgumentNullException.ThrowIfNull(document);
 
+        ActiveDocument = document;
         HasActiveDocument = true;
         TemplateName = document.Template.Name ?? string.Empty;
         TemplateDescription = document.Template.Description ?? string.Empty;

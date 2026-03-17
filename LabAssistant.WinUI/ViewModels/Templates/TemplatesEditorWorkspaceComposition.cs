@@ -5,14 +5,67 @@ using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.ViewModels.Templates;
 
-internal sealed class TemplatesEditorWorkspaceComposition
+internal interface ITemplatesEditorWorkspaceHost
+{
+    bool IsTemplatesLoading { get; }
+
+    void SetTemplatesLoading(bool isLoading);
+
+    void ApplyTemplatesWorkspaceUiState();
+
+    Task EnsureTemplatesLibraryAsync(bool forceRefresh);
+
+    Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName);
+}
+
+internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHost
+{
+    private readonly Func<bool> _isTemplatesLoading;
+    private readonly Action<bool> _setTemplatesLoading;
+    private readonly Action _applyTemplatesWorkspaceUiState;
+    private readonly Func<bool, Task> _ensureTemplatesLibraryAsync;
+    private readonly Func<string, Task<string?>> _pickTemplateFileForSaveAsync;
+
+    public TemplatesEditorWorkspaceHost(
+        Func<bool> isTemplatesLoading,
+        Action<bool> setTemplatesLoading,
+        Action applyTemplatesWorkspaceUiState,
+        Func<bool, Task> ensureTemplatesLibraryAsync,
+        Func<string, Task<string?>> pickTemplateFileForSaveAsync)
+    {
+        _isTemplatesLoading = isTemplatesLoading;
+        _setTemplatesLoading = setTemplatesLoading;
+        _applyTemplatesWorkspaceUiState = applyTemplatesWorkspaceUiState;
+        _ensureTemplatesLibraryAsync = ensureTemplatesLibraryAsync;
+        _pickTemplateFileForSaveAsync = pickTemplateFileForSaveAsync;
+    }
+
+    public bool IsTemplatesLoading => _isTemplatesLoading();
+
+    public void SetTemplatesLoading(bool isLoading) => _setTemplatesLoading(isLoading);
+
+    public void ApplyTemplatesWorkspaceUiState() => _applyTemplatesWorkspaceUiState();
+
+    public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _ensureTemplatesLibraryAsync(forceRefresh);
+
+    public Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName) => _pickTemplateFileForSaveAsync(suggestedFileName);
+}
+
+internal sealed class TemplatesEditorWorkspaceComposition : ITemplatesEditorWorkspaceControllerHost
 {
     private readonly TemplatesEditorView _view;
+    private readonly ITemplatesEditorWorkspaceHost _host;
     private readonly TemplatesEditorWorkspaceViewModel _workspace = new();
+    private readonly TemplatesEditorWorkspaceController _controller;
 
-    public TemplatesEditorWorkspaceComposition(TemplatesEditorView view)
+    public TemplatesEditorWorkspaceComposition(
+        ITemplatesCapabilityService templatesCapabilityService,
+        TemplatesEditorView view,
+        ITemplatesEditorWorkspaceHost host)
     {
         _view = view;
+        _host = host;
+        _controller = new TemplatesEditorWorkspaceController(templatesCapabilityService, _workspace, this);
         _view.DocumentHeaderChanged += TemplatesEditorView_DocumentHeaderChanged;
         _view.SelectedVmChanged += TemplatesEditorView_SelectedVmChanged;
         _view.VmDraftChanged += TemplatesEditorView_VmDraftChanged;
@@ -28,6 +81,8 @@ internal sealed class TemplatesEditorWorkspaceComposition
 
     public VmTemplate? SelectedVmEntry => _workspace.SelectedVmEntry;
 
+    public TemplateEditorDocument? ActiveDocument => _workspace.ActiveDocument;
+
     public TemplatesEditorVmDraftSnapshot CaptureVmDraftState() => _workspace.CaptureVmDraftSnapshot();
 
     public void ApplyShellState(bool isEditorActive)
@@ -40,13 +95,16 @@ internal sealed class TemplatesEditorWorkspaceComposition
         if (document is null)
         {
             _workspace.ClearDocument();
+            _workspace.ReplaceVmEntries(Array.Empty<VmTemplate>());
         }
         else
         {
             _workspace.SetDocument(document);
+            _workspace.ReplaceVmEntries(document.Template.VmTemplates);
         }
 
         ApplyViewState();
+        ApplyVmListState();
         ApplyVmDraftState();
     }
 
@@ -95,6 +153,26 @@ internal sealed class TemplatesEditorWorkspaceComposition
         ApplyViewState();
     }
 
+    public void SyncVmEntriesToDocument()
+    {
+        if (_workspace.ActiveDocument is null)
+        {
+            return;
+        }
+
+        _workspace.ActiveDocument.Template.VmTemplates = _workspace.VmEntries.ToList();
+        _workspace.SetVmCount(_workspace.ActiveDocument.Template.VmTemplates.Count);
+        ApplyViewState();
+    }
+
+    public bool ApplySelectedVmDraft(bool showSuccessStatus) => _controller.ApplySelectedVmDraft(showSuccessStatus);
+
+    public Task SaveAsync() => _controller.SaveAsync();
+
+    public Task SaveAsAsync() => _controller.SaveAsAsync();
+
+    public Task ValidateAsync() => _controller.ValidateAsync();
+
     public TemplatesEditorDocumentHeaderInteractionState CaptureDocumentHeaderState()
     {
         return new TemplatesEditorDocumentHeaderInteractionState(
@@ -133,6 +211,21 @@ internal sealed class TemplatesEditorWorkspaceComposition
     {
         ApplyVmDraftState(_view.CaptureVmDraftInteractionState());
     }
+
+    bool ITemplatesEditorWorkspaceControllerHost.IsTemplatesLoading => _host.IsTemplatesLoading;
+
+    void ITemplatesEditorWorkspaceControllerHost.SetTemplatesLoading(bool isLoading) => _host.SetTemplatesLoading(isLoading);
+
+    void ITemplatesEditorWorkspaceControllerHost.ApplyWorkspaceState()
+    {
+        ApplyViewState();
+        ApplyVmDraftState();
+        _host.ApplyTemplatesWorkspaceUiState();
+    }
+
+    Task ITemplatesEditorWorkspaceControllerHost.EnsureTemplatesLibraryAsync(bool forceRefresh) => _host.EnsureTemplatesLibraryAsync(forceRefresh);
+
+    Task<string?> ITemplatesEditorWorkspaceControllerHost.PickTemplateFileForSaveAsync(string suggestedFileName) => _host.PickTemplateFileForSaveAsync(suggestedFileName);
 
     private void ApplyViewState()
     {
