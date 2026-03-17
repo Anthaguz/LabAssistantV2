@@ -105,7 +105,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("_editorComposition.ApplyShellState(_shellBridge.IsTemplatesEditorActive);", compositionSource);
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", mainWindowSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", mainWindowSource);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", mainWindowSource);
+        Assert.Contains("() => NavigateToRoute(ShellRouteKeys.TemplatesLibrary)", mainWindowSource);
     }
 
     [Fact]

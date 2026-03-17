@@ -44,8 +44,8 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("_editorComposition.ApplyShellState(_shellBridge.IsTemplatesEditorActive);", compositionSource);
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceComposition", libraryCompositionSource);
         Assert.Contains("_view.Visibility = isLibraryActive ? Visibility.Visible : Visibility.Collapsed;", libraryCompositionSource);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
+        Assert.Contains("() => NavigateToRoute(ShellRouteKeys.TemplatesLibrary)", source);
         Assert.Contains("if (!capability.ShowChildRoutesInShell)", source);
     }
 
@@ -58,15 +58,9 @@ public sealed class MilestoneADScenarioMatrixTests
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
         var editorControllerSource = LoadTemplatesEditorWorkspaceControllerSource();
         var libraryViewSource = LoadTemplatesLibraryViewCodeBehindSource();
+        var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
 
-        Assert.Contains("WireTemplatesHandlers()", source);
-        Assert.Contains("SaveTemplateButton.Click += SaveTemplateButton_Click;", source);
-        Assert.Contains("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", source);
-        Assert.Contains("ValidateTemplateButton.Click += ValidateTemplateButton_Click;", source);
-        Assert.Contains("BackToLibraryButton.Click += BackToLibraryButton_Click;", source);
-        Assert.Contains("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", source);
-        Assert.Contains("RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;", source);
-        Assert.Contains("ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;", source);
+        Assert.DoesNotContain("WireTemplatesHandlers()", source);
         Assert.DoesNotContain("TemplatesLibraryView_OpenTemplateRequested", compositionSource);
         Assert.Contains("_view.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;", libraryCompositionSource);
         Assert.Contains("_view.DeleteTemplateRequested += TemplatesLibraryView_DeleteTemplateRequested;", libraryCompositionSource);
@@ -81,20 +75,46 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("new TemplatesEditorWorkspaceHost(", source);
         Assert.Contains("LoadTemplateEditorReferenceDataAsync,", source);
         Assert.Contains("NavigateToTemplatesEditor", source);
-        Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsync();", source);
-        Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsAsync();", source);
-        Assert.Contains("await _templatesWorkspaceComposition.ValidateEditorAsync();", source);
-        Assert.Contains("_templatesWorkspaceComposition.AddEditorVmEntry();", source);
-        Assert.Contains("await _templatesWorkspaceComposition.RemoveSelectedEditorVmEntryAsync();", source);
+        Assert.Contains("() => NavigateToRoute(ShellRouteKeys.TemplatesLibrary)", source);
+        Assert.DoesNotContain("SaveTemplateButton.Click += SaveTemplateButton_Click;", source);
+        Assert.DoesNotContain("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", source);
+        Assert.DoesNotContain("ValidateTemplateButton.Click += ValidateTemplateButton_Click;", source);
+        Assert.DoesNotContain("BackToLibraryButton.Click += BackToLibraryButton_Click;", source);
+        Assert.DoesNotContain("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", source);
+        Assert.DoesNotContain("RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;", source);
+        Assert.DoesNotContain("ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;", source);
         Assert.Contains("internal sealed class TemplatesEditorWorkspaceHost : ITemplatesEditorWorkspaceHost", editorCompositionSource);
         Assert.Contains("private readonly TemplatesEditorWorkspaceController _controller;", editorCompositionSource);
         Assert.Contains("_controller = new TemplatesEditorWorkspaceController(templatesCapabilityService, _workspace, this);", editorCompositionSource);
+        Assert.Contains("_view.AddVmRequested += TemplatesEditorView_AddVmRequested;", editorCompositionSource);
+        Assert.Contains("_view.RemoveVmRequested += TemplatesEditorView_RemoveVmRequested;", editorCompositionSource);
+        Assert.Contains("_view.ApplyVmChangesRequested += TemplatesEditorView_ApplyVmChangesRequested;", editorCompositionSource);
+        Assert.Contains("_view.SaveRequested += TemplatesEditorView_SaveRequested;", editorCompositionSource);
+        Assert.Contains("_view.SaveAsRequested += TemplatesEditorView_SaveAsRequested;", editorCompositionSource);
+        Assert.Contains("_view.ValidateRequested += TemplatesEditorView_ValidateRequested;", editorCompositionSource);
+        Assert.Contains("_view.BackToLibraryRequested += TemplatesEditorView_BackToLibraryRequested;", editorCompositionSource);
+        Assert.Contains("void NavigateToLibrary();", editorCompositionSource);
+        Assert.Contains("public void NavigateToLibrary() => _navigateToLibrary();", editorCompositionSource);
         Assert.Contains("internal sealed class TemplatesEditorWorkspaceController", editorControllerSource);
         Assert.Contains("public bool AddVmEntry()", editorControllerSource);
         Assert.Contains("public async Task RemoveSelectedVmEntryAsync()", editorControllerSource);
         Assert.Contains("public async Task SaveAsync()", editorControllerSource);
         Assert.Contains("public async Task SaveAsAsync()", editorControllerSource);
         Assert.Contains("public async Task ValidateAsync()", editorControllerSource);
+        Assert.Contains("public event EventHandler? AddVmRequested;", editorViewSource);
+        Assert.Contains("public event EventHandler? RemoveVmRequested;", editorViewSource);
+        Assert.Contains("public event EventHandler? ApplyVmChangesRequested;", editorViewSource);
+        Assert.Contains("public event EventHandler? SaveRequested;", editorViewSource);
+        Assert.Contains("public event EventHandler? SaveAsRequested;", editorViewSource);
+        Assert.Contains("public event EventHandler? ValidateRequested;", editorViewSource);
+        Assert.Contains("public event EventHandler? BackToLibraryRequested;", editorViewSource);
+        Assert.Contains("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", editorViewSource);
+        Assert.Contains("RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;", editorViewSource);
+        Assert.Contains("ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;", editorViewSource);
+        Assert.Contains("SaveTemplateButton.Click += SaveTemplateButton_Click;", editorViewSource);
+        Assert.Contains("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", editorViewSource);
+        Assert.Contains("ValidateTemplateButton.Click += ValidateTemplateButton_Click;", editorViewSource);
+        Assert.Contains("BackToLibraryButton.Click += BackToLibraryButton_Click;", editorViewSource);
         Assert.DoesNotContain("_templatesCapabilityService.ImportAsync", source);
         Assert.DoesNotContain("_templatesCapabilityService.ExportAsync", source);
         Assert.DoesNotContain("_templatesCapabilityService.DeleteAsync", source);
@@ -111,7 +131,7 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("public async Task OpenSelectedTemplateInEditorAsync()", controllerSource);
         Assert.Contains("await _host.ShowTemplateEditorAsync(document, \"Template loaded.\");", controllerSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
+        Assert.Contains("() => NavigateToRoute(ShellRouteKeys.TemplatesLibrary)", source);
     }
 
     [Fact]
@@ -172,9 +192,10 @@ public sealed class MilestoneADScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
         var editorControllerSource = LoadTemplatesEditorWorkspaceControllerSource();
+        var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
 
         Assert.Contains("SyncTemplateVmEntriesToDocument()", source);
-        Assert.Contains("_templatesWorkspaceComposition.ApplySelectedEditorVmDraft(showSuccessStatus: true);", source);
+        Assert.Contains("_controller.ApplySelectedVmDraft(showSuccessStatus: true);", editorCompositionSource);
         Assert.Contains("public bool AddVmEntry()", editorControllerSource);
         Assert.Contains("public async Task RemoveSelectedVmEntryAsync()", editorControllerSource);
         Assert.Contains("TryApplyEditorFieldsToDocument(showSuccessStatus: false)", editorControllerSource);

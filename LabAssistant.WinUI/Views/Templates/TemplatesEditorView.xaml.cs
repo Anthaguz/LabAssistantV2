@@ -70,6 +70,13 @@ public sealed partial class TemplatesEditorView : UserControl
     public event EventHandler? DocumentHeaderChanged;
     public event EventHandler? SelectedVmChanged;
     public event EventHandler? VmDraftChanged;
+    public event EventHandler? AddVmRequested;
+    public event EventHandler? RemoveVmRequested;
+    public event EventHandler? ApplyVmChangesRequested;
+    public event EventHandler? SaveRequested;
+    public event EventHandler? SaveAsRequested;
+    public event EventHandler? ValidateRequested;
+    public event EventHandler? BackToLibraryRequested;
 
     public TemplatesEditorView()
     {
@@ -82,47 +89,14 @@ public sealed partial class TemplatesEditorView : UserControl
         TemplateVmCpuTextBox.TextChanged += TemplateVmDraftControl_Changed;
         AddTemplateVmSwitchRowButton.Click += AddTemplateVmSwitchRowButton_Click;
         TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;
+        AddTemplateVmButton.Click += AddTemplateVmButton_Click;
+        RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;
+        ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;
+        SaveTemplateButton.Click += SaveTemplateButton_Click;
+        SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;
+        ValidateTemplateButton.Click += ValidateTemplateButton_Click;
+        BackToLibraryButton.Click += BackToLibraryButton_Click;
     }
-
-    public ListView TemplateVmListViewControl => TemplateVmListView;
-
-    public Button AddTemplateVmButtonControl => AddTemplateVmButton;
-
-    public Button RemoveTemplateVmButtonControl => RemoveTemplateVmButton;
-
-    public TextBlock TemplateVmIdTextBlockControl => TemplateVmIdTextBlock;
-
-    public TextBox TemplateVmNameTextBoxControl => TemplateVmNameTextBox;
-
-    public TextBox TemplateVmMemoryTextBoxControl => TemplateVmMemoryTextBox;
-
-    public TextBox TemplateVmCpuTextBoxControl => TemplateVmCpuTextBox;
-
-    public StackPanel TemplateVmSwitchRowsPanelControl => TemplateVmSwitchRowsPanel;
-
-    public Button AddTemplateVmSwitchRowButtonControl => AddTemplateVmSwitchRowButton;
-
-    public TextBlock TemplateVmSwitchGuidanceTextBlockControl => TemplateVmSwitchGuidanceTextBlock;
-
-    public TextBox TemplateVmVhdxIdTextBoxControl => TemplateVmVhdxIdTextBox;
-
-    public ComboBox TemplateVmVhdxCatalogComboBoxControl => TemplateVmVhdxCatalogComboBox;
-
-    public TextBlock TemplateVmVhdxGuidanceTextBlockControl => TemplateVmVhdxGuidanceTextBlock;
-
-    public TextBox TemplateVmVhdPathTextBoxControl => TemplateVmVhdPathTextBox;
-
-    public TextBox TemplateVmVhdxSignatureTextBoxControl => TemplateVmVhdxSignatureTextBox;
-
-    public Button ApplyTemplateVmChangesButtonControl => ApplyTemplateVmChangesButton;
-
-    public Button SaveTemplateButtonControl => SaveTemplateButton;
-
-    public Button SaveTemplateAsButtonControl => SaveTemplateAsButton;
-
-    public Button ValidateTemplateButtonControl => ValidateTemplateButton;
-
-    public Button BackToLibraryButtonControl => BackToLibraryButton;
 
     public TemplatesEditorDocumentHeaderInteractionState CaptureDocumentHeaderInteractionState()
     {
@@ -272,6 +246,41 @@ public sealed partial class TemplatesEditorView : UserControl
         }
 
         VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        AddVmRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
+    {
+        RemoveVmRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyTemplateVmChangesButton_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyVmChangesRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SaveTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        SaveRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SaveTemplateAsButton_Click(object sender, RoutedEventArgs e)
+    {
+        SaveAsRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ValidateTemplateButton_Click(object sender, RoutedEventArgs e)
+    {
+        ValidateRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void BackToLibraryButton_Click(object sender, RoutedEventArgs e)
+    {
+        BackToLibraryRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void AddTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)

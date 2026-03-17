@@ -205,14 +205,6 @@ public sealed partial class MainWindow : Window
     private Button DeployOnTheFlyOpenTemplateEditorButton => DeployOnTheFlyView.DeployOnTheFlyOpenTemplateEditorButtonControl;
     private Button DeployOnTheFlyStartButton => DeployOnTheFlyView.DeployOnTheFlyStartButtonControl;
     private TextBlock DeployOnTheFlyStatusTextBlock => DeployOnTheFlyView.DeployOnTheFlyStatusTextBlockControl;
-    private Button AddTemplateVmButton => TemplatesEditorView.AddTemplateVmButtonControl;
-    private Button RemoveTemplateVmButton => TemplatesEditorView.RemoveTemplateVmButtonControl;
-    private Button ApplyTemplateVmChangesButton => TemplatesEditorView.ApplyTemplateVmChangesButtonControl;
-    private Button SaveTemplateButton => TemplatesEditorView.SaveTemplateButtonControl;
-    private Button SaveTemplateAsButton => TemplatesEditorView.SaveTemplateAsButtonControl;
-    private Button ValidateTemplateButton => TemplatesEditorView.ValidateTemplateButtonControl;
-    private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
-    private VmTemplate? SelectedTemplateVmEntry => _templatesWorkspaceComposition.SelectedEditorVmEntry;
     private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
     private const string DeployOnTheFlyVhdxPlaceholder = "(Select base disk)";
     private const string DeployCapabilityKey = "deploy";
@@ -289,7 +281,8 @@ public sealed partial class MainWindow : Window
                     LoadTemplateEditorReferenceDataAsync,
                     PickTemplateFileForSaveAsync,
                     ShowRemoveTemplateVmConfirmationDialogAsync,
-                    NavigateToTemplatesEditor)),
+                    NavigateToTemplatesEditor,
+                    () => NavigateToRoute(ShellRouteKeys.TemplatesLibrary))),
             new TemplatesWorkspaceShellBridge(
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
@@ -298,7 +291,6 @@ public sealed partial class MainWindow : Window
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireDiagnosticsLogsHandlers();
-        WireTemplatesHandlers();
         WireDeployHandlers();
         WireOverviewHandlers();
         ConfigureShellIcons();
@@ -337,17 +329,6 @@ public sealed partial class MainWindow : Window
         ReloadLogsButton.Click += ReloadLogsButton_Click;
         OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
         StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
-    }
-
-    private void WireTemplatesHandlers()
-    {
-        SaveTemplateButton.Click += SaveTemplateButton_Click;
-        SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;
-        ValidateTemplateButton.Click += ValidateTemplateButton_Click;
-        BackToLibraryButton.Click += BackToLibraryButton_Click;
-        AddTemplateVmButton.Click += AddTemplateVmButton_Click;
-        RemoveTemplateVmButton.Click += RemoveTemplateVmButton_Click;
-        ApplyTemplateVmChangesButton.Click += ApplyTemplateVmChangesButton_Click;
     }
 
     private void WireDeployHandlers()
@@ -3276,27 +3257,6 @@ public sealed partial class MainWindow : Window
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
-    private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
-    {
-        _templatesWorkspaceComposition.AddEditorVmEntry();
-    }
-
-    private async void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
-    {
-        await _templatesWorkspaceComposition.RemoveSelectedEditorVmEntryAsync();
-    }
-
-    private void ApplyTemplateVmChangesButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedTemplateVmEntry is null)
-        {
-            SetTemplateEditorStatus("Select a VM entry first.");
-            return;
-        }
-
-        _templatesWorkspaceComposition.ApplySelectedEditorVmDraft(showSuccessStatus: true);
-    }
-
     private void SetTemplatesLoading(bool isLoading)
     {
         _isTemplatesLoading = isLoading;
@@ -3326,26 +3286,6 @@ public sealed partial class MainWindow : Window
                 .FirstOrDefault(item => string.Equals(item.FilePath, _selectedDeployTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
             DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
         }
-    }
-
-    private async void SaveTemplateButton_Click(object sender, RoutedEventArgs e)
-    {
-        await _templatesWorkspaceComposition.SaveEditorAsync();
-    }
-
-    private async void SaveTemplateAsButton_Click(object sender, RoutedEventArgs e)
-    {
-        await _templatesWorkspaceComposition.SaveEditorAsAsync();
-    }
-
-    private async void ValidateTemplateButton_Click(object sender, RoutedEventArgs e)
-    {
-        await _templatesWorkspaceComposition.ValidateEditorAsync();
-    }
-
-    private void BackToLibraryButton_Click(object sender, RoutedEventArgs e)
-    {
-        NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
     }
 
     private void InitializeRdpReadinessTimer()
