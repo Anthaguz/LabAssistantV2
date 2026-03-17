@@ -288,6 +288,7 @@ public sealed partial class MainWindow : Window
             DeployOverviewTabViewItem,
             DeployQuickDeployTabViewItem,
             DeployFromTemplateTabViewItem,
+            CreateDeployWorkspaceUiState,
             new DeployWorkspaceShellBridge(
                 () => IsDeployCapabilityActive,
                 () => IsDeployOverviewActive,
@@ -493,7 +494,6 @@ public sealed partial class MainWindow : Window
 
         QueueNavigationSelectionUpdate();
 
-        ApplyDeployWorkspaceUiState();
         _machinesWorkspaceComposition.ApplyShellState();
         _deployWorkspaceComposition.ApplyShellState();
         _assetsWorkspaceComposition.ApplyShellState();
@@ -930,7 +930,7 @@ public sealed partial class MainWindow : Window
         if (_deployOnTheFlyVmEntries.Count > 0)
         {
             SyncDeployOnTheFlyVmEntryRows();
-            ApplyDeployWorkspaceUiState();
+            _deployWorkspaceComposition.RefreshSharedUiState();
             if (_selectedDeployOnTheFlyVmEntry is null)
             {
                 _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyVmEntries[0];
@@ -943,7 +943,7 @@ public sealed partial class MainWindow : Window
         var entry = CreateDefaultDeployOnTheFlyVmEntry(1);
         _deployOnTheFlyVmEntries.Add(entry);
         SyncDeployOnTheFlyVmEntryRows();
-        ApplyDeployWorkspaceUiState();
+        _deployWorkspaceComposition.RefreshSharedUiState();
         _selectedDeployOnTheFlyVmEntry = entry;
         SelectDeployOnTheFlyVmEntry(entry);
     }
@@ -994,7 +994,7 @@ public sealed partial class MainWindow : Window
         }
 
         SyncDeployOnTheFlyVmEntryRows();
-        ApplyDeployWorkspaceUiState();
+        _deployWorkspaceComposition.RefreshSharedUiState();
 
         _selectedDeployOnTheFlyVmEntry = !string.IsNullOrWhiteSpace(previousSelectionId)
             ? _deployOnTheFlyVmEntries.FirstOrDefault(item => string.Equals(item.VmId, previousSelectionId, StringComparison.OrdinalIgnoreCase))
@@ -1778,7 +1778,7 @@ public sealed partial class MainWindow : Window
         var entry = CreateDefaultDeployOnTheFlyVmEntry(nextSequence);
         _deployOnTheFlyVmEntries.Add(entry);
         SyncDeployOnTheFlyVmEntryRows();
-        ApplyDeployWorkspaceUiState();
+        _deployWorkspaceComposition.RefreshSharedUiState();
         _selectedDeployOnTheFlyVmEntry = entry;
         SelectDeployOnTheFlyVmEntry(entry);
         _deployOnTheFlyReadinessReport = null;
@@ -1824,7 +1824,7 @@ public sealed partial class MainWindow : Window
 
         _deployOnTheFlyVmEntries.Remove(vmEntry);
         SyncDeployOnTheFlyVmEntryRows();
-        ApplyDeployWorkspaceUiState();
+        _deployWorkspaceComposition.RefreshSharedUiState();
         _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyVmEntries.FirstOrDefault();
         SelectDeployOnTheFlyVmEntry(_selectedDeployOnTheFlyVmEntry);
         _deployOnTheFlyReadinessReport = null;
@@ -2607,7 +2607,7 @@ public sealed partial class MainWindow : Window
         if (!forceRefresh && TemplatesLibraryItems.Count > 0)
         {
             DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
-            ApplyDeployWorkspaceUiState();
+            _deployWorkspaceComposition.RefreshSharedUiState();
             UpdateDeployUi();
             return;
         }
@@ -2616,7 +2616,7 @@ public sealed partial class MainWindow : Window
         _deployLifecycleState = "Loading";
         _deployProgressPercent = 0;
         _deployProgressSummary = "Loading templates...";
-        ApplyDeployWorkspaceUiState();
+        _deployWorkspaceComposition.RefreshSharedUiState();
         UpdateDeployUi();
         DeployActionStatusTextBlock.Text = "Loading templates for deploy...";
 
@@ -2655,7 +2655,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isDeployLoadingTemplates = false;
-            ApplyDeployWorkspaceUiState();
+            _deployWorkspaceComposition.RefreshSharedUiState();
             UpdateDeployUi();
         }
     }
@@ -3230,15 +3230,15 @@ public sealed partial class MainWindow : Window
             DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
         }
 
-        ApplyDeployWorkspaceUiState();
+        _deployWorkspaceComposition.RefreshSharedUiState();
     }
 
-    private void ApplyDeployWorkspaceUiState()
+    private DeployWorkspaceUiState CreateDeployWorkspaceUiState()
     {
-        _deployWorkspaceComposition.ApplyUiState(new DeployWorkspaceUiState(
+        return new DeployWorkspaceUiState(
             QuickDeployDraftCount: _deployOnTheFlyVmEntries.Count,
             IsLoadingTemplates: _isDeployLoadingTemplates,
-            AvailableTemplateCount: TemplatesLibraryItems.Count));
+            AvailableTemplateCount: TemplatesLibraryItems.Count);
     }
 
     private void InitializeRdpReadinessTimer()

@@ -62,6 +62,7 @@ internal sealed class DeployWorkspaceComposition
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _quickDeployTabViewItem;
     private readonly TabViewItem _fromTemplateTabViewItem;
+    private readonly Func<DeployWorkspaceUiState> _getUiState;
     private readonly IDeployWorkspaceShellBridge _shellBridge;
     private bool _isUpdatingDeploySubviewSelection;
     private DeployWorkspaceUiState _uiState;
@@ -75,6 +76,7 @@ internal sealed class DeployWorkspaceComposition
         TabViewItem overviewTabViewItem,
         TabViewItem quickDeployTabViewItem,
         TabViewItem fromTemplateTabViewItem,
+        Func<DeployWorkspaceUiState> getUiState,
         IDeployWorkspaceShellBridge shellBridge)
     {
         _localNavigationHost = localNavigationHost;
@@ -86,13 +88,14 @@ internal sealed class DeployWorkspaceComposition
         _overviewTabViewItem = overviewTabViewItem;
         _quickDeployTabViewItem = quickDeployTabViewItem;
         _fromTemplateTabViewItem = fromTemplateTabViewItem;
+        _getUiState = getUiState;
         _shellBridge = shellBridge;
         WireSharedHandlers();
     }
 
-    public void ApplyUiState(DeployWorkspaceUiState state)
+    public void RefreshSharedUiState()
     {
-        _uiState = state;
+        _uiState = _getUiState();
         if (_shellBridge.IsDeployOverviewActive)
         {
             UpdateOverviewUi();
@@ -107,11 +110,7 @@ internal sealed class DeployWorkspaceComposition
         _fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
 
         SyncDeploySubviewSelection();
-
-        if (_shellBridge.IsDeployOverviewActive)
-        {
-            UpdateOverviewUi();
-        }
+        RefreshSharedUiState();
     }
 
     private void WireSharedHandlers()

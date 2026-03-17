@@ -1320,14 +1320,16 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("DeployOverviewViewHost,", mainWindowSource);
         Assert.Contains("DeployOnTheFlyViewHost,", mainWindowSource);
         Assert.Contains("DeployFromTemplateViewHost,", mainWindowSource);
+        Assert.Contains("CreateDeployWorkspaceUiState,", mainWindowSource);
         Assert.Contains("new DeployWorkspaceShellBridge(", mainWindowSource);
-        Assert.Contains("ApplyDeployWorkspaceUiState();", mainWindowSource);
+        Assert.Contains("_deployWorkspaceComposition.RefreshSharedUiState();", mainWindowSource);
         Assert.Contains("_deployWorkspaceComposition.ApplyShellState();", mainWindowSource);
 
         Assert.DoesNotContain("private bool _isUpdatingDeploySubviewSelection;", mainWindowSource);
         Assert.DoesNotContain("private void DeploySubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)", mainWindowSource);
         Assert.DoesNotContain("private void SyncDeploySubviewSelection()", mainWindowSource);
         Assert.DoesNotContain("private void UpdateDeployOverviewUi()", mainWindowSource);
+        Assert.DoesNotContain("private void ApplyDeployWorkspaceUiState()", mainWindowSource);
         Assert.DoesNotContain("DeployLocalNavPanel.Visibility = IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
         Assert.DoesNotContain("DeployOverviewPanel.Visibility = IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
         Assert.DoesNotContain("DeployFromTemplatePanel.Visibility = IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
@@ -1347,16 +1349,19 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly FrameworkElement _onTheFlyHost;", compositionSource);
         Assert.Contains("private readonly FrameworkElement _fromTemplateHost;", compositionSource);
         Assert.Contains("private readonly DeployOverviewView _overviewView;", compositionSource);
+        Assert.Contains("private readonly Func<DeployWorkspaceUiState> _getUiState;", compositionSource);
         Assert.Contains("private readonly IDeployWorkspaceShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingDeploySubviewSelection;", compositionSource);
         Assert.Contains("private DeployWorkspaceUiState _uiState;", compositionSource);
-        Assert.Contains("public void ApplyUiState(DeployWorkspaceUiState state)", compositionSource);
+        Assert.Contains("public void RefreshSharedUiState()", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_overviewHost.Visibility = _shellBridge.IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", compositionSource);
+        Assert.Contains("_uiState = _getUiState();", compositionSource);
+        Assert.Contains("RefreshSharedUiState();", compositionSource);
         Assert.Contains("_overviewView.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
         Assert.Contains("_overviewView.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", compositionSource);
         Assert.Contains("_overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _uiState.QuickDeployDraftCount > 0", compositionSource);
@@ -1371,6 +1376,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("EvaluateDeployOnTheFlyReadinessAsync", compositionSource);
         Assert.DoesNotContain("UpdateDeployUi()", compositionSource);
         Assert.DoesNotContain("UpdateDeployOnTheFlyUi()", compositionSource);
+        Assert.DoesNotContain("public void ApplyUiState(DeployWorkspaceUiState state)", compositionSource);
         Assert.DoesNotContain("internal interface IDeployWorkspaceHost", compositionSource);
         Assert.DoesNotContain("internal sealed class DeployWorkspaceHost", compositionSource);
     }
