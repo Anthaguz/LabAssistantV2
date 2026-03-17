@@ -128,8 +128,8 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("x:Name=\"DeployOverviewOpenQuickDeployButton\"", deployOverviewSource);
         Assert.Contains("x:Name=\"DeployOverviewOpenFromTemplateButton\"", deployOverviewSource);
-        Assert.Contains("_view.DeployOverviewOpenQuickDeployButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", deployOverviewCompositionSource);
-        Assert.Contains("_view.DeployOverviewOpenFromTemplateButtonControl.Click += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", deployOverviewCompositionSource);
+        Assert.Contains("_view.OpenQuickDeployRequested += OpenQuickDeployRequested;", deployOverviewCompositionSource);
+        Assert.Contains("_view.OpenFromTemplateRequested += OpenFromTemplateRequested;", deployOverviewCompositionSource);
 
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenLogsButton\"", diagnosticsOverviewSource);
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenSupportExportButton\"", diagnosticsOverviewSource);

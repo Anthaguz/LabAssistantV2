@@ -40,6 +40,7 @@
                     <Button
                         x:Name="DeployOverviewOpenQuickDeployButton"
                         HorizontalAlignment="Left"
+                        Click="DeployOverviewOpenQuickDeployButton_Click"
                         Content="Open Quick Deploy" />
                 </StackPanel>
             </Border>
@@ -64,6 +65,7 @@
                     <Button
                         x:Name="DeployOverviewOpenFromTemplateButton"
                         HorizontalAlignment="Left"
+                        Click="DeployOverviewOpenFromTemplateButton_Click"
                         Content="Open From Template" />
                 </StackPanel>
             </Border>
