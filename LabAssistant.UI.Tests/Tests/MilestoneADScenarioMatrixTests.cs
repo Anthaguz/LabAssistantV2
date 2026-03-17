@@ -79,6 +79,8 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.DoesNotContain("public Button OpenTemplateInEditorButtonControl =>", libraryViewSource);
         Assert.Contains("new TemplatesEditorWorkspaceComposition(", source);
         Assert.Contains("new TemplatesEditorWorkspaceHost(", source);
+        Assert.Contains("LoadTemplateEditorReferenceDataAsync,", source);
+        Assert.Contains("NavigateToTemplatesEditor", source);
         Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsync();", source);
         Assert.Contains("await _templatesWorkspaceComposition.SaveEditorAsAsync();", source);
         Assert.Contains("await _templatesWorkspaceComposition.ValidateEditorAsync();", source);

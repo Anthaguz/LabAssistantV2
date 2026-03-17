@@ -212,9 +212,7 @@ public sealed partial class MainWindow : Window
     private Button SaveTemplateAsButton => TemplatesEditorView.SaveTemplateAsButtonControl;
     private Button ValidateTemplateButton => TemplatesEditorView.ValidateTemplateButtonControl;
     private Button BackToLibraryButton => TemplatesEditorView.BackToLibraryButtonControl;
-    private IReadOnlyList<VmTemplate> TemplateVmEntries => _templatesWorkspaceComposition.EditorVmEntries;
     private VmTemplate? SelectedTemplateVmEntry => _templatesWorkspaceComposition.SelectedEditorVmEntry;
-    private TemplateEditorDocument? ActiveTemplateEditorDocument => _templatesWorkspaceComposition.ActiveEditorDocument;
     private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
     private const string DeployOnTheFlyVhdxPlaceholder = "(Select base disk)";
     private const string DeployCapabilityKey = "deploy";
@@ -288,8 +286,10 @@ public sealed partial class MainWindow : Window
                     SetTemplatesLoading,
                     ApplyTemplatesWorkspaceUiState,
                     EnsureTemplatesLibraryAsync,
+                    LoadTemplateEditorReferenceDataAsync,
                     PickTemplateFileForSaveAsync,
-                    ShowRemoveTemplateVmConfirmationDialogAsync)),
+                    ShowRemoveTemplateVmConfirmationDialogAsync,
+                    NavigateToTemplatesEditor)),
             new TemplatesWorkspaceShellBridge(
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
@@ -2037,7 +2037,7 @@ public sealed partial class MainWindow : Window
         await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
     }
 
-    private void DeployOnTheFlyOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
+    private async void DeployOnTheFlyOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
     {
         if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: false) && _selectedDeployOnTheFlyVmEntry is not null)
         {
@@ -2050,14 +2050,11 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _templatesWorkspaceComposition.SetEditorDocument(new TemplateEditorDocument
+        await _templatesWorkspaceComposition.ShowEditorDocumentAsync(new TemplateEditorDocument
         {
             Template = BuildOnTheFlyTemplate(),
             SourceFilePath = null
-        });
-        BindTemplateEditorDocument();
-        SetTemplateEditorStatus("Opened quick deploy configuration in Templates editor.");
-        NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+        }, "Opened quick deploy configuration in Templates editor.");
         DeployOnTheFlyStatusTextBlock.Text = "Opened quick deploy configuration in Templates editor.";
     }
 
@@ -3162,18 +3159,6 @@ public sealed partial class MainWindow : Window
         await _templatesWorkspaceComposition.EnsureLibraryAsync(forceRefresh);
     }
 
-    private void BindTemplateEditorDocument()
-    {
-        _templatesWorkspaceComposition.SetEditorDocument(ActiveTemplateEditorDocument);
-        if (ActiveTemplateEditorDocument is null)
-        {
-            ApplyTemplatesWorkspaceUiState();
-            return;
-        }
-
-        ApplyTemplatesWorkspaceUiState();
-    }
-
     private async Task EnsureTemplateSwitchesAsync(bool forceRefresh)
     {
         if (!forceRefresh && _templateAvailableSwitches.Count > 0)
@@ -3196,6 +3181,13 @@ public sealed partial class MainWindow : Window
         }
 
         _templatesWorkspaceComposition.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+    }
+
+    private async Task<TemplatesEditorReferenceData> LoadTemplateEditorReferenceDataAsync(bool forceRefresh)
+    {
+        await EnsureTemplateSwitchesAsync(forceRefresh);
+        await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh);
+        return new TemplatesEditorReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
     }
 
     private async Task EnsureTemplateVhdxCatalogOptionsAsync(bool forceRefresh)
@@ -3231,11 +3223,6 @@ public sealed partial class MainWindow : Window
 
     private void SyncTemplateVmEntriesToDocument()
     {
-        if (ActiveTemplateEditorDocument is null)
-        {
-            return;
-        }
-
         _templatesWorkspaceComposition.SyncEditorVmEntriesToDocument();
     }
 
@@ -3292,13 +3279,11 @@ public sealed partial class MainWindow : Window
     private void AddTemplateVmButton_Click(object sender, RoutedEventArgs e)
     {
         _templatesWorkspaceComposition.AddEditorVmEntry();
-        ApplyTemplatesWorkspaceUiState();
     }
 
     private async void RemoveTemplateVmButton_Click(object sender, RoutedEventArgs e)
     {
         await _templatesWorkspaceComposition.RemoveSelectedEditorVmEntryAsync();
-        ApplyTemplatesWorkspaceUiState();
     }
 
     private void ApplyTemplateVmChangesButton_Click(object sender, RoutedEventArgs e)
@@ -3310,7 +3295,6 @@ public sealed partial class MainWindow : Window
         }
 
         _templatesWorkspaceComposition.ApplySelectedEditorVmDraft(showSuccessStatus: true);
-        ApplyTemplatesWorkspaceUiState();
     }
 
     private void SetTemplatesLoading(bool isLoading)
@@ -3319,14 +3303,14 @@ public sealed partial class MainWindow : Window
         ApplyTemplatesWorkspaceUiState();
     }
 
+    private void NavigateToTemplatesEditor()
+    {
+        NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+    }
+
     private async Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText)
     {
-        _templatesWorkspaceComposition.SetEditorDocument(document);
-        await EnsureTemplateSwitchesAsync(forceRefresh: false);
-        await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: false);
-        BindTemplateEditorDocument();
-        SetTemplateEditorStatus(statusText);
-        NavigateToRoute(ShellRouteKeys.TemplatesEditor);
+        await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);
     }
 
     private void SetTemplateEditorStatus(string statusText)

@@ -74,11 +74,9 @@ internal sealed class TemplatesWorkspaceComposition
 
     public Task EnsureLibraryAsync(bool forceRefresh) => _libraryComposition.EnsureLibraryAsync(forceRefresh);
 
-    public void SetEditorDocument(TemplateEditorDocument? document) => _editorComposition.SetDocument(document);
+    public Task ShowEditorDocumentAsync(TemplateEditorDocument document, string statusText) => _editorComposition.ShowDocumentAsync(document, statusText);
 
     public void SetEditorStatus(string statusText) => _editorComposition.SetStatus(statusText);
-
-    public void SetEditorVmCount(int vmCount) => _editorComposition.SetVmCount(vmCount);
 
     public TemplatesEditorDocumentHeaderInteractionState CaptureEditorDocumentHeaderState() => _editorComposition.CaptureDocumentHeaderState();
 
@@ -115,7 +113,7 @@ internal sealed class TemplatesWorkspaceComposition
     public void ApplyUiState(TemplatesWorkspaceUiState state)
     {
         _libraryComposition.ApplyUiState(state.IsLoading, state.HasSelectedLibraryItem);
-        _editorComposition.ApplyActionState(isLoading: state.IsLoading);
+        _editorComposition.RefreshUiState();
     }
 }
 
