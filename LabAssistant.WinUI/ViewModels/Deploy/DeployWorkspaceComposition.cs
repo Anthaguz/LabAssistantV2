@@ -18,15 +18,6 @@ internal interface IDeployWorkspaceShellBridge
     void NavigateToRoute(string routeKey);
 }
 
-internal interface IDeployWorkspaceHost
-{
-    int QuickDeployDraftCount { get; }
-
-    bool IsLoadingTemplates { get; }
-
-    int AvailableTemplateCount { get; }
-}
-
 internal sealed class DeployWorkspaceShellBridge : IDeployWorkspaceShellBridge
 {
     private readonly Func<bool> _isDeployCapabilityActive;
@@ -60,29 +51,6 @@ internal sealed class DeployWorkspaceShellBridge : IDeployWorkspaceShellBridge
     public void NavigateToRoute(string routeKey) => _navigateToRoute(routeKey);
 }
 
-internal sealed class DeployWorkspaceHost : IDeployWorkspaceHost
-{
-    private readonly Func<int> _quickDeployDraftCount;
-    private readonly Func<bool> _isLoadingTemplates;
-    private readonly Func<int> _availableTemplateCount;
-
-    public DeployWorkspaceHost(
-        Func<int> quickDeployDraftCount,
-        Func<bool> isLoadingTemplates,
-        Func<int> availableTemplateCount)
-    {
-        _quickDeployDraftCount = quickDeployDraftCount;
-        _isLoadingTemplates = isLoadingTemplates;
-        _availableTemplateCount = availableTemplateCount;
-    }
-
-    public int QuickDeployDraftCount => _quickDeployDraftCount();
-
-    public bool IsLoadingTemplates => _isLoadingTemplates();
-
-    public int AvailableTemplateCount => _availableTemplateCount();
-}
-
 internal sealed class DeployWorkspaceComposition
 {
     private readonly FrameworkElement _localNavigationHost;
@@ -94,9 +62,9 @@ internal sealed class DeployWorkspaceComposition
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _quickDeployTabViewItem;
     private readonly TabViewItem _fromTemplateTabViewItem;
-    private readonly IDeployWorkspaceHost _host;
     private readonly IDeployWorkspaceShellBridge _shellBridge;
     private bool _isUpdatingDeploySubviewSelection;
+    private DeployWorkspaceUiState _uiState;
 
     public DeployWorkspaceComposition(
         FrameworkElement localNavigationHost,
@@ -107,7 +75,6 @@ internal sealed class DeployWorkspaceComposition
         TabViewItem overviewTabViewItem,
         TabViewItem quickDeployTabViewItem,
         TabViewItem fromTemplateTabViewItem,
-        IDeployWorkspaceHost host,
         IDeployWorkspaceShellBridge shellBridge)
     {
         _localNavigationHost = localNavigationHost;
@@ -119,9 +86,17 @@ internal sealed class DeployWorkspaceComposition
         _overviewTabViewItem = overviewTabViewItem;
         _quickDeployTabViewItem = quickDeployTabViewItem;
         _fromTemplateTabViewItem = fromTemplateTabViewItem;
-        _host = host;
         _shellBridge = shellBridge;
         WireSharedHandlers();
+    }
+
+    public void ApplyUiState(DeployWorkspaceUiState state)
+    {
+        _uiState = state;
+        if (_shellBridge.IsDeployOverviewActive)
+        {
+            UpdateOverviewUi();
+        }
     }
 
     public void ApplyShellState()
@@ -198,13 +173,18 @@ internal sealed class DeployWorkspaceComposition
 
     private void UpdateOverviewUi()
     {
-        _overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _host.QuickDeployDraftCount > 0
-            ? $"{_host.QuickDeployDraftCount} VM entries currently staged in the Quick Deploy draft."
+        _overviewView.DeployOverviewQuickDeploySummaryTextBlockControl.Text = _uiState.QuickDeployDraftCount > 0
+            ? $"{_uiState.QuickDeployDraftCount} VM entries currently staged in the Quick Deploy draft."
             : "Open Quick Deploy to configure VM entries and run deployment.";
-        _overviewView.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _host.IsLoadingTemplates
+        _overviewView.DeployOverviewFromTemplateSummaryTextBlockControl.Text = _uiState.IsLoadingTemplates
             ? "Template inventory is loading."
-            : _host.AvailableTemplateCount > 0
-                ? $"{_host.AvailableTemplateCount} templates currently available for From Template."
+            : _uiState.AvailableTemplateCount > 0
+                ? $"{_uiState.AvailableTemplateCount} templates currently available for From Template."
                 : "Open From Template to load template inventory and review readiness.";
     }
 }
+
+internal readonly record struct DeployWorkspaceUiState(
+    int QuickDeployDraftCount,
+    bool IsLoadingTemplates,
+    int AvailableTemplateCount);

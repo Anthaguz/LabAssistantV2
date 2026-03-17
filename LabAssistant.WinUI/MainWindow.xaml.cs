@@ -288,10 +288,6 @@ public sealed partial class MainWindow : Window
             DeployOverviewTabViewItem,
             DeployQuickDeployTabViewItem,
             DeployFromTemplateTabViewItem,
-            new DeployWorkspaceHost(
-                () => _deployOnTheFlyVmEntries.Count,
-                () => _isDeployLoadingTemplates,
-                () => TemplatesLibraryItems.Count),
             new DeployWorkspaceShellBridge(
                 () => IsDeployCapabilityActive,
                 () => IsDeployOverviewActive,
@@ -497,6 +493,7 @@ public sealed partial class MainWindow : Window
 
         QueueNavigationSelectionUpdate();
 
+        ApplyDeployWorkspaceUiState();
         _machinesWorkspaceComposition.ApplyShellState();
         _deployWorkspaceComposition.ApplyShellState();
         _assetsWorkspaceComposition.ApplyShellState();
@@ -933,6 +930,7 @@ public sealed partial class MainWindow : Window
         if (_deployOnTheFlyVmEntries.Count > 0)
         {
             SyncDeployOnTheFlyVmEntryRows();
+            ApplyDeployWorkspaceUiState();
             if (_selectedDeployOnTheFlyVmEntry is null)
             {
                 _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyVmEntries[0];
@@ -945,6 +943,7 @@ public sealed partial class MainWindow : Window
         var entry = CreateDefaultDeployOnTheFlyVmEntry(1);
         _deployOnTheFlyVmEntries.Add(entry);
         SyncDeployOnTheFlyVmEntryRows();
+        ApplyDeployWorkspaceUiState();
         _selectedDeployOnTheFlyVmEntry = entry;
         SelectDeployOnTheFlyVmEntry(entry);
     }
@@ -995,6 +994,7 @@ public sealed partial class MainWindow : Window
         }
 
         SyncDeployOnTheFlyVmEntryRows();
+        ApplyDeployWorkspaceUiState();
 
         _selectedDeployOnTheFlyVmEntry = !string.IsNullOrWhiteSpace(previousSelectionId)
             ? _deployOnTheFlyVmEntries.FirstOrDefault(item => string.Equals(item.VmId, previousSelectionId, StringComparison.OrdinalIgnoreCase))
@@ -1778,6 +1778,7 @@ public sealed partial class MainWindow : Window
         var entry = CreateDefaultDeployOnTheFlyVmEntry(nextSequence);
         _deployOnTheFlyVmEntries.Add(entry);
         SyncDeployOnTheFlyVmEntryRows();
+        ApplyDeployWorkspaceUiState();
         _selectedDeployOnTheFlyVmEntry = entry;
         SelectDeployOnTheFlyVmEntry(entry);
         _deployOnTheFlyReadinessReport = null;
@@ -1823,6 +1824,7 @@ public sealed partial class MainWindow : Window
 
         _deployOnTheFlyVmEntries.Remove(vmEntry);
         SyncDeployOnTheFlyVmEntryRows();
+        ApplyDeployWorkspaceUiState();
         _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyVmEntries.FirstOrDefault();
         SelectDeployOnTheFlyVmEntry(_selectedDeployOnTheFlyVmEntry);
         _deployOnTheFlyReadinessReport = null;
@@ -2605,6 +2607,7 @@ public sealed partial class MainWindow : Window
         if (!forceRefresh && TemplatesLibraryItems.Count > 0)
         {
             DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
+            ApplyDeployWorkspaceUiState();
             UpdateDeployUi();
             return;
         }
@@ -2613,6 +2616,7 @@ public sealed partial class MainWindow : Window
         _deployLifecycleState = "Loading";
         _deployProgressPercent = 0;
         _deployProgressSummary = "Loading templates...";
+        ApplyDeployWorkspaceUiState();
         UpdateDeployUi();
         DeployActionStatusTextBlock.Text = "Loading templates for deploy...";
 
@@ -2651,6 +2655,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isDeployLoadingTemplates = false;
+            ApplyDeployWorkspaceUiState();
             UpdateDeployUi();
         }
     }
@@ -3224,6 +3229,16 @@ public sealed partial class MainWindow : Window
                 .FirstOrDefault(item => string.Equals(item.FilePath, _selectedDeployTemplateLibraryItem.FilePath, StringComparison.OrdinalIgnoreCase));
             DeployTemplateSelectorComboBox.SelectedItem = _selectedDeployTemplateLibraryItem;
         }
+
+        ApplyDeployWorkspaceUiState();
+    }
+
+    private void ApplyDeployWorkspaceUiState()
+    {
+        _deployWorkspaceComposition.ApplyUiState(new DeployWorkspaceUiState(
+            QuickDeployDraftCount: _deployOnTheFlyVmEntries.Count,
+            IsLoadingTemplates: _isDeployLoadingTemplates,
+            AvailableTemplateCount: TemplatesLibraryItems.Count));
     }
 
     private void InitializeRdpReadinessTimer()
