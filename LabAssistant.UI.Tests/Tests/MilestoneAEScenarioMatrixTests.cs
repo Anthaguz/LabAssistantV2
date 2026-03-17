@@ -32,9 +32,8 @@ public sealed class MilestoneAEScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_DefinesSwitchSelectorRows_ValidationAndGuidancePaths()
+    public void TemplatesEditor_PreservesSwitchSelectorValidationAndGuidancePaths()
     {
-        var source = LoadMainWindowSource();
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
         var editorControllerSource = LoadTemplatesEditorWorkspaceControllerSource();
         var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
@@ -64,7 +63,7 @@ public sealed class MilestoneAEScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_DefinesCatalogFirstVhdxSelector_WithLegacyGuidance()
+    public void TemplatesEditor_PreservesCatalogFirstVhdxSelector_WithLegacyGuidance()
     {
         var source = LoadMainWindowSource();
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
