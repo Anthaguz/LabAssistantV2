@@ -1747,10 +1747,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];", mainWindowSource);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();", mainWindowSource);
         Assert.Contains("DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyWorkspace.VmEntryRows;", mainWindowSource);
-        Assert.Contains("_selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.EnsureSeeded(", mainWindowSource);
-        Assert.Contains("_selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.ReplaceEntriesFromTemplate(", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.EnsureSeeded(", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ReplaceEntriesFromTemplate(", mainWindowSource);
         Assert.Contains("var entry = _deployOnTheFlyWorkspace.AddVmEntry();", mainWindowSource);
-        Assert.Contains("_selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.RemoveVmEntry(vmEntry);", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.RemoveVmEntry(vmEntry);", mainWindowSource);
         Assert.Contains("QuickDeployDraftCount: _deployOnTheFlyWorkspace.VmEntryCount,", mainWindowSource);
 
         Assert.Contains("_onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", deployWorkspaceCompositionSource);
@@ -1768,6 +1768,50 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public VmTemplate? ReplaceEntriesFromTemplate(LabTemplate template, string? selectedVmId)", onTheFlyWorkspaceSource);
         Assert.Contains("public void RefreshVmEntryRows()", onTheFlyWorkspaceSource);
         Assert.Contains("public DeployOnTheFlyVmEntryRow? FindRow(VmTemplate? vmEntry)", onTheFlyWorkspaceSource);
+    }
+
+    [Fact]
+    public void DeployOnTheFly_UsesLocalSelectionAndEditorDraftStateSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
+
+        Assert.DoesNotContain("private VmTemplate? _selectedDeployOnTheFlyVmEntry;", mainWindowSource);
+        Assert.DoesNotContain("private bool _isUpdatingDeployOnTheFlyEditor;", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.SetSelectedVmEntry(", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.BeginEditorDraftSync();", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.EndEditorDraftSync();", mainWindowSource);
+        Assert.Contains("DeployOnTheFlyVmNameTextBox.Text = _deployOnTheFlyWorkspace.EditorVmNameDraft;", mainWindowSource);
+        Assert.Contains("DeployOnTheFlyVmMemoryTextBox.Text = _deployOnTheFlyWorkspace.EditorVmMemoryDraft;", mainWindowSource);
+        Assert.Contains("DeployOnTheFlyVmCpuTextBox.Text = _deployOnTheFlyWorkspace.EditorVmCpuDraft;", mainWindowSource);
+        Assert.Contains("UpdateDeployOnTheFlySelectorsFromDraft()", mainWindowSource);
+        Assert.Contains("SyncDeployOnTheFlyEditorDraftFromControls();", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.UpdateEditorDraft(", mainWindowSource);
+        Assert.Contains("var previousName = _deployOnTheFlyWorkspace.ApplyEditorDraftToSelectedVm();", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.SelectedVmEntry is not null", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft", mainWindowSource);
+
+        Assert.DoesNotContain("DeployOnTheFlyWorkspaceViewModel", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("SelectedVmEntry", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("EditorVmNameDraft", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("IsSynchronizingEditorDraft", deployWorkspaceCompositionSource);
+
+        Assert.Contains("public VmTemplate? SelectedVmEntry { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public string EditorVmNameDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);
+        Assert.Contains("public string EditorVmMemoryDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);
+        Assert.Contains("public string EditorVmCpuDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);
+        Assert.Contains("public string? EditorSwitchNameDraft { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public string? EditorVhdxIdDraft { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public string? EditorVhdPathDraft { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public string? EditorVhdxSignatureDraft { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public bool IsSynchronizingEditorDraft { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public void SetSelectedVmEntry(VmTemplate? vmEntry)", onTheFlyWorkspaceSource);
+        Assert.Contains("public void BeginEditorDraftSync()", onTheFlyWorkspaceSource);
+        Assert.Contains("public void EndEditorDraftSync()", onTheFlyWorkspaceSource);
+        Assert.Contains("public void UpdateEditorDraft(", onTheFlyWorkspaceSource);
+        Assert.Contains("public string? ApplyEditorDraftToSelectedVm()", onTheFlyWorkspaceSource);
+        Assert.Contains("private void LoadEditorDraftFromSelection()", onTheFlyWorkspaceSource);
     }
 
     [Fact]
