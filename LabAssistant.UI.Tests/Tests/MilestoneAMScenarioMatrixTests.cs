@@ -1815,6 +1815,44 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void DeployOnTheFly_UsesLocalReadinessStateSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
+
+        Assert.DoesNotContain("private readonly List<DeployCompatibilityIssue> _deployOnTheFlyCompatibilityIssues = [];", mainWindowSource);
+        Assert.DoesNotContain("private DeploymentReadinessReport? _deployOnTheFlyReadinessReport;", mainWindowSource);
+        Assert.DoesNotContain("private bool _isDeployOnTheFlyEvaluatingReadiness;", mainWindowSource);
+        Assert.DoesNotContain("private string _deployOnTheFlyReadinessSummary = \"Readiness has not been evaluated.\";", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ReadinessReport is null", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.IsEvaluatingReadiness", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.BeginReadinessEvaluation();", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ApplyReadinessResult(", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.SetReadinessEvaluationFailed(\"Readiness evaluation failed.\");", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ClearReadinessState(\"Readiness has not been evaluated.\");", mainWindowSource);
+        Assert.Contains("var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ReadinessSummaryText", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.CompatibilityIssues", mainWindowSource);
+
+        Assert.DoesNotContain("DeployOnTheFlyWorkspaceViewModel", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("ReadinessReport", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("CompatibilityIssues", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("HasBlockingFailures", deployWorkspaceCompositionSource);
+
+        Assert.Contains("public IReadOnlyList<DeployCompatibilityIssue> CompatibilityIssues => _compatibilityIssues;", onTheFlyWorkspaceSource);
+        Assert.Contains("public DeploymentReadinessReport? ReadinessReport { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public bool IsEvaluatingReadiness { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public string ReadinessSummaryText { get; private set; } = \"Readiness has not been evaluated.\";", onTheFlyWorkspaceSource);
+        Assert.Contains("public bool HasBlockingFailures =>", onTheFlyWorkspaceSource);
+        Assert.Contains("private readonly List<DeployCompatibilityIssue> _compatibilityIssues = [];", onTheFlyWorkspaceSource);
+        Assert.Contains("public void BeginReadinessEvaluation()", onTheFlyWorkspaceSource);
+        Assert.Contains("public void ApplyReadinessResult(", onTheFlyWorkspaceSource);
+        Assert.Contains("public void ClearReadinessState(string readinessSummaryText)", onTheFlyWorkspaceSource);
+        Assert.Contains("public void SetReadinessEvaluationFailed(string readinessSummaryText)", onTheFlyWorkspaceSource);
+    }
+
+    [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
