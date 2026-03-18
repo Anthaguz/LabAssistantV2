@@ -13,6 +13,24 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
 
     public int VmEntryCount => VmEntries.Count;
 
+    public VmTemplate? SelectedVmEntry { get; private set; }
+
+    public string EditorVmNameDraft { get; private set; } = string.Empty;
+
+    public string EditorVmMemoryDraft { get; private set; } = string.Empty;
+
+    public string EditorVmCpuDraft { get; private set; } = string.Empty;
+
+    public string? EditorSwitchNameDraft { get; private set; }
+
+    public string? EditorVhdxIdDraft { get; private set; }
+
+    public string? EditorVhdPathDraft { get; private set; }
+
+    public string? EditorVhdxSignatureDraft { get; private set; }
+
+    public bool IsSynchronizingEditorDraft { get; private set; }
+
     public VmTemplate EnsureSeeded(string? selectedVmId)
     {
         if (VmEntries.Count == 0)
@@ -21,7 +39,9 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         }
 
         RefreshVmEntryRows();
-        return ResolveSelection(selectedVmId) ?? VmEntries[0];
+        SelectedVmEntry = ResolveSelection(selectedVmId) ?? VmEntries[0];
+        LoadEditorDraftFromSelection();
+        return SelectedVmEntry;
     }
 
     public VmTemplate AddVmEntry()
@@ -29,6 +49,8 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         var entry = CreateDefaultVmEntry(VmEntries.Count + 1);
         VmEntries.Add(entry);
         RefreshVmEntryRows();
+        SelectedVmEntry = entry;
+        LoadEditorDraftFromSelection();
         return entry;
     }
 
@@ -36,7 +58,9 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
     {
         VmEntries.Remove(vmEntry);
         RefreshVmEntryRows();
-        return VmEntries.FirstOrDefault();
+        SelectedVmEntry = VmEntries.FirstOrDefault();
+        LoadEditorDraftFromSelection();
+        return SelectedVmEntry;
     }
 
     public VmTemplate? ReplaceEntriesFromTemplate(LabTemplate template, string? selectedVmId)
@@ -48,7 +72,9 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         }
 
         RefreshVmEntryRows();
-        return ResolveSelection(selectedVmId) ?? VmEntries.FirstOrDefault();
+        SelectedVmEntry = ResolveSelection(selectedVmId) ?? VmEntries.FirstOrDefault();
+        LoadEditorDraftFromSelection();
+        return SelectedVmEntry;
     }
 
     public IReadOnlyList<VmTemplate> CreateTemplateSnapshot() => VmEntries.Select(CloneVmTemplate).ToList();
@@ -89,11 +115,101 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
             : VmEntryRows.FirstOrDefault(row => ReferenceEquals(row.VmEntry, vmEntry));
     }
 
+    public void SetSelectedVmEntry(VmTemplate? vmEntry)
+    {
+        SelectedVmEntry = vmEntry;
+        LoadEditorDraftFromSelection();
+    }
+
+    public void BeginEditorDraftSync()
+    {
+        IsSynchronizingEditorDraft = true;
+    }
+
+    public void EndEditorDraftSync()
+    {
+        IsSynchronizingEditorDraft = false;
+    }
+
+    public void UpdateEditorDraft(
+        string? vmName,
+        string? memoryText,
+        string? cpuText,
+        string? selectedSwitchName,
+        string? selectedVhdxId,
+        string? selectedVhdPath,
+        string? selectedVhdxSignature)
+    {
+        EditorVmNameDraft = vmName ?? string.Empty;
+        EditorVmMemoryDraft = memoryText ?? string.Empty;
+        EditorVmCpuDraft = cpuText ?? string.Empty;
+        EditorSwitchNameDraft = NormalizeValue(selectedSwitchName);
+        EditorVhdxIdDraft = NormalizeValue(selectedVhdxId);
+        EditorVhdPathDraft = NormalizeValue(selectedVhdPath);
+        EditorVhdxSignatureDraft = NormalizeValue(selectedVhdxSignature);
+    }
+
+    public string? ApplyEditorDraftToSelectedVm()
+    {
+        if (SelectedVmEntry is null)
+        {
+            return null;
+        }
+
+        var previousName = SelectedVmEntry.Name;
+        SelectedVmEntry.Name = EditorVmNameDraft.Trim();
+        SelectedVmEntry.MemoryMb = int.Parse(EditorVmMemoryDraft);
+        SelectedVmEntry.CpuCount = int.Parse(EditorVmCpuDraft);
+        SelectedVmEntry.SwitchName = EditorSwitchNameDraft;
+        SelectedVmEntry.SwitchNames = string.IsNullOrWhiteSpace(EditorSwitchNameDraft)
+            ? null
+            : [EditorSwitchNameDraft];
+        SelectedVmEntry.VhdxId = EditorVhdxIdDraft;
+        SelectedVmEntry.VhdPath = EditorVhdPathDraft;
+        SelectedVmEntry.VhdxSignature = EditorVhdxSignatureDraft;
+        return previousName;
+    }
+
+    public void SetSelectedVhdDraft(string? selectedVhdxId, string? selectedVhdPath, string? selectedVhdxSignature)
+    {
+        EditorVhdxIdDraft = NormalizeValue(selectedVhdxId);
+        EditorVhdPathDraft = NormalizeValue(selectedVhdPath);
+        EditorVhdxSignatureDraft = NormalizeValue(selectedVhdxSignature);
+    }
+
     private VmTemplate? ResolveSelection(string? selectedVmId)
     {
         return string.IsNullOrWhiteSpace(selectedVmId)
             ? null
             : VmEntries.FirstOrDefault(item => string.Equals(item.VmId, selectedVmId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void LoadEditorDraftFromSelection()
+    {
+        if (SelectedVmEntry is null)
+        {
+            EditorVmNameDraft = string.Empty;
+            EditorVmMemoryDraft = string.Empty;
+            EditorVmCpuDraft = string.Empty;
+            EditorSwitchNameDraft = null;
+            EditorVhdxIdDraft = null;
+            EditorVhdPathDraft = null;
+            EditorVhdxSignatureDraft = null;
+            return;
+        }
+
+        EditorVmNameDraft = SelectedVmEntry.Name;
+        EditorVmMemoryDraft = SelectedVmEntry.MemoryMb.ToString();
+        EditorVmCpuDraft = SelectedVmEntry.CpuCount.ToString();
+        EditorSwitchNameDraft = NormalizeValue(SelectedVmEntry.SwitchNames?.FirstOrDefault() ?? SelectedVmEntry.SwitchName);
+        EditorVhdxIdDraft = NormalizeValue(SelectedVmEntry.VhdxId);
+        EditorVhdPathDraft = NormalizeValue(SelectedVmEntry.VhdPath);
+        EditorVhdxSignatureDraft = NormalizeValue(SelectedVmEntry.VhdxSignature);
+    }
+
+    private static string? NormalizeValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static VmTemplate CreateDefaultVmEntry(int sequence)
