@@ -355,10 +355,31 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Expected:**
   - Shared `TemplatesWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of Templates-local workflow/state ownership.
   - `templates.library` remains the stable/default Templates surface, while `templates.editor` remains an explicit workflow-state destination.
-  - `TemplatesLibraryWorkspaceViewModel`, `TemplatesLibraryWorkspaceController`, and `TemplatesLibraryWorkspaceComposition` remain the Library-local seams, with the narrowed Library interaction/view surface still represented.
-  - `TemplatesEditorWorkspaceViewModel`, `TemplatesEditorWorkspaceController`, and `TemplatesEditorWorkspaceComposition` remain the Editor-local seams, with the narrowed Editor interaction/view surface still represented.
+- `TemplatesLibraryWorkspaceViewModel`, `TemplatesLibraryWorkspaceController`, and `TemplatesLibraryWorkspaceComposition` remain the Library-local seams, with the narrowed Library interaction/view surface still represented.
+- `TemplatesEditorWorkspaceViewModel`, `TemplatesEditorWorkspaceController`, and `TemplatesEditorWorkspaceComposition` remain the Editor-local seams, with the narrowed Editor interaction/view surface still represented.
   - Templates remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
   - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Templates changes.
+
+## TC-022: Milestone AM Deploy Extraction Closure Verification
+- **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
+- **Type:** Manual (real Windows machine / Hyper-V host where deploy execution is exercised) + automated coverage
+- **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#439`, `#441`, `#501`, `#502`, `#503`, `#504`, `#505`, `#506`, `#507`, `#508`, `#509`, `#510`, `#511`, `#512`, `#513`, `#514`, `#515`, `#516`, `#517`, `#518`, `#519`, `#520`, `#521`, `#522`, `#523`, `#524`, `#525`, `#526`, `#527`)
+- **Steps:**
+  1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
+  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-deploy-extraction-checklist.md`.
+  3. Verify the shared Deploy foundation remains overview-first, route-stable, and host/delegation only.
+  4. Verify Overview lane summary/navigation sanity plus shared-host non-ownership.
+  5. Verify From Template selection/review/grouped-issue/deploy/results sanity.
+  6. Verify Quick Deploy collection/editor/readiness/deploy/results sanity.
+  7. Verify route switching preserves the long-lived Deploy workspace model and refresh/reconcile behavior rather than per-navigation recreation.
+- **Expected:**
+  - Shared `DeployWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of shared Deploy composition ownership.
+  - `deploy.overview` remains the stable/default Deploy surface, while `deploy.on_the_fly` and `deploy.from_template` remain distinct workflow surfaces.
+  - `DeployOverviewWorkspaceViewModel` and `DeployOverviewWorkspaceComposition` remain the Overview-local seams, with the narrowed Overview interaction/view surface still represented.
+  - `DeployFromTemplateWorkspaceViewModel`, `DeployFromTemplateWorkspaceController`, and `DeployFromTemplateWorkspaceComposition` remain the From Template-local seams, with the narrowed main/right-panel view surfaces still represented.
+  - `DeployOnTheFlyWorkspaceViewModel`, `DeployOnTheFlyWorkspaceController`, and `DeployOnTheFlyWorkspaceComposition` remain the Quick Deploy-local seams, with the narrowed main/right-panel view surfaces still represented.
+  - Deploy remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
+  - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Deploy changes.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
