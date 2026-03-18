@@ -1,8 +1,8 @@
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Views.Deploy;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
@@ -26,7 +26,7 @@ internal interface IDeployOnTheFlyCompositionHost
 
     void ScheduleAutoEvaluate();
 
-    void OnVmEntriesSelectionChanged(object? selectedItem);
+    void OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow);
 
     Task OnVmRemoveRequestedAsync(VmTemplate vmEntry);
 
@@ -36,15 +36,7 @@ internal interface IDeployOnTheFlyCompositionHost
 
     void OnApplyVmChangesRequested();
 
-    void OnVmNameDraftChanged();
-
-    void OnVmMemoryDraftChanged();
-
-    void OnVmCpuDraftChanged();
-
-    void OnVmSwitchSelectionChanged();
-
-    void OnVmVhdxCatalogSelectionChanged();
+    void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);
 
     Task OnEvaluateRequestedAsync();
 
@@ -75,8 +67,8 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _workspace = workspace;
         _host = host;
 
-        _view.DeployOnTheFlyVmEntriesListViewControl.ItemsSource = _workspace.VmEntryRows;
-        _rightPanelView.DeployOnTheFlyVmResultsListViewControl.ItemsSource = _workspace.ResultRows;
+        _view.SetVmEntriesSource(_workspace.VmEntryRows);
+        _rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);
         WireHandlers();
     }
 
@@ -111,34 +103,31 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)
     {
         _rightPanelView.Visibility = isActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
-        _view.DeployOnTheFlyOpenResultsPanelButtonControl.Content = showPanel && isActive ? "Hide Progress / Results" : "Open Progress / Results";
-        _view.DeployOnTheFlyOpenResultsPanelButtonControl.IsEnabled = isActive && !panelUnavailable;
-        _view.DeployOnTheFlyResultsPanelSummaryTextBlockControl.Text = panelUnavailable
-            ? "Expand the window to review the progress and results panel."
-            : _host.IsStarting || string.Equals(_host.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase)
+        _view.SetResultsPanelLauncherState(
+            showPanel && isActive ? "Hide Progress / Results" : "Open Progress / Results",
+            isActive && !panelUnavailable,
+            panelUnavailable
+                ? "Expand the window to review the progress and results panel."
+                : _host.IsStarting || string.Equals(_host.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase)
                 ? "The panel auto-opens while deployment runs and stays available for result review."
                 : ResultRowCount > 0
                     ? $"{ResultRowCount} VM result row(s) are available for review."
-                    : "Use the side panel during or after deploy for progress, timeline, and results.";
+                    : "Use the side panel during or after deploy for progress, timeline, and results.");
     }
 
     private void WireHandlers()
     {
-        _view.DeployOnTheFlyVmEntriesListViewControl.SelectionChanged += (_, _) =>
-            _host.OnVmEntriesSelectionChanged(_view.DeployOnTheFlyVmEntriesListViewControl.SelectedItem);
+        _view.VmEntrySelectionChanged += (_, _) =>
+            _host.OnVmEntriesSelectionChanged(_view.CaptureVmSelectionInteractionState().SelectedVmEntryRow);
         _view.VmRemoveRequested += async vmEntry => await _host.OnVmRemoveRequestedAsync(vmEntry);
-        _view.DeployOnTheFlyAddVmButtonControl.Click += (_, _) => _host.OnAddVmRequested();
-        _view.DeployOnTheFlyRemoveVmButtonControl.Click += async (_, _) => await _host.OnRemoveSelectedVmRequestedAsync();
-        _view.DeployOnTheFlyApplyVmChangesButtonControl.Click += (_, _) => _host.OnApplyVmChangesRequested();
-        _view.DeployOnTheFlyVmNameTextBoxControl.TextChanged += (_, _) => _host.OnVmNameDraftChanged();
-        _view.DeployOnTheFlyVmMemoryTextBoxControl.TextChanged += (_, _) => _host.OnVmMemoryDraftChanged();
-        _view.DeployOnTheFlyVmCpuTextBoxControl.TextChanged += (_, _) => _host.OnVmCpuDraftChanged();
-        _view.DeployOnTheFlyVmSwitchComboBoxControl.SelectionChanged += (_, _) => _host.OnVmSwitchSelectionChanged();
-        _view.DeployOnTheFlyVmVhdxCatalogComboBoxControl.SelectionChanged += (_, _) => _host.OnVmVhdxCatalogSelectionChanged();
-        _view.DeployOnTheFlyEvaluateButtonControl.Click += async (_, _) => await _host.OnEvaluateRequestedAsync();
-        _view.DeployOnTheFlyResolveSuggestionsButtonControl.Click += async (_, _) => await _host.OnResolveSuggestionsRequestedAsync();
-        _view.DeployOnTheFlyOpenTemplateEditorButtonControl.Click += async (_, _) => await _host.OnOpenTemplateEditorRequestedAsync();
-        _view.DeployOnTheFlyStartButtonControl.Click += async (_, _) => await _host.OnStartRequestedAsync();
-        _view.DeployOnTheFlyOpenResultsPanelButtonControl.Click += (_, _) => _host.OnOpenResultsPanelRequested();
+        _view.AddVmRequested += (_, _) => _host.OnAddVmRequested();
+        _view.RemoveSelectedVmRequested += async (_, _) => await _host.OnRemoveSelectedVmRequestedAsync();
+        _view.ApplyVmChangesRequested += (_, _) => _host.OnApplyVmChangesRequested();
+        _view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());
+        _view.EvaluateRequested += async (_, _) => await _host.OnEvaluateRequestedAsync();
+        _view.ResolveSuggestionsRequested += async (_, _) => await _host.OnResolveSuggestionsRequestedAsync();
+        _view.OpenTemplateEditorRequested += async (_, _) => await _host.OnOpenTemplateEditorRequestedAsync();
+        _view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();
+        _view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();
     }
 }

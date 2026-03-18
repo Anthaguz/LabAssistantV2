@@ -66,25 +66,25 @@ public sealed class MilestoneAGScenarioMatrixTests
         var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
 
         Assert.Contains("EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full)", source);
-        Assert.Contains("DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures", source);
+        Assert.Contains("CanStartDeploy: hasEntries && !hasBlockingFailures", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", source);
         Assert.Contains("new DeployOnTheFlyWorkspaceComposition(", source);
-        Assert.Contains("await _deployOnTheFlyWorkspaceController.StartDeployAsync();", source);
+        Assert.Contains("Task IDeployOnTheFlyCompositionHost.OnStartRequestedAsync() => _deployOnTheFlyWorkspaceController.StartDeployAsync();", source);
         Assert.Contains("BuildOnTheFlyTemplate()", source);
         Assert.Contains("var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;", source);
-        Assert.Contains("DeployOnTheFlyProgressBar.Value = _deployOnTheFlyWorkspace.ProgressPercent;", source);
-        Assert.Contains("DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\";", source);
+        Assert.Contains("DeployOnTheFlyViewHost.ApplyWorkspaceState(new DeployOnTheFlyWorkspaceViewState(", source);
+        Assert.Contains("GlobalIssuesBadgeText: $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\"", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("ApplyDeployResolveSuggestionsAsync(template);", source);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceComposition", compositionSource);
-        Assert.Contains("_view.DeployOnTheFlyVmEntriesListViewControl.ItemsSource = _workspace.VmEntryRows;", compositionSource);
-        Assert.Contains("_rightPanelView.DeployOnTheFlyVmResultsListViewControl.ItemsSource = _workspace.ResultRows;", compositionSource);
+        Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
+        Assert.Contains("_rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);", compositionSource);
         Assert.Contains("_ = _host.EnsureReferenceDataAsync(forceRefresh: false);", compositionSource);
-        Assert.Contains("_view.DeployOnTheFlyEvaluateButtonControl.Click += async (_, _) => await _host.OnEvaluateRequestedAsync();", compositionSource);
-        Assert.Contains("_view.DeployOnTheFlyStartButtonControl.Click += async (_, _) => await _host.OnStartRequestedAsync();", compositionSource);
-        Assert.Contains("_view.DeployOnTheFlyOpenResultsPanelButtonControl.Click += (_, _) => _host.OnOpenResultsPanelRequested();", compositionSource);
+        Assert.Contains("_view.EvaluateRequested += async (_, _) => await _host.OnEvaluateRequestedAsync();", compositionSource);
+        Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", compositionSource);
+        Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", compositionSource);
         Assert.Contains("public void ApplyShellState(bool isActive)", compositionSource);
         Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", compositionSource);
 

@@ -196,7 +196,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("x:Name=\"DeployOnTheFlyOpenResultsPanelButton\"", quickDeploySource);
         Assert.Contains("x:Name=\"DeployOpenResultsPanelButton\"", fromTemplateSource);
         Assert.Contains("DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;", mainWindowSource);
-        Assert.Contains("_view.DeployOnTheFlyOpenResultsPanelButtonControl.Click += (_, _) => _host.OnOpenResultsPanelRequested();", quickDeployCompositionSource);
+        Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", quickDeployCompositionSource);
         Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("IssueBadge.Visibility = Visibility.Collapsed;", mainWindowSource);
         Assert.Contains("\"From Template Progress / Results\"", mainWindowSource);
@@ -240,7 +240,7 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("_deployOnTheFlyWorkspace.VmEntryRows", mainWindowSource);
         Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
-        Assert.Contains("UpdateDeployOnTheFlyEditorIssueSummary();", mainWindowSource);
+        Assert.Contains("BuildDeployOnTheFlyEditorIssueSummaryText()", mainWindowSource);
         Assert.Contains("GetDeployOnTheFlyDraftIssues()", mainWindowSource);
         Assert.Contains("Review VM row badges and the selected VM details to fix blockers here before deploy.", mainWindowSource);
     }
