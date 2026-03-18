@@ -75,8 +75,8 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("DeployOnTheFlyVmSwitchComboBox.SelectionChanged += DeployOnTheFlyVmSwitchComboBox_SelectionChanged;", source);
         Assert.Contains("DeployOnTheFlyVmVhdxCatalogComboBox.SelectionChanged += DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged;", source);
         Assert.Contains("var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;", source);
-        Assert.Contains("DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;", source);
-        Assert.Contains("DeployOnTheFlyProgressBar.Value = _deployOnTheFlyProgressPercent;", source);
+        Assert.Contains("DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyWorkspace.ResultRows;", source);
+        Assert.Contains("DeployOnTheFlyProgressBar.Value = _deployOnTheFlyWorkspace.ProgressPercent;", source);
         Assert.Contains("DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\";", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("ApplyDeployResolveSuggestionsAsync(template);", source);
@@ -86,6 +86,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("_host.PrepareDeployExecution(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("_host.ApplyDeploySummary(summary);", controllerSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.SetWorkflowState(\"Running\", 15, \"Preparing deployment...\");", source);
     }
 
     [Fact]

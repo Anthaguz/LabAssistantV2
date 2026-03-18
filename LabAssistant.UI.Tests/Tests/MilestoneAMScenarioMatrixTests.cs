@@ -1891,6 +1891,60 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void DeployOnTheFly_UsesLocalProgressAndResultsStateSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
+        var onTheFlyControllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
+
+        Assert.DoesNotContain("private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];", mainWindowSource);
+        Assert.DoesNotContain("private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];", mainWindowSource);
+        Assert.DoesNotContain("private readonly Dictionary<string, DeployVmProgressState> _deployOnTheFlyProgressByVm = new(StringComparer.OrdinalIgnoreCase);", mainWindowSource);
+        Assert.DoesNotContain("private bool _showDeployOnTheFlyAllVmRows;", mainWindowSource);
+        Assert.DoesNotContain("private string _deployOnTheFlyLifecycleState = \"Idle\";", mainWindowSource);
+        Assert.DoesNotContain("private int _deployOnTheFlyProgressPercent;", mainWindowSource);
+        Assert.DoesNotContain("private string _deployOnTheFlyProgressSummary = \"No deployment started.\";", mainWindowSource);
+        Assert.Contains("DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyWorkspace.ResultRows;", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ResultRows.Count", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.LifecycleState", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ProgressPercent", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ProgressSummary", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.IssueRows", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.LiveProgressVmCount", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ResetProgressState();", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.SetShowAllVmRows(false);", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.ApplyOutcomeSummary(summary);", mainWindowSource);
+
+        Assert.DoesNotContain("DeployOnTheFlyWorkspaceViewModel", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("ResultRows", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("IssueRows", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("ProgressSummary", deployWorkspaceCompositionSource);
+
+        Assert.Contains("public ObservableCollection<DeployVmResultRow> ResultRows { get; } = [];", onTheFlyWorkspaceSource);
+        Assert.Contains("public ObservableCollection<DeployIssueRow> IssueRows { get; } = [];", onTheFlyWorkspaceSource);
+        Assert.Contains("public string LifecycleState { get; private set; } = \"Idle\";", onTheFlyWorkspaceSource);
+        Assert.Contains("public int ProgressPercent { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public string ProgressSummary { get; private set; } = \"No deployment started.\";", onTheFlyWorkspaceSource);
+        Assert.Contains("public bool ShowAllVmRows { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public int LiveProgressVmCount => _progressByVm.Count;", onTheFlyWorkspaceSource);
+        Assert.Contains("public void SetWorkflowState(", onTheFlyWorkspaceSource);
+        Assert.Contains("public void ResetProgressState()", onTheFlyWorkspaceSource);
+        Assert.Contains("public void SetShowAllVmRows(bool showAllVmRows)", onTheFlyWorkspaceSource);
+        Assert.Contains("public void InitializeProgressRows(", onTheFlyWorkspaceSource);
+        Assert.Contains("public void UpdateProgressMessage(string vmName, string? message)", onTheFlyWorkspaceSource);
+        Assert.Contains("public void ApplyProgressUpdate(string vmName, DeployStepStateUpdate update)", onTheFlyWorkspaceSource);
+        Assert.Contains("public void RefreshResultRows()", onTheFlyWorkspaceSource);
+        Assert.Contains("public void RefreshIssueRows()", onTheFlyWorkspaceSource);
+        Assert.Contains("public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)", onTheFlyWorkspaceSource);
+
+        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.BeginDeployWorkflow()", mainWindowSource);
+        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.PrepareDeployExecution(MultiVmDeploymentContext context)", mainWindowSource);
+        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.ApplyDeploySummary(DeploymentOutcomeSummary summary)", mainWindowSource);
+        Assert.Contains("_host.ApplyDeploySummary(summary);", onTheFlyControllerSource);
+    }
+
+    [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
