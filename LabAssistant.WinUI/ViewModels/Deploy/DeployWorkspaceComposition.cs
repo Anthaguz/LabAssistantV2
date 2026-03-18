@@ -55,7 +55,7 @@ internal sealed class DeployWorkspaceComposition
 {
     private readonly FrameworkElement _localNavigationHost;
     private readonly FrameworkElement _overviewHost;
-    private readonly FrameworkElement _onTheFlyHost;
+    private readonly DeployOnTheFlyWorkspaceComposition _onTheFlyWorkspaceComposition;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _quickDeployTabViewItem;
@@ -68,7 +68,7 @@ internal sealed class DeployWorkspaceComposition
     public DeployWorkspaceComposition(
         FrameworkElement localNavigationHost,
         DeployOverviewView overviewView,
-        FrameworkElement onTheFlyHost,
+        DeployOnTheFlyWorkspaceComposition onTheFlyWorkspaceComposition,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem quickDeployTabViewItem,
@@ -79,7 +79,7 @@ internal sealed class DeployWorkspaceComposition
     {
         _localNavigationHost = localNavigationHost;
         _overviewHost = overviewView;
-        _onTheFlyHost = onTheFlyHost;
+        _onTheFlyWorkspaceComposition = onTheFlyWorkspaceComposition;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
         _quickDeployTabViewItem = quickDeployTabViewItem;
@@ -104,7 +104,7 @@ internal sealed class DeployWorkspaceComposition
     {
         _localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         _overviewHost.Visibility = _shellBridge.IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        _onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;
+        _onTheFlyWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);
 
         SyncDeploySubviewSelection();
 
