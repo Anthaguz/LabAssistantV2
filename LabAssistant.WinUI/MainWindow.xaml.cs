@@ -140,22 +140,6 @@ public sealed partial class MainWindow : Window
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
     private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
-    private ComboBox DeployTemplateSelectorComboBox => DeployFromTemplateView.DeployTemplateSelectorComboBoxControl;
-    private Button DeployReloadTemplatesButton => DeployFromTemplateView.DeployReloadTemplatesButtonControl;
-    private Button DeployEvaluateReadinessButton => DeployFromTemplateView.DeployEvaluateReadinessButtonControl;
-    private Button DeployOpenResultsPanelButton => DeployFromTemplateView.DeployOpenResultsPanelButtonControl;
-    private TextBlock DeployResultsPanelSummaryTextBlock => DeployFromTemplateView.DeployResultsPanelSummaryTextBlockControl;
-    private TextBlock DeployGlobalIssuesBadgeTextBlock => DeployFromTemplateView.DeployGlobalIssuesBadgeTextBlockControl;
-    private TextBlock DeployReadinessSummaryTextBlock => DeployFromTemplateView.DeployReadinessSummaryTextBlockControl;
-    private TextBlock DeployTemplateSummaryTextBlock => DeployFromTemplateView.DeployTemplateSummaryTextBlockControl;
-    private TextBlock DeployTemplateRemediationTextBlock => DeployFromTemplateView.DeployTemplateRemediationTextBlockControl;
-    private TextBlock DeploySharedIssuesSummaryTextBlock => DeployFromTemplateView.DeploySharedIssuesSummaryTextBlockControl;
-    private ListView DeploySharedIssuesListView => DeployFromTemplateView.DeploySharedIssuesListViewControl;
-    private ListView DeployGlobalIssuesListView => DeployFromTemplateRightPanelView.DeployGlobalIssuesListViewControl;
-    private Button DeployResolveSuggestionsButton => DeployFromTemplateView.DeployResolveSuggestionsButtonControl;
-    private Button DeployOpenTemplateEditorButton => DeployFromTemplateView.DeployOpenTemplateEditorButtonControl;
-    private Button DeployStartButton => DeployFromTemplateView.DeployStartButtonControl;
-    private TextBlock DeployActionStatusTextBlock => DeployFromTemplateView.DeployActionStatusTextBlockControl;
     private ListView DeployOnTheFlyVmEntriesListView => DeployOnTheFlyView.DeployOnTheFlyVmEntriesListViewControl;
     private Button DeployOnTheFlyAddVmButton => DeployOnTheFlyView.DeployOnTheFlyAddVmButtonControl;
     private Button DeployOnTheFlyRemoveVmButton => DeployOnTheFlyView.DeployOnTheFlyRemoveVmButtonControl;
@@ -349,13 +333,13 @@ public sealed partial class MainWindow : Window
 
     private void WireDeployHandlers()
     {
-        DeployReloadTemplatesButton.Click += DeployReloadTemplatesButton_Click;
-        DeployEvaluateReadinessButton.Click += DeployEvaluateReadinessButton_Click;
-        DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;
-        DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;
-        DeployStartButton.Click += DeployStartButton_Click;
-        DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
-        DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;
+        DeployFromTemplateView.ReloadTemplatesRequested += DeployReloadTemplatesButton_Click;
+        DeployFromTemplateView.EvaluateReadinessRequested += DeployEvaluateReadinessButton_Click;
+        DeployFromTemplateView.ResolveSuggestionsRequested += DeployResolveSuggestionsButton_Click;
+        DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;
+        DeployFromTemplateView.StartDeployRequested += DeployStartButton_Click;
+        DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
+        DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;
         UpdateDeployIssueRows();
 
         DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyVmEntryRows;
@@ -647,19 +631,19 @@ public sealed partial class MainWindow : Window
         var fromTemplateIsRunning = _deployFromTemplateWorkspaceComposition.IsStarting || string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
         var quickDeployIsRunning = _isDeployOnTheFlyStarting || string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
 
-        DeployOpenResultsPanelButton.Content = showPanel && IsDeployFromTemplateActive ? "Hide Progress / Results" : "Open Progress / Results";
         DeployOnTheFlyOpenResultsPanelButton.Content = showPanel && IsDeployOnTheFlyActive ? "Hide Progress / Results" : "Open Progress / Results";
-
-        DeployOpenResultsPanelButton.IsEnabled = IsDeployFromTemplateActive && !panelUnavailable;
         DeployOnTheFlyOpenResultsPanelButton.IsEnabled = IsDeployOnTheFlyActive && !panelUnavailable;
 
-        DeployResultsPanelSummaryTextBlock.Text = panelUnavailable
+        _deployFromTemplateWorkspaceComposition.SetResultsPanelLauncherState(
+            showPanel && IsDeployFromTemplateActive ? "Hide Progress / Results" : "Open Progress / Results",
+            IsDeployFromTemplateActive && !panelUnavailable,
+            panelUnavailable
             ? "Expand the window to review the progress and results panel."
             : fromTemplateIsRunning
                 ? "The panel auto-opens while deployment runs and stays available for result review."
                 : _deployFromTemplateWorkspaceComposition.ResultRowCount > 0
                     ? $"{_deployFromTemplateWorkspaceComposition.ResultRowCount} VM result row(s) are available for review."
-                    : "Use the side panel during or after deploy for progress, timeline, and results.";
+                    : "Use the side panel during or after deploy for progress, timeline, and results.");
 
         DeployOnTheFlyResultsPanelSummaryTextBlock.Text = panelUnavailable
             ? "Expand the window to review the progress and results panel."
@@ -1728,7 +1712,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _deployFromTemplateWorkspaceComposition.SetSelectedTemplateLibraryItem(DeployTemplateSelectorComboBox.SelectedItem as TemplateLibraryItem);
+        _deployFromTemplateWorkspaceComposition.SetSelectedTemplateLibraryItem(DeployFromTemplateView.SelectedTemplateLibraryItem);
         if (_deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem is null)
         {
             _deployFromTemplateWorkspaceComposition.ClearSelection("No template selected.");
@@ -2267,12 +2251,7 @@ public sealed partial class MainWindow : Window
         var hasBlockingFailures = _deployCompatibilityIssues.Any(issue => issue.IsBlocking) ||
                                   (_deployReadinessReport?.HasBlockingFailures ?? false);
 
-        DeployTemplateSelectorComboBox.IsEnabled = !_isDeployLoadingTemplates && !_deployFromTemplateWorkspaceComposition.IsStarting;
-        DeployReloadTemplatesButton.IsEnabled = !_isDeployLoadingTemplates && !_deployFromTemplateWorkspaceComposition.IsStarting;
-        DeployEvaluateReadinessButton.IsEnabled = hasTemplate && !_deployFromTemplateWorkspaceComposition.IsEvaluatingReadiness && !_deployFromTemplateWorkspaceComposition.IsStarting;
-        DeployResolveSuggestionsButton.IsEnabled = hasTemplate && !_deployFromTemplateWorkspaceComposition.IsEvaluatingReadiness && !_deployFromTemplateWorkspaceComposition.IsStarting;
-        DeployOpenTemplateEditorButton.IsEnabled = _deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem is not null && !_deployFromTemplateWorkspaceComposition.IsStarting;
-        DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures && !_deployFromTemplateWorkspaceComposition.IsEvaluatingReadiness && !_deployFromTemplateWorkspaceComposition.IsStarting;
+        _deployFromTemplateWorkspaceComposition.SetInteractionState(_isDeployLoadingTemplates, hasBlockingFailures);
         _deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);
 
         if (activeTemplateDocument is null)

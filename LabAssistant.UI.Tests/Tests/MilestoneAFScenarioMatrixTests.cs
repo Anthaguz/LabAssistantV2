@@ -68,21 +68,21 @@ public sealed class MilestoneAFScenarioMatrixTests
         var source = LoadMainWindowSource();
 
         Assert.Contains("WireDeployHandlers()", source);
-        Assert.Contains("DeployEvaluateReadinessButton.Click += DeployEvaluateReadinessButton_Click;", source);
-        Assert.Contains("DeployStartButton.Click += DeployStartButton_Click;", source);
-        Assert.Contains("DeployTemplateSelectorComboBox.SelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;", source);
+        Assert.Contains("DeployFromTemplateView.EvaluateReadinessRequested += DeployEvaluateReadinessButton_Click;", source);
+        Assert.Contains("DeployFromTemplateView.StartDeployRequested += DeployStartButton_Click;", source);
+        Assert.Contains("DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;", source);
         Assert.Contains("await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);", source);
         Assert.Contains("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", source);
         Assert.Contains("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", source);
         Assert.Contains("await _deployFromTemplateWorkspaceComposition.StartDeployAsync();", source);
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", source);
         Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", source);
-        Assert.Contains("DeployResolveSuggestionsButton.Click += DeployResolveSuggestionsButton_Click;", source);
-        Assert.Contains("DeployOpenTemplateEditorButton.Click += DeployOpenTemplateEditorButton_Click;", source);
+        Assert.Contains("DeployFromTemplateView.ResolveSuggestionsRequested += DeployResolveSuggestionsButton_Click;", source);
+        Assert.Contains("DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;", source);
         Assert.Contains("await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);", source);
         Assert.Contains("_deployFromTemplateWorkspaceComposition.RefreshResultRows(_deployCompatibilityIssues, _deployReadinessReport);", source);
         Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", source);
-        Assert.Contains("DeployStartButton.IsEnabled = hasTemplate && !hasBlockingFailures", source);
+        Assert.Contains("_deployFromTemplateWorkspaceComposition.SetInteractionState(_isDeployLoadingTemplates, hasBlockingFailures);", source);
     }
 
     [Fact]

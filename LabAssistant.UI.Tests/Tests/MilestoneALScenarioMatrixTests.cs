@@ -194,7 +194,7 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("x:Name=\"DeployOnTheFlyOpenResultsPanelButton\"", quickDeploySource);
         Assert.Contains("x:Name=\"DeployOpenResultsPanelButton\"", fromTemplateSource);
-        Assert.Contains("DeployOpenResultsPanelButton.Click += DeployOpenResultsPanelButton_Click;", mainWindowSource);
+        Assert.Contains("DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;", mainWindowSource);
         Assert.Contains("DeployOnTheFlyOpenResultsPanelButton.Click += DeployOnTheFlyOpenResultsPanelButton_Click;", mainWindowSource);
         Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("IssueBadge.Visibility = Visibility.Collapsed;", mainWindowSource);
