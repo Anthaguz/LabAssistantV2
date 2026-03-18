@@ -63,6 +63,7 @@ public sealed class MilestoneAHScenarioMatrixTests
 
         var fromTemplateSource = LoadDeployFromTemplateRightPanelViewSource();
         var onTheFlySource = LoadDeployOnTheFlyRightPanelViewSource();
+        var onTheFlyCodeBehindSource = LoadDeployOnTheFlyRightPanelViewCodeBehindSource();
 
         Assert.Contains("ItemsSource=\"{Binding TimelineSteps}\"", fromTemplateSource);
         Assert.Contains("ItemsSource=\"{Binding TimelineSteps}\"", onTheFlySource);
@@ -70,6 +71,8 @@ public sealed class MilestoneAHScenarioMatrixTests
         Assert.Contains("Text=\"{Binding Label}\"", onTheFlySource);
         Assert.Contains("IsActive=\"{Binding IsRunning}\"", fromTemplateSource);
         Assert.Contains("IsActive=\"{Binding IsRunning}\"", onTheFlySource);
+        Assert.Contains("public void SetResultRowsItemsSource(object? itemsSource)", onTheFlyCodeBehindSource);
+        Assert.DoesNotContain("public ListView DeployOnTheFlyVmResultsListViewControl =>", onTheFlyCodeBehindSource);
     }
 
     [Fact]
@@ -169,6 +172,12 @@ public sealed class MilestoneAHScenarioMatrixTests
     private static string LoadDeployOnTheFlyRightPanelViewSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyRightPanelView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyRightPanelViewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyRightPanelView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

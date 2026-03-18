@@ -64,6 +64,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         var source = LoadMainWindowSource();
         var controllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
         var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
+        var viewSource = LoadDeployOnTheFlyViewSource();
 
         Assert.Contains("EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full)", source);
         Assert.Contains("CanStartDeploy: hasEntries && !hasBlockingFailures", source);
@@ -87,6 +88,8 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", compositionSource);
         Assert.Contains("public void ApplyShellState(bool isActive)", compositionSource);
         Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", compositionSource);
+        Assert.DoesNotContain("DeployOnTheFlyVmEntriesListViewControl", compositionSource);
+        Assert.DoesNotContain("DeployOnTheFlyStartButtonControl", compositionSource);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceController", controllerSource);
         Assert.Contains("await _host.EvaluateReadinessAsync(DeploymentPreflightMode.Full);", controllerSource);
@@ -94,6 +97,10 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("_host.ApplyDeploySummary(summary);", controllerSource);
         Assert.Contains("_deployOnTheFlyWorkspace.SetWorkflowState(\"Running\", 15, \"Preparing deployment...\");", source);
+
+        Assert.Contains("public event EventHandler? VmDraftChanged;", viewSource);
+        Assert.Contains("public void ApplyWorkspaceState(DeployOnTheFlyWorkspaceViewState state)", viewSource);
+        Assert.DoesNotContain("public TextBox DeployOnTheFlyVmNameTextBoxControl =>", viewSource);
     }
 
     [Fact]
@@ -127,6 +134,12 @@ public sealed class MilestoneAGScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml");
         return XDocument.Load(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyViewSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Deploy", "DeployOnTheFlyView.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployOnTheFlyRightPanelViewSource()
