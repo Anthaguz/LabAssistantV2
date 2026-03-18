@@ -227,6 +227,7 @@ public sealed class MilestoneALScenarioMatrixTests
     {
         var quickDeploySource = LoadDeployOnTheFlyViewXamlSource();
         var quickDeployCodeBehindSource = LoadDeployOnTheFlyViewCodeBehindSource();
+        var quickDeployCompositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
         var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("x:Name=\"DeployOnTheFlyEditorIssueSummaryTextBlock\"", quickDeploySource);
@@ -237,12 +238,15 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("public event Action<VmTemplate>? VmRemoveRequested;", quickDeployCodeBehindSource);
         Assert.Contains("VmRemoveRequested?.Invoke(vmEntry);", quickDeployCodeBehindSource);
+        Assert.Contains("public void ApplyWorkspaceState(DeployOnTheFlyWorkspaceViewState state)", quickDeployCodeBehindSource);
+        Assert.DoesNotContain("public TextBlock DeployOnTheFlyEditorIssueSummaryTextBlockControl =>", quickDeployCodeBehindSource);
 
         Assert.Contains("_deployOnTheFlyWorkspace.VmEntryRows", mainWindowSource);
         Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
         Assert.Contains("BuildDeployOnTheFlyEditorIssueSummaryText()", mainWindowSource);
         Assert.Contains("GetDeployOnTheFlyDraftIssues()", mainWindowSource);
         Assert.Contains("Review VM row badges and the selected VM details to fix blockers here before deploy.", mainWindowSource);
+        Assert.Contains("_view.SetResultsPanelLauncherState(", quickDeployCompositionSource);
     }
 
     [Fact]
