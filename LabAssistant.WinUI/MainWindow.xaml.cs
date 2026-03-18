@@ -34,7 +34,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost
+public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost, IDeployOnTheFlyCompositionHost
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -58,6 +58,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
     private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();
     private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;
+    private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private readonly List<DeployCompatibilityIssue> _deployCompatibilityIssues = [];
@@ -257,10 +258,15 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                     return _deploymentOutcomeSummaryBuilder.Build(context);
                 },
                 AttachDeployProgressCallbacks));
+        _deployOnTheFlyWorkspaceComposition = new DeployOnTheFlyWorkspaceComposition(
+            DeployOnTheFlyViewHost,
+            DeployOnTheFlyRightPanelViewHost,
+            _deployOnTheFlyWorkspace,
+            this);
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
             DeployOverviewViewHost,
-            DeployOnTheFlyViewHost,
+            _deployOnTheFlyWorkspaceComposition,
             DeploySubviewTabView,
             DeployOverviewTabViewItem,
             DeployQuickDeployTabViewItem,
@@ -328,27 +334,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
         DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;
         UpdateDeployIssueRows();
-
-        DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyWorkspace.VmEntryRows;
-        DeployOnTheFlyVmEntriesListView.SelectionChanged += DeployOnTheFlyVmEntriesListView_SelectionChanged;
-        DeployOnTheFlyView.VmRemoveRequested += DeployOnTheFlyView_VmRemoveRequested;
-        DeployOnTheFlyAddVmButton.Click += DeployOnTheFlyAddVmButton_Click;
-        DeployOnTheFlyRemoveVmButton.Click += DeployOnTheFlyRemoveVmButton_Click;
-        DeployOnTheFlyApplyVmChangesButton.Click += DeployOnTheFlyApplyVmChangesButton_Click;
-        DeployOnTheFlyVmNameTextBox.TextChanged += DeployOnTheFlyVmNameTextBox_TextChanged;
-        DeployOnTheFlyVmMemoryTextBox.TextChanged += DeployOnTheFlyVmMemoryTextBox_TextChanged;
-        DeployOnTheFlyVmCpuTextBox.TextChanged += DeployOnTheFlyVmCpuTextBox_TextChanged;
-        DeployOnTheFlyVmSwitchComboBox.SelectionChanged += DeployOnTheFlyVmSwitchComboBox_SelectionChanged;
-        DeployOnTheFlyVmVhdxCatalogComboBox.SelectionChanged += DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged;
-        DeployOnTheFlyEvaluateButton.Click += DeployOnTheFlyEvaluateButton_Click;
-        DeployOnTheFlyResolveSuggestionsButton.Click += DeployOnTheFlyResolveSuggestionsButton_Click;
-        DeployOnTheFlyOpenTemplateEditorButton.Click += DeployOnTheFlyOpenTemplateEditorButton_Click;
-        DeployOnTheFlyStartButton.Click += DeployOnTheFlyStartButton_Click;
-        DeployOnTheFlyOpenResultsPanelButton.Click += DeployOnTheFlyOpenResultsPanelButton_Click;
-        DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyWorkspace.ResultRows;
-        EnsureDeployOnTheFlySeeded();
-        UpdateDeployOnTheFlyEditorPanel();
-        UpdateDeployOnTheFlyUi();
     }
 
     private void WireOverviewHandlers()
@@ -491,20 +476,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             UpdateDeployUi();
         }
 
-        if (IsDeployOnTheFlyActive)
-        {
-            EnsureDeployOnTheFlySeeded();
-            _ = EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh: false);
-            UpdateDeployOnTheFlyUi();
-
-            if (_deployOnTheFlyWorkspace.VmEntryCount > 0 &&
-                _deployOnTheFlyWorkspace.ReadinessReport is null &&
-                !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
-                !_deployOnTheFlyWorkspace.IsStarting)
-            {
-                ScheduleDeployOnTheFlyAutoEvaluate();
-            }
-        }
     }
 
     private void RootLayout_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -603,7 +574,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 ? "Quick Deploy Progress / Results"
                 : "Details";
         DeployFromTemplateRightPanel.Visibility = IsDeployFromTemplateActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
-        DeployOnTheFlyRightPanel.Visibility = IsDeployOnTheFlyActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
         RightPanelEmptyStateBorder.Visibility = (!IsDeployFromTemplateActive && !IsDeployOnTheFlyActive && showPanel)
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -616,10 +586,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     {
         var panelUnavailable = _isShellRightPanelInCompactFallback;
         var fromTemplateIsRunning = _deployFromTemplateWorkspaceComposition.IsStarting || string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
-        var quickDeployIsRunning = _deployOnTheFlyWorkspace.IsStarting || string.Equals(_deployOnTheFlyWorkspace.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
-
-        DeployOnTheFlyOpenResultsPanelButton.Content = showPanel && IsDeployOnTheFlyActive ? "Hide Progress / Results" : "Open Progress / Results";
-        DeployOnTheFlyOpenResultsPanelButton.IsEnabled = IsDeployOnTheFlyActive && !panelUnavailable;
 
         _deployFromTemplateWorkspaceComposition.SetResultsPanelLauncherState(
             showPanel && IsDeployFromTemplateActive ? "Hide Progress / Results" : "Open Progress / Results",
@@ -632,13 +598,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                     ? $"{_deployFromTemplateWorkspaceComposition.ResultRowCount} VM result row(s) are available for review."
                     : "Use the side panel during or after deploy for progress, timeline, and results.");
 
-        DeployOnTheFlyResultsPanelSummaryTextBlock.Text = panelUnavailable
-            ? "Expand the window to review the progress and results panel."
-            : quickDeployIsRunning
-                ? "The panel auto-opens while deployment runs and stays available for result review."
-                : _deployOnTheFlyWorkspace.ResultRows.Count > 0
-                    ? $"{_deployOnTheFlyWorkspace.ResultRows.Count} VM result row(s) are available for review."
-                    : "Use the side panel during or after deploy for progress, timeline, and results.";
+        _deployOnTheFlyWorkspaceComposition.ApplyResultsPanelState(IsDeployOnTheFlyActive, showPanel, panelUnavailable);
     }
 
     private void NavigateToRoute(string routeKey)
@@ -807,6 +767,120 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     {
         ToggleDeployRightPanelFromWorkflow();
     }
+
+    int IDeployOnTheFlyCompositionHost.VmEntryCount => _deployOnTheFlyWorkspace.VmEntryCount;
+
+    DeploymentReadinessReport? IDeployOnTheFlyCompositionHost.ReadinessReport => _deployOnTheFlyWorkspace.ReadinessReport;
+
+    bool IDeployOnTheFlyCompositionHost.IsEvaluatingReadiness => _deployOnTheFlyWorkspace.IsEvaluatingReadiness;
+
+    bool IDeployOnTheFlyCompositionHost.IsStarting => _deployOnTheFlyWorkspace.IsStarting;
+
+    string IDeployOnTheFlyCompositionHost.LifecycleState => _deployOnTheFlyWorkspace.LifecycleState;
+
+    void IDeployOnTheFlyCompositionHost.EnsureSeeded() => EnsureDeployOnTheFlySeeded();
+
+    Task IDeployOnTheFlyCompositionHost.EnsureReferenceDataAsync(bool forceRefresh) => EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh);
+
+    void IDeployOnTheFlyCompositionHost.UpdateUi() => UpdateDeployOnTheFlyUi();
+
+    void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => ScheduleDeployOnTheFlyAutoEvaluate();
+
+    void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(object? selectedItem)
+    {
+        _deployOnTheFlyWorkspace.SetSelectedVmEntry((selectedItem as DeployOnTheFlyVmEntryRow)?.VmEntry);
+        UpdateDeployOnTheFlyEditorPanel();
+        UpdateDeployOnTheFlyUi();
+    }
+
+    Task IDeployOnTheFlyCompositionHost.OnVmRemoveRequestedAsync(VmTemplate vmEntry) => RemoveDeployOnTheFlyVmEntryAsync(vmEntry);
+
+    void IDeployOnTheFlyCompositionHost.OnAddVmRequested() => DeployOnTheFlyAddVmButton_Click(this, new RoutedEventArgs());
+
+    Task IDeployOnTheFlyCompositionHost.OnRemoveSelectedVmRequestedAsync() => RemoveDeployOnTheFlyVmEntryAsync(_deployOnTheFlyWorkspace.SelectedVmEntry);
+
+    void IDeployOnTheFlyCompositionHost.OnApplyVmChangesRequested() => DeployOnTheFlyApplyVmChangesButton_Click(this, new RoutedEventArgs());
+
+    void IDeployOnTheFlyCompositionHost.OnVmNameDraftChanged()
+    {
+        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
+        {
+            return;
+        }
+
+        SyncDeployOnTheFlyEditorDraftFromControls();
+        UpdateDeployOnTheFlyUi();
+        ScheduleDeployOnTheFlyAutoEvaluate();
+    }
+
+    void IDeployOnTheFlyCompositionHost.OnVmMemoryDraftChanged()
+    {
+        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
+        {
+            return;
+        }
+
+        SyncDeployOnTheFlyEditorDraftFromControls();
+        UpdateDeployOnTheFlyUi();
+        ScheduleDeployOnTheFlyAutoEvaluate();
+    }
+
+    void IDeployOnTheFlyCompositionHost.OnVmCpuDraftChanged()
+    {
+        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
+        {
+            return;
+        }
+
+        SyncDeployOnTheFlyEditorDraftFromControls();
+        UpdateDeployOnTheFlyUi();
+        ScheduleDeployOnTheFlyAutoEvaluate();
+    }
+
+    void IDeployOnTheFlyCompositionHost.OnVmSwitchSelectionChanged()
+    {
+        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
+        {
+            return;
+        }
+
+        SyncDeployOnTheFlyEditorDraftFromControls();
+        DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = DeployOnTheFlyVmSwitchComboBox.SelectedItem is string selected &&
+                                                        !string.Equals(selected, DeployOnTheFlySwitchPlaceholder, StringComparison.Ordinal)
+            ? "Switch selected from host inventory."
+            : _templateAvailableSwitches.Count == 0
+                ? "No virtual switches found. Add one in Assets before deploy."
+                : "Select a switch for this VM.";
+        UpdateDeployOnTheFlyUi();
+        ScheduleDeployOnTheFlyAutoEvaluate();
+    }
+
+    void IDeployOnTheFlyCompositionHost.OnVmVhdxCatalogSelectionChanged()
+    {
+        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
+        {
+            return;
+        }
+
+        SyncDeployOnTheFlyEditorDraftFromControls();
+        DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedOption
+            ? $"Selected: {selectedOption.DisplayLabel} ({selectedOption.Id})."
+            : _templateVhdxCatalogOptions.Count == 0
+                ? "Import a base disk in Assets before deploy."
+                : "Select a base disk for this VM.";
+        UpdateDeployOnTheFlyUi();
+        ScheduleDeployOnTheFlyAutoEvaluate();
+    }
+
+    Task IDeployOnTheFlyCompositionHost.OnEvaluateRequestedAsync() => EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
+
+    Task IDeployOnTheFlyCompositionHost.OnResolveSuggestionsRequestedAsync() => ResolveDeployOnTheFlySuggestionsAsync();
+
+    Task IDeployOnTheFlyCompositionHost.OnOpenTemplateEditorRequestedAsync() => OpenDeployOnTheFlyTemplateEditorAsync();
+
+    Task IDeployOnTheFlyCompositionHost.OnStartRequestedAsync() => _deployOnTheFlyWorkspaceController.StartDeployAsync();
+
+    void IDeployOnTheFlyCompositionHost.OnOpenResultsPanelRequested() => ToggleDeployRightPanelFromWorkflow();
 
     private void ToggleDeployRightPanelFromWorkflow()
     {
@@ -1807,6 +1881,11 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     private async void DeployOnTheFlyResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
     {
+        await ResolveDeployOnTheFlySuggestionsAsync();
+    }
+
+    private async Task ResolveDeployOnTheFlySuggestionsAsync()
+    {
         if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
             DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
@@ -1827,6 +1906,11 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     }
 
     private async void DeployOnTheFlyOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
+    {
+        await OpenDeployOnTheFlyTemplateEditorAsync();
+    }
+
+    private async Task OpenDeployOnTheFlyTemplateEditorAsync()
     {
         if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
         {
