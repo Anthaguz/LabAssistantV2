@@ -72,8 +72,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("_ = EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh: false);", source);
         Assert.Contains("DeployOnTheFlyVmSwitchComboBox.SelectionChanged += DeployOnTheFlyVmSwitchComboBox_SelectionChanged;", source);
         Assert.Contains("DeployOnTheFlyVmVhdxCatalogComboBox.SelectionChanged += DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged;", source);
-        Assert.Contains("var hasBlockingFailures = _deployOnTheFlyCompatibilityIssues.Any(issue => issue.IsBlocking) ||", source);
-        Assert.Contains("(_deployOnTheFlyReadinessReport?.HasBlockingFailures ?? false);", source);
+        Assert.Contains("var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;", source);
         Assert.Contains("DeployOnTheFlyVmResultsListView.ItemsSource = _deployOnTheFlyVmResultRows;", source);
         Assert.Contains("AttachDeployOnTheFlyProgressCallbacks(deployContext.MultiVmContext);", source);
         Assert.Contains("UpdateDeployOnTheFlyRowsFromSummary(summary);", source);

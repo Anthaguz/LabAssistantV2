@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
@@ -30,6 +31,19 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
     public string? EditorVhdxSignatureDraft { get; private set; }
 
     public bool IsSynchronizingEditorDraft { get; private set; }
+
+    public IReadOnlyList<DeployCompatibilityIssue> CompatibilityIssues => _compatibilityIssues;
+
+    public DeploymentReadinessReport? ReadinessReport { get; private set; }
+
+    public bool IsEvaluatingReadiness { get; private set; }
+
+    public string ReadinessSummaryText { get; private set; } = "Readiness has not been evaluated.";
+
+    public bool HasBlockingFailures =>
+        _compatibilityIssues.Any(issue => issue.IsBlocking) || (ReadinessReport?.HasBlockingFailures ?? false);
+
+    private readonly List<DeployCompatibilityIssue> _compatibilityIssues = [];
 
     public VmTemplate EnsureSeeded(string? selectedVmId)
     {
@@ -175,6 +189,39 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         EditorVhdxIdDraft = NormalizeValue(selectedVhdxId);
         EditorVhdPathDraft = NormalizeValue(selectedVhdPath);
         EditorVhdxSignatureDraft = NormalizeValue(selectedVhdxSignature);
+    }
+
+    public void BeginReadinessEvaluation()
+    {
+        IsEvaluatingReadiness = true;
+    }
+
+    public void ApplyReadinessResult(
+        IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
+        DeploymentReadinessReport readinessReport,
+        string readinessSummaryText)
+    {
+        _compatibilityIssues.Clear();
+        _compatibilityIssues.AddRange(compatibilityIssues);
+        ReadinessReport = readinessReport;
+        ReadinessSummaryText = readinessSummaryText;
+        IsEvaluatingReadiness = false;
+    }
+
+    public void ClearReadinessState(string readinessSummaryText)
+    {
+        _compatibilityIssues.Clear();
+        ReadinessReport = null;
+        ReadinessSummaryText = readinessSummaryText;
+        IsEvaluatingReadiness = false;
+    }
+
+    public void SetReadinessEvaluationFailed(string readinessSummaryText)
+    {
+        _compatibilityIssues.Clear();
+        ReadinessReport = null;
+        ReadinessSummaryText = readinessSummaryText;
+        IsEvaluatingReadiness = false;
     }
 
     private VmTemplate? ResolveSelection(string? selectedVmId)
