@@ -34,7 +34,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -57,6 +57,7 @@ public sealed partial class MainWindow : Window
     private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
     private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();
+    private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
@@ -75,7 +76,6 @@ public sealed partial class MainWindow : Window
     private bool _isUpdatingNavigationSelection;
     private bool _isUpdatingDiagnosticsSubviewSelection;
     private bool _isDeployLoadingTemplates;
-    private bool _isDeployOnTheFlyStarting;
     private int _deployOnTheFlyAutoEvaluateNonce;
     private bool _showDeployOnTheFlyAllVmRows;
     private string _deployOnTheFlyLifecycleState = "Idle";
@@ -280,6 +280,7 @@ public sealed partial class MainWindow : Window
                 () => IsDeployOnTheFlyActive,
                 () => IsDeployFromTemplateActive,
                 NavigateToRoute));
+        _deployOnTheFlyWorkspaceController = new DeployOnTheFlyWorkspaceController(_deployOnTheFlyWorkspace, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         StructuredLogsListView.ItemsSource = _structuredLogEntries;
@@ -506,7 +507,7 @@ public sealed partial class MainWindow : Window
             if (_deployOnTheFlyWorkspace.VmEntryCount > 0 &&
                 _deployOnTheFlyWorkspace.ReadinessReport is null &&
                 !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
-                !_isDeployOnTheFlyStarting)
+                !_deployOnTheFlyWorkspace.IsStarting)
             {
                 ScheduleDeployOnTheFlyAutoEvaluate();
             }
@@ -573,7 +574,7 @@ public sealed partial class MainWindow : Window
         }
 
         return _deployFromTemplateWorkspaceComposition.IsStarting ||
-            _isDeployOnTheFlyStarting ||
+            _deployOnTheFlyWorkspace.IsStarting ||
             string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
     }
@@ -622,7 +623,7 @@ public sealed partial class MainWindow : Window
     {
         var panelUnavailable = _isShellRightPanelInCompactFallback;
         var fromTemplateIsRunning = _deployFromTemplateWorkspaceComposition.IsStarting || string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
-        var quickDeployIsRunning = _isDeployOnTheFlyStarting || string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+        var quickDeployIsRunning = _deployOnTheFlyWorkspace.IsStarting || string.Equals(_deployOnTheFlyLifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
 
         DeployOnTheFlyOpenResultsPanelButton.Content = showPanel && IsDeployOnTheFlyActive ? "Hide Progress / Results" : "Open Progress / Results";
         DeployOnTheFlyOpenResultsPanelButton.IsEnabled = IsDeployOnTheFlyActive && !panelUnavailable;
@@ -1096,7 +1097,7 @@ public sealed partial class MainWindow : Window
 
     private async Task EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode mode)
     {
-        if (!_isDeployOnTheFlyStarting)
+        if (!_deployOnTheFlyWorkspace.IsStarting)
         {
             _showDeployOnTheFlyAllVmRows = false;
         }
@@ -1172,7 +1173,7 @@ public sealed partial class MainWindow : Window
 
     private void ScheduleDeployOnTheFlyAutoEvaluate()
     {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft || _isDeployOnTheFlyStarting)
+        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft || _deployOnTheFlyWorkspace.IsStarting)
         {
             return;
         }
@@ -1184,7 +1185,7 @@ public sealed partial class MainWindow : Window
     private async Task DebouncedDeployOnTheFlyAutoEvaluateAsync(int nonce)
     {
         await Task.Delay(350);
-        if (nonce != _deployOnTheFlyAutoEvaluateNonce || _isDeployOnTheFlyStarting || _deployOnTheFlyWorkspace.IsEvaluatingReadiness)
+        if (nonce != _deployOnTheFlyAutoEvaluateNonce || _deployOnTheFlyWorkspace.IsStarting || _deployOnTheFlyWorkspace.IsEvaluatingReadiness)
         {
             return;
         }
@@ -1385,17 +1386,17 @@ public sealed partial class MainWindow : Window
         var hasEntries = _deployOnTheFlyWorkspace.VmEntryCount > 0;
         var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;
 
-        DeployOnTheFlyAddVmButton.IsEnabled = !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_isDeployOnTheFlyStarting;
+        DeployOnTheFlyAddVmButton.IsEnabled = !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting;
         DeployOnTheFlyRemoveVmButton.IsEnabled = _deployOnTheFlyWorkspace.SelectedVmEntry is not null &&
                                                  !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
-                                                 !_isDeployOnTheFlyStarting;
+                                                 !_deployOnTheFlyWorkspace.IsStarting;
         DeployOnTheFlyApplyVmChangesButton.IsEnabled = _deployOnTheFlyWorkspace.SelectedVmEntry is not null &&
                                                        !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
-                                                       !_isDeployOnTheFlyStarting;
+                                                       !_deployOnTheFlyWorkspace.IsStarting;
         DeployOnTheFlyEvaluateButton.IsEnabled = false;
-        DeployOnTheFlyResolveSuggestionsButton.IsEnabled = hasEntries && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_isDeployOnTheFlyStarting;
-        DeployOnTheFlyOpenTemplateEditorButton.IsEnabled = hasEntries && !_isDeployOnTheFlyStarting;
-        DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_isDeployOnTheFlyStarting;
+        DeployOnTheFlyResolveSuggestionsButton.IsEnabled = hasEntries && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting;
+        DeployOnTheFlyOpenTemplateEditorButton.IsEnabled = hasEntries && !_deployOnTheFlyWorkspace.IsStarting;
+        DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting;
 
         if (!hasEntries)
         {
@@ -1417,7 +1418,7 @@ public sealed partial class MainWindow : Window
         var warningIssueCount = _deployOnTheFlyIssueRows.Count(issue => !string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
         DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}";
         var shouldShowInlineGuidance = hasEntries &&
-                                       !_isDeployOnTheFlyStarting &&
+                                       !_deployOnTheFlyWorkspace.IsStarting &&
                                        _deployOnTheFlyProgressByVm.Count == 0;
         DeployOnTheFlyReadinessSummaryTextBlock.Text = shouldShowInlineGuidance
             ? $"{_deployOnTheFlyWorkspace.ReadinessSummaryText} Review VM row badges and the selected VM details to fix blockers here before deploy."
@@ -1865,75 +1866,7 @@ public sealed partial class MainWindow : Window
 
     private async void DeployOnTheFlyStartButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
-        {
-            return;
-        }
-
-        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
-        {
-            DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
-            return;
-        }
-
-        _isDeployOnTheFlyStarting = true;
-        _showDeployOnTheFlyAllVmRows = true;
-        _deployOnTheFlyProgressByVm.Clear();
-        _deployOnTheFlyLifecycleState = "Running";
-        _deployOnTheFlyProgressPercent = 15;
-        _deployOnTheFlyProgressSummary = "Preparing deployment...";
-        UpdateDeployOnTheFlyUi();
-        try
-        {
-            await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
-            var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;
-            if (hasBlockingFailures)
-            {
-                _deployOnTheFlyLifecycleState = "Blocked";
-                _deployOnTheFlyProgressPercent = 35;
-                _deployOnTheFlyProgressSummary = "Deployment blocked by readiness failures.";
-                DeployOnTheFlyStatusTextBlock.Text = "Deploy blocked by readiness failures. Resolve blocking items first.";
-                return;
-            }
-
-            var template = BuildOnTheFlyTemplate();
-            var deployContext = DeployContextBuilder.Build(template, _settingsStore.Settings, LoadDeployCatalogItems(), _templateAvailableSwitches);
-            InitializeDeployOnTheFlyProgressRows(deployContext.MultiVmContext);
-            AttachDeployOnTheFlyProgressCallbacks(deployContext.MultiVmContext);
-            _deployOnTheFlyProgressPercent = 40;
-            _deployOnTheFlyProgressSummary = $"Deploying {deployContext.MultiVmContext.VmContexts.Count} VM(s)...";
-            DeployOnTheFlyStatusTextBlock.Text = "Starting quick deploy...";
-            UpdateDeployOnTheFlyResultRows();
-            UpdateDeployOnTheFlyUi();
-            await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);
-            var summary = _deploymentOutcomeSummaryBuilder.Build(deployContext.MultiVmContext);
-            UpdateDeployOnTheFlyRowsFromSummary(summary);
-
-            _deployOnTheFlyLifecycleState = summary.OperationState switch
-            {
-                DeploymentOperationState.Completed => "Completed",
-                DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "Cancelled",
-                DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
-                _ => "Completed"
-            };
-            _deployOnTheFlyProgressPercent = 100;
-            _deployOnTheFlyProgressSummary = $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.";
-            DeployOnTheFlyStatusTextBlock.Text =
-                $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}.";
-        }
-        catch (Exception ex)
-        {
-            _deployOnTheFlyLifecycleState = "Failed";
-            _deployOnTheFlyProgressPercent = 100;
-            _deployOnTheFlyProgressSummary = "Deployment failed.";
-            DeployOnTheFlyStatusTextBlock.Text = $"Deploy failed. {ex.Message}";
-        }
-        finally
-        {
-            _showDeployOnTheFlyAllVmRows = true;
-            _isDeployOnTheFlyStarting = false;
-            UpdateDeployOnTheFlyUi();
-        }
+        await _deployOnTheFlyWorkspaceController.StartDeployAsync();
     }
 
     private void InitializeDeployOnTheFlyProgressRows(MultiVmDeploymentContext context)
@@ -1944,6 +1877,93 @@ public sealed partial class MainWindow : Window
     private void AttachDeployOnTheFlyProgressCallbacks(MultiVmDeploymentContext context)
     {
         AttachDeployProgressCallbacks(context, _deployOnTheFlyProgressByVm, isOnTheFly: true);
+    }
+
+    AppSettings IDeployOnTheFlyWorkspaceControllerHost.DeploymentSettings => _settingsStore.Settings;
+
+    IReadOnlyList<string> IDeployOnTheFlyWorkspaceControllerHost.AvailableSwitches => _templateAvailableSwitches;
+
+    IReadOnlyList<VhdxCatalogItem> IDeployOnTheFlyWorkspaceControllerHost.LoadCatalogItems() => LoadDeployCatalogItems();
+
+    bool IDeployOnTheFlyWorkspaceControllerHost.TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors) =>
+        TryApplyDeployOnTheFlyVmFields(showSuccessStatus, showValidationErrors);
+
+    void IDeployOnTheFlyWorkspaceControllerHost.SetActionStatus(string statusText)
+    {
+        DeployOnTheFlyStatusTextBlock.Text = statusText;
+    }
+
+    Task IDeployOnTheFlyWorkspaceControllerHost.EvaluateReadinessAsync(DeploymentPreflightMode mode) =>
+        EvaluateDeployOnTheFlyReadinessAsync(mode);
+
+    LabTemplate IDeployOnTheFlyWorkspaceControllerHost.BuildTemplate() => BuildOnTheFlyTemplate();
+
+    void IDeployOnTheFlyWorkspaceControllerHost.BeginDeployWorkflow()
+    {
+        _showDeployOnTheFlyAllVmRows = true;
+        _deployOnTheFlyProgressByVm.Clear();
+        _deployOnTheFlyLifecycleState = "Running";
+        _deployOnTheFlyProgressPercent = 15;
+        _deployOnTheFlyProgressSummary = "Preparing deployment...";
+        UpdateDeployOnTheFlyUi();
+    }
+
+    void IDeployOnTheFlyWorkspaceControllerHost.PrepareDeployExecution(MultiVmDeploymentContext context)
+    {
+        InitializeDeployOnTheFlyProgressRows(context);
+        AttachDeployOnTheFlyProgressCallbacks(context);
+        _deployOnTheFlyProgressPercent = 40;
+        _deployOnTheFlyProgressSummary = $"Deploying {context.VmContexts.Count} VM(s)...";
+        DeployOnTheFlyStatusTextBlock.Text = "Starting quick deploy...";
+        UpdateDeployOnTheFlyResultRows();
+        UpdateDeployOnTheFlyUi();
+    }
+
+    async Task<DeploymentOutcomeSummary> IDeployOnTheFlyWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context)
+    {
+        await _deploymentCoordinator.DeployAllAsync(context);
+        return _deploymentOutcomeSummaryBuilder.Build(context);
+    }
+
+    void IDeployOnTheFlyWorkspaceControllerHost.SetDeployBlocked()
+    {
+        _deployOnTheFlyLifecycleState = "Blocked";
+        _deployOnTheFlyProgressPercent = 35;
+        _deployOnTheFlyProgressSummary = "Deployment blocked by readiness failures.";
+        DeployOnTheFlyStatusTextBlock.Text = "Deploy blocked by readiness failures. Resolve blocking items first.";
+        UpdateDeployOnTheFlyUi();
+    }
+
+    void IDeployOnTheFlyWorkspaceControllerHost.ApplyDeploySummary(DeploymentOutcomeSummary summary)
+    {
+        UpdateDeployOnTheFlyRowsFromSummary(summary);
+        _deployOnTheFlyLifecycleState = summary.OperationState switch
+        {
+            DeploymentOperationState.Completed => "Completed",
+            DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "Cancelled",
+            DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
+            _ => "Completed"
+        };
+        _deployOnTheFlyProgressPercent = 100;
+        _deployOnTheFlyProgressSummary = $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.";
+        DeployOnTheFlyStatusTextBlock.Text =
+            $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}.";
+        UpdateDeployOnTheFlyUi();
+    }
+
+    void IDeployOnTheFlyWorkspaceControllerHost.SetDeployFailed(string errorMessage)
+    {
+        _deployOnTheFlyLifecycleState = "Failed";
+        _deployOnTheFlyProgressPercent = 100;
+        _deployOnTheFlyProgressSummary = "Deployment failed.";
+        DeployOnTheFlyStatusTextBlock.Text = $"Deploy failed. {errorMessage}";
+        UpdateDeployOnTheFlyUi();
+    }
+
+    void IDeployOnTheFlyWorkspaceControllerHost.FinalizeDeployWorkflow()
+    {
+        _showDeployOnTheFlyAllVmRows = true;
+        UpdateDeployOnTheFlyUi();
     }
 
     private void AttachDeployProgressCallbacks(

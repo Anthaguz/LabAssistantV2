@@ -38,6 +38,8 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
 
     public bool IsEvaluatingReadiness { get; private set; }
 
+    public bool IsStarting { get; private set; }
+
     public string ReadinessSummaryText { get; private set; } = "Readiness has not been evaluated.";
 
     public bool HasBlockingFailures =>
@@ -194,6 +196,16 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
     public void BeginReadinessEvaluation()
     {
         IsEvaluatingReadiness = true;
+    }
+
+    public void BeginStarting()
+    {
+        IsStarting = true;
+    }
+
+    public void EndStarting()
+    {
+        IsStarting = false;
     }
 
     public void ApplyReadinessResult(

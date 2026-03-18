@@ -1853,6 +1853,44 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void DeployOnTheFly_UsesLocalDeployOrchestrationSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
+        var onTheFlyControllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
+
+        Assert.DoesNotContain("private bool _isDeployOnTheFlyStarting;", mainWindowSource);
+        Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspaceController = new DeployOnTheFlyWorkspaceController(_deployOnTheFlyWorkspace, this);", mainWindowSource);
+        Assert.Contains("await _deployOnTheFlyWorkspaceController.StartDeployAsync();", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.IsStarting", mainWindowSource);
+        Assert.DoesNotContain("await _deploymentCoordinator.DeployAllAsync(deployContext.MultiVmContext);", mainWindowSource);
+        Assert.DoesNotContain("var summary = _deploymentOutcomeSummaryBuilder.Build(deployContext.MultiVmContext);", mainWindowSource);
+
+        Assert.DoesNotContain("DeployOnTheFlyWorkspaceController", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("IDeployOnTheFlyWorkspaceControllerHost", deployWorkspaceCompositionSource);
+
+        Assert.Contains("public bool IsStarting { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public void BeginStarting()", onTheFlyWorkspaceSource);
+        Assert.Contains("public void EndStarting()", onTheFlyWorkspaceSource);
+
+        Assert.Contains("internal interface IDeployOnTheFlyWorkspaceControllerHost", onTheFlyControllerSource);
+        Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceController", onTheFlyControllerSource);
+        Assert.Contains("public async Task StartDeployAsync()", onTheFlyControllerSource);
+        Assert.Contains("_workspace.BeginStarting();", onTheFlyControllerSource);
+        Assert.Contains("await _host.EvaluateReadinessAsync(DeploymentPreflightMode.Full);", onTheFlyControllerSource);
+        Assert.Contains("if (_workspace.HasBlockingFailures)", onTheFlyControllerSource);
+        Assert.Contains("var deployContext = DeployContextBuilder.Build(", onTheFlyControllerSource);
+        Assert.Contains("_host.PrepareDeployExecution(deployContext.MultiVmContext);", onTheFlyControllerSource);
+        Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", onTheFlyControllerSource);
+        Assert.Contains("_host.ApplyDeploySummary(summary);", onTheFlyControllerSource);
+        Assert.Contains("_host.SetDeployBlocked();", onTheFlyControllerSource);
+        Assert.Contains("_host.SetDeployFailed(ex.Message);", onTheFlyControllerSource);
+        Assert.Contains("_workspace.EndStarting();", onTheFlyControllerSource);
+    }
+
+    [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
@@ -1977,6 +2015,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployOnTheFlyWorkspaceViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyWorkspaceControllerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
