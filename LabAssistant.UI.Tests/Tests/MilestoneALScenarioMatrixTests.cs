@@ -237,7 +237,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("public event Action<VmTemplate>? VmRemoveRequested;", quickDeployCodeBehindSource);
         Assert.Contains("VmRemoveRequested?.Invoke(vmEntry);", quickDeployCodeBehindSource);
 
-        Assert.Contains("_deployOnTheFlyVmEntryRows", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspace.VmEntryRows", mainWindowSource);
         Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
         Assert.Contains("UpdateDeployOnTheFlyEditorIssueSummary();", mainWindowSource);
         Assert.Contains("GetDeployOnTheFlyDraftIssues()", mainWindowSource);
