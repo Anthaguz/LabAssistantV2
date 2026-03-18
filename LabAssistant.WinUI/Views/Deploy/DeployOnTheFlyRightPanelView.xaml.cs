@@ -9,5 +9,8 @@ public sealed partial class DeployOnTheFlyRightPanelView : UserControl
         InitializeComponent();
     }
 
-    public ListView DeployOnTheFlyVmResultsListViewControl => DeployOnTheFlyVmResultsListView;
+    public void SetResultRowsItemsSource(object? itemsSource)
+    {
+        DeployOnTheFlyVmResultsListView.ItemsSource = itemsSource;
+    }
 }

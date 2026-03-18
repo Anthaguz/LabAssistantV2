@@ -68,6 +68,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private string _activeRouteKey = string.Empty;
     private StructuredLogViewerEntry? _selectedStructuredLogEntry;
     private DeploymentReadinessReport? _deployReadinessReport;
+    private string _deployOnTheFlyStatusText = "Ready.";
     private bool _isSavingDeletionPolicy;
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
@@ -85,14 +86,12 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
-    private DeployOnTheFlyView DeployOnTheFlyView => DeployOnTheFlyViewHost;
     private DiagnosticsOverviewView DiagnosticsOverviewView => DiagnosticsOverviewViewHost;
     private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
     private AssetsOverviewView AssetsOverviewView => AssetsOverviewViewHost;
     private AssetsBaseDisksView AssetsBaseDisksView => AssetsBaseDisksViewHost;
     private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;
     private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
-    private DeployOnTheFlyRightPanelView DeployOnTheFlyRightPanelView => DeployOnTheFlyRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private FrameworkElement DiagnosticsOverviewPanel => DiagnosticsOverviewViewHost;
     private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
@@ -127,31 +126,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
     private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
-    private ListView DeployOnTheFlyVmEntriesListView => DeployOnTheFlyView.DeployOnTheFlyVmEntriesListViewControl;
-    private Button DeployOnTheFlyAddVmButton => DeployOnTheFlyView.DeployOnTheFlyAddVmButtonControl;
-    private Button DeployOnTheFlyRemoveVmButton => DeployOnTheFlyView.DeployOnTheFlyRemoveVmButtonControl;
-    private TextBox DeployOnTheFlyVmNameTextBox => DeployOnTheFlyView.DeployOnTheFlyVmNameTextBoxControl;
-    private TextBox DeployOnTheFlyVmMemoryTextBox => DeployOnTheFlyView.DeployOnTheFlyVmMemoryTextBoxControl;
-    private TextBox DeployOnTheFlyVmCpuTextBox => DeployOnTheFlyView.DeployOnTheFlyVmCpuTextBoxControl;
-    private ComboBox DeployOnTheFlyVmVhdxCatalogComboBox => DeployOnTheFlyView.DeployOnTheFlyVmVhdxCatalogComboBoxControl;
-    private ComboBox DeployOnTheFlyVmSwitchComboBox => DeployOnTheFlyView.DeployOnTheFlyVmSwitchComboBoxControl;
-    private TextBlock DeployOnTheFlyVmSwitchGuidanceTextBlock => DeployOnTheFlyView.DeployOnTheFlyVmSwitchGuidanceTextBlockControl;
-    private TextBlock DeployOnTheFlyVmVhdxGuidanceTextBlock => DeployOnTheFlyView.DeployOnTheFlyVmVhdxGuidanceTextBlockControl;
-    private TextBlock DeployOnTheFlyEditorIssueSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyEditorIssueSummaryTextBlockControl;
-    private Button DeployOnTheFlyApplyVmChangesButton => DeployOnTheFlyView.DeployOnTheFlyApplyVmChangesButtonControl;
-    private TextBlock DeployOnTheFlyOverallStateTextBlock => DeployOnTheFlyView.DeployOnTheFlyOverallStateTextBlockControl;
-    private ProgressBar DeployOnTheFlyProgressBar => DeployOnTheFlyView.DeployOnTheFlyProgressBarControl;
-    private TextBlock DeployOnTheFlyProgressSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyProgressSummaryTextBlockControl;
-    private Button DeployOnTheFlyOpenResultsPanelButton => DeployOnTheFlyView.DeployOnTheFlyOpenResultsPanelButtonControl;
-    private TextBlock DeployOnTheFlyResultsPanelSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyResultsPanelSummaryTextBlockControl;
-    private TextBlock DeployOnTheFlyGlobalIssuesBadgeTextBlock => DeployOnTheFlyView.DeployOnTheFlyGlobalIssuesBadgeTextBlockControl;
-    private TextBlock DeployOnTheFlyReadinessSummaryTextBlock => DeployOnTheFlyView.DeployOnTheFlyReadinessSummaryTextBlockControl;
-    private ListView DeployOnTheFlyVmResultsListView => DeployOnTheFlyRightPanelView.DeployOnTheFlyVmResultsListViewControl;
-    private Button DeployOnTheFlyEvaluateButton => DeployOnTheFlyView.DeployOnTheFlyEvaluateButtonControl;
-    private Button DeployOnTheFlyResolveSuggestionsButton => DeployOnTheFlyView.DeployOnTheFlyResolveSuggestionsButtonControl;
-    private Button DeployOnTheFlyOpenTemplateEditorButton => DeployOnTheFlyView.DeployOnTheFlyOpenTemplateEditorButtonControl;
-    private Button DeployOnTheFlyStartButton => DeployOnTheFlyView.DeployOnTheFlyStartButtonControl;
-    private TextBlock DeployOnTheFlyStatusTextBlock => DeployOnTheFlyView.DeployOnTheFlyStatusTextBlockControl;
     private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
     private const string DeployOnTheFlyVhdxPlaceholder = "(Select base disk)";
     private const string DeployCapabilityKey = "deploy";
@@ -763,11 +737,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         ToggleDeployRightPanelFromWorkflow();
     }
 
-    private void DeployOnTheFlyOpenResultsPanelButton_Click(object sender, RoutedEventArgs e)
-    {
-        ToggleDeployRightPanelFromWorkflow();
-    }
-
     int IDeployOnTheFlyCompositionHost.VmEntryCount => _deployOnTheFlyWorkspace.VmEntryCount;
 
     DeploymentReadinessReport? IDeployOnTheFlyCompositionHost.ReadinessReport => _deployOnTheFlyWorkspace.ReadinessReport;
@@ -786,88 +755,29 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => ScheduleDeployOnTheFlyAutoEvaluate();
 
-    void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(object? selectedItem)
+    void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow)
     {
-        _deployOnTheFlyWorkspace.SetSelectedVmEntry((selectedItem as DeployOnTheFlyVmEntryRow)?.VmEntry);
+        _deployOnTheFlyWorkspace.SetSelectedVmEntry(selectedRow?.VmEntry);
         UpdateDeployOnTheFlyEditorPanel();
         UpdateDeployOnTheFlyUi();
     }
 
     Task IDeployOnTheFlyCompositionHost.OnVmRemoveRequestedAsync(VmTemplate vmEntry) => RemoveDeployOnTheFlyVmEntryAsync(vmEntry);
 
-    void IDeployOnTheFlyCompositionHost.OnAddVmRequested() => DeployOnTheFlyAddVmButton_Click(this, new RoutedEventArgs());
+    void IDeployOnTheFlyCompositionHost.OnAddVmRequested() => AddDeployOnTheFlyVmEntry();
 
     Task IDeployOnTheFlyCompositionHost.OnRemoveSelectedVmRequestedAsync() => RemoveDeployOnTheFlyVmEntryAsync(_deployOnTheFlyWorkspace.SelectedVmEntry);
 
-    void IDeployOnTheFlyCompositionHost.OnApplyVmChangesRequested() => DeployOnTheFlyApplyVmChangesButton_Click(this, new RoutedEventArgs());
+    void IDeployOnTheFlyCompositionHost.OnApplyVmChangesRequested() => ApplyDeployOnTheFlyVmChanges();
 
-    void IDeployOnTheFlyCompositionHost.OnVmNameDraftChanged()
+    void IDeployOnTheFlyCompositionHost.OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState)
     {
         if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
         {
             return;
         }
 
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    void IDeployOnTheFlyCompositionHost.OnVmMemoryDraftChanged()
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    void IDeployOnTheFlyCompositionHost.OnVmCpuDraftChanged()
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    void IDeployOnTheFlyCompositionHost.OnVmSwitchSelectionChanged()
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = DeployOnTheFlyVmSwitchComboBox.SelectedItem is string selected &&
-                                                        !string.Equals(selected, DeployOnTheFlySwitchPlaceholder, StringComparison.Ordinal)
-            ? "Switch selected from host inventory."
-            : _templateAvailableSwitches.Count == 0
-                ? "No virtual switches found. Add one in Assets before deploy."
-                : "Select a switch for this VM.";
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    void IDeployOnTheFlyCompositionHost.OnVmVhdxCatalogSelectionChanged()
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedOption
-            ? $"Selected: {selectedOption.DisplayLabel} ({selectedOption.Id})."
-            : _templateVhdxCatalogOptions.Count == 0
-                ? "Import a base disk in Assets before deploy."
-                : "Select a base disk for this VM.";
+        SyncDeployOnTheFlyEditorDraft(interactionState);
         UpdateDeployOnTheFlyUi();
         ScheduleDeployOnTheFlyAutoEvaluate();
     }
@@ -1002,64 +912,55 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     {
         if (vmEntry is null)
         {
-            DeployOnTheFlyVmEntriesListView.SelectedItem = null;
+            DeployOnTheFlyViewHost.SetVmEntrySelection(null);
             return;
         }
 
         var selectedRow = _deployOnTheFlyWorkspace.FindRow(vmEntry);
-        if (selectedRow is not null)
-        {
-            DeployOnTheFlyVmEntriesListView.SelectedItem = selectedRow;
-        }
+        DeployOnTheFlyViewHost.SetVmEntrySelection(selectedRow);
     }
 
     private void UpdateDeployOnTheFlyEditorPanel()
     {
-        _deployOnTheFlyWorkspace.BeginEditorDraftSync();
-        try
-        {
-            DeployOnTheFlyVmNameTextBox.Text = _deployOnTheFlyWorkspace.EditorVmNameDraft;
-            DeployOnTheFlyVmMemoryTextBox.Text = _deployOnTheFlyWorkspace.EditorVmMemoryDraft;
-            DeployOnTheFlyVmCpuTextBox.Text = _deployOnTheFlyWorkspace.EditorVmCpuDraft;
-            UpdateDeployOnTheFlySelectorsFromDraft();
-        }
-        finally
-        {
-            _deployOnTheFlyWorkspace.EndEditorDraftSync();
-        }
+        DeployOnTheFlyViewHost.ApplyEditorViewState(BuildDeployOnTheFlyEditorViewState());
     }
 
-    private void UpdateDeployOnTheFlySelectorsFromDraft()
+    private DeployOnTheFlyEditorViewState BuildDeployOnTheFlyEditorViewState()
     {
         var switchItems = new List<object> { DeployOnTheFlySwitchPlaceholder };
         switchItems.AddRange(_templateAvailableSwitches);
-        DeployOnTheFlyVmSwitchComboBox.ItemsSource = switchItems;
 
         var vhdItems = new List<object> { DeployOnTheFlyVhdxPlaceholder };
         vhdItems.AddRange(_templateVhdxCatalogOptions);
-        DeployOnTheFlyVmVhdxCatalogComboBox.ItemsSource = vhdItems;
 
         if (_deployOnTheFlyWorkspace.SelectedVmEntry is null)
         {
-            DeployOnTheFlyVmSwitchComboBox.SelectedItem = DeployOnTheFlySwitchPlaceholder;
-            DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem = DeployOnTheFlyVhdxPlaceholder;
-            DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = "Select a VM entry first.";
-            DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = "Select a VM entry first.";
-            return;
+            return new DeployOnTheFlyEditorViewState(
+                _deployOnTheFlyWorkspace.EditorVmNameDraft,
+                _deployOnTheFlyWorkspace.EditorVmMemoryDraft,
+                _deployOnTheFlyWorkspace.EditorVmCpuDraft,
+                switchItems,
+                DeployOnTheFlySwitchPlaceholder,
+                "Select a VM entry first.",
+                vhdItems,
+                DeployOnTheFlyVhdxPlaceholder,
+                "Select a VM entry first.");
         }
 
+        object selectedSwitchItem;
+        string switchGuidanceText;
         var selectedSwitch = _deployOnTheFlyWorkspace.EditorSwitchNameDraft;
         if (!string.IsNullOrWhiteSpace(selectedSwitch) &&
             _templateAvailableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase))
         {
-            DeployOnTheFlyVmSwitchComboBox.SelectedItem = _templateAvailableSwitches.First(name =>
+            selectedSwitchItem = _templateAvailableSwitches.First(name =>
                 string.Equals(name, selectedSwitch, StringComparison.OrdinalIgnoreCase));
-            DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = "Switch selected from host inventory.";
+            switchGuidanceText = "Switch selected from host inventory.";
         }
         else
         {
-            DeployOnTheFlyVmSwitchComboBox.SelectedItem = DeployOnTheFlySwitchPlaceholder;
-            DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = _templateAvailableSwitches.Count == 0
+            selectedSwitchItem = DeployOnTheFlySwitchPlaceholder;
+            switchGuidanceText = _templateAvailableSwitches.Count == 0
                 ? "No host switches available. Add a switch in Assets first."
                 : "Switch selection is optional.";
         }
@@ -1074,32 +975,45 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 string.Equals(option.Path, _deployOnTheFlyWorkspace.EditorVhdPathDraft, StringComparison.OrdinalIgnoreCase));
         }
 
+        object selectedVhdxCatalogItem;
+        string vhdxGuidanceText;
         if (vhdSelection is not null)
         {
-            DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem = vhdSelection;
-            DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = $"Selected: {vhdSelection.DisplayLabel} ({vhdSelection.Id}).";
+            selectedVhdxCatalogItem = vhdSelection;
+            vhdxGuidanceText = $"Selected: {vhdSelection.DisplayLabel} ({vhdSelection.Id}).";
         }
         else
         {
-            DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem = DeployOnTheFlyVhdxPlaceholder;
-            DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = _templateVhdxCatalogOptions.Count == 0
+            selectedVhdxCatalogItem = DeployOnTheFlyVhdxPlaceholder;
+            vhdxGuidanceText = _templateVhdxCatalogOptions.Count == 0
                 ? "No VHDX catalog entries available. Import base disks in Assets first."
                 : "Select a base disk from catalog.";
         }
+
+        return new DeployOnTheFlyEditorViewState(
+            _deployOnTheFlyWorkspace.EditorVmNameDraft,
+            _deployOnTheFlyWorkspace.EditorVmMemoryDraft,
+            _deployOnTheFlyWorkspace.EditorVmCpuDraft,
+            switchItems,
+            selectedSwitchItem,
+            switchGuidanceText,
+            vhdItems,
+            selectedVhdxCatalogItem,
+            vhdxGuidanceText);
     }
 
-    private void SyncDeployOnTheFlyEditorDraftFromControls()
+    private void SyncDeployOnTheFlyEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)
     {
-        var selectedSwitch = DeployOnTheFlyVmSwitchComboBox.SelectedItem is string switchName &&
+        var selectedSwitch = interactionState.SelectedSwitchItem is string switchName &&
                              !string.Equals(switchName, DeployOnTheFlySwitchPlaceholder, StringComparison.Ordinal)
             ? switchName
             : null;
 
-        var selectedCatalogOption = DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem as TemplateVhdxCatalogOption;
+        var selectedCatalogOption = interactionState.SelectedVhdxCatalogOption;
         _deployOnTheFlyWorkspace.UpdateEditorDraft(
-            DeployOnTheFlyVmNameTextBox.Text,
-            DeployOnTheFlyVmMemoryTextBox.Text,
-            DeployOnTheFlyVmCpuTextBox.Text,
+            interactionState.VmName,
+            interactionState.VmMemoryText,
+            interactionState.VmCpuText,
             selectedSwitch,
             selectedCatalogOption?.Id,
             selectedCatalogOption?.Path,
@@ -1118,7 +1032,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         {
             if (showValidationErrors)
             {
-                DeployOnTheFlyStatusTextBlock.Text = "VM name is required.";
+                SetDeployOnTheFlyStatusText("VM name is required.");
             }
             return false;
         }
@@ -1127,7 +1041,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         {
             if (showValidationErrors)
             {
-                DeployOnTheFlyStatusTextBlock.Text = "Memory must be a positive integer.";
+                SetDeployOnTheFlyStatusText("Memory must be a positive integer.");
             }
             return false;
         }
@@ -1136,7 +1050,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         {
             if (showValidationErrors)
             {
-                DeployOnTheFlyStatusTextBlock.Text = "CPU count must be a positive integer.";
+                SetDeployOnTheFlyStatusText("CPU count must be a positive integer.");
             }
             return false;
         }
@@ -1145,7 +1059,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
         if (showSuccessStatus)
         {
-            DeployOnTheFlyStatusTextBlock.Text = $"Updated '{vmName}'.";
+            SetDeployOnTheFlyStatusText($"Updated '{vmName}'.");
         }
 
         if (!string.Equals(previousName, vmName, StringComparison.Ordinal))
@@ -1175,7 +1089,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
         if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
-            DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
+            SetDeployOnTheFlyStatusText("Add at least one VM entry first.");
             return;
         }
 
@@ -1186,9 +1100,10 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             progressSummary: mode == DeploymentPreflightMode.Full
                 ? "Running full readiness checks..."
                 : "Running quick readiness checks...");
-        DeployOnTheFlyStatusTextBlock.Text = mode == DeploymentPreflightMode.Full
-            ? "Running full quick deploy readiness evaluation..."
-            : "Running quick deploy readiness evaluation...";
+        SetDeployOnTheFlyStatusText(
+            mode == DeploymentPreflightMode.Full
+                ? "Running full quick deploy readiness evaluation..."
+                : "Running quick deploy readiness evaluation...");
 
         try
         {
@@ -1220,17 +1135,18 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                     : warningCount > 0
                         ? "Readiness passed with warnings."
                         : "Readiness passed.");
-            DeployOnTheFlyStatusTextBlock.Text = blockingCount > 0
-                ? "Deploy blocked by readiness failures. Resolve blocking items first."
-                : warningCount > 0
-                    ? $"Readiness passed with {warningCount} warning(s)."
-                    : "Readiness passed with no issues.";
+            SetDeployOnTheFlyStatusText(
+                blockingCount > 0
+                    ? "Deploy blocked by readiness failures. Resolve blocking items first."
+                    : warningCount > 0
+                        ? $"Readiness passed with {warningCount} warning(s)."
+                        : "Readiness passed with no issues.");
         }
         catch (Exception ex)
         {
             _deployOnTheFlyWorkspace.SetReadinessEvaluationFailed("Readiness evaluation failed.");
             _deployOnTheFlyWorkspace.SetWorkflowState("Error", 0, "Readiness evaluation failed.");
-            DeployOnTheFlyStatusTextBlock.Text = $"Readiness evaluation failed. {ex.Message}";
+            SetDeployOnTheFlyStatusText($"Readiness evaluation failed. {ex.Message}");
         }
         finally
         {
@@ -1337,33 +1253,29 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
     }
 
-    private void UpdateDeployOnTheFlyEditorIssueSummary()
+    private string BuildDeployOnTheFlyEditorIssueSummaryText()
     {
         if (_deployOnTheFlyWorkspace.SelectedVmEntry is null)
         {
-            DeployOnTheFlyEditorIssueSummaryTextBlock.Text = "Select a VM entry to review its properties and resolve any issues inline.";
-            return;
+            return "Select a VM entry to review its properties and resolve any issues inline.";
         }
 
         var draftIssues = GetDeployOnTheFlyDraftIssues();
         if (draftIssues.Count > 0)
         {
             var blockingCount = draftIssues.Count(issue => issue.IsBlocking);
-            var warningCount = draftIssues.Count - blockingCount;
-            DeployOnTheFlyEditorIssueSummaryTextBlock.Text = blockingCount > 0
+            return blockingCount > 0
                 ? $"Blocking issues in this VM: {string.Join(" ", draftIssues.Where(issue => issue.IsBlocking).Select(issue => issue.Message))}"
                 : $"Warnings in this VM: {string.Join(" ", draftIssues.Select(issue => issue.Message))}";
-            return;
         }
 
         var selectedRow = _deployOnTheFlyWorkspace.FindRow(_deployOnTheFlyWorkspace.SelectedVmEntry);
         if (selectedRow is not null && selectedRow.IssueSummaryVisibility == Visibility.Visible)
         {
-            DeployOnTheFlyEditorIssueSummaryTextBlock.Text = $"{selectedRow.IssueBadgeText}: {selectedRow.IssueSummary}";
-            return;
+            return $"{selectedRow.IssueBadgeText}: {selectedRow.IssueSummary}";
         }
 
-        DeployOnTheFlyEditorIssueSummaryTextBlock.Text = "Ready. Changes validate while you edit. Row signals show which VM needs attention.";
+        return "Ready. Changes validate while you edit. Row signals show which VM needs attention.";
     }
 
     private List<(bool IsBlocking, string Message)> GetDeployOnTheFlyDraftIssues()
@@ -1446,22 +1358,20 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         return string.IsNullOrWhiteSpace(guidance) ? message.Trim() : $"{message} {guidance}".Trim();
     }
 
+    private void SetDeployOnTheFlyStatusText(string statusText)
+    {
+        _deployOnTheFlyStatusText = statusText;
+
+        if (Content is not null)
+        {
+            UpdateDeployOnTheFlyUi();
+        }
+    }
+
     private void UpdateDeployOnTheFlyUi()
     {
         var hasEntries = _deployOnTheFlyWorkspace.VmEntryCount > 0;
         var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;
-
-        DeployOnTheFlyAddVmButton.IsEnabled = !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting;
-        DeployOnTheFlyRemoveVmButton.IsEnabled = _deployOnTheFlyWorkspace.SelectedVmEntry is not null &&
-                                                 !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
-                                                 !_deployOnTheFlyWorkspace.IsStarting;
-        DeployOnTheFlyApplyVmChangesButton.IsEnabled = _deployOnTheFlyWorkspace.SelectedVmEntry is not null &&
-                                                       !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
-                                                       !_deployOnTheFlyWorkspace.IsStarting;
-        DeployOnTheFlyEvaluateButton.IsEnabled = false;
-        DeployOnTheFlyResolveSuggestionsButton.IsEnabled = hasEntries && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting;
-        DeployOnTheFlyOpenTemplateEditorButton.IsEnabled = hasEntries && !_deployOnTheFlyWorkspace.IsStarting;
-        DeployOnTheFlyStartButton.IsEnabled = hasEntries && !hasBlockingFailures && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting;
 
         if (!hasEntries)
         {
@@ -1472,20 +1382,34 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         UpdateDeployOnTheFlyResultRows();
         UpdateDeployOnTheFlyIssueRows();
         UpdateDeployOnTheFlyVmEntryRows();
-        UpdateDeployOnTheFlyEditorIssueSummary();
+        UpdateDeployOnTheFlyEditorPanel();
 
-        DeployOnTheFlyOverallStateTextBlock.Text = _deployOnTheFlyWorkspace.LifecycleState;
-        DeployOnTheFlyProgressBar.Value = _deployOnTheFlyWorkspace.ProgressPercent;
-        DeployOnTheFlyProgressSummaryTextBlock.Text = _deployOnTheFlyWorkspace.ProgressSummary;
         var blockingIssueCount = _deployOnTheFlyWorkspace.IssueRows.Count(issue => string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
         var warningIssueCount = _deployOnTheFlyWorkspace.IssueRows.Count(issue => !string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
-        DeployOnTheFlyGlobalIssuesBadgeTextBlock.Text = $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}";
         var shouldShowInlineGuidance = hasEntries &&
                                        !_deployOnTheFlyWorkspace.IsStarting &&
                                        _deployOnTheFlyWorkspace.LiveProgressVmCount == 0;
-        DeployOnTheFlyReadinessSummaryTextBlock.Text = shouldShowInlineGuidance
-            ? $"{_deployOnTheFlyWorkspace.ReadinessSummaryText} Review VM row badges and the selected VM details to fix blockers here before deploy."
-            : _deployOnTheFlyWorkspace.ProgressSummary;
+        DeployOnTheFlyViewHost.ApplyWorkspaceState(new DeployOnTheFlyWorkspaceViewState(
+            CanAddVm: !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting,
+            CanRemoveVm: _deployOnTheFlyWorkspace.SelectedVmEntry is not null &&
+                         !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
+                         !_deployOnTheFlyWorkspace.IsStarting,
+            CanApplyVmChanges: _deployOnTheFlyWorkspace.SelectedVmEntry is not null &&
+                               !_deployOnTheFlyWorkspace.IsEvaluatingReadiness &&
+                               !_deployOnTheFlyWorkspace.IsStarting,
+            CanEvaluate: false,
+            CanResolveSuggestions: hasEntries && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting,
+            CanOpenTemplateEditor: hasEntries && !_deployOnTheFlyWorkspace.IsStarting,
+            CanStartDeploy: hasEntries && !hasBlockingFailures && !_deployOnTheFlyWorkspace.IsEvaluatingReadiness && !_deployOnTheFlyWorkspace.IsStarting,
+            EditorIssueSummaryText: BuildDeployOnTheFlyEditorIssueSummaryText(),
+            OverallStateText: _deployOnTheFlyWorkspace.LifecycleState,
+            ProgressPercent: _deployOnTheFlyWorkspace.ProgressPercent,
+            ProgressSummaryText: _deployOnTheFlyWorkspace.ProgressSummary,
+            GlobalIssuesBadgeText: $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}",
+            ReadinessSummaryText: shouldShowInlineGuidance
+                ? $"{_deployOnTheFlyWorkspace.ReadinessSummaryText} Review VM row badges and the selected VM details to fix blockers here before deploy."
+                : _deployOnTheFlyWorkspace.ProgressSummary,
+            StatusText: _deployOnTheFlyStatusText));
         ApplyRightPanelState();
     }
 
@@ -1713,19 +1637,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
     }
 
-    private void DeployOnTheFlyVmEntriesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        _deployOnTheFlyWorkspace.SetSelectedVmEntry((DeployOnTheFlyVmEntriesListView.SelectedItem as DeployOnTheFlyVmEntryRow)?.VmEntry);
-        UpdateDeployOnTheFlyEditorPanel();
-        UpdateDeployOnTheFlyUi();
-    }
-
-    private async void DeployOnTheFlyView_VmRemoveRequested(VmTemplate vmEntry)
-    {
-        await RemoveDeployOnTheFlyVmEntryAsync(vmEntry);
-    }
-
-    private void DeployOnTheFlyAddVmButton_Click(object sender, RoutedEventArgs e)
+    private void AddDeployOnTheFlyVmEntry()
     {
         _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
         var entry = _deployOnTheFlyWorkspace.AddVmEntry();
@@ -1733,14 +1645,9 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         SelectDeployOnTheFlyVmEntry(entry);
         _deployOnTheFlyWorkspace.ClearReadinessState("Readiness has not been evaluated.");
         _deployOnTheFlyWorkspace.ResetProgressState();
-        DeployOnTheFlyStatusTextBlock.Text = $"Added VM entry '{entry.Name}'.";
+        SetDeployOnTheFlyStatusText($"Added VM entry '{entry.Name}'.");
         UpdateDeployOnTheFlyEditorPanel();
         UpdateDeployOnTheFlyUi();
-    }
-
-    private async void DeployOnTheFlyRemoveVmButton_Click(object sender, RoutedEventArgs e)
-    {
-        await RemoveDeployOnTheFlyVmEntryAsync(_deployOnTheFlyWorkspace.SelectedVmEntry);
     }
 
     private async Task RemoveDeployOnTheFlyVmEntryAsync(VmTemplate? vmEntry)
@@ -1748,7 +1655,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
         if (vmEntry is null)
         {
-            DeployOnTheFlyStatusTextBlock.Text = "Select a VM entry first.";
+            SetDeployOnTheFlyStatusText("Select a VM entry first.");
             return;
         }
 
@@ -1776,17 +1683,17 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 ? "Add at least one VM entry to evaluate readiness."
                 : "Readiness has not been evaluated.");
         _deployOnTheFlyWorkspace.ResetProgressState();
-        DeployOnTheFlyStatusTextBlock.Text = $"Removed VM entry '{vmName}'.";
+        SetDeployOnTheFlyStatusText($"Removed VM entry '{vmName}'.");
         UpdateDeployOnTheFlyEditorPanel();
         UpdateDeployOnTheFlyUi();
     }
 
-    private void DeployOnTheFlyApplyVmChangesButton_Click(object sender, RoutedEventArgs e)
+    private void ApplyDeployOnTheFlyVmChanges()
     {
         _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
         if (_deployOnTheFlyWorkspace.SelectedVmEntry is null)
         {
-            DeployOnTheFlyStatusTextBlock.Text = "Select a VM entry first.";
+            SetDeployOnTheFlyStatusText("Select a VM entry first.");
             return;
         }
 
@@ -1801,94 +1708,11 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _ = EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
     }
 
-    private void DeployOnTheFlyVmNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    private void DeployOnTheFlyVmMemoryTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    private void DeployOnTheFlyVmCpuTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    private void DeployOnTheFlyVmSwitchComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = DeployOnTheFlyVmSwitchComboBox.SelectedItem is string selected &&
-                                                        !string.Equals(selected, DeployOnTheFlySwitchPlaceholder, StringComparison.Ordinal)
-            ? $"Selected switch: {selected}"
-            : _templateAvailableSwitches.Count == 0
-                ? "No host switches available. Add a switch in Assets first."
-                : "Switch selection is optional.";
-
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    private void DeployOnTheFlyVmVhdxCatalogComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        SyncDeployOnTheFlyEditorDraftFromControls();
-        DeployOnTheFlyVmVhdxGuidanceTextBlock.Text = DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem is TemplateVhdxCatalogOption selectedOption
-            ? $"Selected: {selectedOption.DisplayLabel} ({selectedOption.Id})."
-            : _templateVhdxCatalogOptions.Count == 0
-                ? "No VHDX catalog entries available. Import base disks in Assets first."
-                : "Select a base disk from catalog.";
-
-        UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
-    }
-
-    private async void DeployOnTheFlyEvaluateButton_Click(object sender, RoutedEventArgs e)
-    {
-        await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
-    }
-
-    private async void DeployOnTheFlyResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
-    {
-        await ResolveDeployOnTheFlySuggestionsAsync();
-    }
-
     private async Task ResolveDeployOnTheFlySuggestionsAsync()
     {
         if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
-            DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
+            SetDeployOnTheFlyStatusText("Add at least one VM entry first.");
             return;
         }
 
@@ -1899,15 +1723,10 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             ReplaceDeployOnTheFlyEntriesFromTemplate(template);
         }
 
-        DeployOnTheFlyStatusTextBlock.Text = applied == 0
+        SetDeployOnTheFlyStatusText(applied == 0
             ? "No auto-resolve suggestions available for the current quick deploy configuration."
-            : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...";
+            : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...");
         await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
-    }
-
-    private async void DeployOnTheFlyOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
-    {
-        await OpenDeployOnTheFlyTemplateEditorAsync();
     }
 
     private async Task OpenDeployOnTheFlyTemplateEditorAsync()
@@ -1919,7 +1738,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
         if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
-            DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
+            SetDeployOnTheFlyStatusText("Add at least one VM entry first.");
             return;
         }
 
@@ -1928,12 +1747,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             Template = BuildOnTheFlyTemplate(),
             SourceFilePath = null
         }, "Opened quick deploy configuration in Templates editor.");
-        DeployOnTheFlyStatusTextBlock.Text = "Opened quick deploy configuration in Templates editor.";
-    }
-
-    private async void DeployOnTheFlyStartButton_Click(object sender, RoutedEventArgs e)
-    {
-        await _deployOnTheFlyWorkspaceController.StartDeployAsync();
+        SetDeployOnTheFlyStatusText("Opened quick deploy configuration in Templates editor.");
     }
 
     private void InitializeDeployOnTheFlyProgressRows(MultiVmDeploymentContext context)
@@ -1968,7 +1782,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     void IDeployOnTheFlyWorkspaceControllerHost.SetActionStatus(string statusText)
     {
-        DeployOnTheFlyStatusTextBlock.Text = statusText;
+        SetDeployOnTheFlyStatusText(statusText);
     }
 
     Task IDeployOnTheFlyWorkspaceControllerHost.EvaluateReadinessAsync(DeploymentPreflightMode mode) =>
@@ -1988,7 +1802,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         InitializeDeployOnTheFlyProgressRows(context);
         AttachDeployOnTheFlyProgressCallbacks(context);
         _deployOnTheFlyWorkspace.SetWorkflowState("Running", 40, $"Deploying {context.VmContexts.Count} VM(s)...");
-        DeployOnTheFlyStatusTextBlock.Text = "Starting quick deploy...";
+        SetDeployOnTheFlyStatusText("Starting quick deploy...");
         UpdateDeployOnTheFlyResultRows();
         UpdateDeployOnTheFlyUi();
     }
@@ -2002,7 +1816,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     void IDeployOnTheFlyWorkspaceControllerHost.SetDeployBlocked()
     {
         _deployOnTheFlyWorkspace.SetWorkflowState("Blocked", 35, "Deployment blocked by readiness failures.");
-        DeployOnTheFlyStatusTextBlock.Text = "Deploy blocked by readiness failures. Resolve blocking items first.";
+        SetDeployOnTheFlyStatusText("Deploy blocked by readiness failures. Resolve blocking items first.");
         UpdateDeployOnTheFlyUi();
     }
 
@@ -2019,15 +1833,15 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             },
             progressPercent: 100,
             progressSummary: $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.");
-        DeployOnTheFlyStatusTextBlock.Text =
-            $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}.";
+        SetDeployOnTheFlyStatusText(
+            $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}.");
         UpdateDeployOnTheFlyUi();
     }
 
     void IDeployOnTheFlyWorkspaceControllerHost.SetDeployFailed(string errorMessage)
     {
         _deployOnTheFlyWorkspace.SetWorkflowState("Failed", 100, "Deployment failed.");
-        DeployOnTheFlyStatusTextBlock.Text = $"Deploy failed. {errorMessage}";
+        SetDeployOnTheFlyStatusText($"Deploy failed. {errorMessage}");
         UpdateDeployOnTheFlyUi();
     }
 
