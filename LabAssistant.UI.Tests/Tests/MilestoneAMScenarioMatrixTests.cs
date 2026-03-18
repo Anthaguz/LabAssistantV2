@@ -1981,6 +1981,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
         var onTheFlyControllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
         var onTheFlyCompositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
+        var onTheFlyRightPanelViewSource = LoadDeployOnTheFlyRightPanelViewCodeBehindSource();
         Assert.DoesNotContain("private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];", mainWindowSource);
         Assert.DoesNotContain("private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];", mainWindowSource);
         Assert.DoesNotContain("private readonly Dictionary<string, DeployVmProgressState> _deployOnTheFlyProgressByVm = new(StringComparer.OrdinalIgnoreCase);", mainWindowSource);
