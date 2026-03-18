@@ -56,9 +56,8 @@ public sealed partial class MainWindow : Window
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
     private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
+    private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
-    private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];
-    private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];
     private readonly ObservableCollection<DeployVmResultRow> _deployOnTheFlyVmResultRows = [];
     private readonly ObservableCollection<DeployIssueRow> _deployOnTheFlyIssueRows = [];
     private readonly Dictionary<string, DeployVmProgressState> _deployOnTheFlyProgressByVm = new(StringComparer.OrdinalIgnoreCase);
@@ -342,7 +341,7 @@ public sealed partial class MainWindow : Window
         DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;
         UpdateDeployIssueRows();
 
-        DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyVmEntryRows;
+        DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyWorkspace.VmEntryRows;
         DeployOnTheFlyVmEntriesListView.SelectionChanged += DeployOnTheFlyVmEntriesListView_SelectionChanged;
         DeployOnTheFlyView.VmRemoveRequested += DeployOnTheFlyView_VmRemoveRequested;
         DeployOnTheFlyAddVmButton.Click += DeployOnTheFlyAddVmButton_Click;
@@ -510,7 +509,7 @@ public sealed partial class MainWindow : Window
             _ = EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh: false);
             UpdateDeployOnTheFlyUi();
 
-            if (_deployOnTheFlyVmEntries.Count > 0 &&
+            if (_deployOnTheFlyWorkspace.VmEntryCount > 0 &&
                 _deployOnTheFlyReadinessReport is null &&
                 !_isDeployOnTheFlyEvaluatingReadiness &&
                 !_isDeployOnTheFlyStarting)
@@ -912,51 +911,9 @@ public sealed partial class MainWindow : Window
 
     private void EnsureDeployOnTheFlySeeded()
     {
-        if (_deployOnTheFlyVmEntries.Count > 0)
-        {
-            SyncDeployOnTheFlyVmEntryRows();
-            _deployWorkspaceComposition.RefreshSharedUiState();
-            if (_selectedDeployOnTheFlyVmEntry is null)
-            {
-                _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyVmEntries[0];
-                SelectDeployOnTheFlyVmEntry(_selectedDeployOnTheFlyVmEntry);
-            }
-
-            return;
-        }
-
-        var entry = CreateDefaultDeployOnTheFlyVmEntry(1);
-        _deployOnTheFlyVmEntries.Add(entry);
-        SyncDeployOnTheFlyVmEntryRows();
+        _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.EnsureSeeded(_selectedDeployOnTheFlyVmEntry?.VmId);
         _deployWorkspaceComposition.RefreshSharedUiState();
-        _selectedDeployOnTheFlyVmEntry = entry;
-        SelectDeployOnTheFlyVmEntry(entry);
-    }
-
-    private static VmTemplate CreateDefaultDeployOnTheFlyVmEntry(int sequence)
-    {
-        return new VmTemplate
-        {
-            Name = $"Quick VM {sequence}",
-            MemoryMb = 2048,
-            CpuCount = 2
-        };
-    }
-
-    private static VmTemplate CloneVmTemplate(VmTemplate source)
-    {
-        return new VmTemplate
-        {
-            VmId = source.VmId,
-            Name = source.Name,
-            MemoryMb = source.MemoryMb,
-            CpuCount = source.CpuCount,
-            VhdxId = source.VhdxId,
-            VhdPath = source.VhdPath,
-            VhdxSignature = source.VhdxSignature,
-            SwitchName = source.SwitchName,
-            SwitchNames = source.SwitchNames?.ToList()
-        };
+        SelectDeployOnTheFlyVmEntry(_selectedDeployOnTheFlyVmEntry);
     }
 
     private LabTemplate BuildOnTheFlyTemplate()
@@ -965,58 +922,18 @@ public sealed partial class MainWindow : Window
         {
             Name = "Quick Deploy Draft",
             Description = "Generated quick deploy input.",
-            VmTemplates = _deployOnTheFlyVmEntries.Select(CloneVmTemplate).ToList()
+            VmTemplates = _deployOnTheFlyWorkspace.CreateTemplateSnapshot().ToList()
         };
     }
 
     private void ReplaceDeployOnTheFlyEntriesFromTemplate(LabTemplate template)
     {
-        var previousSelectionId = _selectedDeployOnTheFlyVmEntry?.VmId;
-        _deployOnTheFlyVmEntries.Clear();
-        foreach (var vmTemplate in template.VmTemplates)
-        {
-            _deployOnTheFlyVmEntries.Add(CloneVmTemplate(vmTemplate));
-        }
-
-        SyncDeployOnTheFlyVmEntryRows();
+        _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.ReplaceEntriesFromTemplate(
+            template,
+            _selectedDeployOnTheFlyVmEntry?.VmId);
         _deployWorkspaceComposition.RefreshSharedUiState();
-
-        _selectedDeployOnTheFlyVmEntry = !string.IsNullOrWhiteSpace(previousSelectionId)
-            ? _deployOnTheFlyVmEntries.FirstOrDefault(item => string.Equals(item.VmId, previousSelectionId, StringComparison.OrdinalIgnoreCase))
-            : null;
-
-        _selectedDeployOnTheFlyVmEntry ??= _deployOnTheFlyVmEntries.FirstOrDefault();
         SelectDeployOnTheFlyVmEntry(_selectedDeployOnTheFlyVmEntry);
         UpdateDeployOnTheFlyEditorPanel();
-    }
-
-    private void SyncDeployOnTheFlyVmEntryRows()
-    {
-        var existingByVm = _deployOnTheFlyVmEntryRows.ToDictionary(row => row.VmEntry);
-        var staleRows = _deployOnTheFlyVmEntryRows.Where(row => !_deployOnTheFlyVmEntries.Contains(row.VmEntry)).ToList();
-        foreach (var staleRow in staleRows)
-        {
-            _deployOnTheFlyVmEntryRows.Remove(staleRow);
-        }
-
-        for (var index = 0; index < _deployOnTheFlyVmEntries.Count; index++)
-        {
-            var vmEntry = _deployOnTheFlyVmEntries[index];
-            if (!existingByVm.TryGetValue(vmEntry, out var row))
-            {
-                row = new DeployOnTheFlyVmEntryRow(vmEntry);
-                _deployOnTheFlyVmEntryRows.Insert(index, row);
-                existingByVm[vmEntry] = row;
-            }
-            else
-            {
-                var currentIndex = _deployOnTheFlyVmEntryRows.IndexOf(row);
-                if (currentIndex != index)
-                {
-                    _deployOnTheFlyVmEntryRows.Move(currentIndex, index);
-                }
-            }
-        }
     }
 
     private void SelectDeployOnTheFlyVmEntry(VmTemplate? vmEntry)
@@ -1027,7 +944,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var selectedRow = _deployOnTheFlyVmEntryRows.FirstOrDefault(row => ReferenceEquals(row.VmEntry, vmEntry));
+        var selectedRow = _deployOnTheFlyWorkspace.FindRow(vmEntry);
         if (selectedRow is not null)
         {
             DeployOnTheFlyVmEntriesListView.SelectedItem = selectedRow;
@@ -1199,7 +1116,7 @@ public sealed partial class MainWindow : Window
 
     private void RefreshDeployOnTheFlyVmEntriesList()
     {
-        SyncDeployOnTheFlyVmEntryRows();
+        _deployOnTheFlyWorkspace.RefreshVmEntryRows();
         SelectDeployOnTheFlyVmEntry(_selectedDeployOnTheFlyVmEntry);
     }
 
@@ -1214,7 +1131,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (_deployOnTheFlyVmEntries.Count == 0)
+        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
             DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
             return;
@@ -1316,7 +1233,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateDeployOnTheFlyVmEntryRows()
     {
-        SyncDeployOnTheFlyVmEntryRows();
+        _deployOnTheFlyWorkspace.RefreshVmEntryRows();
 
         var compatibilityByVm = _deployOnTheFlyCompatibilityIssues
             .Where(issue => !string.IsNullOrWhiteSpace(issue.VmName))
@@ -1329,7 +1246,7 @@ public sealed partial class MainWindow : Window
             .GroupBy(tuple => tuple.vmName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Select(item => item.result).ToList(), StringComparer.OrdinalIgnoreCase);
 
-        foreach (var row in _deployOnTheFlyVmEntryRows)
+        foreach (var row in _deployOnTheFlyWorkspace.VmEntryRows)
         {
             row.DisplayName = string.IsNullOrWhiteSpace(row.VmEntry.Name) ? "Unnamed VM" : row.VmEntry.Name.Trim();
             row.SecondaryText = BuildDeployOnTheFlyVmEntrySecondaryText(row.VmEntry);
@@ -1401,7 +1318,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var selectedRow = _deployOnTheFlyVmEntryRows.FirstOrDefault(row => ReferenceEquals(row.VmEntry, _selectedDeployOnTheFlyVmEntry));
+        var selectedRow = _deployOnTheFlyWorkspace.FindRow(_selectedDeployOnTheFlyVmEntry);
         if (selectedRow is not null && selectedRow.IssueSummaryVisibility == Visibility.Visible)
         {
             DeployOnTheFlyEditorIssueSummaryTextBlock.Text = $"{selectedRow.IssueBadgeText}: {selectedRow.IssueSummary}";
@@ -1490,7 +1407,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateDeployOnTheFlyUi()
     {
-        var hasEntries = _deployOnTheFlyVmEntries.Count > 0;
+        var hasEntries = _deployOnTheFlyWorkspace.VmEntryCount > 0;
         var hasBlockingFailures = _deployOnTheFlyCompatibilityIssues.Any(issue => issue.IsBlocking) ||
                                   (_deployOnTheFlyReadinessReport?.HasBlockingFailures ?? false);
 
@@ -1773,10 +1690,7 @@ public sealed partial class MainWindow : Window
     private void DeployOnTheFlyAddVmButton_Click(object sender, RoutedEventArgs e)
     {
         _showDeployOnTheFlyAllVmRows = false;
-        var nextSequence = _deployOnTheFlyVmEntries.Count + 1;
-        var entry = CreateDefaultDeployOnTheFlyVmEntry(nextSequence);
-        _deployOnTheFlyVmEntries.Add(entry);
-        SyncDeployOnTheFlyVmEntryRows();
+        var entry = _deployOnTheFlyWorkspace.AddVmEntry();
         _deployWorkspaceComposition.RefreshSharedUiState();
         _selectedDeployOnTheFlyVmEntry = entry;
         SelectDeployOnTheFlyVmEntry(entry);
@@ -1821,17 +1735,15 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _deployOnTheFlyVmEntries.Remove(vmEntry);
-        SyncDeployOnTheFlyVmEntryRows();
+        _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.RemoveVmEntry(vmEntry);
         _deployWorkspaceComposition.RefreshSharedUiState();
-        _selectedDeployOnTheFlyVmEntry = _deployOnTheFlyVmEntries.FirstOrDefault();
         SelectDeployOnTheFlyVmEntry(_selectedDeployOnTheFlyVmEntry);
         _deployOnTheFlyReadinessReport = null;
         _deployOnTheFlyCompatibilityIssues.Clear();
         _deployOnTheFlyLifecycleState = "Idle";
         _deployOnTheFlyProgressPercent = 0;
         _deployOnTheFlyProgressSummary = "No deployment started.";
-        _deployOnTheFlyReadinessSummary = _deployOnTheFlyVmEntries.Count == 0
+        _deployOnTheFlyReadinessSummary = _deployOnTheFlyWorkspace.VmEntryCount == 0
             ? "Add at least one VM entry to evaluate readiness."
             : "Readiness has not been evaluated.";
         DeployOnTheFlyStatusTextBlock.Text = $"Removed VM entry '{vmName}'.";
@@ -1938,7 +1850,7 @@ public sealed partial class MainWindow : Window
 
     private async void DeployOnTheFlyResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_deployOnTheFlyVmEntries.Count == 0)
+        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
             DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
             return;
@@ -1964,7 +1876,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (_deployOnTheFlyVmEntries.Count == 0)
+        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
             DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
             return;
@@ -1985,7 +1897,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (_deployOnTheFlyVmEntries.Count == 0)
+        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
         {
             DeployOnTheFlyStatusTextBlock.Text = "Add at least one VM entry first.";
             return;
@@ -2321,7 +2233,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var vmNames = _deployOnTheFlyVmEntries
+        var vmNames = _deployOnTheFlyWorkspace.VmEntries
             .Select(vm => string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -2791,7 +2703,7 @@ public sealed partial class MainWindow : Window
     private DeployWorkspaceUiState CreateDeployWorkspaceUiState()
     {
         return new DeployWorkspaceUiState(
-            QuickDeployDraftCount: _deployOnTheFlyVmEntries.Count,
+            QuickDeployDraftCount: _deployOnTheFlyWorkspace.VmEntryCount,
             IsLoadingTemplates: _isDeployLoadingTemplates,
             AvailableTemplateCount: TemplatesLibraryItems.Count);
     }

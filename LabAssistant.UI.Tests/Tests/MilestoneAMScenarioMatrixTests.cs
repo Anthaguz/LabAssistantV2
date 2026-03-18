@@ -1737,6 +1737,40 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
+    public void DeployOnTheFly_UsesLocalVmCollectionStateSeam()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
+
+        Assert.DoesNotContain("private readonly ObservableCollection<VmTemplate> _deployOnTheFlyVmEntries = [];", mainWindowSource);
+        Assert.DoesNotContain("private readonly ObservableCollection<DeployOnTheFlyVmEntryRow> _deployOnTheFlyVmEntryRows = [];", mainWindowSource);
+        Assert.Contains("private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();", mainWindowSource);
+        Assert.Contains("DeployOnTheFlyVmEntriesListView.ItemsSource = _deployOnTheFlyWorkspace.VmEntryRows;", mainWindowSource);
+        Assert.Contains("_selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.EnsureSeeded(", mainWindowSource);
+        Assert.Contains("_selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.ReplaceEntriesFromTemplate(", mainWindowSource);
+        Assert.Contains("var entry = _deployOnTheFlyWorkspace.AddVmEntry();", mainWindowSource);
+        Assert.Contains("_selectedDeployOnTheFlyVmEntry = _deployOnTheFlyWorkspace.RemoveVmEntry(vmEntry);", mainWindowSource);
+        Assert.Contains("QuickDeployDraftCount: _deployOnTheFlyWorkspace.VmEntryCount,", mainWindowSource);
+
+        Assert.Contains("_onTheFlyHost.Visibility = _shellBridge.IsDeployOnTheFlyActive ? Visibility.Visible : Visibility.Collapsed;", deployWorkspaceCompositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("DeployOnTheFlyWorkspaceViewModel", deployWorkspaceCompositionSource);
+        Assert.DoesNotContain("ObservableCollection<VmTemplate>", deployWorkspaceCompositionSource);
+
+        Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceViewModel", onTheFlyWorkspaceSource);
+        Assert.Contains("public ObservableCollection<VmTemplate> VmEntries { get; } = [];", onTheFlyWorkspaceSource);
+        Assert.Contains("public ObservableCollection<DeployOnTheFlyVmEntryRow> VmEntryRows { get; } = [];", onTheFlyWorkspaceSource);
+        Assert.Contains("public int VmEntryCount => VmEntries.Count;", onTheFlyWorkspaceSource);
+        Assert.Contains("public VmTemplate EnsureSeeded(string? selectedVmId)", onTheFlyWorkspaceSource);
+        Assert.Contains("public VmTemplate AddVmEntry()", onTheFlyWorkspaceSource);
+        Assert.Contains("public VmTemplate? RemoveVmEntry(VmTemplate vmEntry)", onTheFlyWorkspaceSource);
+        Assert.Contains("public VmTemplate? ReplaceEntriesFromTemplate(LabTemplate template, string? selectedVmId)", onTheFlyWorkspaceSource);
+        Assert.Contains("public void RefreshVmEntryRows()", onTheFlyWorkspaceSource);
+        Assert.Contains("public DeployOnTheFlyVmEntryRow? FindRow(VmTemplate? vmEntry)", onTheFlyWorkspaceSource);
+    }
+
+    [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
         var compositionSource = LoadDeployWorkspaceCompositionSource();
@@ -1855,6 +1889,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployFromTemplateWorkspaceViewModelSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceViewModel.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyWorkspaceViewModelSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
