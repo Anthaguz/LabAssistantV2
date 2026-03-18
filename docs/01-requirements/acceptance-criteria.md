@@ -3363,3 +3363,77 @@ Each readiness result shall include, at minimum:
 - [ ] long-lived Deploy workspace participation and `deploy.from_template` route-activation refresh expectations are explicit and traceable
 - [ ] Quick Deploy / Overview non-goals are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+# AC-039 - WinUI Deploy Quick Deploy Extraction Cleanup Target (AM95)
+
+**Related FRs:** FR-164, FR-165, FR-166, FR-155, FR-156, FR-157, FR-087, FR-088, FR-089, FR-090, FR-091, FR-092, FR-093, FR-094, FR-100, FR-101, FR-102, FR-103, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Deploy Quick Deploy stays under shared Deploy workspace composition but gains a Quick Deploy-local seam
+**Given**
+- the shared Deploy composition cleanup target, Deploy Overview cleanup target, and Deploy From Template cleanup target are already defined
+
+**When**
+- the narrow `Deploy Quick Deploy` cleanup target is reviewed
+
+**Then**
+- `Deploy Quick Deploy` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Deploy composition remains responsible only for shared capability-level composition concerns
+- a Quick Deploy-local seam becomes the target home for Quick Deploy-specific state, orchestration, composition, and UI coordination
+
+### 2) Quick Deploy-local ownership is explicit without widening shared Deploy composition into the workflow owner
+**Given**
+- `deploy.on_the_fly` is the on-the-fly deploy workflow surface for the capability
+
+**When**
+- Quick Deploy-local ownership is defined
+
+**Then**
+- Quick Deploy-local ownership explicitly includes:
+  - Quick Deploy-specific state
+  - Quick Deploy-specific orchestration
+  - Quick Deploy-specific interaction boundaries used by the Quick Deploy surface
+  - Quick Deploy-specific composition or host cleanup expectations
+  - Quick Deploy-specific refresh or reconcile behavior triggered by `deploy.on_the_fly` activation
+- shared `DeployWorkspaceComposition` does not become the Quick Deploy workflow owner
+- shared Deploy composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
+
+### 3) MainWindow and route-activation boundaries remain explicit for deploy.on_the_fly
+**Given**
+- AM33 and AM78 keep `MainWindow` limited to shell ownership and keep Deploy long-lived by default
+
+**When**
+- the Quick Deploy cleanup target is applied
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- `Deploy Quick Deploy` continues to participate in long-lived Deploy workspace lifetime rather than per-navigation recreation
+- route activation of `deploy.on_the_fly` refreshes or reconciles Quick Deploy state within the existing Deploy workspace
+
+### 4) Deploy Quick Deploy remains behavior-preserving and does not absorb From Template or Overview semantics
+**Given**
+- `Deploy` is an approved Overview-first capability with distinct Quick Deploy and From Template child routes
+
+**When**
+- the Quick Deploy cleanup target is defined
+
+**Then**
+- `deploy.on_the_fly` remains a distinct on-the-fly deploy workflow surface and not the route-entry Deploy surface
+- no From Template ownership is moved into Quick Deploy
+- no Deploy Overview ownership is moved into Quick Deploy
+- runtime implementation, From Template extraction details, Deploy Overview extraction details, Deploy behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `DeployWorkspaceComposition` remains the owner for shared capability-level composition only
+- a Quick Deploy-local seam becomes the target home for Quick Deploy-specific state, orchestration, composition, and interaction coordination
+- `MainWindow` remains shell-only and is not injected into Quick Deploy views
+- `Deploy Quick Deploy` remains long-lived with route-activation refresh inside the existing Deploy workspace
+- Deploy Quick Deploy remains behavior-preserving and does not absorb shared Deploy, From Template, or Overview concerns
+
+## Definition of Done
+- [ ] shared Deploy vs Quick Deploy-local ownership is explicit and traceable
+- [ ] Quick Deploy-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
+- [ ] long-lived Deploy workspace participation and `deploy.on_the_fly` route-activation refresh expectations are explicit and traceable
+- [ ] From Template / Overview non-goals are explicit and traceable
+- [ ] behavior-preservation and non-goals are explicit and traceable
