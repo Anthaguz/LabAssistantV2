@@ -187,6 +187,18 @@ For Deploy From Template extraction planning after the shared Deploy cleanup tar
 Behavioral contract source:
 - `docs/02-ux/winui-from-template-extraction-cleanup-target-am.md`
 
+## 2.14 Milestone AM Deploy Quick Deploy Cleanup Target (Approved)
+
+For Deploy Quick Deploy extraction planning after the shared Deploy cleanup target, Deploy Overview cleanup target, and Deploy From Template cleanup target:
+- `Deploy Quick Deploy` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+- a Quick Deploy-local seam is the target home for Quick Deploy-specific state, orchestration, interaction boundaries, composition or host cleanup, and refresh or reconcile behavior on `deploy.on_the_fly`
+- `deploy.on_the_fly` remains the distinct on-the-fly deploy workflow surface inside the long-lived Deploy workspace and continues to use route-activation refresh within the existing workspace rather than per-navigation recreation
+- Quick Deploy does not become the owner of From Template-specific or Deploy Overview-specific workflow concerns, and Quick Deploy views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-quick-deploy-extraction-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
