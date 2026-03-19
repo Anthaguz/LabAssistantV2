@@ -16,8 +16,6 @@ internal interface IDiagnosticsWorkspaceHost
     void ClearStructuredLogFilters();
 
     void SetSelectedStructuredLogEntry(StructuredLogViewerEntry? selectedEntry);
-
-    void OpenStructuredLogLocation();
 }
 
 internal interface IDiagnosticsWorkspaceShellBridge
@@ -29,6 +27,41 @@ internal interface IDiagnosticsWorkspaceShellBridge
     bool IsDiagnosticsLogsActive { get; }
 
     void NavigateToRoute(string routeKey);
+
+    void OpenStructuredLogLocation();
+}
+
+internal sealed class DiagnosticsWorkspaceHost : IDiagnosticsWorkspaceHost
+{
+    private readonly Func<bool> _isStructuredLogsLoading;
+    private readonly Func<int> _getStructuredLogEntryCount;
+    private readonly Func<bool, Task> _ensureStructuredLogsLoadedAsync;
+    private readonly Action _clearStructuredLogFilters;
+    private readonly Action<StructuredLogViewerEntry?> _setSelectedStructuredLogEntry;
+
+    public DiagnosticsWorkspaceHost(
+        Func<bool> isStructuredLogsLoading,
+        Func<int> getStructuredLogEntryCount,
+        Func<bool, Task> ensureStructuredLogsLoadedAsync,
+        Action clearStructuredLogFilters,
+        Action<StructuredLogViewerEntry?> setSelectedStructuredLogEntry)
+    {
+        _isStructuredLogsLoading = isStructuredLogsLoading;
+        _getStructuredLogEntryCount = getStructuredLogEntryCount;
+        _ensureStructuredLogsLoadedAsync = ensureStructuredLogsLoadedAsync;
+        _clearStructuredLogFilters = clearStructuredLogFilters;
+        _setSelectedStructuredLogEntry = setSelectedStructuredLogEntry;
+    }
+
+    public bool IsStructuredLogsLoading => _isStructuredLogsLoading();
+
+    public int StructuredLogEntryCount => _getStructuredLogEntryCount();
+
+    public Task EnsureStructuredLogsLoadedAsync(bool forceReload) => _ensureStructuredLogsLoadedAsync(forceReload);
+
+    public void ClearStructuredLogFilters() => _clearStructuredLogFilters();
+
+    public void SetSelectedStructuredLogEntry(StructuredLogViewerEntry? selectedEntry) => _setSelectedStructuredLogEntry(selectedEntry);
 }
 
 internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShellBridge
@@ -37,17 +70,20 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
     private readonly Func<bool> _isDiagnosticsOverviewActive;
     private readonly Func<bool> _isDiagnosticsLogsActive;
     private readonly Action<string> _navigateToRoute;
+    private readonly Action _openStructuredLogLocation;
 
     public DiagnosticsWorkspaceShellBridge(
         Func<bool> isDiagnosticsCapabilityActive,
         Func<bool> isDiagnosticsOverviewActive,
         Func<bool> isDiagnosticsLogsActive,
-        Action<string> navigateToRoute)
+        Action<string> navigateToRoute,
+        Action openStructuredLogLocation)
     {
         _isDiagnosticsCapabilityActive = isDiagnosticsCapabilityActive;
         _isDiagnosticsOverviewActive = isDiagnosticsOverviewActive;
         _isDiagnosticsLogsActive = isDiagnosticsLogsActive;
         _navigateToRoute = navigateToRoute;
+        _openStructuredLogLocation = openStructuredLogLocation;
     }
 
     public bool IsDiagnosticsCapabilityActive => _isDiagnosticsCapabilityActive();
@@ -57,6 +93,8 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
     public bool IsDiagnosticsLogsActive => _isDiagnosticsLogsActive();
 
     public void NavigateToRoute(string routeKey) => _navigateToRoute(routeKey);
+
+    public void OpenStructuredLogLocation() => _openStructuredLogLocation();
 }
 
 internal sealed class DiagnosticsWorkspaceComposition
@@ -127,11 +165,11 @@ internal sealed class DiagnosticsWorkspaceComposition
     {
         _subviewTabView.SelectionChanged += DiagnosticsSubviewTabView_SelectionChanged;
         _overviewView.OpenLogsRequested += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
-        _overviewView.OpenSupportExportRequested += (_, _) => _host.OpenStructuredLogLocation();
+        _overviewView.OpenSupportExportRequested += (_, _) => _shellBridge.OpenStructuredLogLocation();
         _logsView.ApplyLogFiltersButton.Click += ApplyLogFiltersButton_Click;
         _logsView.ClearLogFiltersButton.Click += ClearLogFiltersButton_Click;
         _logsView.ReloadLogsButton.Click += ReloadLogsButton_Click;
-        _logsView.OpenRawJsonlButton.Click += (_, _) => _host.OpenStructuredLogLocation();
+        _logsView.OpenRawJsonlButton.Click += (_, _) => _shellBridge.OpenStructuredLogLocation();
         _logsView.StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
     }
 
