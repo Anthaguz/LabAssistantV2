@@ -2120,6 +2120,86 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("UpdateOverviewUi", shellBridgeClassBlock);
     }
 
+    [Fact]
+    public void MainWindow_PreservesShellBoundary_WhileHostingLongLivedDiagnosticsWorkspace()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var shellViewModelSource = LoadShellViewModelSource();
+
+        Assert.Contains("public const string DiagnosticsOverview = \"diagnostics.overview\";", shellViewModelSource);
+        Assert.Contains("public const string DiagnosticsLogs = \"diagnostics.logs\";", shellViewModelSource);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.DiagnosticsOverview, \"Overview\"", shellViewModelSource);
+        Assert.Contains("new ShellSubview(ShellRouteKeys.DiagnosticsLogs, \"Logs\"", shellViewModelSource);
+        Assert.Contains("private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("_diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("DiagnosticsLocalNavigationPanel,", mainWindowSource);
+        Assert.Contains("DiagnosticsOverviewViewHost,", mainWindowSource);
+        Assert.Contains("DiagnosticsLogsViewHost,", mainWindowSource);
+        Assert.Contains("DiagnosticsSubviewTabView,", mainWindowSource);
+        Assert.Contains("DiagnosticsOverviewTabViewItem,", mainWindowSource);
+        Assert.Contains("DiagnosticsLogsTabViewItem,", mainWindowSource);
+        Assert.Contains("new DiagnosticsWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("_diagnosticsWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("_diagnosticsWorkspaceComposition.RefreshSharedUiState();", mainWindowSource);
+
+        Assert.DoesNotContain("private bool _isUpdatingDiagnosticsSubviewSelection;", mainWindowSource);
+        Assert.DoesNotContain("private void WireDiagnosticsLogsHandlers()", mainWindowSource);
+        Assert.DoesNotContain("private void WireOverviewHandlers()", mainWindowSource);
+        Assert.DoesNotContain("DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
+        Assert.DoesNotContain("private void DiagnosticsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)", mainWindowSource);
+        Assert.DoesNotContain("private void SyncDiagnosticsSubviewSelection()", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDiagnosticsOverviewUi()", mainWindowSource);
+    }
+
+    [Fact]
+    public void DiagnosticsExtraction_PreservesLongLivedWorkspaceRefreshAndRouteAnchors()
+    {
+        var mainWindowSource = LoadMainWindowSource();
+        var compositionSource = LoadDiagnosticsWorkspaceCompositionSource();
+        var overviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
+        var shellViewModelSource = LoadShellViewModelSource();
+
+        Assert.Contains("public const string DiagnosticsOverview = \"diagnostics.overview\";", shellViewModelSource);
+        Assert.Contains("public const string DiagnosticsLogs = \"diagnostics.logs\";", shellViewModelSource);
+        Assert.Contains("private bool IsDiagnosticsOverviewActive =>", mainWindowSource);
+        Assert.Contains("private bool IsDiagnosticsLogsActive =>", mainWindowSource);
+        Assert.Contains("private bool IsDiagnosticsCapabilityActive =>", mainWindowSource);
+        Assert.Contains("if (!IsDiagnosticsLogsActive || _isStructuredLogsLoading)", mainWindowSource);
+        Assert.DoesNotContain("private DiagnosticsOverviewView DiagnosticsOverviewView =>", mainWindowSource);
+        Assert.DoesNotContain("private DiagnosticsLogsView DiagnosticsLogsView =>", mainWindowSource);
+
+        Assert.Contains("internal sealed class DiagnosticsWorkspaceComposition", compositionSource);
+        Assert.Contains("private readonly FrameworkElement _localNavigationHost;", compositionSource);
+        Assert.Contains("private readonly DiagnosticsOverviewView _overviewView;", compositionSource);
+        Assert.Contains("private readonly DiagnosticsLogsView _logsView;", compositionSource);
+        Assert.Contains("private readonly IDiagnosticsWorkspaceHost _host;", compositionSource);
+        Assert.Contains("private readonly IDiagnosticsWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("private bool _isUpdatingDiagnosticsSubviewSelection;", compositionSource);
+        Assert.Contains("public void RefreshSharedUiState()", compositionSource);
+        Assert.Contains("public void ApplyShellState()", compositionSource);
+        Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_overviewView.Visibility = _shellBridge.IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("_logsView.Visibility = _shellBridge.IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
+        Assert.Contains("if (_shellBridge.IsDiagnosticsOverviewActive)", compositionSource);
+        Assert.Contains("if (_shellBridge.IsDiagnosticsLogsActive)", compositionSource);
+        Assert.Contains("_ = _host.EnsureStructuredLogsLoadedAsync(forceReload: false);", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsOverview);", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", compositionSource);
+        Assert.Contains("_overviewView.OpenLogsRequested += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", compositionSource);
+        Assert.Contains("_overviewView.OpenSupportExportRequested += (_, _) => _host.OpenStructuredLogLocation();", compositionSource);
+        Assert.DoesNotContain("public void Reset()", compositionSource);
+
+        Assert.Contains("public event EventHandler? OpenLogsRequested;", overviewCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenSupportExportRequested;", overviewCodeBehindSource);
+        Assert.Contains("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", overviewCodeBehindSource);
+        Assert.Contains("OpenLogsRequested?.Invoke(this, EventArgs.Empty);", overviewCodeBehindSource);
+        Assert.Contains("OpenSupportExportRequested?.Invoke(this, EventArgs.Empty);", overviewCodeBehindSource);
+        Assert.DoesNotContain("DiagnosticsOverviewOpenLogsButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("DiagnosticsOverviewOpenSupportExportButtonControl", overviewCodeBehindSource);
+    }
+
     private static string LoadMainWindowSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "MainWindow.xaml.cs");
@@ -2159,6 +2239,18 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadDeployWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDiagnosticsWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDiagnosticsOverviewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Diagnostics", "DiagnosticsOverviewView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

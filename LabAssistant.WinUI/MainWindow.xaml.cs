@@ -20,6 +20,7 @@ using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.ViewModels.Assets;
+using LabAssistant.WinUI.ViewModels.Diagnostics;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
@@ -34,7 +35,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost, IDeployOnTheFlyCompositionHost
+public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost, IDeployOnTheFlyCompositionHost, IDiagnosticsWorkspaceHost
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -56,6 +57,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
     private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
+    private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;
     private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();
     private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;
     private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;
@@ -73,7 +75,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private bool _isStructuredLogsLoading;
     private bool _isTemplatesLoading;
     private bool _isUpdatingNavigationSelection;
-    private bool _isUpdatingDiagnosticsSubviewSelection;
     private bool _isDeployLoadingTemplates;
     private int _deployOnTheFlyAutoEvaluateNonce;
     private bool _isShellRightPanelOpen;
@@ -86,43 +87,18 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
-    private DiagnosticsOverviewView DiagnosticsOverviewView => DiagnosticsOverviewViewHost;
-    private DiagnosticsLogsView DiagnosticsLogsView => DiagnosticsLogsViewHost;
     private AssetsOverviewView AssetsOverviewView => AssetsOverviewViewHost;
     private AssetsBaseDisksView AssetsBaseDisksView => AssetsBaseDisksViewHost;
     private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;
     private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
-    private FrameworkElement DiagnosticsOverviewPanel => DiagnosticsOverviewViewHost;
     private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
     private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
     private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;
     private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
-    private FrameworkElement DiagnosticsLocalNavPanel => DiagnosticsLocalNavigationPanel;
     private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
-    private FrameworkElement DiagnosticsLogsPanel => DiagnosticsLogsViewHost;
-    private TextBox LogFilterOperationIdTextBox => DiagnosticsLogsView.LogFilterOperationIdTextBox;
-    private TextBox LogFilterLevelTextBox => DiagnosticsLogsView.LogFilterLevelTextBox;
-    private TextBox LogFilterEventTextBox => DiagnosticsLogsView.LogFilterEventTextBox;
-    private TextBox LogFilterTextSearchTextBox => DiagnosticsLogsView.LogFilterTextSearchTextBox;
-    private CheckBox LogFilterUseStartDateCheckBox => DiagnosticsLogsView.LogFilterUseStartDateCheckBox;
-    private DatePicker LogFilterStartDatePicker => DiagnosticsLogsView.LogFilterStartDatePicker;
-    private CheckBox LogFilterUseEndDateCheckBox => DiagnosticsLogsView.LogFilterUseEndDateCheckBox;
-    private DatePicker LogFilterEndDatePicker => DiagnosticsLogsView.LogFilterEndDatePicker;
-    private Button ApplyLogFiltersButton => DiagnosticsLogsView.ApplyLogFiltersButton;
-    private Button ClearLogFiltersButton => DiagnosticsLogsView.ClearLogFiltersButton;
-    private Button ReloadLogsButton => DiagnosticsLogsView.ReloadLogsButton;
-    private Button OpenRawJsonlButton => DiagnosticsLogsView.OpenRawJsonlButton;
-    private TextBlock LogsStatusTextBlock => DiagnosticsLogsView.LogsStatusTextBlock;
-    private ListView StructuredLogsListView => DiagnosticsLogsView.StructuredLogsListView;
-    private TextBlock SelectedLogEnvelopeTextBlock => DiagnosticsLogsView.SelectedLogEnvelopeTextBlock;
-    private TextBox SelectedLogContextTextBox => DiagnosticsLogsView.SelectedLogContextTextBox;
-    private Button DiagnosticsOverviewOpenLogsButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenLogsButtonControl;
-    private TextBlock DiagnosticsOverviewLogsSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewLogsSummaryTextBlockControl;
-    private Button DiagnosticsOverviewOpenSupportExportButton => DiagnosticsOverviewView.DiagnosticsOverviewOpenSupportExportButtonControl;
-    private TextBlock DiagnosticsOverviewSupportSummaryTextBlock => DiagnosticsOverviewView.DiagnosticsOverviewSupportSummaryTextBlockControl;
     private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
     private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
     private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
@@ -253,13 +229,24 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 () => IsDeployOnTheFlyActive,
                 () => IsDeployFromTemplateActive,
                 NavigateToRoute));
+        _diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(
+            DiagnosticsLocalNavigationPanel,
+            DiagnosticsOverviewViewHost,
+            DiagnosticsLogsViewHost,
+            DiagnosticsSubviewTabView,
+            DiagnosticsOverviewTabViewItem,
+            DiagnosticsLogsTabViewItem,
+            this,
+            new DiagnosticsWorkspaceShellBridge(
+                () => IsDiagnosticsCapabilityActive,
+                () => IsDiagnosticsOverviewActive,
+                () => IsDiagnosticsLogsActive,
+                NavigateToRoute));
         _deployOnTheFlyWorkspaceController = new DeployOnTheFlyWorkspaceController(_deployOnTheFlyWorkspace, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
-        StructuredLogsListView.ItemsSource = _structuredLogEntries;
-        WireDiagnosticsLogsHandlers();
+        DiagnosticsLogsViewHost.StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireDeployHandlers();
-        WireOverviewHandlers();
         ConfigureShellIcons();
         ConfigureNavigationView();
         ApplyShellNavigationMode(1280);
@@ -289,15 +276,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         appWindow?.Resize(new Windows.Graphics.SizeInt32(width, height));
     }
 
-    private void WireDiagnosticsLogsHandlers()
-    {
-        ApplyLogFiltersButton.Click += ApplyLogFiltersButton_Click;
-        ClearLogFiltersButton.Click += ClearLogFiltersButton_Click;
-        ReloadLogsButton.Click += ReloadLogsButton_Click;
-        OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
-        StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
-    }
-
     private void WireDeployHandlers()
     {
         DeployFromTemplateView.ReloadTemplatesRequested += DeployReloadTemplatesButton_Click;
@@ -308,12 +286,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
         DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;
         UpdateDeployIssueRows();
-    }
-
-    private void WireOverviewHandlers()
-    {
-        DiagnosticsOverviewOpenLogsButton.Click += (_, _) => NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
-        DiagnosticsOverviewOpenSupportExportButton.Click += (_, _) => OpenStructuredLogLocation();
     }
 
     private void ConfigureShellIcons()
@@ -415,12 +387,8 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         AssetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
         AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
-        DiagnosticsLocalNavPanel.Visibility = IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
-        DiagnosticsOverviewPanel.Visibility = IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        SyncDiagnosticsSubviewSelection();
         ApplyTemplatesWorkspaceUiState();
         SettingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
-        DiagnosticsLogsPanel.Visibility = IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
         NonMachinesPlaceholderTextBlock.Visibility = (IsMachinesOverviewActive || IsDeployCapabilityActive || IsAssetsCapabilityActive || IsTemplatesCapabilityActive || IsSettingsMachinesActive || IsDiagnosticsCapabilityActive) ? Visibility.Collapsed : Visibility.Visible;
 
         QueueNavigationSelectionUpdate();
@@ -429,19 +397,10 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _deployWorkspaceComposition.ApplyShellState();
         _assetsWorkspaceComposition.ApplyShellState();
         _templatesWorkspaceComposition.ApplyShellState();
+        _diagnosticsWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)
         {
             _ = LoadMachinesDeletionPolicyAsync();
-        }
-
-        if (IsDiagnosticsOverviewActive)
-        {
-            UpdateDiagnosticsOverviewUi();
-        }
-
-        if (IsDiagnosticsLogsActive)
-        {
-            _ = EnsureStructuredLogsLoadedAsync(forceReload: false);
         }
 
         if (IsDeployFromTemplateActive)
@@ -667,60 +626,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         });
     }
 
-    private void DiagnosticsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isUpdatingDiagnosticsSubviewSelection || DiagnosticsSubviewTabView.SelectedItem is not TabViewItem selectedTab)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(selectedTab, DiagnosticsOverviewTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.DiagnosticsOverview);
-        }
-        else if (ReferenceEquals(selectedTab, DiagnosticsLogsTabViewItem))
-        {
-            NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
-        }
-    }
-
-    private void SyncDiagnosticsSubviewSelection()
-    {
-        if (!IsDiagnosticsCapabilityActive)
-        {
-            return;
-        }
-
-        var selectedTab = IsDiagnosticsOverviewActive
-            ? DiagnosticsOverviewTabViewItem
-            : DiagnosticsLogsTabViewItem;
-
-        if (ReferenceEquals(DiagnosticsSubviewTabView.SelectedItem, selectedTab))
-        {
-            return;
-        }
-
-        _isUpdatingDiagnosticsSubviewSelection = true;
-        try
-        {
-            DiagnosticsSubviewTabView.SelectedItem = selectedTab;
-        }
-        finally
-        {
-            _isUpdatingDiagnosticsSubviewSelection = false;
-        }
-    }
-
-    private void UpdateDiagnosticsOverviewUi()
-    {
-        DiagnosticsOverviewLogsSummaryTextBlock.Text = _isStructuredLogsLoading
-            ? "Structured logs are loading."
-            : _structuredLogEntries.Count > 0
-                ? $"{_structuredLogEntries.Count} structured log entries are currently loaded."
-                : "Open Logs to inspect structured events and current support context.";
-        DiagnosticsOverviewSupportSummaryTextBlock.Text = "Open the current structured log location for support export or manual diagnostics collection.";
-    }
-
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
     {
         if (!CanActiveCapabilityOwnRightPanel())
@@ -791,6 +696,22 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     Task IDeployOnTheFlyCompositionHost.OnStartRequestedAsync() => _deployOnTheFlyWorkspaceController.StartDeployAsync();
 
     void IDeployOnTheFlyCompositionHost.OnOpenResultsPanelRequested() => ToggleDeployRightPanelFromWorkflow();
+
+    bool IDiagnosticsWorkspaceHost.IsStructuredLogsLoading => _isStructuredLogsLoading;
+
+    int IDiagnosticsWorkspaceHost.StructuredLogEntryCount => _structuredLogEntries.Count;
+
+    Task IDiagnosticsWorkspaceHost.EnsureStructuredLogsLoadedAsync(bool forceReload) => EnsureStructuredLogsLoadedAsync(forceReload);
+
+    void IDiagnosticsWorkspaceHost.ClearStructuredLogFilters() => ClearStructuredLogFilters();
+
+    void IDiagnosticsWorkspaceHost.SetSelectedStructuredLogEntry(StructuredLogViewerEntry? selectedEntry)
+    {
+        _selectedStructuredLogEntry = selectedEntry;
+        UpdateStructuredLogSelectionDetails();
+    }
+
+    void IDiagnosticsWorkspaceHost.OpenStructuredLogLocation() => OpenStructuredLogLocation();
 
     private void ToggleDeployRightPanelFromWorkflow()
     {
@@ -2383,11 +2304,11 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
 
         _isStructuredLogsLoading = true;
-        ApplyLogFiltersButton.IsEnabled = false;
-        ClearLogFiltersButton.IsEnabled = false;
-        ReloadLogsButton.IsEnabled = false;
-        OpenRawJsonlButton.IsEnabled = false;
-        LogsStatusTextBlock.Text = "Loading structured logs...";
+        DiagnosticsLogsViewHost.ApplyLogFiltersButton.IsEnabled = false;
+        DiagnosticsLogsViewHost.ClearLogFiltersButton.IsEnabled = false;
+        DiagnosticsLogsViewHost.ReloadLogsButton.IsEnabled = false;
+        DiagnosticsLogsViewHost.OpenRawJsonlButton.IsEnabled = false;
+        DiagnosticsLogsViewHost.LogsStatusTextBlock.Text = "Loading structured logs...";
 
         try
         {
@@ -2400,7 +2321,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 _structuredLogEntries.Add(entry);
             }
 
-            StructuredLogsListView.SelectedItem = null;
+            DiagnosticsLogsViewHost.StructuredLogsListView.SelectedItem = null;
             _selectedStructuredLogEntry = null;
             UpdateStructuredLogSelectionDetails();
 
@@ -2408,21 +2329,22 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             var parseErrorSuffix = result.ParseErrorCount > 0
                 ? $" Skipped malformed lines: {result.ParseErrorCount}."
                 : string.Empty;
-            LogsStatusTextBlock.Text = File.Exists(filePath)
+            DiagnosticsLogsViewHost.LogsStatusTextBlock.Text = File.Exists(filePath)
                 ? $"Loaded {_structuredLogEntries.Count} events from {result.TotalLineCount} lines.{parseErrorSuffix}"
                 : $"Structured log file not found yet: {filePath}";
         }
         catch (Exception ex)
         {
-            LogsStatusTextBlock.Text = $"Failed to load structured logs. {ex.Message}";
+            DiagnosticsLogsViewHost.LogsStatusTextBlock.Text = $"Failed to load structured logs. {ex.Message}";
         }
         finally
         {
             _isStructuredLogsLoading = false;
-            ApplyLogFiltersButton.IsEnabled = true;
-            ClearLogFiltersButton.IsEnabled = true;
-            ReloadLogsButton.IsEnabled = true;
-            OpenRawJsonlButton.IsEnabled = true;
+            DiagnosticsLogsViewHost.ApplyLogFiltersButton.IsEnabled = true;
+            DiagnosticsLogsViewHost.ClearLogFiltersButton.IsEnabled = true;
+            DiagnosticsLogsViewHost.ReloadLogsButton.IsEnabled = true;
+            DiagnosticsLogsViewHost.OpenRawJsonlButton.IsEnabled = true;
+            _diagnosticsWorkspaceComposition.RefreshSharedUiState();
         }
     }
 
@@ -2430,15 +2352,15 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     {
         return new StructuredLogViewerFilter
         {
-            OperationId = NormalizeFilterText(LogFilterOperationIdTextBox.Text),
-            Level = NormalizeFilterText(LogFilterLevelTextBox.Text),
-            Event = NormalizeFilterText(LogFilterEventTextBox.Text),
-            TextSearch = NormalizeFilterText(LogFilterTextSearchTextBox.Text),
-            StartUtc = LogFilterUseStartDateCheckBox.IsChecked == true
-                ? ToDateBoundaryUtc(LogFilterStartDatePicker.Date, isEndBoundary: false)
+            OperationId = NormalizeFilterText(DiagnosticsLogsViewHost.LogFilterOperationIdTextBox.Text),
+            Level = NormalizeFilterText(DiagnosticsLogsViewHost.LogFilterLevelTextBox.Text),
+            Event = NormalizeFilterText(DiagnosticsLogsViewHost.LogFilterEventTextBox.Text),
+            TextSearch = NormalizeFilterText(DiagnosticsLogsViewHost.LogFilterTextSearchTextBox.Text),
+            StartUtc = DiagnosticsLogsViewHost.LogFilterUseStartDateCheckBox.IsChecked == true
+                ? ToDateBoundaryUtc(DiagnosticsLogsViewHost.LogFilterStartDatePicker.Date, isEndBoundary: false)
                 : null,
-            EndUtc = LogFilterUseEndDateCheckBox.IsChecked == true
-                ? ToDateBoundaryUtc(LogFilterEndDatePicker.Date, isEndBoundary: true)
+            EndUtc = DiagnosticsLogsViewHost.LogFilterUseEndDateCheckBox.IsChecked == true
+                ? ToDateBoundaryUtc(DiagnosticsLogsViewHost.LogFilterEndDatePicker.Date, isEndBoundary: true)
                 : null
         };
     }
@@ -2447,14 +2369,14 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     {
         if (_selectedStructuredLogEntry is null)
         {
-            SelectedLogEnvelopeTextBlock.Text = "Select a log entry.";
-            SelectedLogContextTextBox.Text = string.Empty;
+            DiagnosticsLogsViewHost.SelectedLogEnvelopeTextBlock.Text = "Select a log entry.";
+            DiagnosticsLogsViewHost.SelectedLogContextTextBox.Text = string.Empty;
             return;
         }
 
-        SelectedLogEnvelopeTextBlock.Text =
+        DiagnosticsLogsViewHost.SelectedLogEnvelopeTextBlock.Text =
             $"ts={_selectedStructuredLogEntry.TimestampText} | level={_selectedStructuredLogEntry.Level} | event={_selectedStructuredLogEntry.Event} | operationId={_selectedStructuredLogEntry.OperationId} | result={_selectedStructuredLogEntry.Result}";
-        SelectedLogContextTextBox.Text = FormatJsonForDetails(_selectedStructuredLogEntry.ContextJson);
+        DiagnosticsLogsViewHost.SelectedLogContextTextBox.Text = FormatJsonForDetails(_selectedStructuredLogEntry.ContextJson);
     }
 
     private static string NormalizeFilterText(string? value)
@@ -2497,38 +2419,16 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
     }
 
-    private async void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
+    private void ClearStructuredLogFilters()
     {
-        await EnsureStructuredLogsLoadedAsync(forceReload: true);
-    }
-
-    private async void ApplyLogFiltersButton_Click(object sender, RoutedEventArgs e)
-    {
-        await EnsureStructuredLogsLoadedAsync(forceReload: true);
-    }
-
-    private async void ClearLogFiltersButton_Click(object sender, RoutedEventArgs e)
-    {
-        LogFilterOperationIdTextBox.Text = string.Empty;
-        LogFilterLevelTextBox.Text = string.Empty;
-        LogFilterEventTextBox.Text = string.Empty;
-        LogFilterTextSearchTextBox.Text = string.Empty;
-        LogFilterUseStartDateCheckBox.IsChecked = false;
-        LogFilterUseEndDateCheckBox.IsChecked = false;
-        LogFilterStartDatePicker.Date = DateTimeOffset.Now;
-        LogFilterEndDatePicker.Date = DateTimeOffset.Now;
-        await EnsureStructuredLogsLoadedAsync(forceReload: true);
-    }
-
-    private void StructuredLogsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        _selectedStructuredLogEntry = StructuredLogsListView.SelectedItem as StructuredLogViewerEntry;
-        UpdateStructuredLogSelectionDetails();
-    }
-
-    private void OpenRawJsonlButton_Click(object sender, RoutedEventArgs e)
-    {
-        OpenStructuredLogLocation();
+        DiagnosticsLogsViewHost.LogFilterOperationIdTextBox.Text = string.Empty;
+        DiagnosticsLogsViewHost.LogFilterLevelTextBox.Text = string.Empty;
+        DiagnosticsLogsViewHost.LogFilterEventTextBox.Text = string.Empty;
+        DiagnosticsLogsViewHost.LogFilterTextSearchTextBox.Text = string.Empty;
+        DiagnosticsLogsViewHost.LogFilterUseStartDateCheckBox.IsChecked = false;
+        DiagnosticsLogsViewHost.LogFilterUseEndDateCheckBox.IsChecked = false;
+        DiagnosticsLogsViewHost.LogFilterStartDatePicker.Date = DateTimeOffset.Now;
+        DiagnosticsLogsViewHost.LogFilterEndDatePicker.Date = DateTimeOffset.Now;
     }
 
     private void OpenStructuredLogLocation()
@@ -2552,15 +2452,15 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 {
                     UseShellExecute = true
                 });
-                LogsStatusTextBlock.Text = $"Active structured log file not found. Opened log folder: {folderPath}";
+                DiagnosticsLogsViewHost.LogsStatusTextBlock.Text = $"Active structured log file not found. Opened log folder: {folderPath}";
                 return;
             }
 
-            LogsStatusTextBlock.Text = $"Structured log path does not exist yet: {filePath}";
+            DiagnosticsLogsViewHost.LogsStatusTextBlock.Text = $"Structured log path does not exist yet: {filePath}";
         }
         catch (Exception ex)
         {
-            LogsStatusTextBlock.Text = $"Failed to open structured log location. {ex.Message}";
+            DiagnosticsLogsViewHost.LogsStatusTextBlock.Text = $"Failed to open structured log location. {ex.Message}";
         }
     }
 

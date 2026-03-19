@@ -200,8 +200,7 @@
                                 Visibility="Collapsed">
                                 <TabView
                                     x:Name="DiagnosticsSubviewTabView"
-                                    IsAddTabButtonVisible="False"
-                                    SelectionChanged="DiagnosticsSubviewTabView_SelectionChanged">
+                                    IsAddTabButtonVisible="False">
                                     <TabViewItem x:Name="DiagnosticsOverviewTabViewItem" Header="Overview" IsClosable="False">
                                         <diagViews:DiagnosticsOverviewView x:Name="DiagnosticsOverviewViewHost" />
                                     </TabViewItem>

@@ -52,6 +52,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var source = LoadMainWindowSource();
         var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
         var deployCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var diagnosticsCompositionSource = LoadDiagnosticsWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployLocalNavigationPanel"));
         Assert.NotNull(FindByName(xaml, "DeploySubviewTabView"));
@@ -78,7 +79,8 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("SyncDeploySubviewSelection()", deployCompositionSource);
         Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", source);
         Assert.Contains("SyncAssetsSubviewSelection();", assetsCompositionSource);
-        Assert.Contains("SyncDiagnosticsSubviewSelection();", source);
+        Assert.Contains("_diagnosticsWorkspaceComposition.ApplyShellState();", source);
+        Assert.Contains("SyncDiagnosticsSubviewSelection()", diagnosticsCompositionSource);
     }
 
     [Fact]
@@ -118,8 +120,9 @@ public sealed class MilestoneALScenarioMatrixTests
         var deployOverviewSource = LoadDeployOverviewViewXamlSource();
         var deployOverviewCodeBehindSource = LoadDeployOverviewViewCodeBehindSource();
         var diagnosticsOverviewSource = LoadDiagnosticsOverviewViewXamlSource();
-        var mainWindowSource = LoadMainWindowSource();
         var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
+        var diagnosticsCompositionSource = LoadDiagnosticsWorkspaceCompositionSource();
+        var diagnosticsOverviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
 
         Assert.Contains("x:Name=\"AssetsOverviewOpenBaseDisksButton\"", assetsOverviewSource);
         Assert.Contains("x:Name=\"AssetsOverviewOpenSwitchesButton\"", assetsOverviewSource);
@@ -140,8 +143,13 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenLogsButton\"", diagnosticsOverviewSource);
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenSupportExportButton\"", diagnosticsOverviewSource);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", mainWindowSource);
-        Assert.Contains("OpenStructuredLogLocation();", mainWindowSource);
+        Assert.Contains("Click=\"DiagnosticsOverviewOpenLogsButton_Click\"", diagnosticsOverviewSource);
+        Assert.Contains("Click=\"DiagnosticsOverviewOpenSupportExportButton_Click\"", diagnosticsOverviewSource);
+        Assert.Contains("public event EventHandler? OpenLogsRequested;", diagnosticsOverviewCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenSupportExportRequested;", diagnosticsOverviewCodeBehindSource);
+        Assert.Contains("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", diagnosticsOverviewCodeBehindSource);
+        Assert.Contains("_overviewView.OpenLogsRequested += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", diagnosticsCompositionSource);
+        Assert.Contains("_overviewView.OpenSupportExportRequested += (_, _) => _host.OpenStructuredLogLocation();", diagnosticsCompositionSource);
     }
 
     [Fact]
@@ -494,6 +502,18 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDiagnosticsOverviewViewXamlSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Diagnostics", "DiagnosticsOverviewView.xaml");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDiagnosticsOverviewCodeBehindSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Diagnostics", "DiagnosticsOverviewView.xaml.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDiagnosticsWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

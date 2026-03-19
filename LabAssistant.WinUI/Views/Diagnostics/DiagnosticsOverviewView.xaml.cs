@@ -4,16 +4,28 @@ namespace LabAssistant.WinUI.Views.Diagnostics;
 
 public sealed partial class DiagnosticsOverviewView : UserControl
 {
+    public event EventHandler? OpenLogsRequested;
+
+    public event EventHandler? OpenSupportExportRequested;
+
     public DiagnosticsOverviewView()
     {
         InitializeComponent();
     }
 
-    public Button DiagnosticsOverviewOpenLogsButtonControl => DiagnosticsOverviewOpenLogsButton;
+    public void UpdateSummary(string logsSummaryText, string supportSummaryText)
+    {
+        DiagnosticsOverviewLogsSummaryTextBlock.Text = logsSummaryText;
+        DiagnosticsOverviewSupportSummaryTextBlock.Text = supportSummaryText;
+    }
 
-    public TextBlock DiagnosticsOverviewLogsSummaryTextBlockControl => DiagnosticsOverviewLogsSummaryTextBlock;
+    private void DiagnosticsOverviewOpenLogsButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        OpenLogsRequested?.Invoke(this, EventArgs.Empty);
+    }
 
-    public Button DiagnosticsOverviewOpenSupportExportButtonControl => DiagnosticsOverviewOpenSupportExportButton;
-
-    public TextBlock DiagnosticsOverviewSupportSummaryTextBlockControl => DiagnosticsOverviewSupportSummaryTextBlock;
+    private void DiagnosticsOverviewOpenSupportExportButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        OpenSupportExportRequested?.Invoke(this, EventArgs.Empty);
+    }
 }

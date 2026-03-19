@@ -40,6 +40,7 @@
                     <Button
                         x:Name="DiagnosticsOverviewOpenLogsButton"
                         HorizontalAlignment="Left"
+                        Click="DiagnosticsOverviewOpenLogsButton_Click"
                         Content="Open Logs" />
                 </StackPanel>
             </Border>
@@ -64,6 +65,7 @@
                     <Button
                         x:Name="DiagnosticsOverviewOpenSupportExportButton"
                         HorizontalAlignment="Left"
+                        Click="DiagnosticsOverviewOpenSupportExportButton_Click"
                         Content="Open Log Location" />
                 </StackPanel>
             </Border>
