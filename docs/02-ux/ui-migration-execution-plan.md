@@ -442,6 +442,12 @@ Gate expectations:
 - make shared Deploy vs Quick Deploy-local ownership explicit so Quick Deploy-specific state, orchestration, composition, and UI coordination converge behind a Quick Deploy-local seam without widening shared Deploy composition
 - preserve `deploy.on_the_fly` as the on-the-fly deploy surface, keep Quick Deploy inside the long-lived Deploy workspace with route-activation refresh, and keep From Template and Deploy Overview extraction details out of scope
 
+**Diagnostics shared cleanup target checkpoint**
+- before Diagnostics runtime extraction proceeds, define the shared Diagnostics composition cleanup target against the refined AM33 plus post-Machines/post-Assets/post-Templates/post-Deploy model
+- make shell-vs-Diagnostics ownership explicit so shared Diagnostics composition converges into a Diagnostics-local composition owner rather than stopping in `MainWindow`
+- preserve Diagnostics as an Overview-first capability by keeping Diagnostics Overview as the route-entry surface and Diagnostics Logs as a child troubleshooting surface rather than a top-level shell destination
+- treat any `MainWindow` Diagnostics host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
@@ -474,6 +480,12 @@ Gate expectations:
 **Goal**
 - align user-facing IA with actual diagnostics capability
 - preserve shell/global support behaviors
+
+**Shared composition cleanup target**
+- shell ownership stays in `MainWindow`, but shared Diagnostics composition should not terminate there as the long-term architecture
+- a Diagnostics-local composition owner is the target home for shared composition, route activation handling, workspace lifetime participation, and Diagnostics Overview / Diagnostics Logs interaction boundaries
+- Diagnostics remains long-lived while the app session is open; route activation refreshes/reconciles state rather than recreating the workspace on every route change
+- this shared composition target preserves Diagnostics Overview as the route-entry surface and keeps Diagnostics Logs inside the capability rather than as a top-level shell destination
 
 **Must preserve**
 - settings persistence semantics and side effects

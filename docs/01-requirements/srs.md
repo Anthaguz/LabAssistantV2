@@ -712,6 +712,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Deploy composition must not become the Quick Deploy workflow owner; Quick Deploy-specific host bridges or control exposure remain temporary migration cleanup targets behind the Quick Deploy-local seam; `deploy.on_the_fly` must not absorb `deploy.from_template` semantics or Deploy Overview ownership; and the cleanup target must stay explicit that runtime implementation, From Template extraction details, Deploy Overview extraction details, Deploy behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-167:** WinUI `Diagnostics` shared composition cleanup shall converge shared `Diagnostics Overview` and `Diagnostics Logs` composition into a Diagnostics-local composition owner instead of leaving shared capability composition responsibilities in `MainWindow`.
+  - **Acceptance details:** `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact or drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime; the Diagnostics-local composition owner becomes the long-term home for shared Diagnostics-local composition and interaction boundaries across `Diagnostics Overview` and `Diagnostics Logs`.
+  - **Priority:** P1
+
+- **FR-168:** WinUI `Diagnostics` shared composition cleanup shall treat capability-specific host interfaces implemented by `MainWindow` as temporary migration bridges only, and views shall not depend on or receive `MainWindow` directly.
+  - **Acceptance details:** shared Diagnostics route activation handling, shared workspace lifetime participation, and shared local interaction boundaries for Diagnostics Overview and Diagnostics Logs must converge behind the Diagnostics-local composition owner or narrow abstractions rather than direct `MainWindow` injection or permanent shell-host interface accumulation.
+  - **Priority:** P1
+
+- **FR-169:** WinUI `Diagnostics` shared composition cleanup shall preserve the long-lived Diagnostics workspace/session model and existing Overview-first route-entry semantics so route activation reconciles shared Diagnostics state rather than recreating the Diagnostics workspace on every route change.
+  - **Acceptance details:** cleanup-target definition must preserve Diagnostics Overview as the route-entry surface, keep Diagnostics Logs as a child troubleshooting surface rather than a top-level shell destination, keep route activation refresh within the long-lived Diagnostics workspace rather than per-navigation recreation, and remain explicit that Diagnostics Overview extraction details, Diagnostics Logs extraction details, runtime implementation, Diagnostics workflow redesign, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -740,6 +752,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-deploy-overview-extraction-cleanup-target-am.md` for the AM Deploy Overview cleanup target inside the shared Deploy composition boundary.
 - See `docs/02-ux/winui-from-template-extraction-cleanup-target-am.md` for the AM Deploy From Template cleanup target inside the shared Deploy composition boundary.
 - See `docs/02-ux/winui-quick-deploy-extraction-cleanup-target-am.md` for the AM Deploy Quick Deploy cleanup target inside the shared Deploy composition boundary.
+- See `docs/02-ux/winui-diagnostics-composition-cleanup-target-am.md` for the AM shared Diagnostics composition cleanup target that narrows shell-vs-Diagnostics ownership before Diagnostics runtime extraction proceeds.
 
 ---
 
