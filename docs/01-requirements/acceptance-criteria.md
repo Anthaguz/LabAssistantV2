@@ -3437,3 +3437,86 @@ Each readiness result shall include, at minimum:
 - [ ] long-lived Deploy workspace participation and `deploy.on_the_fly` route-activation refresh expectations are explicit and traceable
 - [ ] From Template / Overview non-goals are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
+
+---
+
+# AC-040 - WinUI Diagnostics Shared Composition Cleanup Target (AM105)
+
+**Related FRs:** FR-167, FR-168, FR-169, FR-104, FR-105, FR-106, FR-107, FR-108, FR-109, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) MainWindow remains shell-only while shared Diagnostics composition moves behind a Diagnostics-local owner
+**Given**
+- `Diagnostics` already has approved AL routing/header/navigation behavior
+
+**When**
+- the shared Diagnostics cleanup target is defined
+
+**Then**
+- `MainWindow` remains responsible only for:
+  - shell route switching
+  - shell title/description
+  - shell compact/drawer behavior
+  - shell host visibility
+  - right-panel infrastructure
+  - app-level workspace lifetime
+- shared Diagnostics-local composition does not terminate in `MainWindow`
+- a Diagnostics-local composition owner becomes the target home for shared Diagnostics-local composition and wiring
+
+### 2) Shared Diagnostics responsibilities converge behind the Diagnostics-local composition owner
+**Given**
+- `Diagnostics` includes shared capability concerns across `Diagnostics Overview` and `Diagnostics Logs`
+
+**When**
+- the shared ownership boundary is reviewed
+
+**Then**
+- the Diagnostics-local composition owner is explicitly responsible for:
+  - Diagnostics-local composition and wiring
+  - shared Diagnostics route-activation handling
+  - shared workspace lifetime participation
+  - shared local interaction boundaries for:
+    - Diagnostics Overview
+    - Diagnostics Logs
+- Diagnostics Overview extraction details and Diagnostics Logs extraction details remain deferred to later narrow issues
+
+### 3) Diagnostics preserves its approved route-entry model while rejecting shell-centric end-state patterns
+**Given**
+- AL defined `Diagnostics` as an Overview-first capability with Logs as a child troubleshooting surface
+
+**When**
+- the cleanup target is applied
+
+**Then**
+- Diagnostics Overview remains the route-entry and index surface for `Diagnostics`
+- Diagnostics Logs remains a child troubleshooting surface rather than a top-level shell destination
+- capability-specific host interfaces implemented by `MainWindow` are explicitly treated as temporary bridges only
+- shared Diagnostics composition does not redesign existing Diagnostics routes or route-entry semantics
+
+### 4) Diagnostics remains long-lived with route-activation refresh and no direct MainWindow view coupling
+**Given**
+- AM33 established long-lived capability workspaces by default
+
+**When**
+- the Diagnostics cleanup target is defined
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- Diagnostics remains long-lived while the app session is open unless a later approved contract explicitly changes that rule
+- navigation between Diagnostics Overview and Diagnostics Logs activates and reconciles shared Diagnostics state rather than recreating the workspace every route change
+- runtime implementation, Diagnostics workflow redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shell continues to host Diagnostics workspace lifetime, route visibility, and shell infrastructure
+- a Diagnostics-local composition owner becomes the target home for shared Diagnostics-local composition across Diagnostics Overview and Diagnostics Logs
+- temporary shell-host bridges are allowed only as migration scaffolding and are not the long-term architecture
+- Diagnostics remains long-lived with route-activation refresh rather than per-navigation recreation
+- Diagnostics preserves the Overview-first route-entry model and current shell-contained capability semantics explicitly
+
+## Definition of Done
+- [ ] shell-vs-Diagnostics ownership is explicit and traceable
+- [ ] shared Diagnostics-local composition-owner target is explicit and traceable
+- [ ] Diagnostics route-entry preservation is explicit and traceable
+- [ ] temporary-bridge-vs-final-target rule and no-direct-`MainWindow`-injection rule are explicit and traceable
+- [ ] long-lived Diagnostics workspace and route-activation refresh rule are explicit and traceable

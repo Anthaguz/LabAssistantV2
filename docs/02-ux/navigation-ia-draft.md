@@ -199,6 +199,18 @@ For Deploy Quick Deploy extraction planning after the shared Deploy cleanup targ
 Behavioral contract source:
 - `docs/02-ux/winui-quick-deploy-extraction-cleanup-target-am.md`
 
+## 2.15 Milestone AM Diagnostics Shared Composition Cleanup Target (Approved)
+
+For Diagnostics extraction planning after AL and the AM shared-capability refinement work:
+- `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact/drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime
+- shared Diagnostics composition must converge behind a Diagnostics-local composition owner rather than terminating in `MainWindow`
+- the Diagnostics-local composition owner is responsible for shared Diagnostics-local composition, shared route activation handling, shared workspace lifetime participation, and shared local interaction boundaries across `Diagnostics Overview` and `Diagnostics Logs`
+- Diagnostics remains an Overview-first capability: `Diagnostics Overview` is the route-entry surface and `Diagnostics Logs` remains a child troubleshooting surface rather than a top-level shell destination
+- capability-specific host interfaces implemented by `MainWindow` are temporary bridges only, and Diagnostics views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-diagnostics-composition-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
@@ -555,6 +567,7 @@ This is why the next deliverable after IA should be the GUI Action Map.
 - Resolved: Assets now has a shared composition cleanup target that makes shell-vs-Assets ownership explicit before runtime extraction proceeds in `docs/02-ux/winui-assets-composition-cleanup-target-am.md`.
 - Resolved: Templates now has a shared composition cleanup target that makes shell-vs-Templates ownership explicit before Templates runtime extraction proceeds in `docs/02-ux/winui-templates-composition-cleanup-target-am.md`.
 - Resolved: Deploy now has a shared composition cleanup target that makes shell-vs-Deploy ownership explicit before Deploy runtime extraction proceeds in `docs/02-ux/winui-deploy-composition-cleanup-target-am.md`.
+- Resolved: Diagnostics now has a shared composition cleanup target that makes shell-vs-Diagnostics ownership explicit before Diagnostics runtime extraction proceeds in `docs/02-ux/winui-diagnostics-composition-cleanup-target-am.md`.
 - Resolved: Assets Overview now has a narrow cleanup target that keeps Overview under shared Assets composition while moving Overview-specific state and interaction coordination behind an Overview-local seam in `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md`.
 - Resolved: Assets Base Disks now has a narrow cleanup target that keeps Base Disks under shared Assets composition while moving Base Disks-specific state, orchestration, and UI coordination behind a Base Disks-local seam in `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md`.
 - Resolved: Assets Switches now has a narrow cleanup target that keeps Switches under shared Assets composition while moving Switches-specific state, orchestration, and UI coordination behind a Switches-local seam in `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md`.
