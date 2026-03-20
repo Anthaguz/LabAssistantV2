@@ -381,6 +381,25 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Deploy remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
   - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Deploy changes.
 
+## TC-023: Milestone AM Diagnostics Extraction Closure Verification
+- **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#439`, `#441`, `#528`, `#529`, `#530`, `#531`, `#532`, `#533`, `#534`, `#535`, `#536`, `#537`, `#538`, `#539`, `#540`, `#541`, `#542`, `#543`, `#544`)
+- **Steps:**
+  1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
+  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-diagnostics-extraction-checklist.md`.
+  3. Verify the shared Diagnostics foundation remains Overview-first, route-stable, and host/delegation only.
+  4. Verify Overview lane summary/actions sanity plus shared-host non-ownership.
+  5. Verify Logs filter/query, selection/detail, reload/clear/open-location sanity.
+  6. Verify route switching preserves the long-lived Diagnostics workspace model and refresh/reconcile behavior rather than per-navigation recreation.
+- **Expected:**
+  - Shared `DiagnosticsWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of Diagnostics-local workflow/state ownership.
+  - `diagnostics.overview` remains the stable/default Diagnostics surface, while `diagnostics.logs` remains a distinct Diagnostics surface.
+  - `DiagnosticsOverviewWorkspaceViewModel` and `DiagnosticsOverviewWorkspaceComposition` remain the Overview-local seams, with the narrowed Overview interaction/view surface still represented.
+  - `DiagnosticsLogsWorkspaceViewModel`, `DiagnosticsLogsWorkspaceController`, and `DiagnosticsLogsWorkspaceComposition` remain the Logs-local seams, with the narrowed Logs interaction/view surface still represented.
+  - Diagnostics remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
+  - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Diagnostics changes.
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.

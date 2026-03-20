@@ -2142,6 +2142,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("new DiagnosticsWorkspaceShellBridge(", mainWindowSource);
         Assert.Contains("_diagnosticsWorkspaceComposition.ApplyShellState();", mainWindowSource);
         Assert.Contains("private string? TryOpenStructuredLogLocation(string filePath)", mainWindowSource);
+        Assert.Equal(1, CountOccurrences(mainWindowSource, "private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;"));
+        Assert.Equal(1, CountOccurrences(mainWindowSource, "_diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition("));
 
         Assert.DoesNotContain("IDiagnosticsWorkspaceHost", mainWindowSource);
         Assert.DoesNotContain("private bool _isUpdatingDiagnosticsSubviewSelection;", mainWindowSource);
@@ -2191,6 +2193,11 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsOverview);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", compositionSource);
+        Assert.Contains("private bool _isUpdatingDiagnosticsSubviewSelection;", compositionSource);
+        Assert.Contains("_subviewTabView.SelectionChanged += DiagnosticsSubviewTabView_SelectionChanged;", compositionSource);
+        Assert.Contains("private void SyncDiagnosticsSubviewSelection()", compositionSource);
+        Assert.Contains("if (ReferenceEquals(_subviewTabView.SelectedItem, selectedTab))", compositionSource);
+        Assert.Contains("_subviewTabView.SelectedItem = selectedTab;", compositionSource);
         Assert.Contains("_logsWorkspaceComposition.WorkspaceStateChanged += LogsWorkspaceComposition_WorkspaceStateChanged;", compositionSource);
         Assert.Contains("_logsWorkspaceComposition.ReportStatusText(statusText)", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.RefreshSummary(_logsWorkspaceComposition.IsLoading, _logsWorkspaceComposition.StructuredLogEntryCount);", compositionSource);
@@ -2747,5 +2754,19 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.True(start >= 0, $"Start marker not found: {startMarker}");
         Assert.True(end > start, $"End marker not found after start marker: {endMarker}");
         return source[start..end];
+    }
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var index = 0;
+
+        while ((index = source.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 }
