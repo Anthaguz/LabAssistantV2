@@ -76,10 +76,8 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
 
 internal sealed class DiagnosticsWorkspaceComposition
 {
-    private const string SupportSummaryText = "Open the current structured log location for support export or manual diagnostics collection.";
-
     private readonly FrameworkElement _localNavigationHost;
-    private readonly DiagnosticsOverviewView _overviewView;
+    private readonly DiagnosticsOverviewWorkspaceComposition _overviewWorkspaceComposition;
     private readonly DiagnosticsLogsView _logsView;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
@@ -102,40 +100,34 @@ internal sealed class DiagnosticsWorkspaceComposition
         IDiagnosticsWorkspaceShellBridge shellBridge)
     {
         _localNavigationHost = localNavigationHost;
-        _overviewView = overviewView;
         _logsView = logsView;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
         _logsTabViewItem = logsTabViewItem;
         _host = host;
         _shellBridge = shellBridge;
+        _overviewWorkspaceComposition = new DiagnosticsOverviewWorkspaceComposition(
+            overviewView,
+            new DiagnosticsOverviewWorkspaceHost(
+                _host.GetStructuredLogFilePath,
+                statusText => _logsView.LogsStatusTextBlock.Text = statusText),
+            new DiagnosticsOverviewWorkspaceShellBridge(
+                () => _shellBridge.IsDiagnosticsOverviewActive,
+                _shellBridge.NavigateToRoute,
+                _shellBridge.OpenStructuredLogLocation));
         _logsView.StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireSharedHandlers();
         UpdateStructuredLogSelectionDetails();
-    }
-
-    public void RefreshSharedUiState()
-    {
-        var logsSummaryText = _isStructuredLogsLoading
-            ? "Structured logs are loading."
-            : _structuredLogEntries.Count > 0
-                ? $"{_structuredLogEntries.Count} structured log entries are currently loaded."
-                : "Open Logs to inspect structured events and current support context.";
-        _overviewView.UpdateSummary(logsSummaryText, SupportSummaryText);
+        RefreshOverviewSummary();
     }
 
     public void ApplyShellState()
     {
         _localNavigationHost.Visibility = _shellBridge.IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
-        _overviewView.Visibility = _shellBridge.IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         _logsView.Visibility = _shellBridge.IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;
+        _overviewWorkspaceComposition.ApplyShellState();
 
         SyncDiagnosticsSubviewSelection();
-
-        if (_shellBridge.IsDiagnosticsOverviewActive)
-        {
-            RefreshSharedUiState();
-        }
 
         if (_shellBridge.IsDiagnosticsLogsActive)
         {
@@ -146,8 +138,6 @@ internal sealed class DiagnosticsWorkspaceComposition
     private void WireSharedHandlers()
     {
         _subviewTabView.SelectionChanged += DiagnosticsSubviewTabView_SelectionChanged;
-        _overviewView.OpenLogsRequested += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
-        _overviewView.OpenSupportExportRequested += (_, _) => OpenStructuredLogLocation();
         _logsView.ApplyLogFiltersButton.Click += ApplyLogFiltersButton_Click;
         _logsView.ClearLogFiltersButton.Click += ClearLogFiltersButton_Click;
         _logsView.ReloadLogsButton.Click += ReloadLogsButton_Click;
@@ -204,6 +194,11 @@ internal sealed class DiagnosticsWorkspaceComposition
         await EnsureStructuredLogsLoadedAsync(forceReload: true);
     }
 
+    private void RefreshOverviewSummary()
+    {
+        _overviewWorkspaceComposition.RefreshSummary(_isStructuredLogsLoading, _structuredLogEntries.Count);
+    }
+
     private async void ApplyLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
         await EnsureStructuredLogsLoadedAsync(forceReload: true);
@@ -239,6 +234,7 @@ internal sealed class DiagnosticsWorkspaceComposition
         _logsView.ReloadLogsButton.IsEnabled = false;
         _logsView.OpenRawJsonlButton.IsEnabled = false;
         _logsView.LogsStatusTextBlock.Text = "Loading structured logs...";
+        RefreshOverviewSummary();
 
         try
         {
@@ -274,7 +270,7 @@ internal sealed class DiagnosticsWorkspaceComposition
             _logsView.ClearLogFiltersButton.IsEnabled = true;
             _logsView.ReloadLogsButton.IsEnabled = true;
             _logsView.OpenRawJsonlButton.IsEnabled = true;
-            RefreshSharedUiState();
+            RefreshOverviewSummary();
         }
     }
 
