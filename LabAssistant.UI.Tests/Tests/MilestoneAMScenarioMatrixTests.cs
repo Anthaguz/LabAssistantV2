@@ -2243,7 +2243,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_view.Visibility = _shellBridge.IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;", overviewCompositionSource);
         Assert.Contains("_view.OpenLogsRequested += OpenLogsRequested;", overviewCompositionSource);
         Assert.Contains("_view.OpenSupportExportRequested += OpenSupportExportRequested;", overviewCompositionSource);
-        Assert.Contains("_view.UpdateSummary(_workspace.LogsSummaryText, _workspace.SupportSummaryText);", overviewCompositionSource);
+        Assert.Contains("_view.ApplyWorkspaceState(new DiagnosticsOverviewViewState(", overviewCompositionSource);
+        Assert.Contains("_workspace.LogsSummaryText,", overviewCompositionSource);
+        Assert.Contains("_workspace.SupportSummaryText));", overviewCompositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", overviewCompositionSource);
         Assert.Contains("var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());", overviewCompositionSource);
         Assert.Contains("_host.ReportOpenSupportStatus(statusText);", overviewCompositionSource);
@@ -2254,13 +2256,17 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void RefreshSummary(bool isStructuredLogsLoading, int structuredLogEntryCount)", overviewWorkspaceSource);
         Assert.Contains("LogsSummaryText = isStructuredLogsLoading", overviewWorkspaceSource);
 
-        Assert.Contains("public event EventHandler? OpenLogsRequested;", overviewCodeBehindSource);
-        Assert.Contains("public event EventHandler? OpenSupportExportRequested;", overviewCodeBehindSource);
-        Assert.Contains("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", overviewCodeBehindSource);
-        Assert.Contains("OpenLogsRequested?.Invoke(this, EventArgs.Empty);", overviewCodeBehindSource);
-        Assert.Contains("OpenSupportExportRequested?.Invoke(this, EventArgs.Empty);", overviewCodeBehindSource);
+        Assert.Contains("public readonly record struct DiagnosticsOverviewViewState(", overviewCodeBehindSource);
+        Assert.Contains("public event RoutedEventHandler? OpenLogsRequested;", overviewCodeBehindSource);
+        Assert.Contains("public event RoutedEventHandler? OpenSupportExportRequested;", overviewCodeBehindSource);
+        Assert.Contains("public void ApplyWorkspaceState(DiagnosticsOverviewViewState state)", overviewCodeBehindSource);
+        Assert.Contains("DiagnosticsOverviewLogsSummaryTextBlock.Text = state.LogsSummaryText;", overviewCodeBehindSource);
+        Assert.Contains("DiagnosticsOverviewSupportSummaryTextBlock.Text = state.SupportSummaryText;", overviewCodeBehindSource);
+        Assert.Contains("OpenLogsRequested?.Invoke(this, e);", overviewCodeBehindSource);
+        Assert.Contains("OpenSupportExportRequested?.Invoke(this, e);", overviewCodeBehindSource);
         Assert.DoesNotContain("DiagnosticsOverviewOpenLogsButtonControl", overviewCodeBehindSource);
         Assert.DoesNotContain("DiagnosticsOverviewOpenSupportExportButtonControl", overviewCodeBehindSource);
+        Assert.DoesNotContain("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", overviewCodeBehindSource);
     }
 
     private static string LoadMainWindowSource()

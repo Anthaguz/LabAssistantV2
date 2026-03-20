@@ -1,5 +1,6 @@
 using LabAssistant.WinUI.Views.Diagnostics;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.ViewModels.Diagnostics;
 
@@ -107,15 +108,17 @@ internal sealed class DiagnosticsOverviewWorkspaceComposition
 
     private void ApplyWorkspaceState()
     {
-        _view.UpdateSummary(_workspace.LogsSummaryText, _workspace.SupportSummaryText);
+        _view.ApplyWorkspaceState(new DiagnosticsOverviewViewState(
+            _workspace.LogsSummaryText,
+            _workspace.SupportSummaryText));
     }
 
-    private void OpenLogsRequested(object? sender, EventArgs e)
+    private void OpenLogsRequested(object sender, RoutedEventArgs e)
     {
         _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
     }
 
-    private void OpenSupportExportRequested(object? sender, EventArgs e)
+    private void OpenSupportExportRequested(object sender, RoutedEventArgs e)
     {
         var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());
         if (!string.IsNullOrWhiteSpace(statusText))
