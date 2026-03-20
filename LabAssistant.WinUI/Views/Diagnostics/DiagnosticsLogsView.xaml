@@ -4,7 +4,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Border
         x:Name="DiagnosticsLogsPanel"
-        x:FieldModifier="public"
         Padding="12"
         Background="{StaticResource ShellBackgroundBrush}"
         BorderBrush="{StaticResource ShellBorderBrush}"
@@ -39,30 +38,29 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBox x:Name="LogFilterOperationIdTextBox" x:FieldModifier="public" Grid.Row="0" Grid.Column="0" Width="180" PlaceholderText="OperationId" />
-                        <TextBox x:Name="LogFilterLevelTextBox" x:FieldModifier="public" Grid.Row="0" Grid.Column="1" Width="120" PlaceholderText="Level" />
-                        <TextBox x:Name="LogFilterEventTextBox" x:FieldModifier="public" Grid.Row="0" Grid.Column="2" Width="180" PlaceholderText="Event" />
-                        <TextBox x:Name="LogFilterTextSearchTextBox" x:FieldModifier="public" Grid.Row="0" Grid.Column="3" Width="220" PlaceholderText="Text search" />
+                        <TextBox x:Name="LogFilterOperationIdTextBox" Grid.Row="0" Grid.Column="0" Width="180" PlaceholderText="OperationId" />
+                        <TextBox x:Name="LogFilterLevelTextBox" Grid.Row="0" Grid.Column="1" Width="120" PlaceholderText="Level" />
+                        <TextBox x:Name="LogFilterEventTextBox" Grid.Row="0" Grid.Column="2" Width="180" PlaceholderText="Event" />
+                        <TextBox x:Name="LogFilterTextSearchTextBox" Grid.Row="0" Grid.Column="3" Width="220" PlaceholderText="Text search" />
 
                         <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
-                            <CheckBox x:Name="LogFilterUseStartDateCheckBox" x:FieldModifier="public" VerticalAlignment="Center" Content="Start" />
-                            <DatePicker x:Name="LogFilterStartDatePicker" x:FieldModifier="public" />
+                            <CheckBox x:Name="LogFilterUseStartDateCheckBox" VerticalAlignment="Center" Content="Start" />
+                            <DatePicker x:Name="LogFilterStartDatePicker" />
                         </StackPanel>
                         <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                            <CheckBox x:Name="LogFilterUseEndDateCheckBox" x:FieldModifier="public" VerticalAlignment="Center" Content="End" />
-                            <DatePicker x:Name="LogFilterEndDatePicker" x:FieldModifier="public" />
+                            <CheckBox x:Name="LogFilterUseEndDateCheckBox" VerticalAlignment="Center" Content="End" />
+                            <DatePicker x:Name="LogFilterEndDatePicker" />
                         </StackPanel>
-                        <Button x:Name="ApplyLogFiltersButton" x:FieldModifier="public" Grid.Row="1" Grid.Column="2" Content="Apply filters" />
+                        <Button x:Name="ApplyLogFiltersButton" Grid.Row="1" Grid.Column="2" Content="Apply filters" />
                         <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="ClearLogFiltersButton" x:FieldModifier="public" Content="Clear filters" />
-                            <Button x:Name="ReloadLogsButton" x:FieldModifier="public" Content="Reload" />
-                            <Button x:Name="OpenRawJsonlButton" x:FieldModifier="public" Content="Open raw JSONL" />
+                            <Button x:Name="ClearLogFiltersButton" Content="Clear filters" />
+                            <Button x:Name="ReloadLogsButton" Content="Reload" />
+                            <Button x:Name="OpenRawJsonlButton" Content="Open raw JSONL" />
                         </StackPanel>
                     </Grid>
                 </StackPanel>
                 <TextBlock
                     x:Name="LogsStatusTextBlock"
-                    x:FieldModifier="public"
                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                     Text="Logs not loaded yet."
                     TextWrapping="Wrap" />
@@ -70,7 +68,6 @@
 
             <ListView
                 x:Name="StructuredLogsListView"
-                x:FieldModifier="public"
                 Grid.Row="1"
                 Grid.Column="0">
                 <ListView.ItemTemplate>
@@ -119,14 +116,12 @@
                         VerticalScrollBarVisibility="Auto">
                         <TextBlock
                             x:Name="SelectedLogEnvelopeTextBlock"
-                            x:FieldModifier="public"
                             Foreground="{StaticResource ShellTextSecondaryBrush}"
                             Text="Select a log entry."
                             TextWrapping="WrapWholeWords" />
                     </ScrollViewer>
                     <TextBox
                         x:Name="SelectedLogContextTextBox"
-                        x:FieldModifier="public"
                         Grid.Row="2"
                         AcceptsReturn="True"
                         IsReadOnly="True"

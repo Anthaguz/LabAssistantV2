@@ -29,6 +29,10 @@ public sealed partial class DiagnosticsLogsView : UserControl
 
     public event RoutedEventHandler? ClearFiltersRequested;
 
+    public event EventHandler? ReloadRequested;
+
+    public event EventHandler? OpenRawJsonlRequested;
+
     public event EventHandler? SelectedLogChanged;
 
     public DiagnosticsLogsView()
@@ -61,6 +65,11 @@ public sealed partial class DiagnosticsLogsView : UserControl
             LogFilterStartDatePicker.Date,
             LogFilterUseEndDateCheckBox.IsChecked == true,
             LogFilterEndDatePicker.Date);
+    }
+
+    public void SetStructuredLogItemsSource(object? itemsSource)
+    {
+        StructuredLogsListView.ItemsSource = itemsSource;
     }
 
     public void ApplyFilterState(DiagnosticsLogsFilterViewState state)
@@ -99,6 +108,20 @@ public sealed partial class DiagnosticsLogsView : UserControl
         SelectedLogContextTextBox.Text = state.ContextText;
     }
 
+    public void SetIsActive(bool isActive)
+    {
+        Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public void UpdateInteractionState(bool isLoading, string statusText)
+    {
+        ApplyLogFiltersButton.IsEnabled = !isLoading;
+        ClearLogFiltersButton.IsEnabled = !isLoading;
+        ReloadLogsButton.IsEnabled = !isLoading;
+        OpenRawJsonlButton.IsEnabled = !isLoading;
+        LogsStatusTextBlock.Text = statusText;
+    }
+
     private void WireFilterStateHandlers()
     {
         LogFilterOperationIdTextBox.TextChanged += FilterTextBox_TextChanged;
@@ -113,6 +136,8 @@ public sealed partial class DiagnosticsLogsView : UserControl
         LogFilterEndDatePicker.DateChanged += FilterDatePicker_DateChanged;
         ApplyLogFiltersButton.Click += ApplyLogFiltersButton_Click;
         ClearLogFiltersButton.Click += ClearLogFiltersButton_Click;
+        ReloadLogsButton.Click += ReloadLogsButton_Click;
+        OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
         StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
     }
 
@@ -154,6 +179,16 @@ public sealed partial class DiagnosticsLogsView : UserControl
     private void ClearLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
         ClearFiltersRequested?.Invoke(this, e);
+    }
+
+    private void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ReloadRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OpenRawJsonlButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenRawJsonlRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void StructuredLogsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
