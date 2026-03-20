@@ -453,6 +453,11 @@ Gate expectations:
 - make shared Diagnostics vs Overview-local ownership explicit so Overview-specific state, composition, and UI coordination converge behind an Overview-local seam without widening shared Diagnostics composition
 - preserve `diagnostics.overview` as the route-entry Diagnostics surface, keep Overview inside the long-lived Diagnostics workspace with route-activation refresh or reconcile behavior, and keep Diagnostics Logs extraction details out of scope
 
+**Diagnostics Logs cleanup target checkpoint**
+- before Diagnostics Logs runtime extraction proceeds, define the narrow `Diagnostics Logs` cleanup target under the shared Diagnostics composition boundary
+- make shared Diagnostics vs Logs-local ownership explicit so Logs-specific state, orchestration, composition, and UI coordination converge behind a Logs-local seam without widening shared Diagnostics composition
+- preserve `diagnostics.logs` as the Diagnostics troubleshooting and log-exploration surface, keep Logs inside the long-lived Diagnostics workspace with route-activation refresh or reconcile behavior, and keep Diagnostics Overview extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
@@ -497,6 +502,12 @@ Gate expectations:
 - an Overview-local seam is the target home for Overview-specific state, composition, interaction boundaries, and UI coordination
 - shared Diagnostics composition remains limited to shared capability-level concerns and must not become the Overview workflow owner
 - `diagnostics.overview` continues to refresh or reconcile within the long-lived Diagnostics workspace and does not absorb Diagnostics Logs ownership
+
+**Diagnostics Logs cleanup target**
+- `Diagnostics Logs` remains under shared `DiagnosticsWorkspaceComposition` rather than becoming a shell-owned surface
+- a Logs-local seam is the target home for Logs-specific state, orchestration, composition, interaction boundaries, and UI coordination
+- shared Diagnostics composition remains limited to shared capability-level concerns and must not become the Logs workflow owner
+- `diagnostics.logs` continues to refresh or reconcile within the long-lived Diagnostics workspace and does not absorb Diagnostics Overview route-entry or index semantics
 
 **Must preserve**
 - settings persistence semantics and side effects

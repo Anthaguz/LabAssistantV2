@@ -225,6 +225,20 @@ Behavioral contract source:
 
 ---
 
+## 2.17 Milestone AM Diagnostics Logs Extraction Cleanup Target (Approved)
+
+For Diagnostics Logs extraction planning after the shared Diagnostics cleanup target and the Overview cleanup target:
+- `Diagnostics Logs` remains under shared `DiagnosticsWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Diagnostics composition remains responsible only for shared capability-level concerns, including shared route participation, shared workspace hosting, and shared cross-surface coordination that genuinely spans `Diagnostics Overview` and `Diagnostics Logs`
+- a Logs-local seam is the target home for Logs-specific state, orchestration, composition, interaction boundaries, UI coordination, and refresh or reconcile behavior on `diagnostics.logs`
+- `diagnostics.logs` remains the distinct troubleshooting and log-exploration surface inside the long-lived Diagnostics workspace and continues to use route-activation refresh or reconcile behavior within the existing workspace rather than per-navigation recreation
+- Diagnostics Logs does not become the owner of Diagnostics Overview route-entry or index semantics, and Logs views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-diagnostics-logs-extraction-cleanup-target-am.md`
+
+---
+
 ## 2.2 Two Navigation Scopes (Key Concept)
 
 The future UI should support two distinct navigation scopes:

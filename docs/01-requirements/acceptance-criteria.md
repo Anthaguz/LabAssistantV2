@@ -3596,3 +3596,79 @@ Each readiness result shall include, at minimum:
 - [ ] `diagnostics.overview` route-entry and long-lived workspace participation are explicit and traceable
 - [ ] route-activation refresh or reconcile expectations for `diagnostics.overview` are explicit and traceable
 - [ ] Logs non-goals and shell-only boundary preservation are explicit and traceable
+
+---
+
+# AC-042 - WinUI Diagnostics Logs Extraction Cleanup Target (AM114)
+
+**Related FRs:** FR-173, FR-174, FR-175, FR-167, FR-168, FR-169, FR-170, FR-171, FR-172, FR-104, FR-105, FR-106, FR-107, FR-108, FR-109, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Diagnostics Logs stays under shared Diagnostics composition while converging Logs-local ownership
+**Given**
+- `Diagnostics` already has an approved shared composition boundary under `DiagnosticsWorkspaceComposition`
+
+**When**
+- the `Diagnostics Logs` cleanup target is defined
+
+**Then**
+- `Diagnostics Logs` remains under shared `DiagnosticsWorkspaceComposition`
+- shared Diagnostics composition remains responsible only for shared capability-level concerns
+- a Logs-local seam becomes the target home for Logs-specific state, orchestration, composition, and UI coordination
+- `MainWindow` remains responsible only for shell ownership and app-level workspace lifetime
+
+### 2) Logs-local ownership is explicit without widening shared Diagnostics composition
+**Given**
+- `diagnostics.logs` is the Diagnostics troubleshooting and log-exploration surface
+
+**When**
+- the Logs-local ownership boundary is reviewed
+
+**Then**
+- Logs-local ownership is explicitly responsible for:
+  - Logs troubleshooting or log-exploration state
+  - Logs-local filtering, selection, refresh, and workflow coordination
+  - Logs-local composition and host cleanup expectations
+  - Logs-specific refresh or reconcile behavior triggered by `diagnostics.logs` activation
+- shared Diagnostics composition does not become the Logs workflow owner
+
+### 3) Diagnostics Logs preserves approved troubleshooting behavior and long-lived workspace participation
+**Given**
+- Diagnostics remains an Overview-first capability and Logs remains a child troubleshooting surface
+
+**When**
+- the narrow Logs cleanup target is applied
+
+**Then**
+- `diagnostics.logs` remains the distinct troubleshooting and log-exploration surface for `Diagnostics`
+- Diagnostics Logs continues to participate in the long-lived Diagnostics workspace rather than per-navigation workspace recreation
+- route activation refreshes or reconciles Logs state within the existing Diagnostics workspace
+- Diagnostics Overview route-entry and index semantics remain outside Logs ownership
+
+### 4) Diagnostics Logs rejects shell-centric and Overview-owning end-state patterns
+**Given**
+- shell-only ownership, shared Diagnostics ownership, and Overview ownership are already defined elsewhere
+
+**When**
+- the Logs cleanup target is reviewed for non-goals
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- shared Diagnostics composition must not widen into a Logs workflow owner
+- Logs does not absorb Diagnostics Overview route-entry or index semantics
+- Diagnostics Overview extraction details, runtime implementation, Diagnostics behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `DiagnosticsWorkspaceComposition` continues to own shared Diagnostics capability composition, shared route participation, shared workspace hosting, and shared cross-surface coordination only where it is genuinely capability-level
+- a Logs-local seam becomes the target home for Logs-specific state, orchestration, interaction boundaries, composition, UI coordination, and `diagnostics.logs` refresh or reconcile handling
+- `MainWindow` remains shell-only and is not injected into Logs views
+- Diagnostics Logs remains the child troubleshooting surface inside the long-lived Diagnostics workspace
+- Diagnostics Overview ownership remains outside Logs and outside this issue's seam definition
+
+## Definition of Done
+- [ ] shared Diagnostics vs Logs-local ownership is explicit and traceable
+- [ ] Logs-local state/orchestration/composition/UI-coordination expectations are explicit and traceable
+- [ ] `diagnostics.logs` troubleshooting role and long-lived workspace participation are explicit and traceable
+- [ ] route-activation refresh or reconcile expectations for `diagnostics.logs` are explicit and traceable
+- [ ] Overview non-goals and shell-only boundary preservation are explicit and traceable
