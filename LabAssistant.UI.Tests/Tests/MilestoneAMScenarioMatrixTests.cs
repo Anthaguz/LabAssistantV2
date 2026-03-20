@@ -2167,6 +2167,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var overviewWorkspaceSource = LoadDiagnosticsOverviewWorkspaceViewModelSource();
         var overviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
         var logsCodeBehindSource = LoadDiagnosticsLogsCodeBehindSource();
+        var logsXaml = LoadDiagnosticsLogsXaml();
         var shellViewModelSource = LoadShellViewModelSource();
 
         Assert.Contains("public const string DiagnosticsOverview = \"diagnostics.overview\";", shellViewModelSource);
@@ -2224,7 +2225,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public bool IsLoading => _controller.IsLoading;", logsCompositionSource);
         Assert.Contains("public int StructuredLogEntryCount => _structuredLogEntries.Count;", logsCompositionSource);
         Assert.Contains("public void ApplyShellState()", logsCompositionSource);
-        Assert.Contains("_view.Visibility = _host.IsLogsActive ? Visibility.Visible : Visibility.Collapsed;", logsCompositionSource);
+        Assert.Contains("_view.SetStructuredLogItemsSource(_structuredLogEntries);", logsCompositionSource);
+        Assert.Contains("_view.SetIsActive(_host.IsLogsActive);", logsCompositionSource);
         Assert.Contains("_ = _controller.EnsureLogsLoadedAsync(forceReload: false);", logsCompositionSource);
         Assert.Contains("public void ReportStatusText(string statusText)", logsCompositionSource);
         Assert.Contains("_workspace.SetStatusText(statusText);", logsCompositionSource);
@@ -2232,6 +2234,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_view.FilterStateChanged += FilterStateChanged;", logsCompositionSource);
         Assert.Contains("_view.ApplyFiltersRequested += ApplyFiltersRequested;", logsCompositionSource);
         Assert.Contains("_view.ClearFiltersRequested += ClearFiltersRequested;", logsCompositionSource);
+        Assert.Contains("_view.ReloadRequested += ReloadRequested;", logsCompositionSource);
+        Assert.Contains("_view.OpenRawJsonlRequested += OpenRawJsonlRequested;", logsCompositionSource);
         Assert.Contains("_view.SelectedLogChanged += SelectedLogChanged;", logsCompositionSource);
         Assert.Contains("_controller.HandleFilterStateChanged(_view.CaptureFilterState());", logsCompositionSource);
         Assert.Contains("return _controller.ApplyFiltersAsync(_view.CaptureFilterState());", logsCompositionSource);
@@ -2241,7 +2245,11 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("void IDiagnosticsLogsWorkspaceControllerHost.ApplyWorkspaceState(bool isLoading)", logsCompositionSource);
         Assert.Contains("_view.ApplyFilterState(_workspace.BuildViewState());", logsCompositionSource);
         Assert.Contains("_view.ApplySelectionState(_workspace.BuildSelectionViewState());", logsCompositionSource);
-        Assert.Contains("_view.LogsStatusTextBlock.Text = _workspace.StatusText;", logsCompositionSource);
+        Assert.Contains("_view.UpdateInteractionState(isLoading, _workspace.StatusText);", logsCompositionSource);
+        Assert.DoesNotContain("_view.StructuredLogsListView.ItemsSource", logsCompositionSource);
+        Assert.DoesNotContain("_view.ReloadLogsButton.Click", logsCompositionSource);
+        Assert.DoesNotContain("_view.OpenRawJsonlButton.Click", logsCompositionSource);
+        Assert.DoesNotContain("_view.LogsStatusTextBlock.Text", logsCompositionSource);
 
         Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceViewModel", logsWorkspaceSource);
         Assert.Contains("public string OperationIdQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
@@ -2305,16 +2313,24 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public event EventHandler? FilterStateChanged;", logsCodeBehindSource);
         Assert.Contains("public event RoutedEventHandler? ApplyFiltersRequested;", logsCodeBehindSource);
         Assert.Contains("public event RoutedEventHandler? ClearFiltersRequested;", logsCodeBehindSource);
+        Assert.Contains("public event EventHandler? ReloadRequested;", logsCodeBehindSource);
+        Assert.Contains("public event EventHandler? OpenRawJsonlRequested;", logsCodeBehindSource);
         Assert.Contains("public event EventHandler? SelectedLogChanged;", logsCodeBehindSource);
         Assert.Contains("public DiagnosticsLogsFilterViewState CaptureFilterState()", logsCodeBehindSource);
+        Assert.Contains("public void SetStructuredLogItemsSource(object? itemsSource)", logsCodeBehindSource);
         Assert.Contains("public void ApplyFilterState(DiagnosticsLogsFilterViewState state)", logsCodeBehindSource);
         Assert.Contains("public StructuredLogViewerEntry? CaptureSelectedLogEntry()", logsCodeBehindSource);
         Assert.Contains("public void ApplySelectionState(DiagnosticsLogsSelectionViewState state)", logsCodeBehindSource);
+        Assert.Contains("public void SetIsActive(bool isActive)", logsCodeBehindSource);
+        Assert.Contains("public void UpdateInteractionState(bool isLoading, string statusText)", logsCodeBehindSource);
         Assert.Contains("private void WireFilterStateHandlers()", logsCodeBehindSource);
         Assert.Contains("FilterStateChanged?.Invoke(this, EventArgs.Empty);", logsCodeBehindSource);
         Assert.Contains("ApplyFiltersRequested?.Invoke(this, e);", logsCodeBehindSource);
         Assert.Contains("ClearFiltersRequested?.Invoke(this, e);", logsCodeBehindSource);
+        Assert.Contains("ReloadRequested?.Invoke(this, EventArgs.Empty);", logsCodeBehindSource);
+        Assert.Contains("OpenRawJsonlRequested?.Invoke(this, EventArgs.Empty);", logsCodeBehindSource);
         Assert.Contains("SelectedLogChanged?.Invoke(this, EventArgs.Empty);", logsCodeBehindSource);
+        Assert.DoesNotContain("x:FieldModifier=\"public\"", logsXaml.ToString());
         Assert.DoesNotContain("public TextBox LogFilterOperationIdTextBoxControl =>", logsCodeBehindSource);
     }
 
@@ -2404,6 +2420,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Diagnostics", "DiagnosticsLogsView.xaml.cs");
         return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static XDocument LoadDiagnosticsLogsXaml()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "Views", "Diagnostics", "DiagnosticsLogsView.xaml");
+        return XDocument.Load(Path.GetFullPath(path));
     }
 
     private static string LoadDeployOverviewWorkspaceCompositionSource()

@@ -64,7 +64,7 @@ internal sealed class DiagnosticsLogsWorkspaceComposition
         _view = view;
         _host = host;
         _controller = new DiagnosticsLogsWorkspaceController(_workspace, this);
-        _view.StructuredLogsListView.ItemsSource = _structuredLogEntries;
+        _view.SetStructuredLogItemsSource(_structuredLogEntries);
         WireHandlers();
         ApplyWorkspaceState(isLoading: false);
     }
@@ -75,7 +75,7 @@ internal sealed class DiagnosticsLogsWorkspaceComposition
 
     public void ApplyShellState()
     {
-        _view.Visibility = _host.IsLogsActive ? Visibility.Visible : Visibility.Collapsed;
+        _view.SetIsActive(_host.IsLogsActive);
         if (_host.IsLogsActive)
         {
             _ = _controller.EnsureLogsLoadedAsync(forceReload: false);
@@ -129,8 +129,8 @@ internal sealed class DiagnosticsLogsWorkspaceComposition
         _view.FilterStateChanged += FilterStateChanged;
         _view.ApplyFiltersRequested += ApplyFiltersRequested;
         _view.ClearFiltersRequested += ClearFiltersRequested;
-        _view.ReloadLogsButton.Click += ReloadLogsButton_Click;
-        _view.OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
+        _view.ReloadRequested += ReloadRequested;
+        _view.OpenRawJsonlRequested += OpenRawJsonlRequested;
         _view.SelectedLogChanged += SelectedLogChanged;
     }
 
@@ -149,12 +149,12 @@ internal sealed class DiagnosticsLogsWorkspaceComposition
         await ClearFiltersAsync();
     }
 
-    private async void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
+    private async void ReloadRequested(object? sender, EventArgs e)
     {
         await ReloadAsync();
     }
 
-    private void OpenRawJsonlButton_Click(object sender, RoutedEventArgs e)
+    private void OpenRawJsonlRequested(object? sender, EventArgs e)
     {
         OpenRawLogLocation();
     }
@@ -196,10 +196,6 @@ internal sealed class DiagnosticsLogsWorkspaceComposition
     {
         _view.ApplyFilterState(_workspace.BuildViewState());
         _view.ApplySelectionState(_workspace.BuildSelectionViewState());
-        _view.ApplyLogFiltersButton.IsEnabled = !isLoading;
-        _view.ClearLogFiltersButton.IsEnabled = !isLoading;
-        _view.ReloadLogsButton.IsEnabled = !isLoading;
-        _view.OpenRawJsonlButton.IsEnabled = !isLoading;
-        _view.LogsStatusTextBlock.Text = _workspace.StatusText;
+        _view.UpdateInteractionState(isLoading, _workspace.StatusText);
     }
 }
