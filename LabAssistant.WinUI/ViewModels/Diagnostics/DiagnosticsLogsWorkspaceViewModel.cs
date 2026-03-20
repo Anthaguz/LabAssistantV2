@@ -1,5 +1,6 @@
 using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Views.Diagnostics;
+using System.Text.Json;
 
 namespace LabAssistant.WinUI.ViewModels.Diagnostics;
 
@@ -20,6 +21,14 @@ internal sealed class DiagnosticsLogsWorkspaceViewModel
     public bool UseEndDateFilter { get; private set; }
 
     public DateTimeOffset EndDate { get; private set; } = DateTimeOffset.Now;
+
+    public StructuredLogViewerEntry? SelectedEntry { get; private set; }
+
+    public string? SelectedEntryOperationId { get; private set; }
+
+    public string SelectedEnvelopeText { get; private set; } = "Select a log entry.";
+
+    public string SelectedContextText { get; private set; } = string.Empty;
 
     public void ApplyFilterState(DiagnosticsLogsFilterViewState state)
     {
@@ -45,6 +54,28 @@ internal sealed class DiagnosticsLogsWorkspaceViewModel
         EndDate = DateTimeOffset.Now;
     }
 
+    public void SetSelectedEntry(StructuredLogViewerEntry? entry)
+    {
+        SelectedEntry = entry;
+        SelectedEntryOperationId = entry?.OperationId;
+
+        if (entry is null)
+        {
+            SelectedEnvelopeText = "Select a log entry.";
+            SelectedContextText = string.Empty;
+            return;
+        }
+
+        SelectedEnvelopeText =
+            $"ts={entry.TimestampText} | level={entry.Level} | event={entry.Event} | operationId={entry.OperationId} | result={entry.Result}";
+        SelectedContextText = FormatJsonForDetails(entry.ContextJson);
+    }
+
+    public void ClearSelection()
+    {
+        SetSelectedEntry(null);
+    }
+
     public DiagnosticsLogsFilterViewState BuildViewState()
     {
         return new DiagnosticsLogsFilterViewState(
@@ -56,6 +87,14 @@ internal sealed class DiagnosticsLogsWorkspaceViewModel
             StartDate,
             UseEndDateFilter,
             EndDate);
+    }
+
+    public DiagnosticsLogsSelectionViewState BuildSelectionViewState()
+    {
+        return new DiagnosticsLogsSelectionViewState(
+            SelectedEntry,
+            SelectedEnvelopeText,
+            SelectedContextText);
     }
 
     public StructuredLogViewerFilter BuildStructuredLogFilter()
@@ -92,5 +131,26 @@ internal sealed class DiagnosticsLogsWorkspaceViewModel
             ? selectedDate.AddDays(1).AddTicks(-1)
             : selectedDate;
         return localBoundary.ToUniversalTime();
+    }
+
+    private static string FormatJsonForDetails(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "{}";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            return json;
+        }
     }
 }
