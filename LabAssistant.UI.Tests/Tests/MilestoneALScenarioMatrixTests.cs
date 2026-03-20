@@ -149,7 +149,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("public event EventHandler? OpenSupportExportRequested;", diagnosticsOverviewCodeBehindSource);
         Assert.Contains("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", diagnosticsOverviewCodeBehindSource);
         Assert.Contains("_overviewView.OpenLogsRequested += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", diagnosticsCompositionSource);
-        Assert.Contains("_overviewView.OpenSupportExportRequested += (_, _) => _shellBridge.OpenStructuredLogLocation();", diagnosticsCompositionSource);
+        Assert.Contains("_overviewView.OpenSupportExportRequested += (_, _) => OpenStructuredLogLocation();", diagnosticsCompositionSource);
     }
 
     [Fact]
