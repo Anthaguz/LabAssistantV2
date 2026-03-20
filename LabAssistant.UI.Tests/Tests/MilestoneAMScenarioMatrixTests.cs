@@ -2156,18 +2156,13 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
-    public void DiagnosticsExtraction_PreservesLongLivedWorkspaceRefreshAndRouteAnchors()
+    public void DiagnosticsShellAndSharedComposition_PreserveLogsRouteAndDelegationBoundaries()
     {
         var mainWindowSource = LoadMainWindowSource();
         var compositionSource = LoadDiagnosticsWorkspaceCompositionSource();
-        var logsCompositionSource = LoadDiagnosticsLogsWorkspaceCompositionSource();
-        var logsControllerSource = LoadDiagnosticsLogsWorkspaceControllerSource();
-        var logsWorkspaceSource = LoadDiagnosticsLogsWorkspaceViewModelSource();
         var overviewCompositionSource = LoadDiagnosticsOverviewWorkspaceCompositionSource();
         var overviewWorkspaceSource = LoadDiagnosticsOverviewWorkspaceViewModelSource();
         var overviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
-        var logsCodeBehindSource = LoadDiagnosticsLogsCodeBehindSource();
-        var logsXaml = LoadDiagnosticsLogsXaml();
         var shellViewModelSource = LoadShellViewModelSource();
 
         Assert.Contains("public const string DiagnosticsOverview = \"diagnostics.overview\";", shellViewModelSource);
@@ -2196,7 +2191,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsOverview);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", compositionSource);
-        Assert.Contains("private void RefreshOverviewSummary()", compositionSource);
         Assert.Contains("_logsWorkspaceComposition.WorkspaceStateChanged += LogsWorkspaceComposition_WorkspaceStateChanged;", compositionSource);
         Assert.Contains("_logsWorkspaceComposition.ReportStatusText(statusText)", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.RefreshSummary(_logsWorkspaceComposition.IsLoading, _logsWorkspaceComposition.StructuredLogEntryCount);", compositionSource);
@@ -2211,66 +2205,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("_logsView.FilterStateChanged", compositionSource);
         Assert.DoesNotContain("_logsController.HandleFilterStateChanged", compositionSource);
         Assert.DoesNotContain("ApplyLogsWorkspaceState(isLoading: false);", compositionSource);
-
-        Assert.Contains("internal interface IDiagnosticsLogsWorkspaceHost", logsCompositionSource);
-        Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceHost", logsCompositionSource);
-        Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceComposition", logsCompositionSource);
-        Assert.Contains(": IDiagnosticsLogsWorkspaceControllerHost", logsCompositionSource);
-        Assert.Contains("private readonly DiagnosticsLogsView _view;", logsCompositionSource);
-        Assert.Contains("private readonly IDiagnosticsLogsWorkspaceHost _host;", logsCompositionSource);
-        Assert.Contains("private readonly DiagnosticsLogsWorkspaceViewModel _workspace = new();", logsCompositionSource);
-        Assert.Contains("private readonly DiagnosticsLogsWorkspaceController _controller;", logsCompositionSource);
-        Assert.Contains("private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];", logsCompositionSource);
-        Assert.Contains("public event EventHandler? WorkspaceStateChanged;", logsCompositionSource);
-        Assert.Contains("public bool IsLoading => _controller.IsLoading;", logsCompositionSource);
-        Assert.Contains("public int StructuredLogEntryCount => _structuredLogEntries.Count;", logsCompositionSource);
-        Assert.Contains("public void ApplyShellState()", logsCompositionSource);
-        Assert.Contains("_view.SetStructuredLogItemsSource(_structuredLogEntries);", logsCompositionSource);
-        Assert.Contains("_view.SetIsActive(_host.IsLogsActive);", logsCompositionSource);
-        Assert.Contains("_ = _controller.EnsureLogsLoadedAsync(forceReload: false);", logsCompositionSource);
-        Assert.Contains("public void ReportStatusText(string statusText)", logsCompositionSource);
-        Assert.Contains("_workspace.SetStatusText(statusText);", logsCompositionSource);
-        Assert.Contains("WorkspaceStateChanged?.Invoke(this, EventArgs.Empty);", logsCompositionSource);
-        Assert.Contains("_view.FilterStateChanged += FilterStateChanged;", logsCompositionSource);
-        Assert.Contains("_view.ApplyFiltersRequested += ApplyFiltersRequested;", logsCompositionSource);
-        Assert.Contains("_view.ClearFiltersRequested += ClearFiltersRequested;", logsCompositionSource);
-        Assert.Contains("_view.ReloadRequested += ReloadRequested;", logsCompositionSource);
-        Assert.Contains("_view.OpenRawJsonlRequested += OpenRawJsonlRequested;", logsCompositionSource);
-        Assert.Contains("_view.SelectedLogChanged += SelectedLogChanged;", logsCompositionSource);
-        Assert.Contains("_controller.HandleFilterStateChanged(_view.CaptureFilterState());", logsCompositionSource);
-        Assert.Contains("return _controller.ApplyFiltersAsync(_view.CaptureFilterState());", logsCompositionSource);
-        Assert.Contains("_controller.HandleSelectionChanged(_view.CaptureSelectedLogEntry());", logsCompositionSource);
-        Assert.Contains("bool IDiagnosticsLogsWorkspaceControllerHost.IsLogsActive => _host.IsLogsActive;", logsCompositionSource);
-        Assert.Contains("void IDiagnosticsLogsWorkspaceControllerHost.ReplaceStructuredLogEntries(IReadOnlyList<StructuredLogViewerEntry> entries)", logsCompositionSource);
-        Assert.Contains("void IDiagnosticsLogsWorkspaceControllerHost.ApplyWorkspaceState(bool isLoading)", logsCompositionSource);
-        Assert.Contains("_view.ApplyFilterState(_workspace.BuildViewState());", logsCompositionSource);
-        Assert.Contains("_view.ApplySelectionState(_workspace.BuildSelectionViewState());", logsCompositionSource);
-        Assert.Contains("_view.UpdateInteractionState(isLoading, _workspace.StatusText);", logsCompositionSource);
-        Assert.DoesNotContain("_view.StructuredLogsListView.ItemsSource", logsCompositionSource);
-        Assert.DoesNotContain("_view.ReloadLogsButton.Click", logsCompositionSource);
-        Assert.DoesNotContain("_view.OpenRawJsonlButton.Click", logsCompositionSource);
-        Assert.DoesNotContain("_view.LogsStatusTextBlock.Text", logsCompositionSource);
-
-        Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceViewModel", logsWorkspaceSource);
-        Assert.Contains("public string OperationIdQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
-        Assert.Contains("public string LevelQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
-        Assert.Contains("public string EventQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
-        Assert.Contains("public string TextSearchQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
-        Assert.Contains("public bool UseStartDateFilter { get; private set; }", logsWorkspaceSource);
-        Assert.Contains("public bool UseEndDateFilter { get; private set; }", logsWorkspaceSource);
-        Assert.Contains("public StructuredLogViewerEntry? SelectedEntry { get; private set; }", logsWorkspaceSource);
-        Assert.Contains("public string? SelectedEntryOperationId { get; private set; }", logsWorkspaceSource);
-        Assert.Contains("public string SelectedEnvelopeText { get; private set; } = \"Select a log entry.\";", logsWorkspaceSource);
-        Assert.Contains("public string SelectedContextText { get; private set; } = string.Empty;", logsWorkspaceSource);
-        Assert.Contains("public string StatusText { get; private set; } = \"Logs not loaded yet.\";", logsWorkspaceSource);
-        Assert.Contains("public void ApplyFilterState(DiagnosticsLogsFilterViewState state)", logsWorkspaceSource);
-        Assert.Contains("public void ClearFilters()", logsWorkspaceSource);
-        Assert.Contains("public void SetSelectedEntry(StructuredLogViewerEntry? entry)", logsWorkspaceSource);
-        Assert.Contains("public void ClearSelection()", logsWorkspaceSource);
-        Assert.Contains("public void SetStatusText(string statusText)", logsWorkspaceSource);
-        Assert.Contains("public DiagnosticsLogsFilterViewState BuildViewState()", logsWorkspaceSource);
-        Assert.Contains("public DiagnosticsLogsSelectionViewState BuildSelectionViewState()", logsWorkspaceSource);
-        Assert.Contains("public StructuredLogViewerFilter BuildStructuredLogFilter()", logsWorkspaceSource);
 
         Assert.Contains("internal sealed class DiagnosticsOverviewWorkspaceComposition", overviewCompositionSource);
         Assert.Contains("private readonly DiagnosticsOverviewView _view;", overviewCompositionSource);
@@ -2307,6 +2241,99 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", overviewCodeBehindSource);
         Assert.DoesNotContain("public event EventHandler? OpenLogsRequested;", overviewCodeBehindSource);
         Assert.DoesNotContain("public event EventHandler? OpenSupportExportRequested;", overviewCodeBehindSource);
+    }
+
+    [Fact]
+    public void DiagnosticsLogsLocalSeams_ProtectStateOrchestrationAndCompositionOwnership()
+    {
+        var logsCompositionSource = LoadDiagnosticsLogsWorkspaceCompositionSource();
+        var logsControllerSource = LoadDiagnosticsLogsWorkspaceControllerSource();
+        var logsWorkspaceSource = LoadDiagnosticsLogsWorkspaceViewModelSource();
+
+        Assert.Contains("internal interface IDiagnosticsLogsWorkspaceHost", logsCompositionSource);
+        Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceHost", logsCompositionSource);
+        Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceComposition", logsCompositionSource);
+        Assert.Contains(": IDiagnosticsLogsWorkspaceControllerHost", logsCompositionSource);
+        Assert.Contains("private readonly DiagnosticsLogsView _view;", logsCompositionSource);
+        Assert.Contains("private readonly IDiagnosticsLogsWorkspaceHost _host;", logsCompositionSource);
+        Assert.Contains("private readonly DiagnosticsLogsWorkspaceViewModel _workspace = new();", logsCompositionSource);
+        Assert.Contains("private readonly DiagnosticsLogsWorkspaceController _controller;", logsCompositionSource);
+        Assert.Contains("private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];", logsCompositionSource);
+        Assert.Contains("public event EventHandler? WorkspaceStateChanged;", logsCompositionSource);
+        Assert.Contains("public bool IsLoading => _controller.IsLoading;", logsCompositionSource);
+        Assert.Contains("public int StructuredLogEntryCount => _structuredLogEntries.Count;", logsCompositionSource);
+        Assert.Contains("public void ApplyShellState()", logsCompositionSource);
+        Assert.Contains("_view.SetStructuredLogItemsSource(_structuredLogEntries);", logsCompositionSource);
+        Assert.Contains("_view.SetIsActive(_host.IsLogsActive);", logsCompositionSource);
+        Assert.Contains("_ = _controller.EnsureLogsLoadedAsync(forceReload: false);", logsCompositionSource);
+        Assert.Contains("public void ReportStatusText(string statusText)", logsCompositionSource);
+        Assert.Contains("_workspace.SetStatusText(statusText);", logsCompositionSource);
+        Assert.Contains("WorkspaceStateChanged?.Invoke(this, EventArgs.Empty);", logsCompositionSource);
+        Assert.Contains("_view.FilterStateChanged += FilterStateChanged;", logsCompositionSource);
+        Assert.Contains("_view.ApplyFiltersRequested += ApplyFiltersRequested;", logsCompositionSource);
+        Assert.Contains("_view.ClearFiltersRequested += ClearFiltersRequested;", logsCompositionSource);
+        Assert.Contains("_view.ReloadRequested +=", logsCompositionSource);
+        Assert.Contains("_view.OpenRawJsonlRequested +=", logsCompositionSource);
+        Assert.Contains("_view.SelectedLogChanged += SelectedLogChanged;", logsCompositionSource);
+        Assert.Contains("_controller.HandleFilterStateChanged(_view.CaptureFilterState());", logsCompositionSource);
+        Assert.Contains("return _controller.ApplyFiltersAsync(_view.CaptureFilterState());", logsCompositionSource);
+        Assert.Contains("_controller.HandleSelectionChanged(_view.CaptureSelectedLogEntry());", logsCompositionSource);
+        Assert.Contains("bool IDiagnosticsLogsWorkspaceControllerHost.IsLogsActive => _host.IsLogsActive;", logsCompositionSource);
+        Assert.Contains("void IDiagnosticsLogsWorkspaceControllerHost.ReplaceStructuredLogEntries(IReadOnlyList<StructuredLogViewerEntry> entries)", logsCompositionSource);
+        Assert.Contains("void IDiagnosticsLogsWorkspaceControllerHost.ApplyWorkspaceState(bool isLoading)", logsCompositionSource);
+        Assert.Contains("_view.ApplyFilterState(_workspace.BuildViewState());", logsCompositionSource);
+        Assert.Contains("_view.ApplySelectionState(_workspace.BuildSelectionViewState());", logsCompositionSource);
+        Assert.Contains("_view.UpdateInteractionState(isLoading, _workspace.StatusText);", logsCompositionSource);
+        Assert.DoesNotContain("_view.StructuredLogsListView.ItemsSource", logsCompositionSource);
+        Assert.DoesNotContain("_view.ReloadLogsButton.Click", logsCompositionSource);
+        Assert.DoesNotContain("_view.OpenRawJsonlButton.Click", logsCompositionSource);
+        Assert.DoesNotContain("_view.LogsStatusTextBlock.Text", logsCompositionSource);
+
+        Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceController", logsControllerSource);
+        Assert.Contains("private readonly DiagnosticsLogsWorkspaceViewModel _workspace;", logsControllerSource);
+        Assert.Contains("private readonly IDiagnosticsLogsWorkspaceControllerHost _host;", logsControllerSource);
+        Assert.Contains("public bool IsLoading => _isLoading;", logsControllerSource);
+        Assert.Contains("public async Task EnsureLogsLoadedAsync(bool forceReload)", logsControllerSource);
+        Assert.Contains("public void HandleFilterStateChanged(DiagnosticsLogsFilterViewState state)", logsControllerSource);
+        Assert.Contains("public Task ApplyFiltersAsync(DiagnosticsLogsFilterViewState state)", logsControllerSource);
+        Assert.Contains("public Task ClearFiltersAsync()", logsControllerSource);
+        Assert.Contains("public void HandleSelectionChanged(StructuredLogViewerEntry? selectedEntry)", logsControllerSource);
+        Assert.Contains("public void OpenRawLogLocation()", logsControllerSource);
+        Assert.Contains("_host.LoadStructuredLogsAsync(filter)", logsControllerSource);
+        Assert.Contains("_host.ReplaceStructuredLogEntries(result.Entries);", logsControllerSource);
+        Assert.Contains("_workspace.ClearSelection();", logsControllerSource);
+        Assert.Contains("_workspace.SetStatusText(\"Loading structured logs...\");", logsControllerSource);
+        Assert.Contains("_host.ApplyWorkspaceState(_isLoading);", logsControllerSource);
+        Assert.DoesNotContain("MainWindow", logsControllerSource);
+
+        Assert.Contains("internal sealed class DiagnosticsLogsWorkspaceViewModel", logsWorkspaceSource);
+        Assert.Contains("public string OperationIdQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
+        Assert.Contains("public string LevelQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
+        Assert.Contains("public string EventQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
+        Assert.Contains("public string TextSearchQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
+        Assert.Contains("public bool UseStartDateFilter { get; private set; }", logsWorkspaceSource);
+        Assert.Contains("public bool UseEndDateFilter { get; private set; }", logsWorkspaceSource);
+        Assert.Contains("public StructuredLogViewerEntry? SelectedEntry { get; private set; }", logsWorkspaceSource);
+        Assert.Contains("public string? SelectedEntryOperationId { get; private set; }", logsWorkspaceSource);
+        Assert.Contains("public string SelectedEnvelopeText { get; private set; } = \"Select a log entry.\";", logsWorkspaceSource);
+        Assert.Contains("public string SelectedContextText { get; private set; } = string.Empty;", logsWorkspaceSource);
+        Assert.Contains("public string StatusText { get; private set; } = \"Logs not loaded yet.\";", logsWorkspaceSource);
+        Assert.Contains("public void ApplyFilterState(DiagnosticsLogsFilterViewState state)", logsWorkspaceSource);
+        Assert.Contains("public void ClearFilters()", logsWorkspaceSource);
+        Assert.Contains("public void SetSelectedEntry(StructuredLogViewerEntry? entry)", logsWorkspaceSource);
+        Assert.Contains("public void ClearSelection()", logsWorkspaceSource);
+        Assert.Contains("public void SetStatusText(string statusText)", logsWorkspaceSource);
+        Assert.Contains("public DiagnosticsLogsFilterViewState BuildViewState()", logsWorkspaceSource);
+        Assert.Contains("public DiagnosticsLogsSelectionViewState BuildSelectionViewState()", logsWorkspaceSource);
+        Assert.Contains("public StructuredLogViewerFilter BuildStructuredLogFilter()", logsWorkspaceSource);
+        Assert.DoesNotContain("MainWindow", logsWorkspaceSource);
+    }
+
+    [Fact]
+    public void DiagnosticsLogsView_ExposesOnlyTheNarrowedInteractionSurface()
+    {
+        var logsCodeBehindSource = LoadDiagnosticsLogsCodeBehindSource();
+        var logsXaml = LoadDiagnosticsLogsXaml();
 
         Assert.Contains("public readonly record struct DiagnosticsLogsFilterViewState(", logsCodeBehindSource);
         Assert.Contains("public readonly record struct DiagnosticsLogsSelectionViewState(", logsCodeBehindSource);
@@ -2332,6 +2359,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("SelectedLogChanged?.Invoke(this, EventArgs.Empty);", logsCodeBehindSource);
         Assert.DoesNotContain("x:FieldModifier=\"public\"", logsXaml.ToString());
         Assert.DoesNotContain("public TextBox LogFilterOperationIdTextBoxControl =>", logsCodeBehindSource);
+        Assert.DoesNotContain("public Button ApplyLogFiltersButton", logsCodeBehindSource);
+        Assert.DoesNotContain("public ListView StructuredLogsListView", logsCodeBehindSource);
     }
 
     private static string LoadMainWindowSource()
