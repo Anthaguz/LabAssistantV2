@@ -79,6 +79,7 @@ internal sealed class DiagnosticsWorkspaceComposition
     private readonly FrameworkElement _localNavigationHost;
     private readonly DiagnosticsOverviewWorkspaceComposition _overviewWorkspaceComposition;
     private readonly DiagnosticsLogsView _logsView;
+    private readonly DiagnosticsLogsWorkspaceViewModel _logsWorkspace = new();
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _logsTabViewItem;
@@ -115,6 +116,7 @@ internal sealed class DiagnosticsWorkspaceComposition
                 () => _shellBridge.IsDiagnosticsOverviewActive,
                 _shellBridge.NavigateToRoute,
                 _shellBridge.OpenStructuredLogLocation));
+        _logsView.ApplyFilterState(_logsWorkspace.BuildViewState());
         _logsView.StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireSharedHandlers();
         UpdateStructuredLogSelectionDetails();
@@ -138,8 +140,9 @@ internal sealed class DiagnosticsWorkspaceComposition
     private void WireSharedHandlers()
     {
         _subviewTabView.SelectionChanged += DiagnosticsSubviewTabView_SelectionChanged;
-        _logsView.ApplyLogFiltersButton.Click += ApplyLogFiltersButton_Click;
-        _logsView.ClearLogFiltersButton.Click += ClearLogFiltersButton_Click;
+        _logsView.FilterStateChanged += LogsView_FilterStateChanged;
+        _logsView.ApplyFiltersRequested += ApplyLogFiltersButton_Click;
+        _logsView.ClearFiltersRequested += ClearLogFiltersButton_Click;
         _logsView.ReloadLogsButton.Click += ReloadLogsButton_Click;
         _logsView.OpenRawJsonlButton.Click += (_, _) => OpenStructuredLogLocation();
         _logsView.StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
@@ -199,14 +202,21 @@ internal sealed class DiagnosticsWorkspaceComposition
         _overviewWorkspaceComposition.RefreshSummary(_isStructuredLogsLoading, _structuredLogEntries.Count);
     }
 
+    private void LogsView_FilterStateChanged(object? sender, EventArgs e)
+    {
+        _logsWorkspace.ApplyFilterState(_logsView.CaptureFilterState());
+    }
+
     private async void ApplyLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
+        _logsWorkspace.ApplyFilterState(_logsView.CaptureFilterState());
         await EnsureStructuredLogsLoadedAsync(forceReload: true);
     }
 
     private async void ClearLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
-        ClearStructuredLogFilters();
+        _logsWorkspace.ClearFilters();
+        _logsView.ApplyFilterState(_logsWorkspace.BuildViewState());
         await EnsureStructuredLogsLoadedAsync(forceReload: true);
     }
 
@@ -276,19 +286,7 @@ internal sealed class DiagnosticsWorkspaceComposition
 
     private StructuredLogViewerFilter BuildStructuredLogFilter()
     {
-        return new StructuredLogViewerFilter
-        {
-            OperationId = NormalizeFilterText(_logsView.LogFilterOperationIdTextBox.Text),
-            Level = NormalizeFilterText(_logsView.LogFilterLevelTextBox.Text),
-            Event = NormalizeFilterText(_logsView.LogFilterEventTextBox.Text),
-            TextSearch = NormalizeFilterText(_logsView.LogFilterTextSearchTextBox.Text),
-            StartUtc = _logsView.LogFilterUseStartDateCheckBox.IsChecked == true
-                ? ToDateBoundaryUtc(_logsView.LogFilterStartDatePicker.Date, isEndBoundary: false)
-                : null,
-            EndUtc = _logsView.LogFilterUseEndDateCheckBox.IsChecked == true
-                ? ToDateBoundaryUtc(_logsView.LogFilterEndDatePicker.Date, isEndBoundary: true)
-                : null
-        };
+        return _logsWorkspace.BuildStructuredLogFilter();
     }
 
     private void UpdateStructuredLogSelectionDetails()
@@ -305,18 +303,6 @@ internal sealed class DiagnosticsWorkspaceComposition
         _logsView.SelectedLogContextTextBox.Text = FormatJsonForDetails(_selectedStructuredLogEntry.ContextJson);
     }
 
-    private void ClearStructuredLogFilters()
-    {
-        _logsView.LogFilterOperationIdTextBox.Text = string.Empty;
-        _logsView.LogFilterLevelTextBox.Text = string.Empty;
-        _logsView.LogFilterEventTextBox.Text = string.Empty;
-        _logsView.LogFilterTextSearchTextBox.Text = string.Empty;
-        _logsView.LogFilterUseStartDateCheckBox.IsChecked = false;
-        _logsView.LogFilterUseEndDateCheckBox.IsChecked = false;
-        _logsView.LogFilterStartDatePicker.Date = DateTimeOffset.Now;
-        _logsView.LogFilterEndDatePicker.Date = DateTimeOffset.Now;
-    }
-
     private void OpenStructuredLogLocation()
     {
         var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());
@@ -324,25 +310,6 @@ internal sealed class DiagnosticsWorkspaceComposition
         {
             _logsView.LogsStatusTextBlock.Text = statusText;
         }
-    }
-
-    private static string NormalizeFilterText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value.Trim();
-    }
-
-    private static DateTimeOffset ToDateBoundaryUtc(DateTimeOffset date, bool isEndBoundary)
-    {
-        var selectedDate = date.Date;
-        var localBoundary = isEndBoundary
-            ? selectedDate.AddDays(1).AddTicks(-1)
-            : selectedDate;
-        return localBoundary.ToUniversalTime();
     }
 
     private static string FormatJsonForDetails(string json)
