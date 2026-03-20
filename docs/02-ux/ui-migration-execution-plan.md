@@ -448,6 +448,11 @@ Gate expectations:
 - preserve Diagnostics as an Overview-first capability by keeping Diagnostics Overview as the route-entry surface and Diagnostics Logs as a child troubleshooting surface rather than a top-level shell destination
 - treat any `MainWindow` Diagnostics host interfaces as temporary bridges only, preserve long-lived workspace lifetime, and keep route activation as refresh/reconcile rather than workspace recreation
 
+**Diagnostics Overview cleanup target checkpoint**
+- before Diagnostics Overview runtime extraction proceeds, define the narrow `Diagnostics Overview` cleanup target under the shared Diagnostics composition boundary
+- make shared Diagnostics vs Overview-local ownership explicit so Overview-specific state, composition, and UI coordination converge behind an Overview-local seam without widening shared Diagnostics composition
+- preserve `diagnostics.overview` as the route-entry Diagnostics surface, keep Overview inside the long-lived Diagnostics workspace with route-activation refresh or reconcile behavior, and keep Diagnostics Logs extraction details out of scope
+
 **Recommended capability order**
 1. `Machines`
 2. `Assets`
@@ -486,6 +491,12 @@ Gate expectations:
 - a Diagnostics-local composition owner is the target home for shared composition, route activation handling, workspace lifetime participation, and Diagnostics Overview / Diagnostics Logs interaction boundaries
 - Diagnostics remains long-lived while the app session is open; route activation refreshes/reconciles state rather than recreating the workspace on every route change
 - this shared composition target preserves Diagnostics Overview as the route-entry surface and keeps Diagnostics Logs inside the capability rather than as a top-level shell destination
+
+**Diagnostics Overview cleanup target**
+- `Diagnostics Overview` remains under shared `DiagnosticsWorkspaceComposition` rather than becoming a shell-owned surface
+- an Overview-local seam is the target home for Overview-specific state, composition, interaction boundaries, and UI coordination
+- shared Diagnostics composition remains limited to shared capability-level concerns and must not become the Overview workflow owner
+- `diagnostics.overview` continues to refresh or reconcile within the long-lived Diagnostics workspace and does not absorb Diagnostics Logs ownership
 
 **Must preserve**
 - settings persistence semantics and side effects

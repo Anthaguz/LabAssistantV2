@@ -211,6 +211,18 @@ For Diagnostics extraction planning after AL and the AM shared-capability refine
 Behavioral contract source:
 - `docs/02-ux/winui-diagnostics-composition-cleanup-target-am.md`
 
+## 2.16 Milestone AM Diagnostics Overview Extraction Cleanup Target (Approved)
+
+For Diagnostics Overview extraction planning after the shared Diagnostics cleanup target:
+- `Diagnostics Overview` remains under shared `DiagnosticsWorkspaceComposition` rather than becoming a shell-owned surface
+- shared Diagnostics composition remains responsible only for shared capability-level concerns, including shared route participation, shared workspace hosting, and shared cross-surface coordination that genuinely spans `Diagnostics Overview` and `Diagnostics Logs`
+- an Overview-local seam is the target home for Overview-specific state, composition, interaction boundaries, UI coordination, and refresh or reconcile behavior on `diagnostics.overview`
+- `diagnostics.overview` remains the distinct Diagnostics route-entry and summary surface inside the long-lived Diagnostics workspace and continues to use route-activation refresh or reconcile behavior within the existing workspace rather than per-navigation recreation
+- Diagnostics Overview does not become the owner of Diagnostics Logs semantics, and Overview views must not depend on or receive `MainWindow` directly
+
+Behavioral contract source:
+- `docs/02-ux/winui-diagnostics-overview-extraction-cleanup-target-am.md`
+
 ---
 
 ## 2.2 Two Navigation Scopes (Key Concept)
