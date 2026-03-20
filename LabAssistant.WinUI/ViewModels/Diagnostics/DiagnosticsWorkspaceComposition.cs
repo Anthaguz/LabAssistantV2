@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text.Json;
 using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Views.Diagnostics;
 using Microsoft.UI.Xaml;
@@ -86,7 +85,6 @@ internal sealed class DiagnosticsWorkspaceComposition
     private readonly IDiagnosticsWorkspaceHost _host;
     private readonly IDiagnosticsWorkspaceShellBridge _shellBridge;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
-    private StructuredLogViewerEntry? _selectedStructuredLogEntry;
     private bool _isStructuredLogsLoading;
     private bool _isUpdatingDiagnosticsSubviewSelection;
 
@@ -117,9 +115,9 @@ internal sealed class DiagnosticsWorkspaceComposition
                 _shellBridge.NavigateToRoute,
                 _shellBridge.OpenStructuredLogLocation));
         _logsView.ApplyFilterState(_logsWorkspace.BuildViewState());
+        _logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());
         _logsView.StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireSharedHandlers();
-        UpdateStructuredLogSelectionDetails();
         RefreshOverviewSummary();
     }
 
@@ -145,7 +143,7 @@ internal sealed class DiagnosticsWorkspaceComposition
         _logsView.ClearFiltersRequested += ClearLogFiltersButton_Click;
         _logsView.ReloadLogsButton.Click += ReloadLogsButton_Click;
         _logsView.OpenRawJsonlButton.Click += (_, _) => OpenStructuredLogLocation();
-        _logsView.StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
+        _logsView.SelectedLogChanged += LogsView_SelectedLogChanged;
     }
 
     private void DiagnosticsSubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -220,10 +218,10 @@ internal sealed class DiagnosticsWorkspaceComposition
         await EnsureStructuredLogsLoadedAsync(forceReload: true);
     }
 
-    private void StructuredLogsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void LogsView_SelectedLogChanged(object? sender, EventArgs e)
     {
-        _selectedStructuredLogEntry = _logsView.StructuredLogsListView.SelectedItem as StructuredLogViewerEntry;
-        UpdateStructuredLogSelectionDetails();
+        _logsWorkspace.SetSelectedEntry(_logsView.CaptureSelectedLogEntry());
+        _logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());
     }
 
     private async Task EnsureStructuredLogsLoadedAsync(bool forceReload)
@@ -257,9 +255,8 @@ internal sealed class DiagnosticsWorkspaceComposition
                 _structuredLogEntries.Add(entry);
             }
 
-            _logsView.StructuredLogsListView.SelectedItem = null;
-            _selectedStructuredLogEntry = null;
-            UpdateStructuredLogSelectionDetails();
+            _logsWorkspace.ClearSelection();
+            _logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());
 
             var filePath = _host.GetStructuredLogFilePath();
             var parseErrorSuffix = result.ParseErrorCount > 0
@@ -289,47 +286,12 @@ internal sealed class DiagnosticsWorkspaceComposition
         return _logsWorkspace.BuildStructuredLogFilter();
     }
 
-    private void UpdateStructuredLogSelectionDetails()
-    {
-        if (_selectedStructuredLogEntry is null)
-        {
-            _logsView.SelectedLogEnvelopeTextBlock.Text = "Select a log entry.";
-            _logsView.SelectedLogContextTextBox.Text = string.Empty;
-            return;
-        }
-
-        _logsView.SelectedLogEnvelopeTextBlock.Text =
-            $"ts={_selectedStructuredLogEntry.TimestampText} | level={_selectedStructuredLogEntry.Level} | event={_selectedStructuredLogEntry.Event} | operationId={_selectedStructuredLogEntry.OperationId} | result={_selectedStructuredLogEntry.Result}";
-        _logsView.SelectedLogContextTextBox.Text = FormatJsonForDetails(_selectedStructuredLogEntry.ContextJson);
-    }
-
     private void OpenStructuredLogLocation()
     {
         var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());
         if (!string.IsNullOrWhiteSpace(statusText))
         {
             _logsView.LogsStatusTextBlock.Text = statusText;
-        }
-    }
-
-    private static string FormatJsonForDetails(string json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return "{}";
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
-        }
-        catch
-        {
-            return json;
         }
     }
 }

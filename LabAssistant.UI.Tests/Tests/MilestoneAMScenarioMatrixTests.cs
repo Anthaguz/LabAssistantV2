@@ -2190,6 +2190,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition = new DiagnosticsOverviewWorkspaceComposition(", compositionSource);
         Assert.Contains("_logsView.ApplyFilterState(_logsWorkspace.BuildViewState());", compositionSource);
+        Assert.Contains("_logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());", compositionSource);
         Assert.Contains("_logsView.Visibility = _shellBridge.IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
         Assert.Contains("if (_shellBridge.IsDiagnosticsLogsActive)", compositionSource);
@@ -2198,11 +2199,21 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", compositionSource);
         Assert.Contains("private void RefreshOverviewSummary()", compositionSource);
         Assert.Contains("_logsView.FilterStateChanged += LogsView_FilterStateChanged;", compositionSource);
+        Assert.Contains("_logsView.SelectedLogChanged += LogsView_SelectedLogChanged;", compositionSource);
         Assert.Contains("_logsWorkspace.ApplyFilterState(_logsView.CaptureFilterState());", compositionSource);
         Assert.Contains("_logsWorkspace.ClearFilters();", compositionSource);
+        Assert.Contains("_logsWorkspace.SetSelectedEntry(_logsView.CaptureSelectedLogEntry());", compositionSource);
+        Assert.Contains("_logsWorkspace.ClearSelection();", compositionSource);
+        Assert.Contains("_logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());", compositionSource);
         Assert.Contains("return _logsWorkspace.BuildStructuredLogFilter();", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.RefreshSummary(_isStructuredLogsLoading, _structuredLogEntries.Count);", compositionSource);
         Assert.Contains("RefreshOverviewSummary();", compositionSource);
+        Assert.DoesNotContain("private StructuredLogViewerEntry? _selectedStructuredLogEntry;", compositionSource);
+        Assert.DoesNotContain("_selectedStructuredLogEntry = _logsView.StructuredLogsListView.SelectedItem as StructuredLogViewerEntry;", compositionSource);
+        Assert.DoesNotContain("private void UpdateStructuredLogSelectionDetails()", compositionSource);
+        Assert.DoesNotContain("_logsView.SelectedLogEnvelopeTextBlock.Text =", compositionSource);
+        Assert.DoesNotContain("_logsView.SelectedLogContextTextBox.Text =", compositionSource);
+        Assert.DoesNotContain("private static string FormatJsonForDetails(string json)", compositionSource);
         Assert.DoesNotContain("OperationId = NormalizeFilterText(_logsView.LogFilterOperationIdTextBox.Text)", compositionSource);
         Assert.DoesNotContain("_logsView.LogFilterOperationIdTextBox.Text = string.Empty;", compositionSource);
         Assert.DoesNotContain("private static string NormalizeFilterText(string? value)", compositionSource);
@@ -2219,9 +2230,16 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public string TextSearchQuery { get; private set; } = string.Empty;", logsWorkspaceSource);
         Assert.Contains("public bool UseStartDateFilter { get; private set; }", logsWorkspaceSource);
         Assert.Contains("public bool UseEndDateFilter { get; private set; }", logsWorkspaceSource);
+        Assert.Contains("public StructuredLogViewerEntry? SelectedEntry { get; private set; }", logsWorkspaceSource);
+        Assert.Contains("public string? SelectedEntryOperationId { get; private set; }", logsWorkspaceSource);
+        Assert.Contains("public string SelectedEnvelopeText { get; private set; } = \"Select a log entry.\";", logsWorkspaceSource);
+        Assert.Contains("public string SelectedContextText { get; private set; } = string.Empty;", logsWorkspaceSource);
         Assert.Contains("public void ApplyFilterState(DiagnosticsLogsFilterViewState state)", logsWorkspaceSource);
         Assert.Contains("public void ClearFilters()", logsWorkspaceSource);
+        Assert.Contains("public void SetSelectedEntry(StructuredLogViewerEntry? entry)", logsWorkspaceSource);
+        Assert.Contains("public void ClearSelection()", logsWorkspaceSource);
         Assert.Contains("public DiagnosticsLogsFilterViewState BuildViewState()", logsWorkspaceSource);
+        Assert.Contains("public DiagnosticsLogsSelectionViewState BuildSelectionViewState()", logsWorkspaceSource);
         Assert.Contains("public StructuredLogViewerFilter BuildStructuredLogFilter()", logsWorkspaceSource);
 
         Assert.Contains("internal sealed class DiagnosticsOverviewWorkspaceComposition", overviewCompositionSource);
@@ -2261,15 +2279,20 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("public event EventHandler? OpenSupportExportRequested;", overviewCodeBehindSource);
 
         Assert.Contains("public readonly record struct DiagnosticsLogsFilterViewState(", logsCodeBehindSource);
+        Assert.Contains("public readonly record struct DiagnosticsLogsSelectionViewState(", logsCodeBehindSource);
         Assert.Contains("public event EventHandler? FilterStateChanged;", logsCodeBehindSource);
         Assert.Contains("public event RoutedEventHandler? ApplyFiltersRequested;", logsCodeBehindSource);
         Assert.Contains("public event RoutedEventHandler? ClearFiltersRequested;", logsCodeBehindSource);
+        Assert.Contains("public event EventHandler? SelectedLogChanged;", logsCodeBehindSource);
         Assert.Contains("public DiagnosticsLogsFilterViewState CaptureFilterState()", logsCodeBehindSource);
         Assert.Contains("public void ApplyFilterState(DiagnosticsLogsFilterViewState state)", logsCodeBehindSource);
+        Assert.Contains("public StructuredLogViewerEntry? CaptureSelectedLogEntry()", logsCodeBehindSource);
+        Assert.Contains("public void ApplySelectionState(DiagnosticsLogsSelectionViewState state)", logsCodeBehindSource);
         Assert.Contains("private void WireFilterStateHandlers()", logsCodeBehindSource);
         Assert.Contains("FilterStateChanged?.Invoke(this, EventArgs.Empty);", logsCodeBehindSource);
         Assert.Contains("ApplyFiltersRequested?.Invoke(this, e);", logsCodeBehindSource);
         Assert.Contains("ClearFiltersRequested?.Invoke(this, e);", logsCodeBehindSource);
+        Assert.Contains("SelectedLogChanged?.Invoke(this, EventArgs.Empty);", logsCodeBehindSource);
         Assert.DoesNotContain("public TextBox LogFilterOperationIdTextBoxControl =>", logsCodeBehindSource);
     }
 
