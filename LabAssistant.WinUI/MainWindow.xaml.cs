@@ -35,7 +35,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost, IDeployOnTheFlyCompositionHost, IDiagnosticsWorkspaceHost
+public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost, IDeployOnTheFlyCompositionHost
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -236,12 +236,18 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             DiagnosticsSubviewTabView,
             DiagnosticsOverviewTabViewItem,
             DiagnosticsLogsTabViewItem,
-            this,
+            new DiagnosticsWorkspaceHost(
+                () => _isStructuredLogsLoading,
+                () => _structuredLogEntries.Count,
+                EnsureStructuredLogsLoadedAsync,
+                ClearStructuredLogFilters,
+                SetSelectedStructuredLogEntry),
             new DiagnosticsWorkspaceShellBridge(
                 () => IsDiagnosticsCapabilityActive,
                 () => IsDiagnosticsOverviewActive,
                 () => IsDiagnosticsLogsActive,
-                NavigateToRoute));
+                NavigateToRoute,
+                OpenStructuredLogLocation));
         _deployOnTheFlyWorkspaceController = new DeployOnTheFlyWorkspaceController(_deployOnTheFlyWorkspace, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
@@ -697,21 +703,11 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     void IDeployOnTheFlyCompositionHost.OnOpenResultsPanelRequested() => ToggleDeployRightPanelFromWorkflow();
 
-    bool IDiagnosticsWorkspaceHost.IsStructuredLogsLoading => _isStructuredLogsLoading;
-
-    int IDiagnosticsWorkspaceHost.StructuredLogEntryCount => _structuredLogEntries.Count;
-
-    Task IDiagnosticsWorkspaceHost.EnsureStructuredLogsLoadedAsync(bool forceReload) => EnsureStructuredLogsLoadedAsync(forceReload);
-
-    void IDiagnosticsWorkspaceHost.ClearStructuredLogFilters() => ClearStructuredLogFilters();
-
-    void IDiagnosticsWorkspaceHost.SetSelectedStructuredLogEntry(StructuredLogViewerEntry? selectedEntry)
+    private void SetSelectedStructuredLogEntry(StructuredLogViewerEntry? selectedEntry)
     {
         _selectedStructuredLogEntry = selectedEntry;
         UpdateStructuredLogSelectionDetails();
     }
-
-    void IDiagnosticsWorkspaceHost.OpenStructuredLogLocation() => OpenStructuredLogLocation();
 
     private void ToggleDeployRightPanelFromWorkflow()
     {
