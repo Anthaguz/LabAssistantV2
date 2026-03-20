@@ -74,18 +74,19 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
 }
 
 internal sealed class DiagnosticsWorkspaceComposition
+    : IDiagnosticsLogsWorkspaceControllerHost
 {
     private readonly FrameworkElement _localNavigationHost;
     private readonly DiagnosticsOverviewWorkspaceComposition _overviewWorkspaceComposition;
     private readonly DiagnosticsLogsView _logsView;
     private readonly DiagnosticsLogsWorkspaceViewModel _logsWorkspace = new();
+    private readonly DiagnosticsLogsWorkspaceController _logsController;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _logsTabViewItem;
     private readonly IDiagnosticsWorkspaceHost _host;
     private readonly IDiagnosticsWorkspaceShellBridge _shellBridge;
     private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
-    private bool _isStructuredLogsLoading;
     private bool _isUpdatingDiagnosticsSubviewSelection;
 
     public DiagnosticsWorkspaceComposition(
@@ -105,6 +106,7 @@ internal sealed class DiagnosticsWorkspaceComposition
         _logsTabViewItem = logsTabViewItem;
         _host = host;
         _shellBridge = shellBridge;
+        _logsController = new DiagnosticsLogsWorkspaceController(_logsWorkspace, this);
         _overviewWorkspaceComposition = new DiagnosticsOverviewWorkspaceComposition(
             overviewView,
             new DiagnosticsOverviewWorkspaceHost(
@@ -114,10 +116,9 @@ internal sealed class DiagnosticsWorkspaceComposition
                 () => _shellBridge.IsDiagnosticsOverviewActive,
                 _shellBridge.NavigateToRoute,
                 _shellBridge.OpenStructuredLogLocation));
-        _logsView.ApplyFilterState(_logsWorkspace.BuildViewState());
-        _logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());
         _logsView.StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireSharedHandlers();
+        ApplyLogsWorkspaceState(isLoading: false);
         RefreshOverviewSummary();
     }
 
@@ -131,7 +132,7 @@ internal sealed class DiagnosticsWorkspaceComposition
 
         if (_shellBridge.IsDiagnosticsLogsActive)
         {
-            _ = EnsureStructuredLogsLoadedAsync(forceReload: false);
+            _ = _logsController.EnsureLogsLoadedAsync(forceReload: false);
         }
     }
 
@@ -142,7 +143,7 @@ internal sealed class DiagnosticsWorkspaceComposition
         _logsView.ApplyFiltersRequested += ApplyLogFiltersButton_Click;
         _logsView.ClearFiltersRequested += ClearLogFiltersButton_Click;
         _logsView.ReloadLogsButton.Click += ReloadLogsButton_Click;
-        _logsView.OpenRawJsonlButton.Click += (_, _) => OpenStructuredLogLocation();
+        _logsView.OpenRawJsonlButton.Click += OpenRawJsonlButton_Click;
         _logsView.SelectedLogChanged += LogsView_SelectedLogChanged;
     }
 
@@ -192,106 +193,75 @@ internal sealed class DiagnosticsWorkspaceComposition
 
     private async void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
     {
-        await EnsureStructuredLogsLoadedAsync(forceReload: true);
+        await _logsController.EnsureLogsLoadedAsync(forceReload: true);
+    }
+
+    private void OpenRawJsonlButton_Click(object sender, RoutedEventArgs e)
+    {
+        _logsController.OpenRawLogLocation();
     }
 
     private void RefreshOverviewSummary()
     {
-        _overviewWorkspaceComposition.RefreshSummary(_isStructuredLogsLoading, _structuredLogEntries.Count);
+        _overviewWorkspaceComposition.RefreshSummary(_logsController.IsLoading, _structuredLogEntries.Count);
     }
 
     private void LogsView_FilterStateChanged(object? sender, EventArgs e)
     {
-        _logsWorkspace.ApplyFilterState(_logsView.CaptureFilterState());
+        _logsController.HandleFilterStateChanged(_logsView.CaptureFilterState());
     }
 
     private async void ApplyLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
-        _logsWorkspace.ApplyFilterState(_logsView.CaptureFilterState());
-        await EnsureStructuredLogsLoadedAsync(forceReload: true);
+        await _logsController.ApplyFiltersAsync(_logsView.CaptureFilterState());
     }
 
     private async void ClearLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
-        _logsWorkspace.ClearFilters();
-        _logsView.ApplyFilterState(_logsWorkspace.BuildViewState());
-        await EnsureStructuredLogsLoadedAsync(forceReload: true);
+        await _logsController.ClearFiltersAsync();
     }
 
     private void LogsView_SelectedLogChanged(object? sender, EventArgs e)
     {
-        _logsWorkspace.SetSelectedEntry(_logsView.CaptureSelectedLogEntry());
-        _logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());
+        _logsController.HandleSelectionChanged(_logsView.CaptureSelectedLogEntry());
     }
 
-    private async Task EnsureStructuredLogsLoadedAsync(bool forceReload)
+    bool IDiagnosticsLogsWorkspaceControllerHost.IsLogsActive => _shellBridge.IsDiagnosticsLogsActive;
+
+    int IDiagnosticsLogsWorkspaceControllerHost.StructuredLogEntryCount => _structuredLogEntries.Count;
+
+    Task<StructuredLogViewerLoadResult> IDiagnosticsLogsWorkspaceControllerHost.LoadStructuredLogsAsync(StructuredLogViewerFilter filter)
+        => _host.LoadStructuredLogsAsync(filter);
+
+    string IDiagnosticsLogsWorkspaceControllerHost.GetStructuredLogFilePath()
+        => _host.GetStructuredLogFilePath();
+
+    string? IDiagnosticsLogsWorkspaceControllerHost.OpenStructuredLogLocation(string filePath)
+        => _shellBridge.OpenStructuredLogLocation(filePath);
+
+    void IDiagnosticsLogsWorkspaceControllerHost.ReplaceStructuredLogEntries(IReadOnlyList<StructuredLogViewerEntry> entries)
     {
-        if (!_shellBridge.IsDiagnosticsLogsActive || _isStructuredLogsLoading)
+        _structuredLogEntries.Clear();
+        foreach (var entry in entries)
         {
-            return;
+            _structuredLogEntries.Add(entry);
         }
+    }
 
-        if (!forceReload && _structuredLogEntries.Count > 0)
-        {
-            return;
-        }
-
-        _isStructuredLogsLoading = true;
-        _logsView.ApplyLogFiltersButton.IsEnabled = false;
-        _logsView.ClearLogFiltersButton.IsEnabled = false;
-        _logsView.ReloadLogsButton.IsEnabled = false;
-        _logsView.OpenRawJsonlButton.IsEnabled = false;
-        _logsView.LogsStatusTextBlock.Text = "Loading structured logs...";
+    void IDiagnosticsLogsWorkspaceControllerHost.ApplyWorkspaceState(bool isLoading)
+    {
+        ApplyLogsWorkspaceState(isLoading);
         RefreshOverviewSummary();
-
-        try
-        {
-            var filter = BuildStructuredLogFilter();
-            var result = await _host.LoadStructuredLogsAsync(filter);
-
-            _structuredLogEntries.Clear();
-            foreach (var entry in result.Entries)
-            {
-                _structuredLogEntries.Add(entry);
-            }
-
-            _logsWorkspace.ClearSelection();
-            _logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());
-
-            var filePath = _host.GetStructuredLogFilePath();
-            var parseErrorSuffix = result.ParseErrorCount > 0
-                ? $" Skipped malformed lines: {result.ParseErrorCount}."
-                : string.Empty;
-            _logsView.LogsStatusTextBlock.Text = File.Exists(filePath)
-                ? $"Loaded {_structuredLogEntries.Count} events from {result.TotalLineCount} lines.{parseErrorSuffix}"
-                : $"Structured log file not found yet: {filePath}";
-        }
-        catch (Exception ex)
-        {
-            _logsView.LogsStatusTextBlock.Text = $"Failed to load structured logs. {ex.Message}";
-        }
-        finally
-        {
-            _isStructuredLogsLoading = false;
-            _logsView.ApplyLogFiltersButton.IsEnabled = true;
-            _logsView.ClearLogFiltersButton.IsEnabled = true;
-            _logsView.ReloadLogsButton.IsEnabled = true;
-            _logsView.OpenRawJsonlButton.IsEnabled = true;
-            RefreshOverviewSummary();
-        }
     }
 
-    private StructuredLogViewerFilter BuildStructuredLogFilter()
+    private void ApplyLogsWorkspaceState(bool isLoading)
     {
-        return _logsWorkspace.BuildStructuredLogFilter();
-    }
-
-    private void OpenStructuredLogLocation()
-    {
-        var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());
-        if (!string.IsNullOrWhiteSpace(statusText))
-        {
-            _logsView.LogsStatusTextBlock.Text = statusText;
-        }
+        _logsView.ApplyFilterState(_logsWorkspace.BuildViewState());
+        _logsView.ApplySelectionState(_logsWorkspace.BuildSelectionViewState());
+        _logsView.ApplyLogFiltersButton.IsEnabled = !isLoading;
+        _logsView.ClearLogFiltersButton.IsEnabled = !isLoading;
+        _logsView.ReloadLogsButton.IsEnabled = !isLoading;
+        _logsView.OpenRawJsonlButton.IsEnabled = !isLoading;
+        _logsView.LogsStatusTextBlock.Text = _logsWorkspace.StatusText;
     }
 }

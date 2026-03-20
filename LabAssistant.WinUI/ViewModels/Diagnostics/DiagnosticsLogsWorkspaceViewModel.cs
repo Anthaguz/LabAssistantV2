@@ -30,6 +30,8 @@ internal sealed class DiagnosticsLogsWorkspaceViewModel
 
     public string SelectedContextText { get; private set; } = string.Empty;
 
+    public string StatusText { get; private set; } = "Logs not loaded yet.";
+
     public void ApplyFilterState(DiagnosticsLogsFilterViewState state)
     {
         OperationIdQuery = NormalizeFilterText(state.OperationIdQuery);
@@ -74,6 +76,11 @@ internal sealed class DiagnosticsLogsWorkspaceViewModel
     public void ClearSelection()
     {
         SetSelectedEntry(null);
+    }
+
+    public void SetStatusText(string statusText)
+    {
+        StatusText = statusText;
     }
 
     public DiagnosticsLogsFilterViewState BuildViewState()
