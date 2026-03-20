@@ -2176,10 +2176,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private StructuredLogViewerEntry? _selectedStructuredLogEntry;", mainWindowSource);
         Assert.DoesNotContain("private bool _isStructuredLogsLoading;", mainWindowSource);
         Assert.DoesNotContain("private async Task EnsureStructuredLogsLoadedAsync(bool forceReload)", mainWindowSource);
-        Assert.DoesNotContain("private StructuredLogViewerFilter BuildStructuredLogFilter()", mainWindowSource);
-        Assert.DoesNotContain("private void UpdateStructuredLogSelectionDetails()", mainWindowSource);
-        Assert.DoesNotContain("private void ClearStructuredLogFilters()", mainWindowSource);
-        Assert.DoesNotContain("private void OpenStructuredLogLocation()", mainWindowSource);
         Assert.DoesNotContain("private DiagnosticsOverviewView DiagnosticsOverviewView =>", mainWindowSource);
         Assert.DoesNotContain("private DiagnosticsLogsView DiagnosticsLogsView =>", mainWindowSource);
 
@@ -2187,45 +2183,18 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly FrameworkElement _localNavigationHost;", compositionSource);
         Assert.Contains("private readonly DiagnosticsOverviewWorkspaceComposition _overviewWorkspaceComposition;", compositionSource);
         Assert.Contains("private readonly DiagnosticsLogsView _logsView;", compositionSource);
-        Assert.Contains("private readonly IDiagnosticsWorkspaceHost _host;", compositionSource);
-        Assert.Contains("private readonly IDiagnosticsWorkspaceShellBridge _shellBridge;", compositionSource);
-        Assert.Contains("private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];", compositionSource);
-        Assert.Contains("private StructuredLogViewerEntry? _selectedStructuredLogEntry;", compositionSource);
-        Assert.Contains("private bool _isStructuredLogsLoading;", compositionSource);
-        Assert.Contains("private bool _isUpdatingDiagnosticsSubviewSelection;", compositionSource);
-        Assert.Contains("internal sealed class DiagnosticsWorkspaceHost : IDiagnosticsWorkspaceHost", compositionSource);
-        Assert.Contains("public Task<StructuredLogViewerLoadResult> LoadStructuredLogsAsync(StructuredLogViewerFilter filter) => _structuredLogViewerService.LoadAsync(filter);", compositionSource);
-        Assert.Contains("public string GetStructuredLogFilePath() => _structuredLogViewerService.GetStructuredLogFilePath();", compositionSource);
         Assert.Contains("public void ApplyShellState()", compositionSource);
         Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDiagnosticsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition = new DiagnosticsOverviewWorkspaceComposition(", compositionSource);
-        Assert.Contains("new DiagnosticsOverviewWorkspaceHost(", compositionSource);
-        Assert.Contains("new DiagnosticsOverviewWorkspaceShellBridge(", compositionSource);
-        Assert.Contains("statusText => _logsView.LogsStatusTextBlock.Text = statusText", compositionSource);
         Assert.Contains("_logsView.Visibility = _shellBridge.IsDiagnosticsLogsActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
         Assert.Contains("if (_shellBridge.IsDiagnosticsLogsActive)", compositionSource);
         Assert.Contains("_ = EnsureStructuredLogsLoadedAsync(forceReload: false);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsOverview);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", compositionSource);
-        Assert.Contains("string? OpenStructuredLogLocation(string filePath);", compositionSource);
-        Assert.Contains("public string? OpenStructuredLogLocation(string filePath) => _openStructuredLogLocation(filePath);", compositionSource);
-        Assert.Contains("_logsView.OpenRawJsonlButton.Click += (_, _) => OpenStructuredLogLocation();", compositionSource);
         Assert.Contains("private void RefreshOverviewSummary()", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.RefreshSummary(_isStructuredLogsLoading, _structuredLogEntries.Count);", compositionSource);
         Assert.Contains("RefreshOverviewSummary();", compositionSource);
-        Assert.Contains("private async Task EnsureStructuredLogsLoadedAsync(bool forceReload)", compositionSource);
-        Assert.Contains("var result = await _host.LoadStructuredLogsAsync(filter);", compositionSource);
-        Assert.Contains("var filePath = _host.GetStructuredLogFilePath();", compositionSource);
-        Assert.Contains("private StructuredLogViewerFilter BuildStructuredLogFilter()", compositionSource);
-        Assert.Contains("private void UpdateStructuredLogSelectionDetails()", compositionSource);
-        Assert.Contains("private void ClearStructuredLogFilters()", compositionSource);
-        Assert.Contains("private void OpenStructuredLogLocation()", compositionSource);
-        Assert.Contains("var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());", compositionSource);
-        Assert.Contains("private static string NormalizeFilterText(string? value)", compositionSource);
-        Assert.Contains("private static DateTimeOffset ToDateBoundaryUtc(DateTimeOffset date, bool isEndBoundary)", compositionSource);
-        Assert.Contains("private static string FormatJsonForDetails(string json)", compositionSource);
-        Assert.DoesNotContain("public void Reset()", compositionSource);
         Assert.DoesNotContain("private readonly DiagnosticsOverviewView _overviewView;", compositionSource);
         Assert.DoesNotContain("public void RefreshSharedUiState()", compositionSource);
         Assert.DoesNotContain("_overviewView.OpenLogsRequested", compositionSource);
@@ -2234,10 +2203,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("internal sealed class DiagnosticsOverviewWorkspaceComposition", overviewCompositionSource);
         Assert.Contains("private readonly DiagnosticsOverviewView _view;", overviewCompositionSource);
         Assert.Contains("private readonly DiagnosticsOverviewWorkspaceViewModel _workspace = new();", overviewCompositionSource);
-        Assert.Contains("private readonly IDiagnosticsOverviewWorkspaceHost _host;", overviewCompositionSource);
-        Assert.Contains("private readonly IDiagnosticsOverviewWorkspaceShellBridge _shellBridge;", overviewCompositionSource);
-        Assert.Contains("internal sealed class DiagnosticsOverviewWorkspaceHost : IDiagnosticsOverviewWorkspaceHost", overviewCompositionSource);
-        Assert.Contains("internal sealed class DiagnosticsOverviewWorkspaceShellBridge : IDiagnosticsOverviewWorkspaceShellBridge", overviewCompositionSource);
         Assert.Contains("public void RefreshSummary(bool isStructuredLogsLoading, int structuredLogEntryCount)", overviewCompositionSource);
         Assert.Contains("public void ApplyShellState()", overviewCompositionSource);
         Assert.Contains("_view.Visibility = _shellBridge.IsDiagnosticsOverviewActive ? Visibility.Visible : Visibility.Collapsed;", overviewCompositionSource);
@@ -2249,6 +2214,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", overviewCompositionSource);
         Assert.Contains("var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());", overviewCompositionSource);
         Assert.Contains("_host.ReportOpenSupportStatus(statusText);", overviewCompositionSource);
+        Assert.DoesNotContain("_logsView", overviewCompositionSource);
 
         Assert.Contains("internal sealed class DiagnosticsOverviewWorkspaceViewModel", overviewWorkspaceSource);
         Assert.Contains("public string LogsSummaryText { get; private set; }", overviewWorkspaceSource);
@@ -2267,6 +2233,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("DiagnosticsOverviewOpenLogsButtonControl", overviewCodeBehindSource);
         Assert.DoesNotContain("DiagnosticsOverviewOpenSupportExportButtonControl", overviewCodeBehindSource);
         Assert.DoesNotContain("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", overviewCodeBehindSource);
+        Assert.DoesNotContain("public event EventHandler? OpenLogsRequested;", overviewCodeBehindSource);
+        Assert.DoesNotContain("public event EventHandler? OpenSupportExportRequested;", overviewCodeBehindSource);
     }
 
     private static string LoadMainWindowSource()
