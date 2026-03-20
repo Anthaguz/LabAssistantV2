@@ -724,6 +724,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** cleanup-target definition must preserve Diagnostics Overview as the route-entry surface, keep Diagnostics Logs as a child troubleshooting surface rather than a top-level shell destination, keep route activation refresh within the long-lived Diagnostics workspace rather than per-navigation recreation, and remain explicit that Diagnostics Overview extraction details, Diagnostics Logs extraction details, runtime implementation, Diagnostics workflow redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-170:** WinUI `Diagnostics Overview` cleanup shall remain under shared `DiagnosticsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Overview-specific state behind an Overview-local seam.
+  - **Acceptance details:** the Diagnostics Overview cleanup target must explicitly keep shared Diagnostics composition responsible only for shared capability-level concerns, must keep `MainWindow` limited to shell ownership, and must make an Overview-local seam the target owner for Overview summary state, entry-surface state, and Overview-specific refresh or reconcile behavior triggered by `diagnostics.overview` activation.
+  - **Priority:** P1
+
+- **FR-171:** WinUI `Diagnostics Overview` cleanup shall preserve current `diagnostics.overview` behavior and long-lived Diagnostics workspace participation while converging Overview-specific composition and UI coordination behind an Overview-local seam.
+  - **Acceptance details:** the Diagnostics Overview cleanup target must preserve `diagnostics.overview` as the distinct Diagnostics route-entry and summary surface, must keep route activation refresh or reconcile behavior within the existing long-lived Diagnostics workspace rather than per-navigation recreation, and must make Overview-local composition, interaction boundaries, navigation coordination, and host-cleanup expectations explicit without widening shared Diagnostics composition into the Overview workflow owner.
+  - **Priority:** P1
+
+- **FR-172:** WinUI `Diagnostics Overview` cleanup shall reject direct `MainWindow` view dependency, shared Diagnostics composition widening into the Overview workflow owner, Overview absorption of Diagnostics Logs semantics, and unapproved runtime or performance redesign during seam definition.
+  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Diagnostics composition must not become the Overview workflow owner; temporary Overview-specific host bridges or control exposure remain migration cleanup targets behind the Overview-local seam; `diagnostics.overview` must not absorb Diagnostics Logs ownership; and the cleanup target must stay explicit that Diagnostics Logs extraction details, runtime implementation, Diagnostics behavior redesign, and performance redesign are out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -738,6 +750,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
 - See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
+- See `docs/02-ux/winui-diagnostics-overview-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Overview` ownership, route-activation refresh, and non-goal boundaries.
 - See `docs/02-ux/winui-capability-workspace-composition-contract-am.md` for Milestone AM capability-local workspace composition refinement after the first Machines extraction slices.
 - See `docs/02-ux/winui-machines-composition-cleanup-target-am.md` for the post-AM33 Machines-specific cleanup target before broader capability rollout continues.
 - See `docs/02-ux/winui-assets-workspace-extraction-seam-am.md` for the AM Assets-specific extraction seam and composition target after the Machines proof point.

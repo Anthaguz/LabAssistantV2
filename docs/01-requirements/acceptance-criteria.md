@@ -3520,3 +3520,79 @@ Each readiness result shall include, at minimum:
 - [ ] Diagnostics route-entry preservation is explicit and traceable
 - [ ] temporary-bridge-vs-final-target rule and no-direct-`MainWindow`-injection rule are explicit and traceable
 - [ ] long-lived Diagnostics workspace and route-activation refresh rule are explicit and traceable
+
+---
+
+# AC-041 - WinUI Diagnostics Overview Extraction Cleanup Target (AM110)
+
+**Related FRs:** FR-170, FR-171, FR-172, FR-167, FR-168, FR-169, FR-104, FR-105, FR-106, FR-107, FR-108, FR-109, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Diagnostics Overview stays under shared Diagnostics composition while converging Overview-local ownership
+**Given**
+- `Diagnostics` already has an approved shared composition boundary under `DiagnosticsWorkspaceComposition`
+
+**When**
+- the `Diagnostics Overview` cleanup target is defined
+
+**Then**
+- `Diagnostics Overview` remains under shared `DiagnosticsWorkspaceComposition`
+- shared Diagnostics composition remains responsible only for shared capability-level concerns
+- an Overview-local seam becomes the target home for Overview-specific state, composition, and UI coordination
+- `MainWindow` remains responsible only for shell ownership and app-level workspace lifetime
+
+### 2) Overview-local ownership is explicit without widening shared Diagnostics composition
+**Given**
+- `diagnostics.overview` is the Diagnostics route-entry and summary surface
+
+**When**
+- the Overview-local ownership boundary is reviewed
+
+**Then**
+- Overview-local ownership is explicitly responsible for:
+  - Overview summary or entry-surface state
+  - Overview-local navigation or interaction coordination
+  - Overview-local composition and host cleanup expectations
+  - Overview-specific refresh or reconcile behavior triggered by `diagnostics.overview` activation
+- shared Diagnostics composition does not become the Overview workflow owner
+
+### 3) Diagnostics Overview preserves approved route-entry behavior and long-lived workspace participation
+**Given**
+- Diagnostics remains an Overview-first capability and Logs remains a child troubleshooting surface
+
+**When**
+- the narrow Overview cleanup target is applied
+
+**Then**
+- `diagnostics.overview` remains the distinct route-entry and index surface for `Diagnostics`
+- Diagnostics Overview continues to participate in the long-lived Diagnostics workspace rather than per-navigation workspace recreation
+- route activation refreshes or reconciles Overview state within the existing Diagnostics workspace
+- Diagnostics Logs ownership and semantics remain outside Overview ownership
+
+### 4) Diagnostics Overview rejects shell-centric and Logs-owning end-state patterns
+**Given**
+- shell-only ownership and shared Diagnostics ownership are already defined elsewhere
+
+**When**
+- the Overview cleanup target is reviewed for non-goals
+
+**Then**
+- views must not depend on or receive `MainWindow` directly
+- shared Diagnostics composition must not widen into an Overview workflow owner
+- Overview does not absorb Diagnostics Logs ownership or semantics
+- Diagnostics Logs extraction details, runtime implementation, Diagnostics behavior redesign, and performance redesign remain out of scope
+
+## Expected Boundary
+- shared `DiagnosticsWorkspaceComposition` continues to own shared Diagnostics capability composition, shared route participation, shared workspace hosting, and shared cross-surface coordination only where it is genuinely capability-level
+- an Overview-local seam becomes the target home for Overview-specific state, composition, interaction boundaries, UI coordination, and `diagnostics.overview` refresh or reconcile handling
+- `MainWindow` remains shell-only and is not injected into Overview views
+- Diagnostics Overview remains the route-entry surface inside the long-lived Diagnostics workspace
+- Diagnostics Logs ownership remains outside Overview and outside this issue's seam definition
+
+## Definition of Done
+- [ ] shared Diagnostics vs Overview-local ownership is explicit and traceable
+- [ ] Overview-local state/composition/UI-coordination expectations are explicit and traceable
+- [ ] `diagnostics.overview` route-entry and long-lived workspace participation are explicit and traceable
+- [ ] route-activation refresh or reconcile expectations for `diagnostics.overview` are explicit and traceable
+- [ ] Logs non-goals and shell-only boundary preservation are explicit and traceable
