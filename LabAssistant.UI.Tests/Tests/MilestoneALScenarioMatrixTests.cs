@@ -122,6 +122,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var diagnosticsOverviewSource = LoadDiagnosticsOverviewViewXamlSource();
         var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
         var diagnosticsCompositionSource = LoadDiagnosticsWorkspaceCompositionSource();
+        var diagnosticsOverviewCompositionSource = LoadDiagnosticsOverviewWorkspaceCompositionSource();
         var diagnosticsOverviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
 
         Assert.Contains("x:Name=\"AssetsOverviewOpenBaseDisksButton\"", assetsOverviewSource);
@@ -148,8 +149,9 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("public event EventHandler? OpenLogsRequested;", diagnosticsOverviewCodeBehindSource);
         Assert.Contains("public event EventHandler? OpenSupportExportRequested;", diagnosticsOverviewCodeBehindSource);
         Assert.Contains("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", diagnosticsOverviewCodeBehindSource);
-        Assert.Contains("_overviewView.OpenLogsRequested += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);", diagnosticsCompositionSource);
-        Assert.Contains("_overviewView.OpenSupportExportRequested += (_, _) => OpenStructuredLogLocation();", diagnosticsCompositionSource);
+        Assert.Contains("_overviewWorkspaceComposition = new DiagnosticsOverviewWorkspaceComposition(", diagnosticsCompositionSource);
+        Assert.Contains("_view.OpenLogsRequested += OpenLogsRequested;", diagnosticsOverviewCompositionSource);
+        Assert.Contains("_view.OpenSupportExportRequested += OpenSupportExportRequested;", diagnosticsOverviewCompositionSource);
     }
 
     [Fact]
@@ -514,6 +516,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDiagnosticsWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDiagnosticsOverviewWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsOverviewWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
