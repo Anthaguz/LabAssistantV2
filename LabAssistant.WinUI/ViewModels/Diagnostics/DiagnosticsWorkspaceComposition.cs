@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.Text.Json;
 using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Views.Diagnostics;
 using Microsoft.UI.Xaml;
@@ -7,15 +9,9 @@ namespace LabAssistant.WinUI.ViewModels.Diagnostics;
 
 internal interface IDiagnosticsWorkspaceHost
 {
-    bool IsStructuredLogsLoading { get; }
+    Task<StructuredLogViewerLoadResult> LoadStructuredLogsAsync(StructuredLogViewerFilter filter);
 
-    int StructuredLogEntryCount { get; }
-
-    Task EnsureStructuredLogsLoadedAsync(bool forceReload);
-
-    void ClearStructuredLogFilters();
-
-    void SetSelectedStructuredLogEntry(StructuredLogViewerEntry? selectedEntry);
+    string GetStructuredLogFilePath();
 }
 
 internal interface IDiagnosticsWorkspaceShellBridge
@@ -28,40 +24,21 @@ internal interface IDiagnosticsWorkspaceShellBridge
 
     void NavigateToRoute(string routeKey);
 
-    void OpenStructuredLogLocation();
+    string? OpenStructuredLogLocation(string filePath);
 }
 
 internal sealed class DiagnosticsWorkspaceHost : IDiagnosticsWorkspaceHost
 {
-    private readonly Func<bool> _isStructuredLogsLoading;
-    private readonly Func<int> _getStructuredLogEntryCount;
-    private readonly Func<bool, Task> _ensureStructuredLogsLoadedAsync;
-    private readonly Action _clearStructuredLogFilters;
-    private readonly Action<StructuredLogViewerEntry?> _setSelectedStructuredLogEntry;
+    private readonly IStructuredLogViewerService _structuredLogViewerService;
 
-    public DiagnosticsWorkspaceHost(
-        Func<bool> isStructuredLogsLoading,
-        Func<int> getStructuredLogEntryCount,
-        Func<bool, Task> ensureStructuredLogsLoadedAsync,
-        Action clearStructuredLogFilters,
-        Action<StructuredLogViewerEntry?> setSelectedStructuredLogEntry)
+    public DiagnosticsWorkspaceHost(IStructuredLogViewerService structuredLogViewerService)
     {
-        _isStructuredLogsLoading = isStructuredLogsLoading;
-        _getStructuredLogEntryCount = getStructuredLogEntryCount;
-        _ensureStructuredLogsLoadedAsync = ensureStructuredLogsLoadedAsync;
-        _clearStructuredLogFilters = clearStructuredLogFilters;
-        _setSelectedStructuredLogEntry = setSelectedStructuredLogEntry;
+        _structuredLogViewerService = structuredLogViewerService;
     }
 
-    public bool IsStructuredLogsLoading => _isStructuredLogsLoading();
+    public Task<StructuredLogViewerLoadResult> LoadStructuredLogsAsync(StructuredLogViewerFilter filter) => _structuredLogViewerService.LoadAsync(filter);
 
-    public int StructuredLogEntryCount => _getStructuredLogEntryCount();
-
-    public Task EnsureStructuredLogsLoadedAsync(bool forceReload) => _ensureStructuredLogsLoadedAsync(forceReload);
-
-    public void ClearStructuredLogFilters() => _clearStructuredLogFilters();
-
-    public void SetSelectedStructuredLogEntry(StructuredLogViewerEntry? selectedEntry) => _setSelectedStructuredLogEntry(selectedEntry);
+    public string GetStructuredLogFilePath() => _structuredLogViewerService.GetStructuredLogFilePath();
 }
 
 internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShellBridge
@@ -70,14 +47,14 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
     private readonly Func<bool> _isDiagnosticsOverviewActive;
     private readonly Func<bool> _isDiagnosticsLogsActive;
     private readonly Action<string> _navigateToRoute;
-    private readonly Action _openStructuredLogLocation;
+    private readonly Func<string, string?> _openStructuredLogLocation;
 
     public DiagnosticsWorkspaceShellBridge(
         Func<bool> isDiagnosticsCapabilityActive,
         Func<bool> isDiagnosticsOverviewActive,
         Func<bool> isDiagnosticsLogsActive,
         Action<string> navigateToRoute,
-        Action openStructuredLogLocation)
+        Func<string, string?> openStructuredLogLocation)
     {
         _isDiagnosticsCapabilityActive = isDiagnosticsCapabilityActive;
         _isDiagnosticsOverviewActive = isDiagnosticsOverviewActive;
@@ -94,7 +71,7 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
 
     public void NavigateToRoute(string routeKey) => _navigateToRoute(routeKey);
 
-    public void OpenStructuredLogLocation() => _openStructuredLogLocation();
+    public string? OpenStructuredLogLocation(string filePath) => _openStructuredLogLocation(filePath);
 }
 
 internal sealed class DiagnosticsWorkspaceComposition
@@ -109,6 +86,9 @@ internal sealed class DiagnosticsWorkspaceComposition
     private readonly TabViewItem _logsTabViewItem;
     private readonly IDiagnosticsWorkspaceHost _host;
     private readonly IDiagnosticsWorkspaceShellBridge _shellBridge;
+    private readonly ObservableCollection<StructuredLogViewerEntry> _structuredLogEntries = [];
+    private StructuredLogViewerEntry? _selectedStructuredLogEntry;
+    private bool _isStructuredLogsLoading;
     private bool _isUpdatingDiagnosticsSubviewSelection;
 
     public DiagnosticsWorkspaceComposition(
@@ -129,15 +109,17 @@ internal sealed class DiagnosticsWorkspaceComposition
         _logsTabViewItem = logsTabViewItem;
         _host = host;
         _shellBridge = shellBridge;
+        _logsView.StructuredLogsListView.ItemsSource = _structuredLogEntries;
         WireSharedHandlers();
+        UpdateStructuredLogSelectionDetails();
     }
 
     public void RefreshSharedUiState()
     {
-        var logsSummaryText = _host.IsStructuredLogsLoading
+        var logsSummaryText = _isStructuredLogsLoading
             ? "Structured logs are loading."
-            : _host.StructuredLogEntryCount > 0
-                ? $"{_host.StructuredLogEntryCount} structured log entries are currently loaded."
+            : _structuredLogEntries.Count > 0
+                ? $"{_structuredLogEntries.Count} structured log entries are currently loaded."
                 : "Open Logs to inspect structured events and current support context.";
         _overviewView.UpdateSummary(logsSummaryText, SupportSummaryText);
     }
@@ -157,7 +139,7 @@ internal sealed class DiagnosticsWorkspaceComposition
 
         if (_shellBridge.IsDiagnosticsLogsActive)
         {
-            _ = _host.EnsureStructuredLogsLoadedAsync(forceReload: false);
+            _ = EnsureStructuredLogsLoadedAsync(forceReload: false);
         }
     }
 
@@ -165,11 +147,11 @@ internal sealed class DiagnosticsWorkspaceComposition
     {
         _subviewTabView.SelectionChanged += DiagnosticsSubviewTabView_SelectionChanged;
         _overviewView.OpenLogsRequested += (_, _) => _shellBridge.NavigateToRoute(ShellRouteKeys.DiagnosticsLogs);
-        _overviewView.OpenSupportExportRequested += (_, _) => _shellBridge.OpenStructuredLogLocation();
+        _overviewView.OpenSupportExportRequested += (_, _) => OpenStructuredLogLocation();
         _logsView.ApplyLogFiltersButton.Click += ApplyLogFiltersButton_Click;
         _logsView.ClearLogFiltersButton.Click += ClearLogFiltersButton_Click;
         _logsView.ReloadLogsButton.Click += ReloadLogsButton_Click;
-        _logsView.OpenRawJsonlButton.Click += (_, _) => _shellBridge.OpenStructuredLogLocation();
+        _logsView.OpenRawJsonlButton.Click += (_, _) => OpenStructuredLogLocation();
         _logsView.StructuredLogsListView.SelectionChanged += StructuredLogsListView_SelectionChanged;
     }
 
@@ -219,22 +201,172 @@ internal sealed class DiagnosticsWorkspaceComposition
 
     private async void ReloadLogsButton_Click(object sender, RoutedEventArgs e)
     {
-        await _host.EnsureStructuredLogsLoadedAsync(forceReload: true);
+        await EnsureStructuredLogsLoadedAsync(forceReload: true);
     }
 
     private async void ApplyLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
-        await _host.EnsureStructuredLogsLoadedAsync(forceReload: true);
+        await EnsureStructuredLogsLoadedAsync(forceReload: true);
     }
 
     private async void ClearLogFiltersButton_Click(object sender, RoutedEventArgs e)
     {
-        _host.ClearStructuredLogFilters();
-        await _host.EnsureStructuredLogsLoadedAsync(forceReload: true);
+        ClearStructuredLogFilters();
+        await EnsureStructuredLogsLoadedAsync(forceReload: true);
     }
 
     private void StructuredLogsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        _host.SetSelectedStructuredLogEntry(_logsView.StructuredLogsListView.SelectedItem as StructuredLogViewerEntry);
+        _selectedStructuredLogEntry = _logsView.StructuredLogsListView.SelectedItem as StructuredLogViewerEntry;
+        UpdateStructuredLogSelectionDetails();
+    }
+
+    private async Task EnsureStructuredLogsLoadedAsync(bool forceReload)
+    {
+        if (!_shellBridge.IsDiagnosticsLogsActive || _isStructuredLogsLoading)
+        {
+            return;
+        }
+
+        if (!forceReload && _structuredLogEntries.Count > 0)
+        {
+            return;
+        }
+
+        _isStructuredLogsLoading = true;
+        _logsView.ApplyLogFiltersButton.IsEnabled = false;
+        _logsView.ClearLogFiltersButton.IsEnabled = false;
+        _logsView.ReloadLogsButton.IsEnabled = false;
+        _logsView.OpenRawJsonlButton.IsEnabled = false;
+        _logsView.LogsStatusTextBlock.Text = "Loading structured logs...";
+
+        try
+        {
+            var filter = BuildStructuredLogFilter();
+            var result = await _host.LoadStructuredLogsAsync(filter);
+
+            _structuredLogEntries.Clear();
+            foreach (var entry in result.Entries)
+            {
+                _structuredLogEntries.Add(entry);
+            }
+
+            _logsView.StructuredLogsListView.SelectedItem = null;
+            _selectedStructuredLogEntry = null;
+            UpdateStructuredLogSelectionDetails();
+
+            var filePath = _host.GetStructuredLogFilePath();
+            var parseErrorSuffix = result.ParseErrorCount > 0
+                ? $" Skipped malformed lines: {result.ParseErrorCount}."
+                : string.Empty;
+            _logsView.LogsStatusTextBlock.Text = File.Exists(filePath)
+                ? $"Loaded {_structuredLogEntries.Count} events from {result.TotalLineCount} lines.{parseErrorSuffix}"
+                : $"Structured log file not found yet: {filePath}";
+        }
+        catch (Exception ex)
+        {
+            _logsView.LogsStatusTextBlock.Text = $"Failed to load structured logs. {ex.Message}";
+        }
+        finally
+        {
+            _isStructuredLogsLoading = false;
+            _logsView.ApplyLogFiltersButton.IsEnabled = true;
+            _logsView.ClearLogFiltersButton.IsEnabled = true;
+            _logsView.ReloadLogsButton.IsEnabled = true;
+            _logsView.OpenRawJsonlButton.IsEnabled = true;
+            RefreshSharedUiState();
+        }
+    }
+
+    private StructuredLogViewerFilter BuildStructuredLogFilter()
+    {
+        return new StructuredLogViewerFilter
+        {
+            OperationId = NormalizeFilterText(_logsView.LogFilterOperationIdTextBox.Text),
+            Level = NormalizeFilterText(_logsView.LogFilterLevelTextBox.Text),
+            Event = NormalizeFilterText(_logsView.LogFilterEventTextBox.Text),
+            TextSearch = NormalizeFilterText(_logsView.LogFilterTextSearchTextBox.Text),
+            StartUtc = _logsView.LogFilterUseStartDateCheckBox.IsChecked == true
+                ? ToDateBoundaryUtc(_logsView.LogFilterStartDatePicker.Date, isEndBoundary: false)
+                : null,
+            EndUtc = _logsView.LogFilterUseEndDateCheckBox.IsChecked == true
+                ? ToDateBoundaryUtc(_logsView.LogFilterEndDatePicker.Date, isEndBoundary: true)
+                : null
+        };
+    }
+
+    private void UpdateStructuredLogSelectionDetails()
+    {
+        if (_selectedStructuredLogEntry is null)
+        {
+            _logsView.SelectedLogEnvelopeTextBlock.Text = "Select a log entry.";
+            _logsView.SelectedLogContextTextBox.Text = string.Empty;
+            return;
+        }
+
+        _logsView.SelectedLogEnvelopeTextBlock.Text =
+            $"ts={_selectedStructuredLogEntry.TimestampText} | level={_selectedStructuredLogEntry.Level} | event={_selectedStructuredLogEntry.Event} | operationId={_selectedStructuredLogEntry.OperationId} | result={_selectedStructuredLogEntry.Result}";
+        _logsView.SelectedLogContextTextBox.Text = FormatJsonForDetails(_selectedStructuredLogEntry.ContextJson);
+    }
+
+    private void ClearStructuredLogFilters()
+    {
+        _logsView.LogFilterOperationIdTextBox.Text = string.Empty;
+        _logsView.LogFilterLevelTextBox.Text = string.Empty;
+        _logsView.LogFilterEventTextBox.Text = string.Empty;
+        _logsView.LogFilterTextSearchTextBox.Text = string.Empty;
+        _logsView.LogFilterUseStartDateCheckBox.IsChecked = false;
+        _logsView.LogFilterUseEndDateCheckBox.IsChecked = false;
+        _logsView.LogFilterStartDatePicker.Date = DateTimeOffset.Now;
+        _logsView.LogFilterEndDatePicker.Date = DateTimeOffset.Now;
+    }
+
+    private void OpenStructuredLogLocation()
+    {
+        var statusText = _shellBridge.OpenStructuredLogLocation(_host.GetStructuredLogFilePath());
+        if (!string.IsNullOrWhiteSpace(statusText))
+        {
+            _logsView.LogsStatusTextBlock.Text = statusText;
+        }
+    }
+
+    private static string NormalizeFilterText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Trim();
+    }
+
+    private static DateTimeOffset ToDateBoundaryUtc(DateTimeOffset date, bool isEndBoundary)
+    {
+        var selectedDate = date.Date;
+        var localBoundary = isEndBoundary
+            ? selectedDate.AddDays(1).AddTicks(-1)
+            : selectedDate;
+        return localBoundary.ToUniversalTime();
+    }
+
+    private static string FormatJsonForDetails(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "{}";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            return json;
+        }
     }
 }
