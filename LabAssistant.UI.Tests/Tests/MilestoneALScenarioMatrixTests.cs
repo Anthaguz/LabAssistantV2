@@ -146,9 +146,10 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("x:Name=\"DiagnosticsOverviewOpenSupportExportButton\"", diagnosticsOverviewSource);
         Assert.Contains("Click=\"DiagnosticsOverviewOpenLogsButton_Click\"", diagnosticsOverviewSource);
         Assert.Contains("Click=\"DiagnosticsOverviewOpenSupportExportButton_Click\"", diagnosticsOverviewSource);
-        Assert.Contains("public event EventHandler? OpenLogsRequested;", diagnosticsOverviewCodeBehindSource);
-        Assert.Contains("public event EventHandler? OpenSupportExportRequested;", diagnosticsOverviewCodeBehindSource);
-        Assert.Contains("public void UpdateSummary(string logsSummaryText, string supportSummaryText)", diagnosticsOverviewCodeBehindSource);
+        Assert.Contains("public readonly record struct DiagnosticsOverviewViewState(", diagnosticsOverviewCodeBehindSource);
+        Assert.Contains("public event RoutedEventHandler? OpenLogsRequested;", diagnosticsOverviewCodeBehindSource);
+        Assert.Contains("public event RoutedEventHandler? OpenSupportExportRequested;", diagnosticsOverviewCodeBehindSource);
+        Assert.Contains("public void ApplyWorkspaceState(DiagnosticsOverviewViewState state)", diagnosticsOverviewCodeBehindSource);
         Assert.Contains("_overviewWorkspaceComposition = new DiagnosticsOverviewWorkspaceComposition(", diagnosticsCompositionSource);
         Assert.Contains("_view.OpenLogsRequested += OpenLogsRequested;", diagnosticsOverviewCompositionSource);
         Assert.Contains("_view.OpenSupportExportRequested += OpenSupportExportRequested;", diagnosticsOverviewCompositionSource);

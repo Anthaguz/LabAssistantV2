@@ -1,31 +1,36 @@
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.Views.Diagnostics;
 
+public readonly record struct DiagnosticsOverviewViewState(
+    string LogsSummaryText,
+    string SupportSummaryText);
+
 public sealed partial class DiagnosticsOverviewView : UserControl
 {
-    public event EventHandler? OpenLogsRequested;
+    public event RoutedEventHandler? OpenLogsRequested;
 
-    public event EventHandler? OpenSupportExportRequested;
+    public event RoutedEventHandler? OpenSupportExportRequested;
 
     public DiagnosticsOverviewView()
     {
         InitializeComponent();
     }
 
-    public void UpdateSummary(string logsSummaryText, string supportSummaryText)
+    public void ApplyWorkspaceState(DiagnosticsOverviewViewState state)
     {
-        DiagnosticsOverviewLogsSummaryTextBlock.Text = logsSummaryText;
-        DiagnosticsOverviewSupportSummaryTextBlock.Text = supportSummaryText;
+        DiagnosticsOverviewLogsSummaryTextBlock.Text = state.LogsSummaryText;
+        DiagnosticsOverviewSupportSummaryTextBlock.Text = state.SupportSummaryText;
     }
 
-    private void DiagnosticsOverviewOpenLogsButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void DiagnosticsOverviewOpenLogsButton_Click(object sender, RoutedEventArgs e)
     {
-        OpenLogsRequested?.Invoke(this, EventArgs.Empty);
+        OpenLogsRequested?.Invoke(this, e);
     }
 
-    private void DiagnosticsOverviewOpenSupportExportButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void DiagnosticsOverviewOpenSupportExportButton_Click(object sender, RoutedEventArgs e)
     {
-        OpenSupportExportRequested?.Invoke(this, EventArgs.Empty);
+        OpenSupportExportRequested?.Invoke(this, e);
     }
 }
