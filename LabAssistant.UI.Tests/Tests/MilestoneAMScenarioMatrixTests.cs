@@ -1840,10 +1840,13 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private VmTemplate? _selectedDeployOnTheFlyVmEntry;", mainWindowSource);
         Assert.DoesNotContain("private bool _isUpdatingDeployOnTheFlyEditor;", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.SetSelectedVmEntry(", mainWindowSource);
-        Assert.Contains("DeployOnTheFlyViewHost.SetVmEntrySelection(selectedRow);", mainWindowSource);
-        Assert.Contains("DeployOnTheFlyViewHost.ApplyEditorViewState(", mainWindowSource);
-        Assert.Contains("private void SyncDeployOnTheFlyEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)", mainWindowSource);
-        Assert.Contains("_deployOnTheFlyWorkspace.UpdateEditorDraft(", mainWindowSource);
+        Assert.DoesNotContain("private void SelectDeployOnTheFlyVmEntry(VmTemplate? vmEntry)", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDeployOnTheFlyEditorPanel()", mainWindowSource);
+        Assert.DoesNotContain("private DeployOnTheFlyEditorViewState BuildDeployOnTheFlyEditorViewState()", mainWindowSource);
+        Assert.DoesNotContain("private void SyncDeployOnTheFlyEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspaceComposition.SelectVmEntry(", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspaceComposition.SyncEditorDraft(interactionState);", mainWindowSource);
         Assert.Contains("var previousName = _deployOnTheFlyWorkspace.ApplyEditorDraftToSelectedVm();", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.SelectedVmEntry is not null", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft", mainWindowSource);
@@ -1860,6 +1863,13 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);", onTheFlyCompositionSource);
         Assert.Contains("_view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());", onTheFlyCompositionSource);
+        Assert.Contains("public void SelectVmEntry(VmTemplate? vmEntry)", onTheFlyCompositionSource);
+        Assert.Contains("public void UpdateEditorPanel()", onTheFlyCompositionSource);
+        Assert.Contains("private DeployOnTheFlyEditorViewState BuildEditorViewState()", onTheFlyCompositionSource);
+        Assert.Contains("public void SyncEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)", onTheFlyCompositionSource);
+        Assert.Contains("_view.SetVmEntrySelection(selectedRow);", onTheFlyCompositionSource);
+        Assert.Contains("_view.ApplyEditorViewState(BuildEditorViewState());", onTheFlyCompositionSource);
+        Assert.Contains("_workspace.UpdateEditorDraft(", onTheFlyCompositionSource);
 
         Assert.Contains("public VmTemplate? SelectedVmEntry { get; private set; }", onTheFlyWorkspaceSource);
         Assert.Contains("public string EditorVmNameDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);
