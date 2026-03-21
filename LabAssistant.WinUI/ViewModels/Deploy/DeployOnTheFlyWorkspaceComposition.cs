@@ -1,6 +1,7 @@
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
+using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.Views.Deploy;
 using Microsoft.UI.Xaml;
 
@@ -51,10 +52,14 @@ internal interface IDeployOnTheFlyCompositionHost
 
 internal sealed class DeployOnTheFlyWorkspaceComposition
 {
+    private const string SwitchPlaceholder = "(No switch)";
+    private const string VhdxPlaceholder = "(Select base disk)";
     private readonly DeployOnTheFlyView _view;
     private readonly DeployOnTheFlyRightPanelView _rightPanelView;
     private readonly DeployOnTheFlyWorkspaceViewModel _workspace;
     private readonly IDeployOnTheFlyCompositionHost _host;
+    private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
+    private IReadOnlyList<TemplateVhdxCatalogOption> _availableVhdxCatalogOptions = Array.Empty<TemplateVhdxCatalogOption>();
 
     public DeployOnTheFlyWorkspaceComposition(
         DeployOnTheFlyView view,
@@ -77,6 +82,49 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     public bool IsStarting => _workspace.IsStarting;
 
     public string LifecycleState => _workspace.LifecycleState;
+
+    public void SetEditorReferenceData(
+        IReadOnlyList<string> availableSwitches,
+        IReadOnlyList<TemplateVhdxCatalogOption> availableVhdxCatalogOptions)
+    {
+        _availableSwitches = availableSwitches;
+        _availableVhdxCatalogOptions = availableVhdxCatalogOptions;
+    }
+
+    public void SelectVmEntry(VmTemplate? vmEntry)
+    {
+        if (vmEntry is null)
+        {
+            _view.SetVmEntrySelection(null);
+            return;
+        }
+
+        var selectedRow = _workspace.FindRow(vmEntry);
+        _view.SetVmEntrySelection(selectedRow);
+    }
+
+    public void UpdateEditorPanel()
+    {
+        _view.ApplyEditorViewState(BuildEditorViewState());
+    }
+
+    public void SyncEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)
+    {
+        var selectedSwitch = interactionState.SelectedSwitchItem is string switchName &&
+                             !string.Equals(switchName, SwitchPlaceholder, StringComparison.Ordinal)
+            ? switchName
+            : null;
+
+        var selectedCatalogOption = interactionState.SelectedVhdxCatalogOption;
+        _workspace.UpdateEditorDraft(
+            interactionState.VmName,
+            interactionState.VmMemoryText,
+            interactionState.VmCpuText,
+            selectedSwitch,
+            selectedCatalogOption?.Id,
+            selectedCatalogOption?.Path,
+            selectedCatalogOption?.Signature);
+    }
 
     public void ApplyShellState(bool isActive)
     {
@@ -113,6 +161,83 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
                 : ResultRowCount > 0
                     ? $"{ResultRowCount} VM result row(s) are available for review."
                     : "Use the side panel during or after deploy for progress, timeline, and results.");
+    }
+
+    private DeployOnTheFlyEditorViewState BuildEditorViewState()
+    {
+        var switchItems = new List<object> { SwitchPlaceholder };
+        switchItems.AddRange(_availableSwitches);
+
+        var vhdItems = new List<object> { VhdxPlaceholder };
+        vhdItems.AddRange(_availableVhdxCatalogOptions);
+
+        if (_workspace.SelectedVmEntry is null)
+        {
+            return new DeployOnTheFlyEditorViewState(
+                _workspace.EditorVmNameDraft,
+                _workspace.EditorVmMemoryDraft,
+                _workspace.EditorVmCpuDraft,
+                switchItems,
+                SwitchPlaceholder,
+                "Select a VM entry first.",
+                vhdItems,
+                VhdxPlaceholder,
+                "Select a VM entry first.");
+        }
+
+        object selectedSwitchItem;
+        string switchGuidanceText;
+        var selectedSwitch = _workspace.EditorSwitchNameDraft;
+        if (!string.IsNullOrWhiteSpace(selectedSwitch) &&
+            _availableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase))
+        {
+            selectedSwitchItem = _availableSwitches.First(name =>
+                string.Equals(name, selectedSwitch, StringComparison.OrdinalIgnoreCase));
+            switchGuidanceText = "Switch selected from host inventory.";
+        }
+        else
+        {
+            selectedSwitchItem = SwitchPlaceholder;
+            switchGuidanceText = _availableSwitches.Count == 0
+                ? "No host switches available. Add a switch in Assets first."
+                : "Switch selection is optional.";
+        }
+
+        var vhdSelection = string.IsNullOrWhiteSpace(_workspace.EditorVhdxIdDraft)
+            ? null
+            : _availableVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Id, _workspace.EditorVhdxIdDraft, StringComparison.OrdinalIgnoreCase));
+        if (vhdSelection is null && !string.IsNullOrWhiteSpace(_workspace.EditorVhdPathDraft))
+        {
+            vhdSelection = _availableVhdxCatalogOptions.FirstOrDefault(option =>
+                string.Equals(option.Path, _workspace.EditorVhdPathDraft, StringComparison.OrdinalIgnoreCase));
+        }
+
+        object selectedVhdxCatalogItem;
+        string vhdxGuidanceText;
+        if (vhdSelection is not null)
+        {
+            selectedVhdxCatalogItem = vhdSelection;
+            vhdxGuidanceText = $"Selected: {vhdSelection.DisplayLabel} ({vhdSelection.Id}).";
+        }
+        else
+        {
+            selectedVhdxCatalogItem = VhdxPlaceholder;
+            vhdxGuidanceText = _availableVhdxCatalogOptions.Count == 0
+                ? "No VHDX catalog entries available. Import base disks in Assets first."
+                : "Select a base disk from catalog.";
+        }
+
+        return new DeployOnTheFlyEditorViewState(
+            _workspace.EditorVmNameDraft,
+            _workspace.EditorVmMemoryDraft,
+            _workspace.EditorVmCpuDraft,
+            switchItems,
+            selectedSwitchItem,
+            switchGuidanceText,
+            vhdItems,
+            selectedVhdxCatalogItem,
+            vhdxGuidanceText);
     }
 
     private void WireHandlers()
