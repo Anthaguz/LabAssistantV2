@@ -24,7 +24,6 @@ public sealed class MilestoneAJScenarioMatrixTests
 
         Assert.NotNull(FindByName(xaml, "AssetsBaseDisksViewHost"));
         Assert.Contains("xmlns:assetsViews=\"using:LabAssistant.WinUI.Views.Assets\"", xamlSource);
-        Assert.Contains("private AssetsBaseDisksView AssetsBaseDisksView => AssetsBaseDisksViewHost;", source);
         Assert.Contains("private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;", source);
         Assert.Contains("AssetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;", source);
     }

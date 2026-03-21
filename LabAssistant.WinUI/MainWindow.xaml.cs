@@ -23,10 +23,8 @@ using LabAssistant.WinUI.ViewModels.Diagnostics;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
-using LabAssistant.WinUI.Views.Assets;
 using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Machines;
-using LabAssistant.WinUI.Views.Templates;
 using LabAssistant.WinUI.Interop;
 using Microsoft.UI.Dispatching;
 using WinRT.Interop;
@@ -81,10 +79,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
     private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
-    private AssetsOverviewView AssetsOverviewView => AssetsOverviewViewHost;
-    private AssetsBaseDisksView AssetsBaseDisksView => AssetsBaseDisksViewHost;
-    private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;
-    private DeployFromTemplateRightPanelView DeployFromTemplateRightPanelView => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
@@ -93,8 +87,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
     private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
     private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
-    private TemplatesLibraryView TemplatesLibraryView => TemplatesLibraryViewHost;
-    private TemplatesEditorView TemplatesEditorView => TemplatesEditorViewHost;
     private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
     private const string DeployOnTheFlySwitchPlaceholder = "(No switch)";
     private const string DeployOnTheFlyVhdxPlaceholder = "(Select base disk)";
@@ -2320,126 +2312,4 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             MachinesDeletionPolicyStatusTextBlock.Text = $"Failed to load policy. {ex.Message}";
         }
     }
-
-    /* obsolete_machines_delete_scope_dialog_signature
-    {
-        var vmOnlyRadio = new RadioButton
-        {
-            Content = "VM registration only",
-            IsChecked = preview.DefaultScope == MachineDeleteScope.VmRegistrationOnly
-        };
-        var vmAndStorageRadio = new RadioButton
-        {
-            IsChecked = preview.DefaultScope == MachineDeleteScope.VmAndStorage,
-            Content = "VM + associated disks/files"
-        };
-        var confirmationCheck = new CheckBox
-        {
-            Content = $"I confirm I want to delete '{vm.VmName}'."
-        };
-
-        var content = new StackPanel { Spacing = 10 };
-        content.Children.Add(new TextBlock
-        {
-            Text = "Choose delete scope. This action is destructive.",
-            TextWrapping = TextWrapping.Wrap
-        });
-        content.Children.Add(new TextBlock
-        {
-            Text = $"Policy: {preview.PolicyMode} — {preview.PolicyMessage}",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
-        });
-
-        foreach (var disk in preview.DiskClassifications)
-        {
-            content.Children.Add(new TextBlock
-            {
-                Text = $"Disk: {disk.DiskPath} | {disk.Classification} ({disk.Reason})",
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
-            });
-        }
-
-        content.Children.Add(vmOnlyRadio);
-        content.Children.Add(vmAndStorageRadio);
-        content.Children.Add(new TextBlock
-        {
-            Text = "If deleting with storage, associated disks/files will be removed where possible.",
-            TextWrapping = TextWrapping.Wrap
-        });
-        content.Children.Add(confirmationCheck);
-
-        var dialog = new ContentDialog
-        {
-            Title = "Delete VM",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
-            IsPrimaryButtonEnabled = false,
-            XamlRoot = RootLayout.XamlRoot,
-            Content = content
-        };
-
-        confirmationCheck.Checked += (_, _) => dialog.IsPrimaryButtonEnabled = true;
-        confirmationCheck.Unchecked += (_, _) => dialog.IsPrimaryButtonEnabled = false;
-
-        var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Primary)
-        {
-            return null;
-        }
-
-        return vmAndStorageRadio.IsChecked == true
-            ? MachineDeleteScope.VmAndStorage
-            : MachineDeleteScope.VmRegistrationOnly;
-    }
-
-    obsolete_machines_delete_confirmation_dialog_signature(
-        MachineInventoryItem vm,
-        MachineDeletePreview preview,
-        MachineDeleteScope effectiveScope)
-    {
-        var scopeText = effectiveScope == MachineDeleteScope.VmAndStorage
-            ? "VM + associated disks/files"
-            : "VM registration only";
-        var confirmationCheck = new CheckBox
-        {
-            Content = $"I confirm I want to delete '{vm.VmName}'."
-        };
-
-        var content = new StackPanel { Spacing = 10 };
-        content.Children.Add(new TextBlock
-        {
-            Text = $"Effective delete scope: {scopeText}",
-            TextWrapping = TextWrapping.Wrap,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-        });
-        content.Children.Add(new TextBlock
-        {
-            Text = $"Policy: {preview.PolicyMode} — {preview.PolicyMessage}",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ShellTextSecondaryBrush"]
-        });
-        content.Children.Add(confirmationCheck);
-
-        var dialog = new ContentDialog
-        {
-            Title = "Delete VM",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
-            IsPrimaryButtonEnabled = false,
-            XamlRoot = RootLayout.XamlRoot,
-            Content = content
-        };
-
-        confirmationCheck.Checked += (_, _) => dialog.IsPrimaryButtonEnabled = true;
-        confirmationCheck.Unchecked += (_, _) => dialog.IsPrimaryButtonEnabled = false;
-
-        var result = await dialog.ShowAsync();
-        return result == ContentDialogResult.Primary;
-    }
-
-    */
 }
