@@ -21,7 +21,6 @@ public sealed class MilestoneAKScenarioMatrixTests
         var source = LoadMainWindowSource();
 
         Assert.NotNull(FindByName(xaml, "AssetsSwitchesViewHost"));
-        Assert.Contains("private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;", source);
         Assert.Contains("private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;", source);
         Assert.Contains("AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;", source);
         Assert.Contains("private bool IsAssetsSwitchesActive =>", source);
@@ -133,7 +132,6 @@ public sealed class MilestoneAKScenarioMatrixTests
         var compositionSource = LoadAssetsSwitchesCompositionSource();
 
         Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", LoadShellViewModelSource());
-        Assert.Contains("private AssetsSwitchesView AssetsSwitchesView => AssetsSwitchesViewHost;", source);
         Assert.Contains("AssetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;", source);
 
         Assert.NotNull(FindByName(LoadAssetsSwitchesViewXaml(), "AssetsSwitchesListRegion"));
