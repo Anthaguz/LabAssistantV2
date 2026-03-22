@@ -66,7 +66,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
         var viewSource = LoadDeployOnTheFlyViewSource();
 
-        Assert.Contains("EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full)", source);
+        Assert.Contains("_deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(DeploymentPreflightMode.Full)", source);
         Assert.Contains("CanStartDeploy: hasEntries && !hasBlockingFailures", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", source);
@@ -83,7 +83,8 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
         Assert.Contains("_rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);", compositionSource);
         Assert.Contains("_ = _host.EnsureReferenceDataAsync(forceRefresh: false);", compositionSource);
-        Assert.Contains("_view.EvaluateRequested += async (_, _) => await _host.OnEvaluateRequestedAsync();", compositionSource);
+        Assert.Contains("public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>", compositionSource);
+        Assert.Contains("_view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
         Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", compositionSource);
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", compositionSource);
         Assert.Contains("public void ApplyShellState(bool isActive)", compositionSource);
@@ -92,7 +93,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.DoesNotContain("DeployOnTheFlyStartButtonControl", compositionSource);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceController", controllerSource);
-        Assert.Contains("await _host.EvaluateReadinessAsync(DeploymentPreflightMode.Full);", controllerSource);
+        Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", controllerSource);
         Assert.Contains("_host.PrepareDeployExecution(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("_host.ApplyDeploySummary(summary);", controllerSource);
