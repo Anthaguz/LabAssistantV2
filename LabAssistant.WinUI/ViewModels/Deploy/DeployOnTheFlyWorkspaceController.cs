@@ -45,6 +45,7 @@ internal sealed class DeployOnTheFlyWorkspaceController
 {
     private readonly DeployOnTheFlyWorkspaceViewModel _workspace;
     private readonly IDeployOnTheFlyWorkspaceControllerHost _host;
+    private int _autoEvaluateNonce;
 
     public DeployOnTheFlyWorkspaceController(
         DeployOnTheFlyWorkspaceViewModel workspace,
@@ -180,5 +181,36 @@ internal sealed class DeployOnTheFlyWorkspaceController
         {
             _host.UpdateUi();
         }
+    }
+
+    public void ScheduleAutoEvaluate()
+    {
+        if (_workspace.IsSynchronizingEditorDraft || _workspace.IsStarting)
+        {
+            return;
+        }
+
+        var nonce = Interlocked.Increment(ref _autoEvaluateNonce);
+        _ = DebouncedAutoEvaluateAsync(nonce);
+    }
+
+    private async Task DebouncedAutoEvaluateAsync(int nonce)
+    {
+        await Task.Delay(350);
+        if (nonce != _autoEvaluateNonce || _workspace.IsStarting || _workspace.IsEvaluatingReadiness)
+        {
+            return;
+        }
+
+        if (!_host.TryApplyVmFields(showSuccessStatus: false, showValidationErrors: false))
+        {
+            return;
+        }
+
+        _workspace.ClearReadinessState("Readiness has not been evaluated.");
+        _workspace.ResetProgressState();
+        _host.UpdateUi();
+
+        await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
     }
 }

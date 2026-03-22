@@ -2080,7 +2080,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("void IDeployOnTheFlyCompositionHost.EnsureSeeded() => EnsureDeployOnTheFlySeeded();", mainWindowSource);
         Assert.Contains("Task IDeployOnTheFlyCompositionHost.EnsureReferenceDataAsync(bool forceRefresh) => EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh);", mainWindowSource);
         Assert.Contains("void IDeployOnTheFlyCompositionHost.UpdateUi() => UpdateDeployOnTheFlyUi();", mainWindowSource);
-        Assert.Contains("void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => ScheduleDeployOnTheFlyAutoEvaluate();", mainWindowSource);
+        Assert.Contains("void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();", mainWindowSource);
+        Assert.DoesNotContain("private void ScheduleDeployOnTheFlyAutoEvaluate()", mainWindowSource);
+        Assert.DoesNotContain("private async Task DebouncedDeployOnTheFlyAutoEvaluateAsync(int nonce)", mainWindowSource);
+        Assert.DoesNotContain("_deployOnTheFlyAutoEvaluateNonce", mainWindowSource);
         Assert.Contains("void IDeployOnTheFlyCompositionHost.OnOpenResultsPanelRequested() => ToggleDeployRightPanelFromWorkflow();", mainWindowSource);
 
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _onTheFlyWorkspaceComposition;", deployWorkspaceCompositionSource);
@@ -2104,6 +2107,14 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());", onTheFlyCompositionSource);
         Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", onTheFlyCompositionSource);
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", onTheFlyCompositionSource);
+
+        var controllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
+        Assert.Contains("private int _autoEvaluateNonce;", controllerSource);
+        Assert.Contains("public void ScheduleAutoEvaluate()", controllerSource);
+        Assert.Contains("private async Task DebouncedAutoEvaluateAsync(int nonce)", controllerSource);
+        Assert.Contains("var nonce = Interlocked.Increment(ref _autoEvaluateNonce);", controllerSource);
+        Assert.Contains("await Task.Delay(350);", controllerSource);
+        Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", controllerSource);
     }
 
     [Fact]
