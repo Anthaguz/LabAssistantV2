@@ -641,6 +641,8 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     void IDeployOnTheFlyCompositionHost.UpdateUi() => UpdateDeployOnTheFlyUi();
 
+    void IDeployOnTheFlyCompositionHost.SetActionStatus(string statusText) => SetDeployOnTheFlyStatusText(statusText);
+
     void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => ScheduleDeployOnTheFlyAutoEvaluate();
 
     void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow)
@@ -796,69 +798,13 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
     }
 
-    private bool TryApplyDeployOnTheFlyVmFields(bool showSuccessStatus, bool showValidationErrors = true)
-    {
-        if (_deployOnTheFlyWorkspace.SelectedVmEntry is null || _deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return false;
-        }
-
-        var vmName = _deployOnTheFlyWorkspace.EditorVmNameDraft.Trim();
-        if (string.IsNullOrWhiteSpace(vmName))
-        {
-            if (showValidationErrors)
-            {
-                SetDeployOnTheFlyStatusText("VM name is required.");
-            }
-            return false;
-        }
-
-        if (!int.TryParse(_deployOnTheFlyWorkspace.EditorVmMemoryDraft, out var memoryMb) || memoryMb <= 0)
-        {
-            if (showValidationErrors)
-            {
-                SetDeployOnTheFlyStatusText("Memory must be a positive integer.");
-            }
-            return false;
-        }
-
-        if (!int.TryParse(_deployOnTheFlyWorkspace.EditorVmCpuDraft, out var cpuCount) || cpuCount <= 0)
-        {
-            if (showValidationErrors)
-            {
-                SetDeployOnTheFlyStatusText("CPU count must be a positive integer.");
-            }
-            return false;
-        }
-
-        var previousName = _deployOnTheFlyWorkspace.ApplyEditorDraftToSelectedVm();
-
-        if (showSuccessStatus)
-        {
-            SetDeployOnTheFlyStatusText($"Updated '{vmName}'.");
-        }
-
-        if (!string.Equals(previousName, vmName, StringComparison.Ordinal))
-        {
-            RefreshDeployOnTheFlyVmEntriesList();
-        }
-
-        return true;
-    }
-
-    private void RefreshDeployOnTheFlyVmEntriesList()
-    {
-        _deployOnTheFlyWorkspace.RefreshVmEntryRows();
-        _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
-    }
-
     private async Task EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode mode)
     {
         if (!_deployOnTheFlyWorkspace.IsStarting)
         {
             _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
         }
-        if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
+        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
         {
             return;
         }
@@ -949,7 +895,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             return;
         }
 
-        if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: false, showValidationErrors: false))
+        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: false, showValidationErrors: false))
         {
             return;
         }
@@ -1473,7 +1419,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             return;
         }
 
-        if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: true))
+        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: true))
         {
             return;
         }
@@ -1507,7 +1453,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     private async Task OpenDeployOnTheFlyTemplateEditorAsync()
     {
-        if (!TryApplyDeployOnTheFlyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
+        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
         {
             return;
         }
@@ -1554,7 +1500,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     IReadOnlyList<VhdxCatalogItem> IDeployOnTheFlyWorkspaceControllerHost.LoadCatalogItems() => LoadDeployCatalogItems();
 
     bool IDeployOnTheFlyWorkspaceControllerHost.TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors) =>
-        TryApplyDeployOnTheFlyVmFields(showSuccessStatus, showValidationErrors);
+        _deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus, showValidationErrors);
 
     void IDeployOnTheFlyWorkspaceControllerHost.SetActionStatus(string statusText)
     {

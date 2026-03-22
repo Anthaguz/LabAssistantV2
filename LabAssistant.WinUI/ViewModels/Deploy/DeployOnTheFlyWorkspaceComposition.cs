@@ -25,6 +25,8 @@ internal interface IDeployOnTheFlyCompositionHost
 
     void UpdateUi();
 
+    void SetActionStatus(string statusText);
+
     void ScheduleAutoEvaluate();
 
     void OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow);
@@ -124,6 +126,58 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
             selectedCatalogOption?.Id,
             selectedCatalogOption?.Path,
             selectedCatalogOption?.Signature);
+    }
+
+    public bool TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors = true)
+    {
+        if (_workspace.SelectedVmEntry is null || _workspace.IsSynchronizingEditorDraft)
+        {
+            return false;
+        }
+
+        var vmName = _workspace.EditorVmNameDraft.Trim();
+        if (string.IsNullOrWhiteSpace(vmName))
+        {
+            if (showValidationErrors)
+            {
+                _host.SetActionStatus("VM name is required.");
+            }
+
+            return false;
+        }
+
+        if (!int.TryParse(_workspace.EditorVmMemoryDraft, out var memoryMb) || memoryMb <= 0)
+        {
+            if (showValidationErrors)
+            {
+                _host.SetActionStatus("Memory must be a positive integer.");
+            }
+
+            return false;
+        }
+
+        if (!int.TryParse(_workspace.EditorVmCpuDraft, out var cpuCount) || cpuCount <= 0)
+        {
+            if (showValidationErrors)
+            {
+                _host.SetActionStatus("CPU count must be a positive integer.");
+            }
+
+            return false;
+        }
+
+        var previousName = _workspace.ApplyEditorDraftToSelectedVm();
+        if (showSuccessStatus)
+        {
+            _host.SetActionStatus($"Updated '{vmName}'.");
+        }
+
+        if (!string.Equals(previousName, vmName, StringComparison.Ordinal))
+        {
+            RefreshVmEntryRows();
+        }
+
+        return true;
     }
 
     public void ApplyShellState(bool isActive)
@@ -238,6 +292,12 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
             vhdItems,
             selectedVhdxCatalogItem,
             vhdxGuidanceText);
+    }
+
+    private void RefreshVmEntryRows()
+    {
+        _workspace.RefreshVmEntryRows();
+        SelectVmEntry(_workspace.SelectedVmEntry);
     }
 
     private void WireHandlers()
