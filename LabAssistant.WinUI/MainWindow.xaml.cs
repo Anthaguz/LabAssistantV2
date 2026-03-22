@@ -644,6 +644,17 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();
 
+    LabTemplate IDeployOnTheFlyCompositionHost.BuildTemplate() => BuildOnTheFlyTemplate();
+
+    void IDeployOnTheFlyCompositionHost.ReplaceVmEntriesFromTemplate(LabTemplate template) =>
+        ReplaceDeployOnTheFlyEntriesFromTemplate(template);
+
+    Task<int> IDeployOnTheFlyCompositionHost.ApplyResolveSuggestionsAsync(LabTemplate template) =>
+        ApplyDeployResolveSuggestionsAsync(template);
+
+    Task IDeployOnTheFlyCompositionHost.ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) =>
+        ShowTemplateEditorAsync(document, statusText);
+
     void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow)
     {
         _deployOnTheFlyWorkspace.SetSelectedVmEntry(selectedRow?.VmEntry);
@@ -671,10 +682,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     Task IDeployOnTheFlyCompositionHost.OnEvaluateRequestedAsync(DeploymentPreflightMode mode) =>
         _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(mode);
-
-    Task IDeployOnTheFlyCompositionHost.OnResolveSuggestionsRequestedAsync() => ResolveDeployOnTheFlySuggestionsAsync();
-
-    Task IDeployOnTheFlyCompositionHost.OnOpenTemplateEditorRequestedAsync() => OpenDeployOnTheFlyTemplateEditorAsync();
 
     Task IDeployOnTheFlyCompositionHost.OnStartRequestedAsync() => _deployOnTheFlyWorkspaceController.StartDeployAsync();
 
@@ -1297,48 +1304,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         SetDeployOnTheFlyStatusText($"Removed VM entry '{vmName}'.");
         _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
         UpdateDeployOnTheFlyUi();
-    }
-
-    private async Task ResolveDeployOnTheFlySuggestionsAsync()
-    {
-        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
-        {
-            SetDeployOnTheFlyStatusText("Add at least one VM entry first.");
-            return;
-        }
-
-        var template = BuildOnTheFlyTemplate();
-        var applied = await ApplyDeployResolveSuggestionsAsync(template);
-        if (applied > 0)
-        {
-            ReplaceDeployOnTheFlyEntriesFromTemplate(template);
-        }
-
-        SetDeployOnTheFlyStatusText(applied == 0
-            ? "No auto-resolve suggestions available for the current quick deploy configuration."
-            : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...");
-        await _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(DeploymentPreflightMode.Full);
-    }
-
-    private async Task OpenDeployOnTheFlyTemplateEditorAsync()
-    {
-        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
-        {
-            return;
-        }
-
-        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
-        {
-            SetDeployOnTheFlyStatusText("Add at least one VM entry first.");
-            return;
-        }
-
-        await _templatesWorkspaceComposition.ShowEditorDocumentAsync(new TemplateEditorDocument
-        {
-            Template = BuildOnTheFlyTemplate(),
-            SourceFilePath = null
-        }, "Opened quick deploy configuration in Templates editor.");
-        SetDeployOnTheFlyStatusText("Opened quick deploy configuration in Templates editor.");
     }
 
     private void InitializeDeployOnTheFlyProgressRows(MultiVmDeploymentContext context)
