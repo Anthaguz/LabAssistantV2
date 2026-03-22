@@ -7,6 +7,10 @@ using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
+/// <summary>
+/// Shell-facing contract for the Quick Deploy composition.
+/// Keeps shell-owned route, panel, and cross-capability actions explicit while editor and workspace coordination stay inside capability-local seams.
+/// </summary>
 internal interface IDeployOnTheFlyCompositionHost
 {
     int VmEntryCount { get; }
@@ -50,6 +54,10 @@ internal interface IDeployOnTheFlyCompositionHost
     void OnOpenResultsPanelRequested();
 }
 
+/// <summary>
+/// Coordinates the long-lived Quick Deploy views with workspace state and delegates shell-owned actions through <see cref="IDeployOnTheFlyCompositionHost"/>.
+/// This composition owns capability-local editor synchronization and view application, but not shell chrome or routing.
+/// </summary>
 internal sealed class DeployOnTheFlyWorkspaceComposition
 {
     private const string SwitchPlaceholder = "(No switch)";
@@ -83,6 +91,9 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
 
     public string LifecycleState => _workspace.LifecycleState;
 
+    /// <summary>
+    /// Updates the reference data used to render the selected VM editor without recreating the workspace.
+    /// </summary>
     public void SetEditorReferenceData(
         IReadOnlyList<string> availableSwitches,
         IReadOnlyList<TemplateVhdxCatalogOption> availableVhdxCatalogOptions)
@@ -91,6 +102,9 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _availableVhdxCatalogOptions = availableVhdxCatalogOptions;
     }
 
+    /// <summary>
+    /// Reconciles the editor selection with the workspace-selected VM entry.
+    /// </summary>
     public void SelectVmEntry(VmTemplate? vmEntry)
     {
         if (vmEntry is null)
@@ -103,11 +117,17 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _view.SetVmEntrySelection(selectedRow);
     }
 
+    /// <summary>
+    /// Applies the current editor view state for the selected VM entry.
+    /// </summary>
     public void UpdateEditorPanel()
     {
         _view.ApplyEditorViewState(BuildEditorViewState());
     }
 
+    /// <summary>
+    /// Captures editor interaction back into workspace draft state while leaving shell refresh and delayed readiness triggering outside this method.
+    /// </summary>
     public void SyncEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)
     {
         var selectedSwitch = interactionState.SelectedSwitchItem is string switchName &&
@@ -126,6 +146,9 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
             selectedCatalogOption?.Signature);
     }
 
+    /// <summary>
+    /// Validates and applies the current editor draft to the selected VM entry, including row refresh when a rename changes list presentation.
+    /// </summary>
     public bool TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors = true)
     {
         if (_workspace.SelectedVmEntry is null || _workspace.IsSynchronizingEditorDraft)
@@ -178,6 +201,9 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         return true;
     }
 
+    /// <summary>
+    /// Applies the current VM draft and immediately routes into the existing readiness boundary for the updated workspace snapshot.
+    /// </summary>
     public async Task ApplyVmChangesAsync()
     {
         _workspace.SetShowAllVmRows(false);
@@ -198,9 +224,15 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
     }
 
+    /// <summary>
+    /// Forwards explicit readiness requests to the local readiness owner without pulling that workflow back into the shell.
+    /// </summary>
     public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>
         _host.OnEvaluateRequestedAsync(mode);
 
+    /// <summary>
+    /// Applies shell activation state while preserving the long-lived Quick Deploy workspace and triggering initial readiness only when the active route first needs it.
+    /// </summary>
     public void ApplyShellState(bool isActive)
     {
         _view.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;

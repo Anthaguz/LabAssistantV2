@@ -68,7 +68,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private bool _isTemplatesLoading;
     private bool _isUpdatingNavigationSelection;
     private bool _isDeployLoadingTemplates;
-    private int _deployOnTheFlyAutoEvaluateNonce;
     private bool _isShellRightPanelOpen;
     private bool _isShellRightPanelInCompactFallback;
     private string _shellRightPanelOwnerCapabilityKey = string.Empty;
@@ -643,7 +642,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     void IDeployOnTheFlyCompositionHost.SetActionStatus(string statusText) => SetDeployOnTheFlyStatusText(statusText);
 
-    void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => ScheduleDeployOnTheFlyAutoEvaluate();
+    void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();
 
     void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow)
     {
@@ -667,7 +666,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
         _deployOnTheFlyWorkspaceComposition.SyncEditorDraft(interactionState);
         UpdateDeployOnTheFlyUi();
-        ScheduleDeployOnTheFlyAutoEvaluate();
+        _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();
     }
 
     Task IDeployOnTheFlyCompositionHost.OnEvaluateRequestedAsync(DeploymentPreflightMode mode) =>
@@ -795,37 +794,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _deployWorkspaceComposition.RefreshSharedUiState();
         _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
         _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
-    }
-
-    private void ScheduleDeployOnTheFlyAutoEvaluate()
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft || _deployOnTheFlyWorkspace.IsStarting)
-        {
-            return;
-        }
-
-        var nonce = Interlocked.Increment(ref _deployOnTheFlyAutoEvaluateNonce);
-        _ = DebouncedDeployOnTheFlyAutoEvaluateAsync(nonce);
-    }
-
-    private async Task DebouncedDeployOnTheFlyAutoEvaluateAsync(int nonce)
-    {
-        await Task.Delay(350);
-        if (nonce != _deployOnTheFlyAutoEvaluateNonce || _deployOnTheFlyWorkspace.IsStarting || _deployOnTheFlyWorkspace.IsEvaluatingReadiness)
-        {
-            return;
-        }
-
-        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: false, showValidationErrors: false))
-        {
-            return;
-        }
-
-        _deployOnTheFlyWorkspace.ClearReadinessState("Readiness has not been evaluated.");
-        _deployOnTheFlyWorkspace.ResetProgressState();
-        UpdateDeployOnTheFlyUi();
-
-        await _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(DeploymentPreflightMode.Full);
     }
 
     private void UpdateDeployOnTheFlyVmEntryRows()
