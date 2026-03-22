@@ -151,6 +151,29 @@ WinUI composition rules:
 - Load only the docs, files, and tests needed for the current issue.
 - If the work requires holding multiple capabilities, contracts, and test suites in memory at once, the issue is probably too large and should be split.
 
+### 5.7 Code Documentation
+- Code comments must improve maintainability, not narrate obvious mechanics.
+- Prefer documenting:
+  - ownership boundaries,
+  - shell vs capability responsibilities,
+  - long-lived workspace expectations,
+  - route refresh vs recreate behavior,
+  - cleanup/cancellation sequencing,
+  - and ordering-sensitive workflow coordination.
+- XML documentation comments are expected for:
+  - public types and public members,
+  - architecture seam contracts such as workspace composition classes, controllers, host interfaces, and shell bridge interfaces when they are an important maintenance boundary.
+- Inline comments should be used sparingly and only where the code would otherwise hide an important invariant, boundary, or non-obvious decision.
+- Avoid comments that:
+  - restate names already visible in code,
+  - narrate line-by-line mechanics,
+  - or explain trivial getters/setters/event hookups.
+- Comment length should match the complexity of the concept:
+  - one sentence is often enough,
+  - but 1-3 short sentences are preferred when a method or type needs boundary or invariant context.
+- Do not attempt broad comment backfills in unrelated code. Apply the standard incrementally in touched files, prioritizing composition/workflow seams first.
+- Canonical guidance and examples live in `docs/03-architecture/code-documentation.md`.
+
 ---
 
 ## 6) Documentation Rules

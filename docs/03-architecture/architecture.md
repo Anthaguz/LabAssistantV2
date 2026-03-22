@@ -39,6 +39,8 @@ Behavioral boundaries:
 - Services execute external actions and infrastructure concerns.
 - Data persists and loads local artifacts/configuration.
 
+Code documentation guidance for composition seams, workflow methods, and shell bridges is defined in `docs/03-architecture/code-documentation.md`.
+
 ## 4. Key Workflows (end-to-end)
 ### Workflow: Deploy Lab (on-the-fly or template-based)
 1. UI/ViewModel maintains a deployment readiness report and triggers **quick preflight** on relevant configuration changes (debounced).
