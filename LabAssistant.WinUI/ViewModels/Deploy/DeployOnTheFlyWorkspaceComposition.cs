@@ -39,7 +39,7 @@ internal interface IDeployOnTheFlyCompositionHost
 
     void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);
 
-    Task OnEvaluateRequestedAsync();
+    Task OnEvaluateRequestedAsync(DeploymentPreflightMode mode);
 
     Task OnResolveSuggestionsRequestedAsync();
 
@@ -195,8 +195,11 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _workspace.ClearReadinessState("Readiness has not been evaluated.");
         _workspace.ResetProgressState();
         _host.UpdateUi();
-        await _host.OnEvaluateRequestedAsync();
+        await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
     }
+
+    public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>
+        _host.OnEvaluateRequestedAsync(mode);
 
     public void ApplyShellState(bool isActive)
     {
@@ -327,7 +330,7 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _view.RemoveSelectedVmRequested += async (_, _) => await _host.OnRemoveSelectedVmRequestedAsync();
         _view.ApplyVmChangesRequested += async (_, _) => await ApplyVmChangesAsync();
         _view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());
-        _view.EvaluateRequested += async (_, _) => await _host.OnEvaluateRequestedAsync();
+        _view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
         _view.ResolveSuggestionsRequested += async (_, _) => await _host.OnResolveSuggestionsRequestedAsync();
         _view.OpenTemplateEditorRequested += async (_, _) => await _host.OnOpenTemplateEditorRequestedAsync();
         _view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();

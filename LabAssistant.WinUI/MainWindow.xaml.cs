@@ -670,7 +670,8 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         ScheduleDeployOnTheFlyAutoEvaluate();
     }
 
-    Task IDeployOnTheFlyCompositionHost.OnEvaluateRequestedAsync() => EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
+    Task IDeployOnTheFlyCompositionHost.OnEvaluateRequestedAsync(DeploymentPreflightMode mode) =>
+        _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(mode);
 
     Task IDeployOnTheFlyCompositionHost.OnResolveSuggestionsRequestedAsync() => ResolveDeployOnTheFlySuggestionsAsync();
 
@@ -796,84 +797,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
     }
 
-    private async Task EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode mode)
-    {
-        if (!_deployOnTheFlyWorkspace.IsStarting)
-        {
-            _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
-        }
-        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: false) && _deployOnTheFlyWorkspace.SelectedVmEntry is not null)
-        {
-            return;
-        }
-
-        if (_deployOnTheFlyWorkspace.VmEntryCount == 0)
-        {
-            SetDeployOnTheFlyStatusText("Add at least one VM entry first.");
-            return;
-        }
-
-        _deployOnTheFlyWorkspace.BeginReadinessEvaluation();
-        _deployOnTheFlyWorkspace.SetWorkflowState(
-            lifecycleState: "Evaluating",
-            progressPercent: mode == DeploymentPreflightMode.Full ? 18 : 12,
-            progressSummary: mode == DeploymentPreflightMode.Full
-                ? "Running full readiness checks..."
-                : "Running quick readiness checks...");
-        SetDeployOnTheFlyStatusText(
-            mode == DeploymentPreflightMode.Full
-                ? "Running full quick deploy readiness evaluation..."
-                : "Running quick deploy readiness evaluation...");
-
-        try
-        {
-            await EnsureTemplateSwitchesAsync(forceRefresh: false);
-            var template = BuildOnTheFlyTemplate();
-            var deployContext = DeployContextBuilder.Build(template, _settingsStore.Settings, LoadDeployCatalogItems(), _templateAvailableSwitches);
-            var readinessReport = await _deploymentPreflightService.RunAsync(deployContext.MultiVmContext, mode);
-
-            var blockingCount = deployContext.CompatibilityIssues.Count(issue => issue.IsBlocking) +
-                                readinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Fail);
-            var warningCount = deployContext.CompatibilityIssues.Count(issue => !issue.IsBlocking) +
-                               readinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn);
-            var readinessSummaryText = blockingCount > 0
-                ? $"Readiness blocked ({blockingCount} fail, {warningCount} warn)."
-                : warningCount > 0
-                    ? $"Readiness passed with warnings ({warningCount})."
-                    : "Readiness passed.";
-
-            _deployOnTheFlyWorkspace.ApplyReadinessResult(
-                deployContext.CompatibilityIssues,
-                readinessReport,
-                readinessSummaryText);
-
-            _deployOnTheFlyWorkspace.SetWorkflowState(
-                lifecycleState: blockingCount > 0 ? "Blocked" : warningCount > 0 ? "Warning" : "Ready",
-                progressPercent: blockingCount > 0 ? 35 : warningCount > 0 ? 45 : 55,
-                progressSummary: blockingCount > 0
-                    ? "Readiness blocked."
-                    : warningCount > 0
-                        ? "Readiness passed with warnings."
-                        : "Readiness passed.");
-            SetDeployOnTheFlyStatusText(
-                blockingCount > 0
-                    ? "Deploy blocked by readiness failures. Resolve blocking items first."
-                    : warningCount > 0
-                        ? $"Readiness passed with {warningCount} warning(s)."
-                        : "Readiness passed with no issues.");
-        }
-        catch (Exception ex)
-        {
-            _deployOnTheFlyWorkspace.SetReadinessEvaluationFailed("Readiness evaluation failed.");
-            _deployOnTheFlyWorkspace.SetWorkflowState("Error", 0, "Readiness evaluation failed.");
-            SetDeployOnTheFlyStatusText($"Readiness evaluation failed. {ex.Message}");
-        }
-        finally
-        {
-            UpdateDeployOnTheFlyUi();
-        }
-    }
-
     private void ScheduleDeployOnTheFlyAutoEvaluate()
     {
         if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft || _deployOnTheFlyWorkspace.IsStarting)
@@ -902,7 +825,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _deployOnTheFlyWorkspace.ResetProgressState();
         UpdateDeployOnTheFlyUi();
 
-        await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
+        await _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(DeploymentPreflightMode.Full);
     }
 
     private void UpdateDeployOnTheFlyVmEntryRows()
@@ -1426,7 +1349,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         SetDeployOnTheFlyStatusText(applied == 0
             ? "No auto-resolve suggestions available for the current quick deploy configuration."
             : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...");
-        await EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
+        await _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(DeploymentPreflightMode.Full);
     }
 
     private async Task OpenDeployOnTheFlyTemplateEditorAsync()
@@ -1485,8 +1408,15 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         SetDeployOnTheFlyStatusText(statusText);
     }
 
-    Task IDeployOnTheFlyWorkspaceControllerHost.EvaluateReadinessAsync(DeploymentPreflightMode mode) =>
-        EvaluateDeployOnTheFlyReadinessAsync(mode);
+    Task IDeployOnTheFlyWorkspaceControllerHost.EnsureReferenceDataAsync(bool forceRefresh) =>
+        EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh);
+
+    Task<DeploymentReadinessReport> IDeployOnTheFlyWorkspaceControllerHost.RunReadinessChecksAsync(
+        MultiVmDeploymentContext context,
+        DeploymentPreflightMode mode) =>
+        _deploymentPreflightService.RunAsync(context, mode);
+
+    void IDeployOnTheFlyWorkspaceControllerHost.UpdateUi() => UpdateDeployOnTheFlyUi();
 
     LabTemplate IDeployOnTheFlyWorkspaceControllerHost.BuildTemplate() => BuildOnTheFlyTemplate();
 

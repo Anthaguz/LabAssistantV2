@@ -1848,10 +1848,12 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private void RefreshDeployOnTheFlyVmEntriesList()", mainWindowSource);
         Assert.DoesNotContain("private void ApplyDeployOnTheFlyVmChanges()", mainWindowSource);
         Assert.DoesNotContain("void IDeployOnTheFlyCompositionHost.OnApplyVmChangesRequested()", mainWindowSource);
+        Assert.DoesNotContain("private async Task EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode mode)", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspaceComposition.SelectVmEntry(", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspaceComposition.SyncEditorDraft(interactionState);", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(", mainWindowSource);
+        Assert.Contains("_deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.SelectedVmEntry is not null", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft", mainWindowSource);
         Assert.DoesNotContain("DeployOnTheFlyVmNameTextBox", mainWindowSource);
@@ -1873,6 +1875,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void SyncEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)", onTheFlyCompositionSource);
         Assert.Contains("public bool TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors = true)", onTheFlyCompositionSource);
         Assert.Contains("public async Task ApplyVmChangesAsync()", onTheFlyCompositionSource);
+        Assert.Contains("public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>", onTheFlyCompositionSource);
         Assert.Contains("private void RefreshVmEntryRows()", onTheFlyCompositionSource);
         Assert.Contains("_view.SetVmEntrySelection(selectedRow);", onTheFlyCompositionSource);
         Assert.Contains("_view.ApplyEditorViewState(BuildEditorViewState());", onTheFlyCompositionSource);
@@ -1920,16 +1923,15 @@ public sealed class MilestoneAMScenarioMatrixTests
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
         var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
         var onTheFlyCompositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
+        var onTheFlyControllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
 
         Assert.DoesNotContain("private readonly List<DeployCompatibilityIssue> _deployOnTheFlyCompatibilityIssues = [];", mainWindowSource);
         Assert.DoesNotContain("private DeploymentReadinessReport? _deployOnTheFlyReadinessReport;", mainWindowSource);
         Assert.DoesNotContain("private bool _isDeployOnTheFlyEvaluatingReadiness;", mainWindowSource);
         Assert.DoesNotContain("private string _deployOnTheFlyReadinessSummary = \"Readiness has not been evaluated.\";", mainWindowSource);
+        Assert.DoesNotContain("private async Task EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode mode)", mainWindowSource);
         Assert.Contains("DeploymentReadinessReport? IDeployOnTheFlyCompositionHost.ReadinessReport => _deployOnTheFlyWorkspace.ReadinessReport;", mainWindowSource);
         Assert.Contains("bool IDeployOnTheFlyCompositionHost.IsEvaluatingReadiness => _deployOnTheFlyWorkspace.IsEvaluatingReadiness;", mainWindowSource);
-        Assert.Contains("_deployOnTheFlyWorkspace.BeginReadinessEvaluation();", mainWindowSource);
-        Assert.Contains("_deployOnTheFlyWorkspace.ApplyReadinessResult(", mainWindowSource);
-        Assert.Contains("_deployOnTheFlyWorkspace.SetReadinessEvaluationFailed(\"Readiness evaluation failed.\");", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.ClearReadinessState(\"Readiness has not been evaluated.\");", mainWindowSource);
         Assert.Contains("var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.ReadinessSummaryText", mainWindowSource);
@@ -1942,6 +1944,13 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("_host.ReadinessReport is null", onTheFlyCompositionSource);
         Assert.Contains("!_host.IsEvaluatingReadiness", onTheFlyCompositionSource);
+        Assert.Contains("public async Task EvaluateReadinessAsync(DeploymentPreflightMode mode)", onTheFlyControllerSource);
+        Assert.Contains("_workspace.BeginReadinessEvaluation();", onTheFlyControllerSource);
+        Assert.Contains("_workspace.ApplyReadinessResult(", onTheFlyControllerSource);
+        Assert.Contains("_workspace.SetReadinessEvaluationFailed(\"Readiness evaluation failed.\");", onTheFlyControllerSource);
+        Assert.Contains("await _host.EnsureReferenceDataAsync(forceRefresh: false);", onTheFlyControllerSource);
+        Assert.Contains("var readinessReport = await _host.RunReadinessChecksAsync(deployContext.MultiVmContext, mode);", onTheFlyControllerSource);
+        Assert.Contains("_host.UpdateUi();", onTheFlyControllerSource);
 
         Assert.Contains("public IReadOnlyList<DeployCompatibilityIssue> CompatibilityIssues => _compatibilityIssues;", onTheFlyWorkspaceSource);
         Assert.Contains("public DeploymentReadinessReport? ReadinessReport { get; private set; }", onTheFlyWorkspaceSource);
@@ -1981,8 +1990,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("internal interface IDeployOnTheFlyWorkspaceControllerHost", onTheFlyControllerSource);
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceController", onTheFlyControllerSource);
         Assert.Contains("public async Task StartDeployAsync()", onTheFlyControllerSource);
+        Assert.Contains("public async Task EvaluateReadinessAsync(DeploymentPreflightMode mode)", onTheFlyControllerSource);
         Assert.Contains("_workspace.BeginStarting();", onTheFlyControllerSource);
-        Assert.Contains("await _host.EvaluateReadinessAsync(DeploymentPreflightMode.Full);", onTheFlyControllerSource);
+        Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", onTheFlyControllerSource);
         Assert.Contains("if (_workspace.HasBlockingFailures)", onTheFlyControllerSource);
         Assert.Contains("var deployContext = DeployContextBuilder.Build(", onTheFlyControllerSource);
         Assert.Contains("_host.PrepareDeployExecution(deployContext.MultiVmContext);", onTheFlyControllerSource);
