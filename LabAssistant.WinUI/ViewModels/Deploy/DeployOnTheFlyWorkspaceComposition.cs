@@ -1,5 +1,6 @@
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Business.Templates;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.Views.Deploy;
@@ -33,6 +34,26 @@ internal interface IDeployOnTheFlyCompositionHost
 
     void ScheduleAutoEvaluate();
 
+    /// <summary>
+    /// Builds the current Quick Deploy draft as a template snapshot for downstream workflow steps.
+    /// </summary>
+    LabTemplate BuildTemplate();
+
+    /// <summary>
+    /// Replaces the current Quick Deploy VM entries from a template snapshot after host-owned suggestion resolution mutates it.
+    /// </summary>
+    void ReplaceVmEntriesFromTemplate(LabTemplate template);
+
+    /// <summary>
+    /// Applies host-owned auto-resolve logic to a template snapshot without moving that shared helper into the Quick Deploy seam.
+    /// </summary>
+    Task<int> ApplyResolveSuggestionsAsync(LabTemplate template);
+
+    /// <summary>
+    /// Opens a template snapshot in the shared Templates editor workflow.
+    /// </summary>
+    Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText);
+
     void OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow);
 
     Task OnVmRemoveRequestedAsync(VmTemplate vmEntry);
@@ -44,10 +65,6 @@ internal interface IDeployOnTheFlyCompositionHost
     void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);
 
     Task OnEvaluateRequestedAsync(DeploymentPreflightMode mode);
-
-    Task OnResolveSuggestionsRequestedAsync();
-
-    Task OnOpenTemplateEditorRequestedAsync();
 
     Task OnStartRequestedAsync();
 
@@ -231,6 +248,54 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _host.OnEvaluateRequestedAsync(mode);
 
     /// <summary>
+    /// Applies auto-resolve suggestions against the current Quick Deploy snapshot and keeps the long-lived workspace in sync with any changes.
+    /// </summary>
+    public async Task ResolveSuggestionsAsync()
+    {
+        if (_workspace.VmEntryCount == 0)
+        {
+            _host.SetActionStatus("Add at least one VM entry first.");
+            return;
+        }
+
+        var template = _host.BuildTemplate();
+        var applied = await _host.ApplyResolveSuggestionsAsync(template);
+        if (applied > 0)
+        {
+            _host.ReplaceVmEntriesFromTemplate(template);
+        }
+
+        _host.SetActionStatus(applied == 0
+            ? "No auto-resolve suggestions available for the current quick deploy configuration."
+            : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...");
+        await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
+    }
+
+    /// <summary>
+    /// Opens the current Quick Deploy draft in the Templates editor while keeping editor validation local to the Quick Deploy seam first.
+    /// </summary>
+    public async Task OpenTemplateEditorAsync()
+    {
+        if (!TryApplyVmFields(showSuccessStatus: false) && _workspace.SelectedVmEntry is not null)
+        {
+            return;
+        }
+
+        if (_workspace.VmEntryCount == 0)
+        {
+            _host.SetActionStatus("Add at least one VM entry first.");
+            return;
+        }
+
+        await _host.ShowTemplateEditorAsync(new TemplateEditorDocument
+        {
+            Template = _host.BuildTemplate(),
+            SourceFilePath = null
+        }, "Opened quick deploy configuration in Templates editor.");
+        _host.SetActionStatus("Opened quick deploy configuration in Templates editor.");
+    }
+
+    /// <summary>
     /// Applies shell activation state while preserving the long-lived Quick Deploy workspace and triggering initial readiness only when the active route first needs it.
     /// </summary>
     public void ApplyShellState(bool isActive)
@@ -363,8 +428,8 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _view.ApplyVmChangesRequested += async (_, _) => await ApplyVmChangesAsync();
         _view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());
         _view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
-        _view.ResolveSuggestionsRequested += async (_, _) => await _host.OnResolveSuggestionsRequestedAsync();
-        _view.OpenTemplateEditorRequested += async (_, _) => await _host.OnOpenTemplateEditorRequestedAsync();
+        _view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();
+        _view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();
         _view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();
         _view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();
     }

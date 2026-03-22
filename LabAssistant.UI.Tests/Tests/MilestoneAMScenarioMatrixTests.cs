@@ -2081,9 +2081,15 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("Task IDeployOnTheFlyCompositionHost.EnsureReferenceDataAsync(bool forceRefresh) => EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh);", mainWindowSource);
         Assert.Contains("void IDeployOnTheFlyCompositionHost.UpdateUi() => UpdateDeployOnTheFlyUi();", mainWindowSource);
         Assert.Contains("void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();", mainWindowSource);
+        Assert.Contains("LabTemplate IDeployOnTheFlyCompositionHost.BuildTemplate() => BuildOnTheFlyTemplate();", mainWindowSource);
+        Assert.Contains("void IDeployOnTheFlyCompositionHost.ReplaceVmEntriesFromTemplate(LabTemplate template) =>", mainWindowSource);
+        Assert.Contains("Task<int> IDeployOnTheFlyCompositionHost.ApplyResolveSuggestionsAsync(LabTemplate template) =>", mainWindowSource);
+        Assert.Contains("Task IDeployOnTheFlyCompositionHost.ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) =>", mainWindowSource);
         Assert.DoesNotContain("private void ScheduleDeployOnTheFlyAutoEvaluate()", mainWindowSource);
         Assert.DoesNotContain("private async Task DebouncedDeployOnTheFlyAutoEvaluateAsync(int nonce)", mainWindowSource);
         Assert.DoesNotContain("_deployOnTheFlyAutoEvaluateNonce", mainWindowSource);
+        Assert.DoesNotContain("private async Task ResolveDeployOnTheFlySuggestionsAsync()", mainWindowSource);
+        Assert.DoesNotContain("private async Task OpenDeployOnTheFlyTemplateEditorAsync()", mainWindowSource);
         Assert.Contains("void IDeployOnTheFlyCompositionHost.OnOpenResultsPanelRequested() => ToggleDeployRightPanelFromWorkflow();", mainWindowSource);
 
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _onTheFlyWorkspaceComposition;", deployWorkspaceCompositionSource);
@@ -2105,6 +2111,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_view.SetResultsPanelLauncherState(", onTheFlyCompositionSource);
         Assert.Contains("_view.VmEntrySelectionChanged += (_, _) =>", onTheFlyCompositionSource);
         Assert.Contains("_view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());", onTheFlyCompositionSource);
+        Assert.Contains("public async Task ResolveSuggestionsAsync()", onTheFlyCompositionSource);
+        Assert.Contains("public async Task OpenTemplateEditorAsync()", onTheFlyCompositionSource);
+        Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", onTheFlyCompositionSource);
+        Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", onTheFlyCompositionSource);
         Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", onTheFlyCompositionSource);
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", onTheFlyCompositionSource);
 

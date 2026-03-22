@@ -66,7 +66,6 @@ public sealed class MilestoneAGScenarioMatrixTests
         var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
         var viewSource = LoadDeployOnTheFlyViewSource();
 
-        Assert.Contains("_deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(DeploymentPreflightMode.Full)", source);
         Assert.Contains("CanStartDeploy: hasEntries && !hasBlockingFailures", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", source);
@@ -78,13 +77,20 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("GlobalIssuesBadgeText: $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\"", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("ApplyDeployResolveSuggestionsAsync(template);", source);
+        Assert.DoesNotContain("ResolveDeployOnTheFlySuggestionsAsync()", source);
+        Assert.DoesNotContain("OpenDeployOnTheFlyTemplateEditorAsync()", source);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceComposition", compositionSource);
         Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
         Assert.Contains("_rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);", compositionSource);
         Assert.Contains("_ = _host.EnsureReferenceDataAsync(forceRefresh: false);", compositionSource);
         Assert.Contains("public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>", compositionSource);
+        Assert.Contains("public async Task ResolveSuggestionsAsync()", compositionSource);
+        Assert.Contains("public async Task OpenTemplateEditorAsync()", compositionSource);
         Assert.Contains("_view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
+        Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", compositionSource);
+        Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", compositionSource);
+        Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
         Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", compositionSource);
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", compositionSource);
         Assert.Contains("public void ApplyShellState(bool isActive)", compositionSource);
