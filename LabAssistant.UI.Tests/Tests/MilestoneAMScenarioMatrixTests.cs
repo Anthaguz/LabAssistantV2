@@ -1846,6 +1846,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private void SyncDeployOnTheFlyEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)", mainWindowSource);
         Assert.DoesNotContain("private bool TryApplyDeployOnTheFlyVmFields(bool showSuccessStatus, bool showValidationErrors = true)", mainWindowSource);
         Assert.DoesNotContain("private void RefreshDeployOnTheFlyVmEntriesList()", mainWindowSource);
+        Assert.DoesNotContain("private void ApplyDeployOnTheFlyVmChanges()", mainWindowSource);
+        Assert.DoesNotContain("void IDeployOnTheFlyCompositionHost.OnApplyVmChangesRequested()", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspaceComposition.SelectVmEntry(", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspaceComposition.SyncEditorDraft(interactionState);", mainWindowSource);
@@ -1870,12 +1872,14 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private DeployOnTheFlyEditorViewState BuildEditorViewState()", onTheFlyCompositionSource);
         Assert.Contains("public void SyncEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)", onTheFlyCompositionSource);
         Assert.Contains("public bool TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors = true)", onTheFlyCompositionSource);
+        Assert.Contains("public async Task ApplyVmChangesAsync()", onTheFlyCompositionSource);
         Assert.Contains("private void RefreshVmEntryRows()", onTheFlyCompositionSource);
         Assert.Contains("_view.SetVmEntrySelection(selectedRow);", onTheFlyCompositionSource);
         Assert.Contains("_view.ApplyEditorViewState(BuildEditorViewState());", onTheFlyCompositionSource);
         Assert.Contains("_workspace.UpdateEditorDraft(", onTheFlyCompositionSource);
         Assert.Contains("var previousName = _workspace.ApplyEditorDraftToSelectedVm();", onTheFlyCompositionSource);
         Assert.Contains("_workspace.RefreshVmEntryRows();", onTheFlyCompositionSource);
+        Assert.Contains("_view.ApplyVmChangesRequested += async (_, _) => await ApplyVmChangesAsync();", onTheFlyCompositionSource);
 
         Assert.Contains("public VmTemplate? SelectedVmEntry { get; private set; }", onTheFlyWorkspaceSource);
         Assert.Contains("public string EditorVmNameDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);

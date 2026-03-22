@@ -37,8 +37,6 @@ internal interface IDeployOnTheFlyCompositionHost
 
     Task OnRemoveSelectedVmRequestedAsync();
 
-    void OnApplyVmChangesRequested();
-
     void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);
 
     Task OnEvaluateRequestedAsync();
@@ -180,6 +178,26 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         return true;
     }
 
+    public async Task ApplyVmChangesAsync()
+    {
+        _workspace.SetShowAllVmRows(false);
+        if (_workspace.SelectedVmEntry is null)
+        {
+            _host.SetActionStatus("Select a VM entry first.");
+            return;
+        }
+
+        if (!TryApplyVmFields(showSuccessStatus: true))
+        {
+            return;
+        }
+
+        _workspace.ClearReadinessState("Readiness has not been evaluated.");
+        _workspace.ResetProgressState();
+        _host.UpdateUi();
+        await _host.OnEvaluateRequestedAsync();
+    }
+
     public void ApplyShellState(bool isActive)
     {
         _view.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
@@ -307,7 +325,7 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _view.VmRemoveRequested += async vmEntry => await _host.OnVmRemoveRequestedAsync(vmEntry);
         _view.AddVmRequested += (_, _) => _host.OnAddVmRequested();
         _view.RemoveSelectedVmRequested += async (_, _) => await _host.OnRemoveSelectedVmRequestedAsync();
-        _view.ApplyVmChangesRequested += (_, _) => _host.OnApplyVmChangesRequested();
+        _view.ApplyVmChangesRequested += async (_, _) => await ApplyVmChangesAsync();
         _view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());
         _view.EvaluateRequested += async (_, _) => await _host.OnEvaluateRequestedAsync();
         _view.ResolveSuggestionsRequested += async (_, _) => await _host.OnResolveSuggestionsRequestedAsync();

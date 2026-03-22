@@ -658,8 +658,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     Task IDeployOnTheFlyCompositionHost.OnRemoveSelectedVmRequestedAsync() => RemoveDeployOnTheFlyVmEntryAsync(_deployOnTheFlyWorkspace.SelectedVmEntry);
 
-    void IDeployOnTheFlyCompositionHost.OnApplyVmChangesRequested() => ApplyDeployOnTheFlyVmChanges();
-
     void IDeployOnTheFlyCompositionHost.OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState)
     {
         if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
@@ -1408,26 +1406,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         SetDeployOnTheFlyStatusText($"Removed VM entry '{vmName}'.");
         _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
         UpdateDeployOnTheFlyUi();
-    }
-
-    private void ApplyDeployOnTheFlyVmChanges()
-    {
-        _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
-        if (_deployOnTheFlyWorkspace.SelectedVmEntry is null)
-        {
-            SetDeployOnTheFlyStatusText("Select a VM entry first.");
-            return;
-        }
-
-        if (!_deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus: true))
-        {
-            return;
-        }
-
-        _deployOnTheFlyWorkspace.ClearReadinessState("Readiness has not been evaluated.");
-        _deployOnTheFlyWorkspace.ResetProgressState();
-        UpdateDeployOnTheFlyUi();
-        _ = EvaluateDeployOnTheFlyReadinessAsync(DeploymentPreflightMode.Full);
     }
 
     private async Task ResolveDeployOnTheFlySuggestionsAsync()
