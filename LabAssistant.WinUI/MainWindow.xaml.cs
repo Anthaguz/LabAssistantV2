@@ -655,18 +655,17 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     Task IDeployOnTheFlyCompositionHost.ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) =>
         ShowTemplateEditorAsync(document, statusText);
 
+    void IDeployOnTheFlyCompositionHost.RefreshSharedUiState() => _deployWorkspaceComposition.RefreshSharedUiState();
+
+    Task<bool> IDeployOnTheFlyCompositionHost.ShowRemoveVmEntryConfirmationDialogAsync(string vmName) =>
+        ShowRemoveDeployOnTheFlyVmEntryConfirmationDialogAsync(vmName);
+
     void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow)
     {
         _deployOnTheFlyWorkspace.SetSelectedVmEntry(selectedRow?.VmEntry);
         _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
         UpdateDeployOnTheFlyUi();
     }
-
-    Task IDeployOnTheFlyCompositionHost.OnVmRemoveRequestedAsync(VmTemplate vmEntry) => RemoveDeployOnTheFlyVmEntryAsync(vmEntry);
-
-    void IDeployOnTheFlyCompositionHost.OnAddVmRequested() => AddDeployOnTheFlyVmEntry();
-
-    Task IDeployOnTheFlyCompositionHost.OnRemoveSelectedVmRequestedAsync() => RemoveDeployOnTheFlyVmEntryAsync(_deployOnTheFlyWorkspace.SelectedVmEntry);
 
     void IDeployOnTheFlyCompositionHost.OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState)
     {
@@ -1255,57 +1254,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
     }
 
-    private void AddDeployOnTheFlyVmEntry()
-    {
-        _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
-        var entry = _deployOnTheFlyWorkspace.AddVmEntry();
-        _deployWorkspaceComposition.RefreshSharedUiState();
-        _deployOnTheFlyWorkspaceComposition.SelectVmEntry(entry);
-        _deployOnTheFlyWorkspace.ClearReadinessState("Readiness has not been evaluated.");
-        _deployOnTheFlyWorkspace.ResetProgressState();
-        SetDeployOnTheFlyStatusText($"Added VM entry '{entry.Name}'.");
-        _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
-        UpdateDeployOnTheFlyUi();
-    }
-
-    private async Task RemoveDeployOnTheFlyVmEntryAsync(VmTemplate? vmEntry)
-    {
-        _deployOnTheFlyWorkspace.SetShowAllVmRows(false);
-        if (vmEntry is null)
-        {
-            SetDeployOnTheFlyStatusText("Select a VM entry first.");
-            return;
-        }
-
-        var vmName = vmEntry.Name;
-        var dialog = new ContentDialog
-        {
-            XamlRoot = RootLayout.XamlRoot,
-            Title = "Remove VM Entry",
-            PrimaryButtonText = "Remove",
-            CloseButtonText = "Cancel",
-            Content = $"Remove '{vmName}' from quick deploy configuration?",
-            DefaultButton = ContentDialogButton.Close
-        };
-
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
-        {
-            return;
-        }
-
-        _deployOnTheFlyWorkspace.RemoveVmEntry(vmEntry);
-        _deployWorkspaceComposition.RefreshSharedUiState();
-        _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
-        _deployOnTheFlyWorkspace.ClearReadinessState(
-            _deployOnTheFlyWorkspace.VmEntryCount == 0
-                ? "Add at least one VM entry to evaluate readiness."
-                : "Readiness has not been evaluated.");
-        _deployOnTheFlyWorkspace.ResetProgressState();
-        SetDeployOnTheFlyStatusText($"Removed VM entry '{vmName}'.");
-        _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
-        UpdateDeployOnTheFlyUi();
-    }
-
     private void InitializeDeployOnTheFlyProgressRows(MultiVmDeploymentContext context)
     {
         _deployOnTheFlyWorkspace.InitializeProgressRows(context, BuildExpectedDeploySteps);
@@ -1876,6 +1824,21 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private async Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText)
     {
         await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);
+    }
+
+    private async Task<bool> ShowRemoveDeployOnTheFlyVmEntryConfirmationDialogAsync(string vmName)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = RootLayout.XamlRoot,
+            Title = "Remove VM Entry",
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
+            Content = $"Remove '{vmName}' from quick deploy configuration?",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
     private void SetTemplateEditorStatus(string statusText)

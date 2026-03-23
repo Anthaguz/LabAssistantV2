@@ -79,6 +79,8 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("ApplyDeployResolveSuggestionsAsync(template);", source);
         Assert.DoesNotContain("ResolveDeployOnTheFlySuggestionsAsync()", source);
         Assert.DoesNotContain("OpenDeployOnTheFlyTemplateEditorAsync()", source);
+        Assert.DoesNotContain("AddDeployOnTheFlyVmEntry()", source);
+        Assert.DoesNotContain("RemoveDeployOnTheFlyVmEntryAsync(VmTemplate? vmEntry)", source);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceComposition", compositionSource);
         Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
@@ -87,7 +89,12 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>", compositionSource);
         Assert.Contains("public async Task ResolveSuggestionsAsync()", compositionSource);
         Assert.Contains("public async Task OpenTemplateEditorAsync()", compositionSource);
+        Assert.Contains("public void AddVmEntry()", compositionSource);
+        Assert.Contains("public async Task RemoveVmEntryAsync(VmTemplate? vmEntry)", compositionSource);
         Assert.Contains("_view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
+        Assert.Contains("_view.VmRemoveRequested += async vmEntry => await RemoveVmEntryAsync(vmEntry);", compositionSource);
+        Assert.Contains("_view.AddVmRequested += (_, _) => AddVmEntry();", compositionSource);
+        Assert.Contains("_view.RemoveSelectedVmRequested += async (_, _) => await RemoveVmEntryAsync(_workspace.SelectedVmEntry);", compositionSource);
         Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", compositionSource);
         Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", compositionSource);
         Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);

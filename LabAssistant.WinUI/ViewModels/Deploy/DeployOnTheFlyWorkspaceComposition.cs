@@ -54,13 +54,17 @@ internal interface IDeployOnTheFlyCompositionHost
     /// </summary>
     Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText);
 
+    /// <summary>
+    /// Refreshes shared Deploy shell state after Quick Deploy entry count changes.
+    /// </summary>
+    void RefreshSharedUiState();
+
+    /// <summary>
+    /// Shows the shell-owned confirmation dialog for removing a Quick Deploy VM entry.
+    /// </summary>
+    Task<bool> ShowRemoveVmEntryConfirmationDialogAsync(string vmName);
+
     void OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow);
-
-    Task OnVmRemoveRequestedAsync(VmTemplate vmEntry);
-
-    void OnAddVmRequested();
-
-    Task OnRemoveSelectedVmRequestedAsync();
 
     void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);
 
@@ -296,6 +300,53 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     }
 
     /// <summary>
+    /// Adds a VM entry to the long-lived Quick Deploy workspace and resets readiness/progress state for the updated draft.
+    /// </summary>
+    public void AddVmEntry()
+    {
+        _workspace.SetShowAllVmRows(false);
+        var entry = _workspace.AddVmEntry();
+        _host.RefreshSharedUiState();
+        SelectVmEntry(entry);
+        _workspace.ClearReadinessState("Readiness has not been evaluated.");
+        _workspace.ResetProgressState();
+        _host.SetActionStatus($"Added VM entry '{entry.Name}'.");
+        UpdateEditorPanel();
+        _host.UpdateUi();
+    }
+
+    /// <summary>
+    /// Removes a VM entry from the long-lived Quick Deploy workspace after shell confirmation and reconciles the selection/editor state that remains.
+    /// </summary>
+    public async Task RemoveVmEntryAsync(VmTemplate? vmEntry)
+    {
+        _workspace.SetShowAllVmRows(false);
+        if (vmEntry is null)
+        {
+            _host.SetActionStatus("Select a VM entry first.");
+            return;
+        }
+
+        var vmName = vmEntry.Name;
+        if (!await _host.ShowRemoveVmEntryConfirmationDialogAsync(vmName))
+        {
+            return;
+        }
+
+        _workspace.RemoveVmEntry(vmEntry);
+        _host.RefreshSharedUiState();
+        SelectVmEntry(_workspace.SelectedVmEntry);
+        _workspace.ClearReadinessState(
+            _workspace.VmEntryCount == 0
+                ? "Add at least one VM entry to evaluate readiness."
+                : "Readiness has not been evaluated.");
+        _workspace.ResetProgressState();
+        _host.SetActionStatus($"Removed VM entry '{vmName}'.");
+        UpdateEditorPanel();
+        _host.UpdateUi();
+    }
+
+    /// <summary>
     /// Applies shell activation state while preserving the long-lived Quick Deploy workspace and triggering initial readiness only when the active route first needs it.
     /// </summary>
     public void ApplyShellState(bool isActive)
@@ -422,9 +473,9 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     {
         _view.VmEntrySelectionChanged += (_, _) =>
             _host.OnVmEntriesSelectionChanged(_view.CaptureVmSelectionInteractionState().SelectedVmEntryRow);
-        _view.VmRemoveRequested += async vmEntry => await _host.OnVmRemoveRequestedAsync(vmEntry);
-        _view.AddVmRequested += (_, _) => _host.OnAddVmRequested();
-        _view.RemoveSelectedVmRequested += async (_, _) => await _host.OnRemoveSelectedVmRequestedAsync();
+        _view.VmRemoveRequested += async vmEntry => await RemoveVmEntryAsync(vmEntry);
+        _view.AddVmRequested += (_, _) => AddVmEntry();
+        _view.RemoveSelectedVmRequested += async (_, _) => await RemoveVmEntryAsync(_workspace.SelectedVmEntry);
         _view.ApplyVmChangesRequested += async (_, _) => await ApplyVmChangesAsync();
         _view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());
         _view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
