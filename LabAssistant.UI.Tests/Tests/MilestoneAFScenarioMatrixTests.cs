@@ -66,6 +66,7 @@ public sealed class MilestoneAFScenarioMatrixTests
     public void MainWindow_WiresDeployReadinessAndExecutionFlowForAf3()
     {
         var source = LoadMainWindowSource();
+        var controllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
 
         Assert.Contains("WireDeployHandlers()", source);
         Assert.Contains("DeployFromTemplateView.EvaluateReadinessRequested += DeployEvaluateReadinessButton_Click;", source);
@@ -76,7 +77,7 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", source);
         Assert.Contains("await _deployFromTemplateWorkspaceComposition.StartDeployAsync();", source);
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", source);
-        Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", source);
+        Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", controllerSource);
         Assert.Contains("DeployFromTemplateView.ResolveSuggestionsRequested += DeployResolveSuggestionsButton_Click;", source);
         Assert.Contains("DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;", source);
         Assert.Contains("await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);", source);
@@ -140,6 +141,12 @@ public sealed class MilestoneAFScenarioMatrixTests
     private static string LoadDeployWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceControllerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

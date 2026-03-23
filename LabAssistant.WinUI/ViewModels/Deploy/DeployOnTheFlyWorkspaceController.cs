@@ -3,6 +3,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
@@ -29,21 +30,14 @@ internal interface IDeployOnTheFlyWorkspaceControllerHost
 
     Task<DeploymentReadinessReport> RunReadinessChecksAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 
+    /// <summary>
+    /// Marshals workflow callback updates back onto the shell UI thread without routing the workflow ownership back through the shell.
+    /// </summary>
+    void EnqueueUiUpdate(Action updateAction);
+
     void UpdateUi();
 
-    void BeginDeployWorkflow();
-
-    void PrepareDeployExecution(MultiVmDeploymentContext context);
-
     Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context);
-
-    void SetDeployBlocked();
-
-    void ApplyDeploySummary(DeploymentOutcomeSummary summary);
-
-    void SetDeployFailed(string errorMessage);
-
-    void FinalizeDeployWorkflow();
 }
 
 /// <summary>
@@ -82,13 +76,13 @@ internal sealed class DeployOnTheFlyWorkspaceController
         }
 
         _workspace.BeginStarting();
-        _host.BeginDeployWorkflow();
+        BeginDeployWorkflow();
         try
         {
             await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
             if (_workspace.HasBlockingFailures)
             {
-                _host.SetDeployBlocked();
+                SetDeployBlocked();
                 return;
             }
 
@@ -98,18 +92,18 @@ internal sealed class DeployOnTheFlyWorkspaceController
                 _host.DeploymentSettings,
                 _host.LoadCatalogItems(),
                 _host.AvailableSwitches);
-            _host.PrepareDeployExecution(deployContext.MultiVmContext);
+            PrepareDeployExecution(deployContext.MultiVmContext);
             var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);
-            _host.ApplyDeploySummary(summary);
+            ApplyDeploySummary(summary);
         }
         catch (Exception ex)
         {
-            _host.SetDeployFailed(ex.Message);
+            SetDeployFailed(ex.Message);
         }
         finally
         {
             _workspace.EndStarting();
-            _host.FinalizeDeployWorkflow();
+            FinalizeDeployWorkflow();
         }
     }
 
@@ -235,5 +229,133 @@ internal sealed class DeployOnTheFlyWorkspaceController
         _host.UpdateUi();
 
         await EvaluateReadinessAsync(DeploymentPreflightMode.Full);
+    }
+
+    /// <summary>
+    /// Initializes the execution-visible workflow state before readiness-corrected deployment begins.
+    /// </summary>
+    private void BeginDeployWorkflow()
+    {
+        _workspace.SetShowAllVmRows(true);
+        _workspace.SetWorkflowState("Running", 15, "Preparing deployment...");
+        _host.UpdateUi();
+    }
+
+    /// <summary>
+    /// Prepares progress rows and callback wiring for a concrete deploy execution without routing that ownership back through the shell.
+    /// </summary>
+    private void PrepareDeployExecution(MultiVmDeploymentContext context)
+    {
+        _workspace.InitializeProgressRows(context, BuildExpectedDeploySteps);
+        AttachProgressCallbacks(context);
+        _workspace.SetWorkflowState("Running", 40, $"Deploying {context.VmContexts.Count} VM(s)...");
+        _host.SetActionStatus("Starting quick deploy...");
+        _host.UpdateUi();
+    }
+
+    /// <summary>
+    /// Applies the blocked state after readiness fails immediately before execution.
+    /// </summary>
+    private void SetDeployBlocked()
+    {
+        _workspace.SetWorkflowState("Blocked", 35, "Deployment blocked by readiness failures.");
+        _host.SetActionStatus("Deploy blocked by readiness failures. Resolve blocking items first.");
+        _host.UpdateUi();
+    }
+
+    /// <summary>
+    /// Applies the finished deployment summary to workspace-owned rows and workflow state.
+    /// </summary>
+    private void ApplyDeploySummary(DeploymentOutcomeSummary summary)
+    {
+        _workspace.ApplyOutcomeSummary(summary);
+        _workspace.SetWorkflowState(
+            lifecycleState: summary.OperationState switch
+            {
+                DeploymentOperationState.Completed => "Completed",
+                DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "Cancelled",
+                DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
+                _ => "Completed"
+            },
+            progressPercent: 100,
+            progressSummary: $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.");
+        _host.SetActionStatus(
+            $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}.");
+        _host.UpdateUi();
+    }
+
+    /// <summary>
+    /// Applies the failed execution state after an exception escapes the deploy pipeline.
+    /// </summary>
+    private void SetDeployFailed(string errorMessage)
+    {
+        _workspace.SetWorkflowState("Failed", 100, "Deployment failed.");
+        _host.SetActionStatus($"Deploy failed. {errorMessage}");
+        _host.UpdateUi();
+    }
+
+    /// <summary>
+    /// Restores the post-execution shell-visible row mode after deployment exits.
+    /// </summary>
+    private void FinalizeDeployWorkflow()
+    {
+        _workspace.SetShowAllVmRows(true);
+        _host.UpdateUi();
+    }
+
+    private void AttachProgressCallbacks(MultiVmDeploymentContext context)
+    {
+        foreach (var vmContext in context.VmContexts)
+        {
+            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
+            vmContext.LogCallback = message => _host.EnqueueUiUpdate(() =>
+            {
+                _workspace.UpdateProgressMessage(vmName, message);
+                _host.UpdateUi();
+            });
+            vmContext.StepStateEmitter = update => _host.EnqueueUiUpdate(() =>
+            {
+                _workspace.ApplyProgressUpdate(vmName, update);
+                _host.UpdateUi();
+            });
+        }
+    }
+
+    private static IReadOnlyList<DeployTimelineStepDefinition> BuildExpectedDeploySteps(VmDeploymentContext context)
+    {
+        var steps = new List<DeployTimelineStepDefinition>
+        {
+            new(DeploymentStepKeys.CheckHyperV, "Check Hyper-V"),
+            new(DeploymentStepKeys.CreateVmFolder, "Create VM folder"),
+            new(DeploymentStepKeys.CreateVhd, "Create differencing disk"),
+            new(DeploymentStepKeys.CreateVm, "Create VM"),
+            new(DeploymentStepKeys.AddNicToVm, "Add network adapter"),
+            new(DeploymentStepKeys.ConfigureVm, "Configure VM"),
+            new(DeploymentStepKeys.EnableGuestServices, "Enable guest services"),
+            new(DeploymentStepKeys.DisableVmCheckpoints, "Disable VM checkpoints"),
+            new(DeploymentStepKeys.StartVm, "Start VM")
+        };
+
+        if (context.ConfigureTimeZone)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.SetTimeZone, "Set Time Zone"));
+        }
+
+        if (context.InstallSoftware)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallSoftware, "Install Software"));
+        }
+
+        if (context.InstallRole)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallRole, "Install Role"));
+        }
+
+        if (context.ConfigureNetworkInformation)
+        {
+            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.ConfigureNetworkInformation, "Configure Network Information"));
+        }
+
+        return steps;
     }
 }

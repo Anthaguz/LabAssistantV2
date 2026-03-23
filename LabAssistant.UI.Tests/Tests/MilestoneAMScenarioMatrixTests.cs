@@ -1998,11 +1998,13 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", onTheFlyControllerSource);
         Assert.Contains("if (_workspace.HasBlockingFailures)", onTheFlyControllerSource);
         Assert.Contains("var deployContext = DeployContextBuilder.Build(", onTheFlyControllerSource);
-        Assert.Contains("_host.PrepareDeployExecution(deployContext.MultiVmContext);", onTheFlyControllerSource);
+        Assert.Contains("PrepareDeployExecution(deployContext.MultiVmContext);", onTheFlyControllerSource);
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", onTheFlyControllerSource);
-        Assert.Contains("_host.ApplyDeploySummary(summary);", onTheFlyControllerSource);
-        Assert.Contains("_host.SetDeployBlocked();", onTheFlyControllerSource);
-        Assert.Contains("_host.SetDeployFailed(ex.Message);", onTheFlyControllerSource);
+        Assert.Contains("ApplyDeploySummary(summary);", onTheFlyControllerSource);
+        Assert.Contains("SetDeployBlocked();", onTheFlyControllerSource);
+        Assert.Contains("SetDeployFailed(ex.Message);", onTheFlyControllerSource);
+        Assert.Contains("BeginDeployWorkflow();", onTheFlyControllerSource);
+        Assert.Contains("FinalizeDeployWorkflow();", onTheFlyControllerSource);
         Assert.Contains("_workspace.EndStarting();", onTheFlyControllerSource);
     }
 
@@ -2064,10 +2066,23 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void SetResultRowsItemsSource(object? itemsSource)", onTheFlyRightPanelViewSource);
         Assert.DoesNotContain("public ListView DeployOnTheFlyVmResultsListViewControl =>", onTheFlyRightPanelViewSource);
 
-        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.BeginDeployWorkflow()", mainWindowSource);
-        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.PrepareDeployExecution(MultiVmDeploymentContext context)", mainWindowSource);
-        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.ApplyDeploySummary(DeploymentOutcomeSummary summary)", mainWindowSource);
-        Assert.Contains("_host.ApplyDeploySummary(summary);", onTheFlyControllerSource);
+        Assert.DoesNotContain("void IDeployOnTheFlyWorkspaceControllerHost.BeginDeployWorkflow()", mainWindowSource);
+        Assert.DoesNotContain("void IDeployOnTheFlyWorkspaceControllerHost.PrepareDeployExecution(MultiVmDeploymentContext context)", mainWindowSource);
+        Assert.DoesNotContain("void IDeployOnTheFlyWorkspaceControllerHost.SetDeployBlocked()", mainWindowSource);
+        Assert.DoesNotContain("void IDeployOnTheFlyWorkspaceControllerHost.ApplyDeploySummary(DeploymentOutcomeSummary summary)", mainWindowSource);
+        Assert.DoesNotContain("void IDeployOnTheFlyWorkspaceControllerHost.SetDeployFailed(string errorMessage)", mainWindowSource);
+        Assert.DoesNotContain("void IDeployOnTheFlyWorkspaceControllerHost.FinalizeDeployWorkflow()", mainWindowSource);
+        Assert.DoesNotContain("private void InitializeDeployOnTheFlyProgressRows(MultiVmDeploymentContext context)", mainWindowSource);
+        Assert.DoesNotContain("private void AttachDeployOnTheFlyProgressCallbacks(MultiVmDeploymentContext context)", mainWindowSource);
+        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)", mainWindowSource);
+        Assert.Contains("private void BeginDeployWorkflow()", onTheFlyControllerSource);
+        Assert.Contains("private void PrepareDeployExecution(MultiVmDeploymentContext context)", onTheFlyControllerSource);
+        Assert.Contains("private void SetDeployBlocked()", onTheFlyControllerSource);
+        Assert.Contains("private void ApplyDeploySummary(DeploymentOutcomeSummary summary)", onTheFlyControllerSource);
+        Assert.Contains("private void SetDeployFailed(string errorMessage)", onTheFlyControllerSource);
+        Assert.Contains("private void FinalizeDeployWorkflow()", onTheFlyControllerSource);
+        Assert.Contains("private void AttachProgressCallbacks(MultiVmDeploymentContext context)", onTheFlyControllerSource);
+        Assert.Contains("private static IReadOnlyList<DeployTimelineStepDefinition> BuildExpectedDeploySteps(VmDeploymentContext context)", onTheFlyControllerSource);
     }
 
     [Fact]
