@@ -81,6 +81,9 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.DoesNotContain("OpenDeployOnTheFlyTemplateEditorAsync()", source);
         Assert.DoesNotContain("AddDeployOnTheFlyVmEntry()", source);
         Assert.DoesNotContain("RemoveDeployOnTheFlyVmEntryAsync(VmTemplate? vmEntry)", source);
+        Assert.DoesNotContain("UpdateDeployOnTheFlyResultRows()", source);
+        Assert.DoesNotContain("UpdateDeployOnTheFlyIssueRows()", source);
+        Assert.DoesNotContain("UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)", source);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceComposition", compositionSource);
         Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
@@ -91,6 +94,9 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("public async Task OpenTemplateEditorAsync()", compositionSource);
         Assert.Contains("public void AddVmEntry()", compositionSource);
         Assert.Contains("public async Task RemoveVmEntryAsync(VmTemplate? vmEntry)", compositionSource);
+        Assert.Contains("public void RefreshResultRows()", compositionSource);
+        Assert.Contains("public void RefreshIssueRows()", compositionSource);
+        Assert.Contains("public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)", compositionSource);
         Assert.Contains("_view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
         Assert.Contains("_view.VmRemoveRequested += async vmEntry => await RemoveVmEntryAsync(vmEntry);", compositionSource);
         Assert.Contains("_view.AddVmRequested += (_, _) => AddVmEntry();", compositionSource);
@@ -110,6 +116,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("_host.PrepareDeployExecution(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("_host.ApplyDeploySummary(summary);", controllerSource);
+        Assert.DoesNotContain("_deployOnTheFlyWorkspace.ApplyOutcomeSummary(summary);", source);
         Assert.Contains("_deployOnTheFlyWorkspace.SetWorkflowState(\"Running\", 15, \"Preparing deployment...\");", source);
 
         Assert.Contains("public event EventHandler? VmDraftChanged;", viewSource);

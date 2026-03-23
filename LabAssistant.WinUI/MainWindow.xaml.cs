@@ -996,8 +996,8 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             _deployOnTheFlyWorkspace.ResetProgressState();
         }
 
-        UpdateDeployOnTheFlyResultRows();
-        UpdateDeployOnTheFlyIssueRows();
+        _deployOnTheFlyWorkspaceComposition.RefreshResultRows();
+        _deployOnTheFlyWorkspaceComposition.RefreshIssueRows();
         UpdateDeployOnTheFlyVmEntryRows();
         _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
 
@@ -1314,7 +1314,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         AttachDeployOnTheFlyProgressCallbacks(context);
         _deployOnTheFlyWorkspace.SetWorkflowState("Running", 40, $"Deploying {context.VmContexts.Count} VM(s)...");
         SetDeployOnTheFlyStatusText("Starting quick deploy...");
-        UpdateDeployOnTheFlyResultRows();
+        _deployOnTheFlyWorkspaceComposition.RefreshResultRows();
         UpdateDeployOnTheFlyUi();
     }
 
@@ -1333,7 +1333,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     void IDeployOnTheFlyWorkspaceControllerHost.ApplyDeploySummary(DeploymentOutcomeSummary summary)
     {
-        UpdateDeployOnTheFlyRowsFromSummary(summary);
+        _deployOnTheFlyWorkspaceComposition.ApplyOutcomeSummary(summary);
         _deployOnTheFlyWorkspace.SetWorkflowState(
             lifecycleState: summary.OperationState switch
             {
@@ -1486,21 +1486,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
 
         _deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);
-    }
-
-    private void UpdateDeployOnTheFlyResultRows()
-    {
-        _deployOnTheFlyWorkspace.RefreshResultRows();
-    }
-
-    private void UpdateDeployOnTheFlyIssueRows()
-    {
-        _deployOnTheFlyWorkspace.RefreshIssueRows();
-    }
-
-    private void UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)
-    {
-        _deployOnTheFlyWorkspace.ApplyOutcomeSummary(summary);
     }
 
     private async Task EnsureDeployTemplatesLoadedAsync(bool forceRefresh)
