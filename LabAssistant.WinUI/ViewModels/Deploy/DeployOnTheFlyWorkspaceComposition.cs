@@ -113,6 +113,30 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     public string LifecycleState => _workspace.LifecycleState;
 
     /// <summary>
+    /// Rebuilds the Quick Deploy result rows from the current workspace state for the bound right panel.
+    /// </summary>
+    public void RefreshResultRows()
+    {
+        _workspace.RefreshResultRows();
+    }
+
+    /// <summary>
+    /// Rebuilds the Quick Deploy issue rows from the current workspace state for the bound right panel.
+    /// </summary>
+    public void RefreshIssueRows()
+    {
+        _workspace.RefreshIssueRows();
+    }
+
+    /// <summary>
+    /// Applies a completed deployment outcome summary to the Quick Deploy workspace-owned result and issue rows.
+    /// </summary>
+    public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)
+    {
+        _workspace.ApplyOutcomeSummary(summary);
+    }
+
+    /// <summary>
     /// Updates the reference data used to render the selected VM editor without recreating the workspace.
     /// </summary>
     public void SetEditorReferenceData(

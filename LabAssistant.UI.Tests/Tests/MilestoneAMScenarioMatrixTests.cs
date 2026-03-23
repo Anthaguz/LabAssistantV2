@@ -2028,7 +2028,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_deployOnTheFlyWorkspace.IssueRows", mainWindowSource);
         Assert.Contains("_deployOnTheFlyWorkspace.LiveProgressVmCount", mainWindowSource);
         Assert.DoesNotContain("_deployOnTheFlyWorkspace.SetShowAllVmRows(false);", mainWindowSource);
-        Assert.Contains("_deployOnTheFlyWorkspace.ApplyOutcomeSummary(summary);", mainWindowSource);
+        Assert.DoesNotContain("_deployOnTheFlyWorkspace.ApplyOutcomeSummary(summary);", mainWindowSource);
 
         Assert.DoesNotContain("DeployOnTheFlyWorkspaceViewModel", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("ResultRows", deployWorkspaceCompositionSource);
@@ -2040,6 +2040,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public string LifecycleState => _workspace.LifecycleState;", onTheFlyCompositionSource);
         Assert.Contains("_workspace.ResetProgressState();", onTheFlyCompositionSource);
         Assert.Contains("_workspace.SetShowAllVmRows(false);", onTheFlyCompositionSource);
+        Assert.Contains("_workspace.RefreshResultRows();", onTheFlyCompositionSource);
+        Assert.Contains("_workspace.RefreshIssueRows();", onTheFlyCompositionSource);
+        Assert.Contains("_workspace.ApplyOutcomeSummary(summary);", onTheFlyCompositionSource);
         Assert.Contains("ResultRowCount > 0", onTheFlyCompositionSource);
 
         Assert.Contains("public ObservableCollection<DeployVmResultRow> ResultRows { get; } = [];", onTheFlyWorkspaceSource);
@@ -2098,6 +2101,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private async Task OpenDeployOnTheFlyTemplateEditorAsync()", mainWindowSource);
         Assert.DoesNotContain("private void AddDeployOnTheFlyVmEntry()", mainWindowSource);
         Assert.DoesNotContain("private async Task RemoveDeployOnTheFlyVmEntryAsync(VmTemplate? vmEntry)", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDeployOnTheFlyResultRows()", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDeployOnTheFlyIssueRows()", mainWindowSource);
+        Assert.DoesNotContain("private void UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)", mainWindowSource);
         Assert.Contains("void IDeployOnTheFlyCompositionHost.OnOpenResultsPanelRequested() => ToggleDeployRightPanelFromWorkflow();", mainWindowSource);
 
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _onTheFlyWorkspaceComposition;", deployWorkspaceCompositionSource);
@@ -2123,6 +2129,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public async Task OpenTemplateEditorAsync()", onTheFlyCompositionSource);
         Assert.Contains("public void AddVmEntry()", onTheFlyCompositionSource);
         Assert.Contains("public async Task RemoveVmEntryAsync(VmTemplate? vmEntry)", onTheFlyCompositionSource);
+        Assert.Contains("public void RefreshResultRows()", onTheFlyCompositionSource);
+        Assert.Contains("public void RefreshIssueRows()", onTheFlyCompositionSource);
+        Assert.Contains("public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)", onTheFlyCompositionSource);
         Assert.Contains("_view.VmRemoveRequested += async vmEntry => await RemoveVmEntryAsync(vmEntry);", onTheFlyCompositionSource);
         Assert.Contains("_view.AddVmRequested += (_, _) => AddVmEntry();", onTheFlyCompositionSource);
         Assert.Contains("_view.RemoveSelectedVmRequested += async (_, _) => await RemoveVmEntryAsync(_workspace.SelectedVmEntry);", onTheFlyCompositionSource);
