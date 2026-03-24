@@ -225,6 +225,7 @@ public sealed class MilestoneALScenarioMatrixTests
     {
         var fromTemplateSource = LoadDeployFromTemplateViewXamlSource();
         var mainWindowSource = LoadMainWindowSource();
+        var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
 
         Assert.Contains("x:Name=\"DeployTemplateSummaryTextBlock\"", fromTemplateSource);
         Assert.Contains("x:Name=\"DeployTemplateRemediationTextBlock\"", fromTemplateSource);
@@ -233,9 +234,11 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("Content=\"Review Readiness\"", fromTemplateSource);
         Assert.Contains("Content=\"Fix in Templates Editor\"", fromTemplateSource);
 
-        Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
         Assert.Contains("Template Review", fromTemplateSource);
-        Assert.Contains("_deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);", mainWindowSource);
+        Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
+        Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);", mainWindowSource);
+        Assert.Contains("private void UpdateIssueRows()", fromTemplateCompositionSource);
+        Assert.Contains("_workspace.RefreshReviewState(hasBlockingFailures);", fromTemplateCompositionSource);
     }
 
     [Fact]
@@ -379,7 +382,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.DoesNotContain("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("public void ApplyRightPanelState(bool showPanel, bool panelUnavailable)", LoadDeployWorkspaceCompositionSource());
         Assert.Contains("private void UpdateVmEntryRows()", LoadDeployOnTheFlyWorkspaceCompositionSource());
-        Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
+        Assert.Contains("private void UpdateIssueRows()", LoadDeployFromTemplateWorkspaceCompositionSource());
         Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);
         Assert.Contains("x:Name=\"DeployOnTheFlyEditorIssueSummaryTextBlock\"", quickDeploySource);
         Assert.Contains("x:Name=\"DeploySharedIssuesListView\"", fromTemplateSource);

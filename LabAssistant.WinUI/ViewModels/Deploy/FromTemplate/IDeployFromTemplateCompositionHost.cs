@@ -13,17 +13,25 @@ internal interface IDeployFromTemplateCompositionHost
 
     IReadOnlyList<string> AvailableSwitches { get; }
 
-    TemplateEditorDocument? ActiveTemplateDocument { get; }
+    bool IsTemplatesLoading { get; }
+
+    IReadOnlyList<TemplateLibraryItem> TemplateLibraryItems { get; }
 
     IReadOnlyList<VhdxCatalogItem> LoadCatalogItems();
 
     Task EnsureTemplateSwitchesAsync(bool forceRefresh);
 
+    Task EnsureTemplatesLibraryAsync(bool forceRefresh);
+
+    Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath);
+
     Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 
-    void ReplaceCompatibilityIssues(IReadOnlyList<DeployCompatibilityIssue> issues);
+    void RefreshSharedUiState();
 
-    DeploymentReadinessReport? CurrentReadinessReport { get; set; }
+    void ApplyRightPanelState();
+
+    void OnOpenResultsPanelRequested();
 
     Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context);
 
@@ -31,6 +39,4 @@ internal interface IDeployFromTemplateCompositionHost
         MultiVmDeploymentContext context,
         Action<string, string?> onLogMessage,
         Action<string, DeployStepStateUpdate> onStepStateUpdated);
-
-    void OnOpenResultsPanelRequested();
 }

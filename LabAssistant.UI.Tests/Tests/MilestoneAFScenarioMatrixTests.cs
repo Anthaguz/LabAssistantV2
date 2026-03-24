@@ -66,12 +66,13 @@ public sealed class MilestoneAFScenarioMatrixTests
     public void MainWindow_WiresDeployReadinessAndExecutionFlowForAf3()
     {
         var source = LoadMainWindowSource();
+        var compositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var controllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
 
         Assert.Contains("WireDeployHandlers()", source);
         Assert.Contains("DeployFromTemplateView.EvaluateReadinessRequested += DeployEvaluateReadinessButton_Click;", source);
         Assert.Contains("DeployFromTemplateView.StartDeployRequested += DeployStartButton_Click;", source);
-        Assert.Contains("DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;", source);
+        Assert.DoesNotContain("DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;", source);
         Assert.Contains("await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);", source);
         Assert.Contains("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", source);
         Assert.Contains("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", source);
@@ -81,9 +82,10 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.Contains("DeployFromTemplateView.ResolveSuggestionsRequested += DeployResolveSuggestionsButton_Click;", source);
         Assert.Contains("DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;", source);
         Assert.Contains("await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);", source);
-        Assert.Contains("_deployFromTemplateWorkspaceComposition.RefreshResultRows(_deployCompatibilityIssues, _deployReadinessReport);", source);
-        Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", source);
-        Assert.Contains("_deployFromTemplateWorkspaceComposition.SetInteractionState(_isDeployLoadingTemplates, hasBlockingFailures);", source);
+        Assert.Contains("_view.TemplateSelectionChanged += async (_, _) => await HandleTemplateSelectionChangedAsync();", compositionSource);
+        Assert.Contains("_view.ReloadTemplatesRequested += async (_, _) => await LoadTemplatesAsync(forceRefresh: true);", compositionSource);
+        Assert.Contains("private void UpdateUi()", compositionSource);
+        Assert.Contains("private void UpdateIssueRows()", compositionSource);
     }
 
     [Fact]
@@ -141,6 +143,12 @@ public sealed class MilestoneAFScenarioMatrixTests
     private static string LoadDeployWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
