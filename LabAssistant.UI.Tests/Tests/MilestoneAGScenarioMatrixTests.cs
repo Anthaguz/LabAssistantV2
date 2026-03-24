@@ -64,15 +64,16 @@ public sealed class MilestoneAGScenarioMatrixTests
         var source = LoadMainWindowSource();
         var controllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
         var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
+        var hostSource = LoadDeployOnTheFlyWorkspaceHostSource();
         var viewSource = LoadDeployOnTheFlyViewSource();
 
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", source);
         Assert.Contains("new DeployOnTheFlyWorkspaceComposition(", source);
-        Assert.Contains("Task IDeployOnTheFlyCompositionHost.OnStartRequestedAsync() => _deployOnTheFlyWorkspaceController.StartDeployAsync();", source);
+        Assert.Contains("new DeployOnTheFlyWorkspaceHost(", source);
         Assert.Contains("BuildOnTheFlyTemplate()", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
-        Assert.Contains("ApplyDeployResolveSuggestionsAsync(template);", source);
+        Assert.Contains("applyResolveSuggestionsAsync: ApplyDeployResolveSuggestionsAsync,", source);
         Assert.DoesNotContain("ResolveDeployOnTheFlySuggestionsAsync()", source);
         Assert.DoesNotContain("OpenDeployOnTheFlyTemplateEditorAsync()", source);
         Assert.DoesNotContain("AddDeployOnTheFlyVmEntry()", source);
@@ -86,6 +87,9 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.DoesNotContain("BuildDeployOnTheFlyEditorIssueSummaryText()", source);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceComposition", compositionSource);
+        Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceHost : IDeployOnTheFlyCompositionHost", hostSource);
+        Assert.Contains("public Task OnStartRequestedAsync() => _onStartRequestedAsync();", hostSource);
+        Assert.Contains("public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();", hostSource);
         Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
         Assert.Contains("_rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);", compositionSource);
         Assert.Contains("_ = _host.EnsureReferenceDataAsync(forceRefresh: false);", compositionSource);
@@ -202,6 +206,12 @@ public sealed class MilestoneAGScenarioMatrixTests
     private static string LoadDeployOnTheFlyWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyWorkspaceHostSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceHost.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

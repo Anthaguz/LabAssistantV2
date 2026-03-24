@@ -30,7 +30,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost, IDeployOnTheFlyCompositionHost
+public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -188,11 +188,74 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                     return _deploymentOutcomeSummaryBuilder.Build(context);
                 },
                 AttachDeployProgressCallbacks));
+        var deployOnTheFlyWorkspaceHost = new DeployOnTheFlyWorkspaceHost(
+            getVmEntryCount: () => _deployOnTheFlyWorkspace.VmEntryCount,
+            getReadinessReport: () => _deployOnTheFlyWorkspace.ReadinessReport,
+            isEvaluatingReadiness: () => _deployOnTheFlyWorkspace.IsEvaluatingReadiness,
+            isStarting: () => _deployOnTheFlyWorkspace.IsStarting,
+            getLifecycleState: () => _deployOnTheFlyWorkspace.LifecycleState,
+            ensureSeeded: () =>
+            {
+                _deployOnTheFlyWorkspace.EnsureSeeded(_deployOnTheFlyWorkspace.SelectedVmEntry?.VmId);
+                _deployWorkspaceComposition.RefreshSharedUiState();
+                _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
+            },
+            ensureReferenceDataAsync: EnsureDeployOnTheFlyReferenceDataAsync,
+            updateUi: () => _deployOnTheFlyWorkspaceComposition.UpdateUi(),
+            setActionStatus: statusText => _deployOnTheFlyWorkspaceComposition.SetActionStatus(statusText),
+            scheduleAutoEvaluate: () => _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate(),
+            buildTemplate: BuildOnTheFlyTemplate,
+            replaceVmEntriesFromTemplate: template =>
+            {
+                _deployOnTheFlyWorkspace.ReplaceEntriesFromTemplate(
+                    template,
+                    _deployOnTheFlyWorkspace.SelectedVmEntry?.VmId);
+                _deployWorkspaceComposition.RefreshSharedUiState();
+                _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
+                _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
+            },
+            applyResolveSuggestionsAsync: ApplyDeployResolveSuggestionsAsync,
+            showTemplateEditorAsync: ShowTemplateEditorAsync,
+            refreshSharedUiState: () => _deployWorkspaceComposition.RefreshSharedUiState(),
+            showRemoveVmEntryConfirmationDialogAsync: async vmName =>
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = RootLayout.XamlRoot,
+                    Title = "Remove VM Entry",
+                    PrimaryButtonText = "Remove",
+                    CloseButtonText = "Cancel",
+                    Content = $"Remove '{vmName}' from quick deploy configuration?",
+                    DefaultButton = ContentDialogButton.Close
+                };
+
+                return await dialog.ShowAsync() == ContentDialogResult.Primary;
+            },
+            onVmEntriesSelectionChanged: selectedRow =>
+            {
+                _deployOnTheFlyWorkspace.SetSelectedVmEntry(selectedRow?.VmEntry);
+                _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
+                _deployOnTheFlyWorkspaceComposition.UpdateUi();
+            },
+            onEditorInteractionChanged: interactionState =>
+            {
+                if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
+                {
+                    return;
+                }
+
+                _deployOnTheFlyWorkspaceComposition.SyncEditorDraft(interactionState);
+                _deployOnTheFlyWorkspaceComposition.UpdateUi();
+                _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();
+            },
+            onEvaluateRequestedAsync: mode => _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(mode),
+            onStartRequestedAsync: () => _deployOnTheFlyWorkspaceController.StartDeployAsync(),
+            onOpenResultsPanelRequested: ToggleDeployRightPanelFromWorkflow);
         _deployOnTheFlyWorkspaceComposition = new DeployOnTheFlyWorkspaceComposition(
             DeployOnTheFlyViewHost,
             DeployOnTheFlyRightPanelViewHost,
             _deployOnTheFlyWorkspace,
-            this);
+            deployOnTheFlyWorkspaceHost);
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
             DeployOverviewViewHost,
@@ -622,68 +685,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         ToggleDeployRightPanelFromWorkflow();
     }
 
-    int IDeployOnTheFlyCompositionHost.VmEntryCount => _deployOnTheFlyWorkspace.VmEntryCount;
-
-    DeploymentReadinessReport? IDeployOnTheFlyCompositionHost.ReadinessReport => _deployOnTheFlyWorkspace.ReadinessReport;
-
-    bool IDeployOnTheFlyCompositionHost.IsEvaluatingReadiness => _deployOnTheFlyWorkspace.IsEvaluatingReadiness;
-
-    bool IDeployOnTheFlyCompositionHost.IsStarting => _deployOnTheFlyWorkspace.IsStarting;
-
-    string IDeployOnTheFlyCompositionHost.LifecycleState => _deployOnTheFlyWorkspace.LifecycleState;
-
-    void IDeployOnTheFlyCompositionHost.EnsureSeeded() => EnsureDeployOnTheFlySeeded();
-
-    Task IDeployOnTheFlyCompositionHost.EnsureReferenceDataAsync(bool forceRefresh) => EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh);
-
-    void IDeployOnTheFlyCompositionHost.UpdateUi() => _deployOnTheFlyWorkspaceComposition.UpdateUi();
-
-    void IDeployOnTheFlyCompositionHost.SetActionStatus(string statusText) => _deployOnTheFlyWorkspaceComposition.SetActionStatus(statusText);
-
-    void IDeployOnTheFlyCompositionHost.ScheduleAutoEvaluate() => _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();
-
-    LabTemplate IDeployOnTheFlyCompositionHost.BuildTemplate() => BuildOnTheFlyTemplate();
-
-    void IDeployOnTheFlyCompositionHost.ReplaceVmEntriesFromTemplate(LabTemplate template) =>
-        ReplaceDeployOnTheFlyEntriesFromTemplate(template);
-
-    Task<int> IDeployOnTheFlyCompositionHost.ApplyResolveSuggestionsAsync(LabTemplate template) =>
-        ApplyDeployResolveSuggestionsAsync(template);
-
-    Task IDeployOnTheFlyCompositionHost.ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) =>
-        ShowTemplateEditorAsync(document, statusText);
-
-    void IDeployOnTheFlyCompositionHost.RefreshSharedUiState() => _deployWorkspaceComposition.RefreshSharedUiState();
-
-    Task<bool> IDeployOnTheFlyCompositionHost.ShowRemoveVmEntryConfirmationDialogAsync(string vmName) =>
-        ShowRemoveDeployOnTheFlyVmEntryConfirmationDialogAsync(vmName);
-
-    void IDeployOnTheFlyCompositionHost.OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow)
-    {
-        _deployOnTheFlyWorkspace.SetSelectedVmEntry(selectedRow?.VmEntry);
-        _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
-        _deployOnTheFlyWorkspaceComposition.UpdateUi();
-    }
-
-    void IDeployOnTheFlyCompositionHost.OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState)
-    {
-        if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-        {
-            return;
-        }
-
-        _deployOnTheFlyWorkspaceComposition.SyncEditorDraft(interactionState);
-        _deployOnTheFlyWorkspaceComposition.UpdateUi();
-        _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();
-    }
-
-    Task IDeployOnTheFlyCompositionHost.OnEvaluateRequestedAsync(DeploymentPreflightMode mode) =>
-        _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(mode);
-
-    Task IDeployOnTheFlyCompositionHost.OnStartRequestedAsync() => _deployOnTheFlyWorkspaceController.StartDeployAsync();
-
-    void IDeployOnTheFlyCompositionHost.OnOpenResultsPanelRequested() => ToggleDeployRightPanelFromWorkflow();
-
     private void ToggleDeployRightPanelFromWorkflow()
     {
         if (!CanActiveCapabilityOwnRightPanel() || _isShellRightPanelInCompactFallback)
@@ -773,13 +774,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private bool IsDeployCapabilityActive =>
         IsDeployOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive;
 
-    private void EnsureDeployOnTheFlySeeded()
-    {
-        _deployOnTheFlyWorkspace.EnsureSeeded(_deployOnTheFlyWorkspace.SelectedVmEntry?.VmId);
-        _deployWorkspaceComposition.RefreshSharedUiState();
-        _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
-    }
-
     private LabTemplate BuildOnTheFlyTemplate()
     {
         return new LabTemplate
@@ -788,16 +782,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             Description = "Generated quick deploy input.",
             VmTemplates = _deployOnTheFlyWorkspace.CreateTemplateSnapshot().ToList()
         };
-    }
-
-    private void ReplaceDeployOnTheFlyEntriesFromTemplate(LabTemplate template)
-    {
-        _deployOnTheFlyWorkspace.ReplaceEntriesFromTemplate(
-            template,
-            _deployOnTheFlyWorkspace.SelectedVmEntry?.VmId);
-        _deployWorkspaceComposition.RefreshSharedUiState();
-        _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
-        _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
     }
 
     private string? PickBaseDiskFilePath()
@@ -1470,21 +1454,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private async Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText)
     {
         await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);
-    }
-
-    private async Task<bool> ShowRemoveDeployOnTheFlyVmEntryConfirmationDialogAsync(string vmName)
-    {
-        var dialog = new ContentDialog
-        {
-            XamlRoot = RootLayout.XamlRoot,
-            Title = "Remove VM Entry",
-            PrimaryButtonText = "Remove",
-            CloseButtonText = "Cancel",
-            Content = $"Remove '{vmName}' from quick deploy configuration?",
-            DefaultButton = ContentDialogButton.Close
-        };
-
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
     private void SetTemplateEditorStatus(string statusText)
