@@ -54,6 +54,69 @@ internal sealed class DeployWorkspaceComposition
 
     public void RefreshSharedUiState() => _overviewWorkspaceComposition.RefreshUiState();
 
+    /// <summary>
+    /// Resets Deploy-local right-panel behavior when the shell changes capability ownership.
+    /// </summary>
+    public void ResetRightPanelBehavior()
+    {
+        _fromTemplateWorkspaceComposition.ResetPanelState();
+    }
+
+    /// <summary>
+    /// Indicates whether Deploy workflow state should force the shell-owned panel infrastructure open.
+    /// </summary>
+    public bool ShouldAutoOpenRightPanel()
+    {
+        return _fromTemplateWorkspaceComposition.IsStarting ||
+            _onTheFlyWorkspaceComposition.IsStarting ||
+            string.Equals(_fromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(_onTheFlyWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Applies the Deploy workflow-local toggle semantics while leaving the shell-owned open/closed flag in the shell.
+    /// </summary>
+    public bool TryToggleRightPanelFromWorkflow(bool isPanelUnavailable, bool isPanelOpen, out bool nextPanelOpenState)
+    {
+        nextPanelOpenState = isPanelOpen;
+        if (isPanelUnavailable || (!_shellBridge.IsDeployFromTemplateActive && !_shellBridge.IsDeployOnTheFlyActive))
+        {
+            return false;
+        }
+
+        nextPanelOpenState = !isPanelOpen;
+        return true;
+    }
+
+    /// <summary>
+    /// Applies Deploy lane-specific panel visibility and launcher state while the shell keeps container and sizing ownership.
+    /// </summary>
+    public void ApplyRightPanelState(bool showPanel, bool panelUnavailable)
+    {
+        _fromTemplateWorkspaceComposition.ApplyResultsPanelState(_shellBridge.IsDeployFromTemplateActive, showPanel, panelUnavailable);
+        _onTheFlyWorkspaceComposition.ApplyResultsPanelState(_shellBridge.IsDeployOnTheFlyActive, showPanel, panelUnavailable);
+    }
+
+    /// <summary>
+    /// Returns the Deploy-owned right-panel title for the active Deploy lane.
+    /// </summary>
+    public string GetRightPanelTitleText()
+    {
+        return _shellBridge.IsDeployFromTemplateActive
+            ? "From Template Progress / Results"
+            : _shellBridge.IsDeployOnTheFlyActive
+                ? "Quick Deploy Progress / Results"
+                : "Details";
+    }
+
+    /// <summary>
+    /// Returns whether the shell should show the Deploy overview empty-state content in the shared panel host.
+    /// </summary>
+    public bool ShouldShowRightPanelEmptyState(bool showPanel)
+    {
+        return showPanel && !_shellBridge.IsDeployFromTemplateActive && !_shellBridge.IsDeployOnTheFlyActive;
+    }
+
     public void ApplyShellState()
     {
         _localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;

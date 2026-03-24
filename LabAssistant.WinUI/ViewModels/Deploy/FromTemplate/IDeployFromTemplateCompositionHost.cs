@@ -31,4 +31,6 @@ internal interface IDeployFromTemplateCompositionHost
         MultiVmDeploymentContext context,
         Action<string, string?> onLogMessage,
         Action<string, DeployStepStateUpdate> onStepStateUpdated);
+
+    void OnOpenResultsPanelRequested();
 }

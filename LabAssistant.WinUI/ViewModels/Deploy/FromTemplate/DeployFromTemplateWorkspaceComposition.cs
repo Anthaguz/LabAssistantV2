@@ -34,6 +34,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _rightPanelView.SetIssueRowsItemsSource(_workspace.IssueRows);
         _rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);
         _rightPanelView.ResetPanelState();
+        WireHandlers();
         ApplyWorkspaceState();
     }
 
@@ -164,9 +165,23 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
             isStartDeployEnabled: hasTemplate && !hasBlockingFailures && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting);
     }
 
-    public void SetResultsPanelLauncherState(string buttonText, bool isEnabled, string summaryText)
+    /// <summary>
+    /// Applies the From Template lane-specific right-panel state while the shell retains the shared panel container and sizing mechanics.
+    /// </summary>
+    public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)
     {
-        _view.SetResultsPanelLauncherState(buttonText, isEnabled, summaryText);
+        _rightPanelView.Visibility = isActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
+        var isRunning = _workspace.IsStarting || string.Equals(_workspace.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+        _view.SetResultsPanelLauncherState(
+            showPanel && isActive ? "Hide Progress / Results" : "Open Progress / Results",
+            isActive && !panelUnavailable,
+            panelUnavailable
+                ? "Expand the window to review the progress and results panel."
+                : isRunning
+                    ? "The panel auto-opens while deployment runs and stays available for result review."
+                    : _workspace.ResultRows.Count > 0
+                        ? $"{_workspace.ResultRows.Count} VM result row(s) are available for review."
+                        : "Use the side panel during or after deploy for progress, timeline, and results.");
     }
 
     AppSettings IDeployFromTemplateWorkspaceControllerHost.DeploymentSettings => _host.DeploymentSettings;
@@ -197,6 +212,11 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         Action<string, DeployStepStateUpdate> onStepStateUpdated) => _host.AttachProgressCallbacks(context, onLogMessage, onStepStateUpdated);
 
     void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => ApplyWorkspaceState();
+
+    private void WireHandlers()
+    {
+        _view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();
+    }
 
     private void ApplyWorkspaceState()
     {

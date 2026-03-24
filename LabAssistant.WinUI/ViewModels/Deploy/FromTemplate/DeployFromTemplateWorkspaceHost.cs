@@ -20,6 +20,7 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     private readonly Action<DeploymentReadinessReport?> _setCurrentReadinessReport;
     private readonly Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> _deployAllAsync;
     private readonly Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> _attachProgressCallbacks;
+    private readonly Action _onOpenResultsPanelRequested;
 
     public DeployFromTemplateWorkspaceHost(
         Func<AppSettings> deploymentSettings,
@@ -32,7 +33,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         Func<DeploymentReadinessReport?> getCurrentReadinessReport,
         Action<DeploymentReadinessReport?> setCurrentReadinessReport,
         Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> deployAllAsync,
-        Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> attachProgressCallbacks)
+        Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> attachProgressCallbacks,
+        Action onOpenResultsPanelRequested)
     {
         _deploymentSettings = deploymentSettings;
         _availableSwitches = availableSwitches;
@@ -45,6 +47,7 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         _setCurrentReadinessReport = setCurrentReadinessReport;
         _attachProgressCallbacks = attachProgressCallbacks;
         _deployAllAsync = deployAllAsync;
+        _onOpenResultsPanelRequested = onOpenResultsPanelRequested;
     }
 
     public AppSettings DeploymentSettings => _deploymentSettings();
@@ -73,4 +76,6 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         MultiVmDeploymentContext context,
         Action<string, string?> onLogMessage,
         Action<string, DeployStepStateUpdate> onStepStateUpdated) => _attachProgressCallbacks(context, onLogMessage, onStepStateUpdated);
+
+    public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();
 }
