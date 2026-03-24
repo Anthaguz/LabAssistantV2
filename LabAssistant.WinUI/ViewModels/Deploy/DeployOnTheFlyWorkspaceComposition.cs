@@ -89,6 +89,7 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     private readonly IDeployOnTheFlyCompositionHost _host;
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private IReadOnlyList<TemplateVhdxCatalogOption> _availableVhdxCatalogOptions = Array.Empty<TemplateVhdxCatalogOption>();
+    private string _statusText = "Ready.";
 
     public DeployOnTheFlyWorkspaceComposition(
         DeployOnTheFlyView view,
@@ -111,6 +112,66 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     public bool IsStarting => _workspace.IsStarting;
 
     public string LifecycleState => _workspace.LifecycleState;
+
+    /// <summary>
+    /// Applies the current Quick Deploy workspace state to the bound view while keeping shell panel ownership outside this seam.
+    /// </summary>
+    public void UpdateUi()
+    {
+        var hasEntries = _workspace.VmEntryCount > 0;
+        var hasBlockingFailures = _workspace.HasBlockingFailures;
+
+        if (!hasEntries)
+        {
+            _workspace.ClearReadinessState("Add at least one VM entry to evaluate readiness.");
+            _workspace.ResetProgressState();
+        }
+
+        RefreshResultRows();
+        RefreshIssueRows();
+        UpdateVmEntryRows();
+        UpdateEditorPanel();
+
+        var blockingIssueCount = _workspace.IssueRows.Count(issue => string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
+        var warningIssueCount = _workspace.IssueRows.Count(issue => !string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase));
+        var shouldShowInlineGuidance = hasEntries &&
+                                       !_workspace.IsStarting &&
+                                       _workspace.LiveProgressVmCount == 0;
+        _view.ApplyWorkspaceState(new DeployOnTheFlyWorkspaceViewState(
+            CanAddVm: !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting,
+            CanRemoveVm: _workspace.SelectedVmEntry is not null &&
+                         !_workspace.IsEvaluatingReadiness &&
+                         !_workspace.IsStarting,
+            CanApplyVmChanges: _workspace.SelectedVmEntry is not null &&
+                               !_workspace.IsEvaluatingReadiness &&
+                               !_workspace.IsStarting,
+            CanEvaluate: false,
+            CanResolveSuggestions: hasEntries && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting,
+            CanOpenTemplateEditor: hasEntries && !_workspace.IsStarting,
+            CanStartDeploy: hasEntries && !hasBlockingFailures && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting,
+            EditorIssueSummaryText: BuildEditorIssueSummaryText(),
+            OverallStateText: _workspace.LifecycleState,
+            ProgressPercent: _workspace.ProgressPercent,
+            ProgressSummaryText: _workspace.ProgressSummary,
+            GlobalIssuesBadgeText: $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}",
+            ReadinessSummaryText: shouldShowInlineGuidance
+                ? $"{_workspace.ReadinessSummaryText} Review VM row badges and the selected VM details to fix blockers here before deploy."
+                : _workspace.ProgressSummary,
+            StatusText: _statusText));
+    }
+
+    /// <summary>
+    /// Updates the Quick Deploy status text and reapplies the current view state when the view has already been loaded.
+    /// </summary>
+    public void SetActionStatus(string statusText)
+    {
+        _statusText = statusText;
+
+        if (_view.Content is not null)
+        {
+            UpdateUi();
+        }
+    }
 
     /// <summary>
     /// Rebuilds the Quick Deploy result rows from the current workspace state for the bound right panel.
@@ -491,6 +552,179 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     {
         _workspace.RefreshVmEntryRows();
         SelectVmEntry(_workspace.SelectedVmEntry);
+    }
+
+    private void UpdateVmEntryRows()
+    {
+        _workspace.RefreshVmEntryRows();
+
+        var compatibilityByVm = _workspace.CompatibilityIssues
+            .Where(issue => !string.IsNullOrWhiteSpace(issue.VmName))
+            .GroupBy(issue => issue.VmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var readinessByVm = (_workspace.ReadinessReport?.Results ?? [])
+            .SelectMany(result => result.AffectedVmNames.Select(vmName => (vmName, result)))
+            .Where(tuple => !string.IsNullOrWhiteSpace(tuple.vmName))
+            .GroupBy(tuple => tuple.vmName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.result).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in _workspace.VmEntryRows)
+        {
+            row.DisplayName = string.IsNullOrWhiteSpace(row.VmEntry.Name) ? "Unnamed VM" : row.VmEntry.Name.Trim();
+            row.SecondaryText = BuildVmEntrySecondaryText(row.VmEntry);
+
+            compatibilityByVm.TryGetValue(row.VmEntry.Name ?? string.Empty, out var compatibilityIssues);
+            readinessByVm.TryGetValue(row.VmEntry.Name ?? string.Empty, out var readinessIssues);
+            compatibilityIssues ??= [];
+            readinessIssues ??= [];
+
+            var draftIssues = ReferenceEquals(row.VmEntry, _workspace.SelectedVmEntry)
+                ? GetDraftIssues()
+                : GetVmEntryIssues(row.VmEntry);
+
+            var blockingMessages = new List<string>();
+            var warningMessages = new List<string>();
+
+            blockingMessages.AddRange(draftIssues.Where(issue => issue.IsBlocking).Select(issue => issue.Message));
+            warningMessages.AddRange(draftIssues.Where(issue => !issue.IsBlocking).Select(issue => issue.Message));
+
+            blockingMessages.AddRange(compatibilityIssues.Where(issue => issue.IsBlocking).Select(issue => FormatIssueMessage(issue.Message, issue.Guidance)));
+            warningMessages.AddRange(compatibilityIssues.Where(issue => !issue.IsBlocking).Select(issue => FormatIssueMessage(issue.Message, issue.Guidance)));
+
+            blockingMessages.AddRange(readinessIssues.Where(issue => issue.Status == DeploymentReadinessStatus.Fail).Select(issue => FormatIssueMessage(issue.Message, issue.ActionableGuidance)));
+            warningMessages.AddRange(readinessIssues.Where(issue => issue.Status == DeploymentReadinessStatus.Warn).Select(issue => FormatIssueMessage(issue.Message, issue.ActionableGuidance)));
+
+            if (blockingMessages.Count > 0)
+            {
+                row.IssueBadgeText = "Blocked";
+                row.IssueSummary = blockingMessages[0];
+                row.IssueBrush = Application.Current.Resources["ShellCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                row.IssueBadgeVisibility = Visibility.Visible;
+                row.IssueSummaryVisibility = Visibility.Visible;
+            }
+            else if (warningMessages.Count > 0)
+            {
+                row.IssueBadgeText = "Warning";
+                row.IssueSummary = warningMessages[0];
+                row.IssueBrush = Application.Current.Resources["ShellWarnBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                row.IssueBadgeVisibility = Visibility.Visible;
+                row.IssueSummaryVisibility = Visibility.Visible;
+            }
+            else
+            {
+                row.IssueBadgeText = string.Empty;
+                row.IssueSummary = string.Empty;
+                row.IssueBrush = Application.Current.Resources["ShellTextSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                row.IssueBadgeVisibility = Visibility.Collapsed;
+                row.IssueSummaryVisibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private string BuildEditorIssueSummaryText()
+    {
+        if (_workspace.SelectedVmEntry is null)
+        {
+            return "Select a VM entry to review its properties and resolve any issues inline.";
+        }
+
+        var draftIssues = GetDraftIssues();
+        if (draftIssues.Count > 0)
+        {
+            var blockingCount = draftIssues.Count(issue => issue.IsBlocking);
+            return blockingCount > 0
+                ? $"Blocking issues in this VM: {string.Join(" ", draftIssues.Where(issue => issue.IsBlocking).Select(issue => issue.Message))}"
+                : $"Warnings in this VM: {string.Join(" ", draftIssues.Select(issue => issue.Message))}";
+        }
+
+        var selectedRow = _workspace.FindRow(_workspace.SelectedVmEntry);
+        if (selectedRow is not null && selectedRow.IssueSummaryVisibility == Visibility.Visible)
+        {
+            return $"{selectedRow.IssueBadgeText}: {selectedRow.IssueSummary}";
+        }
+
+        return "Ready. Changes validate while you edit. Row signals show which VM needs attention.";
+    }
+
+    private List<(bool IsBlocking, string Message)> GetDraftIssues()
+    {
+        if (_workspace.SelectedVmEntry is null)
+        {
+            return [];
+        }
+
+        return GetDraftIssues(
+            _workspace.EditorVmNameDraft,
+            _workspace.EditorVmMemoryDraft,
+            _workspace.EditorVmCpuDraft,
+            string.IsNullOrWhiteSpace(_workspace.EditorVhdxIdDraft) &&
+            string.IsNullOrWhiteSpace(_workspace.EditorVhdPathDraft)
+                ? null
+                : new object(),
+            _availableVhdxCatalogOptions.Count);
+    }
+
+    private static List<(bool IsBlocking, string Message)> GetVmEntryIssues(VmTemplate vmEntry)
+    {
+        var memoryText = vmEntry.MemoryMb.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var cpuText = vmEntry.CpuCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var selectedCatalog = string.IsNullOrWhiteSpace(vmEntry.VhdxId) && string.IsNullOrWhiteSpace(vmEntry.VhdPath)
+            ? null
+            : new object();
+
+        return GetDraftIssues(vmEntry.Name, memoryText, cpuText, selectedCatalog, availableCatalogCount: 1);
+    }
+
+    private static List<(bool IsBlocking, string Message)> GetDraftIssues(
+        string? vmName,
+        string? memoryText,
+        string? cpuText,
+        object? selectedCatalogItem,
+        int availableCatalogCount)
+    {
+        var issues = new List<(bool IsBlocking, string Message)>();
+        if (string.IsNullOrWhiteSpace(vmName))
+        {
+            issues.Add((true, "VM name is required."));
+        }
+
+        if (!int.TryParse(memoryText, out var memoryMb) || memoryMb <= 0)
+        {
+            issues.Add((true, "Memory must be a positive integer."));
+        }
+
+        if (!int.TryParse(cpuText, out var cpuCount) || cpuCount <= 0)
+        {
+            issues.Add((true, "CPU count must be a positive integer."));
+        }
+
+        if (selectedCatalogItem is null)
+        {
+            issues.Add((true, availableCatalogCount == 0
+                ? "Import a base disk in Assets before deploy."
+                : "Select a base disk in VM Properties."));
+        }
+
+        return issues;
+    }
+
+    private static string BuildVmEntrySecondaryText(VmTemplate vmEntry)
+    {
+        var diskText = string.IsNullOrWhiteSpace(vmEntry.VhdxId) && string.IsNullOrWhiteSpace(vmEntry.VhdPath)
+            ? "No base disk"
+            : string.IsNullOrWhiteSpace(vmEntry.VhdxId)
+                ? "Catalog disk selected"
+                : $"Disk: {vmEntry.VhdxId}";
+        var switchText = vmEntry.SwitchNames?.FirstOrDefault()
+                         ?? vmEntry.SwitchName
+                         ?? "No switch";
+        return $"{vmEntry.MemoryMb} MB | {vmEntry.CpuCount} vCPU | {diskText} | Switch: {switchText}";
+    }
+
+    private static string FormatIssueMessage(string message, string? guidance)
+    {
+        return string.IsNullOrWhiteSpace(guidance) ? message.Trim() : $"{message} {guidance}".Trim();
     }
 
     private void WireHandlers()

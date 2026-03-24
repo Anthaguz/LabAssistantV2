@@ -66,15 +66,11 @@ public sealed class MilestoneAGScenarioMatrixTests
         var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
         var viewSource = LoadDeployOnTheFlyViewSource();
 
-        Assert.Contains("CanStartDeploy: hasEntries && !hasBlockingFailures", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;", source);
         Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", source);
         Assert.Contains("new DeployOnTheFlyWorkspaceComposition(", source);
         Assert.Contains("Task IDeployOnTheFlyCompositionHost.OnStartRequestedAsync() => _deployOnTheFlyWorkspaceController.StartDeployAsync();", source);
         Assert.Contains("BuildOnTheFlyTemplate()", source);
-        Assert.Contains("var hasBlockingFailures = _deployOnTheFlyWorkspace.HasBlockingFailures;", source);
-        Assert.Contains("DeployOnTheFlyViewHost.ApplyWorkspaceState(new DeployOnTheFlyWorkspaceViewState(", source);
-        Assert.Contains("GlobalIssuesBadgeText: $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\"", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("ApplyDeployResolveSuggestionsAsync(template);", source);
         Assert.DoesNotContain("ResolveDeployOnTheFlySuggestionsAsync()", source);
@@ -84,12 +80,19 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.DoesNotContain("UpdateDeployOnTheFlyResultRows()", source);
         Assert.DoesNotContain("UpdateDeployOnTheFlyIssueRows()", source);
         Assert.DoesNotContain("UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)", source);
+        Assert.DoesNotContain("UpdateDeployOnTheFlyUi()", source);
+        Assert.DoesNotContain("SetDeployOnTheFlyStatusText(string statusText)", source);
+        Assert.DoesNotContain("UpdateDeployOnTheFlyVmEntryRows()", source);
+        Assert.DoesNotContain("BuildDeployOnTheFlyEditorIssueSummaryText()", source);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceComposition", compositionSource);
         Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
         Assert.Contains("_rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);", compositionSource);
         Assert.Contains("_ = _host.EnsureReferenceDataAsync(forceRefresh: false);", compositionSource);
+        Assert.Contains("public void UpdateUi()", compositionSource);
+        Assert.Contains("public void SetActionStatus(string statusText)", compositionSource);
         Assert.Contains("public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>", compositionSource);
+        Assert.Contains("CanStartDeploy: hasEntries && !hasBlockingFailures", compositionSource);
         Assert.Contains("public async Task ResolveSuggestionsAsync()", compositionSource);
         Assert.Contains("public async Task OpenTemplateEditorAsync()", compositionSource);
         Assert.Contains("public void AddVmEntry()", compositionSource);
@@ -106,6 +109,11 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
         Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", compositionSource);
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", compositionSource);
+        Assert.Contains("var hasBlockingFailures = _workspace.HasBlockingFailures;", compositionSource);
+        Assert.Contains("_view.ApplyWorkspaceState(new DeployOnTheFlyWorkspaceViewState(", compositionSource);
+        Assert.Contains("GlobalIssuesBadgeText: $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\"", compositionSource);
+        Assert.Contains("private void UpdateVmEntryRows()", compositionSource);
+        Assert.Contains("private string BuildEditorIssueSummaryText()", compositionSource);
         Assert.Contains("public void ApplyShellState(bool isActive)", compositionSource);
         Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", compositionSource);
         Assert.DoesNotContain("DeployOnTheFlyVmEntriesListViewControl", compositionSource);
