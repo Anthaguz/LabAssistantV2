@@ -252,11 +252,14 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("public void ApplyWorkspaceState(DeployOnTheFlyWorkspaceViewState state)", quickDeployCodeBehindSource);
         Assert.DoesNotContain("public TextBlock DeployOnTheFlyEditorIssueSummaryTextBlockControl =>", quickDeployCodeBehindSource);
 
-        Assert.Contains("_deployOnTheFlyWorkspace.VmEntryRows", mainWindowSource);
-        Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
-        Assert.Contains("BuildDeployOnTheFlyEditorIssueSummaryText()", mainWindowSource);
-        Assert.Contains("GetDeployOnTheFlyDraftIssues()", mainWindowSource);
-        Assert.Contains("Review VM row badges and the selected VM details to fix blockers here before deploy.", mainWindowSource);
+        Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", quickDeployCompositionSource);
+        Assert.DoesNotContain("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
+        Assert.DoesNotContain("BuildDeployOnTheFlyEditorIssueSummaryText()", mainWindowSource);
+        Assert.DoesNotContain("GetDeployOnTheFlyDraftIssues()", mainWindowSource);
+        Assert.Contains("Review VM row badges and the selected VM details to fix blockers here before deploy.", quickDeployCompositionSource);
+        Assert.Contains("private void UpdateVmEntryRows()", quickDeployCompositionSource);
+        Assert.Contains("private string BuildEditorIssueSummaryText()", quickDeployCompositionSource);
+        Assert.Contains("private List<(bool IsBlocking, string Message)> GetDraftIssues()", quickDeployCompositionSource);
         Assert.Contains("_view.SetResultsPanelLauncherState(", quickDeployCompositionSource);
     }
 
@@ -369,7 +372,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
         Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
-        Assert.Contains("UpdateDeployOnTheFlyVmEntryRows();", mainWindowSource);
+        Assert.Contains("private void UpdateVmEntryRows()", LoadDeployOnTheFlyWorkspaceCompositionSource());
         Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
         Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);
         Assert.Contains("x:Name=\"DeployOnTheFlyEditorIssueSummaryTextBlock\"", quickDeploySource);
