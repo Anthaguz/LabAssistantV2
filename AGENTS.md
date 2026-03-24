@@ -174,6 +174,27 @@ WinUI composition rules:
 - Do not attempt broad comment backfills in unrelated code. Apply the standard incrementally in touched files, prioritizing composition/workflow seams first.
 - Canonical guidance and examples live in `docs/03-architecture/code-documentation.md`.
 
+### 5.8 File Organization
+- Large seam-heavy WinUI files must follow a stable member ordering when the relevant sections exist:
+  1. fields
+  2. constructor
+  3. public API
+  4. interface implementation
+  5. event wiring / event handlers
+  6. core workflow methods
+  7. UI/application helpers
+  8. small private parsing/format helpers
+- Only include sections that actually apply to the file.
+- Do not add empty placeholder sections.
+- Do not use `#region` as a substitute for proper file splitting or method grouping.
+- Use one top-level class per file.
+- Use one top-level interface per file.
+- Keep files as short as practically possible while preserving cohesive logic; for seam-heavy files, prefer splitting before they become navigation-hostile and generally aim to stay below roughly 300-500 lines when the responsibility can be separated cleanly.
+- In `LabAssistant.WinUI/ViewModels/<Capability>/`, capability-shared files stay at the capability root.
+- Lane-local files should live in PascalCase lane folders named for the intended route/workflow surface, for example `Overview`, `QuickDeploy`, `FromTemplate`, or `Logs`.
+- Apply these organization rules incrementally in touched files rather than through broad repo-wide churn.
+- Canonical guidance and examples live in `docs/03-architecture/code-organization.md`.
+
 ---
 
 ## 6) Documentation Rules

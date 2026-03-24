@@ -40,6 +40,7 @@ Behavioral boundaries:
 - Data persists and loads local artifacts/configuration.
 
 Code documentation guidance for composition seams, workflow methods, and shell bridges is defined in `docs/03-architecture/code-documentation.md`.
+Code organization guidance for seam-heavy files is defined in `docs/03-architecture/code-organization.md`.
 
 ## 4. Key Workflows (end-to-end)
 ### Workflow: Deploy Lab (on-the-fly or template-based)
