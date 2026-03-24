@@ -146,7 +146,7 @@ public sealed class MilestoneAFScenarioMatrixTests
 
     private static string LoadDeployFromTemplateWorkspaceControllerSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceController.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

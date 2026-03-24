@@ -2,63 +2,6 @@ using LabAssistant.WinUI.Views.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
-internal interface IDeployOverviewWorkspaceHost
-{
-    int QuickDeployDraftCount { get; }
-
-    bool IsLoadingTemplates { get; }
-
-    int AvailableTemplateCount { get; }
-}
-
-internal interface IDeployOverviewWorkspaceShellBridge
-{
-    bool IsDeployOverviewActive { get; }
-
-    void NavigateToRoute(string routeKey);
-}
-
-internal sealed class DeployOverviewWorkspaceHost : IDeployOverviewWorkspaceHost
-{
-    private readonly Func<int> _getQuickDeployDraftCount;
-    private readonly Func<bool> _isLoadingTemplates;
-    private readonly Func<int> _getAvailableTemplateCount;
-
-    public DeployOverviewWorkspaceHost(
-        Func<int> getQuickDeployDraftCount,
-        Func<bool> isLoadingTemplates,
-        Func<int> getAvailableTemplateCount)
-    {
-        _getQuickDeployDraftCount = getQuickDeployDraftCount;
-        _isLoadingTemplates = isLoadingTemplates;
-        _getAvailableTemplateCount = getAvailableTemplateCount;
-    }
-
-    public int QuickDeployDraftCount => _getQuickDeployDraftCount();
-
-    public bool IsLoadingTemplates => _isLoadingTemplates();
-
-    public int AvailableTemplateCount => _getAvailableTemplateCount();
-}
-
-internal sealed class DeployOverviewWorkspaceShellBridge : IDeployOverviewWorkspaceShellBridge
-{
-    private readonly Func<bool> _isDeployOverviewActive;
-    private readonly Action<string> _navigateToRoute;
-
-    public DeployOverviewWorkspaceShellBridge(
-        Func<bool> isDeployOverviewActive,
-        Action<string> navigateToRoute)
-    {
-        _isDeployOverviewActive = isDeployOverviewActive;
-        _navigateToRoute = navigateToRoute;
-    }
-
-    public bool IsDeployOverviewActive => _isDeployOverviewActive();
-
-    public void NavigateToRoute(string routeKey) => _navigateToRoute(routeKey);
-}
-
 internal sealed class DeployOverviewWorkspaceComposition
 {
     private readonly DeployOverviewView _view;

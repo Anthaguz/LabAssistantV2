@@ -1596,7 +1596,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
         var fromTemplateControllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
+        var fromTemplateControllerHostSource = LoadDeployFromTemplateWorkspaceControllerHostSource();
         var fromTemplateHostSource = LoadDeployFromTemplateWorkspaceHostSource();
+        var fromTemplateCompositionHostSource = LoadDeployFromTemplateCompositionHostSource();
         var deployContextBuilderSource = LoadDeployContextBuilderSource();
         var deployContextTypesSource = LoadDeployContextTypesSource();
 
@@ -1617,7 +1619,6 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("Task<DeploymentOutcomeSummary> IDeployFromTemplateWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context) => _host.DeployAllAsync(context);", fromTemplateCompositionSource);
         Assert.Contains("void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => ApplyWorkspaceState();", fromTemplateCompositionSource);
 
-        Assert.Contains("internal interface IDeployFromTemplateWorkspaceControllerHost", fromTemplateControllerSource);
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceController", fromTemplateControllerSource);
         Assert.Contains("private readonly IDeployFromTemplateWorkspaceControllerHost _host;", fromTemplateControllerSource);
         Assert.Contains("public async Task EvaluateReadinessAsync(DeploymentPreflightMode mode)", fromTemplateControllerSource);
@@ -1625,8 +1626,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("var deployContext = DeployContextBuilder.Build(", fromTemplateControllerSource);
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", fromTemplateControllerSource);
         Assert.Contains("_host.ApplyWorkspaceState();", fromTemplateControllerSource);
+        Assert.Contains("internal interface IDeployFromTemplateWorkspaceControllerHost", fromTemplateControllerHostSource);
 
-        Assert.Contains("internal interface IDeployFromTemplateCompositionHost", fromTemplateHostSource);
+        Assert.Contains("internal interface IDeployFromTemplateCompositionHost", fromTemplateCompositionHostSource);
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompositionHost", fromTemplateHostSource);
 
         Assert.Contains("public bool IsEvaluatingReadiness { get; private set; }", fromTemplateWorkspaceSource);
@@ -1692,7 +1694,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
         var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var fromTemplateControllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
+        var fromTemplateControllerHostSource = LoadDeployFromTemplateWorkspaceControllerHostSource();
         var fromTemplateHostSource = LoadDeployFromTemplateWorkspaceHostSource();
+        var fromTemplateCompositionHostSource = LoadDeployFromTemplateCompositionHostSource();
         var fromTemplateRightPanelViewCodeBehindSource = LoadDeployFromTemplateRightPanelViewCodeBehindSource();
 
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
@@ -1712,10 +1716,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_rightPanelView.ResetPanelState();", fromTemplateCompositionSource);
         Assert.Contains("void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => ApplyWorkspaceState();", fromTemplateCompositionSource);
 
-        Assert.Contains("internal interface IDeployFromTemplateWorkspaceControllerHost", fromTemplateControllerSource);
-        Assert.Contains("void ApplyWorkspaceState();", fromTemplateControllerSource);
+        Assert.Contains("internal interface IDeployFromTemplateWorkspaceControllerHost", fromTemplateControllerHostSource);
+        Assert.Contains("void ApplyWorkspaceState();", fromTemplateControllerHostSource);
 
-        Assert.Contains("internal interface IDeployFromTemplateCompositionHost", fromTemplateHostSource);
+        Assert.Contains("internal interface IDeployFromTemplateCompositionHost", fromTemplateCompositionHostSource);
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompositionHost", fromTemplateHostSource);
         Assert.Contains("public void ResetPanelState()", fromTemplateRightPanelViewCodeBehindSource);
         Assert.DoesNotContain("public Expander DeployGlobalIssuesExpanderControl =>", fromTemplateRightPanelViewCodeBehindSource);
@@ -1837,6 +1841,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
         var onTheFlyCompositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
         var onTheFlyHostSource = LoadDeployOnTheFlyWorkspaceHostSource();
+        var onTheFlyCompositionHostSource = LoadDeployOnTheFlyCompositionHostSource();
         var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
         var onTheFlyViewSource = LoadDeployOnTheFlyViewCodeBehindSource();
 
@@ -1870,7 +1875,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("EditorVmNameDraft", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("IsSynchronizingEditorDraft", deployWorkspaceCompositionSource);
 
-        Assert.Contains("void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);", onTheFlyHostSource);
+        Assert.Contains("void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState);", onTheFlyCompositionHostSource);
         Assert.Contains("_view.VmDraftChanged += (_, _) => _host.OnEditorInteractionChanged(_view.CaptureEditorInteractionState());", onTheFlyCompositionSource);
         Assert.Contains("public void SelectVmEntry(VmTemplate? vmEntry)", onTheFlyCompositionSource);
         Assert.Contains("public void UpdateEditorPanel()", onTheFlyCompositionSource);
@@ -1978,6 +1983,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
         var onTheFlyWorkspaceSource = LoadDeployOnTheFlyWorkspaceViewModelSource();
         var onTheFlyHostSource = LoadDeployOnTheFlyWorkspaceHostSource();
+        var onTheFlyControllerHostSource = LoadDeployOnTheFlyWorkspaceControllerHostSource();
         var onTheFlyControllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
 
         Assert.DoesNotContain("private bool _isDeployOnTheFlyStarting;", mainWindowSource);
@@ -1996,7 +2002,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void BeginStarting()", onTheFlyWorkspaceSource);
         Assert.Contains("public void EndStarting()", onTheFlyWorkspaceSource);
 
-        Assert.Contains("internal interface IDeployOnTheFlyWorkspaceControllerHost", onTheFlyControllerSource);
+        Assert.Contains("internal interface IDeployOnTheFlyWorkspaceControllerHost", onTheFlyControllerHostSource);
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceController", onTheFlyControllerSource);
         Assert.Contains("public async Task StartDeployAsync()", onTheFlyControllerSource);
         Assert.Contains("public async Task EvaluateReadinessAsync(DeploymentPreflightMode mode)", onTheFlyControllerSource);
@@ -2098,6 +2104,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
         var onTheFlyCompositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
         var onTheFlyHostSource = LoadDeployOnTheFlyWorkspaceHostSource();
+        var onTheFlyCompositionHostSource = LoadDeployOnTheFlyCompositionHostSource();
 
         Assert.Contains("public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost", mainWindowSource);
         Assert.DoesNotContain("IDeployOnTheFlyCompositionHost", mainWindowSource);
@@ -2156,7 +2163,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", onTheFlyCompositionSource);
         Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", onTheFlyCompositionSource);
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", onTheFlyCompositionSource);
-        Assert.Contains("internal interface IDeployOnTheFlyCompositionHost", onTheFlyHostSource);
+        Assert.Contains("internal interface IDeployOnTheFlyCompositionHost", onTheFlyCompositionHostSource);
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceHost : IDeployOnTheFlyCompositionHost", onTheFlyHostSource);
         Assert.Contains("public void EnsureSeeded() => _ensureSeeded();", onTheFlyHostSource);
         Assert.Contains("public Task EnsureReferenceDataAsync(bool forceRefresh) => _ensureReferenceDataAsync(forceRefresh);", onTheFlyHostSource);
@@ -2184,15 +2191,8 @@ public sealed class MilestoneAMScenarioMatrixTests
     [Fact]
     public void DeployWorkspaceShellBridge_RemainsNarrowAndShellOwned()
     {
-        var compositionSource = LoadDeployWorkspaceCompositionSource();
-        var shellBridgeInterfaceBlock = ExtractSection(
-            compositionSource,
-            "internal interface IDeployWorkspaceShellBridge",
-            "internal sealed class DeployWorkspaceShellBridge");
-        var shellBridgeClassBlock = ExtractSection(
-            compositionSource,
-            "internal sealed class DeployWorkspaceShellBridge",
-            "internal sealed class DeployWorkspaceComposition");
+        var shellBridgeInterfaceBlock = LoadDeployWorkspaceShellBridgeInterfaceSource();
+        var shellBridgeClassBlock = LoadDeployWorkspaceShellBridgeSource();
 
         Assert.Contains("bool IsDeployCapabilityActive { get; }", shellBridgeInterfaceBlock);
         Assert.Contains("bool IsDeployOverviewActive { get; }", shellBridgeInterfaceBlock);
@@ -2517,6 +2517,18 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
+    private static string LoadDeployWorkspaceShellBridgeInterfaceSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "IDeployWorkspaceShellBridge.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployWorkspaceShellBridgeSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceShellBridge.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
     private static string LoadDiagnosticsWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsWorkspaceComposition.cs");
@@ -2571,19 +2583,19 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadDeployOverviewWorkspaceCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "Overview", "DeployOverviewWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployOverviewWorkspaceViewModelSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOverviewWorkspaceViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "Overview", "DeployOverviewWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployFromTemplateWorkspaceCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
@@ -2601,31 +2613,43 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadDeployFromTemplateWorkspaceViewModelSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployOnTheFlyWorkspaceViewModelSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployOnTheFlyWorkspaceControllerSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceController.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyWorkspaceControllerHostSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "IDeployOnTheFlyWorkspaceControllerHost.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployOnTheFlyWorkspaceCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployOnTheFlyWorkspaceHostSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceHost.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceHost.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployOnTheFlyCompositionHostSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "IDeployOnTheFlyCompositionHost.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
@@ -2655,13 +2679,25 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadDeployFromTemplateWorkspaceControllerSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceController.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceControllerHostSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "IDeployFromTemplateWorkspaceControllerHost.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadDeployFromTemplateWorkspaceHostSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployFromTemplateWorkspaceHost.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceHost.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateCompositionHostSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "IDeployFromTemplateCompositionHost.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

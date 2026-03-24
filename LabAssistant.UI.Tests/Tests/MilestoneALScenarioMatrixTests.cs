@@ -387,7 +387,7 @@ public sealed class MilestoneALScenarioMatrixTests
 
     private static string LoadDeployOnTheFlyWorkspaceCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployOnTheFlyWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
