@@ -201,17 +201,22 @@ public sealed class MilestoneALScenarioMatrixTests
         var quickDeploySource = LoadDeployOnTheFlyViewXamlSource();
         var fromTemplateSource = LoadDeployFromTemplateViewXamlSource();
         var mainWindowSource = LoadMainWindowSource();
+        var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
         var quickDeployCompositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
+        var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var fromTemplateRightPanelSource = LoadDeployFromTemplateRightPanelViewXamlSource();
 
         Assert.Contains("x:Name=\"DeployOnTheFlyOpenResultsPanelButton\"", quickDeploySource);
         Assert.Contains("x:Name=\"DeployOpenResultsPanelButton\"", fromTemplateSource);
-        Assert.Contains("DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;", mainWindowSource);
+        Assert.DoesNotContain("DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;", mainWindowSource);
+        Assert.Contains("public bool TryToggleRightPanelFromWorkflow(bool isPanelUnavailable, bool isPanelOpen, out bool nextPanelOpenState)", deployWorkspaceCompositionSource);
+        Assert.Contains("public string GetRightPanelTitleText()", deployWorkspaceCompositionSource);
+        Assert.Contains("public bool ShouldShowRightPanelEmptyState(bool showPanel)", deployWorkspaceCompositionSource);
         Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", quickDeployCompositionSource);
-        Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
+        Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", fromTemplateCompositionSource);
+        Assert.DoesNotContain("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("IssueBadge.Visibility = Visibility.Collapsed;", mainWindowSource);
-        Assert.Contains("\"From Template Progress / Results\"", mainWindowSource);
-        Assert.Contains("\"Quick Deploy Progress / Results\"", mainWindowSource);
+        Assert.Contains("RightPanelTitleTextBlock.Text = _deployWorkspaceComposition.GetRightPanelTitleText();", mainWindowSource);
         Assert.Contains("Text=\"Run warnings / errors\"", fromTemplateRightPanelSource);
     }
 
@@ -371,7 +376,8 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("showChildRoutesInShell: false", shellSource);
         Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
         Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
-        Assert.Contains("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
+        Assert.DoesNotContain("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
+        Assert.Contains("public void ApplyRightPanelState(bool showPanel, bool panelUnavailable)", LoadDeployWorkspaceCompositionSource());
         Assert.Contains("private void UpdateVmEntryRows()", LoadDeployOnTheFlyWorkspaceCompositionSource());
         Assert.Contains("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
         Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);
@@ -418,6 +424,12 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDeployWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceCompositionSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

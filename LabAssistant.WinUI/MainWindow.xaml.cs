@@ -82,8 +82,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
     private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;
     private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
-    private FrameworkElement DeployFromTemplateRightPanel => DeployFromTemplateRightPanelViewHost;
-    private FrameworkElement DeployOnTheFlyRightPanel => DeployOnTheFlyRightPanelViewHost;
     private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
     private const string DeployCapabilityKey = "deploy";
 
@@ -187,7 +185,18 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                     await _deploymentCoordinator.DeployAllAsync(context);
                     return _deploymentOutcomeSummaryBuilder.Build(context);
                 },
-                AttachDeployProgressCallbacks));
+                AttachDeployProgressCallbacks,
+                () =>
+                {
+                    if (_deployWorkspaceComposition.TryToggleRightPanelFromWorkflow(
+                            _isShellRightPanelInCompactFallback,
+                            _isShellRightPanelOpen,
+                            out var nextOpenState))
+                    {
+                        _isShellRightPanelOpen = nextOpenState;
+                        ApplyRightPanelState();
+                    }
+                }));
         var deployOnTheFlyWorkspaceHost = new DeployOnTheFlyWorkspaceHost(
             getVmEntryCount: () => _deployOnTheFlyWorkspace.VmEntryCount,
             getReadinessReport: () => _deployOnTheFlyWorkspace.ReadinessReport,
@@ -250,7 +259,17 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             },
             onEvaluateRequestedAsync: mode => _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(mode),
             onStartRequestedAsync: () => _deployOnTheFlyWorkspaceController.StartDeployAsync(),
-            onOpenResultsPanelRequested: ToggleDeployRightPanelFromWorkflow);
+            onOpenResultsPanelRequested: () =>
+            {
+                if (_deployWorkspaceComposition.TryToggleRightPanelFromWorkflow(
+                        _isShellRightPanelInCompactFallback,
+                        _isShellRightPanelOpen,
+                        out var nextOpenState))
+                {
+                    _isShellRightPanelOpen = nextOpenState;
+                    ApplyRightPanelState();
+                }
+            });
         _deployOnTheFlyWorkspaceComposition = new DeployOnTheFlyWorkspaceComposition(
             DeployOnTheFlyViewHost,
             DeployOnTheFlyRightPanelViewHost,
@@ -327,7 +346,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;
         DeployFromTemplateView.StartDeployRequested += DeployStartButton_Click;
         DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;
-        DeployFromTemplateView.OpenResultsPanelRequested += DeployOpenResultsPanelButton_Click;
         UpdateDeployIssueRows();
     }
 
@@ -491,7 +509,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     {
         _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(incomingCapabilityKey);
         _isShellRightPanelOpen = false;
-        _deployFromTemplateWorkspaceComposition.ResetPanelState();
+        _deployWorkspaceComposition.ResetRightPanelBehavior();
     }
 
     private string ResolveRightPanelOwnerCapabilityKey(string capabilityKey)
@@ -504,19 +522,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private bool CanActiveCapabilityOwnRightPanel()
     {
         return string.Equals(_shellRightPanelOwnerCapabilityKey, DeployCapabilityKey, StringComparison.Ordinal);
-    }
-
-    private bool ShouldOwnerAutoOpenRightPanel()
-    {
-        if (!CanActiveCapabilityOwnRightPanel())
-        {
-            return false;
-        }
-
-        return _deployFromTemplateWorkspaceComposition.IsStarting ||
-            _deployOnTheFlyWorkspace.IsStarting ||
-            string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(_deployOnTheFlyWorkspace.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ApplyRightPanelState()
@@ -532,7 +537,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             _isShellRightPanelOpen = false;
         }
 
-        if (ShouldOwnerAutoOpenRightPanel())
+        if (CanActiveCapabilityOwnRightPanel() && _deployWorkspaceComposition.ShouldAutoOpenRightPanel())
         {
             _isShellRightPanelOpen = true;
         }
@@ -544,37 +549,13 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         InsightsToggleButton.IsEnabled = hasOwner && !_isShellRightPanelInCompactFallback;
         InsightsToggleButton.Opacity = InsightsToggleButton.IsEnabled ? 1.0 : 0.45;
         ToolTipService.SetToolTip(InsightsToggleButton, "Toggle progress and results panel");
-        RightPanelTitleTextBlock.Text = IsDeployFromTemplateActive
-            ? "From Template Progress / Results"
-            : IsDeployOnTheFlyActive
-                ? "Quick Deploy Progress / Results"
-                : "Details";
-        DeployFromTemplateRightPanel.Visibility = IsDeployFromTemplateActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
-        RightPanelEmptyStateBorder.Visibility = (!IsDeployFromTemplateActive && !IsDeployOnTheFlyActive && showPanel)
+        RightPanelTitleTextBlock.Text = _deployWorkspaceComposition.GetRightPanelTitleText();
+        RightPanelEmptyStateBorder.Visibility = _deployWorkspaceComposition.ShouldShowRightPanelEmptyState(showPanel)
             ? Visibility.Visible
             : Visibility.Collapsed;
-        UpdateDeployRightPanelLaunchers(showPanel);
+        _deployWorkspaceComposition.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);
         IssueBadge.Visibility = Visibility.Collapsed;
         IssueBadgeTextBlock.Text = string.Empty;
-    }
-
-    private void UpdateDeployRightPanelLaunchers(bool showPanel)
-    {
-        var panelUnavailable = _isShellRightPanelInCompactFallback;
-        var fromTemplateIsRunning = _deployFromTemplateWorkspaceComposition.IsStarting || string.Equals(_deployFromTemplateWorkspaceComposition.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
-
-        _deployFromTemplateWorkspaceComposition.SetResultsPanelLauncherState(
-            showPanel && IsDeployFromTemplateActive ? "Hide Progress / Results" : "Open Progress / Results",
-            IsDeployFromTemplateActive && !panelUnavailable,
-            panelUnavailable
-            ? "Expand the window to review the progress and results panel."
-            : fromTemplateIsRunning
-                ? "The panel auto-opens while deployment runs and stays available for result review."
-                : _deployFromTemplateWorkspaceComposition.ResultRowCount > 0
-                    ? $"{_deployFromTemplateWorkspaceComposition.ResultRowCount} VM result row(s) are available for review."
-                    : "Use the side panel during or after deploy for progress, timeline, and results.");
-
-        _deployOnTheFlyWorkspaceComposition.ApplyResultsPanelState(IsDeployOnTheFlyActive, showPanel, panelUnavailable);
     }
 
     private void NavigateToRoute(string routeKey)
@@ -672,22 +653,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private void InsightsButton_Click(object sender, RoutedEventArgs e)
     {
         if (!CanActiveCapabilityOwnRightPanel())
-        {
-            return;
-        }
-
-        _isShellRightPanelOpen = !_isShellRightPanelOpen;
-        ApplyRightPanelState();
-    }
-
-    private void DeployOpenResultsPanelButton_Click(object sender, RoutedEventArgs e)
-    {
-        ToggleDeployRightPanelFromWorkflow();
-    }
-
-    private void ToggleDeployRightPanelFromWorkflow()
-    {
-        if (!CanActiveCapabilityOwnRightPanel() || _isShellRightPanelInCompactFallback)
         {
             return;
         }
