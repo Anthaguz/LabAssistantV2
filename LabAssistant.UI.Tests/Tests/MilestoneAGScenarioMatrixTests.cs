@@ -113,11 +113,15 @@ public sealed class MilestoneAGScenarioMatrixTests
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceController", controllerSource);
         Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", controllerSource);
-        Assert.Contains("_host.PrepareDeployExecution(deployContext.MultiVmContext);", controllerSource);
+        Assert.Contains("PrepareDeployExecution(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", controllerSource);
-        Assert.Contains("_host.ApplyDeploySummary(summary);", controllerSource);
+        Assert.Contains("ApplyDeploySummary(summary);", controllerSource);
+        Assert.Contains("private void PrepareDeployExecution(MultiVmDeploymentContext context)", controllerSource);
+        Assert.Contains("private void ApplyDeploySummary(DeploymentOutcomeSummary summary)", controllerSource);
+        Assert.Contains("private void AttachProgressCallbacks(MultiVmDeploymentContext context)", controllerSource);
         Assert.DoesNotContain("_deployOnTheFlyWorkspace.ApplyOutcomeSummary(summary);", source);
-        Assert.Contains("_deployOnTheFlyWorkspace.SetWorkflowState(\"Running\", 15, \"Preparing deployment...\");", source);
+        Assert.DoesNotContain("_deployOnTheFlyWorkspace.SetWorkflowState(\"Running\", 15, \"Preparing deployment...\");", source);
+        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)", source);
 
         Assert.Contains("public event EventHandler? VmDraftChanged;", viewSource);
         Assert.Contains("public void ApplyWorkspaceState(DeployOnTheFlyWorkspaceViewState state)", viewSource);

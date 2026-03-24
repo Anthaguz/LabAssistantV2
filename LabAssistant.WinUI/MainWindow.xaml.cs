@@ -1254,27 +1254,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
     }
 
-    private void InitializeDeployOnTheFlyProgressRows(MultiVmDeploymentContext context)
-    {
-        _deployOnTheFlyWorkspace.InitializeProgressRows(context, BuildExpectedDeploySteps);
-    }
-
-    private void AttachDeployOnTheFlyProgressCallbacks(MultiVmDeploymentContext context)
-    {
-        AttachDeployProgressCallbacks(
-            context,
-            (vmName, message) =>
-            {
-                _deployOnTheFlyWorkspace.UpdateProgressMessage(vmName, message);
-                UpdateDeployOnTheFlyUi();
-            },
-            (vmName, update) =>
-            {
-                _deployOnTheFlyWorkspace.ApplyProgressUpdate(vmName, update);
-                UpdateDeployOnTheFlyUi();
-            });
-    }
-
     AppSettings IDeployOnTheFlyWorkspaceControllerHost.DeploymentSettings => _settingsStore.Settings;
 
     IReadOnlyList<string> IDeployOnTheFlyWorkspaceControllerHost.AvailableSwitches => _templateAvailableSwitches;
@@ -1297,69 +1276,19 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         DeploymentPreflightMode mode) =>
         _deploymentPreflightService.RunAsync(context, mode);
 
+    void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)
+    {
+        DispatcherQueue.TryEnqueue(() => updateAction());
+    }
+
     void IDeployOnTheFlyWorkspaceControllerHost.UpdateUi() => UpdateDeployOnTheFlyUi();
 
     LabTemplate IDeployOnTheFlyWorkspaceControllerHost.BuildTemplate() => BuildOnTheFlyTemplate();
-
-    void IDeployOnTheFlyWorkspaceControllerHost.BeginDeployWorkflow()
-    {
-        _deployOnTheFlyWorkspace.SetShowAllVmRows(true);
-        _deployOnTheFlyWorkspace.SetWorkflowState("Running", 15, "Preparing deployment...");
-        UpdateDeployOnTheFlyUi();
-    }
-
-    void IDeployOnTheFlyWorkspaceControllerHost.PrepareDeployExecution(MultiVmDeploymentContext context)
-    {
-        InitializeDeployOnTheFlyProgressRows(context);
-        AttachDeployOnTheFlyProgressCallbacks(context);
-        _deployOnTheFlyWorkspace.SetWorkflowState("Running", 40, $"Deploying {context.VmContexts.Count} VM(s)...");
-        SetDeployOnTheFlyStatusText("Starting quick deploy...");
-        _deployOnTheFlyWorkspaceComposition.RefreshResultRows();
-        UpdateDeployOnTheFlyUi();
-    }
 
     async Task<DeploymentOutcomeSummary> IDeployOnTheFlyWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context)
     {
         await _deploymentCoordinator.DeployAllAsync(context);
         return _deploymentOutcomeSummaryBuilder.Build(context);
-    }
-
-    void IDeployOnTheFlyWorkspaceControllerHost.SetDeployBlocked()
-    {
-        _deployOnTheFlyWorkspace.SetWorkflowState("Blocked", 35, "Deployment blocked by readiness failures.");
-        SetDeployOnTheFlyStatusText("Deploy blocked by readiness failures. Resolve blocking items first.");
-        UpdateDeployOnTheFlyUi();
-    }
-
-    void IDeployOnTheFlyWorkspaceControllerHost.ApplyDeploySummary(DeploymentOutcomeSummary summary)
-    {
-        _deployOnTheFlyWorkspaceComposition.ApplyOutcomeSummary(summary);
-        _deployOnTheFlyWorkspace.SetWorkflowState(
-            lifecycleState: summary.OperationState switch
-            {
-                DeploymentOperationState.Completed => "Completed",
-                DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "Cancelled",
-                DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
-                _ => "Completed"
-            },
-            progressPercent: 100,
-            progressSummary: $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.");
-        SetDeployOnTheFlyStatusText(
-            $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}.");
-        UpdateDeployOnTheFlyUi();
-    }
-
-    void IDeployOnTheFlyWorkspaceControllerHost.SetDeployFailed(string errorMessage)
-    {
-        _deployOnTheFlyWorkspace.SetWorkflowState("Failed", 100, "Deployment failed.");
-        SetDeployOnTheFlyStatusText($"Deploy failed. {errorMessage}");
-        UpdateDeployOnTheFlyUi();
-    }
-
-    void IDeployOnTheFlyWorkspaceControllerHost.FinalizeDeployWorkflow()
-    {
-        _deployOnTheFlyWorkspace.SetShowAllVmRows(true);
-        UpdateDeployOnTheFlyUi();
     }
 
     private void AttachDeployProgressCallbacks(
@@ -1373,44 +1302,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             vmContext.LogCallback = message => DispatcherQueue.TryEnqueue(() => onLogMessage(vmName, message));
             vmContext.StepStateEmitter = update => DispatcherQueue.TryEnqueue(() => onStepStateUpdated(vmName, update));
         }
-    }
-
-    private static IReadOnlyList<DeployTimelineStepDefinition> BuildExpectedDeploySteps(VmDeploymentContext context)
-    {
-        var steps = new List<DeployTimelineStepDefinition>
-        {
-            new(DeploymentStepKeys.CheckHyperV, "Check Hyper-V"),
-            new(DeploymentStepKeys.CreateVmFolder, "Create VM folder"),
-            new(DeploymentStepKeys.CreateVhd, "Create differencing disk"),
-            new(DeploymentStepKeys.CreateVm, "Create VM"),
-            new(DeploymentStepKeys.AddNicToVm, "Add network adapter"),
-            new(DeploymentStepKeys.ConfigureVm, "Configure VM"),
-            new(DeploymentStepKeys.EnableGuestServices, "Enable guest services"),
-            new(DeploymentStepKeys.DisableVmCheckpoints, "Disable VM checkpoints"),
-            new(DeploymentStepKeys.StartVm, "Start VM")
-        };
-
-        if (context.ConfigureTimeZone)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.SetTimeZone, "Set Time Zone"));
-        }
-
-        if (context.InstallSoftware)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallSoftware, "Install Software"));
-        }
-
-        if (context.InstallRole)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallRole, "Install Role"));
-        }
-
-        if (context.ConfigureNetworkInformation)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.ConfigureNetworkInformation, "Configure Network Information"));
-        }
-
-        return steps;
     }
 
     private void ApplyTemplatesWorkspaceUiState()
