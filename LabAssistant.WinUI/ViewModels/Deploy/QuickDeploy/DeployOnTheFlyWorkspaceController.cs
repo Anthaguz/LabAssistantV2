@@ -8,8 +8,8 @@ using LabAssistant.WinUI.Models.Deploy;
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 /// <summary>
-/// Owns Quick Deploy workflow orchestration that should live with the long-lived workspace rather
-/// than in the shell, including readiness evaluation, deploy start sequencing, and auto-evaluate debounce.
+/// Owns Quick Deploy workflow orchestration that belongs with the long-lived workspace rather than in the shell, including readiness evaluation, deploy start sequencing, and auto-evaluate debounce.
+/// Remaining host calls from this controller are temporary residual shell/shared integration except where the dependency is a true shell boundary such as UI-thread marshaling.
 /// </summary>
 internal sealed class DeployOnTheFlyWorkspaceController
 {
@@ -76,7 +76,7 @@ internal sealed class DeployOnTheFlyWorkspaceController
 
     /// <summary>
     /// Runs the readiness boundary for the current workspace snapshot.
-    /// This method owns workflow sequencing, but relies on the host for shell-owned reference data, services, and UI refresh.
+    /// This method owns workflow sequencing, but still relies on the current residual host bridge for shell/shared reference data, services, and UI refresh while cleanup is in progress.
     /// </summary>
     public async Task EvaluateReadinessAsync(DeploymentPreflightMode mode)
     {
@@ -180,7 +180,7 @@ internal sealed class DeployOnTheFlyWorkspaceController
         await Task.Delay(350);
 
         // Only the newest scheduled pass may continue, and only while the workflow is idle enough
-        // to safely reconcile the draft back into workspace state.
+        // to safely reconcile the draft back into workspace state before calling the current residual readiness bridge.
         if (nonce != _autoEvaluateNonce || _workspace.IsStarting || _workspace.IsEvaluatingReadiness)
         {
             return;

@@ -7,8 +7,8 @@ using LabAssistant.WinUI.Views.Deploy;
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 /// <summary>
-/// Shell-facing contract for the Quick Deploy composition.
-/// Keeps shell-owned route, panel, and cross-capability actions explicit while editor and workspace coordination stay inside capability-local seams.
+/// Temporary residual bridge between the Quick Deploy composition and shell/shared integration that has not yet converged behind a purely capability-local owner.
+/// This contract exists to keep true shell boundaries and shared Deploy hooks explicit during cleanup; it is not the default long-term scaling model for capability-specific coordination.
 /// </summary>
 internal interface IDeployOnTheFlyCompositionHost
 {
