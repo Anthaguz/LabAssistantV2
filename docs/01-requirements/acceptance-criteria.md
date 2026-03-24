@@ -2044,10 +2044,22 @@ Each readiness result shall include, at minimum:
 - The capability renders right-panel content or triggers the panel
 
 **Then**
-- Shell owns the panel container and lifecycle, but active capability owns panel meaning and trigger placement
+- Shell owns right-panel infrastructure:
+  - panel container and layout host
+  - generic visibility mechanics
+  - compact fallback behavior
+  - owner reset when active capability changes
+  - internal panel scroll ownership
+- Active capability or lane owns panel behavior:
+  - whether the workflow uses the panel
+  - what content appears there
+  - what the panel means in that workflow
+  - workflow-local open/close/update triggers
+  - lane-specific titles, summaries, results, and contextual actions
 - Right panel remains secondary context, not the primary editor surface
 - `Deploy` uses right panel for progress/results-first behavior
 - Pre-run issue counts and validation ownership may live in the child workflow rather than shell-global chrome
+- Mixed concerns that cross both buckets are treated as narrower shared-integration follow-ups rather than defaulting to shell ownership
 
 ### 5) Actions and iconography follow shared placement rules
 **Given**
@@ -2120,8 +2132,9 @@ Each readiness result shall include, at minimum:
 - Runtime composition responsibilities are assigned
 
 **Then**
-- `MainWindow` owns shell chrome, route resolution, shell navigation behavior, shell header state, theme shell state, and right-panel host lifecycle
+- `MainWindow` owns shell chrome, route resolution, shell navigation behavior, shell header state, theme shell state, and right-panel host lifecycle/infrastructure
 - `MainWindow` does not remain the long-term owner of capability-local inventory state, selection state, edit drafts, readiness state, or capability-specific workflow orchestration
+- `MainWindow` does not centralize lane-specific right-panel meaning, content, or workflow-local update rules
 - Shell ownership boundaries remain explicit and testable
 
 ### 2) Capability-local state can move behind explicit workspace seams

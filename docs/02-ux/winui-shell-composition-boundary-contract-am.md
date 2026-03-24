@@ -39,6 +39,7 @@ That means:
 - shell theme state
 - shell compact drawer mode behavior
 - right-panel container, lifecycle, owner reset, and compact fallback
+  - shell infrastructure only; capability or lane semantics for the panel remain outside the shell boundary
 - capability host visibility at the shell level
 
 `MainWindow` may temporarily bridge to capability workspaces while extraction is in progress, but AM work should reduce that bridge over time.

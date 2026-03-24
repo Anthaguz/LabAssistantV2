@@ -489,7 +489,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-111:** WinUI shell right panel shall remain shell-owned infrastructure, but capability views shall own panel meaning, trigger placement, and issue/progress scoping according to the active workflow contract.
-  - **Acceptance details:** workflow-local panel toggles and issue counts may live inside child views; `Deploy` right panel is progress/results-first, while pre-run validation issues move inline in the main workspace; right-panel content remains secondary context and must not be the primary editor surface.
+  - **Acceptance details:** shell-owned infrastructure includes the panel container, layout host, generic visibility mechanics, compact-width fallback, owner reset on capability change, and internal vertical scroll ownership; active capability or lane owns whether the panel is used, what it means, what content appears there, and the workflow-local triggers/titles/summaries/results/actions that open, close, or refresh it; workflow-local panel toggles and issue counts may live inside child views; `Deploy` right panel is progress/results-first, while pre-run validation issues move inline in the main workspace; right-panel content remains secondary context and must not be the primary editor surface.
   - **Priority:** P1
 
 - **FR-112:** WinUI migrated capability surfaces shall follow shared action-placement, iconography, and compact-layout rules derived from the cross-view audit.
@@ -497,7 +497,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-113:** WinUI `MainWindow` shall act as the shell composition root only and shall limit its direct ownership to shell chrome, route resolution, shell navigation behavior, shell header state, and shell right-panel host lifecycle.
-  - **Acceptance details:** `MainWindow` may continue to own shell-level state such as active route, active capability, shell theme state, compact drawer behavior, and right-panel container lifecycle, but it shall not remain the long-term owner of capability-local inventory state, selection state, edit drafts, workflow-specific readiness state, or capability-specific action orchestration once AM extraction slices land.
+  - **Acceptance details:** `MainWindow` may continue to own shell-level state such as active route, active capability, shell theme state, compact drawer behavior, right-panel container lifecycle, generic panel visibility mechanics, and shell-level size constraints, but it shall not remain the long-term owner of capability-local inventory state, selection state, edit drafts, workflow-specific readiness state, capability-specific action orchestration, or lane-specific right-panel meaning/content/update rules once AM extraction slices land.
   - **Priority:** P1
 
 - **FR-114:** WinUI migrated capabilities shall expose explicit workspace seams so capability-local state and workflow orchestration can move out of `MainWindow` without changing approved shell contracts or user-facing capability behavior.
