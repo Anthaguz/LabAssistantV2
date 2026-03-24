@@ -66,6 +66,20 @@ Code organization guidance for seam-heavy files is defined in `docs/03-architect
 3. Structured logs remain JSONL and can be filtered by `operationId`.
 
 ## 5. Cross-Cutting Concerns
+- **Shell Right-Panel Ownership**
+  - The shell owns right-panel infrastructure only:
+    - container existence
+    - layout host and bounded scroll host
+    - generic visibility mechanics
+    - compact-width fallback behavior
+    - owner reset when active capability changes
+  - The active capability or lane owns right-panel behavior:
+    - whether the workflow uses the panel
+    - what content appears there
+    - what the panel means in that workflow
+    - when workflow behavior opens, closes, or refreshes it
+    - workflow-local titles, summaries, results, and contextual actions
+  - If a concern mixes both categories, treat it as shared integration that needs a narrower seam decision; do not silently centralize capability semantics in `MainWindow` and do not duplicate shell container mechanics inside each capability.
 - **Logging**
   - Structured JSONL logging (`structured-events.jsonl`) is the canonical diagnostics path.
   - Legacy `DebugLogger` text logs remain supplemental/transitional.
