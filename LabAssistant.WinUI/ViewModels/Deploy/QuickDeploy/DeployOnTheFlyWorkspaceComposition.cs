@@ -9,8 +9,8 @@ using Microsoft.UI.Xaml;
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 /// <summary>
-/// Coordinates the long-lived Quick Deploy views with workspace state and delegates shell-owned actions through <see cref="IDeployOnTheFlyCompositionHost"/>.
-/// This composition owns capability-local editor synchronization and view application, but not shell chrome or routing.
+/// Coordinates the long-lived Quick Deploy views with workspace state and delegates the remaining residual shell/shared hooks through <see cref="IDeployOnTheFlyCompositionHost"/>.
+/// This composition owns capability-local editor synchronization and view application; shell chrome stays outside this seam, and the residual host bridge is treated as cleanup-era integration rather than the desired end-state architecture.
 /// </summary>
 internal sealed class DeployOnTheFlyWorkspaceComposition
 {

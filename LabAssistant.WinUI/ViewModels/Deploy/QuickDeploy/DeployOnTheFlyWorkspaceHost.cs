@@ -7,8 +7,8 @@ using LabAssistant.WinUI.Views.Deploy;
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 /// <summary>
-/// Adapts shell-owned and cross-capability hooks for Quick Deploy so <c>MainWindow</c> no longer implements the composition host boundary directly.
-/// The lambdas supplied here are the remaining explicit shell/shared integration points for the Quick Deploy composition.
+/// Packages the current residual shell/shared hooks behind a narrow Quick Deploy-local adapter so the composition no longer terminates directly in <c>MainWindow</c>.
+/// The delegates supplied here are migration-era integration points that remain only until each hook is either justified as a true shell boundary or reduced behind a more local seam.
 /// </summary>
 internal sealed class DeployOnTheFlyWorkspaceHost : IDeployOnTheFlyCompositionHost
 {
