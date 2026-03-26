@@ -235,9 +235,50 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     private void WireHandlers()
     {
-        _view.ReloadTemplatesRequested += async (_, _) => await LoadTemplatesAsync(forceRefresh: true);
+        _view.ReloadTemplatesRequested += async (_, _) => await EnsureTemplatesLoadedAsync(forceRefresh: true);
+        _view.EvaluateReadinessRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);
+        _view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();
+        _view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();
+        _view.StartDeployRequested += async (_, _) => await StartDeployAsync();
         _view.TemplateSelectionChanged += async (_, _) => await HandleTemplateSelectionChangedAsync();
         _view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();
+    }
+
+    private async Task ResolveSuggestionsAsync()
+    {
+        if (_workspace.ActiveTemplateDocument is null)
+        {
+            _workspace.SetActionStatus("Select a template first.");
+            return;
+        }
+
+        var applied = await _host.ApplyResolveSuggestionsAsync(_workspace.ActiveTemplateDocument.Template);
+        _workspace.SetActionStatus(
+            applied == 0
+                ? "No auto-resolve suggestions available for the current template state."
+                : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...");
+        await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);
+    }
+
+    private async Task OpenTemplateEditorAsync()
+    {
+        var selectedTemplateLibraryItem = _workspace.SelectedTemplateLibraryItem;
+        if (selectedTemplateLibraryItem is null)
+        {
+            _workspace.SetActionStatus("Select a template first.");
+            return;
+        }
+
+        try
+        {
+            var document = await _host.LoadTemplateForEditorAsync(selectedTemplateLibraryItem.FilePath);
+            await _host.ShowTemplateEditorAsync(document, "Template loaded.");
+            _workspace.SetActionStatus($"Opened '{selectedTemplateLibraryItem.Name}' in Templates editor.");
+        }
+        catch (Exception ex)
+        {
+            _workspace.SetActionStatus($"Failed to open template in editor. {ex.Message}");
+        }
     }
 
     private async Task HandleTemplateSelectionChangedAsync()

@@ -126,8 +126,8 @@ public sealed class MilestoneADScenarioMatrixTests
         var source = LoadMainWindowSource();
         var controllerSource = LoadTemplatesLibraryWorkspaceControllerSource();
 
-        Assert.Contains("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", source);
-        Assert.Contains("await ShowTemplateEditorAsync(document, \"Template loaded.\");", source);
+        Assert.DoesNotContain("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", source);
+        Assert.DoesNotContain("await ShowTemplateEditorAsync(document, \"Template loaded.\");", source);
         Assert.Contains("public async Task OpenSelectedTemplateInEditorAsync()", controllerSource);
         Assert.Contains("await _host.ShowTemplateEditorAsync(document, \"Template loaded.\");", controllerSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);

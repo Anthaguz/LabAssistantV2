@@ -69,21 +69,25 @@ public sealed class MilestoneAFScenarioMatrixTests
         var compositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var controllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
 
-        Assert.Contains("WireDeployHandlers()", source);
-        Assert.Contains("DeployFromTemplateView.EvaluateReadinessRequested += DeployEvaluateReadinessButton_Click;", source);
-        Assert.Contains("DeployFromTemplateView.StartDeployRequested += DeployStartButton_Click;", source);
-        Assert.DoesNotContain("DeployFromTemplateView.TemplateSelectionChanged += DeployTemplateSelectorComboBox_SelectionChanged;", source);
-        Assert.Contains("await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);", source);
-        Assert.Contains("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", source);
-        Assert.Contains("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", source);
-        Assert.Contains("await _deployFromTemplateWorkspaceComposition.StartDeployAsync();", source);
+        Assert.DoesNotContain("WireDeployHandlers()", source);
+        Assert.DoesNotContain("DeployFromTemplateView.EvaluateReadinessRequested += DeployEvaluateReadinessButton_Click;", source);
+        Assert.DoesNotContain("DeployFromTemplateView.ResolveSuggestionsRequested += DeployResolveSuggestionsButton_Click;", source);
+        Assert.DoesNotContain("DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;", source);
+        Assert.DoesNotContain("DeployFromTemplateView.StartDeployRequested += DeployStartButton_Click;", source);
+        Assert.DoesNotContain("private async void DeployEvaluateReadinessButton_Click(object sender, RoutedEventArgs e)", source);
+        Assert.DoesNotContain("private async void DeployResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)", source);
+        Assert.DoesNotContain("private async void DeployOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)", source);
+        Assert.DoesNotContain("private async void DeployStartButton_Click(object sender, RoutedEventArgs e)", source);
+        Assert.DoesNotContain("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", source);
+        Assert.DoesNotContain("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", source);
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", source);
         Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", controllerSource);
-        Assert.Contains("DeployFromTemplateView.ResolveSuggestionsRequested += DeployResolveSuggestionsButton_Click;", source);
-        Assert.Contains("DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;", source);
-        Assert.Contains("await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);", source);
+        Assert.Contains("_view.ReloadTemplatesRequested += async (_, _) => await EnsureTemplatesLoadedAsync(forceRefresh: true);", compositionSource);
+        Assert.Contains("_view.EvaluateReadinessRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);", compositionSource);
+        Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", compositionSource);
+        Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", compositionSource);
+        Assert.Contains("_view.StartDeployRequested += async (_, _) => await StartDeployAsync();", compositionSource);
         Assert.Contains("_view.TemplateSelectionChanged += async (_, _) => await HandleTemplateSelectionChangedAsync();", compositionSource);
-        Assert.Contains("_view.ReloadTemplatesRequested += async (_, _) => await LoadTemplatesAsync(forceRefresh: true);", compositionSource);
         Assert.Contains("private void UpdateUi()", compositionSource);
         Assert.Contains("private void UpdateIssueRows()", compositionSource);
     }
