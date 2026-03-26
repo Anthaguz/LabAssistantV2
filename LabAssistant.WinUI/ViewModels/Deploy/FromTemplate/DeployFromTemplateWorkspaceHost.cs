@@ -3,6 +3,7 @@ using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
@@ -17,6 +18,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     private readonly Func<bool, Task> _ensureTemplateSwitchesAsync;
     private readonly Func<bool, Task> _ensureTemplatesLibraryAsync;
     private readonly Func<string, Task<TemplateEditorDocument>> _loadTemplateForEditorAsync;
+    private readonly Func<LabTemplate, Task<int>> _applyResolveSuggestionsAsync;
+    private readonly Func<TemplateEditorDocument, string, Task> _showTemplateEditorAsync;
     private readonly Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> _runReadinessAsync;
     private readonly Action _refreshSharedUiState;
     private readonly Action _applyRightPanelState;
@@ -33,6 +36,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         Func<bool, Task> ensureTemplateSwitchesAsync,
         Func<bool, Task> ensureTemplatesLibraryAsync,
         Func<string, Task<TemplateEditorDocument>> loadTemplateForEditorAsync,
+        Func<LabTemplate, Task<int>> applyResolveSuggestionsAsync,
+        Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync,
         Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> runReadinessAsync,
         Action refreshSharedUiState,
         Action applyRightPanelState,
@@ -48,6 +53,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         _ensureTemplateSwitchesAsync = ensureTemplateSwitchesAsync;
         _ensureTemplatesLibraryAsync = ensureTemplatesLibraryAsync;
         _loadTemplateForEditorAsync = loadTemplateForEditorAsync;
+        _applyResolveSuggestionsAsync = applyResolveSuggestionsAsync;
+        _showTemplateEditorAsync = showTemplateEditorAsync;
         _runReadinessAsync = runReadinessAsync;
         _refreshSharedUiState = refreshSharedUiState;
         _applyRightPanelState = applyRightPanelState;
@@ -71,6 +78,10 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _ensureTemplatesLibraryAsync(forceRefresh);
 
     public Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath) => _loadTemplateForEditorAsync(filePath);
+
+    public Task<int> ApplyResolveSuggestionsAsync(LabTemplate template) => _applyResolveSuggestionsAsync(template);
+
+    public Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) => _showTemplateEditorAsync(document, statusText);
 
     public Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode) => _runReadinessAsync(context, mode);
 

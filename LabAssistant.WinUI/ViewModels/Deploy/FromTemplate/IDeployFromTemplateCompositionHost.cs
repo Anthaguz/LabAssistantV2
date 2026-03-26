@@ -3,6 +3,7 @@ using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
@@ -24,6 +25,10 @@ internal interface IDeployFromTemplateCompositionHost
     Task EnsureTemplatesLibraryAsync(bool forceRefresh);
 
     Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath);
+
+    Task<int> ApplyResolveSuggestionsAsync(LabTemplate template);
+
+    Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText);
 
     Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 

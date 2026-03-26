@@ -72,7 +72,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
-    private DeployFromTemplateView DeployFromTemplateView => DeployFromTemplateViewHost;
     private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;
     private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;
     private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;
@@ -172,6 +171,8 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 EnsureTemplateSwitchesAsync,
                 EnsureTemplatesLibraryAsync,
                 filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),
+                ApplyDeployResolveSuggestionsAsync,
+                ShowTemplateEditorAsync,
                 (context, mode) => _deploymentPreflightService.RunAsync(context, mode),
                 () => _deployWorkspaceComposition.RefreshSharedUiState(),
                 ApplyRightPanelState,
@@ -303,7 +304,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         _deployOnTheFlyWorkspaceController = new DeployOnTheFlyWorkspaceController(_deployOnTheFlyWorkspace, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
-        WireDeployHandlers();
         ConfigureShellIcons();
         ConfigureNavigationView();
         ApplyShellNavigationMode(1280);
@@ -331,14 +331,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
         appWindow?.Resize(new Windows.Graphics.SizeInt32(width, height));
-    }
-
-    private void WireDeployHandlers()
-    {
-        DeployFromTemplateView.EvaluateReadinessRequested += DeployEvaluateReadinessButton_Click;
-        DeployFromTemplateView.ResolveSuggestionsRequested += DeployResolveSuggestionsButton_Click;
-        DeployFromTemplateView.OpenTemplateEditorRequested += DeployOpenTemplateEditorButton_Click;
-        DeployFromTemplateView.StartDeployRequested += DeployStartButton_Click;
     }
 
     private void ConfigureShellIcons()
@@ -872,40 +864,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private bool IsDiagnosticsCapabilityActive =>
         IsDiagnosticsOverviewActive || IsDiagnosticsLogsActive;
 
-    private async void DeployEvaluateReadinessButton_Click(object sender, RoutedEventArgs e)
-    {
-        await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
-    }
-
-    private async void DeployResolveSuggestionsButton_Click(object sender, RoutedEventArgs e)
-    {
-        var activeTemplateDocument = _deployFromTemplateWorkspaceComposition.ActiveTemplateDocument;
-        if (activeTemplateDocument is null)
-        {
-            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
-            return;
-        }
-
-        var applied = await ApplyDeployResolveSuggestionsAsync(activeTemplateDocument.Template);
-        _deployFromTemplateWorkspaceComposition.SetActionStatus(
-            applied == 0
-                ? "No auto-resolve suggestions available for the current template state."
-                : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...");
-        await EvaluateDeployReadinessAsync(DeploymentPreflightMode.Quick);
-    }
-
-    private async void DeployOpenTemplateEditorButton_Click(object sender, RoutedEventArgs e)
-    {
-        var selectedTemplateLibraryItem = _deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem;
-        if (selectedTemplateLibraryItem is null)
-        {
-            _deployFromTemplateWorkspaceComposition.SetActionStatus("Select a template first.");
-            return;
-        }
-
-        await OpenTemplateInEditorAsync(selectedTemplateLibraryItem, fromDeploy: true);
-    }
-
     AppSettings IDeployOnTheFlyWorkspaceControllerHost.DeploymentSettings => _settingsStore.Settings;
 
     IReadOnlyList<string> IDeployOnTheFlyWorkspaceControllerHost.AvailableSwitches => _templateAvailableSwitches;
@@ -966,14 +924,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         return new TemplatesWorkspaceUiState(
             IsLoading: _isTemplatesLoading,
             HasSelectedLibraryItem: _templatesWorkspaceComposition.SelectedLibraryItem is not null);
-    }
-
-    private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>
-        _deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);
-
-    private async void DeployStartButton_Click(object sender, RoutedEventArgs e)
-    {
-        await _deployFromTemplateWorkspaceComposition.StartDeployAsync();
     }
 
     private async Task<int> ApplyDeployResolveSuggestionsAsync(LabTemplate template)
@@ -1045,35 +995,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
         }
 
         return applied;
-    }
-
-    private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)
-    {
-        _isTemplatesLoading = true;
-        ApplyTemplatesWorkspaceUiState();
-        try
-        {
-            var document = await _templatesCapabilityService.LoadForEditorAsync(templateItem.FilePath);
-            await ShowTemplateEditorAsync(document, "Template loaded.");
-            if (fromDeploy)
-            {
-                _deployFromTemplateWorkspaceComposition.SetActionStatus($"Opened '{templateItem.Name}' in Templates editor.");
-            }
-        }
-        catch (Exception ex)
-        {
-            SetTemplateEditorStatus($"Failed to open template. {ex.Message}");
-            if (fromDeploy)
-            {
-                _deployFromTemplateWorkspaceComposition.SetActionStatus($"Failed to open template in editor. {ex.Message}");
-            }
-        }
-        finally
-        {
-            _isTemplatesLoading = false;
-            ApplyTemplatesWorkspaceUiState();
-            _deployFromTemplateWorkspaceComposition.RefreshUi();
-        }
     }
 
     private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
