@@ -140,7 +140,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                     PickTemplateFileForOpenAsync,
                     PickTemplateFileForSaveAsync,
                     ShowDeleteTemplateConfirmationDialogAsync,
-                    ReconcileDeployTemplateSelection)),
+                    items => _deployWorkspaceComposition.ReconcileFromTemplateSelection(items))),
             new TemplatesEditorWorkspaceComposition(
                 _templatesCapabilityService,
                 TemplatesEditorViewHost,
@@ -171,7 +171,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 EnsureTemplateSwitchesAsync,
                 EnsureTemplatesLibraryAsync,
                 filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),
-                ApplyDeployResolveSuggestionsAsync,
+                template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),
                 ShowTemplateEditorAsync,
                 (context, mode) => _deploymentPreflightService.RunAsync(context, mode),
                 () => _deployWorkspaceComposition.RefreshSharedUiState(),
@@ -219,7 +219,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
                 _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
             },
-            applyResolveSuggestionsAsync: ApplyDeployResolveSuggestionsAsync,
+            applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),
             showTemplateEditorAsync: ShowTemplateEditorAsync,
             refreshSharedUiState: () => _deployWorkspaceComposition.RefreshSharedUiState(),
             showRemoveVmEntryConfirmationDialogAsync: async vmName =>
@@ -281,6 +281,9 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             DeployFromTemplateTabViewItem,
             CreateDeployWorkspaceUiState,
             _deployFromTemplateWorkspaceComposition,
+            LoadDeployCatalogItems,
+            () => _templateAvailableSwitches,
+            async () => await _machinesCapabilityService.LoadVirtualSwitchesAsync(),
             new DeployWorkspaceShellBridge(
                 () => IsDeployCapabilityActive,
                 () => IsDeployOverviewActive,
@@ -926,77 +929,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             HasSelectedLibraryItem: _templatesWorkspaceComposition.SelectedLibraryItem is not null);
     }
 
-    private async Task<int> ApplyDeployResolveSuggestionsAsync(LabTemplate template)
-    {
-        var catalogResult = _vhdxCatalogStore.Load(_settingsStore.Settings.CatalogPath);
-        var catalogItems = catalogResult.Items;
-        var templateSwitches = _templateAvailableSwitches.Count > 0
-            ? _templateAvailableSwitches
-            : await _machinesCapabilityService.LoadVirtualSwitchesAsync();
-        var availableSwitches = templateSwitches
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var applied = 0;
-        foreach (var vm in template.VmTemplates)
-        {
-            var switchNames = vm.SwitchNames?.Where(name => !string.IsNullOrWhiteSpace(name)).ToList() ?? [];
-            if (switchNames.Count == 0 && !string.IsNullOrWhiteSpace(vm.SwitchName))
-            {
-                switchNames.Add(vm.SwitchName);
-            }
-
-            if (switchNames.Count > 0)
-            {
-                var normalized = switchNames
-                    .Where(name => availableSwitches.Contains(name, StringComparer.OrdinalIgnoreCase))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                if (normalized.Count != switchNames.Count)
-                {
-                    applied++;
-                }
-
-                vm.SwitchNames = normalized.Count > 0 ? normalized : null;
-                vm.SwitchName = normalized.Count > 0 ? normalized[0] : null;
-            }
-
-            if (!string.IsNullOrWhiteSpace(vm.VhdxId))
-            {
-                continue;
-            }
-
-            if (!string.IsNullOrWhiteSpace(vm.VhdxSignature))
-            {
-                var signatureMatches = VhdxSignature.FindMatches(vm.VhdxSignature, catalogItems);
-                if (signatureMatches.Count == 1)
-                {
-                    var match = signatureMatches[0];
-                    vm.VhdxId = match.Id;
-                    vm.VhdPath = match.Path;
-                    vm.VhdxSignature = match.Signature;
-                    applied++;
-                    continue;
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(vm.VhdPath))
-            {
-                var pathMatch = catalogItems.FirstOrDefault(item =>
-                    string.Equals(item.Path, vm.VhdPath, StringComparison.OrdinalIgnoreCase));
-                if (pathMatch is not null)
-                {
-                    vm.VhdxId = pathMatch.Id;
-                    vm.VhdxSignature = pathMatch.Signature;
-                    vm.VhdPath = pathMatch.Path;
-                    applied++;
-                }
-            }
-        }
-
-        return applied;
-    }
-
     private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
     {
         await _templatesWorkspaceComposition.EnsureLibraryAsync(forceRefresh);
@@ -1146,12 +1078,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private void SetTemplateEditorStatus(string statusText)
     {
         _templatesWorkspaceComposition.SetEditorStatus(statusText);
-    }
-
-    private void ReconcileDeployTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)
-    {
-        _deployFromTemplateWorkspaceComposition.ReconcileSelection(items);
-        _deployWorkspaceComposition.RefreshSharedUiState();
     }
 
     private DeployWorkspaceUiState CreateDeployWorkspaceUiState()

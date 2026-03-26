@@ -1,3 +1,6 @@
+using LabAssistant.Business.Templates;
+using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.Views.Deploy;
 using Microsoft.UI.Xaml;
@@ -17,6 +20,9 @@ internal sealed class DeployWorkspaceComposition
     private readonly DeployOverviewWorkspaceComposition _overviewWorkspaceComposition;
     private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;
     private readonly IDeployWorkspaceShellBridge _shellBridge;
+    private readonly Func<IReadOnlyList<VhdxCatalogItem>> _loadCatalogItems;
+    private readonly Func<IReadOnlyList<string>> _availableSwitches;
+    private readonly Func<Task<IReadOnlyList<string>>> _loadSwitchesAsync;
     private bool _isUpdatingDeploySubviewSelection;
 
     public DeployWorkspaceComposition(
@@ -29,6 +35,9 @@ internal sealed class DeployWorkspaceComposition
         TabViewItem fromTemplateTabViewItem,
         Func<DeployWorkspaceUiState> getUiState,
         DeployFromTemplateWorkspaceComposition fromTemplateWorkspaceComposition,
+        Func<IReadOnlyList<VhdxCatalogItem>> loadCatalogItems,
+        Func<IReadOnlyList<string>> availableSwitches,
+        Func<Task<IReadOnlyList<string>>> loadSwitchesAsync,
         IDeployWorkspaceShellBridge shellBridge)
     {
         _localNavigationHost = localNavigationHost;
@@ -39,6 +48,9 @@ internal sealed class DeployWorkspaceComposition
         _quickDeployTabViewItem = quickDeployTabViewItem;
         _fromTemplateTabViewItem = fromTemplateTabViewItem;
         _fromTemplateWorkspaceComposition = fromTemplateWorkspaceComposition;
+        _loadCatalogItems = loadCatalogItems;
+        _availableSwitches = availableSwitches;
+        _loadSwitchesAsync = loadSwitchesAsync;
         _shellBridge = shellBridge;
         _overviewWorkspaceComposition = new DeployOverviewWorkspaceComposition(
             overviewView,
@@ -53,6 +65,89 @@ internal sealed class DeployWorkspaceComposition
     }
 
     public void RefreshSharedUiState() => _overviewWorkspaceComposition.RefreshUiState();
+
+    /// <summary>
+    /// Applies shared Deploy-side auto-resolve suggestions so lane workflows do not route that integration back through MainWindow.
+    /// </summary>
+    public async Task<int> ApplyResolveSuggestionsAsync(LabTemplate template)
+    {
+        var catalogItems = _loadCatalogItems();
+        var cachedSwitches = _availableSwitches();
+        var templateSwitches = cachedSwitches.Count > 0
+            ? cachedSwitches
+            : await _loadSwitchesAsync();
+        var availableSwitches = templateSwitches
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var applied = 0;
+        foreach (var vm in template.VmTemplates)
+        {
+            var switchNames = vm.SwitchNames?.Where(name => !string.IsNullOrWhiteSpace(name)).ToList() ?? [];
+            if (switchNames.Count == 0 && !string.IsNullOrWhiteSpace(vm.SwitchName))
+            {
+                switchNames.Add(vm.SwitchName);
+            }
+
+            if (switchNames.Count > 0)
+            {
+                var normalized = switchNames
+                    .Where(name => availableSwitches.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (normalized.Count != switchNames.Count)
+                {
+                    applied++;
+                }
+
+                vm.SwitchNames = normalized.Count > 0 ? normalized : null;
+                vm.SwitchName = normalized.Count > 0 ? normalized[0] : null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(vm.VhdxId))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(vm.VhdxSignature))
+            {
+                var signatureMatches = VhdxSignature.FindMatches(vm.VhdxSignature, catalogItems);
+                if (signatureMatches.Count == 1)
+                {
+                    var match = signatureMatches[0];
+                    vm.VhdxId = match.Id;
+                    vm.VhdPath = match.Path;
+                    vm.VhdxSignature = match.Signature;
+                    applied++;
+                    continue;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(vm.VhdPath))
+            {
+                var pathMatch = catalogItems.FirstOrDefault(item =>
+                    string.Equals(item.Path, vm.VhdPath, StringComparison.OrdinalIgnoreCase));
+                if (pathMatch is not null)
+                {
+                    vm.VhdxId = pathMatch.Id;
+                    vm.VhdxSignature = pathMatch.Signature;
+                    vm.VhdPath = pathMatch.Path;
+                    applied++;
+                }
+            }
+        }
+
+        return applied;
+    }
+
+    /// <summary>
+    /// Reconciles Deploy From Template selection against the shared Templates inventory without routing that integration back through MainWindow.
+    /// </summary>
+    public void ReconcileFromTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)
+    {
+        _fromTemplateWorkspaceComposition.ReconcileSelection(items);
+        RefreshSharedUiState();
+    }
 
     /// <summary>
     /// Resets Deploy-local right-panel behavior when the shell changes capability ownership.

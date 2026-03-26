@@ -73,7 +73,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.Contains("new DeployOnTheFlyWorkspaceHost(", source);
         Assert.Contains("BuildOnTheFlyTemplate()", source);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
-        Assert.Contains("applyResolveSuggestionsAsync: ApplyDeployResolveSuggestionsAsync,", source);
+        Assert.Contains("applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),", source);
         Assert.DoesNotContain("ResolveDeployOnTheFlySuggestionsAsync()", source);
         Assert.DoesNotContain("OpenDeployOnTheFlyTemplateEditorAsync()", source);
         Assert.DoesNotContain("AddDeployOnTheFlyVmEntry()", source);
