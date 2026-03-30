@@ -7,8 +7,8 @@ using LabAssistant.Models.Templates;
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 /// <summary>
-/// Temporary residual bridge for controller dependencies that still cross into shell/shared Deploy ownership during the cleanup chain.
-/// It exposes only the current shell-owned state, UI refresh, and deployment services the controller still needs, and should not be read as approval for capability-specific controller contracts to scale permanently through the shell.
+/// Quick Deploy-local controller host contract.
+/// Implementations own the lane-local workflow boundary and may forward only the narrow shared Deploy or shell callbacks that still remain outside the local owner.
 /// </summary>
 internal interface IDeployOnTheFlyWorkspaceControllerHost
 {
@@ -29,8 +29,7 @@ internal interface IDeployOnTheFlyWorkspaceControllerHost
     Task<DeploymentReadinessReport> RunReadinessChecksAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 
     /// <summary>
-    /// Marshals workflow callback updates onto the shell UI thread.
-    /// This is a true shell boundary and remains acceptable even while other capability-specific bridge members are treated as temporary residual integration.
+    /// Marshals workflow callback updates onto the UI thread through the narrow shell bridge retained by the Quick Deploy-local owner.
     /// </summary>
     void EnqueueUiUpdate(Action updateAction);
 

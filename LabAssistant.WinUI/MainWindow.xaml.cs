@@ -30,7 +30,7 @@ using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
-public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost
+public sealed partial class MainWindow : Window
 {
     private readonly ShellViewModel _shellViewModel = new();
     private readonly Dictionary<string, NavigationViewItem> _routeToNavigationItem = new(StringComparer.Ordinal);
@@ -53,7 +53,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
     private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;
     private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();
-    private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;
     private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
@@ -194,34 +193,14 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                     }
                 }));
         var deployOnTheFlyWorkspaceHost = new DeployOnTheFlyWorkspaceHost(
-            getVmEntryCount: () => _deployOnTheFlyWorkspace.VmEntryCount,
-            getReadinessReport: () => _deployOnTheFlyWorkspace.ReadinessReport,
-            isEvaluatingReadiness: () => _deployOnTheFlyWorkspace.IsEvaluatingReadiness,
-            isStarting: () => _deployOnTheFlyWorkspace.IsStarting,
-            getLifecycleState: () => _deployOnTheFlyWorkspace.LifecycleState,
-            ensureSeeded: () =>
-            {
-                _deployOnTheFlyWorkspace.EnsureSeeded(_deployOnTheFlyWorkspace.SelectedVmEntry?.VmId);
-                _deployWorkspaceComposition.RefreshSharedUiState();
-                _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
-            },
+            _deployOnTheFlyWorkspace,
+            getDeploymentSettings: () => _settingsStore.Settings,
+            getAvailableSwitches: () => _templateAvailableSwitches,
+            loadCatalogItems: LoadDeployCatalogItems,
+            refreshSharedUiState: () => _deployWorkspaceComposition.RefreshSharedUiState(),
             ensureReferenceDataAsync: EnsureDeployOnTheFlyReferenceDataAsync,
-            updateUi: () => _deployOnTheFlyWorkspaceComposition.UpdateUi(),
-            setActionStatus: statusText => _deployOnTheFlyWorkspaceComposition.SetActionStatus(statusText),
-            scheduleAutoEvaluate: () => _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate(),
-            buildTemplate: BuildOnTheFlyTemplate,
-            replaceVmEntriesFromTemplate: template =>
-            {
-                _deployOnTheFlyWorkspace.ReplaceEntriesFromTemplate(
-                    template,
-                    _deployOnTheFlyWorkspace.SelectedVmEntry?.VmId);
-                _deployWorkspaceComposition.RefreshSharedUiState();
-                _deployOnTheFlyWorkspaceComposition.SelectVmEntry(_deployOnTheFlyWorkspace.SelectedVmEntry);
-                _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
-            },
             applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),
             showTemplateEditorAsync: ShowTemplateEditorAsync,
-            refreshSharedUiState: () => _deployWorkspaceComposition.RefreshSharedUiState(),
             showRemoveVmEntryConfirmationDialogAsync: async vmName =>
             {
                 var dialog = new ContentDialog
@@ -236,25 +215,13 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
                 return await dialog.ShowAsync() == ContentDialogResult.Primary;
             },
-            onVmEntriesSelectionChanged: selectedRow =>
+            runReadinessChecksAsync: (context, mode) => _deploymentPreflightService.RunAsync(context, mode),
+            deployAllAsync: async context =>
             {
-                _deployOnTheFlyWorkspace.SetSelectedVmEntry(selectedRow?.VmEntry);
-                _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
-                _deployOnTheFlyWorkspaceComposition.UpdateUi();
+                await _deploymentCoordinator.DeployAllAsync(context);
+                return _deploymentOutcomeSummaryBuilder.Build(context);
             },
-            onEditorInteractionChanged: interactionState =>
-            {
-                if (_deployOnTheFlyWorkspace.IsSynchronizingEditorDraft)
-                {
-                    return;
-                }
-
-                _deployOnTheFlyWorkspaceComposition.SyncEditorDraft(interactionState);
-                _deployOnTheFlyWorkspaceComposition.UpdateUi();
-                _deployOnTheFlyWorkspaceController.ScheduleAutoEvaluate();
-            },
-            onEvaluateRequestedAsync: mode => _deployOnTheFlyWorkspaceController.EvaluateReadinessAsync(mode),
-            onStartRequestedAsync: () => _deployOnTheFlyWorkspaceController.StartDeployAsync(),
+            enqueueUiUpdate: updateAction => DispatcherQueue.TryEnqueue(() => updateAction()),
             onOpenResultsPanelRequested: () =>
             {
                 if (_deployWorkspaceComposition.TryToggleRightPanelFromWorkflow(
@@ -271,6 +238,7 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
             DeployOnTheFlyRightPanelViewHost,
             _deployOnTheFlyWorkspace,
             deployOnTheFlyWorkspaceHost);
+        deployOnTheFlyWorkspaceHost.AttachComposition(_deployOnTheFlyWorkspaceComposition);
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
             DeployOverviewViewHost,
@@ -304,7 +272,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
                 () => IsDiagnosticsLogsActive,
                 NavigateToRoute,
                 TryOpenStructuredLogLocation));
-        _deployOnTheFlyWorkspaceController = new DeployOnTheFlyWorkspaceController(_deployOnTheFlyWorkspace, this);
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         ConfigureShellIcons();
@@ -725,16 +692,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
     private bool IsDeployCapabilityActive =>
         IsDeployOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive;
 
-    private LabTemplate BuildOnTheFlyTemplate()
-    {
-        return new LabTemplate
-        {
-            Name = "Quick Deploy Draft",
-            Description = "Generated quick deploy input.",
-            VmTemplates = _deployOnTheFlyWorkspace.CreateTemplateSnapshot().ToList()
-        };
-    }
-
     private string? PickBaseDiskFilePath()
     {
         var hwnd = WindowNative.GetWindowHandle(this);
@@ -866,43 +823,6 @@ public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControl
 
     private bool IsDiagnosticsCapabilityActive =>
         IsDiagnosticsOverviewActive || IsDiagnosticsLogsActive;
-
-    AppSettings IDeployOnTheFlyWorkspaceControllerHost.DeploymentSettings => _settingsStore.Settings;
-
-    IReadOnlyList<string> IDeployOnTheFlyWorkspaceControllerHost.AvailableSwitches => _templateAvailableSwitches;
-
-    IReadOnlyList<VhdxCatalogItem> IDeployOnTheFlyWorkspaceControllerHost.LoadCatalogItems() => LoadDeployCatalogItems();
-
-    bool IDeployOnTheFlyWorkspaceControllerHost.TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors) =>
-        _deployOnTheFlyWorkspaceComposition.TryApplyVmFields(showSuccessStatus, showValidationErrors);
-
-    void IDeployOnTheFlyWorkspaceControllerHost.SetActionStatus(string statusText)
-    {
-        _deployOnTheFlyWorkspaceComposition.SetActionStatus(statusText);
-    }
-
-    Task IDeployOnTheFlyWorkspaceControllerHost.EnsureReferenceDataAsync(bool forceRefresh) =>
-        EnsureDeployOnTheFlyReferenceDataAsync(forceRefresh);
-
-    Task<DeploymentReadinessReport> IDeployOnTheFlyWorkspaceControllerHost.RunReadinessChecksAsync(
-        MultiVmDeploymentContext context,
-        DeploymentPreflightMode mode) =>
-        _deploymentPreflightService.RunAsync(context, mode);
-
-    void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)
-    {
-        DispatcherQueue.TryEnqueue(() => updateAction());
-    }
-
-    void IDeployOnTheFlyWorkspaceControllerHost.UpdateUi() => _deployOnTheFlyWorkspaceComposition.UpdateUi();
-
-    LabTemplate IDeployOnTheFlyWorkspaceControllerHost.BuildTemplate() => BuildOnTheFlyTemplate();
-
-    async Task<DeploymentOutcomeSummary> IDeployOnTheFlyWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context)
-    {
-        await _deploymentCoordinator.DeployAllAsync(context);
-        return _deploymentOutcomeSummaryBuilder.Build(context);
-    }
 
     private void AttachDeployProgressCallbacks(
         MultiVmDeploymentContext context,
