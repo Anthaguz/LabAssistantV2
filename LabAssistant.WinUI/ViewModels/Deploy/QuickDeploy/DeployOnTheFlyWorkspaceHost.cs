@@ -1,4 +1,7 @@
+using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Templates;
+using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
@@ -7,102 +10,115 @@ using LabAssistant.WinUI.Views.Deploy;
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 /// <summary>
-/// Packages the current residual shell/shared hooks behind a narrow Quick Deploy-local adapter so the composition no longer terminates directly in <c>MainWindow</c>.
-/// The delegates supplied here are migration-era integration points that remain only until each hook is either justified as a true shell boundary or reduced behind a more local seam.
+/// Owns the Quick Deploy-local host boundary so controller construction and controller-host implementation no longer terminate in <c>MainWindow</c>.
+/// The delegates supplied here are limited to shared Deploy integration, deployment services, and narrow shell callbacks that still remain outside the Quick Deploy owner.
 /// </summary>
-internal sealed class DeployOnTheFlyWorkspaceHost : IDeployOnTheFlyCompositionHost
+internal sealed class DeployOnTheFlyWorkspaceHost : IDeployOnTheFlyCompositionHost, IDeployOnTheFlyWorkspaceControllerHost
 {
-    private readonly Func<int> _getVmEntryCount;
-    private readonly Func<DeploymentReadinessReport?> _getReadinessReport;
-    private readonly Func<bool> _isEvaluatingReadiness;
-    private readonly Func<bool> _isStarting;
-    private readonly Func<string> _getLifecycleState;
-    private readonly Action _ensureSeeded;
+    private readonly DeployOnTheFlyWorkspaceViewModel _workspace;
+    private readonly Func<AppSettings> _getDeploymentSettings;
+    private readonly Func<IReadOnlyList<string>> _getAvailableSwitches;
+    private readonly Func<IReadOnlyList<VhdxCatalogItem>> _loadCatalogItems;
+    private readonly Action _refreshSharedUiState;
     private readonly Func<bool, Task> _ensureReferenceDataAsync;
-    private readonly Action _updateUi;
-    private readonly Action<string> _setActionStatus;
-    private readonly Action _scheduleAutoEvaluate;
-    private readonly Func<LabTemplate> _buildTemplate;
-    private readonly Action<LabTemplate> _replaceVmEntriesFromTemplate;
     private readonly Func<LabTemplate, Task<int>> _applyResolveSuggestionsAsync;
     private readonly Func<TemplateEditorDocument, string, Task> _showTemplateEditorAsync;
-    private readonly Action _refreshSharedUiState;
     private readonly Func<string, Task<bool>> _showRemoveVmEntryConfirmationDialogAsync;
-    private readonly Action<DeployOnTheFlyVmEntryRow?> _onVmEntriesSelectionChanged;
-    private readonly Action<DeployOnTheFlyEditorInteractionState> _onEditorInteractionChanged;
-    private readonly Func<DeploymentPreflightMode, Task> _onEvaluateRequestedAsync;
-    private readonly Func<Task> _onStartRequestedAsync;
+    private readonly Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> _runReadinessChecksAsync;
+    private readonly Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> _deployAllAsync;
+    private readonly Action<Action> _enqueueUiUpdate;
     private readonly Action _onOpenResultsPanelRequested;
+    private readonly DeployOnTheFlyWorkspaceController _controller;
+    private DeployOnTheFlyWorkspaceComposition? _composition;
 
     public DeployOnTheFlyWorkspaceHost(
-        Func<int> getVmEntryCount,
-        Func<DeploymentReadinessReport?> getReadinessReport,
-        Func<bool> isEvaluatingReadiness,
-        Func<bool> isStarting,
-        Func<string> getLifecycleState,
-        Action ensureSeeded,
+        DeployOnTheFlyWorkspaceViewModel workspace,
+        Func<AppSettings> getDeploymentSettings,
+        Func<IReadOnlyList<string>> getAvailableSwitches,
+        Func<IReadOnlyList<VhdxCatalogItem>> loadCatalogItems,
+        Action refreshSharedUiState,
         Func<bool, Task> ensureReferenceDataAsync,
-        Action updateUi,
-        Action<string> setActionStatus,
-        Action scheduleAutoEvaluate,
-        Func<LabTemplate> buildTemplate,
-        Action<LabTemplate> replaceVmEntriesFromTemplate,
         Func<LabTemplate, Task<int>> applyResolveSuggestionsAsync,
         Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync,
-        Action refreshSharedUiState,
         Func<string, Task<bool>> showRemoveVmEntryConfirmationDialogAsync,
-        Action<DeployOnTheFlyVmEntryRow?> onVmEntriesSelectionChanged,
-        Action<DeployOnTheFlyEditorInteractionState> onEditorInteractionChanged,
-        Func<DeploymentPreflightMode, Task> onEvaluateRequestedAsync,
-        Func<Task> onStartRequestedAsync,
+        Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> runReadinessChecksAsync,
+        Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> deployAllAsync,
+        Action<Action> enqueueUiUpdate,
         Action onOpenResultsPanelRequested)
     {
-        _getVmEntryCount = getVmEntryCount;
-        _getReadinessReport = getReadinessReport;
-        _isEvaluatingReadiness = isEvaluatingReadiness;
-        _isStarting = isStarting;
-        _getLifecycleState = getLifecycleState;
-        _ensureSeeded = ensureSeeded;
+        _workspace = workspace;
+        _getDeploymentSettings = getDeploymentSettings;
+        _getAvailableSwitches = getAvailableSwitches;
+        _loadCatalogItems = loadCatalogItems;
+        _refreshSharedUiState = refreshSharedUiState;
         _ensureReferenceDataAsync = ensureReferenceDataAsync;
-        _updateUi = updateUi;
-        _setActionStatus = setActionStatus;
-        _scheduleAutoEvaluate = scheduleAutoEvaluate;
-        _buildTemplate = buildTemplate;
-        _replaceVmEntriesFromTemplate = replaceVmEntriesFromTemplate;
         _applyResolveSuggestionsAsync = applyResolveSuggestionsAsync;
         _showTemplateEditorAsync = showTemplateEditorAsync;
-        _refreshSharedUiState = refreshSharedUiState;
         _showRemoveVmEntryConfirmationDialogAsync = showRemoveVmEntryConfirmationDialogAsync;
-        _onVmEntriesSelectionChanged = onVmEntriesSelectionChanged;
-        _onEditorInteractionChanged = onEditorInteractionChanged;
-        _onEvaluateRequestedAsync = onEvaluateRequestedAsync;
-        _onStartRequestedAsync = onStartRequestedAsync;
+        _runReadinessChecksAsync = runReadinessChecksAsync;
+        _deployAllAsync = deployAllAsync;
+        _enqueueUiUpdate = enqueueUiUpdate;
         _onOpenResultsPanelRequested = onOpenResultsPanelRequested;
+        _controller = new DeployOnTheFlyWorkspaceController(_workspace, this);
     }
 
-    public int VmEntryCount => _getVmEntryCount();
+    /// <summary>
+    /// Completes the local owner/composition cycle after the Quick Deploy composition is created.
+    /// </summary>
+    public void AttachComposition(DeployOnTheFlyWorkspaceComposition composition)
+    {
+        ArgumentNullException.ThrowIfNull(composition);
 
-    public DeploymentReadinessReport? ReadinessReport => _getReadinessReport();
+        if (_composition is not null && !ReferenceEquals(_composition, composition))
+        {
+            throw new InvalidOperationException("Quick Deploy composition is already attached.");
+        }
 
-    public bool IsEvaluatingReadiness => _isEvaluatingReadiness();
+        _composition = composition;
+    }
 
-    public bool IsStarting => _isStarting();
+    public int VmEntryCount => _workspace.VmEntryCount;
 
-    public string LifecycleState => _getLifecycleState();
+    public DeploymentReadinessReport? ReadinessReport => _workspace.ReadinessReport;
 
-    public void EnsureSeeded() => _ensureSeeded();
+    public bool IsEvaluatingReadiness => _workspace.IsEvaluatingReadiness;
+
+    public bool IsStarting => _workspace.IsStarting;
+
+    public string LifecycleState => _workspace.LifecycleState;
+
+    public void EnsureSeeded()
+    {
+        _workspace.EnsureSeeded(_workspace.SelectedVmEntry?.VmId);
+        _refreshSharedUiState();
+        Composition.SelectVmEntry(_workspace.SelectedVmEntry);
+    }
 
     public Task EnsureReferenceDataAsync(bool forceRefresh) => _ensureReferenceDataAsync(forceRefresh);
 
-    public void UpdateUi() => _updateUi();
+    public void UpdateUi() => Composition.UpdateUi();
 
-    public void SetActionStatus(string statusText) => _setActionStatus(statusText);
+    public void SetActionStatus(string statusText) => Composition.SetActionStatus(statusText);
 
-    public void ScheduleAutoEvaluate() => _scheduleAutoEvaluate();
+    public void ScheduleAutoEvaluate() => _controller.ScheduleAutoEvaluate();
 
-    public LabTemplate BuildTemplate() => _buildTemplate();
+    public LabTemplate BuildTemplate()
+    {
+        return new LabTemplate
+        {
+            Name = "Quick Deploy Draft",
+            Description = "Generated quick deploy input.",
+            VmTemplates = _workspace.CreateTemplateSnapshot().ToList()
+        };
+    }
 
-    public void ReplaceVmEntriesFromTemplate(LabTemplate template) => _replaceVmEntriesFromTemplate(template);
+    public void ReplaceVmEntriesFromTemplate(LabTemplate template)
+    {
+        _workspace.ReplaceEntriesFromTemplate(template, _workspace.SelectedVmEntry?.VmId);
+        _refreshSharedUiState();
+        Composition.SelectVmEntry(_workspace.SelectedVmEntry);
+        Composition.UpdateEditorPanel();
+    }
 
     public Task<int> ApplyResolveSuggestionsAsync(LabTemplate template) => _applyResolveSuggestionsAsync(template);
 
@@ -112,13 +128,53 @@ internal sealed class DeployOnTheFlyWorkspaceHost : IDeployOnTheFlyCompositionHo
 
     public Task<bool> ShowRemoveVmEntryConfirmationDialogAsync(string vmName) => _showRemoveVmEntryConfirmationDialogAsync(vmName);
 
-    public void OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow) => _onVmEntriesSelectionChanged(selectedRow);
+    public void OnVmEntriesSelectionChanged(DeployOnTheFlyVmEntryRow? selectedRow)
+    {
+        _workspace.SetSelectedVmEntry(selectedRow?.VmEntry);
+        Composition.UpdateEditorPanel();
+        Composition.UpdateUi();
+    }
 
-    public void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState) => _onEditorInteractionChanged(interactionState);
+    public void OnEditorInteractionChanged(DeployOnTheFlyEditorInteractionState interactionState)
+    {
+        if (_workspace.IsSynchronizingEditorDraft)
+        {
+            return;
+        }
 
-    public Task OnEvaluateRequestedAsync(DeploymentPreflightMode mode) => _onEvaluateRequestedAsync(mode);
+        Composition.SyncEditorDraft(interactionState);
+        Composition.UpdateUi();
+        _controller.ScheduleAutoEvaluate();
+    }
 
-    public Task OnStartRequestedAsync() => _onStartRequestedAsync();
+    public Task OnEvaluateRequestedAsync(DeploymentPreflightMode mode) => _controller.EvaluateReadinessAsync(mode);
+
+    public Task OnStartRequestedAsync() => _controller.StartDeployAsync();
 
     public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();
+
+    AppSettings IDeployOnTheFlyWorkspaceControllerHost.DeploymentSettings => _getDeploymentSettings();
+
+    IReadOnlyList<string> IDeployOnTheFlyWorkspaceControllerHost.AvailableSwitches => _getAvailableSwitches();
+
+    IReadOnlyList<VhdxCatalogItem> IDeployOnTheFlyWorkspaceControllerHost.LoadCatalogItems() => _loadCatalogItems();
+
+    bool IDeployOnTheFlyWorkspaceControllerHost.TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors) =>
+        Composition.TryApplyVmFields(showSuccessStatus, showValidationErrors);
+
+    Task<DeploymentReadinessReport> IDeployOnTheFlyWorkspaceControllerHost.RunReadinessChecksAsync(
+        MultiVmDeploymentContext context,
+        DeploymentPreflightMode mode) =>
+        _runReadinessChecksAsync(context, mode);
+
+    void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)
+    {
+        _enqueueUiUpdate(updateAction);
+    }
+
+    Task<DeploymentOutcomeSummary> IDeployOnTheFlyWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context) =>
+        _deployAllAsync(context);
+
+    private DeployOnTheFlyWorkspaceComposition Composition =>
+        _composition ?? throw new InvalidOperationException("Quick Deploy composition has not been attached.");
 }

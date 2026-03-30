@@ -377,7 +377,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - `deploy.overview` remains the stable/default Deploy surface, while `deploy.on_the_fly` and `deploy.from_template` remain distinct workflow surfaces.
   - `DeployOverviewWorkspaceViewModel` and `DeployOverviewWorkspaceComposition` remain the Overview-local seams, with the narrowed Overview interaction/view surface still represented.
   - `DeployFromTemplateWorkspaceViewModel`, `DeployFromTemplateWorkspaceController`, and `DeployFromTemplateWorkspaceComposition` remain the From Template-local seams, with the narrowed main/right-panel view surfaces still represented.
-  - `DeployOnTheFlyWorkspaceViewModel`, `DeployOnTheFlyWorkspaceController`, and `DeployOnTheFlyWorkspaceComposition` remain the Quick Deploy-local seams, with the narrowed main/right-panel view surfaces still represented.
+  - `DeployOnTheFlyWorkspaceViewModel`, `DeployOnTheFlyWorkspaceHost`, `DeployOnTheFlyWorkspaceController`, and `DeployOnTheFlyWorkspaceComposition` remain the Quick Deploy-local seams, with controller-host ownership terminating in the local host rather than `MainWindow` and the narrowed main/right-panel view surfaces still represented.
   - Deploy remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
   - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Deploy changes.
 
