@@ -1618,14 +1618,17 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", mainWindowSource);
         Assert.DoesNotContain("await _deployFromTemplateWorkspaceComposition.StartDeployAsync();", mainWindowSource);
         Assert.Contains("filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),", mainWindowSource);
-        Assert.Contains("ApplyDeployResolveSuggestionsAsync,", mainWindowSource);
+        Assert.Contains("template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),", mainWindowSource);
         Assert.Contains("ShowTemplateEditorAsync,", mainWindowSource);
+        Assert.DoesNotContain("private async Task<int> ApplyDeployResolveSuggestionsAsync(LabTemplate template)", mainWindowSource);
         Assert.DoesNotContain("private DeployContextBuildResult BuildDeployContext(LabTemplate template)", mainWindowSource);
         Assert.DoesNotContain("private static DeployDiskResolution ResolveDeployDiskIdentity", mainWindowSource);
         Assert.DoesNotContain("private static DeploySwitchResolution ResolveDeploySwitches", mainWindowSource);
 
         Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;", deployWorkspaceCompositionSource);
         Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
+        Assert.Contains("public async Task<int> ApplyResolveSuggestionsAsync(LabTemplate template)", deployWorkspaceCompositionSource);
+        Assert.Contains("public void ReconcileFromTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)", deployWorkspaceCompositionSource);
 
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost", fromTemplateCompositionSource);
         Assert.Contains("private readonly DeployFromTemplateWorkspaceController _controller;", fromTemplateCompositionSource);
