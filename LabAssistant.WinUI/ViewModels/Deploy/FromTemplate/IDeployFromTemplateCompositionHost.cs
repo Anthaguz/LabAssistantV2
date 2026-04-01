@@ -20,7 +20,7 @@ internal interface IDeployFromTemplateCompositionHost
 
     IReadOnlyList<VhdxCatalogItem> LoadCatalogItems();
 
-    Task EnsureTemplateSwitchesAsync(bool forceRefresh);
+    Task EnsureReferenceDataAsync(bool forceRefresh);
 
     Task EnsureTemplatesLibraryAsync(bool forceRefresh);
 

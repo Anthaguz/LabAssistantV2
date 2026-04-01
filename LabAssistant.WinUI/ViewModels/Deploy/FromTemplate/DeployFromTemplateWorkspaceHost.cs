@@ -10,15 +10,12 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompositionHost
 {
-    private readonly Func<AppSettings> _deploymentSettings;
-    private readonly Func<IReadOnlyList<string>> _availableSwitches;
+    private readonly DeployReferenceDataService _referenceDataService;
+    private readonly DeployResolveSuggestionsService _resolveSuggestionsService;
     private readonly Func<bool> _isTemplatesLoading;
     private readonly Func<IReadOnlyList<TemplateLibraryItem>> _templateLibraryItems;
-    private readonly Func<IReadOnlyList<VhdxCatalogItem>> _loadCatalogItems;
-    private readonly Func<bool, Task> _ensureTemplateSwitchesAsync;
     private readonly Func<bool, Task> _ensureTemplatesLibraryAsync;
     private readonly Func<string, Task<TemplateEditorDocument>> _loadTemplateForEditorAsync;
-    private readonly Func<LabTemplate, Task<int>> _applyResolveSuggestionsAsync;
     private readonly Func<TemplateEditorDocument, string, Task> _showTemplateEditorAsync;
     private readonly Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> _runReadinessAsync;
     private readonly Action _refreshSharedUiState;
@@ -28,15 +25,12 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     private readonly Action _onOpenResultsPanelRequested;
 
     public DeployFromTemplateWorkspaceHost(
-        Func<AppSettings> deploymentSettings,
-        Func<IReadOnlyList<string>> availableSwitches,
+        DeployReferenceDataService referenceDataService,
+        DeployResolveSuggestionsService resolveSuggestionsService,
         Func<bool> isTemplatesLoading,
         Func<IReadOnlyList<TemplateLibraryItem>> templateLibraryItems,
-        Func<IReadOnlyList<VhdxCatalogItem>> loadCatalogItems,
-        Func<bool, Task> ensureTemplateSwitchesAsync,
         Func<bool, Task> ensureTemplatesLibraryAsync,
         Func<string, Task<TemplateEditorDocument>> loadTemplateForEditorAsync,
-        Func<LabTemplate, Task<int>> applyResolveSuggestionsAsync,
         Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync,
         Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> runReadinessAsync,
         Action refreshSharedUiState,
@@ -45,15 +39,12 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> attachProgressCallbacks,
         Action onOpenResultsPanelRequested)
     {
-        _deploymentSettings = deploymentSettings;
-        _availableSwitches = availableSwitches;
+        _referenceDataService = referenceDataService;
+        _resolveSuggestionsService = resolveSuggestionsService;
         _isTemplatesLoading = isTemplatesLoading;
         _templateLibraryItems = templateLibraryItems;
-        _loadCatalogItems = loadCatalogItems;
-        _ensureTemplateSwitchesAsync = ensureTemplateSwitchesAsync;
         _ensureTemplatesLibraryAsync = ensureTemplatesLibraryAsync;
         _loadTemplateForEditorAsync = loadTemplateForEditorAsync;
-        _applyResolveSuggestionsAsync = applyResolveSuggestionsAsync;
         _showTemplateEditorAsync = showTemplateEditorAsync;
         _runReadinessAsync = runReadinessAsync;
         _refreshSharedUiState = refreshSharedUiState;
@@ -63,23 +54,30 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         _onOpenResultsPanelRequested = onOpenResultsPanelRequested;
     }
 
-    public AppSettings DeploymentSettings => _deploymentSettings();
+    public AppSettings DeploymentSettings => _referenceDataService.DeploymentSettings;
 
-    public IReadOnlyList<string> AvailableSwitches => _availableSwitches();
+    public IReadOnlyList<string> AvailableSwitches => _referenceDataService.AvailableSwitches;
 
     public bool IsTemplatesLoading => _isTemplatesLoading();
 
     public IReadOnlyList<TemplateLibraryItem> TemplateLibraryItems => _templateLibraryItems();
 
-    public IReadOnlyList<VhdxCatalogItem> LoadCatalogItems() => _loadCatalogItems();
+    public IReadOnlyList<VhdxCatalogItem> LoadCatalogItems() => _referenceDataService.CatalogItems;
 
-    public Task EnsureTemplateSwitchesAsync(bool forceRefresh) => _ensureTemplateSwitchesAsync(forceRefresh);
+    public Task EnsureReferenceDataAsync(bool forceRefresh) => _referenceDataService.EnsureAsync(forceRefresh);
 
     public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _ensureTemplatesLibraryAsync(forceRefresh);
 
     public Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath) => _loadTemplateForEditorAsync(filePath);
 
-    public Task<int> ApplyResolveSuggestionsAsync(LabTemplate template) => _applyResolveSuggestionsAsync(template);
+    public async Task<int> ApplyResolveSuggestionsAsync(LabTemplate template)
+    {
+        await _referenceDataService.EnsureAsync(forceRefresh: false);
+        return _resolveSuggestionsService.Apply(
+            template,
+            _referenceDataService.CatalogItems,
+            _referenceDataService.AvailableSwitches);
+    }
 
     public Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) => _showTemplateEditorAsync(document, statusText);
 

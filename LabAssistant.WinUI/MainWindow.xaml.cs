@@ -50,10 +50,11 @@ public sealed partial class MainWindow : Window
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
     private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;
+    private readonly DeployReferenceDataService _deployReferenceDataService;
+    private readonly DeployOnTheFlyWorkspaceOwner _deployOnTheFlyWorkspaceOwner;
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
+    private readonly DeployResultsPanelCoordinator _deployResultsPanelCoordinator;
     private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;
-    private readonly DeployOnTheFlyWorkspaceViewModel _deployOnTheFlyWorkspace = new();
-    private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
@@ -92,6 +93,12 @@ public sealed partial class MainWindow : Window
         _vhdxCatalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
         _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
+        _deployReferenceDataService = new DeployReferenceDataService(
+            _settingsStore,
+            _vhdxCatalogStore,
+            _machinesCapabilityService,
+            _templatesCapabilityService);
+        var deployResolveSuggestionsService = new DeployResolveSuggestionsService();
         _machinesWorkspaceComposition = new MachinesWorkspaceComposition(
             _machinesCapabilityService,
             MachinesOverviewViewHost,
@@ -139,7 +146,7 @@ public sealed partial class MainWindow : Window
                     PickTemplateFileForOpenAsync,
                     PickTemplateFileForSaveAsync,
                     ShowDeleteTemplateConfirmationDialogAsync,
-                    items => _deployWorkspaceComposition.ReconcileFromTemplateSelection(items))),
+                    ReconcileDeployFromTemplateSelection)),
             new TemplatesEditorWorkspaceComposition(
                 _templatesCapabilityService,
                 TemplatesEditorViewHost,
@@ -162,18 +169,15 @@ public sealed partial class MainWindow : Window
             DeployFromTemplateRightPanelViewHost,
             TemplatesLibraryItems,
             new DeployFromTemplateWorkspaceHost(
-                () => _settingsStore.Settings,
-                () => _templateAvailableSwitches,
+                _deployReferenceDataService,
+                deployResolveSuggestionsService,
                 () => _isTemplatesLoading,
                 () => TemplatesLibraryItems.ToList(),
-                LoadDeployCatalogItems,
-                EnsureTemplateSwitchesAsync,
                 EnsureTemplatesLibraryAsync,
                 filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),
-                template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),
                 ShowTemplateEditorAsync,
                 (context, mode) => _deploymentPreflightService.RunAsync(context, mode),
-                () => _deployWorkspaceComposition.RefreshSharedUiState(),
+                RefreshDeploySharedUiState,
                 ApplyRightPanelState,
                 async context =>
                 {
@@ -181,83 +185,43 @@ public sealed partial class MainWindow : Window
                     return _deploymentOutcomeSummaryBuilder.Build(context);
                 },
                 AttachDeployProgressCallbacks,
-                () =>
-                {
-                    if (_deployWorkspaceComposition.TryToggleRightPanelFromWorkflow(
-                            _isShellRightPanelInCompactFallback,
-                            _isShellRightPanelOpen,
-                            out var nextOpenState))
-                    {
-                        _isShellRightPanelOpen = nextOpenState;
-                        ApplyRightPanelState();
-                    }
-                }));
-        var deployOnTheFlyWorkspaceHost = new DeployOnTheFlyWorkspaceHost(
-            _deployOnTheFlyWorkspace,
-            getDeploymentSettings: () => _settingsStore.Settings,
-            getAvailableSwitches: () => _templateAvailableSwitches,
-            loadCatalogItems: LoadDeployCatalogItems,
-            refreshSharedUiState: () => _deployWorkspaceComposition.RefreshSharedUiState(),
-            ensureReferenceDataAsync: EnsureDeployOnTheFlyReferenceDataAsync,
-            applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),
-            showTemplateEditorAsync: ShowTemplateEditorAsync,
-            showRemoveVmEntryConfirmationDialogAsync: async vmName =>
-            {
-                var dialog = new ContentDialog
-                {
-                    XamlRoot = RootLayout.XamlRoot,
-                    Title = "Remove VM Entry",
-                    PrimaryButtonText = "Remove",
-                    CloseButtonText = "Cancel",
-                    Content = $"Remove '{vmName}' from quick deploy configuration?",
-                    DefaultButton = ContentDialogButton.Close
-                };
-
-                return await dialog.ShowAsync() == ContentDialogResult.Primary;
-            },
-            runReadinessChecksAsync: (context, mode) => _deploymentPreflightService.RunAsync(context, mode),
-            deployAllAsync: async context =>
-            {
-                await _deploymentCoordinator.DeployAllAsync(context);
-                return _deploymentOutcomeSummaryBuilder.Build(context);
-            },
-            enqueueUiUpdate: updateAction => DispatcherQueue.TryEnqueue(() => updateAction()),
-            onOpenResultsPanelRequested: () =>
-            {
-                if (_deployWorkspaceComposition.TryToggleRightPanelFromWorkflow(
-                        _isShellRightPanelInCompactFallback,
-                        _isShellRightPanelOpen,
-                        out var nextOpenState))
-                {
-                    _isShellRightPanelOpen = nextOpenState;
-                    ApplyRightPanelState();
-                }
-            });
-        _deployOnTheFlyWorkspaceComposition = new DeployOnTheFlyWorkspaceComposition(
+                RequestDeployResultsPanelToggle));
+        _deployOnTheFlyWorkspaceOwner = new DeployOnTheFlyWorkspaceOwner(
             DeployOnTheFlyViewHost,
             DeployOnTheFlyRightPanelViewHost,
-            _deployOnTheFlyWorkspace,
-            deployOnTheFlyWorkspaceHost);
-        deployOnTheFlyWorkspaceHost.AttachComposition(_deployOnTheFlyWorkspaceComposition);
+            _deployReferenceDataService,
+            deployResolveSuggestionsService,
+            new DeployTemplateEditorLauncher(_templatesWorkspaceComposition),
+            new DeployOnTheFlyWorkspaceShellBridge(
+                DispatcherQueue,
+                () => RootLayout.XamlRoot,
+                RequestDeployResultsPanelToggle,
+                ApplyRightPanelState),
+            _deploymentPreflightService,
+            _deploymentCoordinator,
+            _deploymentOutcomeSummaryBuilder);
         _deployWorkspaceComposition = new DeployWorkspaceComposition(
             DeployLocalNavigationPanel,
             DeployOverviewViewHost,
-            _deployOnTheFlyWorkspaceComposition,
+            _deployOnTheFlyWorkspaceOwner,
             DeploySubviewTabView,
             DeployOverviewTabViewItem,
             DeployQuickDeployTabViewItem,
             DeployFromTemplateTabViewItem,
             CreateDeployWorkspaceUiState,
             _deployFromTemplateWorkspaceComposition,
-            LoadDeployCatalogItems,
-            () => _templateAvailableSwitches,
-            async () => await _machinesCapabilityService.LoadVirtualSwitchesAsync(),
             new DeployWorkspaceShellBridge(
                 () => IsDeployCapabilityActive,
                 () => IsDeployOverviewActive,
                 () => IsDeployOnTheFlyActive,
                 () => IsDeployFromTemplateActive,
                 NavigateToRoute));
+        _deployResultsPanelCoordinator = new DeployResultsPanelCoordinator(
+            _deployOnTheFlyWorkspaceOwner,
+            _deployFromTemplateWorkspaceComposition,
+            () => IsDeployOverviewActive,
+            () => IsDeployOnTheFlyActive,
+            () => IsDeployFromTemplateActive);
         _diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(
             DiagnosticsLocalNavigationPanel,
             DiagnosticsOverviewViewHost,
@@ -462,7 +426,7 @@ public sealed partial class MainWindow : Window
     {
         _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(incomingCapabilityKey);
         _isShellRightPanelOpen = false;
-        _deployWorkspaceComposition.ResetRightPanelBehavior();
+        _deployResultsPanelCoordinator.ResetRightPanelBehavior();
     }
 
     private string ResolveRightPanelOwnerCapabilityKey(string capabilityKey)
@@ -490,7 +454,7 @@ public sealed partial class MainWindow : Window
             _isShellRightPanelOpen = false;
         }
 
-        if (CanActiveCapabilityOwnRightPanel() && _deployWorkspaceComposition.ShouldAutoOpenRightPanel())
+        if (CanActiveCapabilityOwnRightPanel() && _deployResultsPanelCoordinator.ShouldAutoOpenRightPanel())
         {
             _isShellRightPanelOpen = true;
         }
@@ -502,13 +466,26 @@ public sealed partial class MainWindow : Window
         InsightsToggleButton.IsEnabled = hasOwner && !_isShellRightPanelInCompactFallback;
         InsightsToggleButton.Opacity = InsightsToggleButton.IsEnabled ? 1.0 : 0.45;
         ToolTipService.SetToolTip(InsightsToggleButton, "Toggle progress and results panel");
-        RightPanelTitleTextBlock.Text = _deployWorkspaceComposition.GetRightPanelTitleText();
-        RightPanelEmptyStateBorder.Visibility = _deployWorkspaceComposition.ShouldShowRightPanelEmptyState(showPanel)
+        RightPanelTitleTextBlock.Text = _deployResultsPanelCoordinator.GetRightPanelTitleText();
+        RightPanelEmptyStateBorder.Visibility = _deployResultsPanelCoordinator.ShouldShowRightPanelEmptyState(showPanel)
             ? Visibility.Visible
             : Visibility.Collapsed;
-        _deployWorkspaceComposition.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);
+        _deployResultsPanelCoordinator.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);
         IssueBadge.Visibility = Visibility.Collapsed;
         IssueBadgeTextBlock.Text = string.Empty;
+    }
+
+    private void RequestDeployResultsPanelToggle()
+    {
+        if (_isShellRightPanelInCompactFallback ||
+            !CanActiveCapabilityOwnRightPanel() ||
+            (!IsDeployOnTheFlyActive && !IsDeployFromTemplateActive))
+        {
+            return;
+        }
+
+        _isShellRightPanelOpen = !_isShellRightPanelOpen;
+        ApplyRightPanelState();
     }
 
     private void NavigateToRoute(string routeKey)
@@ -908,21 +885,6 @@ public sealed partial class MainWindow : Window
         _templatesWorkspaceComposition.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
     }
 
-    private IReadOnlyList<VhdxCatalogItem> LoadDeployCatalogItems()
-    {
-        var catalogResult = _vhdxCatalogStore.Load(_settingsStore.Settings.CatalogPath);
-        return catalogResult.Items;
-    }
-
-    private async Task EnsureDeployOnTheFlyReferenceDataAsync(bool forceRefresh)
-    {
-        await EnsureTemplateSwitchesAsync(forceRefresh);
-        await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh);
-        _deployOnTheFlyWorkspaceComposition.SetEditorReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
-        _deployOnTheFlyWorkspaceComposition.UpdateEditorPanel();
-        _deployOnTheFlyWorkspaceComposition.UpdateUi();
-    }
-
     private void SyncTemplateVmEntriesToDocument()
     {
         _templatesWorkspaceComposition.SyncEditorVmEntriesToDocument();
@@ -995,6 +957,20 @@ public sealed partial class MainWindow : Window
         await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);
     }
 
+    private void ReconcileDeployFromTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)
+    {
+        _deployFromTemplateWorkspaceComposition.ReconcileSelection(items);
+        RefreshDeploySharedUiState();
+    }
+
+    private void RefreshDeploySharedUiState()
+    {
+        if (_deployWorkspaceComposition is not null)
+        {
+            _deployWorkspaceComposition.RefreshSharedUiState();
+        }
+    }
+
     private void SetTemplateEditorStatus(string statusText)
     {
         _templatesWorkspaceComposition.SetEditorStatus(statusText);
@@ -1003,7 +979,7 @@ public sealed partial class MainWindow : Window
     private DeployWorkspaceUiState CreateDeployWorkspaceUiState()
     {
         return new DeployWorkspaceUiState(
-            QuickDeployDraftCount: _deployOnTheFlyWorkspace.VmEntryCount,
+            QuickDeployDraftCount: _deployOnTheFlyWorkspaceOwner.DraftCount,
             IsLoadingTemplates: _deployFromTemplateWorkspaceComposition.IsLoadingTemplates,
             AvailableTemplateCount: TemplatesLibraryItems.Count);
     }

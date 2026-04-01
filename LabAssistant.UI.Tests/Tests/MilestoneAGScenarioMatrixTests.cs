@@ -15,16 +15,25 @@ public sealed class MilestoneAGScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_DefinesDeployOnTheFlyHostAndVisibilityWiring()
+    public void MainWindow_AndDeployWorkspaceComposition_PreserveQuickDeployRouteHosting()
     {
         var xaml = LoadMainWindowXaml();
-        var source = LoadDeployWorkspaceCompositionSource();
-        var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
+        var mainWindowSource = LoadMainWindowSource();
+        var compositionSource = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyViewHost"));
-        Assert.Contains("_onTheFlyWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);", source);
-        Assert.Contains("_view.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
-        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", source);
+        Assert.Contains("private readonly DeployOnTheFlyWorkspaceOwner _deployOnTheFlyWorkspaceOwner;", mainWindowSource);
+        Assert.Contains("new DeployOnTheFlyWorkspaceOwner(", mainWindowSource);
+        Assert.Contains("new DeployOnTheFlyWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("new DeployResultsPanelCoordinator(", mainWindowSource);
+        Assert.DoesNotContain("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", mainWindowSource);
+        Assert.DoesNotContain("new DeployOnTheFlyWorkspaceHost(", mainWindowSource);
+        Assert.DoesNotContain("AttachComposition(", mainWindowSource);
+
+        Assert.Contains("_onTheFlyWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);", compositionSource);
+        Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
+        Assert.DoesNotContain("TryToggleRightPanelFromWorkflow", compositionSource);
+        Assert.DoesNotContain("ShouldAutoOpenRightPanel", compositionSource);
     }
 
     [Fact]
@@ -59,86 +68,80 @@ public sealed class MilestoneAGScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_WiresOnTheFlyReadinessCorrectionAndExecutionForAg3()
+    public void QuickDeploy_Owner_Composition_AndController_ProtectTheNewLocalBoundary()
     {
-        var source = LoadMainWindowSource();
-        var controllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
+        var mainWindowSource = LoadMainWindowSource();
+        var ownerSource = LoadDeployOnTheFlyWorkspaceOwnerSource();
         var compositionSource = LoadDeployOnTheFlyWorkspaceCompositionSource();
-        var hostSource = LoadDeployOnTheFlyWorkspaceHostSource();
+        var controllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
+        var shellBridgeSource = LoadDeployOnTheFlyWorkspaceShellBridgeSource();
+        var referenceDataSource = LoadDeployReferenceDataServiceSource();
+        var resolveSuggestionsSource = LoadDeployResolveSuggestionsServiceSource();
         var viewSource = LoadDeployOnTheFlyViewSource();
 
-        Assert.DoesNotContain("private readonly DeployOnTheFlyWorkspaceController _deployOnTheFlyWorkspaceController;", source);
-        Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", source);
-        Assert.Contains("new DeployOnTheFlyWorkspaceComposition(", source);
-        Assert.Contains("new DeployOnTheFlyWorkspaceHost(", source);
-        Assert.Contains("deployOnTheFlyWorkspaceHost.AttachComposition(_deployOnTheFlyWorkspaceComposition);", source);
-        Assert.DoesNotContain("BuildOnTheFlyTemplate()", source);
-        Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
-        Assert.Contains("applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),", source);
-        Assert.DoesNotContain("ResolveDeployOnTheFlySuggestionsAsync()", source);
-        Assert.DoesNotContain("OpenDeployOnTheFlyTemplateEditorAsync()", source);
-        Assert.DoesNotContain("AddDeployOnTheFlyVmEntry()", source);
-        Assert.DoesNotContain("RemoveDeployOnTheFlyVmEntryAsync(VmTemplate? vmEntry)", source);
-        Assert.DoesNotContain("UpdateDeployOnTheFlyResultRows()", source);
-        Assert.DoesNotContain("UpdateDeployOnTheFlyIssueRows()", source);
-        Assert.DoesNotContain("UpdateDeployOnTheFlyRowsFromSummary(DeploymentOutcomeSummary summary)", source);
-        Assert.DoesNotContain("UpdateDeployOnTheFlyUi()", source);
-        Assert.DoesNotContain("SetDeployOnTheFlyStatusText(string statusText)", source);
-        Assert.DoesNotContain("UpdateDeployOnTheFlyVmEntryRows()", source);
-        Assert.DoesNotContain("BuildDeployOnTheFlyEditorIssueSummaryText()", source);
+        Assert.Contains("private readonly DeployOnTheFlyWorkspaceOwner _deployOnTheFlyWorkspaceOwner;", mainWindowSource);
+        Assert.Contains("new DeployTemplateEditorLauncher(_templatesWorkspaceComposition)", mainWindowSource);
+        Assert.DoesNotContain("BuildOnTheFlyTemplate()", mainWindowSource);
+        Assert.DoesNotContain("EnsureDeployOnTheFlyReferenceDataAsync", mainWindowSource);
+        Assert.DoesNotContain("applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),", mainWindowSource);
+
+        Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceOwner : IDeployOnTheFlyWorkspaceControllerHost", ownerSource);
+        Assert.Contains("private readonly DeployOnTheFlyWorkspaceViewModel _workspace = new();", ownerSource);
+        Assert.Contains("private readonly DeployOnTheFlyWorkspaceComposition _composition;", ownerSource);
+        Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _controller;", ownerSource);
+        Assert.Contains("_composition = new DeployOnTheFlyWorkspaceComposition(view, rightPanelView, _workspace);", ownerSource);
+        Assert.Contains("_controller = new DeployOnTheFlyWorkspaceController(_workspace, this);", ownerSource);
+        Assert.Contains("public event EventHandler? SharedUiStateChanged;", ownerSource);
+        Assert.Contains("public void ApplyShellState(bool isActive)", ownerSource);
+        Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", ownerSource);
+        Assert.Contains("private void WireHandlers()", ownerSource);
+        Assert.Contains("_view.VmEntrySelectionChanged += VmEntrySelectionChanged;", ownerSource);
+        Assert.Contains("_view.ResolveSuggestionsRequested += ResolveSuggestionsRequested;", ownerSource);
+        Assert.Contains("_view.OpenTemplateEditorRequested += OpenTemplateEditorRequested;", ownerSource);
+        Assert.Contains("_view.StartDeployRequested += StartDeployRequested;", ownerSource);
+        Assert.Contains("_view.OpenResultsPanelRequested += OpenResultsPanelRequested;", ownerSource);
+        Assert.Contains("private async Task EnsureReferenceDataAsync(bool forceRefresh)", ownerSource);
+        Assert.Contains("private LabTemplate BuildTemplate()", ownerSource);
+        Assert.Contains("private void ReplaceVmEntriesFromTemplate(LabTemplate template)", ownerSource);
+        Assert.Contains("private async Task<int> ApplyResolveSuggestionsAsync(LabTemplate template)", ownerSource);
+        Assert.Contains("private async Task OpenTemplateEditorAsync()", ownerSource);
+        Assert.Contains("_shellBridge.RequestResultsPanelToggle();", ownerSource);
+        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)", ownerSource);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceComposition", compositionSource);
-        Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceHost : IDeployOnTheFlyCompositionHost, IDeployOnTheFlyWorkspaceControllerHost", hostSource);
-        Assert.Contains("private readonly DeployOnTheFlyWorkspaceController _controller;", hostSource);
-        Assert.Contains("_controller = new DeployOnTheFlyWorkspaceController(_workspace, this);", hostSource);
-        Assert.Contains("public Task OnEvaluateRequestedAsync(DeploymentPreflightMode mode) => _controller.EvaluateReadinessAsync(mode);", hostSource);
-        Assert.Contains("public Task OnStartRequestedAsync() => _controller.StartDeployAsync();", hostSource);
-        Assert.Contains("public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();", hostSource);
         Assert.Contains("_view.SetVmEntriesSource(_workspace.VmEntryRows);", compositionSource);
         Assert.Contains("_rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);", compositionSource);
-        Assert.Contains("_ = _host.EnsureReferenceDataAsync(forceRefresh: false);", compositionSource);
-        Assert.Contains("public void UpdateUi()", compositionSource);
-        Assert.Contains("public void SetActionStatus(string statusText)", compositionSource);
-        Assert.Contains("public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>", compositionSource);
-        Assert.Contains("CanStartDeploy: hasEntries && !hasBlockingFailures", compositionSource);
-        Assert.Contains("public async Task ResolveSuggestionsAsync()", compositionSource);
-        Assert.Contains("public async Task OpenTemplateEditorAsync()", compositionSource);
-        Assert.Contains("public void AddVmEntry()", compositionSource);
-        Assert.Contains("public async Task RemoveVmEntryAsync(VmTemplate? vmEntry)", compositionSource);
-        Assert.Contains("public void RefreshResultRows()", compositionSource);
-        Assert.Contains("public void RefreshIssueRows()", compositionSource);
-        Assert.Contains("public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)", compositionSource);
-        Assert.Contains("_view.EvaluateRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
-        Assert.Contains("_view.VmRemoveRequested += async vmEntry => await RemoveVmEntryAsync(vmEntry);", compositionSource);
-        Assert.Contains("_view.AddVmRequested += (_, _) => AddVmEntry();", compositionSource);
-        Assert.Contains("_view.RemoveSelectedVmRequested += async (_, _) => await RemoveVmEntryAsync(_workspace.SelectedVmEntry);", compositionSource);
-        Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", compositionSource);
-        Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", compositionSource);
-        Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", compositionSource);
-        Assert.Contains("_view.StartDeployRequested += async (_, _) => await _host.OnStartRequestedAsync();", compositionSource);
-        Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", compositionSource);
-        Assert.Contains("var hasBlockingFailures = _workspace.HasBlockingFailures;", compositionSource);
-        Assert.Contains("_view.ApplyWorkspaceState(new DeployOnTheFlyWorkspaceViewState(", compositionSource);
-        Assert.Contains("GlobalIssuesBadgeText: $\"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}\"", compositionSource);
-        Assert.Contains("private void UpdateVmEntryRows()", compositionSource);
-        Assert.Contains("private string BuildEditorIssueSummaryText()", compositionSource);
-        Assert.Contains("public void ApplyShellState(bool isActive)", compositionSource);
+        Assert.Contains("public void SetVisibility(bool isActive)", compositionSource);
         Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", compositionSource);
-        Assert.DoesNotContain("DeployOnTheFlyVmEntriesListViewControl", compositionSource);
-        Assert.DoesNotContain("DeployOnTheFlyStartButtonControl", compositionSource);
+        Assert.Contains("public bool TryApplyVmFields(bool showSuccessStatus, bool showValidationErrors = true)", compositionSource);
+        Assert.DoesNotContain("IDeployOnTheFlyCompositionHost", compositionSource);
+        Assert.DoesNotContain("public async Task ResolveSuggestionsAsync()", compositionSource);
+        Assert.DoesNotContain("public async Task OpenTemplateEditorAsync()", compositionSource);
+        Assert.DoesNotContain("public void AddVmEntry()", compositionSource);
+        Assert.DoesNotContain("public async Task RemoveVmEntryAsync(VmTemplate? vmEntry)", compositionSource);
+        Assert.DoesNotContain("public void ApplyShellState(bool isActive)", compositionSource);
+        Assert.DoesNotContain("WireHandlers()", compositionSource);
 
         Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceController", controllerSource);
-        Assert.Contains("await EvaluateReadinessAsync(DeploymentPreflightMode.Full);", controllerSource);
+        Assert.Contains("await _host.EnsureReferenceDataAsync(forceRefresh: false);", controllerSource);
         Assert.Contains("PrepareDeployExecution(deployContext.MultiVmContext);", controllerSource);
         Assert.Contains("var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);", controllerSource);
-        Assert.Contains("ApplyDeploySummary(summary);", controllerSource);
-        Assert.Contains("private void PrepareDeployExecution(MultiVmDeploymentContext context)", controllerSource);
-        Assert.Contains("private void ApplyDeploySummary(DeploymentOutcomeSummary summary)", controllerSource);
         Assert.Contains("private void AttachProgressCallbacks(MultiVmDeploymentContext context)", controllerSource);
-        Assert.DoesNotContain("_deployOnTheFlyWorkspace.ApplyOutcomeSummary(summary);", source);
-        Assert.DoesNotContain("_deployOnTheFlyWorkspace.SetWorkflowState(\"Running\", 15, \"Preparing deployment...\");", source);
-        Assert.DoesNotContain("void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)", source);
-        Assert.Contains("void IDeployOnTheFlyWorkspaceControllerHost.EnqueueUiUpdate(Action updateAction)", hostSource);
+
+        Assert.Contains("internal sealed class DeployOnTheFlyWorkspaceShellBridge", shellBridgeSource);
+        Assert.Contains("public async Task<bool> ShowRemoveVmEntryConfirmationDialogAsync(string vmName)", shellBridgeSource);
+        Assert.Contains("public void RequestResultsPanelToggle() => _requestResultsPanelToggle();", shellBridgeSource);
+        Assert.Contains("public void RefreshResultsPanelState() => _refreshResultsPanelState();", shellBridgeSource);
+
+        Assert.Contains("internal sealed class DeployReferenceDataService", referenceDataSource);
+        Assert.Contains("public async Task EnsureAsync(bool forceRefresh)", referenceDataSource);
+        Assert.Contains("public IReadOnlyList<TemplateVhdxCatalogOption> VhdxCatalogOptions => _vhdxCatalogOptions;", referenceDataSource);
+
+        Assert.Contains("internal sealed class DeployResolveSuggestionsService", resolveSuggestionsSource);
+        Assert.Contains("public int Apply(", resolveSuggestionsSource);
+
+        Assert.False(File.Exists(GetQuickDeployHostPath()));
+        Assert.False(File.Exists(GetQuickDeployCompositionHostPath()));
 
         Assert.Contains("public event EventHandler? VmDraftChanged;", viewSource);
         Assert.Contains("public void ApplyWorkspaceState(DeployOnTheFlyWorkspaceViewState state)", viewSource);
@@ -202,6 +205,12 @@ public sealed class MilestoneAGScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
+    private static string LoadDeployOnTheFlyWorkspaceOwnerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceOwner.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
     private static string LoadDeployOnTheFlyWorkspaceControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceController.cs");
@@ -214,9 +223,21 @@ public sealed class MilestoneAGScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadDeployOnTheFlyWorkspaceHostSource()
+    private static string LoadDeployOnTheFlyWorkspaceShellBridgeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceHost.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceShellBridge.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployReferenceDataServiceSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployReferenceDataService.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployResolveSuggestionsServiceSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployResolveSuggestionsService.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
@@ -224,6 +245,22 @@ public sealed class MilestoneAGScenarioMatrixTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string GetQuickDeployHostPath()
+    {
+        return Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..",
+            "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "DeployOnTheFlyWorkspaceHost.cs"));
+    }
+
+    private static string GetQuickDeployCompositionHostPath()
+    {
+        return Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..",
+            "LabAssistant.WinUI", "ViewModels", "Deploy", "QuickDeploy", "IDeployOnTheFlyCompositionHost.cs"));
     }
 
     private static XElement FindByName(XDocument xaml, string name)
