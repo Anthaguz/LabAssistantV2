@@ -51,7 +51,7 @@ internal sealed class DeployFromTemplateWorkspaceController
 
         try
         {
-            await _host.EnsureTemplateSwitchesAsync(forceRefresh: false);
+            await _host.EnsureReferenceDataAsync(forceRefresh: false);
             var deployContext = DeployContextBuilder.Build(
                 activeTemplateDocument.Template,
                 _host.DeploymentSettings,

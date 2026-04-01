@@ -18,7 +18,7 @@ internal interface IDeployFromTemplateWorkspaceControllerHost
 
     IReadOnlyList<VhdxCatalogItem> LoadCatalogItems();
 
-    Task EnsureTemplateSwitchesAsync(bool forceRefresh);
+    Task EnsureReferenceDataAsync(bool forceRefresh);
 
     Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 

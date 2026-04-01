@@ -61,6 +61,11 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     public string ProgressSummary => _workspace.ProgressSummary;
 
+    public bool ShouldAutoOpenResultsPanel =>
+        _workspace.IsStarting || string.Equals(_workspace.LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+
+    public string ResultsPanelTitle => "From Template Progress / Results";
+
     public void ApplyShellState(bool isFromTemplateActive)
     {
         _view.Visibility = isFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;
@@ -201,7 +206,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     IReadOnlyList<VhdxCatalogItem> IDeployFromTemplateWorkspaceControllerHost.LoadCatalogItems() => _host.LoadCatalogItems();
 
-    Task IDeployFromTemplateWorkspaceControllerHost.EnsureTemplateSwitchesAsync(bool forceRefresh) => _host.EnsureTemplateSwitchesAsync(forceRefresh);
+    Task IDeployFromTemplateWorkspaceControllerHost.EnsureReferenceDataAsync(bool forceRefresh) => _host.EnsureReferenceDataAsync(forceRefresh);
 
     Task<DeploymentReadinessReport> IDeployFromTemplateWorkspaceControllerHost.RunReadinessAsync(
         MultiVmDeploymentContext context,

@@ -8,8 +8,8 @@ using LabAssistant.WinUI.Models.Deploy;
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 /// <summary>
-/// Owns Quick Deploy workflow orchestration that belongs with the long-lived workspace rather than in the shell, including readiness evaluation, deploy start sequencing, and auto-evaluate debounce.
-/// Remaining host calls from this controller are temporary residual shell/shared integration except where the dependency is a true shell boundary such as UI-thread marshaling.
+/// Owns Quick Deploy workflow orchestration that belongs with the long-lived workspace rather than in the shell,
+/// including readiness evaluation, deploy start sequencing, and auto-evaluate debounce.
 /// </summary>
 internal sealed class DeployOnTheFlyWorkspaceController
 {
@@ -76,7 +76,7 @@ internal sealed class DeployOnTheFlyWorkspaceController
 
     /// <summary>
     /// Runs the readiness boundary for the current workspace snapshot.
-    /// This method owns workflow sequencing, but still relies on the current residual host bridge for shell/shared reference data, services, and UI refresh while cleanup is in progress.
+    /// This method owns workflow sequencing while delegating only narrow service and UI-thread hooks through the local owner host contract.
     /// </summary>
     public async Task EvaluateReadinessAsync(DeploymentPreflightMode mode)
     {
