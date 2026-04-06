@@ -748,6 +748,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Diagnostics composition must not become the Logs workflow owner; temporary Logs-specific host bridges or control exposure remain migration cleanup targets behind the Logs-local seam; `diagnostics.logs` must not absorb Diagnostics Overview route-entry or index semantics; and the cleanup target must stay explicit that Diagnostics Overview extraction details, runtime implementation, Diagnostics behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
+- **FR-176:** WinUI non-trivial lane cleanup shall use an explicit lane-local role split so lane ownership does not remain implied by host wiring or shared composition.
+  - **Acceptance details:** when a lane owns meaningful local workflow, refresh/reconcile, helper coordination, auxiliary view composition, or shell interaction seams, the canonical target shall be an explicit `WorkspaceOwner`, `WorkspaceController`, `WorkspaceComposition`, and `WorkspaceShellBridge`, each with documented may-own and must-not-own boundaries that preserve the existing shell and capability composition contracts.
+  - **Priority:** P1
+
+- **FR-177:** WinUI lane architecture shall reject backpack hosts, attach cycles, lane-specific shell lambdas in `MainWindow`, and lane-specific logic inside shared capability composition as the long-term implementation pattern.
+  - **Acceptance details:** host abstractions must not become mixed-responsibility dumping grounds; lane wiring must not rely on multi-step attach cycles to imply the final owner; lane-specific shell integration must converge behind named narrow shell bridges rather than ad hoc shell lambdas; and shared capability composition must remain limited to genuinely capability-shared concerns rather than lane-local workflow or panel semantics.
+  - **Priority:** P1
+
+- **FR-178:** WinUI lane architecture shall allow a slimmer form only for genuinely simple lanes and shall require that exception to stay explicit and bounded.
+  - **Acceptance details:** a lane may avoid the full owner/controller/composition/shell-bridge split only when it lacks independent workflow orchestration, lane-local helper coordination, dedicated auxiliary surfaces, and genuine shell-owned interaction seams; even then, the shell-only `MainWindow` rule, shared-capability-only composition rule, and banned-pattern list shall still apply.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -761,6 +773,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-shell-composition-boundary-contract-am.md` for Milestone AM shell composition ownership and workspace extraction boundary rules.
 - See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
 - See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
+- See `docs/02-ux/winui-lane-architecture-standard-an.md` for Milestone AN lane-local role boundaries, banned patterns, and the simple-lane exception rule.
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
 - See `docs/02-ux/winui-diagnostics-overview-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Overview` ownership, route-activation refresh, and non-goal boundaries.
 - See `docs/02-ux/winui-diagnostics-logs-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Logs` ownership, route-activation refresh, and non-goal boundaries.

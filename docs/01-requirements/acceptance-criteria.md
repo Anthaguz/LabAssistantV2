@@ -3685,3 +3685,115 @@ Each readiness result shall include, at minimum:
 - [ ] `diagnostics.logs` troubleshooting role and long-lived workspace participation are explicit and traceable
 - [ ] route-activation refresh or reconcile expectations for `diagnostics.logs` are explicit and traceable
 - [ ] Overview non-goals and shell-only boundary preservation are explicit and traceable
+
+---
+
+# AC-043 - WinUI Lane Architecture Standard (AN1)
+
+**Related FRs:** FR-176, FR-177, FR-178, FR-113, FR-114, FR-115, FR-125, FR-126, FR-127
+
+## Scenarios
+
+### 1) Non-trivial lanes use an explicit owner/controller/composition/shell-bridge split
+**Given**
+- shell ownership and capability composition ownership are already defined elsewhere
+- some child WinUI lanes own enough local workflow or lifecycle behavior that lane-local ownership can no longer stay implicit
+
+**When**
+- the canonical lane architecture standard is defined
+
+**Then**
+- a non-trivial lane is explicitly expected to converge behind:
+  - `WorkspaceOwner`
+  - `WorkspaceController`
+  - `WorkspaceComposition`
+  - `WorkspaceShellBridge`
+- `WorkspaceOwner` is explicitly responsible for:
+  - lane-local lifetime and top-level wiring
+  - controller/composition/shell-bridge lifetime
+  - lane-specific route-activation entry points
+  - lane-local refresh or reconcile sequencing
+  - lane-local helper coordination where needed
+- `WorkspaceController` is explicitly responsible for:
+  - lane-local workflow orchestration
+  - async sequencing or action flow
+  - narrow host-driven cooperation without direct view or shell ownership
+- `WorkspaceComposition` is explicitly responsible for:
+  - lane-local view composition
+  - view-state application
+  - interaction-state capture
+- `WorkspaceShellBridge` is explicitly responsible only for:
+  - genuine shell-owned interaction seams such as dispatcher marshalling, dialogs, route-active queries, or explicit panel toggles
+
+### 2) Each role has explicit non-goals so ownership does not drift by convenience
+**Given**
+- a non-trivial lane uses the canonical role split
+
+**When**
+- role ownership is reviewed
+
+**Then**
+- `WorkspaceOwner` does not become:
+  - the shell route owner
+  - the shell container owner
+  - the detailed workflow sequencer
+  - the detailed view-state applier
+- `WorkspaceController` does not become:
+  - a direct view owner
+  - a direct `MainWindow` consumer
+  - a shared-capability composition owner
+- `WorkspaceComposition` does not become:
+  - the workflow owner
+  - the lane-helper coordinator
+  - the shared-capability owner
+- `WorkspaceShellBridge` does not become:
+  - a general-purpose shell escape hatch
+  - a holder for lane workflow state
+  - a disguised direct `MainWindow` dependency
+
+### 3) Known drift patterns are explicitly rejected
+**Given**
+- later runtime cleanup will continue adding or refining lane-local seams
+
+**When**
+- the standard defines banned patterns
+
+**Then**
+- backpack hosts are explicitly rejected
+- attach cycles are explicitly rejected
+- lane-specific shell lambdas in `MainWindow` are explicitly rejected as the integration pattern
+- lane-specific logic inside shared capability composition is explicitly rejected
+- a narrow dedicated shell bridge remains acceptable, but ad hoc shell wiring is not treated as equivalent
+
+### 4) The simple-lane exception is explicit and bounded
+**Given**
+- some lanes may be too small to justify the full four-part split
+
+**When**
+- the standard defines when a slimmer form is allowed
+
+**Then**
+- the full split may be avoided only when a lane:
+  - lacks independent lane-local workflow orchestration
+  - lacks lane-local helper coordination
+  - lacks a dedicated auxiliary surface such as a lane-local side panel or second bound view
+  - lacks a genuine shell-owned interaction seam beyond already-approved visibility handling
+- even under the slimmer form:
+  - `MainWindow` remains shell-only
+  - shared capability composition remains capability-shared only
+  - the banned-pattern list still applies
+- the simple-lane exception is treated as an explicit fit rule, not as permission to leave ownership ambiguous
+
+## Expected Boundary
+- non-trivial lanes use an explicit owner/controller/composition/shell-bridge split
+- each lane role has explicit may-own and must-not-own boundaries
+- shell-only and capability-shared-only ownership rules remain preserved
+- backpack hosts, attach cycles, lane-specific shell lambdas in `MainWindow`, and lane-specific logic in shared capability composition are rejected as end-state patterns
+- a simple-lane exception exists, but only for genuinely narrow lanes and without weakening the existing shell or capability boundaries
+
+## Definition of Done
+- [ ] the non-trivial lane role split is explicit and traceable
+- [ ] each role's non-goals are explicit and traceable
+- [ ] the banned-pattern list is explicit and traceable
+- [ ] the simple-lane exception rule is explicit and traceable
+- [ ] shell-only and shared-capability-only boundary preservation remains explicit and traceable
