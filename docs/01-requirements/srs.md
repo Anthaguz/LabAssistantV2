@@ -760,6 +760,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** a lane may avoid the full owner/controller/composition/shell-bridge split only when it lacks independent workflow orchestration, lane-local helper coordination, dedicated auxiliary surfaces, and genuine shell-owned interaction seams; even then, the shell-only `MainWindow` rule, shared-capability-only composition rule, and banned-pattern list shall still apply.
   - **Priority:** P1
 
+- **FR-179:** WinUI capability bootstrap shall remain a shell-owned construction step that creates one typed capability runtime boundary per capability instead of leaving `MainWindow` to remain the long-term direct owner of lane seams and capability-local helpers.
+  - **Acceptance details:** capability bootstrap may resolve DI services, shell-owned view roots, and shell bridges needed to instantiate a typed capability runtime, but bootstrap must remain distinct from the long-lived capability runtime and must not become the capability's ongoing workflow owner after construction.
+  - **Priority:** P1
+
+- **FR-180:** WinUI typed capability runtime shall own the capability-local runtime boundary above shared capability composition and lane-local seams without absorbing shell ownership or lane-local workflow ownership that belongs lower in the stack.
+  - **Acceptance details:** a typed capability runtime may own shared capability composition lifetime, capability-shared helper lifetime, lane-local seam lifetime, route-activation handoff, and capability-level refresh or reconcile entry points; shared capability composition must remain capability-shared only; lane-local seams must remain responsible for lane-local workflow and view-state application.
+  - **Priority:** P1
+
+- **FR-181:** WinUI shell cleanup shall preserve `MainWindow` as the shell composition root after typed runtime introduction while converging `MainWindow` toward one typed runtime field per capability rather than direct lane-by-lane or helper-by-helper capability wiring.
+  - **Acceptance details:** `MainWindow` must retain shell route switching, shell navigation, shell header/theme, shell container infrastructure, shell host visibility, app-level capability runtime lifetime, and capability bootstrap entry points; it must not remain the long-term direct owner of multiple lane-local fields, capability-local helper fields, or scattered capability-local route-activation wiring for the same capability; runtime implementation, eager-vs-lazy bootstrap policy, and behavior redesign remain out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -774,6 +786,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
 - See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
 - See `docs/02-ux/winui-lane-architecture-standard-an.md` for Milestone AN lane-local role boundaries, banned patterns, and the simple-lane exception rule.
+- See `docs/02-ux/winui-typed-capability-runtime-contract-an.md` for Milestone AN typed capability bootstrap/runtime boundary and runtime ownership rules.
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
 - See `docs/02-ux/winui-diagnostics-overview-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Overview` ownership, route-activation refresh, and non-goal boundaries.
 - See `docs/02-ux/winui-diagnostics-logs-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Logs` ownership, route-activation refresh, and non-goal boundaries.
