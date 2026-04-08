@@ -772,6 +772,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** `MainWindow` must retain shell route switching, shell navigation, shell header/theme, shell container infrastructure, shell host visibility, app-level capability runtime lifetime, and capability bootstrap entry points; it must not remain the long-term direct owner of multiple lane-local fields, capability-local helper fields, or scattered capability-local route-activation wiring for the same capability; runtime implementation, eager-vs-lazy bootstrap policy, and behavior redesign remain out of scope.
   - **Priority:** P1
 
+- **FR-182:** WinUI `DeployResultsPanelCoordinator` shall remain a narrow shared Deploy seam for results-panel intent aggregation rather than a general shared Deploy owner.
+  - **Acceptance details:** the coordinator may aggregate active-lane title text, auto-open recommendations, Overview empty-state participation, and panel-state delegation across `deploy.on_the_fly` and `deploy.from_template`, while keeping its role limited to shared Deploy right-panel intent only.
+  - **Priority:** P1
+
+- **FR-183:** WinUI `DeployResultsPanelCoordinator` shall reject shell right-panel infrastructure ownership, lane-local workflow ownership, and general shared Deploy helper ownership.
+  - **Acceptance details:** shell panel open state, compact fallback, width/layout, owner-capability precedence, container visibility, and lifecycle remain shell-owned; lane-local readiness, progress, result-row construction, issue-row construction, launcher semantics, and workflow sequencing remain lane-local; reference-data refresh, template-editor launch, and other general shared Deploy helper policy remain outside the coordinator.
+  - **Priority:** P1
+
+- **FR-184:** WinUI shared Deploy composition may delegate narrow results-panel integration questions to `DeployResultsPanelCoordinator` without widening it into a route owner or workflow owner.
+  - **Acceptance details:** acceptable delegation includes panel title selection, auto-open recommendation, Overview empty-state visibility, panel-state application into the participating lanes, and capability-switch reset hooks specifically about Deploy panel presentation; route resolution, general Deploy refresh policy, and capability-wide workflow coordination remain out of scope.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -787,6 +799,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
 - See `docs/02-ux/winui-lane-architecture-standard-an.md` for Milestone AN lane-local role boundaries, banned patterns, and the simple-lane exception rule.
 - See `docs/02-ux/winui-typed-capability-runtime-contract-an.md` for Milestone AN typed capability bootstrap/runtime boundary and runtime ownership rules.
+- See `docs/02-ux/winui-deploy-results-panel-coordinator-contract-an.md` for Milestone AN the narrow Deploy results-panel coordinator seam and its non-goals.
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
 - See `docs/02-ux/winui-diagnostics-overview-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Overview` ownership, route-activation refresh, and non-goal boundaries.
 - See `docs/02-ux/winui-diagnostics-logs-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Logs` ownership, route-activation refresh, and non-goal boundaries.
