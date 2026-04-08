@@ -8,6 +8,9 @@ using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
+/// <summary>
+/// Exposes the owner-owned lane workflow boundary that the From Template controller may drive.
+/// </summary>
 internal interface IDeployFromTemplateWorkspaceControllerHost
 {
     AppSettings DeploymentSettings { get; }

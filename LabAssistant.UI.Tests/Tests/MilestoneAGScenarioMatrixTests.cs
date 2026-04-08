@@ -165,7 +165,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         var source = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployFromTemplateViewHost"));
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", source);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", source);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", source);
     }
 

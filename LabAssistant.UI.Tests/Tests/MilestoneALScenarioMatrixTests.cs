@@ -205,7 +205,8 @@ public sealed class MilestoneALScenarioMatrixTests
         var deployResultsPanelCoordinatorSource = LoadDeployResultsPanelCoordinatorSource();
         var quickDeployOwnerSource = LoadDeployOnTheFlyWorkspaceOwnerSource();
         var quickDeployShellBridgeSource = LoadDeployOnTheFlyWorkspaceShellBridgeSource();
-        var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
+        var fromTemplateOwnerSource = LoadDeployFromTemplateWorkspaceOwnerSource();
+        var fromTemplateShellBridgeSource = LoadDeployFromTemplateWorkspaceShellBridgeSource();
         var fromTemplateRightPanelSource = LoadDeployFromTemplateRightPanelViewXamlSource();
 
         Assert.Contains("x:Name=\"DeployOnTheFlyOpenResultsPanelButton\"", quickDeploySource);
@@ -219,7 +220,8 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("public bool ShouldShowRightPanelEmptyState(bool showPanel)", deployResultsPanelCoordinatorSource);
         Assert.Contains("_shellBridge.RequestResultsPanelToggle();", quickDeployOwnerSource);
         Assert.Contains("public void RequestResultsPanelToggle() => _requestResultsPanelToggle();", quickDeployShellBridgeSource);
-        Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", fromTemplateCompositionSource);
+        Assert.Contains("_view.OpenResultsPanelRequested += OpenResultsPanelRequested;", fromTemplateOwnerSource);
+        Assert.Contains("public void RequestResultsPanelToggle() => _requestResultsPanelToggle();", fromTemplateShellBridgeSource);
         Assert.DoesNotContain("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("InsightsPanel.Visibility = showPanel ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
         Assert.Contains("ShellRightPanelColumn.Width = showPanel ? new GridLength(ShellRightPanelExpandedWidth) : new GridLength(0);", mainWindowSource);
@@ -244,9 +246,9 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("Content=\"Fix in Templates Editor\"", fromTemplateSource);
 
         Assert.Contains("Template Review", fromTemplateSource);
-        Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.ReplaceIssueRows(issueRows);", mainWindowSource);
-        Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.RefreshReviewState(hasBlockingFailures);", mainWindowSource);
-        Assert.Contains("private void UpdateIssueRows()", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_deployFromTemplateWorkspaceOwner.ReplaceIssueRows(issueRows);", mainWindowSource);
+        Assert.DoesNotContain("_deployFromTemplateWorkspaceOwner.RefreshReviewState(hasBlockingFailures);", mainWindowSource);
+        Assert.Contains("private void UpdateIssueRows(", fromTemplateCompositionSource);
         Assert.Contains("_workspace.RefreshReviewState(hasBlockingFailures);", fromTemplateCompositionSource);
     }
 
@@ -396,7 +398,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("public void ApplyRightPanelState(bool showPanel, bool panelUnavailable)", deployResultsPanelCoordinatorSource);
         Assert.Contains("RightPanelTitleTextBlock.Text = _deployResultsPanelCoordinator.GetRightPanelTitleText();", mainWindowSource);
         Assert.Contains("private void UpdateVmEntryRows()", LoadDeployOnTheFlyWorkspaceCompositionSource());
-        Assert.Contains("private void UpdateIssueRows()", LoadDeployFromTemplateWorkspaceCompositionSource());
+        Assert.Contains("private void UpdateIssueRows(", LoadDeployFromTemplateWorkspaceCompositionSource());
         Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);
         Assert.Contains("x:Name=\"DeployOnTheFlyEditorIssueSummaryTextBlock\"", quickDeploySource);
         Assert.Contains("x:Name=\"DeploySharedIssuesListView\"", fromTemplateSource);
@@ -453,6 +455,18 @@ public sealed class MilestoneALScenarioMatrixTests
     private static string LoadDeployFromTemplateWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceOwnerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceOwner.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceShellBridgeSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceShellBridge.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

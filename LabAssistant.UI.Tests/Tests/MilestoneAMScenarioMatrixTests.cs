@@ -1340,7 +1340,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("RefreshDeploySharedUiState,", mainWindowSource);
         Assert.Contains("_deployWorkspaceComposition.ApplyShellState();", mainWindowSource);
         Assert.Contains("if (IsDeployFromTemplateActive)", mainWindowSource);
-        Assert.Contains("_ = _deployFromTemplateWorkspaceComposition.EnsureTemplatesLoadedAsync(forceRefresh: false);", mainWindowSource);
+        Assert.Contains("_ = _deployFromTemplateWorkspaceOwner.EnsureTemplatesLoadedAsync(forceRefresh: false);", mainWindowSource);
 
         Assert.DoesNotContain("private bool _isUpdatingDeploySubviewSelection;", mainWindowSource);
         Assert.DoesNotContain("private void DeploySubviewTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)", mainWindowSource);
@@ -1376,7 +1376,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private bool IsDeployOnTheFlyActive =>", mainWindowSource);
         Assert.Contains("private bool IsDeployCapabilityActive =>", mainWindowSource);
         Assert.Contains("if (IsDeployFromTemplateActive)", mainWindowSource);
-        Assert.Contains("_ = _deployFromTemplateWorkspaceComposition.EnsureTemplatesLoadedAsync(forceRefresh: false);", mainWindowSource);
+        Assert.Contains("_ = _deployFromTemplateWorkspaceOwner.EnsureTemplatesLoadedAsync(forceRefresh: false);", mainWindowSource);
         Assert.Contains("private void RefreshDeploySharedUiState()", mainWindowSource);
         Assert.Contains("private void ReconcileDeployFromTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)", mainWindowSource);
         Assert.Contains("QuickDeployDraftCount: _deployOnTheFlyWorkspaceOwner.DraftCount,", mainWindowSource);
@@ -1391,7 +1391,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("if (_shellBridge.IsDeployOverviewActive)", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
         Assert.Contains("_onTheFlyWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);", compositionSource);
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", compositionSource);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", compositionSource);
         Assert.Contains("if (!_shellBridge.IsDeployCapabilityActive)", compositionSource);
         Assert.Contains("var selectedTab = _shellBridge.IsDeployOverviewActive", compositionSource);
         Assert.Contains("public void RefreshSharedUiState() => _overviewWorkspaceComposition.RefreshUiState();", compositionSource);
@@ -1440,7 +1440,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_overviewHost.Visibility = _shellBridge.IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;", compositionSource);
         Assert.Contains("_onTheFlyWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);", compositionSource);
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", compositionSource);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", compositionSource);
         Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", compositionSource);
         Assert.Contains("public void RefreshSharedUiState() => _overviewWorkspaceComposition.RefreshUiState();", compositionSource);
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", compositionSource);
@@ -1515,6 +1515,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var mainWindowSource = LoadMainWindowSource();
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var fromTemplateOwnerSource = LoadDeployFromTemplateWorkspaceOwnerSource();
         var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
         var fromTemplateViewCodeBehindSource = LoadDeployFromTemplateViewCodeBehindSource();
@@ -1523,38 +1524,44 @@ public sealed class MilestoneAMScenarioMatrixTests
             "public sealed partial class DeployFromTemplateView : UserControl",
             "private void OnTemplateSelectionChanged");
 
-        Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;", mainWindowSource);
-        Assert.Contains("_deployFromTemplateWorkspaceComposition = new DeployFromTemplateWorkspaceComposition(", mainWindowSource);
-        Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.ActiveTemplateDocument", mainWindowSource);
-        Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.SelectedTemplateLibraryItem", mainWindowSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceOwner _deployFromTemplateWorkspaceOwner;", mainWindowSource);
+        Assert.Contains("_deployFromTemplateWorkspaceOwner = new DeployFromTemplateWorkspaceOwner(", mainWindowSource);
+        Assert.DoesNotContain("_deployFromTemplateWorkspaceOwner.ActiveTemplateDocument", mainWindowSource);
+        Assert.DoesNotContain("_deployFromTemplateWorkspaceOwner.SelectedTemplateLibraryItem", mainWindowSource);
         Assert.DoesNotContain("private TemplateLibraryItem? _selectedDeployTemplateLibraryItem;", mainWindowSource);
         Assert.DoesNotContain("private TemplateEditorDocument? _activeDeployTemplateDocument;", mainWindowSource);
 
-        Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;", deployWorkspaceCompositionSource);
-        Assert.Contains("DeployFromTemplateWorkspaceComposition fromTemplateWorkspaceComposition,", deployWorkspaceCompositionSource);
-        Assert.Contains("_fromTemplateWorkspaceComposition = fromTemplateWorkspaceComposition;", deployWorkspaceCompositionSource);
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceOwner _fromTemplateWorkspaceOwner;", deployWorkspaceCompositionSource);
+        Assert.Contains("DeployFromTemplateWorkspaceOwner fromTemplateWorkspaceOwner,", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceOwner = fromTemplateWorkspaceOwner;", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
 
-        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost", fromTemplateCompositionSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceOwner : IDeployFromTemplateWorkspaceControllerHost", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployFromTemplateView _view;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceViewModel _workspace = new();", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _composition;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceController _controller;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly IDeployFromTemplateWorkspaceHost _host;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployReferenceDataService _referenceDataService;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployResolveSuggestionsService _resolveSuggestionsService;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployTemplateEditorLauncher _templateEditorLauncher;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceShellBridge _shellBridge;", fromTemplateOwnerSource);
+        Assert.Contains("public Task EnsureTemplatesLoadedAsync(bool forceRefresh) => LoadTemplatesAsync(forceRefresh);", fromTemplateOwnerSource);
+        Assert.Contains("public void RefreshUi() => UpdateUi();", fromTemplateOwnerSource);
+        Assert.Contains("public void ReconcileSelection(IReadOnlyList<TemplateLibraryItem> items)", fromTemplateOwnerSource);
+        Assert.Contains("private async Task OpenTemplateEditorAsync()", fromTemplateOwnerSource);
+        Assert.Contains("await _templateEditorLauncher.ShowEditorAsync(document, \"Template loaded.\");", fromTemplateOwnerSource);
+        Assert.Contains("private async Task HandleTemplateSelectionChangedAsync()", fromTemplateOwnerSource);
+        Assert.Contains("private async Task LoadTemplatesAsync(bool forceRefresh)", fromTemplateOwnerSource);
+
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition", fromTemplateCompositionSource);
         Assert.Contains("private readonly DeployFromTemplateView _view;", fromTemplateCompositionSource);
-        Assert.Contains("private readonly DeployFromTemplateWorkspaceViewModel _workspace = new();", fromTemplateCompositionSource);
-        Assert.Contains("private readonly IDeployFromTemplateCompositionHost _host;", fromTemplateCompositionSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceViewModel _workspace;", fromTemplateCompositionSource);
+        Assert.DoesNotContain("IDeployFromTemplateWorkspaceControllerHost", fromTemplateCompositionSource);
+        Assert.DoesNotContain("private readonly IDeployFromTemplateCompositionHost _host;", fromTemplateCompositionSource);
         Assert.Contains("templateItemsSource,", fromTemplateCompositionSource);
-        Assert.Contains("UpdateUi();", fromTemplateCompositionSource);
-        Assert.Contains("public TemplateLibraryItem? SelectedTemplateLibraryItem => _workspace.SelectedTemplateLibraryItem;", fromTemplateCompositionSource);
-        Assert.Contains("public TemplateEditorDocument? ActiveTemplateDocument => _workspace.ActiveTemplateDocument;", fromTemplateCompositionSource);
-        Assert.Contains("private async Task OpenTemplateEditorAsync()", fromTemplateCompositionSource);
-        Assert.Contains("await _host.ShowTemplateEditorAsync(document, \"Template loaded.\");", fromTemplateCompositionSource);
-        Assert.Contains("public Task EnsureTemplatesLoadedAsync(bool forceRefresh) => LoadTemplatesAsync(forceRefresh);", fromTemplateCompositionSource);
-        Assert.Contains("public void RefreshUi() => UpdateUi();", fromTemplateCompositionSource);
-        Assert.Contains("public void ApplyShellState(bool isFromTemplateActive)", fromTemplateCompositionSource);
-        Assert.Contains("public void SetSelectedTemplateLibraryItem(TemplateLibraryItem? selectedTemplateLibraryItem)", fromTemplateCompositionSource);
-        Assert.Contains("public void SetLoadedTemplateDocument(TemplateEditorDocument document, string actionStatusText)", fromTemplateCompositionSource);
-        Assert.Contains("public void SetActionStatus(string actionStatusText)", fromTemplateCompositionSource);
-        Assert.Contains("public void RefreshReviewState(bool hasBlockingFailures)", fromTemplateCompositionSource);
-        Assert.Contains("public void ReconcileSelection(IReadOnlyList<TemplateLibraryItem> items)", fromTemplateCompositionSource);
-        Assert.Contains("private async Task HandleTemplateSelectionChangedAsync()", fromTemplateCompositionSource);
-        Assert.Contains("private async Task LoadTemplatesAsync(bool forceRefresh)", fromTemplateCompositionSource);
+        Assert.Contains("public void SetVisibility(bool isActive)", fromTemplateCompositionSource);
+        Assert.Contains("public void UpdateUi(", fromTemplateCompositionSource);
         Assert.DoesNotContain("BuildDeployContext", fromTemplateCompositionSource);
 
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceViewModel", fromTemplateWorkspaceSource);
@@ -1594,11 +1601,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private void UpdateDeploySharedIssueSummaries()", mainWindowSource);
 
         Assert.Contains("private readonly DeployFromTemplateRightPanelView _rightPanelView;", fromTemplateCompositionSource);
-        Assert.Contains("public int IssueRowCount => _workspace.IssueRows.Count;", fromTemplateCompositionSource);
-        Assert.Contains("public void SetReadinessSummary(string readinessSummaryText)", fromTemplateCompositionSource);
-        Assert.Contains("public void ClearGroupedIssueState()", fromTemplateCompositionSource);
-        Assert.Contains("public void ReplaceIssueRows(IReadOnlyList<DeployIssueRow> issueRows)", fromTemplateCompositionSource);
-        Assert.Contains("private void UpdateIssueRows()", fromTemplateCompositionSource);
+        Assert.Contains("_view.SetSharedIssueSummariesItemsSource(_workspace.SharedIssueSummaries);", fromTemplateCompositionSource);
+        Assert.Contains("_rightPanelView.SetIssueRowsItemsSource(_workspace.IssueRows);", fromTemplateCompositionSource);
+        Assert.Contains("private void UpdateIssueRows(", fromTemplateCompositionSource);
         Assert.Contains("ApplyWorkspaceState()", fromTemplateCompositionSource);
 
         Assert.Contains("public ObservableCollection<DeployIssueRow> IssueRows { get; } = [];", fromTemplateWorkspaceSource);
@@ -1618,18 +1623,21 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var mainWindowSource = LoadMainWindowSource();
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var fromTemplateOwnerSource = LoadDeployFromTemplateWorkspaceOwnerSource();
         var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
         var fromTemplateControllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
         var fromTemplateControllerHostSource = LoadDeployFromTemplateWorkspaceControllerHostSource();
+        var fromTemplateWorkspaceHostInterfaceSource = LoadDeployFromTemplateWorkspaceHostInterfaceSource();
         var fromTemplateHostSource = LoadDeployFromTemplateWorkspaceHostSource();
-        var fromTemplateCompositionHostSource = LoadDeployFromTemplateCompositionHostSource();
+        var fromTemplateShellBridgeSource = LoadDeployFromTemplateWorkspaceShellBridgeSource();
         var deployContextBuilderSource = LoadDeployContextBuilderSource();
         var deployContextTypesSource = LoadDeployContextTypesSource();
 
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
         Assert.Contains("new DeployReferenceDataService(", mainWindowSource);
         Assert.Contains("var deployResolveSuggestionsService = new DeployResolveSuggestionsService();", mainWindowSource);
+        Assert.Contains("var deployTemplateEditorLauncher = new DeployTemplateEditorLauncher(_templatesWorkspaceComposition);", mainWindowSource);
         Assert.Contains("() => _isTemplatesLoading,", mainWindowSource);
         Assert.Contains("() => TemplatesLibraryItems.ToList(),", mainWindowSource);
         Assert.Contains("EnsureTemplatesLibraryAsync,", mainWindowSource);
@@ -1637,29 +1645,36 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", mainWindowSource);
         Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.EvaluateReadinessAsync(mode);", mainWindowSource);
         Assert.DoesNotContain("await _deployFromTemplateWorkspaceComposition.StartDeployAsync();", mainWindowSource);
-        Assert.Contains("filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),", mainWindowSource);
         Assert.DoesNotContain("template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),", mainWindowSource);
-        Assert.Contains("ShowTemplateEditorAsync,", mainWindowSource);
         Assert.Contains("RefreshDeploySharedUiState,", mainWindowSource);
         Assert.DoesNotContain("private async Task<int> ApplyDeployResolveSuggestionsAsync(LabTemplate template)", mainWindowSource);
         Assert.DoesNotContain("private DeployContextBuildResult BuildDeployContext(LabTemplate template)", mainWindowSource);
         Assert.DoesNotContain("private static DeployDiskResolution ResolveDeployDiskIdentity", mainWindowSource);
         Assert.DoesNotContain("private static DeploySwitchResolution ResolveDeploySwitches", mainWindowSource);
 
-        Assert.Contains("private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;", deployWorkspaceCompositionSource);
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceOwner _fromTemplateWorkspaceOwner;", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("ApplyResolveSuggestionsAsync", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("ReconcileFromTemplateSelection", deployWorkspaceCompositionSource);
 
-        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost", fromTemplateCompositionSource);
-        Assert.Contains("private readonly DeployFromTemplateWorkspaceController _controller;", fromTemplateCompositionSource);
-        Assert.Contains("Task<DeploymentOutcomeSummary> IDeployFromTemplateWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context) => _host.DeployAllAsync(context);", fromTemplateCompositionSource);
-        Assert.Contains("void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => UpdateUi();", fromTemplateCompositionSource);
-        Assert.Contains("_view.ReloadTemplatesRequested += async (_, _) => await EnsureTemplatesLoadedAsync(forceRefresh: true);", fromTemplateCompositionSource);
-        Assert.Contains("_view.EvaluateReadinessRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);", fromTemplateCompositionSource);
-        Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", fromTemplateCompositionSource);
-        Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", fromTemplateCompositionSource);
-        Assert.Contains("_view.StartDeployRequested += async (_, _) => await StartDeployAsync();", fromTemplateCompositionSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceOwner : IDeployFromTemplateWorkspaceControllerHost", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceController _controller;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly IDeployFromTemplateWorkspaceHost _host;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployReferenceDataService _referenceDataService;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployResolveSuggestionsService _resolveSuggestionsService;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployTemplateEditorLauncher _templateEditorLauncher;", fromTemplateOwnerSource);
+        Assert.Contains("private readonly DeployFromTemplateWorkspaceShellBridge _shellBridge;", fromTemplateOwnerSource);
+        Assert.Contains("Task<DeploymentOutcomeSummary> IDeployFromTemplateWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context) => _host.DeployAllAsync(context);", fromTemplateOwnerSource);
+        Assert.Contains("void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => UpdateUi();", fromTemplateOwnerSource);
+        Assert.Contains("_view.ReloadTemplatesRequested += ReloadTemplatesRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.EvaluateReadinessRequested += EvaluateReadinessRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.ResolveSuggestionsRequested += ResolveSuggestionsRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.OpenTemplateEditorRequested += OpenTemplateEditorRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.StartDeployRequested += StartDeployRequested;", fromTemplateOwnerSource);
+
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition", fromTemplateCompositionSource);
+        Assert.DoesNotContain("IDeployFromTemplateWorkspaceControllerHost", fromTemplateCompositionSource);
+        Assert.DoesNotContain("private readonly DeployFromTemplateWorkspaceController _controller;", fromTemplateCompositionSource);
 
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceController", fromTemplateControllerSource);
         Assert.Contains("private readonly IDeployFromTemplateWorkspaceControllerHost _host;", fromTemplateControllerSource);
@@ -1672,12 +1687,19 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("internal interface IDeployFromTemplateWorkspaceControllerHost", fromTemplateControllerHostSource);
         Assert.Contains("Task EnsureReferenceDataAsync(bool forceRefresh);", fromTemplateControllerHostSource);
 
-        Assert.Contains("internal interface IDeployFromTemplateCompositionHost", fromTemplateCompositionHostSource);
-        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompositionHost", fromTemplateHostSource);
-        Assert.Contains("private readonly DeployReferenceDataService _referenceDataService;", fromTemplateHostSource);
-        Assert.Contains("private readonly DeployResolveSuggestionsService _resolveSuggestionsService;", fromTemplateHostSource);
-        Assert.Contains("public Task EnsureReferenceDataAsync(bool forceRefresh) => _referenceDataService.EnsureAsync(forceRefresh);", fromTemplateHostSource);
-        Assert.Contains("public async Task<int> ApplyResolveSuggestionsAsync(LabTemplate template)", fromTemplateHostSource);
+        Assert.Contains("internal interface IDeployFromTemplateWorkspaceHost", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("Task EnsureTemplatesLibraryAsync(bool forceRefresh);", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath);", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("void RefreshSharedUiState();", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateWorkspaceHost", fromTemplateHostSource);
+        Assert.DoesNotContain("DeployReferenceDataService", fromTemplateHostSource);
+        Assert.DoesNotContain("DeployResolveSuggestionsService", fromTemplateHostSource);
+        Assert.DoesNotContain("ApplyResolveSuggestionsAsync", fromTemplateHostSource);
+
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceShellBridge", fromTemplateShellBridgeSource);
+        Assert.Contains("public void RequestResultsPanelToggle() => _requestResultsPanelToggle();", fromTemplateShellBridgeSource);
+        Assert.Contains("public void RefreshResultsPanelState() => _refreshResultsPanelState();", fromTemplateShellBridgeSource);
 
         Assert.Contains("public bool IsEvaluatingReadiness { get; private set; }", fromTemplateWorkspaceSource);
         Assert.Contains("public bool IsStarting { get; private set; }", fromTemplateWorkspaceSource);
@@ -1714,8 +1736,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.RefreshResultRows(_deployCompatibilityIssues, _deployReadinessReport);", mainWindowSource);
         Assert.DoesNotContain("_deployFromTemplateWorkspaceComposition.ResultRowCount", mainWindowSource);
 
-        Assert.Contains("public int ResultRowCount => _workspace.ResultRows.Count;", fromTemplateCompositionSource);
-        Assert.Contains("public void RefreshResultRows(", fromTemplateCompositionSource);
+        Assert.Contains("_rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);", fromTemplateCompositionSource);
+        Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", fromTemplateCompositionSource);
         Assert.Contains("_workspace.ResultRows.Count > 0", fromTemplateCompositionSource);
 
         Assert.Contains("public ObservableCollection<DeployVmResultRow> ResultRows { get; } = [];", fromTemplateWorkspaceSource);
@@ -1741,52 +1763,60 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var mainWindowSource = LoadMainWindowSource();
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var fromTemplateOwnerSource = LoadDeployFromTemplateWorkspaceOwnerSource();
         var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
-        var fromTemplateControllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
         var fromTemplateControllerHostSource = LoadDeployFromTemplateWorkspaceControllerHostSource();
+        var fromTemplateWorkspaceHostInterfaceSource = LoadDeployFromTemplateWorkspaceHostInterfaceSource();
         var fromTemplateHostSource = LoadDeployFromTemplateWorkspaceHostSource();
-        var fromTemplateCompositionHostSource = LoadDeployFromTemplateCompositionHostSource();
+        var fromTemplateShellBridgeSource = LoadDeployFromTemplateWorkspaceShellBridgeSource();
         var fromTemplateRightPanelViewCodeBehindSource = LoadDeployFromTemplateRightPanelViewCodeBehindSource();
 
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
+        Assert.Contains("new DeployFromTemplateWorkspaceShellBridge(", mainWindowSource);
         Assert.DoesNotContain("UpdateDeployUi));", mainWindowSource);
         Assert.Contains("_deployResultsPanelCoordinator.ResetRightPanelBehavior();", mainWindowSource);
         Assert.DoesNotContain("DeployGlobalIssuesExpander.IsExpanded = false;", mainWindowSource);
 
         Assert.DoesNotContain("DeployFromTemplateView fromTemplateView,", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("_fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", deployWorkspaceCompositionSource);
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
 
-        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost", fromTemplateCompositionSource);
-        Assert.Contains("private readonly IDeployFromTemplateCompositionHost _host;", fromTemplateCompositionSource);
-        Assert.Contains("public void ApplyShellState(bool isFromTemplateActive)", fromTemplateCompositionSource);
-        Assert.Contains("_view.Visibility = isFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", fromTemplateCompositionSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceOwner : IDeployFromTemplateWorkspaceControllerHost", fromTemplateOwnerSource);
+        Assert.Contains("public void ApplyShellState(bool isFromTemplateActive)", fromTemplateOwnerSource);
+        Assert.Contains("public void ResetPanelState()", fromTemplateOwnerSource);
+        Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", fromTemplateOwnerSource);
+        Assert.Contains("public bool ShouldAutoOpenResultsPanel =>", fromTemplateOwnerSource);
+        Assert.Contains("public string ResultsPanelTitle => \"From Template Progress / Results\";", fromTemplateOwnerSource);
+        Assert.Contains("_shellBridge.RequestResultsPanelToggle();", fromTemplateOwnerSource);
+        Assert.Contains("_shellBridge.RefreshResultsPanelState();", fromTemplateOwnerSource);
+
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition", fromTemplateCompositionSource);
+        Assert.DoesNotContain("IDeployFromTemplateWorkspaceControllerHost", fromTemplateCompositionSource);
+        Assert.Contains("public void SetVisibility(bool isActive)", fromTemplateCompositionSource);
+        Assert.Contains("_view.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;", fromTemplateCompositionSource);
         Assert.Contains("public void ResetPanelState()", fromTemplateCompositionSource);
         Assert.Contains("_rightPanelView.ResetPanelState();", fromTemplateCompositionSource);
         Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", fromTemplateCompositionSource);
-        Assert.Contains("public bool IsLoadingTemplates => _isLoadingTemplates;", fromTemplateCompositionSource);
-        Assert.Contains("public bool ShouldAutoOpenResultsPanel =>", fromTemplateCompositionSource);
-        Assert.Contains("public string ResultsPanelTitle => \"From Template Progress / Results\";", fromTemplateCompositionSource);
-        Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", fromTemplateCompositionSource);
-        Assert.Contains("void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => UpdateUi();", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.OpenResultsPanelRequested +=", fromTemplateCompositionSource);
+        Assert.DoesNotContain("void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState()", fromTemplateCompositionSource);
 
         Assert.Contains("internal interface IDeployFromTemplateWorkspaceControllerHost", fromTemplateControllerHostSource);
         Assert.Contains("Task EnsureReferenceDataAsync(bool forceRefresh);", fromTemplateControllerHostSource);
         Assert.Contains("void ApplyWorkspaceState();", fromTemplateControllerHostSource);
 
-        Assert.Contains("internal interface IDeployFromTemplateCompositionHost", fromTemplateCompositionHostSource);
-        Assert.Contains("bool IsTemplatesLoading { get; }", fromTemplateCompositionHostSource);
-        Assert.Contains("Task EnsureReferenceDataAsync(bool forceRefresh);", fromTemplateCompositionHostSource);
-        Assert.Contains("Task EnsureTemplatesLibraryAsync(bool forceRefresh);", fromTemplateCompositionHostSource);
-        Assert.Contains("Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath);", fromTemplateCompositionHostSource);
-        Assert.Contains("void RefreshSharedUiState();", fromTemplateCompositionHostSource);
-        Assert.Contains("void ApplyRightPanelState();", fromTemplateCompositionHostSource);
-        Assert.Contains("void OnOpenResultsPanelRequested();", fromTemplateCompositionHostSource);
-        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompositionHost", fromTemplateHostSource);
+        Assert.Contains("internal interface IDeployFromTemplateWorkspaceHost", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("bool IsTemplatesLoading { get; }", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("Task EnsureTemplatesLibraryAsync(bool forceRefresh);", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath);", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("void RefreshSharedUiState();", fromTemplateWorkspaceHostInterfaceSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateWorkspaceHost", fromTemplateHostSource);
         Assert.Contains("public bool IsTemplatesLoading => _isTemplatesLoading();", fromTemplateHostSource);
         Assert.Contains("public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _ensureTemplatesLibraryAsync(forceRefresh);", fromTemplateHostSource);
         Assert.Contains("public Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath) => _loadTemplateForEditorAsync(filePath);", fromTemplateHostSource);
-        Assert.Contains("public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();", fromTemplateHostSource);
+        Assert.DoesNotContain("OnOpenResultsPanelRequested", fromTemplateHostSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceShellBridge", fromTemplateShellBridgeSource);
+        Assert.Contains("public void RequestResultsPanelToggle() => _requestResultsPanelToggle();", fromTemplateShellBridgeSource);
+        Assert.Contains("public void RefreshResultsPanelState() => _refreshResultsPanelState();", fromTemplateShellBridgeSource);
         Assert.Contains("public void ResetPanelState()", fromTemplateRightPanelViewCodeBehindSource);
         Assert.DoesNotContain("public Expander DeployGlobalIssuesExpanderControl =>", fromTemplateRightPanelViewCodeBehindSource);
     }
@@ -1795,6 +1825,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     public void DeployFromTemplate_ReducesBroadViewExposureAndUsesNarrowViewSeams()
     {
         var mainWindowSource = LoadMainWindowSource();
+        var fromTemplateOwnerSource = LoadDeployFromTemplateWorkspaceOwnerSource();
         var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var fromTemplateViewCodeBehindSource = LoadDeployFromTemplateViewCodeBehindSource();
         var fromTemplateRightPanelViewCodeBehindSource = LoadDeployFromTemplateRightPanelViewCodeBehindSource();
@@ -1815,18 +1846,29 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private Button DeployReloadTemplatesButton =>", mainWindowSource);
         Assert.DoesNotContain("private TextBlock DeployResultsPanelSummaryTextBlock =>", mainWindowSource);
 
-        Assert.Contains("public void SetInteractionState(bool isLoadingTemplates, bool hasBlockingFailures)", fromTemplateCompositionSource);
+        Assert.Contains("private void SetInteractionState(bool isLoadingTemplates, bool hasBlockingFailures)", fromTemplateCompositionSource);
         Assert.Contains("public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)", fromTemplateCompositionSource);
-        Assert.Contains("_view.ReloadTemplatesRequested += async (_, _) => await EnsureTemplatesLoadedAsync(forceRefresh: true);", fromTemplateCompositionSource);
-        Assert.Contains("_view.EvaluateReadinessRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);", fromTemplateCompositionSource);
-        Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", fromTemplateCompositionSource);
-        Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", fromTemplateCompositionSource);
-        Assert.Contains("_view.StartDeployRequested += async (_, _) => await StartDeployAsync();", fromTemplateCompositionSource);
-        Assert.Contains("_view.TemplateSelectionChanged += async (_, _) => await HandleTemplateSelectionChangedAsync();", fromTemplateCompositionSource);
-        Assert.Contains("_view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();", fromTemplateCompositionSource);
+        Assert.Contains("_view.SetTemplateItemsSource(templateItemsSource);", fromTemplateCompositionSource);
+        Assert.Contains("_view.SetSharedIssueSummariesItemsSource(_workspace.SharedIssueSummaries);", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.ReloadTemplatesRequested +=", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.EvaluateReadinessRequested +=", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.ResolveSuggestionsRequested +=", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.OpenTemplateEditorRequested +=", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.StartDeployRequested +=", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.TemplateSelectionChanged +=", fromTemplateCompositionSource);
+        Assert.DoesNotContain("_view.OpenResultsPanelRequested +=", fromTemplateCompositionSource);
         Assert.DoesNotContain("DeployTemplateSelectorComboBoxControl", fromTemplateCompositionSource);
         Assert.DoesNotContain("DeploySharedIssuesListViewControl", fromTemplateCompositionSource);
         Assert.DoesNotContain("DeployVmResultsListViewControl", fromTemplateCompositionSource);
+
+        Assert.Contains("private void WireHandlers()", fromTemplateOwnerSource);
+        Assert.Contains("_view.ReloadTemplatesRequested += ReloadTemplatesRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.EvaluateReadinessRequested += EvaluateReadinessRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.ResolveSuggestionsRequested += ResolveSuggestionsRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.OpenTemplateEditorRequested += OpenTemplateEditorRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.StartDeployRequested += StartDeployRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_view.TemplateSelectionChanged += TemplateSelectionChanged;", fromTemplateOwnerSource);
+        Assert.Contains("_view.OpenResultsPanelRequested += OpenResultsPanelRequested;", fromTemplateOwnerSource);
 
         Assert.Contains("public event RoutedEventHandler? ReloadTemplatesRequested;", fromTemplateViewCodeBehindSource);
         Assert.Contains("public event RoutedEventHandler? OpenResultsPanelRequested;", fromTemplateViewCodeBehindSource);
@@ -1847,6 +1889,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var mainWindowSource = LoadMainWindowSource();
         var deployWorkspaceCompositionSource = LoadDeployWorkspaceCompositionSource();
+        var fromTemplateOwnerSource = LoadDeployFromTemplateWorkspaceOwnerSource();
         var fromTemplateCompositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var fromTemplateWorkspaceSource = LoadDeployFromTemplateWorkspaceViewModelSource();
         var fromTemplateControllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
@@ -1855,9 +1898,10 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceViewModel", fromTemplateWorkspaceSource);
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceController", fromTemplateControllerSource);
+        Assert.Contains("internal sealed class DeployFromTemplateWorkspaceOwner", fromTemplateOwnerSource);
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceComposition", fromTemplateCompositionSource);
 
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("DeployFromTemplateView fromTemplateView,", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("_fromTemplateHost.Visibility = _shellBridge.IsDeployFromTemplateActive ? Visibility.Visible : Visibility.Collapsed;", deployWorkspaceCompositionSource);
         Assert.DoesNotContain("ApplyResolveSuggestionsAsync", deployWorkspaceCompositionSource);
@@ -1877,6 +1921,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_deployResultsPanelCoordinator.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
         Assert.DoesNotContain("private ComboBox DeployTemplateSelectorComboBox =>", mainWindowSource);
         Assert.DoesNotContain("private ListView DeployGlobalIssuesListView =>", mainWindowSource);
+
+        Assert.Contains("_view.OpenResultsPanelRequested += OpenResultsPanelRequested;", fromTemplateOwnerSource);
+        Assert.Contains("_shellBridge.RequestResultsPanelToggle();", fromTemplateOwnerSource);
 
         Assert.Contains("public event SelectionChangedEventHandler? TemplateSelectionChanged;", fromTemplateViewCodeBehindSource);
         Assert.Contains("public event RoutedEventHandler? OpenResultsPanelRequested;", fromTemplateViewCodeBehindSource);
@@ -2256,9 +2303,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.False(File.Exists(GetDeployOnTheFlyCompositionHostPath()));
 
         var fromTemplateHostSource = LoadDeployFromTemplateWorkspaceHostSource();
-        var fromTemplateCompositionHostSource = LoadDeployFromTemplateCompositionHostSource();
-        Assert.Contains("void OnOpenResultsPanelRequested();", fromTemplateCompositionHostSource);
-        Assert.Contains("public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();", fromTemplateHostSource);
+        var fromTemplateShellBridgeSource = LoadDeployFromTemplateWorkspaceShellBridgeSource();
+        Assert.DoesNotContain("OnOpenResultsPanelRequested", fromTemplateHostSource);
+        Assert.Contains("public void RequestResultsPanelToggle() => _requestResultsPanelToggle();", fromTemplateShellBridgeSource);
 
         var controllerSource = LoadDeployOnTheFlyWorkspaceControllerSource();
         Assert.Contains("private int _autoEvaluateNonce;", controllerSource);
@@ -2788,15 +2835,27 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
+    private static string LoadDeployFromTemplateWorkspaceOwnerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceOwner.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceHostInterfaceSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "IDeployFromTemplateWorkspaceHost.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
     private static string LoadDeployFromTemplateWorkspaceHostSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceHost.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadDeployFromTemplateCompositionHostSource()
+    private static string LoadDeployFromTemplateWorkspaceShellBridgeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "IDeployFromTemplateCompositionHost.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceShellBridge.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

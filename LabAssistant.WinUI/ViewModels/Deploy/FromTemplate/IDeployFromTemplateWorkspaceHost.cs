@@ -1,42 +1,27 @@
 using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Templates;
-using LabAssistant.Models.Catalog;
-using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
-using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
-internal interface IDeployFromTemplateCompositionHost
+/// <summary>
+/// Exposes the non-shell external integrations that the From Template owner still needs.
+/// Lane workflow ownership stays in the owner/controller pair; this seam is limited to shared Templates/Deploy service access.
+/// </summary>
+internal interface IDeployFromTemplateWorkspaceHost
 {
-    AppSettings DeploymentSettings { get; }
-
-    IReadOnlyList<string> AvailableSwitches { get; }
-
     bool IsTemplatesLoading { get; }
 
     IReadOnlyList<TemplateLibraryItem> TemplateLibraryItems { get; }
-
-    IReadOnlyList<VhdxCatalogItem> LoadCatalogItems();
-
-    Task EnsureReferenceDataAsync(bool forceRefresh);
 
     Task EnsureTemplatesLibraryAsync(bool forceRefresh);
 
     Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath);
 
-    Task<int> ApplyResolveSuggestionsAsync(LabTemplate template);
-
-    Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText);
-
     Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 
     void RefreshSharedUiState();
-
-    void ApplyRightPanelState();
-
-    void OnOpenResultsPanelRequested();
 
     Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context);
 

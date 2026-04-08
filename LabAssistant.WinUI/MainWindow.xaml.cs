@@ -49,7 +49,7 @@ public sealed partial class MainWindow : Window
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
-    private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;
+    private readonly DeployFromTemplateWorkspaceOwner _deployFromTemplateWorkspaceOwner;
     private readonly DeployReferenceDataService _deployReferenceDataService;
     private readonly DeployOnTheFlyWorkspaceOwner _deployOnTheFlyWorkspaceOwner;
     private readonly DeployWorkspaceComposition _deployWorkspaceComposition;
@@ -164,34 +164,36 @@ public sealed partial class MainWindow : Window
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
                 () => IsTemplatesEditorActive));
-        _deployFromTemplateWorkspaceComposition = new DeployFromTemplateWorkspaceComposition(
+        var deployTemplateEditorLauncher = new DeployTemplateEditorLauncher(_templatesWorkspaceComposition);
+        _deployFromTemplateWorkspaceOwner = new DeployFromTemplateWorkspaceOwner(
             DeployFromTemplateViewHost,
             DeployFromTemplateRightPanelViewHost,
             TemplatesLibraryItems,
             new DeployFromTemplateWorkspaceHost(
-                _deployReferenceDataService,
-                deployResolveSuggestionsService,
                 () => _isTemplatesLoading,
                 () => TemplatesLibraryItems.ToList(),
                 EnsureTemplatesLibraryAsync,
                 filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),
-                ShowTemplateEditorAsync,
                 (context, mode) => _deploymentPreflightService.RunAsync(context, mode),
                 RefreshDeploySharedUiState,
-                ApplyRightPanelState,
                 async context =>
                 {
                     await _deploymentCoordinator.DeployAllAsync(context);
                     return _deploymentOutcomeSummaryBuilder.Build(context);
                 },
-                AttachDeployProgressCallbacks,
-                RequestDeployResultsPanelToggle));
+                AttachDeployProgressCallbacks),
+            _deployReferenceDataService,
+            deployResolveSuggestionsService,
+            deployTemplateEditorLauncher,
+            new DeployFromTemplateWorkspaceShellBridge(
+                RequestDeployResultsPanelToggle,
+                ApplyRightPanelState));
         _deployOnTheFlyWorkspaceOwner = new DeployOnTheFlyWorkspaceOwner(
             DeployOnTheFlyViewHost,
             DeployOnTheFlyRightPanelViewHost,
             _deployReferenceDataService,
             deployResolveSuggestionsService,
-            new DeployTemplateEditorLauncher(_templatesWorkspaceComposition),
+            deployTemplateEditorLauncher,
             new DeployOnTheFlyWorkspaceShellBridge(
                 DispatcherQueue,
                 () => RootLayout.XamlRoot,
@@ -209,7 +211,7 @@ public sealed partial class MainWindow : Window
             DeployQuickDeployTabViewItem,
             DeployFromTemplateTabViewItem,
             CreateDeployWorkspaceUiState,
-            _deployFromTemplateWorkspaceComposition,
+            _deployFromTemplateWorkspaceOwner,
             new DeployWorkspaceShellBridge(
                 () => IsDeployCapabilityActive,
                 () => IsDeployOverviewActive,
@@ -218,7 +220,7 @@ public sealed partial class MainWindow : Window
                 NavigateToRoute));
         _deployResultsPanelCoordinator = new DeployResultsPanelCoordinator(
             _deployOnTheFlyWorkspaceOwner,
-            _deployFromTemplateWorkspaceComposition,
+            _deployFromTemplateWorkspaceOwner,
             () => IsDeployOverviewActive,
             () => IsDeployOnTheFlyActive,
             () => IsDeployFromTemplateActive);
@@ -384,7 +386,7 @@ public sealed partial class MainWindow : Window
 
         if (IsDeployFromTemplateActive)
         {
-            _ = _deployFromTemplateWorkspaceComposition.EnsureTemplatesLoadedAsync(forceRefresh: false);
+            _ = _deployFromTemplateWorkspaceOwner.EnsureTemplatesLoadedAsync(forceRefresh: false);
         }
 
     }
@@ -944,7 +946,7 @@ public sealed partial class MainWindow : Window
     {
         _isTemplatesLoading = isLoading;
         ApplyTemplatesWorkspaceUiState();
-        _deployFromTemplateWorkspaceComposition.RefreshUi();
+        _deployFromTemplateWorkspaceOwner.RefreshUi();
     }
 
     private void NavigateToTemplatesEditor()
@@ -959,7 +961,7 @@ public sealed partial class MainWindow : Window
 
     private void ReconcileDeployFromTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)
     {
-        _deployFromTemplateWorkspaceComposition.ReconcileSelection(items);
+        _deployFromTemplateWorkspaceOwner.ReconcileSelection(items);
         RefreshDeploySharedUiState();
     }
 
@@ -980,7 +982,7 @@ public sealed partial class MainWindow : Window
     {
         return new DeployWorkspaceUiState(
             QuickDeployDraftCount: _deployOnTheFlyWorkspaceOwner.DraftCount,
-            IsLoadingTemplates: _deployFromTemplateWorkspaceComposition.IsLoadingTemplates,
+            IsLoadingTemplates: _deployFromTemplateWorkspaceOwner.IsLoadingTemplates,
             AvailableTemplateCount: TemplatesLibraryItems.Count);
     }
 

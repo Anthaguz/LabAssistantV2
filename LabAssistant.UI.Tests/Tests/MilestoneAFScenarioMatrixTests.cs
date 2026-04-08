@@ -30,7 +30,7 @@ public sealed class MilestoneAFScenarioMatrixTests
         var source = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployFromTemplateViewHost"));
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", source);
+        Assert.Contains("_fromTemplateWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", source);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", source);
     }
 
@@ -66,6 +66,7 @@ public sealed class MilestoneAFScenarioMatrixTests
     public void MainWindow_WiresDeployReadinessAndExecutionFlowForAf3()
     {
         var source = LoadMainWindowSource();
+        var ownerSource = LoadDeployFromTemplateWorkspaceOwnerSource();
         var compositionSource = LoadDeployFromTemplateWorkspaceCompositionSource();
         var controllerSource = LoadDeployFromTemplateWorkspaceControllerSource();
 
@@ -80,16 +81,19 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.DoesNotContain("private async void DeployStartButton_Click(object sender, RoutedEventArgs e)", source);
         Assert.DoesNotContain("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", source);
         Assert.DoesNotContain("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", source);
+        Assert.Contains("var deployTemplateEditorLauncher = new DeployTemplateEditorLauncher(_templatesWorkspaceComposition);", source);
+        Assert.Contains("_deployFromTemplateWorkspaceOwner = new DeployFromTemplateWorkspaceOwner(", source);
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", source);
         Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", controllerSource);
-        Assert.Contains("_view.ReloadTemplatesRequested += async (_, _) => await EnsureTemplatesLoadedAsync(forceRefresh: true);", compositionSource);
-        Assert.Contains("_view.EvaluateReadinessRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);", compositionSource);
-        Assert.Contains("_view.ResolveSuggestionsRequested += async (_, _) => await ResolveSuggestionsAsync();", compositionSource);
-        Assert.Contains("_view.OpenTemplateEditorRequested += async (_, _) => await OpenTemplateEditorAsync();", compositionSource);
-        Assert.Contains("_view.StartDeployRequested += async (_, _) => await StartDeployAsync();", compositionSource);
-        Assert.Contains("_view.TemplateSelectionChanged += async (_, _) => await HandleTemplateSelectionChangedAsync();", compositionSource);
-        Assert.Contains("private void UpdateUi()", compositionSource);
-        Assert.Contains("private void UpdateIssueRows()", compositionSource);
+        Assert.Contains("private void WireHandlers()", ownerSource);
+        Assert.Contains("_view.ReloadTemplatesRequested += ReloadTemplatesRequested;", ownerSource);
+        Assert.Contains("_view.EvaluateReadinessRequested += EvaluateReadinessRequested;", ownerSource);
+        Assert.Contains("_view.ResolveSuggestionsRequested += ResolveSuggestionsRequested;", ownerSource);
+        Assert.Contains("_view.OpenTemplateEditorRequested += OpenTemplateEditorRequested;", ownerSource);
+        Assert.Contains("_view.StartDeployRequested += StartDeployRequested;", ownerSource);
+        Assert.Contains("_view.TemplateSelectionChanged += TemplateSelectionChanged;", ownerSource);
+        Assert.Contains("private void UpdateUi()", ownerSource);
+        Assert.Contains("private void UpdateIssueRows(", compositionSource);
     }
 
     [Fact]
@@ -153,6 +157,12 @@ public sealed class MilestoneAFScenarioMatrixTests
     private static string LoadDeployFromTemplateWorkspaceCompositionSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceComposition.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadDeployFromTemplateWorkspaceOwnerSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "FromTemplate", "DeployFromTemplateWorkspaceOwner.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
