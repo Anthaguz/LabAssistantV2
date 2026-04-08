@@ -3911,3 +3911,94 @@ Each readiness result shall include, at minimum:
 - [ ] runtime vs shared-capability vs lane-local hierarchy is explicit and traceable
 - [ ] `MainWindow` residual shell ownership is explicit and traceable
 - [ ] runtime implementation and bootstrap-timing non-goals are explicit and traceable
+
+---
+
+# AC-045 - WinUI Deploy Results Panel Coordinator Contract (AN3)
+
+**Related FRs:** FR-182, FR-183, FR-184, FR-090, FR-097, FR-113, FR-155, FR-161, FR-162, FR-163, FR-164, FR-165, FR-166
+
+## Scenarios
+
+### 1) The coordinator remains a narrow shared Deploy panel-intent seam
+**Given**
+- the shell owns right-panel infrastructure
+- Quick Deploy and From Template both participate in the shared Deploy results panel
+
+**When**
+- the `DeployResultsPanelCoordinator` seam is defined
+
+**Then**
+- the coordinator is explicitly allowed to own:
+  - active-lane-based panel title selection
+  - active-lane-based auto-open recommendation
+  - Overview empty-state participation for the shared Deploy panel region
+  - panel-state delegation into the participating lane-local seams
+  - capability-switch reset hooks that are specifically about Deploy panel presentation
+- the coordinator is explicitly treated as a shared Deploy panel-intent seam rather than a general shared Deploy owner
+
+### 2) Shell right-panel infrastructure remains outside the coordinator
+**Given**
+- `MainWindow` remains the shell composition root
+
+**When**
+- coordinator ownership is reviewed
+
+**Then**
+- the coordinator does not own:
+  - shell panel open state
+  - shell panel width/layout or compact fallback
+  - shell owner-capability precedence
+  - shell container visibility
+  - shell host lifecycle
+- those concerns remain explicitly shell-owned
+
+### 3) Lane-local workflow and result semantics remain outside the coordinator
+**Given**
+- Quick Deploy and From Template already expose lane-local panel behavior through their own seams
+
+**When**
+- coordinator non-goals are reviewed
+
+**Then**
+- the coordinator does not own:
+  - lane-local readiness or progress state
+  - lane-local workflow sequencing
+  - lane-local result-row or issue-row construction
+  - lane-local launcher semantics beyond reading already-exposed lane intent
+  - general shared Deploy helper coordination such as reference-data refresh or template-editor launch policy
+- lane-local seams remain responsible for their own panel meaning, content, and workflow-local state application
+
+### 4) Shared Deploy may delegate narrow panel-integration questions without widening the seam
+**Given**
+- shared Deploy composition still needs one place to answer shared panel-integration questions
+
+**When**
+- later runtime cleanup uses the coordinator seam
+
+**Then**
+- acceptable delegation is limited to:
+  - panel title selection
+  - auto-open recommendation
+  - Overview empty-state visibility
+  - panel-state application into the participating lanes
+  - capability-switch reset hooks specifically tied to Deploy panel presentation
+- unacceptable delegation includes:
+  - route resolution
+  - general Deploy refresh policy
+  - general shared-helper policy
+  - capability-wide workflow ownership
+
+## Expected Boundary
+- `DeployResultsPanelCoordinator` remains a narrow shared Deploy panel-intent seam
+- shell panel infrastructure remains shell-owned
+- Quick Deploy and From Template remain responsible for lane-local panel meaning and lane-local workflow semantics
+- shared Deploy may use the coordinator for narrow panel-integration decisions only
+- the coordinator's non-goals are explicit enough that future refactors do not treat it as a convenience landfill
+
+## Definition of Done
+- [ ] the coordinator's allowed ownership is explicit and traceable
+- [ ] shell-owned panel infrastructure stays explicit and traceable outside the coordinator
+- [ ] lane-local workflow and result-semantics non-goals are explicit and traceable
+- [ ] allowed shared Deploy delegation is explicit and traceable
+- [ ] the coordinator remains a narrow seam rather than a shared Deploy workflow owner
