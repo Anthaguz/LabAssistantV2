@@ -4002,3 +4002,114 @@ Each readiness result shall include, at minimum:
 - [ ] lane-local workflow and result-semantics non-goals are explicit and traceable
 - [ ] allowed shared Deploy delegation is explicit and traceable
 - [ ] the coordinator remains a narrow seam rather than a shared Deploy workflow owner
+
+---
+
+# AC-046 - WinUI Deploy Shared Helper Ownership Contract (AN4)
+
+**Related FRs:** FR-185, FR-186, FR-187, FR-188, FR-155, FR-161, FR-162, FR-163, FR-164, FR-165, FR-166, FR-176, FR-177, FR-179, FR-180
+
+## Scenarios
+
+### 1) Shared Deploy helpers remain narrow capability-shared, lane-triggered seams
+**Given**
+- shared Deploy already has lane-local owners and compositions beneath the current shell-owned construction path
+- later cleanup may reuse helper seams across more than one Deploy lane
+
+**When**
+- shared Deploy helper ownership is defined
+
+**Then**
+- shared Deploy helpers are explicitly classified as capability-shared, lane-triggered seams
+- helper reuse does not make the helper the owner of lane-local workflow meaning
+- lane-local owners, lane-local hosts, or later capability-runtime seams remain responsible for:
+  - invocation timing
+  - status and remediation messaging
+  - post-helper workflow sequencing
+  - route-activation-driven refresh or reconcile behavior
+
+### 2) `DeployReferenceDataService` remains a shared reference-data seam only
+**Given**
+- Quick Deploy and From Template both depend on shared Deploy-side reference inputs
+
+**When**
+- `DeployReferenceDataService` ownership is reviewed
+
+**Then**
+- the helper is explicitly allowed to own:
+  - shared Deploy reference-data loading
+  - shared settings/switch/catalog snapshot exposure
+  - shared cached snapshot behavior where current callers do not require stronger freshness guarantees
+  - a narrow `EnsureAsync(forceRefresh)` boundary
+- the helper does not own:
+  - route-activation refresh policy
+  - lane-local refresh/reconcile sequencing
+  - readiness re-evaluation
+  - lane-local default selection
+  - user-facing remediation or status messaging
+  - shell or panel coordination
+
+### 3) `DeployResolveSuggestionsService` remains a shared deterministic suggestion seam only
+**Given**
+- multiple Deploy lanes may need the same switch/disk auto-resolve rules
+
+**When**
+- `DeployResolveSuggestionsService` ownership is reviewed
+
+**Then**
+- the helper is explicitly allowed to own:
+  - deterministic shared Deploy-side normalization and suggestion rules
+  - applying those rules to a caller-supplied template using caller-supplied reference data
+  - returning an applied-count summary
+- the helper does not own:
+  - loading or refreshing reference data
+  - deciding when suggestions run
+  - deciding whether suggestions are automatic or user-invoked in a given lane
+  - readiness re-evaluation after suggestions apply
+  - lane-local status text or correction messaging
+  - template-editor launch behavior
+
+### 4) `DeployTemplateEditorLauncher` remains a narrow cross-capability launch seam only
+**Given**
+- Deploy may need to hand off a caller-prepared template document into the Templates editor workspace
+
+**When**
+- `DeployTemplateEditorLauncher` ownership is reviewed
+
+**Then**
+- the helper is explicitly allowed to own:
+  - forwarding a caller-supplied `TemplateEditorDocument`
+  - forwarding a caller-supplied status text
+  - the narrow launch boundary into the existing Templates editor seam
+- the helper does not own:
+  - deciding when a lane should open the editor
+  - building the template snapshot or choosing the document contents
+  - lane-local validation or correction policy
+  - template-library selection or reconciliation policy
+  - broader Deploy-to-Templates workflow coordination
+
+### 5) `DeployReferenceDataService` invalidation remains explicit and deferred
+**Given**
+- current shared Deploy reference data uses caller-invoked refresh rather than a broader invalidation system
+
+**When**
+- invalidation scope is reviewed in this docs-only issue
+
+**Then**
+- the contract explicitly allows caller-owned `EnsureAsync(forceRefresh: true)` triggers
+- the contract does not silently promise auto-invalidation across Assets, Templates, or other app-state changes
+- stronger same-session freshness guarantees remain deferred until a later narrow issue establishes the trigger, scope, and owner
+
+## Expected Boundary
+- shared Deploy helpers are narrow reusable seams under lane-local or later runtime ownership, not replacements for those owners
+- `DeployReferenceDataService` owns shared reference-data loading/caching only
+- `DeployResolveSuggestionsService` owns deterministic shared suggestion application only
+- `DeployTemplateEditorLauncher` owns the narrow Deploy-to-Templates launch handoff only
+- invalidation remains an explicit caller-owned/deferred rule rather than an assumed background guarantee
+
+## Definition of Done
+- [ ] shared Deploy helper classification is explicit and traceable
+- [ ] `DeployReferenceDataService` ownership and non-goals are explicit and traceable
+- [ ] `DeployResolveSuggestionsService` ownership and non-goals are explicit and traceable
+- [ ] `DeployTemplateEditorLauncher` ownership and non-goals are explicit and traceable
+- [ ] `DeployReferenceDataService` invalidation is either contracted or explicitly deferred with rationale
