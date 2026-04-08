@@ -784,6 +784,22 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** acceptable delegation includes panel title selection, auto-open recommendation, Overview empty-state visibility, panel-state application into the participating lanes, and capability-switch reset hooks specifically about Deploy panel presentation; route resolution, general Deploy refresh policy, and capability-wide workflow coordination remain out of scope.
   - **Priority:** P1
 
+- **FR-185:** WinUI shared Deploy helpers shall remain narrow capability-shared, lane-triggered seams rather than becoming shared workflow owners by convenience.
+  - **Acceptance details:** shared Deploy helpers may encode narrow reusable Deploy-side integration or data rules, but lane-local owners, hosts, or later capability-runtime seams shall remain responsible for invocation timing, workflow meaning, status messaging, and post-invocation orchestration.
+  - **Priority:** P1
+
+- **FR-186:** WinUI `DeployReferenceDataService` shall remain limited to shared Deploy reference-data loading, cached snapshot exposure, and explicit caller-requested refresh rather than absorbing lane refresh policy or workflow ownership.
+  - **Acceptance details:** the helper may expose shared Deploy settings, switch inventory, catalog items, catalog options, and a narrow `EnsureAsync(forceRefresh)` boundary; route activation policy, readiness sequencing, lane-local defaults, remediation messaging, and shell/panel concerns remain outside it.
+  - **Priority:** P1
+
+- **FR-187:** WinUI `DeployResolveSuggestionsService` and `DeployTemplateEditorLauncher` shall remain narrow shared Deploy helper seams with explicit non-goals for workflow ownership.
+  - **Acceptance details:** `DeployResolveSuggestionsService` may apply deterministic shared Deploy-side suggestions to a caller-supplied template using caller-supplied reference data, but it shall not own data loading, invocation timing, readiness re-evaluation, or lane messaging; `DeployTemplateEditorLauncher` may forward a caller-supplied document and status text into the Templates editor seam, but it shall not own document construction, invocation timing, template-library policy, or cross-capability workflow coordination.
+  - **Priority:** P1
+
+- **FR-188:** WinUI `DeployReferenceDataService` invalidation shall remain explicit and caller-owned until a later narrow contract defines stronger freshness guarantees.
+  - **Acceptance details:** the current contract permits caller-owned `forceRefresh` triggers and existing cached/shared snapshot behavior, but it does not silently promise auto-invalidation across Assets, Templates, or other app-state changes; if stronger same-session freshness guarantees become required, they must be defined in a later narrow contract issue instead of inferred.
+  - **Priority:** P1
+
 Detailed capability contract:
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
 - See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
@@ -800,6 +816,7 @@ Detailed capability contract:
 - See `docs/02-ux/winui-lane-architecture-standard-an.md` for Milestone AN lane-local role boundaries, banned patterns, and the simple-lane exception rule.
 - See `docs/02-ux/winui-typed-capability-runtime-contract-an.md` for Milestone AN typed capability bootstrap/runtime boundary and runtime ownership rules.
 - See `docs/02-ux/winui-deploy-results-panel-coordinator-contract-an.md` for Milestone AN the narrow Deploy results-panel coordinator seam and its non-goals.
+- See `docs/02-ux/winui-deploy-shared-helper-ownership-contract-an.md` for Milestone AN shared Deploy helper ownership limits and the explicit deferred invalidation rule for `DeployReferenceDataService`.
 - See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
 - See `docs/02-ux/winui-diagnostics-overview-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Overview` ownership, route-activation refresh, and non-goal boundaries.
 - See `docs/02-ux/winui-diagnostics-logs-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Logs` ownership, route-activation refresh, and non-goal boundaries.
