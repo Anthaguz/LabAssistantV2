@@ -3797,3 +3797,117 @@ Each readiness result shall include, at minimum:
 - [ ] the banned-pattern list is explicit and traceable
 - [ ] the simple-lane exception rule is explicit and traceable
 - [ ] shell-only and shared-capability-only boundary preservation remains explicit and traceable
+
+---
+
+# AC-044 - WinUI Typed Capability Bootstrap and Runtime Contract (AN2)
+
+**Related FRs:** FR-179, FR-180, FR-181, FR-113, FR-114, FR-115, FR-125, FR-126, FR-127, FR-176, FR-177, FR-178
+
+## Scenarios
+
+### 1) Capability bootstrap is explicit and distinct from the long-lived runtime boundary
+**Given**
+- `MainWindow` remains the shell composition root
+- later runtime cleanup needs a clearer shell-to-capability boundary than direct lane/helper construction in `MainWindow`
+
+**When**
+- the typed capability bootstrap/runtime contract is defined
+
+**Then**
+- capability bootstrap is explicitly defined as the shell-owned construction step for a capability runtime
+- capability bootstrap may:
+  - resolve app-level services
+  - bind fixed shell-owned hosts or view roots
+  - create shell bridges or adapters needed by the capability runtime
+  - instantiate one typed runtime boundary for the capability
+- capability bootstrap does not remain the capability's long-lived owner after construction
+
+### 2) The typed capability runtime owns the capability-local runtime boundary without replacing lower seams
+**Given**
+- a capability may already have shared capability composition and lane-local seams beneath it
+
+**When**
+- the typed runtime boundary is defined
+
+**Then**
+- the typed capability runtime is explicitly responsible for:
+  - shared capability composition lifetime
+  - capability-shared helper lifetime
+  - lane-local seam lifetime
+  - capability-local route-activation handoff
+  - capability-level refresh or reconcile entry points
+- the typed capability runtime does not become:
+  - the shell route owner
+  - the shell navigation or shell header owner
+  - the shell container owner
+  - the lane-local workflow owner when that responsibility belongs in lane-local seams
+
+### 3) The relationship between runtime, shared capability composition, and lane seams remains explicit
+**Given**
+- shared capability composition and lane-local seams are already part of the approved direction
+
+**When**
+- the runtime hierarchy is defined
+
+**Then**
+- the intended hierarchy is explicit:
+  - `MainWindow`
+  - capability bootstrap
+  - typed capability runtime
+  - shared capability composition and capability-shared helpers where needed
+  - lane-local seams under the capability boundary
+- shared capability composition remains limited to genuinely shared capability-level concerns
+- lane-local seams remain responsible for lane-local workflow and lane-local view-state application
+- typed capability runtime does not replace the lane architecture standard from AN1
+
+### 4) MainWindow remains shell-only while converging toward one typed runtime per capability
+**Given**
+- `MainWindow` already owns shell route switching, shell header state, shell panel infrastructure, and app-level workspace lifetime
+
+**When**
+- the typed capability runtime target is defined
+
+**Then**
+- `MainWindow` remains explicitly responsible for:
+  - shell route switching and route resolution
+  - shell navigation configuration and selection
+  - shell header/title/description
+  - shell theme and compact/drawer behavior
+  - shell-owned panel/container infrastructure
+  - shell host visibility
+  - app-level capability runtime lifetime
+  - capability bootstrap entry points
+- `MainWindow` is not treated as the long-term direct owner of:
+  - multiple lane-local composition fields for the same capability
+  - multiple lane-local owner fields for the same capability
+  - capability-local helper fields whose meaning is local to one capability
+  - scattered capability-local route-activation wiring for the same capability
+- the target is one typed runtime field per capability rather than one shell field per capability sub-piece
+
+### 5) Implementation policy and bootstrap timing remain explicit non-goals
+**Given**
+- the issue is docs-only
+
+**When**
+- the runtime contract is reviewed for scope
+
+**Then**
+- runtime implementation remains out of scope
+- eager-vs-lazy bootstrap timing remains out of scope
+- generic runtime-framework design remains out of scope
+- behavior redesign remains out of scope
+
+## Expected Boundary
+- capability bootstrap is a shell-owned construction phase distinct from the long-lived typed capability runtime
+- each capability can converge toward one typed runtime boundary owned by `MainWindow` at the app level
+- typed capability runtime sits above shared capability composition and lane-local seams without replacing either
+- `MainWindow` remains shell-only while converging away from lane/helper field sprawl
+- AN1 lane-local rules remain in force underneath the typed runtime boundary
+
+## Definition of Done
+- [ ] capability bootstrap vs runtime ownership is explicit and traceable
+- [ ] typed capability runtime ownership is explicit and traceable
+- [ ] runtime vs shared-capability vs lane-local hierarchy is explicit and traceable
+- [ ] `MainWindow` residual shell ownership is explicit and traceable
+- [ ] runtime implementation and bootstrap-timing non-goals are explicit and traceable
