@@ -87,7 +87,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Type:** Manual (Hyper-V host) + automated coverage
 - **Related stabilization note:** Includes regression observations captured after `#219` (PersistentPowerShellSession + catalog validation path stabilization)
 - **Steps:**
-  1. Run the Milestone U checklist in `docs/07-testing/milestone-u-hyperv-verification-checklist.md`.
+  1. Run the Milestone U checklist in `docs/07-testing/Archived/milestone-u-hyperv-verification-checklist.md`.
   2. Verify catalog-time VHDX validation (good + invalid VHDX).
   3. Verify quick/full preflight behavior and deploy gating on the Deploy page.
   4. Trigger a runtime deployment failure and inspect UI summary, structured logs, and debug logs.
@@ -104,7 +104,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Type:** Manual (real machine) + automated coverage
 - **Related milestone:** Milestone V (`#225`-`#229`)
 - **Steps:**
-  1. Run the Milestone V checklist in `docs/07-testing/milestone-v-operational-hardening-checklist.md`.
+  1. Run the Milestone V checklist in `docs/07-testing/Archived/milestone-v-operational-hardening-checklist.md`.
   2. Verify wrapper trace toggle off/on behavior (`LABASSISTANT_POWERSHELL_WRAPPER_TRACE`).
   3. Spot-check PowerShell-backed actions for no-hang/shutdown regressions.
   4. Verify structured/debug log rotation and retention behavior.
@@ -121,7 +121,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Type:** Manual (real app/Hyper-V host where deploy runtime checks are exercised) + automated coverage
 - **Related milestone:** Milestone W (`#230`-`#235`)
 - **Steps:**
-  1. Run the Milestone W checklist in `docs/07-testing/milestone-w-workflow-completion-checklist.md`.
+  1. Run the Milestone W checklist in `docs/07-testing/Archived/milestone-w-workflow-completion-checklist.md`.
   2. Verify guest-step controls UI grouping, placeholder visibility/labeling, and network grouping in `VmConfigPanel`.
   3. Verify template save/load JSON round-trip for implemented guest-step configs and placeholder-only guest network omission.
   4. Verify runtime guest-step skip/execution outcomes in per-VM summary and `structured-events.jsonl`.
@@ -138,7 +138,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Type:** Manual (real Windows machine / Hyper-V host) + automated coverage
 - **Related milestone:** Milestone AA (`#265`, `#266`, `#274`, `#267`, `#269`)
 - **Steps:**
-  1. Run the Milestone AA checklist in `docs/07-testing/milestone-aa-winui-shell-machines-checklist.md`.
+  1. Run the Milestone AA checklist in `docs/07-testing/Archived/milestone-aa-winui-shell-machines-checklist.md`.
   2. Verify shell behavior (drawer motion/dismiss, top-bar visibility, theme readability, insights collapsed default).
   3. Verify capability-local navigation behavior (capability defaults, subview switching, breadcrumb/context updates).
   4. Verify Machines v1 behavior (inventory/selection, start-stop-restart-console, delete scope + confirmation, RDP disabled with reason).
@@ -156,7 +156,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AB (`#286`, `#287`, `#288`)
 - **Steps:**
   1. Run automated AB matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneABScenarioMatrixTests.cs`.
-  2. Run the Milestone AB checklist in `docs/07-testing/milestone-ab-layout-hardening-checklist.md`.
+  2. Run the Milestone AB checklist in `docs/07-testing/Archived/milestone-ab-layout-hardening-checklist.md`.
   3. Verify compact/normal/wide resize behavior across Machines and Diagnostics surfaces.
   4. Verify overflow/scroll ownership behavior, especially long Diagnostics payload details and filter/action reachability.
   5. Verify extracted host rendering remains stable while switching capabilities/subviews (no empty-host regressions).
@@ -173,7 +173,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AC (`#292`, `#293`, `#294`)
 - **Steps:**
   1. Run automated AC matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneACScenarioMatrixTests.cs`.
-  2. Run the Milestone AC checklist in `docs/07-testing/milestone-ac-global-navigationview-checklist.md`.
+  2. Run the Milestone AC checklist in `docs/07-testing/Archived/milestone-ac-global-navigationview-checklist.md`.
   3. Verify global entity set + settings footer placement and startup route determinism (`machines.overview`).
   4. Verify expanded parent->default child behavior and direct child route selection.
   5. Verify compact mode child accessibility by click (no hover-only dependency) and accepted compact parent-click behavior.
@@ -190,7 +190,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AD (`#300`, `#301`, `#302`, `#307`, `#308`, `#303`)
 - **Steps:**
   1. Run automated AD matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneADScenarioMatrixTests.cs`.
-  2. Run the Milestone AD checklist in `docs/07-testing/milestone-ad-templates-convergence-checklist.md`.
+  2. Run the Milestone AD checklist in `docs/07-testing/Archived/milestone-ad-templates-convergence-checklist.md`.
   3. Verify Templates routing (`templates.library` default from parent, local navigation to `templates.editor`).
   4. Verify unified workflow continuity (Library selection -> Editor context -> back to Library with coherent selection state).
   5. Verify AD3 operation entry points and AC-012 VM-edit parity flows (add/remove/edit/apply + save/reload round-trip).
@@ -209,7 +209,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AE (`#312`, `#313`, `#314`, `#315`, `#316`)
 - **Steps:**
   1. Run automated AE matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAEScenarioMatrixTests.cs`.
-  2. Run the Milestone AE checklist in `docs/07-testing/milestone-ae-templates-selector-normalization-checklist.md`.
+  2. Run the Milestone AE checklist in `docs/07-testing/Archived/milestone-ae-templates-selector-normalization-checklist.md`.
   3. Verify switch selector rows (`add/remove`, `zero-row valid`, duplicate/empty-row guards, empty-host guidance).
   4. Verify catalog-first VHDX selector behavior and path-first legacy compatibility guidance.
   5. Verify normalization conflict policy blocks save until catalog resolution when identities conflict.
@@ -227,7 +227,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AF (`#322`, `#323`, `#324`, `#325`, `#326`)
 - **Steps:**
   1. Run automated AF matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAFScenarioMatrixTests.cs`.
-  2. Run the Milestone AF checklist in `docs/07-testing/milestone-af-deploy-from-template-checklist.md`.
+  2. Run the Milestone AF checklist in `docs/07-testing/Archived/milestone-af-deploy-from-template-checklist.md`.
   3. Verify Deploy parent scope defaults to `deploy.from_template` and on-the-fly remains deferred for AF.
   4. Verify readiness/gating behavior (blocking disk identity conflicts, warning switch mapping states, gated deploy start).
   5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and route/context handoff.
@@ -246,7 +246,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AG (`#332`, `#333`, `#334`, `#335`, `#336`)
 - **Steps:**
   1. Run automated AG matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAGScenarioMatrixTests.cs`.
-  2. Run the Milestone AG checklist in `docs/07-testing/milestone-ag-deploy-on-the-fly-checklist.md`.
+  2. Run the Milestone AG checklist in `docs/07-testing/Archived/milestone-ag-deploy-on-the-fly-checklist.md`.
   3. Verify route/scope behavior (`deploy.on_the_fly`) and Deploy subview continuity.
   4. Verify readiness gating (blocking vs warning) and deploy-start enablement rules.
   5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and context handoff.
@@ -265,7 +265,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AJ (`#355`, `#356`, `#357`, `#358`, `#359`)
 - **Steps:**
   1. Run automated AJ matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAJScenarioMatrixTests.cs`.
-  2. Run the Milestone AJ checklist in `docs/07-testing/milestone-aj-base-disks-convergence-checklist.md`.
+  2. Run the Milestone AJ checklist in `docs/07-testing/Archived/milestone-aj-base-disks-convergence-checklist.md`.
   3. Verify `assets.base_disks` route and shell hosting remain canonical and stable.
   4. Verify scaffold regions and explicit loading/empty/error states remain present.
   5. Verify operational Base Disks behavior: list, refresh, import/register, metadata edit/save, validate, and registry-only remove.
@@ -285,7 +285,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AK (`#365`, `#366`, `#367`, `#368`, `#369`)
 - **Steps:**
   1. Run automated AK matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAKScenarioMatrixTests.cs`.
-  2. Run the Milestone AK checklist in `docs/07-testing/milestone-ak-switches-convergence-checklist.md`.
+  2. Run the Milestone AK checklist in `docs/07-testing/Archived/milestone-ak-switches-convergence-checklist.md`.
   3. Verify `assets.switches` route and shell hosting remain canonical and stable.
   4. Verify AK2 scaffold continuity for list/details/edit/actions and explicit loading/empty/error state containers.
   5. Verify AK3 operational continuity for load/refresh/create/update/delete wiring, conservative update rules, and delete blocking when any VM is attached.
@@ -305,7 +305,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AL (`#378`, `#379`, `#380`, `#381`, `#382`, `#383`, `#384`, `#385`, `#386`, `#387`)
 - **Steps:**
   1. Run automated AL matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneALScenarioMatrixTests.cs`.
-  2. Run the Milestone AL checklist in `docs/07-testing/milestone-al-shell-view-consistency-checklist.md`.
+  2. Run the Milestone AL checklist in `docs/07-testing/Archived/milestone-al-shell-view-consistency-checklist.md`.
   3. Verify shell title/description ownership and confirm targeted child views do not reintroduce duplicated page-level header bands.
   4. Verify Overview-first behavior for `Assets`, `Deploy`, and `Diagnostics`, and verify `Templates` still uses the Library-first exception model.
   5. Verify Deploy right-panel behavior remains workflow-local and progress/results-first, with Quick Deploy issue signaling kept in the workflow/editor surface.
@@ -327,7 +327,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#407`, `#408`, `#409`, `#410`, `#411`, `#412`, `#439`, `#441`, `#453`, `#454`, `#455`, `#456`, `#457`, `#458`, `#459`, `#460`, `#461`, `#462`, `#463`, `#464`, `#465`, `#466`, `#467`, `#468`, `#469`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
-  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-assets-extraction-checklist.md`.
+  2. Run the Milestone AM checklist in `docs/07-testing/Archived/milestone-am-assets-extraction-checklist.md`.
   3. Verify the shared Assets foundation remains overview-first, route-stable, and host/delegation only.
   4. Verify Overview lane summary/navigation sanity plus shared-host non-ownership.
   5. Verify Base Disks route, selection, edit, import/register, validation, and remove flow sanity.
@@ -347,7 +347,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#413`, `#414`, `#415`, `#416`, `#417`, `#418`, `#419`, `#420`, `#421`, `#422`, `#423`, `#424`, `#425`, `#426`, `#427`, `#428`, `#429`, `#430`, `#439`, `#441`, `#497`, `#498`, `#499`, `#500`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
-  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-templates-extraction-checklist.md`.
+  2. Run the Milestone AM checklist in `docs/07-testing/Archived/milestone-am-templates-extraction-checklist.md`.
   3. Verify the shared Templates foundation remains Library-first, route-stable, and host/delegation only.
   4. Verify Library search/filter/list/selection/action sanity plus shared-host non-ownership.
   5. Verify Editor explicit-entry behavior, document/header state, VM list/selection/draft/apply, save/save-as/validate, and VM-entry add/remove sanity.
@@ -366,7 +366,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#439`, `#441`, `#501`, `#502`, `#503`, `#504`, `#505`, `#506`, `#507`, `#508`, `#509`, `#510`, `#511`, `#512`, `#513`, `#514`, `#515`, `#516`, `#517`, `#518`, `#519`, `#520`, `#521`, `#522`, `#523`, `#524`, `#525`, `#526`, `#527`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
-  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-deploy-extraction-checklist.md`.
+  2. Run the Milestone AM checklist in `docs/07-testing/Archived/milestone-am-deploy-extraction-checklist.md`.
   3. Verify the shared Deploy foundation remains overview-first, route-stable, and host/delegation only.
   4. Verify Overview lane summary/navigation sanity plus shared-host non-ownership.
   5. Verify From Template selection/review/grouped-issue/deploy/results sanity.
@@ -387,7 +387,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#439`, `#441`, `#528`, `#529`, `#530`, `#531`, `#532`, `#533`, `#534`, `#535`, `#536`, `#537`, `#538`, `#539`, `#540`, `#541`, `#542`, `#543`, `#544`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
-  2. Run the Milestone AM checklist in `docs/07-testing/milestone-am-diagnostics-extraction-checklist.md`.
+  2. Run the Milestone AM checklist in `docs/07-testing/Archived/milestone-am-diagnostics-extraction-checklist.md`.
   3. Verify the shared Diagnostics foundation remains Overview-first, route-stable, and host/delegation only.
   4. Verify Overview lane summary/actions sanity plus shared-host non-ownership.
   5. Verify Logs filter/query, selection/detail, reload/clear/open-location sanity.

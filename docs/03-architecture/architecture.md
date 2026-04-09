@@ -2,15 +2,20 @@
 
 **Purpose:** Explain how the system is structured and how code should be organized.
 
+Current document authority for WinUI shell, lane, and shared seam rules is defined in `docs/00-overview/authoritative-doc-map.md`.
+
 ## 1. High-Level Overview
 - **Architecture style:** Layered desktop application with MVVM-style UI state management.
 - **Key goals:** Maintainable local-first automation, safe Hyper-V operations, testable orchestration logic, and clear diagnostics.
 
 ## 2. Solution Structure
-- **UI (`LabAssistant`)**
-  - WPF application and top-level composition root.
-  - Owns navigation, views, viewmodels, and user interaction state.
+- **UI (`LabAssistant.WinUI`)**
+  - Primary desktop UI and current shell composition root.
+  - Owns navigation, views, viewmodels, and user interaction state for the supported product surface.
   - Binds to business/data/service abstractions and displays progress, summaries, and errors.
+- **Legacy UI (`LabAssistant`)**
+  - WPF application kept only for legacy maintenance, migration cleanup, or explicit removal work.
+  - It is not the current authority for WinUI behavior, ownership, or workflow design.
 - **Business (`LabAssistant.Business`)**
   - Orchestrates workflows (deployment pipeline, cleanup/cancellation coordination, outcome summaries).
   - Owns validation and workflow decision logic that should be unit-testable.
@@ -38,6 +43,12 @@ Behavioral boundaries:
 - Business coordinates ordering, validation, cancellation, cleanup, and summaries.
 - Services execute external actions and infrastructure concerns.
 - Data persists and loads local artifacts/configuration.
+
+Current authoritative WinUI architecture docs:
+- `docs/03-architecture/winui-shell-navigation-layout.md`
+- `docs/03-architecture/winui-shell-bootstrap-runtime.md`
+- `docs/03-architecture/winui-lane-architecture.md`
+- `docs/03-architecture/winui-shared-seam-ownership.md`
 
 Code documentation guidance for composition seams, workflow methods, and shell bridges is defined in `docs/03-architecture/code-documentation.md`.
 Code organization guidance for seam-heavy files is defined in `docs/03-architecture/code-organization.md`.
@@ -107,14 +118,14 @@ Code organization guidance for seam-heavy files is defined in `docs/03-architect
   - These behaviors were stabilized during Milestone U follow-up hotfix `#219` and should be preserved unless intentionally redesigned/tested.
 
 ## Open Questions / TBDs
-- Sequence diagrams for deploy/cancel/cleanup and diagnostics export (`docs/03-architecture/sequence-diagrams.md`).
 - Whether to formalize PowerShell wrapper protocol/lifecycle details in a dedicated architecture/supportability doc beyond the summary above (planned in Milestone V).
 - Whether future switch management and guest configuration features should introduce new business workflow coordinators or extend current deployment pipeline abstractions.
-- GUI action maps currently available for migration behavior preservation:
-  - `docs/03-architecture/gui-action-map.deploy.md`
-  - `docs/03-architecture/gui-action-map.templates.md`
-  - `docs/03-architecture/gui-action-map.assets.md`
-  - `docs/03-architecture/gui-action-map.settings-diagnostics-shell.md`
-- Code-path reading index (migration/onboarding aid):
-  - `docs/03-architecture/code-path-index.md`
-- Future action maps should be added for new capability surfaces (especially `Machines`) as those workflows are designed/implemented.
+
+## Historical Reference Aids
+- Historical migration/reference aids retained in `docs/03-architecture/Archived/`:
+  - `docs/03-architecture/Archived/sequence-diagrams.md`
+  - `docs/03-architecture/Archived/gui-action-map.deploy.md`
+  - `docs/03-architecture/Archived/gui-action-map.templates.md`
+  - `docs/03-architecture/Archived/gui-action-map.assets.md`
+  - `docs/03-architecture/Archived/gui-action-map.settings-diagnostics-shell.md`
+  - `docs/03-architecture/Archived/code-path-index.md`

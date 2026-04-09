@@ -25,16 +25,22 @@ It combines: (1) repo architecture rules, (2) documentation/process rules, and (
    - Open an issue: `Mismatch: docs vs code — <topic>` and propose a resolution.
    - When multiple docs disagree, use this precedence order unless a newer approved canonical doc explicitly states otherwise:
      1. `docs/01-requirements/acceptance-criteria.md`
-     2. milestone UX/contracts
-     3. SRS
-     4. architecture docs
-     5. test-plan/checklist docs
+     2. `docs/01-requirements/srs.md`
+     3. canonical docs named in `docs/00-overview/authoritative-doc-map.md`
+     4. specialized requirement supplements explicitly cited by `srs.md` or `acceptance-criteria.md`
+     5. the active issue brief, but only for slice scope, ordering, and execution notes
+   - `docs/01-requirements/user-stories.md`, `docs/01-requirements/non-functional-requirements.md`, `docs/07-testing/test-strategy.md`, and `docs/07-testing/test-plan.md` are live support docs within their own domains, but they do not override `acceptance-criteria.md` / `srs.md` on product behavior unless a higher-order doc explicitly delegates.
+   - Milestone-coded docs, milestone checklists, and archived migration/reference docs are historical by default and must not be treated as current authority for new work unless the user explicitly asks for historical reconstruction or audit work.
+   - If a historical milestone doc still contains a rule that appears missing from the current authority set, treat that as a documentation bug to fix in the current authority docs, not as permission to reactivate the milestone doc silently.
 3) **New behavior must be documented before implementation**, except tiny refactors that don’t change behavior.
    - “Documented” means: update **SRS + Acceptance Criteria** at minimum.
 4) **Acceptance Criteria is the implementation contract.**
    - If you can’t map work to Acceptance Criteria, stop and escalate.
 5) **Never commit secrets.**
    - If secrets are found: stop, report, and propose remediation (rotate + purge history if needed).
+6) **Future-facing agent workflow rules must live in `AGENTS.md`.**
+   - If a new rule changes how agents should choose authority, respect roles, scope issues, prepare issue briefs, or decide what is historical vs authoritative, add that rule to `AGENTS.md` in the same docs slice.
+   - Do NOT leave durable process/governance rules only in milestone docs, issue threads, or chat.
 
 ---
 
@@ -57,6 +63,9 @@ Rules:
 - PM must keep issue scope within a single decision seam or implementation slice.
 - PM must avoid milestone issues that require reading many capability contracts just to begin.
 - PM should prefer a chain of narrow issues over one “finish the capability” issue.
+- PM must keep durable architecture and ownership rules in canonical docs or in `srs.md` / `acceptance-criteria.md`, not in new milestone-coded docs.
+- PM must treat milestone-coded docs as historical decision artifacts or closure evidence, not as long-term implementation authority.
+- PM issue briefs must state the acting mode for the slice (`PM-only`, `Dev-only`, or another explicitly approved mode) and list the exact authoritative docs for that slice.
 
 ### Dev Agent responsibilities
 Implements **only** from approved requirements:
@@ -220,6 +229,9 @@ TBD rules:
   - convert to issue,
   - keep deferred with rationale,
   - or remove as obsolete.
+- Active unresolved TBDs must also be listed in `docs/00-overview/tbd-register.md`.
+- The source document remains authoritative for the actual rule or decision boundary; `docs/00-overview/tbd-register.md` is the tracking index, not a replacement source of truth.
+- Archived docs, templates, and examples do not create active TBDs unless the unresolved item is explicitly promoted into `docs/00-overview/tbd-register.md`.
 
 Consolidation rules:
 - Milestone-local docs may record local decisions, but durable cross-capability rules must eventually be promoted into canonical docs.
@@ -228,6 +240,26 @@ Consolidation rules:
   - durable behavioral rules -> Acceptance Criteria / SRS / architecture docs
   - milestone contracts -> local decision history, migration guidance, or references to canonical docs
 - Milestone contracts should not remain the long-term only place where cross-capability behavior is defined.
+- A legacy doc may be moved into an `Archived` folder only after:
+  - any still-live rules have been promoted into the current authority docs,
+  - live references have been updated,
+  - and the file no longer acts as a required source to understand current behavior.
+- Archiving is the last step of consolidation, not the consolidation itself.
+
+Authority rules:
+- The current authority set for new work is:
+  - `AGENTS.md`
+  - `docs/00-overview/scope.md`, `docs/00-overview/product-vision.md`, and `docs/00-overview/glossary.md` when product framing or terminology matters
+  - `docs/01-requirements/user-stories.md` when story framing or story-to-FR/AC/test traceability matters
+  - `docs/01-requirements/srs.md`
+  - `docs/01-requirements/acceptance-criteria.md`
+  - `docs/01-requirements/non-functional-requirements.md` and specialized requirement supplements when quality bars or specialized contracts matter
+  - `docs/07-testing/test-strategy.md` and `docs/07-testing/test-plan.md` when test strategy or recurring verification scope matters
+  - canonical docs named in `docs/00-overview/authoritative-doc-map.md`
+  - the active issue brief for scope and execution notes only
+- Milestone-coded docs under `docs/02-ux/`, milestone checklists under `docs/07-testing/`, and archived migration/reference aids under `docs/03-architecture/Archived/` are historical by default.
+- Do not create a new milestone-coded doc when the rule is meant to remain authoritative beyond that slice.
+- When a milestone doc is absorbed, update the canonical authority docs in the same slice and explicitly mark the milestone doc as historical.
 
 ---
 
@@ -295,6 +327,8 @@ Consolidation rules:
 - Hand off using a short issue brief, not a full replay of prior discussion.
 - Reference only the canonical docs and tests needed for the active issue.
 - Summaries should reduce context, not restate the whole milestone.
+- Do not pull milestone-coded docs into the active authority set for a normal implementation slice.
+- If historical milestone context is genuinely needed, cite it as history and restate the surviving rule in the current authority docs or issue brief before relying on it.
 
 ### 7.2 Project-Specific AGENTS.md Files
 - A project-specific `AGENTS.md` is worth adding only when a project has rules that genuinely differ from the repo default.
@@ -311,8 +345,11 @@ Consolidation rules:
 
 ### 7.3 Test Target Preference
 - Prefer tests around extracted seams, state owners, controllers, or viewmodels over tests that assert literal source layout.
+- When extracting WinUI seams, prefer route continuity, state-owner seam presence, capability-level behavior, and narrow interaction-boundary coverage where practical.
 - Use source-shape or XAML/source-string tests only when they protect contract-critical shell structure, routing, or named interaction surfaces that are intentionally part of the contract.
 - Manual checklist verification remains valid for end-to-end workflow confirmation, but it does not replace targeted automated tests for extracted logic seams.
+- If runtime extraction changes ownership boundaries, interaction seams, or route-bearing structure, the directly impacted tests must be updated in the same issue/PR.
+- Temporary scaffold tests may be reduced only when stable contract coverage remains explicit after the change.
 
 ### 7.4 Active TBD Handling
 - Agents are not expected to keep all repo TBDs in active memory.
@@ -380,8 +417,11 @@ Consolidation rules:
 - When handing off to PM or preparing a reusable handoff for a future Dev/PM, use a stable structure rather than ad hoc prose.
 - PM handoffs should preserve the existing structure/style the PM is already using in this repository rather than inventing a new layout.
 - PM handoffs are issue briefs for the next slice, not implementation-result summaries.
+- PM handoffs must not use the Dev handoff header or the Dev result-summary template.
 - Preferred PM handoff sections are:
-  - `## Dev Session Handoff — Issue #<n> (<milestone code>)`
+  - `## PM Issue Brief — Issue #<n> (<milestone code>)`
+  - `### Mode`
+  - `### Authoritative Docs`
   - `### Issue`
   - `### Goal`
   - `### Why this issue exists`
@@ -399,6 +439,8 @@ Consolidation rules:
   - `### PR Requirements`
   - `### Definition of Done`
 - PM handoffs should keep the current PM level of detail unless the user explicitly asks for a shorter issue brief.
+- The `### Mode` section must state the acting role and allowed action class for the slice, for example `PM-only; no code edits or PRs` or `Dev-only; implementation permitted`.
+- The `### Authoritative Docs` section must list only the small current authority set needed for the slice.
 - The `### Issue` section should preserve the PM’s existing issue-brief style and should normally include:
   - issue number and title
   - milestone name/code

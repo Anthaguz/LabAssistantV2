@@ -7,9 +7,9 @@
 **Related:**
 - `docs/01-requirements/srs.md` (FR-060..FR-066)
 - `docs/01-requirements/acceptance-criteria.md` (AC-006)
-- `docs/02-ux/capability-taxonomy.md`
-- `docs/02-ux/navigation-ia-draft.md`
-- `docs/02-ux/migration-preservation-matrix.md`
+- `docs/02-ux/Archived/capability-taxonomy.md`
+- `docs/02-ux/Archived/navigation-ia-draft.md`
+- `docs/02-ux/Archived/migration-preservation-matrix.md`
 
 ---
 
@@ -75,6 +75,7 @@ v1 scope follows the agreed **scope B** direction:
 - Delete-with-storage should remove safe/owned VM folder artifacts when possible; failures must be explicit and actionable.
 - Failures must be actionable and non-silent.
 - RDP and Console actions are separate controls; one must not hide the other.
+- Console and RDP actions should remain grouped together as the dedicated remote-access action cluster rather than being scattered across unrelated action areas.
 - `Open RDP` shall be disabled (grayed out) when readiness is unknown/unmet.
 - Basic edit workflow is draft-based:
   - edits are local until user clicks `Apply`
