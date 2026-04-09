@@ -291,24 +291,24 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-067:** The product shall support a parallel UI execution model during WinUI migration:
-  - `LabAssistant` (WPF) remains available as production baseline
+  - `LabAssistant` (WPF) remains available as a legacy baseline/maintenance surface
   - `LabAssistant.WinUI` is introduced as a separate application project
   - **Acceptance details:** both UI projects build in solution and are independently launchable.
   - **Priority:** P1
 
 - **FR-068:** WinUI shell navigation shall use icon-rail + hamburger drawer interaction:
-  - icon rail is always visible for top-level capabilities
+  - normal desktop widths may show a persistent icon rail for top-level capabilities
   - hamburger opens a slide-out capability drawer with scrim
   - drawer dismisses on outside click or `Esc`
-  - **Acceptance details:** full-menu navigation must not depend on hover-only behavior.
+  - **Acceptance details:** full-menu navigation must not depend on hover-only behavior; compact widths may replace a persistent icon rail with a hamburger-invoked drawer model when that better preserves workspace economy.
   - **Priority:** P1
 
 - **FR-069:** WinUI shall default to `Machines` on startup and shall not persist last selected capability across restarts.
   - **Acceptance details:** app startup route is deterministic (`Machines`) unless explicitly changed by future approved requirements.
   - **Priority:** P1
 
-- **FR-070:** WinUI shell shall include a right-side insights panel that is collapsed by default and opened via a warning/issue trigger.
-  - **Acceptance details:** shell shows issue indicator/badge when issues exist; panel presence does not block normal workspace interaction when collapsed.
+- **FR-070:** WinUI shell shall include right-side panel infrastructure that is collapsed by default and available for approved capability- or lane-owned secondary context.
+  - **Acceptance details:** the shell owns the panel container, layout host, generic visibility mechanics, and collapsed-by-default behavior; active capability or lane contracts decide whether workflow-local triggers or counts are exposed; panel presence does not block normal workspace interaction when collapsed.
   - **Priority:** P1
 
 - **FR-071:** Machines editor UX in WinUI shall use section-based details navigation (for example, Hardware grouping CPU + Memory) instead of legacy collapsible stacks.
@@ -417,7 +417,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-093:** WinUI Deploy `on-the-fly` shall provide correction affordances for blocking readiness issues and gate execution until blocking issues are resolved.
-  - **Acceptance details:** Readiness output provides explicit correction actions and preserves existing deployment orchestration semantics once unblocked.
+  - **Acceptance details:** readiness output provides explicit correction actions, should surface issues at field, group, or VM-row granularity where that improves fixability, and preserves existing deployment orchestration semantics once unblocked; Quick Deploy draft editing remains live draft state rather than a per-VM apply workflow, and the handoff for saving the current draft into template authoring should remain explicitly labeled as a save-to-template action rather than an ambiguous editor-launch label.
   - **Priority:** P1
 
 - **FR-094:** WinUI Deploy `on-the-fly` results UX shall follow compact-first visibility parity with AF results patterns.
@@ -449,7 +449,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-101:** WinUI `Assets` Base Disks shall provide an in-context management surface for registered base disks that preserves current base-disk domain behavior.
-  - **Acceptance details:** the surface shall support list, refresh, import/register, metadata edit, validation/readiness visibility, and remove actions without requiring a separate edit route; metadata editing remains in selected-item details context and does not invent new schema or disk-domain semantics.
+  - **Acceptance details:** the surface shall support list, refresh, import/register, metadata edit, validation/readiness visibility, and remove actions without requiring a separate edit route; metadata editing remains in selected-item details context and does not invent new schema or disk-domain semantics; selection state remains clear and stable across refresh/update actions; existing embedded asset shortcuts from Deploy/Templates remain preserved.
   - **Priority:** P1
 
 - **FR-102:** WinUI `Assets` Base Disks shall classify registration and catalog validation outcomes as blocking or warning with actionable user guidance.
@@ -457,7 +457,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-103:** WinUI `Assets` Base Disks removal shall enforce explicit safety guardrails and operation-scoped diagnostics.
-  - **Acceptance details:** AJ scope covers registry removal, not underlying file deletion; remove requires explicit confirmation, must surface whether the disk appears in use or referenced, blocks or warns per approved safety taxonomy, and emits structured logs with `operationId`, `baseDiskId`, action context, result, and error details; failed removal must not leave partial registry state.
+  - **Acceptance details:** AJ scope covers registry removal, not underlying file deletion; remove requires explicit confirmation, must surface whether the disk appears in use or referenced, blocks or warns per approved safety taxonomy, and emits structured logs with `operationId`, `baseDiskId`, action context, result, and error details; failed removal must not leave partial registry state; if remove, update, or register flows fail after transient or in-memory state changes, the visible state must reconcile back to persisted truth.
   - **Priority:** P1
 
 - **FR-104:** WinUI `Assets` shall expose a canonical `assets.switches` subview for virtual switch management within the existing shell route model.
@@ -485,15 +485,15 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-110:** WinUI capability-local navigation shall support approved overview/index surfaces only where they add routing or status value, and shall preserve explicit workflow-state exceptions where a peer tab model would be misleading.
-  - **Acceptance details:** `Assets`, `Deploy`, and `Diagnostics` use approved `Overview`-first local navigation; `Machines` remains single-surface for current scope; `Templates` keeps `Library` as the primary capability surface while `Editor` remains a workflow-state entered from explicit actions rather than a permanently exposed peer destination.
+  - **Acceptance details:** approved `Overview` surfaces are not decorative and must provide at least two of route-entry value, useful summary, or attention/health signaling; `Assets` uses `Overview`, `Base Disks`, and `Switches` as the current local model, and Assets Overview remains primarily a summary-and-navigation surface rather than the place that absorbs the full operational action set; `Deploy` uses `Overview`, `Quick Deploy`, and `From Template`, where Deploy Overview remains the route-entry chooser/index surface rather than a heavy deployment-history dashboard by default, `Quick Deploy` remains the direct configuration workflow, and `From Template` remains a review/remediation/deploy workflow rather than a duplicate Quick Deploy editor; `Diagnostics` uses `Overview` and `Logs` with Overview as a lightweight support dashboard; `Machines` remains single-surface for current scope; `Templates` keeps `Library` as the primary capability surface while `Editor` remains a workflow-state entered from explicit actions rather than a permanently exposed peer destination.
   - **Priority:** P1
 
 - **FR-111:** WinUI shell right panel shall remain shell-owned infrastructure, but capability views shall own panel meaning, trigger placement, and issue/progress scoping according to the active workflow contract.
-  - **Acceptance details:** shell-owned infrastructure includes the panel container, layout host, generic visibility mechanics, compact-width fallback, owner reset on capability change, and internal vertical scroll ownership; active capability or lane owns whether the panel is used, what it means, what content appears there, and the workflow-local triggers/titles/summaries/results/actions that open, close, or refresh it; workflow-local panel toggles and issue counts may live inside child views; `Deploy` right panel is progress/results-first, while pre-run validation issues move inline in the main workspace; right-panel content remains secondary context and must not be the primary editor surface.
+  - **Acceptance details:** shell-owned infrastructure includes the panel container, layout host, generic visibility mechanics, compact-width fallback, owner reset on capability change, and internal vertical scroll ownership; active capability or lane owns whether the panel is used, what it means, what content appears there, and the workflow-local triggers/titles/summaries/results/actions that open, close, or refresh it; workflow-local panel toggles and issue counts may live inside child views; `Deploy` right panel is progress/results-first, while pre-run validation issues move inline in the main workspace; current `Assets`, `Machines`, `Templates`, and `Diagnostics` scope do not require right-panel dependence by default; right-panel content remains secondary context and must not be the primary editor surface.
   - **Priority:** P1
 
 - **FR-112:** WinUI migrated capability surfaces shall follow shared action-placement, iconography, and compact-layout rules derived from the cross-view audit.
-  - **Acceptance details:** actions live nearest to the state they affect; `New` defaults to an inventory-level action that clears the current details/editor into draft state; icon-first command chrome with tooltips is preferred, including trash-can delete affordances and icon-based save/apply where clarity remains sufficient; compact layouts prioritize the primary workflow region and use bounded scroll owners rather than unbounded page growth.
+  - **Acceptance details:** actions live nearest to the state they affect; inventory actions stay in inventory/list header context; current-object actions stay in details/editor context; workflow actions may remain text-capable where clarity requires it; support actions stay secondary; `New` defaults to an inventory-level action that clears the current details/editor into draft state; icon-first command chrome with tooltips is preferred, including trash-can delete affordances and icon-based save/apply where clarity remains sufficient; overview pages may use more page-like scrolling when appropriate, but dense operational surfaces still prioritize bounded scroll owners rather than unbounded page growth.
   - **Priority:** P1
 
 - **FR-113:** WinUI `MainWindow` shall act as the shell composition root only and shall limit its direct ownership to shell chrome, route resolution, shell navigation behavior, shell header state, and shell right-panel host lifecycle.
@@ -800,41 +800,16 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** the current contract permits caller-owned `forceRefresh` triggers and existing cached/shared snapshot behavior, but it does not silently promise auto-invalidation across Assets, Templates, or other app-state changes; if stronger same-session freshness guarantees become required, they must be defined in a later narrow contract issue instead of inferred.
   - **Priority:** P1
 
-Detailed capability contract:
+- **FR-189:** WinUI surfaces shall preserve a baseline accessibility contract for primary workflows, including keyboard reachability, logical focus order, visible focus indication, non-color-only error communication, and resilience under supported text scaling and high-contrast modes.
+  - **Acceptance details:** primary workflows must remain operable without hover-only or pointer-only dependency; compact/layout adaptations must not hide primary actions from keyboard users or break focus flow when text scaling or high-contrast presentation is applied.
+  - **Priority:** P1
+
+Supporting authority:
+- See `docs/00-overview/authoritative-doc-map.md` for the current authority model and the rule that milestone-coded docs are historical, not live authority.
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.
-- See `docs/02-ux/winui-shell-contract-aa.md` for Milestone AA shell-specific contract details.
-- See `docs/02-ux/winui-global-navigationview-contract-ac.md` for Milestone AC global NavigationView behavior and routing contract.
-- See `docs/02-ux/winui-templates-capability-contract-ad.md` for Milestone AD `Templates` routing and unified workflow contract.
-- See `docs/02-ux/winui-deploy-from-template-contract-af.md` for Milestone AF `Deploy from-template` routing, readiness, and results visibility contract.
-- See `docs/02-ux/winui-deploy-on-the-fly-contract-ag.md` for Milestone AG `Deploy on-the-fly` routing, readiness, correction affordances, and results visibility parity contract.
-- See `docs/02-ux/winui-assets-base-disks-capability-contract-aj.md` for Milestone AJ `Assets > Base Disks` routing, operations, validation taxonomy, and removal safety contract.
-- See `docs/02-ux/winui-assets-switches-capability-contract-ak.md` for Milestone AK `Assets > Switches` routing, CRUD surface, validation taxonomy, and deletion guardrail contract.
-- See `docs/02-ux/winui-shell-view-consistency-contract-al.md` for Milestone AL cross-view shell/header/navigation/right-panel/action/compact-layout consistency rules.
-- See `docs/02-ux/winui-shell-composition-boundary-contract-am.md` for Milestone AM shell composition ownership and workspace extraction boundary rules.
-- See `docs/02-ux/winui-view-interaction-contract-am.md` for Milestone AM view interaction rules replacing broad child-control exposure patterns.
-- See `docs/02-ux/winui-ui-test-convergence-contract-am.md` for Milestone AM UI test strategy rules during shell/workspace extraction.
-- See `docs/02-ux/winui-lane-architecture-standard-an.md` for Milestone AN lane-local role boundaries, banned patterns, and the simple-lane exception rule.
-- See `docs/02-ux/winui-typed-capability-runtime-contract-an.md` for Milestone AN typed capability bootstrap/runtime boundary and runtime ownership rules.
-- See `docs/02-ux/winui-deploy-results-panel-coordinator-contract-an.md` for Milestone AN the narrow Deploy results-panel coordinator seam and its non-goals.
-- See `docs/02-ux/winui-deploy-shared-helper-ownership-contract-an.md` for Milestone AN shared Deploy helper ownership limits and the explicit deferred invalidation rule for `DeployReferenceDataService`.
-- See `docs/02-ux/winui-machines-workspace-extraction-seam-am.md` for Milestone AM Machines-specific extraction seam rules.
-- See `docs/02-ux/winui-diagnostics-overview-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Overview` ownership, route-activation refresh, and non-goal boundaries.
-- See `docs/02-ux/winui-diagnostics-logs-extraction-cleanup-target-am.md` for Milestone AM `Diagnostics Logs` ownership, route-activation refresh, and non-goal boundaries.
-- See `docs/02-ux/winui-capability-workspace-composition-contract-am.md` for Milestone AM capability-local workspace composition refinement after the first Machines extraction slices.
-- See `docs/02-ux/winui-machines-composition-cleanup-target-am.md` for the post-AM33 Machines-specific cleanup target before broader capability rollout continues.
-- See `docs/02-ux/winui-assets-workspace-extraction-seam-am.md` for the AM Assets-specific extraction seam and composition target after the Machines proof point.
-- See `docs/02-ux/winui-assets-composition-cleanup-target-am.md` for the AM shared Assets composition cleanup target that narrows shell-vs-Assets ownership before Assets runtime extraction proceeds.
-- See `docs/02-ux/winui-templates-composition-cleanup-target-am.md` for the AM shared Templates composition cleanup target that narrows shell-vs-Templates ownership before Templates runtime extraction proceeds.
-- See `docs/02-ux/winui-templates-library-extraction-cleanup-target-am.md` for the AM Templates Library cleanup target inside the shared Templates composition boundary.
-- See `docs/02-ux/winui-templates-editor-extraction-cleanup-target-am.md` for the AM Templates Editor cleanup target inside the shared Templates composition boundary.
-- See `docs/02-ux/winui-assets-overview-extraction-cleanup-target-am.md` for the AM Assets Overview cleanup target inside the shared Assets composition boundary.
-- See `docs/02-ux/winui-assets-base-disks-extraction-cleanup-target-am.md` for the AM Assets Base Disks cleanup target inside the shared Assets composition boundary.
-- See `docs/02-ux/winui-assets-switches-extraction-cleanup-target-am.md` for the AM Assets Switches cleanup target inside the shared Assets composition boundary.
-- See `docs/02-ux/winui-deploy-composition-cleanup-target-am.md` for the AM shared Deploy composition cleanup target that narrows shell-vs-Deploy ownership before Deploy runtime extraction proceeds.
-- See `docs/02-ux/winui-deploy-overview-extraction-cleanup-target-am.md` for the AM Deploy Overview cleanup target inside the shared Deploy composition boundary.
-- See `docs/02-ux/winui-from-template-extraction-cleanup-target-am.md` for the AM Deploy From Template cleanup target inside the shared Deploy composition boundary.
-- See `docs/02-ux/winui-quick-deploy-extraction-cleanup-target-am.md` for the AM Deploy Quick Deploy cleanup target inside the shared Deploy composition boundary.
-- See `docs/02-ux/winui-diagnostics-composition-cleanup-target-am.md` for the AM shared Diagnostics composition cleanup target that narrows shell-vs-Diagnostics ownership before Diagnostics runtime extraction proceeds.
+- See `docs/03-architecture/winui-shell-bootstrap-runtime.md` for the current shell-only `MainWindow` boundary, capability bootstrap/runtime rules, long-lived workspace lifetime, and no-direct-`MainWindow` view rule.
+- See `docs/03-architecture/winui-lane-architecture.md` for the current lane-local role split, interaction boundary, banned patterns, and simple-lane exception rule.
+- See `docs/03-architecture/winui-shared-seam-ownership.md` for the current shared Deploy seam and shared helper ownership rules.
 
 ---
 
@@ -898,7 +873,7 @@ Detailed schema contract:
 Detailed runtime policy:
 
 - See `docs/01-requirements/cleanup-cancellation-policy.md` for cleanup order, cancellation boundaries, residual status rules, and expected terminal outcomes.
-- Real-host regression observations for the persistent PowerShell wrapper and VHDX validation path are captured in `docs/07-testing/milestone-u-hyperv-verification-checklist.md` (post-`#219` stabilization).
+- See `docs/03-architecture/architecture.md` for the current implementation notes covering the persistent PowerShell wrapper and related runtime constraints.
 
 ---
 

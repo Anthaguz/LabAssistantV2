@@ -174,6 +174,5 @@ Rule:
 
 ## Open Questions / TBDs
 
-- Final `templateRevision` format: integer counter vs semantic version.
 - Exact migration flow UX for schema upgrades.
 - Field-level compatibility matrix for minor schema version changes.

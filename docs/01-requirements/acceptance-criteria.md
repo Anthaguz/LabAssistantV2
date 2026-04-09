@@ -647,6 +647,7 @@ Each readiness result shall include, at minimum:
 **Then**
 - `Open Hyper-V Console` is available as a dedicated action
 - `Open RDP` is a separate dedicated action
+- Console and RDP actions remain grouped together as the dedicated remote-access action cluster
 - `Open RDP` is disabled (grayed out) when readiness is unknown/unmet
 - Disabled RDP state includes user-facing reason text/guidance
 - Action attempts and results are logged
@@ -787,7 +788,7 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - Both UIs launch successfully
-- WPF remains available for production usage
+- WPF remains launchable as the legacy baseline/maintenance surface
 - WinUI shell startup is functional without requiring feature-parity migration
 
 ### 2) Shell Navigation â€” Icon Rail + Hamburger Drawer
@@ -798,11 +799,12 @@ Each readiness result shall include, at minimum:
 - User interacts with left navigation
 
 **Then**
-- Top-level capability icons are visible in icon rail
+- Normal desktop widths may show top-level capability icons in a persistent icon rail
 - Hamburger opens a slide-out capability drawer from left
 - Drawer shows scrim over remaining app content
 - Drawer closes on outside click and on `Esc`
 - Capability navigation does not rely on hover-only full-menu behavior
+- Compact widths may replace the persistent rail with a hamburger-invoked drawer model
 
 ### 3) Startup Route and Persistence Policy
 **Given**
@@ -815,7 +817,7 @@ Each readiness result shall include, at minimum:
 - Default landing capability is `Machines`
 - Last selected capability is not restored from previous session
 
-### 4) Shell Issue Insights Panel
+### 4) Shell Right Panel Infrastructure
 **Given**
 - WinUI shell is running
 
@@ -823,9 +825,9 @@ Each readiness result shall include, at minimum:
 - User views shell chrome
 
 **Then**
-- Insights panel is collapsed by default
-- Warning/issue trigger can open insights panel
-- Trigger shows visible count/badge when issues exist
+- Right panel infrastructure is collapsed by default
+- Shell owns panel container/layout and generic visibility mechanics
+- Approved capability or lane workflows may expose their own local triggers or counts when they use the panel
 
 ### 5) Machines Details Navigation Pattern
 **Given**
@@ -867,9 +869,9 @@ Each readiness result shall include, at minimum:
 
 ## Definition of Done
 - [ ] Parallel WPF + WinUI projects are present and launchable
-- [ ] Icon-rail + hamburger drawer behavior matches contract (including scrim and dismiss interactions)
+- [ ] Icon-rail + hamburger drawer behavior matches contract, including compact-width drawer fallback plus scrim and dismiss interactions
 - [ ] WinUI defaults to Machines and does not persist last selected capability
-- [ ] Insights panel is collapsed by default and warning trigger/badge behavior is present
+- [ ] Right panel infrastructure is collapsed by default and capability-local trigger ownership remains explicit
 - [ ] Machines details UX uses section navigation with breadcrumb context
 - [ ] Theme token foundation (light/dark + semantic brushes) is implemented
 
@@ -1009,27 +1011,27 @@ Each readiness result shall include, at minimum:
 
 ### 4) First-class surface coverage
 **Given**
-- AB2 implementation planning is prepared
+- the canonical shell/layout rules are reviewed
 
 **When**
 - Contract references are reviewed
 
 **Then**
 - Diagnostics Logs and Machines are explicitly covered as first-class layout examples
-- AB2 checklist includes decomposition order, overflow hardening criteria, and regression checks
+- right-panel bounded-scroll behavior is explicit
+- compact-width reachability rules remain explicit for dense action/filter surfaces
 
 ## Expected Artifacts
 - Dedicated contract doc:
-  - `docs/02-ux/winui-layout-constraints-contract.md`
-- Migration plan links and gating references updated
-- IA references updated for layout ownership and constraints
+  - `docs/03-architecture/winui-shell-navigation-layout.md`
+- SRS and architecture references remain aligned with the canonical shell/layout doc
 
 ## Definition of Done
-- [ ] WinUI layout constraints contract doc exists and is complete
+- [ ] Canonical WinUI shell navigation/layout doc exists and is complete
 - [ ] Contract defines testable rules for region sizing, scroll ownership, overflow, and resize behavior
 - [ ] Diagnostics Logs and Machines are explicitly covered
-- [ ] Migration plan references layout contract as AB gate
-- [ ] AB2 can execute without ambiguous layout decisions
+- [ ] Right-panel bounded-scroll behavior is explicit
+- [ ] Compact-width primary-action reachability rules are explicit
 
 ---
 
@@ -1050,6 +1052,7 @@ Each readiness result shall include, at minimum:
 - Shell uses a single global `NavigationView` in `LeftCompact` mode
 - Compact state is icon-first
 - Expanded state shows labels and hierarchical entity/action entries
+- Navigation remains keyboard- and pointer-accessible
 
 ### 2) Entity and child-action routing
 **Given**
@@ -1098,12 +1101,13 @@ Each readiness result shall include, at minimum:
 
 ## Expected UI
 - One global shell `NavigationView` (LeftCompact)
+- Top-level capabilities: `Machines`, `Deploy`, `Templates`, `Assets`, `Diagnostics`, and footer `Settings`
 - Main entity list with hierarchical child entries
 - Compact-mode child access affordance
 - Footer `Settings` entry
 
 ## Definition of Done
-- [ ] Navigation model matches `docs/02-ux/winui-global-navigationview-contract-ac.md`
+- [ ] Global shell navigation contract is captured in `docs/03-architecture/winui-shell-navigation-layout.md`
 - [ ] Route keys use canonical `capability.subview`
 - [ ] Parent-select-to-default-child behavior is implemented
 - [ ] Compact mode exposes child actions without hover dependency
@@ -1437,6 +1441,8 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - UI shows auto-resolve suggestions where deterministic repair is possible
+- Shared dependency issues are grouped where that reduces redundant remediation work
+- Safe one-to-many remapping is allowed when the issue is a shared environmental compatibility problem
 - UI provides explicit `Open in Templates Editor` correction action
 - Correction flow is non-silent and does not require guesswork
 
@@ -1513,6 +1519,7 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - UI provides actionable correction affordances for blocking issues
+- Readiness issues may surface at field, group, or VM-row granularity where that improves fixability
 - Correction flow is explicit and non-silent
 - Deploy start remains gated until blocking issues are resolved
 
@@ -1540,6 +1547,18 @@ Each readiness result shall include, at minimum:
 - Per-VM rows are concise by default with expandable details
 - Global warnings/errors are collapsed by default and discoverable
 
+### 6) Quick Deploy editing and template-authoring handoff stay explicit
+**Given**
+- User edits one or more VM rows in the on-the-fly deploy workflow
+
+**When**
+- User updates draft values or chooses to preserve the current draft for template authoring
+
+**Then**
+- Draft editing remains live in memory rather than requiring per-VM apply actions
+- Per-VM remove remains row-local rather than moving into global workflow chrome
+- Any template-authoring handoff for the current draft uses explicit save-to-template wording rather than an ambiguous editor-launch label
+
 ## Scope boundary for AG implementation
 - In scope:
   - WinUI `deploy.on_the_fly` route and workspace convergence
@@ -1557,6 +1576,7 @@ Each readiness result shall include, at minimum:
 - [ ] Correction affordances for blocking readiness issues are defined
 - [ ] Execution boundary preserves existing deployment orchestration semantics
 - [ ] Compact-first results parity contract is explicit and testable
+- [ ] Quick Deploy editing and template-authoring handoff behavior remain explicit
 - [ ] AG scope boundaries are explicit and enforceable
 
 ---
@@ -1784,6 +1804,7 @@ Each readiness result shall include, at minimum:
 - Loading state is explicit
 - Load/refresh failure state is explicit and actionable
 - Selected-disk details context is available for metadata visibility/editing without a separate edit route
+- Selection state remains clear and stable across refresh/update actions
 
 ### 3) Import/register and metadata edit contract
 **Given**
@@ -1798,6 +1819,7 @@ Each readiness result shall include, at minimum:
 - Metadata edit remains in-context on the selected-disk surface
 - Save/update feedback is actionable and non-silent
 - Existing base disk semantics from AC-004 remain preserved
+- Existing embedded asset shortcuts from Deploy/Templates remain preserved
 
 ### 4) Validation and readiness taxonomy
 **Given**
@@ -1824,6 +1846,7 @@ Each readiness result shall include, at minimum:
 - AJ1 removal scope is registry removal only; underlying file deletion is not part of this contract
 - The UI surfaces whether the disk appears referenced/in-use and classifies the condition as block or warning per contract
 - Removal failure produces actionable feedback and does not leave partial registry state
+- If remove/update/register flows fail after transient or in-memory state changes, visible state reconciles back to persisted truth
 - Successful removal removes the entry from selection surfaces
 
 ### 6) Logging and diagnostics contract
@@ -2022,6 +2045,11 @@ Each readiness result shall include, at minimum:
 - `Assets`, `Deploy`, and `Diagnostics` expose approved `Overview`-first local navigation
 - `Machines` remains single-surface for current scope
 - `Templates` keeps `Library` as the primary capability surface and does not expose `Editor` as a misleading always-peer tab
+- Approved `Overview` surfaces are not decorative and provide at least two of route-entry value, useful summary, or attention/health signaling
+- `Assets` local navigation model is `Overview`, `Base Disks`, `Switches`
+- `Assets Overview` remains primarily a summary-and-navigation surface rather than the place that absorbs the full operational action set
+- `Deploy` local navigation model is `Overview`, `Quick Deploy`, `From Template`, with `Deploy Overview` remaining the route-entry chooser/index surface, `Quick Deploy` remaining the direct configuration workflow, and `From Template` remaining a review/remediation/deploy workflow
+- `Diagnostics` local navigation model is `Overview`, `Logs`, with `Overview` remaining a lightweight support dashboard
 - Child-route ordering and labeling remain explicit and testable
 
 ### 3) Shell header owns capability context by default
@@ -2058,6 +2086,7 @@ Each readiness result shall include, at minimum:
   - lane-specific titles, summaries, results, and contextual actions
 - Right panel remains secondary context, not the primary editor surface
 - `Deploy` uses right panel for progress/results-first behavior
+- Current `Assets`, `Machines`, `Templates`, and `Diagnostics` scope do not require right-panel dependence by default
 - Pre-run issue counts and validation ownership may live in the child workflow rather than shell-global chrome
 - Mixed concerns that cross both buckets are treated as narrower shared-integration follow-ups rather than defaulting to shell ownership
 
@@ -2072,6 +2101,8 @@ Each readiness result shall include, at minimum:
 - Actions live nearest to the state they affect
 - Inventory-level actions stay in inventory/header context
 - Current-object actions stay in details/editor context
+- Workflow actions may remain text-capable where clarity requires it
+- Support actions stay secondary and do not compete with the primary action
 - `New` defaults to an inventory-level action that clears the current details/editor into a draft state
 - Icon-first command chrome is preferred with tooltip labels
 - Delete actions may use trash-can iconography with confirmation as the safety layer
@@ -2088,6 +2119,7 @@ Each readiness result shall include, at minimum:
 - Shell frame remains bounded and does not become an unbounded page-scroll surface
 - Right panel owns its own internal scroll
 - Operational master/detail or workflow surfaces keep bounded scroll owners rather than uncontrolled full-page growth
+- Overview/index surfaces may use more page-like scrolling when appropriate
 - Compact mode may shift to focus-mode or hamburger-invoked navigation to preserve workspace economy
 
 ## Expected UI
@@ -2109,7 +2141,6 @@ Each readiness result shall include, at minimum:
 ---
 
 ## Open Questions / TBDs
-- Cleanup strategy is defined in `docs/01-requirements/cleanup-cancellation-policy.md`.
 - VM/lab naming strategy and uniqueness rules
 - Whether to store deployment history records locally
 - RDP readiness policy beyond v1 host-observable checks (for example guest policy/NLA/firewall introspection).
@@ -4113,3 +4144,68 @@ Each readiness result shall include, at minimum:
 - [ ] `DeployResolveSuggestionsService` ownership and non-goals are explicit and traceable
 - [ ] `DeployTemplateEditorLauncher` ownership and non-goals are explicit and traceable
 - [ ] `DeployReferenceDataService` invalidation is either contracted or explicitly deferred with rationale
+
+---
+
+# AC-047 - WinUI Accessibility Baseline
+
+**Related FRs:** FR-189, FR-041
+
+## Scenarios
+
+### 1) Primary workflows remain keyboard reachable with logical focus flow
+**Given**
+- a user is navigating a primary WinUI workflow without relying on the mouse
+
+**When**
+- focus moves through the active surface using keyboard navigation
+
+**Then**
+- the primary controls for the workflow are reachable by keyboard
+- focus order is logical for the visible workflow
+- keyboard-only users are not blocked by hover-only affordances
+
+### 2) Focus visibility remains explicit
+**Given**
+- focus is moved across interactive controls in a WinUI surface
+
+**When**
+- the user tabs, arrow-navigates, or otherwise changes focus
+
+**Then**
+- focused controls remain visibly distinguishable
+- compact or dense layouts do not remove the user's ability to identify the active control
+
+### 3) Supported text scaling and high-contrast modes do not break primary interaction
+**Given**
+- the shell or a capability surface is shown under supported text scaling or high-contrast presentation
+
+**When**
+- the user loads or interacts with a primary workflow
+
+**Then**
+- layout adaptation does not hide the workflow's primary controls
+- text remains readable enough to complete the workflow
+- focus flow and primary action access remain intact
+
+### 4) Errors are not communicated by color alone
+**Given**
+- a WinUI workflow shows validation, readiness, or runtime error state
+
+**When**
+- the issue is presented to the user
+
+**Then**
+- the message includes clear text or equivalent non-color cues
+- users are not required to infer the problem from color alone
+- the error remains actionable rather than purely decorative
+
+## Expected Boundary
+- the accessibility baseline is a cross-cutting WinUI quality contract, not a capability-specific redesign mandate
+- slices may satisfy the baseline using the existing shell/view patterns as long as keyboard access, focus clarity, readable presentation, and non-color-only errors remain intact
+
+## Definition of Done
+- [ ] keyboard reachability is explicit for primary WinUI workflows
+- [ ] logical focus order and visible focus indication are explicit
+- [ ] supported text scaling and high-contrast resilience are explicit
+- [ ] non-color-only error communication is explicit

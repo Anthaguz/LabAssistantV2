@@ -154,4 +154,3 @@ Define once so timing numbers mean something.
 - Pick N for the lab performance test case.
 - Decide naming collision strategy (prompt vs auto-suffix vs block).
 - Decide retention policy for logs and diagnostic bundles.
-- TBDs will be resolved by measuring current behavior on a representative workstation once per milestone.

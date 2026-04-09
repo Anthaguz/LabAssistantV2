@@ -2,6 +2,8 @@
 
 **Purpose:** Describe desired behavior from the user’s perspective, in a way that is detailed enough for development, agent execution, and test planning.
 
+**Status:** Live planning/traceability doc. It supports story framing and story-to-FR/AC/test mapping, but it does not override `srs.md` or `acceptance-criteria.md` on implementation behavior. Draft placeholders in this file do not become active implementation authority until they are mapped into the current requirement set or an active slice explicitly depends on them.
+
 ## How to fill this (advanced-stage workflow)
 - Keep each story **end-to-end** and user-observable (UI + outcomes).
 - Link each story to:
@@ -713,7 +715,5 @@
 ---
 
 ## Open Questions / TBDs
-- Template schema: exact structure and versioning evolution strategy
-- Collision policies (template names, VM names): prompt vs auto-suffix vs block
-- Mapping when multiple compatible base disks exist: prompt vs deterministic selection
-- Which networking “topology” features are in v1 vs future
+- Mapping when multiple compatible base disks exist remains deferred to the current TBD inventory in `docs/00-overview/tbd-register.md`.
+- Collision policies remain deferred to the current naming-policy TBD inventory in `docs/00-overview/tbd-register.md`.
