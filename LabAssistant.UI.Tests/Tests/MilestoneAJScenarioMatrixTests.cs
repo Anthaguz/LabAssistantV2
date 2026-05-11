@@ -51,6 +51,7 @@ public sealed class MilestoneAJScenarioMatrixTests
     {
         var source = LoadMainWindowSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
+        var editorWorkflowSource = LoadAssetsBaseDisksEditorWorkflowSource();
         var compositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var viewSource = LoadAssetsBaseDisksViewCodeBehindSource();
         var nativeFileDialogsSource = LoadNativeFileDialogsSource();
@@ -82,7 +83,10 @@ public sealed class MilestoneAJScenarioMatrixTests
         Assert.Contains("_view.SaveMetadataRequested += AssetsBaseDisksSaveMetadataRequested;", compositionSource);
         Assert.Contains("_view.RemoveRequested += AssetsBaseDisksRemoveRequested;", compositionSource);
         Assert.Contains("ShowRemoveConfirmationDialogAsync", controllerSource);
-        Assert.Contains("FormatValidationText", controllerSource);
+        Assert.Contains("private readonly AssetsBaseDisksEditorWorkflow _editorWorkflow;", controllerSource);
+        Assert.Contains("_editorWorkflow = new AssetsBaseDisksEditorWorkflow(capabilityService, workspace, host);", controllerSource);
+        Assert.Contains("internal sealed class AssetsBaseDisksEditorWorkflow", editorWorkflowSource);
+        Assert.Contains("FormatValidationText", editorWorkflowSource);
         Assert.Contains("_workspace.PendingDraft", controllerSource);
         Assert.Contains("_workspace.HasErrorState", controllerSource);
         Assert.Contains("IAssetsBaseDisksCapabilityService", source);
@@ -90,7 +94,7 @@ public sealed class MilestoneAJScenarioMatrixTests
         Assert.Contains("Active runtime consumer detection is not currently implemented.", capabilitySource);
         Assert.Contains("Base disk removed from the registry.", capabilitySource);
         Assert.Contains("Registry-only removal.", xamlSource);
-        Assert.Contains("Validate and Save Metadata", controllerSource);
+        Assert.Contains("Validate and Save Metadata", editorWorkflowSource);
         Assert.DoesNotContain("public Button", viewSource);
         Assert.DoesNotContain("public TextBox", viewSource);
         Assert.DoesNotContain("public ListView", viewSource);
@@ -136,6 +140,12 @@ public sealed class MilestoneAJScenarioMatrixTests
     private static string LoadAssetsBaseDisksWorkspaceControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksEditorWorkflowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksEditorWorkflow.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

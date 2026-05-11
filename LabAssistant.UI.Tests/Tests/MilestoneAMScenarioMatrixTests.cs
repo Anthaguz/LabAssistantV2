@@ -262,6 +262,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var compositionSource = LoadAssetsWorkspaceCompositionSource();
         var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
+        var editorWorkflowSource = LoadAssetsBaseDisksEditorWorkflowSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var baseDisksWorkspaceSource = LoadAssetsBaseDisksWorkspaceViewModelSource();
         var switchesCompositionSource = LoadAssetsSwitchesWorkspaceCompositionSource();
@@ -412,11 +413,24 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public async Task SaveDraftAsync()", controllerSource);
         Assert.Contains("public void HandleMetadataChanged()", controllerSource);
         Assert.Contains("public void ApplyWorkspaceState()", controllerSource);
-        Assert.Contains("_host.ApplyWorkspaceState(_workspace, canSaveDraft);", controllerSource);
-        Assert.Contains("LoadEditorFromRow", controllerSource);
-        Assert.Contains("LoadEditorFromDraft", controllerSource);
-        Assert.Contains("ClearEditor", controllerSource);
+        Assert.Contains("private readonly AssetsBaseDisksEditorWorkflow _editorWorkflow;", controllerSource);
+        Assert.Contains("_editorWorkflow = new AssetsBaseDisksEditorWorkflow(capabilityService, workspace, host);", controllerSource);
+        Assert.Contains("_editorWorkflow.RestoreAfterInventoryRefresh();", controllerSource);
         Assert.DoesNotContain("MainWindow", controllerSource);
+
+        Assert.Contains("internal sealed class AssetsBaseDisksEditorWorkflow", editorWorkflowSource);
+        Assert.Contains("public void RestoreAfterInventoryRefresh()", editorWorkflowSource);
+        Assert.Contains("public void HandleSelectionChanged(AssetsBaseDiskListRow? selectedRow)", editorWorkflowSource);
+        Assert.Contains("public void BeginImport()", editorWorkflowSource);
+        Assert.Contains("public async Task ValidateAsync()", editorWorkflowSource);
+        Assert.Contains("public void HandleBrowsePath()", editorWorkflowSource);
+        Assert.Contains("public async Task SaveDraftAsync(Func<Task> refreshInventoryAsync)", editorWorkflowSource);
+        Assert.Contains("public void HandleMetadataChanged()", editorWorkflowSource);
+        Assert.Contains("public void ApplyWorkspaceState()", editorWorkflowSource);
+        Assert.Contains("LoadEditorFromRow", editorWorkflowSource);
+        Assert.Contains("LoadEditorFromDraft", editorWorkflowSource);
+        Assert.Contains("ClearEditor", editorWorkflowSource);
+        Assert.Contains("FormatValidationText", editorWorkflowSource);
 
         Assert.DoesNotContain("MainWindow", compositionSource);
     }
@@ -2918,6 +2932,12 @@ public sealed class MilestoneAMScenarioMatrixTests
     private static string LoadAssetsBaseDisksWorkspaceControllerSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsBaseDisksEditorWorkflowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksEditorWorkflow.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
