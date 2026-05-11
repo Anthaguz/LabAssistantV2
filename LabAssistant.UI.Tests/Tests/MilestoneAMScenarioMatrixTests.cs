@@ -1781,9 +1781,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("void RefreshResultsPanelState();", fromTemplateCompositionHostSource);
         Assert.Contains("void OnOpenResultsPanelRequested();", fromTemplateCompositionHostSource);
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompositionHost", fromTemplateHostSource);
-        Assert.Contains("public bool IsTemplatesLoading => _isTemplatesLoading();", fromTemplateHostSource);
-        Assert.Contains("public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _ensureTemplatesLibraryAsync(forceRefresh);", fromTemplateHostSource);
-        Assert.Contains("public Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath) => _loadTemplateForEditorAsync(filePath);", fromTemplateHostSource);
+        Assert.Contains("public bool IsTemplatesLoading => _templatesShellAdapter.IsTemplatesLoading;", fromTemplateHostSource);
+        Assert.Contains("public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _templatesShellAdapter.EnsureLibraryAsync(forceRefresh);", fromTemplateHostSource);
+        Assert.Contains("public Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath) => _templatesShellAdapter.LoadTemplateForEditorAsync(filePath);", fromTemplateHostSource);
         Assert.Contains("public void RefreshResultsPanelState() => _capabilityUiHooks.RefreshResultsPanelState();", fromTemplateHostSource);
         Assert.Contains("public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();", fromTemplateHostSource);
         Assert.Contains("public void ResetPanelState()", fromTemplateRightPanelViewCodeBehindSource);
