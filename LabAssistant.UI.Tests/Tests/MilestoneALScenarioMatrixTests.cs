@@ -74,7 +74,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("if (_shellViewModel.TryResolveCapability(key, out var capability))", source);
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", source);
         Assert.Contains("if (capability.HasOverview && string.Equals(subview.RouteKey, capability.DefaultSubview.RouteKey, StringComparison.Ordinal))", source);
-        Assert.Contains("_deployWorkspaceComposition.ApplyShellState();", source);
+        Assert.Contains("_deployCapabilityRuntime.ApplyShellState();", source);
         Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", deployCompositionSource);
         Assert.Contains("SyncDeploySubviewSelection()", deployCompositionSource);
         Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", source);
@@ -223,8 +223,8 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.DoesNotContain("private void ToggleDeployRightPanelFromWorkflow()", mainWindowSource);
         Assert.Contains("InsightsPanel.Visibility = showPanel ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
         Assert.Contains("ShellRightPanelColumn.Width = showPanel ? new GridLength(ShellRightPanelExpandedWidth) : new GridLength(0);", mainWindowSource);
-        Assert.Contains("RightPanelTitleTextBlock.Text = _deployResultsPanelCoordinator.GetRightPanelTitleText();", mainWindowSource);
-        Assert.Contains("_deployResultsPanelCoordinator.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
+        Assert.Contains("RightPanelTitleTextBlock.Text = _deployCapabilityRuntime.GetRightPanelTitleText();", mainWindowSource);
+        Assert.Contains("_deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
         Assert.Contains("IssueBadge.Visibility = Visibility.Collapsed;", mainWindowSource);
         Assert.Contains("Text=\"Run warnings / errors\"", fromTemplateRightPanelSource);
     }
@@ -394,7 +394,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.DoesNotContain("public void ApplyRightPanelState(bool showPanel, bool panelUnavailable)", deployWorkspaceCompositionSource);
         Assert.Contains("internal sealed class DeployResultsPanelCoordinator", deployResultsPanelCoordinatorSource);
         Assert.Contains("public void ApplyRightPanelState(bool showPanel, bool panelUnavailable)", deployResultsPanelCoordinatorSource);
-        Assert.Contains("RightPanelTitleTextBlock.Text = _deployResultsPanelCoordinator.GetRightPanelTitleText();", mainWindowSource);
+        Assert.Contains("RightPanelTitleTextBlock.Text = _deployCapabilityRuntime.GetRightPanelTitleText();", mainWindowSource);
         Assert.Contains("private void UpdateVmEntryRows()", LoadDeployOnTheFlyWorkspaceCompositionSource());
         Assert.Contains("private void UpdateIssueRows()", LoadDeployFromTemplateWorkspaceCompositionSource());
         Assert.Contains("private const double ShellNavigationDrawerThreshold = 1100;", mainWindowSource);

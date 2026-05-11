@@ -1,5 +1,4 @@
 using LabAssistant.Business.Templates;
-using LabAssistant.WinUI.ViewModels.Templates;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
@@ -8,13 +7,13 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 /// </summary>
 internal sealed class DeployTemplateEditorLauncher
 {
-    private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
+    private readonly DeployTemplatesShellAdapter _templatesShellAdapter;
 
-    public DeployTemplateEditorLauncher(TemplatesWorkspaceComposition templatesWorkspaceComposition)
+    public DeployTemplateEditorLauncher(DeployTemplatesShellAdapter templatesShellAdapter)
     {
-        _templatesWorkspaceComposition = templatesWorkspaceComposition;
+        _templatesShellAdapter = templatesShellAdapter;
     }
 
     public Task ShowEditorAsync(TemplateEditorDocument document, string statusText) =>
-        _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);
+        _templatesShellAdapter.ShowTemplateEditorAsync(document, statusText);
 }

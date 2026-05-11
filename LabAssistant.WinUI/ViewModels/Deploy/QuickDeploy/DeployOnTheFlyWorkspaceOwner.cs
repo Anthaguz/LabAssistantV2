@@ -13,7 +13,7 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 /// reference-data refresh, template handoff, resolve suggestions, and lane-local panel intent.
 /// Shell routing and the shared panel container still remain outside this owner.
 /// </summary>
-internal sealed class DeployOnTheFlyWorkspaceOwner : IDeployOnTheFlyWorkspaceControllerHost
+internal sealed class DeployOnTheFlyWorkspaceOwner : IDeployOnTheFlyWorkspaceControllerHost, IDeployQuickDeployLane
 {
     private readonly DeployOnTheFlyView _view;
     private readonly DeployOnTheFlyWorkspaceViewModel _workspace = new();

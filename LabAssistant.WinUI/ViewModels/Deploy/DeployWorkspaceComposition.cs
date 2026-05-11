@@ -9,36 +9,36 @@ internal sealed class DeployWorkspaceComposition
 {
     private readonly FrameworkElement _localNavigationHost;
     private readonly FrameworkElement _overviewHost;
-    private readonly DeployOnTheFlyWorkspaceOwner _onTheFlyWorkspaceOwner;
+    private readonly IDeployQuickDeployLane _quickDeployLane;
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _quickDeployTabViewItem;
     private readonly TabViewItem _fromTemplateTabViewItem;
     private readonly DeployOverviewWorkspaceComposition _overviewWorkspaceComposition;
-    private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;
+    private readonly IDeployFromTemplateLane _fromTemplateLane;
     private readonly IDeployWorkspaceShellBridge _shellBridge;
     private bool _isUpdatingDeploySubviewSelection;
 
     public DeployWorkspaceComposition(
         FrameworkElement localNavigationHost,
         DeployOverviewView overviewView,
-        DeployOnTheFlyWorkspaceOwner onTheFlyWorkspaceOwner,
+        IDeployQuickDeployLane quickDeployLane,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem quickDeployTabViewItem,
         TabViewItem fromTemplateTabViewItem,
         Func<DeployWorkspaceUiState> getUiState,
-        DeployFromTemplateWorkspaceComposition fromTemplateWorkspaceComposition,
+        IDeployFromTemplateLane fromTemplateLane,
         IDeployWorkspaceShellBridge shellBridge)
     {
         _localNavigationHost = localNavigationHost;
         _overviewHost = overviewView;
-        _onTheFlyWorkspaceOwner = onTheFlyWorkspaceOwner;
+        _quickDeployLane = quickDeployLane;
         _subviewTabView = subviewTabView;
         _overviewTabViewItem = overviewTabViewItem;
         _quickDeployTabViewItem = quickDeployTabViewItem;
         _fromTemplateTabViewItem = fromTemplateTabViewItem;
-        _fromTemplateWorkspaceComposition = fromTemplateWorkspaceComposition;
+        _fromTemplateLane = fromTemplateLane;
         _shellBridge = shellBridge;
         _overviewWorkspaceComposition = new DeployOverviewWorkspaceComposition(
             overviewView,
@@ -49,7 +49,7 @@ internal sealed class DeployWorkspaceComposition
             new DeployOverviewWorkspaceShellBridge(
                 () => _shellBridge.IsDeployOverviewActive,
                 _shellBridge.NavigateToRoute));
-        _onTheFlyWorkspaceOwner.SharedUiStateChanged += OnTheFlyWorkspaceOwner_SharedUiStateChanged;
+        _quickDeployLane.SharedUiStateChanged += OnQuickDeployLane_SharedUiStateChanged;
         WireSharedHandlers();
     }
 
@@ -59,7 +59,7 @@ internal sealed class DeployWorkspaceComposition
     {
         _localNavigationHost.Visibility = _shellBridge.IsDeployCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         _overviewHost.Visibility = _shellBridge.IsDeployOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        _onTheFlyWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);
+        _quickDeployLane.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);
 
         SyncDeploySubviewSelection();
 
@@ -68,7 +68,7 @@ internal sealed class DeployWorkspaceComposition
             _overviewWorkspaceComposition.ApplyShellState();
         }
 
-        _fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);
+        _fromTemplateLane.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);
     }
 
     private void WireSharedHandlers()
@@ -76,7 +76,7 @@ internal sealed class DeployWorkspaceComposition
         _subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;
     }
 
-    private void OnTheFlyWorkspaceOwner_SharedUiStateChanged(object? sender, EventArgs e)
+    private void OnQuickDeployLane_SharedUiStateChanged(object? sender, EventArgs e)
     {
         RefreshSharedUiState();
     }
