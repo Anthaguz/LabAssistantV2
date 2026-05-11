@@ -5,21 +5,21 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 /// </summary>
 internal sealed class DeployResultsPanelCoordinator
 {
-    private readonly DeployOnTheFlyWorkspaceOwner _onTheFlyWorkspaceOwner;
-    private readonly DeployFromTemplateWorkspaceComposition _fromTemplateWorkspaceComposition;
+    private readonly IDeployQuickDeployLane _quickDeployLane;
+    private readonly IDeployFromTemplateLane _fromTemplateLane;
     private readonly Func<bool> _isDeployOverviewActive;
     private readonly Func<bool> _isDeployOnTheFlyActive;
     private readonly Func<bool> _isDeployFromTemplateActive;
 
     public DeployResultsPanelCoordinator(
-        DeployOnTheFlyWorkspaceOwner onTheFlyWorkspaceOwner,
-        DeployFromTemplateWorkspaceComposition fromTemplateWorkspaceComposition,
+        IDeployQuickDeployLane quickDeployLane,
+        IDeployFromTemplateLane fromTemplateLane,
         Func<bool> isDeployOverviewActive,
         Func<bool> isDeployOnTheFlyActive,
         Func<bool> isDeployFromTemplateActive)
     {
-        _onTheFlyWorkspaceOwner = onTheFlyWorkspaceOwner;
-        _fromTemplateWorkspaceComposition = fromTemplateWorkspaceComposition;
+        _quickDeployLane = quickDeployLane;
+        _fromTemplateLane = fromTemplateLane;
         _isDeployOverviewActive = isDeployOverviewActive;
         _isDeployOnTheFlyActive = isDeployOnTheFlyActive;
         _isDeployFromTemplateActive = isDeployFromTemplateActive;
@@ -27,27 +27,27 @@ internal sealed class DeployResultsPanelCoordinator
 
     public void ResetRightPanelBehavior()
     {
-        _fromTemplateWorkspaceComposition.ResetPanelState();
+        _fromTemplateLane.ResetPanelState();
     }
 
     public bool ShouldAutoOpenRightPanel()
     {
-        return _fromTemplateWorkspaceComposition.ShouldAutoOpenResultsPanel ||
-            _onTheFlyWorkspaceOwner.ShouldAutoOpenResultsPanel;
+        return _fromTemplateLane.ShouldAutoOpenResultsPanel ||
+            _quickDeployLane.ShouldAutoOpenResultsPanel;
     }
 
     public void ApplyRightPanelState(bool showPanel, bool panelUnavailable)
     {
-        _fromTemplateWorkspaceComposition.ApplyResultsPanelState(_isDeployFromTemplateActive(), showPanel, panelUnavailable);
-        _onTheFlyWorkspaceOwner.ApplyResultsPanelState(_isDeployOnTheFlyActive(), showPanel, panelUnavailable);
+        _fromTemplateLane.ApplyResultsPanelState(_isDeployFromTemplateActive(), showPanel, panelUnavailable);
+        _quickDeployLane.ApplyResultsPanelState(_isDeployOnTheFlyActive(), showPanel, panelUnavailable);
     }
 
     public string GetRightPanelTitleText()
     {
         return _isDeployFromTemplateActive()
-            ? _fromTemplateWorkspaceComposition.ResultsPanelTitle
+            ? _fromTemplateLane.ResultsPanelTitle
             : _isDeployOnTheFlyActive()
-                ? _onTheFlyWorkspaceOwner.ResultsPanelTitle
+                ? _quickDeployLane.ResultsPanelTitle
                 : "Details";
     }
 

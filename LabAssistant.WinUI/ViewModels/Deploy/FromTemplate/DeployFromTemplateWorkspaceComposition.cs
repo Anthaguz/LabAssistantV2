@@ -10,7 +10,7 @@ using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
-internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost
+internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost, IDeployFromTemplateLane
 {
     private readonly DeployFromTemplateView _view;
     private readonly DeployFromTemplateRightPanelView _rightPanelView;
@@ -426,7 +426,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
             _workspace.RefreshResultRows(_compatibilityIssues, _readinessReport);
             UpdateIssueRows();
             ApplyWorkspaceState();
-            _host.ApplyRightPanelState();
+            _host.RefreshResultsPanelState();
             return;
         }
 
@@ -443,7 +443,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _workspace.RefreshResultRows(_compatibilityIssues, _readinessReport);
         UpdateIssueRows();
         ApplyWorkspaceState();
-        _host.ApplyRightPanelState();
+        _host.RefreshResultsPanelState();
     }
 
     private void UpdateIssueRows()

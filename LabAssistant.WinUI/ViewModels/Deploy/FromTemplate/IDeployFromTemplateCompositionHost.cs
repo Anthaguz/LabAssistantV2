@@ -34,7 +34,7 @@ internal interface IDeployFromTemplateCompositionHost
 
     void RefreshSharedUiState();
 
-    void ApplyRightPanelState();
+    void RefreshResultsPanelState();
 
     void OnOpenResultsPanelRequested();
 

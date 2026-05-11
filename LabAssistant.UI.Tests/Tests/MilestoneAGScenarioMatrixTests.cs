@@ -22,15 +22,14 @@ public sealed class MilestoneAGScenarioMatrixTests
         var compositionSource = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyViewHost"));
-        Assert.Contains("private readonly DeployOnTheFlyWorkspaceOwner _deployOnTheFlyWorkspaceOwner;", mainWindowSource);
-        Assert.Contains("new DeployOnTheFlyWorkspaceOwner(", mainWindowSource);
-        Assert.Contains("new DeployOnTheFlyWorkspaceShellBridge(", mainWindowSource);
-        Assert.Contains("new DeployResultsPanelCoordinator(", mainWindowSource);
+        Assert.Contains("private readonly DeployCapabilityRuntime _deployCapabilityRuntime;", mainWindowSource);
+        Assert.Contains("_deployCapabilityRuntime = DeployCapabilityBootstrap.Bootstrap(services, new DeployCapabilityBootstrapContext", mainWindowSource);
+        Assert.Contains("new DeployCapabilityShellBridge(", mainWindowSource);
         Assert.DoesNotContain("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", mainWindowSource);
         Assert.DoesNotContain("new DeployOnTheFlyWorkspaceHost(", mainWindowSource);
         Assert.DoesNotContain("AttachComposition(", mainWindowSource);
 
-        Assert.Contains("_onTheFlyWorkspaceOwner.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);", compositionSource);
+        Assert.Contains("_quickDeployLane.ApplyShellState(_shellBridge.IsDeployOnTheFlyActive);", compositionSource);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);", compositionSource);
         Assert.DoesNotContain("TryToggleRightPanelFromWorkflow", compositionSource);
         Assert.DoesNotContain("ShouldAutoOpenRightPanel", compositionSource);
@@ -79,8 +78,8 @@ public sealed class MilestoneAGScenarioMatrixTests
         var resolveSuggestionsSource = LoadDeployResolveSuggestionsServiceSource();
         var viewSource = LoadDeployOnTheFlyViewSource();
 
-        Assert.Contains("private readonly DeployOnTheFlyWorkspaceOwner _deployOnTheFlyWorkspaceOwner;", mainWindowSource);
-        Assert.Contains("new DeployTemplateEditorLauncher(_templatesWorkspaceComposition)", mainWindowSource);
+        Assert.Contains("private readonly DeployCapabilityRuntime _deployCapabilityRuntime;", mainWindowSource);
+        Assert.DoesNotContain("new DeployTemplateEditorLauncher(_templatesWorkspaceComposition)", mainWindowSource);
         Assert.DoesNotContain("BuildOnTheFlyTemplate()", mainWindowSource);
         Assert.DoesNotContain("EnsureDeployOnTheFlyReferenceDataAsync", mainWindowSource);
         Assert.DoesNotContain("applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),", mainWindowSource);
@@ -165,7 +164,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         var source = LoadDeployWorkspaceCompositionSource();
 
         Assert.NotNull(FindByName(xaml, "DeployFromTemplateViewHost"));
-        Assert.Contains("_fromTemplateWorkspaceComposition.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", source);
+        Assert.Contains("_fromTemplateLane.ApplyShellState(_shellBridge.IsDeployFromTemplateActive);", source);
         Assert.Contains("_shellBridge.NavigateToRoute(ShellRouteKeys.DeployFromTemplate);", source);
     }
 
