@@ -11,11 +11,16 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("private readonly DeployCapabilityRuntime _deployCapabilityRuntime;", mainWindowSource);
+        Assert.Contains("_deployCapabilityRuntime = CreateDeployCapabilityRuntime();", mainWindowSource);
+        Assert.Contains("private DeployCapabilityRuntime CreateDeployCapabilityRuntime()", mainWindowSource);
         Assert.Contains("IServiceProvider services = App.Services;", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime = DeployCapabilityBootstrap.Bootstrap(services, new DeployCapabilityBootstrapContext", mainWindowSource);
+        Assert.Contains("var bootstrapContext = new DeployCapabilityBootstrapContext", mainWindowSource);
+        Assert.Contains("return DeployCapabilityBootstrap.Bootstrap(services, bootstrapContext);", mainWindowSource);
         Assert.Contains("new DeployCapabilityShellBridge(", mainWindowSource);
-        Assert.Contains("ShellViewHosts = new DeployCapabilityShellViewHosts", mainWindowSource);
-        Assert.Contains("Templates = new DeployTemplatesShellAdapter(", mainWindowSource);
+        Assert.Contains("private DeployCapabilityShellViewHosts CreateDeployCapabilityShellViewHosts()", mainWindowSource);
+        Assert.Contains("return new DeployCapabilityShellViewHosts", mainWindowSource);
+        Assert.Contains("private DeployTemplatesShellAdapter CreateDeployTemplatesShellAdapter()", mainWindowSource);
+        Assert.Contains("return new DeployTemplatesShellAdapter(", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ResetRightPanelBehavior();", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.GetRightPanelTitleText();", mainWindowSource);

@@ -144,49 +144,7 @@ public sealed partial class MainWindow : Window
                 () => IsTemplatesCapabilityActive,
                 () => IsTemplatesLibraryActive,
                 () => IsTemplatesEditorActive));
-        IServiceProvider services = App.Services;
-        _deployCapabilityRuntime = DeployCapabilityBootstrap.Bootstrap(services, new DeployCapabilityBootstrapContext
-        {
-            ShellBridge = new DeployCapabilityShellBridge(
-                DispatcherQueue,
-                () => RootLayout.XamlRoot,
-                () => IsDeployCapabilityActive,
-                () => IsDeployOverviewActive,
-                () => IsDeployOnTheFlyActive,
-                () => IsDeployFromTemplateActive,
-                NavigateToRoute,
-                RequestDeployResultsPanelToggle,
-                ApplyRightPanelState),
-            ShellViewHosts = new DeployCapabilityShellViewHosts
-            {
-                LocalNavigationHost = DeployLocalNavigationPanel,
-                OverviewView = DeployOverviewViewHost,
-                QuickDeploy = new DeployQuickDeployShellViewHosts
-                {
-                    View = DeployOnTheFlyViewHost,
-                    RightPanelView = DeployOnTheFlyRightPanelViewHost
-                },
-                FromTemplate = new DeployFromTemplateShellViewHosts
-                {
-                    View = DeployFromTemplateViewHost,
-                    RightPanelView = DeployFromTemplateRightPanelViewHost
-                },
-                Navigation = new DeployCapabilityShellNavigationHosts
-                {
-                    SubviewTabView = DeploySubviewTabView,
-                    OverviewTabViewItem = DeployOverviewTabViewItem,
-                    QuickDeployTabViewItem = DeployQuickDeployTabViewItem,
-                    FromTemplateTabViewItem = DeployFromTemplateTabViewItem
-                }
-            },
-            Templates = new DeployTemplatesShellAdapter(
-                TemplatesLibraryItems,
-                () => _isTemplatesLoading,
-                () => TemplatesLibraryItems.ToList(),
-                EnsureTemplatesLibraryAsync,
-                filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),
-                ShowTemplateEditorAsync)
-        });
+        _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
         _diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(
             DiagnosticsLocalNavigationPanel,
             DiagnosticsOverviewViewHost,
@@ -222,6 +180,124 @@ public sealed partial class MainWindow : Window
             await LoadMachinesDeletionPolicyAsync();
         };
         ApplyState();
+    }
+
+    private DeployCapabilityRuntime CreateDeployCapabilityRuntime()
+    {
+        IServiceProvider services = App.Services;
+        var shellBridge = CreateDeployCapabilityShellBridge();
+        var shellViewHosts = CreateDeployCapabilityShellViewHosts();
+        var templatesShellAdapter = CreateDeployTemplatesShellAdapter();
+
+        var bootstrapContext = new DeployCapabilityBootstrapContext
+        {
+            ShellBridge = shellBridge,
+            ShellViewHosts = shellViewHosts,
+            Templates = templatesShellAdapter
+        };
+
+        return DeployCapabilityBootstrap.Bootstrap(services, bootstrapContext);
+    }
+
+    private DeployCapabilityShellBridge CreateDeployCapabilityShellBridge()
+    {
+        var dispatcherQueue = DispatcherQueue;
+        Func<XamlRoot?> getXamlRoot = () => RootLayout.XamlRoot;
+        Func<bool> isDeployCapabilityActive = () => IsDeployCapabilityActive;
+        Func<bool> isDeployOverviewActive = () => IsDeployOverviewActive;
+        Func<bool> isDeployOnTheFlyActive = () => IsDeployOnTheFlyActive;
+        Func<bool> isDeployFromTemplateActive = () => IsDeployFromTemplateActive;
+        Action<string> navigateToRoute = NavigateToRoute;
+        Action requestResultsPanelToggle = RequestDeployResultsPanelToggle;
+        Action refreshResultsPanelState = ApplyRightPanelState;
+
+        return new DeployCapabilityShellBridge(
+            dispatcherQueue,
+            getXamlRoot,
+            isDeployCapabilityActive,
+            isDeployOverviewActive,
+            isDeployOnTheFlyActive,
+            isDeployFromTemplateActive,
+            navigateToRoute,
+            requestResultsPanelToggle,
+            refreshResultsPanelState);
+    }
+
+    private DeployCapabilityShellViewHosts CreateDeployCapabilityShellViewHosts()
+    {
+        var localNavigationHost = DeployLocalNavigationPanel;
+        var overviewView = DeployOverviewViewHost;
+        var quickDeployHosts = CreateDeployQuickDeployShellViewHosts();
+        var fromTemplateHosts = CreateDeployFromTemplateShellViewHosts();
+        var navigationHosts = CreateDeployCapabilityShellNavigationHosts();
+
+        return new DeployCapabilityShellViewHosts
+        {
+            LocalNavigationHost = localNavigationHost,
+            OverviewView = overviewView,
+            QuickDeploy = quickDeployHosts,
+            FromTemplate = fromTemplateHosts,
+            Navigation = navigationHosts
+        };
+    }
+
+    private DeployQuickDeployShellViewHosts CreateDeployQuickDeployShellViewHosts()
+    {
+        var view = DeployOnTheFlyViewHost;
+        var rightPanelView = DeployOnTheFlyRightPanelViewHost;
+
+        return new DeployQuickDeployShellViewHosts
+        {
+            View = view,
+            RightPanelView = rightPanelView
+        };
+    }
+
+    private DeployFromTemplateShellViewHosts CreateDeployFromTemplateShellViewHosts()
+    {
+        var view = DeployFromTemplateViewHost;
+        var rightPanelView = DeployFromTemplateRightPanelViewHost;
+
+        return new DeployFromTemplateShellViewHosts
+        {
+            View = view,
+            RightPanelView = rightPanelView
+        };
+    }
+
+    private DeployCapabilityShellNavigationHosts CreateDeployCapabilityShellNavigationHosts()
+    {
+        var subviewTabView = DeploySubviewTabView;
+        var overviewTabViewItem = DeployOverviewTabViewItem;
+        var quickDeployTabViewItem = DeployQuickDeployTabViewItem;
+        var fromTemplateTabViewItem = DeployFromTemplateTabViewItem;
+
+        return new DeployCapabilityShellNavigationHosts
+        {
+            SubviewTabView = subviewTabView,
+            OverviewTabViewItem = overviewTabViewItem,
+            QuickDeployTabViewItem = quickDeployTabViewItem,
+            FromTemplateTabViewItem = fromTemplateTabViewItem
+        };
+    }
+
+    private DeployTemplatesShellAdapter CreateDeployTemplatesShellAdapter()
+    {
+        var itemsSource = TemplatesLibraryItems;
+        Func<bool> isTemplatesLoading = () => _isTemplatesLoading;
+        Func<IReadOnlyList<TemplateLibraryItem>> getLibraryItems = () => TemplatesLibraryItems.ToList();
+        Func<bool, Task> ensureLibraryAsync = EnsureTemplatesLibraryAsync;
+        Func<string, Task<TemplateEditorDocument>> loadTemplateForEditorAsync =
+            filePath => _templatesCapabilityService.LoadForEditorAsync(filePath);
+        Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync = ShowTemplateEditorAsync;
+
+        return new DeployTemplatesShellAdapter(
+            itemsSource,
+            isTemplatesLoading,
+            getLibraryItems,
+            ensureLibraryAsync,
+            loadTemplateForEditorAsync,
+            showTemplateEditorAsync);
     }
 
     private void SetInitialSize(int width, int height)

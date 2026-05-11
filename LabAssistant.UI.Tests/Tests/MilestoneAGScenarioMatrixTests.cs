@@ -23,7 +23,8 @@ public sealed class MilestoneAGScenarioMatrixTests
 
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyViewHost"));
         Assert.Contains("private readonly DeployCapabilityRuntime _deployCapabilityRuntime;", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime = DeployCapabilityBootstrap.Bootstrap(services, new DeployCapabilityBootstrapContext", mainWindowSource);
+        Assert.Contains("_deployCapabilityRuntime = CreateDeployCapabilityRuntime();", mainWindowSource);
+        Assert.Contains("private DeployCapabilityRuntime CreateDeployCapabilityRuntime()", mainWindowSource);
         Assert.Contains("new DeployCapabilityShellBridge(", mainWindowSource);
         Assert.DoesNotContain("private readonly DeployOnTheFlyWorkspaceComposition _deployOnTheFlyWorkspaceComposition;", mainWindowSource);
         Assert.DoesNotContain("new DeployOnTheFlyWorkspaceHost(", mainWindowSource);
