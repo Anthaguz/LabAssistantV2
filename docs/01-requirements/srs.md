@@ -592,7 +592,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** cleanup-target definition must preserve `assets.overview`, `assets.base_disks`, and `assets.switches` route continuity and must remain explicit that Base Disks-specific extraction details, Switches-specific extraction details, Overview-specific extraction details, runtime implementation, and performance redesign are out of scope.
   - **Priority:** P1
 
-- **FR-137:** WinUI `Assets Overview` cleanup shall remain under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Overview-specific state and UI coordination behind an Overview-local seam.
+- **FR-137:** WinUI `Assets Overview` cleanup shall remain under shared `AssetsCapabilityRuntime` rather than becoming a shell-owned surface, while converging Overview-specific state and UI coordination behind an Overview-local seam.
   - **Acceptance details:** the Overview cleanup target must explicitly keep shared Assets composition responsible only for capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Overview-local seam the target owner for Overview summary/navigation state and Overview-local interaction coordination.
   - **Priority:** P1
 
@@ -604,7 +604,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Assets composition must not be widened into an Overview-centric shared owner; and the cleanup target must stay explicit that Base Disks extraction details, Switches extraction details, runtime implementation, overview redesign beyond ownership cleanup, and performance redesign are out of scope.
   - **Priority:** P1
 
-- **FR-140:** WinUI `Assets Base Disks` cleanup shall remain under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Base Disks-specific state, orchestration, and UI coordination behind a Base Disks-local seam.
+- **FR-140:** WinUI `Assets Base Disks` cleanup shall remain under shared `AssetsCapabilityRuntime` rather than becoming a shell-owned surface, while converging Base Disks-specific state, orchestration, and UI coordination behind a Base Disks-local seam.
   - **Acceptance details:** the Base Disks cleanup target must explicitly keep shared Assets composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Base Disks-local seam the target owner for Base Disks-specific state, orchestration, composition, and interaction coordination.
   - **Priority:** P1
 
@@ -616,7 +616,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Assets composition must not become the Base Disks workflow owner; Base Disks-specific host bridges or control exposure remain temporary migration cleanup targets behind the Base Disks-local seam; and the cleanup target must stay explicit that Switches extraction details, Overview extraction details, runtime implementation, Base Disks behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
-- **FR-143:** WinUI `Assets Switches` cleanup shall remain under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Switches-specific state, orchestration, and UI coordination behind a Switches-local seam.
+- **FR-143:** WinUI `Assets Switches` cleanup shall remain under shared `AssetsCapabilityRuntime` rather than becoming a shell-owned surface, while converging Switches-specific state, orchestration, and UI coordination behind a Switches-local seam.
   - **Acceptance details:** the Switches cleanup target must explicitly keep shared Assets composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Switches-local seam the target owner for Switches-specific state, orchestration, composition, and interaction coordination.
   - **Priority:** P1
 

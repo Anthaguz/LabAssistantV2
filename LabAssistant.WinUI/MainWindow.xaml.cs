@@ -39,7 +39,7 @@ public sealed partial class MainWindow : Window
     private readonly IAssetsBaseDisksCapabilityService _assetsBaseDisksCapabilityService;
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
     private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
-    private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
+    private readonly AssetsCapabilityRuntime _assetsCapabilityRuntime;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
@@ -97,7 +97,7 @@ public sealed partial class MainWindow : Window
             AssetsSwitchesViewHost,
             new AssetsSwitchesCompositionHost(
                 ShowAssetsSwitchDeleteConfirmationDialogAsync));
-        _assetsWorkspaceComposition = new AssetsWorkspaceComposition(
+        _assetsCapabilityRuntime = new AssetsCapabilityRuntime(
             AssetsOverviewViewHost,
             _assetsBaseDisksWorkspaceComposition,
             _assetsSwitchesWorkspaceComposition,
@@ -105,8 +105,8 @@ public sealed partial class MainWindow : Window
             AssetsOverviewTabViewItem,
             AssetsBaseDisksTabViewItem,
             AssetsSwitchesTabViewItem,
-            new AssetsWorkspaceHost(),
-            new AssetsWorkspaceShellBridge(
+            new AssetsCapabilityHost(),
+            new AssetsCapabilityShellBridge(
                 () => IsAssetsCapabilityActive,
                 () => IsAssetsOverviewActive,
                 () => IsAssetsBaseDisksActive,
@@ -482,7 +482,7 @@ public sealed partial class MainWindow : Window
 
         _machinesWorkspaceComposition.ApplyShellState();
         _deployCapabilityRuntime.ApplyShellState();
-        _assetsWorkspaceComposition.ApplyShellState();
+        _assetsCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
         _diagnosticsWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)

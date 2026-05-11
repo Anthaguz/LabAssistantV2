@@ -50,7 +50,7 @@ public sealed class MilestoneALScenarioMatrixTests
     {
         var xaml = LoadMainWindowXaml();
         var source = LoadMainWindowSource();
-        var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
+        var assetsCompositionSource = LoadAssetsCapabilityRuntimeSource();
         var deployCompositionSource = LoadDeployWorkspaceCompositionSource();
         var diagnosticsCompositionSource = LoadDiagnosticsWorkspaceCompositionSource();
 
@@ -77,7 +77,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("_deployCapabilityRuntime.ApplyShellState();", source);
         Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", deployCompositionSource);
         Assert.Contains("SyncDeploySubviewSelection()", deployCompositionSource);
-        Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", source);
+        Assert.Contains("_assetsCapabilityRuntime.ApplyShellState();", source);
         Assert.Contains("SyncAssetsSubviewSelection();", assetsCompositionSource);
         Assert.Contains("_diagnosticsWorkspaceComposition.ApplyShellState();", source);
         Assert.Contains("SyncDiagnosticsSubviewSelection()", diagnosticsCompositionSource);
@@ -120,7 +120,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var deployOverviewSource = LoadDeployOverviewViewXamlSource();
         var deployOverviewCodeBehindSource = LoadDeployOverviewViewCodeBehindSource();
         var diagnosticsOverviewSource = LoadDiagnosticsOverviewViewXamlSource();
-        var assetsCompositionSource = LoadAssetsWorkspaceCompositionSource();
+        var assetsCompositionSource = LoadAssetsCapabilityRuntimeSource();
         var diagnosticsCompositionSource = LoadDiagnosticsWorkspaceCompositionSource();
         var diagnosticsOverviewCompositionSource = LoadDiagnosticsOverviewWorkspaceCompositionSource();
         var diagnosticsOverviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
@@ -432,9 +432,9 @@ public sealed class MilestoneALScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadAssetsWorkspaceCompositionSource()
+    private static string LoadAssetsCapabilityRuntimeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsCapabilityRuntime.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

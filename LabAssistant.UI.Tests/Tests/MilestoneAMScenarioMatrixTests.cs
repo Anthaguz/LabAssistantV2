@@ -192,19 +192,19 @@ public sealed class MilestoneAMScenarioMatrixTests
         var mainWindowSource = LoadMainWindowSource();
         var shellViewModelSource = LoadShellViewModelSource();
 
-        Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("private readonly AssetsCapabilityRuntime _assetsCapabilityRuntime;", mainWindowSource);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", mainWindowSource);
         Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;", mainWindowSource);
-        Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("_assetsCapabilityRuntime = new AssetsCapabilityRuntime(", mainWindowSource);
         Assert.Contains("_assetsBaseDisksWorkspaceComposition,", mainWindowSource);
         Assert.Contains("_assetsSwitchesWorkspaceComposition,", mainWindowSource);
         Assert.Contains("_assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(", mainWindowSource);
         Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", mainWindowSource);
         Assert.Contains("new AssetsBaseDisksCompositionHost(", mainWindowSource);
         Assert.Contains("new AssetsSwitchesCompositionHost(", mainWindowSource);
-        Assert.Contains("new AssetsWorkspaceHost()", mainWindowSource);
-        Assert.Contains("new AssetsWorkspaceShellBridge(", mainWindowSource);
-        Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("new AssetsCapabilityHost()", mainWindowSource);
+        Assert.Contains("new AssetsCapabilityShellBridge(", mainWindowSource);
+        Assert.Contains("_assetsCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
         Assert.Contains("private FrameworkElement AssetsOverviewPanel => AssetsOverviewViewHost;", mainWindowSource);
         Assert.Contains("private FrameworkElement AssetsBaseDisksPanel => AssetsBaseDisksViewHost;", mainWindowSource);
@@ -259,7 +259,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     [Fact]
     public void AssetsOverview_ProtectsRefinedLocalOwnershipModel()
     {
-        var compositionSource = LoadAssetsWorkspaceCompositionSource();
+        var compositionSource = LoadAssetsCapabilityRuntimeSource();
         var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
         var editorWorkflowSource = LoadAssetsBaseDisksEditorWorkflowSource();
@@ -270,13 +270,13 @@ public sealed class MilestoneAMScenarioMatrixTests
         var overviewXaml = LoadAssetsOverviewXaml();
         var overviewCodeBehindSource = LoadAssetsOverviewCodeBehindSource();
 
-        Assert.Contains("internal sealed class AssetsWorkspaceComposition", compositionSource);
+        Assert.Contains("internal sealed class AssetsCapabilityRuntime", compositionSource);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _baseDisksWorkspaceComposition;", compositionSource);
         Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _switchesWorkspaceComposition;", compositionSource);
         Assert.Contains("private readonly TabView _subviewTabView;", compositionSource);
         Assert.Contains("private readonly AssetsOverviewWorkspaceComposition _overviewWorkspaceComposition;", compositionSource);
-        Assert.Contains("private readonly IAssetsWorkspaceHost _host;", compositionSource);
-        Assert.Contains("private readonly IAssetsWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("private readonly IAssetsCapabilityHost _host;", compositionSource);
+        Assert.Contains("private readonly IAssetsCapabilityShellBridge _shellBridge;", compositionSource);
         Assert.Contains("private bool _isUpdatingAssetsSubviewSelection;", compositionSource);
         Assert.Contains("AssetsBaseDisksWorkspaceComposition baseDisksWorkspaceComposition,", compositionSource);
         Assert.Contains("AssetsSwitchesWorkspaceComposition switchesWorkspaceComposition,", compositionSource);
@@ -639,27 +639,27 @@ public sealed class MilestoneAMScenarioMatrixTests
     [Fact]
     public void AssetsShellBridge_RemainsNarrowAndShellOwned()
     {
-        var compositionSource = LoadAssetsWorkspaceCompositionSource();
+        var compositionSource = LoadAssetsCapabilityRuntimeSource();
         var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
         var controllerSource = LoadAssetsBaseDisksWorkspaceControllerSource();
         var switchesCompositionSource = LoadAssetsSwitchesWorkspaceCompositionSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var shellBridgeInterfaceBlock = ExtractSection(
             compositionSource,
-            "internal interface IAssetsWorkspaceShellBridge",
-            "internal interface IAssetsWorkspaceHost");
+            "internal interface IAssetsCapabilityShellBridge",
+            "internal interface IAssetsCapabilityHost");
         var shellBridgeClassBlock = ExtractSection(
             compositionSource,
-            "internal sealed class AssetsWorkspaceShellBridge",
-            "internal sealed class AssetsWorkspaceHost");
+            "internal sealed class AssetsCapabilityShellBridge",
+            "internal sealed class AssetsCapabilityHost");
         var hostInterfaceBlock = ExtractSection(
             compositionSource,
-            "internal interface IAssetsWorkspaceHost",
-            "internal sealed class AssetsWorkspaceShellBridge");
+            "internal interface IAssetsCapabilityHost",
+            "internal sealed class AssetsCapabilityShellBridge");
         var hostClassBlock = ExtractSection(
             compositionSource,
-            "internal sealed class AssetsWorkspaceHost",
-            "internal sealed class AssetsWorkspaceComposition");
+            "internal sealed class AssetsCapabilityHost",
+            "internal sealed class AssetsCapabilityRuntime");
 
         Assert.Contains("bool IsAssetsCapabilityActive { get; }", shellBridgeInterfaceBlock);
         Assert.Contains("bool IsAssetsOverviewActive { get; }", shellBridgeInterfaceBlock);
@@ -672,7 +672,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("UpdateAssetsBaseDisksUi", shellBridgeInterfaceBlock);
         Assert.DoesNotContain("UpdateAssetsSwitchesUi", shellBridgeInterfaceBlock);
 
-        Assert.Contains("internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge", shellBridgeClassBlock);
+        Assert.Contains("internal sealed class AssetsCapabilityShellBridge : IAssetsCapabilityShellBridge", shellBridgeClassBlock);
         Assert.Contains("public bool IsAssetsCapabilityActive =>", shellBridgeClassBlock);
         Assert.Contains("public bool IsAssetsOverviewActive =>", shellBridgeClassBlock);
         Assert.Contains("public bool IsAssetsBaseDisksActive =>", shellBridgeClassBlock);
@@ -692,7 +692,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("int AssetsBaseDiskCount { get; }", hostInterfaceBlock);
         Assert.DoesNotContain("Task", hostInterfaceBlock);
 
-        Assert.Contains("internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost", hostClassBlock);
+        Assert.Contains("internal sealed class AssetsCapabilityHost : IAssetsCapabilityHost", hostClassBlock);
         Assert.DoesNotContain("_updateAssetsOverviewUi", hostClassBlock);
         Assert.DoesNotContain("public bool IsAssetsSwitchesLoading =>", hostClassBlock);
         Assert.DoesNotContain("public int AssetsSwitchCount =>", hostClassBlock);
@@ -832,7 +832,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var mainWindowSource = LoadMainWindowSource();
         var shellViewModelSource = LoadShellViewModelSource();
-        var sharedCompositionSource = LoadAssetsWorkspaceCompositionSource();
+        var sharedCompositionSource = LoadAssetsCapabilityRuntimeSource();
         var overviewCompositionSource = LoadAssetsOverviewWorkspaceCompositionSource();
         var overviewWorkspaceSource = LoadAssetsOverviewWorkspaceViewModelSource();
         var baseDisksCompositionSource = LoadAssetsBaseDisksWorkspaceCompositionSource();
@@ -844,13 +844,13 @@ public sealed class MilestoneAMScenarioMatrixTests
         var switchesWorkspaceSource = LoadAssetsSwitchesWorkspaceViewModelSource();
         var switchesViewSource = LoadAssetsSwitchesViewCodeBehindSource();
 
-        Assert.Contains("private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("private readonly AssetsCapabilityRuntime _assetsCapabilityRuntime;", mainWindowSource);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", mainWindowSource);
         Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;", mainWindowSource);
-        Assert.Contains("_assetsWorkspaceComposition = new AssetsWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("_assetsCapabilityRuntime = new AssetsCapabilityRuntime(", mainWindowSource);
         Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", mainWindowSource);
         Assert.Contains("_assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("_assetsWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("_assetsCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
         Assert.DoesNotContain("private readonly AssetsBaseDisksWorkspaceViewModel _assetsBaseDisksWorkspace = new();", mainWindowSource);
         Assert.DoesNotContain("private readonly AssetsSwitchesWorkspaceViewModel _assetsSwitchesWorkspace = new();", mainWindowSource);
@@ -860,12 +860,12 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public const string AssetsBaseDisks = \"assets.base_disks\";", shellViewModelSource);
         Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", shellViewModelSource);
 
-        Assert.Contains("internal sealed class AssetsWorkspaceComposition", sharedCompositionSource);
+        Assert.Contains("internal sealed class AssetsCapabilityRuntime", sharedCompositionSource);
         Assert.Contains("private readonly AssetsOverviewWorkspaceComposition _overviewWorkspaceComposition;", sharedCompositionSource);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _baseDisksWorkspaceComposition;", sharedCompositionSource);
         Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _switchesWorkspaceComposition;", sharedCompositionSource);
-        Assert.Contains("private readonly IAssetsWorkspaceHost _host;", sharedCompositionSource);
-        Assert.Contains("private readonly IAssetsWorkspaceShellBridge _shellBridge;", sharedCompositionSource);
+        Assert.Contains("private readonly IAssetsCapabilityHost _host;", sharedCompositionSource);
+        Assert.Contains("private readonly IAssetsCapabilityShellBridge _shellBridge;", sharedCompositionSource);
         Assert.Contains("_overviewWorkspaceComposition.ApplyShellState();", sharedCompositionSource);
         Assert.Contains("_baseDisksWorkspaceComposition.ApplyShellState();", sharedCompositionSource);
         Assert.Contains("_switchesWorkspaceComposition.ApplyShellState();", sharedCompositionSource);
@@ -2613,9 +2613,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadAssetsWorkspaceCompositionSource()
+    private static string LoadAssetsCapabilityRuntimeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsCapabilityRuntime.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
@@ -2907,13 +2907,13 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadAssetsOverviewWorkspaceCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsOverviewWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Overview", "AssetsOverviewWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadAssetsOverviewWorkspaceViewModelSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsOverviewWorkspaceViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Overview", "AssetsOverviewWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
