@@ -42,7 +42,7 @@ public sealed partial class MainWindow : Window
     private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
-    private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;
+    private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
     private readonly DeployCapabilityRuntime _deployCapabilityRuntime;
     private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
@@ -69,7 +69,7 @@ public sealed partial class MainWindow : Window
     private FrameworkElement AssetsSwitchesPanel => AssetsSwitchesViewHost;
     private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;
     private FrameworkElement AssetsLocalNavPanel => AssetsLocalNavigationPanel;
-    private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;
+    private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesCapabilityRuntime.LibraryItems;
     private const string DeployCapabilityKey = "deploy";
 
     public MainWindow()
@@ -112,38 +112,7 @@ public sealed partial class MainWindow : Window
                 () => IsAssetsBaseDisksActive,
                 () => IsAssetsSwitchesActive,
                 NavigateToRoute));
-        _templatesWorkspaceComposition = new TemplatesWorkspaceComposition(
-            TemplatesWorkspacePanel,
-            new TemplatesLibraryWorkspaceComposition(
-                _templatesCapabilityService,
-                TemplatesLibraryViewHost,
-                new TemplatesLibraryWorkspaceHost(
-                    () => _isTemplatesLoading,
-                    SetTemplatesLoading,
-                    ApplyTemplatesWorkspaceUiState,
-                    ShowTemplateEditorAsync,
-                    SetTemplateEditorStatus,
-                    PickTemplateFileForOpenAsync,
-                    PickTemplateFileForSaveAsync,
-                    ShowDeleteTemplateConfirmationDialogAsync,
-                    ReconcileDeployFromTemplateSelection)),
-            new TemplatesEditorWorkspaceComposition(
-                _templatesCapabilityService,
-                TemplatesEditorViewHost,
-                new TemplatesEditorWorkspaceHost(
-                    () => _isTemplatesLoading,
-                    SetTemplatesLoading,
-                    ApplyTemplatesWorkspaceUiState,
-                    EnsureTemplatesLibraryAsync,
-                    LoadTemplateEditorReferenceDataAsync,
-                    PickTemplateFileForSaveAsync,
-                    ShowRemoveTemplateVmConfirmationDialogAsync,
-                    NavigateToTemplatesEditor,
-                    () => NavigateToRoute(ShellRouteKeys.TemplatesLibrary))),
-            new TemplatesWorkspaceShellBridge(
-                () => IsTemplatesCapabilityActive,
-                () => IsTemplatesLibraryActive,
-                () => IsTemplatesEditorActive));
+        _templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
         _diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(
             DiagnosticsLocalNavigationPanel,
@@ -175,11 +144,109 @@ public sealed partial class MainWindow : Window
             await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
             await EnsureTemplateSwitchesAsync(forceRefresh: true);
             await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: true);
-            await _templatesWorkspaceComposition.EnsureLibraryAsync(forceRefresh: true);
+            await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
             await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
             await LoadMachinesDeletionPolicyAsync();
         };
         ApplyState();
+    }
+
+    private TemplatesCapabilityRuntime CreateTemplatesCapabilityRuntime()
+    {
+        var workspaceHost = TemplatesWorkspacePanel;
+        var libraryComposition = CreateTemplatesLibraryWorkspaceComposition();
+        var editorComposition = CreateTemplatesEditorWorkspaceComposition();
+        var shellBridge = CreateTemplatesWorkspaceShellBridge();
+
+        return new TemplatesCapabilityRuntime(
+            workspaceHost,
+            libraryComposition,
+            editorComposition,
+            shellBridge);
+    }
+
+    private TemplatesLibraryWorkspaceComposition CreateTemplatesLibraryWorkspaceComposition()
+    {
+        ITemplatesCapabilityService templatesCapabilityService = _templatesCapabilityService;
+        var view = TemplatesLibraryViewHost;
+        var host = CreateTemplatesLibraryWorkspaceHost();
+
+        return new TemplatesLibraryWorkspaceComposition(
+            templatesCapabilityService,
+            view,
+            host);
+    }
+
+    private TemplatesLibraryWorkspaceHost CreateTemplatesLibraryWorkspaceHost()
+    {
+        Func<bool> isTemplatesLoading = () => _isTemplatesLoading;
+        Action<bool> setTemplatesLoading = SetTemplatesLoading;
+        Action applyTemplatesWorkspaceUiState = ApplyTemplatesWorkspaceUiState;
+        Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync = ShowTemplateEditorAsync;
+        Action<string> setTemplateEditorStatus = SetTemplateEditorStatus;
+        Func<Task<string?>> pickTemplateFileForOpenAsync = PickTemplateFileForOpenAsync;
+        Func<string, Task<string?>> pickTemplateFileForSaveAsync = PickTemplateFileForSaveAsync;
+        Func<TemplateLibraryItem, Task<bool>> showDeleteTemplateConfirmationDialogAsync = ShowDeleteTemplateConfirmationDialogAsync;
+        Action<IReadOnlyList<TemplateLibraryItem>> reconcileDeployTemplateSelection = ReconcileDeployFromTemplateSelection;
+
+        return new TemplatesLibraryWorkspaceHost(
+            isTemplatesLoading,
+            setTemplatesLoading,
+            applyTemplatesWorkspaceUiState,
+            showTemplateEditorAsync,
+            setTemplateEditorStatus,
+            pickTemplateFileForOpenAsync,
+            pickTemplateFileForSaveAsync,
+            showDeleteTemplateConfirmationDialogAsync,
+            reconcileDeployTemplateSelection);
+    }
+
+    private TemplatesEditorWorkspaceComposition CreateTemplatesEditorWorkspaceComposition()
+    {
+        ITemplatesCapabilityService templatesCapabilityService = _templatesCapabilityService;
+        var view = TemplatesEditorViewHost;
+        var host = CreateTemplatesEditorWorkspaceHost();
+
+        return new TemplatesEditorWorkspaceComposition(
+            templatesCapabilityService,
+            view,
+            host);
+    }
+
+    private TemplatesEditorWorkspaceHost CreateTemplatesEditorWorkspaceHost()
+    {
+        Func<bool> isTemplatesLoading = () => _isTemplatesLoading;
+        Action<bool> setTemplatesLoading = SetTemplatesLoading;
+        Action applyTemplatesWorkspaceUiState = ApplyTemplatesWorkspaceUiState;
+        Func<bool, Task> ensureTemplatesLibraryAsync = EnsureTemplatesLibraryAsync;
+        Func<bool, Task<TemplatesEditorReferenceData>> loadReferenceDataAsync = LoadTemplateEditorReferenceDataAsync;
+        Func<string, Task<string?>> pickTemplateFileForSaveAsync = PickTemplateFileForSaveAsync;
+        Func<string, Task<bool>> showRemoveTemplateVmConfirmationDialogAsync = ShowRemoveTemplateVmConfirmationDialogAsync;
+        Action navigateToEditor = NavigateToTemplatesEditor;
+        Action navigateToLibrary = () => NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
+
+        return new TemplatesEditorWorkspaceHost(
+            isTemplatesLoading,
+            setTemplatesLoading,
+            applyTemplatesWorkspaceUiState,
+            ensureTemplatesLibraryAsync,
+            loadReferenceDataAsync,
+            pickTemplateFileForSaveAsync,
+            showRemoveTemplateVmConfirmationDialogAsync,
+            navigateToEditor,
+            navigateToLibrary);
+    }
+
+    private TemplatesWorkspaceShellBridge CreateTemplatesWorkspaceShellBridge()
+    {
+        Func<bool> isTemplatesCapabilityActive = () => IsTemplatesCapabilityActive;
+        Func<bool> isTemplatesLibraryActive = () => IsTemplatesLibraryActive;
+        Func<bool> isTemplatesEditorActive = () => IsTemplatesEditorActive;
+
+        return new TemplatesWorkspaceShellBridge(
+            isTemplatesCapabilityActive,
+            isTemplatesLibraryActive,
+            isTemplatesEditorActive);
     }
 
     private DeployCapabilityRuntime CreateDeployCapabilityRuntime()
@@ -416,7 +483,7 @@ public sealed partial class MainWindow : Window
         _machinesWorkspaceComposition.ApplyShellState();
         _deployCapabilityRuntime.ApplyShellState();
         _assetsWorkspaceComposition.ApplyShellState();
-        _templatesWorkspaceComposition.ApplyShellState();
+        _templatesCapabilityRuntime.ApplyShellState();
         _diagnosticsWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)
         {
@@ -852,19 +919,19 @@ public sealed partial class MainWindow : Window
 
     private void ApplyTemplatesWorkspaceUiState()
     {
-        _templatesWorkspaceComposition.ApplyUiState(CreateTemplatesWorkspaceUiState());
+        _templatesCapabilityRuntime.ApplyUiState(CreateTemplatesWorkspaceUiState());
     }
 
     private TemplatesWorkspaceUiState CreateTemplatesWorkspaceUiState()
     {
         return new TemplatesWorkspaceUiState(
             IsLoading: _isTemplatesLoading,
-            HasSelectedLibraryItem: _templatesWorkspaceComposition.SelectedLibraryItem is not null);
+            HasSelectedLibraryItem: _templatesCapabilityRuntime.SelectedLibraryItem is not null);
     }
 
     private async Task EnsureTemplatesLibraryAsync(bool forceRefresh)
     {
-        await _templatesWorkspaceComposition.EnsureLibraryAsync(forceRefresh);
+        await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh);
     }
 
     private async Task EnsureTemplateSwitchesAsync(bool forceRefresh)
@@ -888,7 +955,7 @@ public sealed partial class MainWindow : Window
             _templateAvailableSwitches = Array.Empty<string>();
         }
 
-        _templatesWorkspaceComposition.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+        _templatesCapabilityRuntime.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
     }
 
     private async Task<TemplatesEditorReferenceData> LoadTemplateEditorReferenceDataAsync(bool forceRefresh)
@@ -918,17 +985,17 @@ public sealed partial class MainWindow : Window
                 item.Signature));
         }
 
-        _templatesWorkspaceComposition.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+        _templatesCapabilityRuntime.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
     }
 
     private void SyncTemplateVmEntriesToDocument()
     {
-        _templatesWorkspaceComposition.SyncEditorVmEntriesToDocument();
+        _templatesCapabilityRuntime.SyncEditorVmEntriesToDocument();
     }
 
     private void RefreshTemplateVmListView()
     {
-        _templatesWorkspaceComposition.RefreshEditorVmEntries();
+        _templatesCapabilityRuntime.RefreshEditorVmEntries();
     }
 
 
@@ -990,7 +1057,7 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText)
     {
-        await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);
+        await _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText);
     }
 
     private void ReconcileDeployFromTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)
@@ -1000,7 +1067,7 @@ public sealed partial class MainWindow : Window
 
     private void SetTemplateEditorStatus(string statusText)
     {
-        _templatesWorkspaceComposition.SetEditorStatus(statusText);
+        _templatesCapabilityRuntime.SetEditorStatus(statusText);
     }
 
     private void InitializeRdpReadinessTimer()

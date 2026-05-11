@@ -37,14 +37,14 @@ internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBr
     public bool IsTemplatesEditorActive => _isTemplatesEditorActive();
 }
 
-internal sealed class TemplatesWorkspaceComposition
+internal sealed class TemplatesCapabilityRuntime
 {
     private readonly FrameworkElement _workspaceHost;
     private readonly TemplatesLibraryWorkspaceComposition _libraryComposition;
     private readonly TemplatesEditorWorkspaceComposition _editorComposition;
     private readonly ITemplatesWorkspaceShellBridge _shellBridge;
 
-    public TemplatesWorkspaceComposition(
+    public TemplatesCapabilityRuntime(
         FrameworkElement workspaceHost,
         TemplatesLibraryWorkspaceComposition libraryComposition,
         TemplatesEditorWorkspaceComposition editorComposition,

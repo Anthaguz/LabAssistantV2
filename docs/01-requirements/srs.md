@@ -640,7 +640,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** cleanup-target definition must preserve `templates.library` as the stable/default Templates surface, keep `templates.editor` as a workflow-state destination entered from explicit actions rather than a peer tab, and remain explicit that Templates Library extraction details, Templates Editor extraction details, runtime implementation, editor behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
-- **FR-149:** WinUI `Templates Library` cleanup shall remain under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface, while converging Library-specific state, orchestration, composition, and UI coordination behind a Library-local seam.
+- **FR-149:** WinUI `Templates Library` cleanup shall remain under shared `TemplatesCapabilityRuntime` rather than becoming a shell-owned surface, while converging Library-specific state, orchestration, composition, and UI coordination behind a Library-local seam.
   - **Acceptance details:** the Library cleanup target must explicitly keep shared Templates composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Library-local seam the target owner for Library-specific state, orchestration, composition, and interaction coordination.
   - **Priority:** P1
 
@@ -652,7 +652,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Templates composition must not become the Library workflow owner; Library-specific host bridges or control exposure remain temporary migration cleanup targets behind the Library-local seam; and the cleanup target must stay explicit that Templates Editor extraction details, runtime implementation, Library behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
-- **FR-152:** WinUI `Templates Editor` cleanup shall remain under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface, while converging Editor-specific state, orchestration, composition, and UI coordination behind an Editor-local seam.
+- **FR-152:** WinUI `Templates Editor` cleanup shall remain under shared `TemplatesCapabilityRuntime` rather than becoming a shell-owned surface, while converging Editor-specific state, orchestration, composition, and UI coordination behind an Editor-local seam.
   - **Acceptance details:** the Editor cleanup target must explicitly keep shared Templates composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make the Editor-local seam the target owner for Editor-specific state, orchestration, composition, and interaction coordination.
   - **Priority:** P1
 
