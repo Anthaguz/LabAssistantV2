@@ -60,7 +60,8 @@ public sealed class MilestoneAJScenarioMatrixTests
 
         Assert.Contains("private bool IsAssetsBaseDisksActive =>", source);
         Assert.Contains("private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;", source);
-        Assert.Contains("_assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", source);
+        Assert.Contains("var baseDisksCompositionHost = new AssetsBaseDisksCompositionHost(", source);
+        Assert.Contains("assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(", source);
         Assert.Contains("new AssetsBaseDisksCompositionHost(", source);
         Assert.DoesNotContain("AssetsBaseDisksRefreshButton_Click", source);
         Assert.DoesNotContain("AssetsBaseDisksImportButton_Click", source);
