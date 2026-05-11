@@ -3040,7 +3040,7 @@ Each readiness result shall include, at minimum:
 - the narrow `Templates Library` cleanup target is reviewed
 
 **Then**
-- `Templates Library` remains under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface
+- `Templates Library` remains under shared `TemplatesCapabilityRuntime` rather than becoming a shell-owned surface
 - shared Templates composition remains responsible only for shared capability-level composition concerns
 - a Library-local seam becomes the target home for Library-specific state, orchestration, composition, and UI coordination
 
@@ -3057,7 +3057,7 @@ Each readiness result shall include, at minimum:
   - Library-specific orchestration for refresh, load/open, create-entry, import, export, delete, and library-surface selection flows
   - Library-local composition and interaction coordination for the `templates.library` surface
   - cleanup or reduction of temporary Library-specific host bridges or control exposure behind the Library-local seam
-- shared `TemplatesWorkspaceComposition` does not become the Library workflow owner
+- shared `TemplatesCapabilityRuntime` does not become the Library workflow owner
 - shared Templates composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
 
 ### 3) MainWindow and route-activation boundaries remain explicit for templates.library
@@ -3086,7 +3086,7 @@ Each readiness result shall include, at minimum:
 - runtime implementation, Templates Editor extraction details, Library behavior redesign, and performance redesign remain out of scope
 
 ## Expected Boundary
-- shared `TemplatesWorkspaceComposition` remains the owner for shared capability-level composition only
+- shared `TemplatesCapabilityRuntime` remains the owner for shared capability-level composition only
 - a Library-local seam becomes the target home for Library-specific state, orchestration, composition, and interaction coordination
 - `MainWindow` remains shell-only and is not injected into Library views
 - `Templates Library` remains long-lived with route-activation refresh inside the existing Templates workspace
@@ -3114,7 +3114,7 @@ Each readiness result shall include, at minimum:
 - the narrow `Templates Editor` cleanup target is reviewed
 
 **Then**
-- `Templates Editor` remains under shared `TemplatesWorkspaceComposition` rather than becoming a shell-owned surface
+- `Templates Editor` remains under shared `TemplatesCapabilityRuntime` rather than becoming a shell-owned surface
 - shared Templates composition remains responsible only for shared capability-level composition concerns
 - an Editor-local seam becomes the target home for Editor-specific state, orchestration, composition, and UI coordination
 
@@ -3131,7 +3131,7 @@ Each readiness result shall include, at minimum:
   - Editor-specific orchestration for open/load, create-new, edit, save, save-as-needed, discard/reset, and editor-surface VM-entry editing flows
   - Editor-local composition and interaction coordination for the `templates.editor` surface
   - cleanup or reduction of temporary Editor-specific host bridges or control exposure behind the Editor-local seam
-- shared `TemplatesWorkspaceComposition` does not become the Editor workflow owner
+- shared `TemplatesCapabilityRuntime` does not become the Editor workflow owner
 - shared Templates composition keeps only cross-surface capability concerns such as shared route activation, shared workspace participation, and shared coordination genuinely spanning Library and Editor
 
 ### 3) MainWindow and route-activation boundaries remain explicit for templates.editor
@@ -3161,7 +3161,7 @@ Each readiness result shall include, at minimum:
 - runtime implementation, Templates Library extraction details, Editor behavior redesign, and performance redesign remain out of scope
 
 ## Expected Boundary
-- shared `TemplatesWorkspaceComposition` remains the owner for shared capability-level composition only
+- shared `TemplatesCapabilityRuntime` remains the owner for shared capability-level composition only
 - an Editor-local seam becomes the target home for Editor-specific state, orchestration, composition, and interaction coordination
 - `MainWindow` remains shell-only and is not injected into Editor views
 - `Templates Editor` remains long-lived with route-activation refresh inside the existing Templates workspace

@@ -80,7 +80,7 @@ public sealed class MilestoneAGScenarioMatrixTests
         var viewSource = LoadDeployOnTheFlyViewSource();
 
         Assert.Contains("private readonly DeployCapabilityRuntime _deployCapabilityRuntime;", mainWindowSource);
-        Assert.DoesNotContain("new DeployTemplateEditorLauncher(_templatesWorkspaceComposition)", mainWindowSource);
+        Assert.DoesNotContain("new DeployTemplateEditorLauncher(_templatesCapabilityRuntime)", mainWindowSource);
         Assert.DoesNotContain("BuildOnTheFlyTemplate()", mainWindowSource);
         Assert.DoesNotContain("EnsureDeployOnTheFlyReferenceDataAsync", mainWindowSource);
         Assert.DoesNotContain("applyResolveSuggestionsAsync: template => _deployWorkspaceComposition.ApplyResolveSuggestionsAsync(template),", mainWindowSource);

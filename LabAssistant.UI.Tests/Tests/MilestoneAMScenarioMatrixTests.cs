@@ -892,22 +892,23 @@ public sealed class MilestoneAMScenarioMatrixTests
         var mainWindowSource = LoadMainWindowSource();
         var shellViewModelSource = LoadShellViewModelSource();
 
-        Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
-        Assert.Contains("_templatesWorkspaceComposition = new TemplatesWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("new TemplatesWorkspaceShellBridge(", mainWindowSource);
-        Assert.Contains("() => IsTemplatesCapabilityActive,", mainWindowSource);
-        Assert.Contains("() => IsTemplatesLibraryActive,", mainWindowSource);
-        Assert.Contains("() => IsTemplatesEditorActive));", mainWindowSource);
-        Assert.Contains("_templatesWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;", mainWindowSource);
+        Assert.Contains("_templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();", mainWindowSource);
+        Assert.Contains("private TemplatesCapabilityRuntime CreateTemplatesCapabilityRuntime()", mainWindowSource);
+        Assert.Contains("private TemplatesWorkspaceShellBridge CreateTemplatesWorkspaceShellBridge()", mainWindowSource);
+        Assert.Contains("Func<bool> isTemplatesCapabilityActive = () => IsTemplatesCapabilityActive;", mainWindowSource);
+        Assert.Contains("Func<bool> isTemplatesLibraryActive = () => IsTemplatesLibraryActive;", mainWindowSource);
+        Assert.Contains("Func<bool> isTemplatesEditorActive = () => IsTemplatesEditorActive;", mainWindowSource);
+        Assert.Contains("_templatesCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("ApplyTemplatesWorkspaceUiState();", mainWindowSource);
         Assert.Contains("private TemplatesWorkspaceUiState CreateTemplatesWorkspaceUiState()", mainWindowSource);
         Assert.Contains("private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;", mainWindowSource);
-        Assert.Contains("private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesWorkspaceComposition.LibraryItems;", mainWindowSource);
-        Assert.Contains("new TemplatesEditorWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("new TemplatesEditorWorkspaceHost(", mainWindowSource);
-        Assert.Contains("LoadTemplateEditorReferenceDataAsync,", mainWindowSource);
-        Assert.Contains("await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
-        Assert.Contains("() => NavigateToRoute(ShellRouteKeys.TemplatesLibrary)", mainWindowSource);
+        Assert.Contains("private IList<TemplateLibraryItem> TemplatesLibraryItems => _templatesCapabilityRuntime.LibraryItems;", mainWindowSource);
+        Assert.Contains("private TemplatesEditorWorkspaceComposition CreateTemplatesEditorWorkspaceComposition()", mainWindowSource);
+        Assert.Contains("private TemplatesEditorWorkspaceHost CreateTemplatesEditorWorkspaceHost()", mainWindowSource);
+        Assert.Contains("Func<bool, Task<TemplatesEditorReferenceData>> loadReferenceDataAsync = LoadTemplateEditorReferenceDataAsync;", mainWindowSource);
+        Assert.Contains("await _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
+        Assert.Contains("Action navigateToLibrary = () => NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", mainWindowSource);
         Assert.Contains("private bool IsTemplatesLibraryActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesEditorActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesCapabilityActive =>", mainWindowSource);
@@ -944,7 +945,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     [Fact]
     public void TemplatesLibrary_RefinedArchitecture_KeepsSharedCompositionAsDelegatingHost()
     {
-        var compositionSource = LoadTemplatesWorkspaceCompositionSource();
+        var compositionSource = LoadTemplatesCapabilityRuntimeSource();
         var libraryCompositionSource = LoadTemplatesLibraryWorkspaceCompositionSource();
         var mainWindowSource = LoadMainWindowSource();
 
@@ -953,7 +954,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("bool IsTemplatesLibraryActive { get; }", compositionSource);
         Assert.Contains("bool IsTemplatesEditorActive { get; }", compositionSource);
         Assert.Contains("internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBridge", compositionSource);
-        Assert.Contains("internal sealed class TemplatesWorkspaceComposition", compositionSource);
+        Assert.Contains("internal sealed class TemplatesCapabilityRuntime", compositionSource);
         Assert.Contains("private readonly FrameworkElement _workspaceHost;", compositionSource);
         Assert.Contains("private readonly TemplatesLibraryWorkspaceComposition _libraryComposition;", compositionSource);
         Assert.Contains("private readonly TemplatesEditorWorkspaceComposition _editorComposition;", compositionSource);
@@ -988,8 +989,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("TemplateLibraryListView.SelectedItem = _selectedTemplateLibraryItem;", compositionSource);
         Assert.DoesNotContain("private readonly TemplatesEditorView _editorView;", compositionSource);
         Assert.DoesNotContain("_editorView.TemplateEditorContextTextBlockControl.Text = state.TemplateEditorContextText;", compositionSource);
-        Assert.Contains("new TemplatesLibraryWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("new TemplatesLibraryWorkspaceHost(", mainWindowSource);
+        Assert.Contains("private TemplatesLibraryWorkspaceComposition CreateTemplatesLibraryWorkspaceComposition()", mainWindowSource);
+        Assert.Contains("private TemplatesLibraryWorkspaceHost CreateTemplatesLibraryWorkspaceHost()", mainWindowSource);
 
         Assert.Contains("internal interface ITemplatesLibraryWorkspaceHost", libraryCompositionSource);
         Assert.Contains("internal sealed class TemplatesLibraryWorkspaceHost : ITemplatesLibraryWorkspaceHost", libraryCompositionSource);
@@ -1033,7 +1034,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public void SetSelectedItem(TemplateLibraryItem? selectedItem)", libraryWorkspaceSource);
         Assert.Contains("public void SetFailure(string statusText)", libraryWorkspaceSource);
 
-        Assert.Contains("await _templatesWorkspaceComposition.EnsureLibraryAsync(forceRefresh: true);", mainWindowSource);
+        Assert.Contains("await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);", mainWindowSource);
         Assert.DoesNotContain("TemplateLibraryListView.ItemsSource = _templateLibraryItems;", mainWindowSource);
         Assert.DoesNotContain("TemplatesLibraryView.SelectedTemplateChanged += TemplatesLibraryView_SelectedTemplateChanged;", mainWindowSource);
         Assert.DoesNotContain("ApplyTemplateSearchButton.Click += ApplyTemplateSearchButton_Click;", mainWindowSource);
@@ -1089,7 +1090,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var editorControllerSource = LoadTemplatesEditorWorkspaceControllerSource();
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
         var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
-        var templatesWorkspaceCompositionSource = LoadTemplatesWorkspaceCompositionSource();
+        var templatesWorkspaceCompositionSource = LoadTemplatesCapabilityRuntimeSource();
         var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("internal sealed class TemplatesEditorWorkspaceViewModel", editorWorkspaceSource);
@@ -1220,9 +1221,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private readonly TemplatesEditorView _editorView;", templatesWorkspaceCompositionSource);
         Assert.DoesNotContain("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", templatesWorkspaceCompositionSource);
 
-        Assert.Contains("_templatesWorkspaceComposition.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);", mainWindowSource);
-        Assert.Contains("await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
-        Assert.Contains("new TemplatesEditorWorkspaceHost(", mainWindowSource);
+        Assert.Contains("_templatesCapabilityRuntime.SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);", mainWindowSource);
+        Assert.Contains("await _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
+        Assert.Contains("private TemplatesEditorWorkspaceHost CreateTemplatesEditorWorkspaceHost()", mainWindowSource);
         Assert.DoesNotContain("SaveTemplateButton.Click += SaveTemplateButton_Click;", mainWindowSource);
         Assert.DoesNotContain("AddTemplateVmButton.Click += AddTemplateVmButton_Click;", mainWindowSource);
         Assert.DoesNotContain("private void BindTemplateEditorDocument()", mainWindowSource);
@@ -1240,7 +1241,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var mainWindowSource = LoadMainWindowSource();
         var shellViewModelSource = LoadShellViewModelSource();
-        var templatesWorkspaceCompositionSource = LoadTemplatesWorkspaceCompositionSource();
+        var templatesWorkspaceCompositionSource = LoadTemplatesCapabilityRuntimeSource();
         var libraryWorkspaceSource = LoadTemplatesLibraryWorkspaceSource();
         var libraryControllerSource = LoadTemplatesLibraryWorkspaceControllerSource();
         var libraryCompositionSource = LoadTemplatesLibraryWorkspaceCompositionSource();
@@ -1250,7 +1251,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
         var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
 
-        Assert.Contains("internal sealed class TemplatesWorkspaceComposition", templatesWorkspaceCompositionSource);
+        Assert.Contains("internal sealed class TemplatesCapabilityRuntime", templatesWorkspaceCompositionSource);
         Assert.Contains("private readonly TemplatesLibraryWorkspaceComposition _libraryComposition;", templatesWorkspaceCompositionSource);
         Assert.Contains("private readonly TemplatesEditorWorkspaceComposition _editorComposition;", templatesWorkspaceCompositionSource);
         Assert.Contains("private readonly ITemplatesWorkspaceShellBridge _shellBridge;", templatesWorkspaceCompositionSource);
@@ -1281,14 +1282,14 @@ public sealed class MilestoneAMScenarioMatrixTests
 
         Assert.Contains("public const string TemplatesLibrary = \"templates.library\";", shellViewModelSource);
         Assert.Contains("public const string TemplatesEditor = \"templates.editor\";", shellViewModelSource);
-        Assert.Contains("private readonly TemplatesWorkspaceComposition _templatesWorkspaceComposition;", mainWindowSource);
+        Assert.Contains("private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;", mainWindowSource);
         Assert.Contains("private FrameworkElement TemplatesWorkspaceHost => TemplatesWorkspacePanel;", mainWindowSource);
         Assert.Contains("private bool IsTemplatesCapabilityActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesLibraryActive =>", mainWindowSource);
         Assert.Contains("private bool IsTemplatesEditorActive =>", mainWindowSource);
         Assert.Contains("ApplyTemplatesWorkspaceUiState();", mainWindowSource);
-        Assert.Contains("await _templatesWorkspaceComposition.EnsureLibraryAsync(forceRefresh: true);", mainWindowSource);
-        Assert.Contains("await _templatesWorkspaceComposition.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
+        Assert.Contains("await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);", mainWindowSource);
+        Assert.Contains("await _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText);", mainWindowSource);
 
         Assert.DoesNotContain("private readonly TemplatesLibraryView _templatesLibraryView = new();", mainWindowSource);
         Assert.DoesNotContain("private readonly TemplatesEditorView _templatesEditorView = new();", mainWindowSource);
@@ -2592,9 +2593,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadTemplatesWorkspaceCompositionSource()
+    private static string LoadTemplatesCapabilityRuntimeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Templates", "TemplatesCapabilityRuntime.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

@@ -353,7 +353,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   5. Verify Editor explicit-entry behavior, document/header state, VM list/selection/draft/apply, save/save-as/validate, and VM-entry add/remove sanity.
   6. Verify route switching preserves the long-lived Templates workspace model and refresh/reconcile behavior rather than per-navigation recreation.
 - **Expected:**
-  - Shared `TemplatesWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of Templates-local workflow/state ownership.
+  - Shared `TemplatesCapabilityRuntime` remains the shared capability composition owner, while `MainWindow` remains out of Templates-local workflow/state ownership.
   - `templates.library` remains the stable/default Templates surface, while `templates.editor` remains an explicit workflow-state destination.
 - `TemplatesLibraryWorkspaceViewModel`, `TemplatesLibraryWorkspaceController`, and `TemplatesLibraryWorkspaceComposition` remain the Library-local seams, with the narrowed Library interaction/view surface still represented.
 - `TemplatesEditorWorkspaceViewModel`, `TemplatesEditorWorkspaceController`, and `TemplatesEditorWorkspaceComposition` remain the Editor-local seams, with the narrowed Editor interaction/view surface still represented.
