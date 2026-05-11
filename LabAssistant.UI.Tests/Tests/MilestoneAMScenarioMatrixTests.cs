@@ -2907,7 +2907,7 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadAssetsBaseDisksWorkspaceViewModelSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "BaseDisks", "AssetsBaseDisksWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
@@ -2931,19 +2931,19 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadAssetsBaseDisksWorkspaceControllerSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceController.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "BaseDisks", "AssetsBaseDisksWorkspaceController.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadAssetsBaseDisksEditorWorkflowSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksEditorWorkflow.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "BaseDisks", "AssetsBaseDisksEditorWorkflow.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadAssetsBaseDisksWorkspaceCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsBaseDisksWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "BaseDisks", "AssetsBaseDisksWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
