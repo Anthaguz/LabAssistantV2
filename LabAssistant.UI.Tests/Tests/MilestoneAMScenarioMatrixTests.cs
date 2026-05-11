@@ -570,6 +570,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     {
         var workspaceSource = LoadAssetsSwitchesWorkspaceViewModelSource();
         var controllerSource = LoadAssetsSwitchesWorkspaceControllerSource();
+        var editorWorkflowSource = LoadAssetsSwitchesEditorWorkflowSource();
         var compositionSource = LoadAssetsSwitchesWorkspaceCompositionSource();
         var viewSource = LoadAssetsSwitchesViewCodeBehindSource();
 
@@ -592,6 +593,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("private readonly IAssetsSwitchesCapabilityService _capabilityService;", controllerSource);
         Assert.Contains("private readonly AssetsSwitchesWorkspaceViewModel _workspace;", controllerSource);
         Assert.Contains("private readonly IAssetsSwitchesWorkspaceHost _host;", controllerSource);
+        Assert.Contains("private readonly AssetsSwitchesEditorWorkflow _editorWorkflow;", controllerSource);
         Assert.Contains("public async Task EnsureInventoryAsync(bool forceRefresh)", controllerSource);
         Assert.Contains("public async Task HandleSelectionChangedAsync(AssetsSwitchListRow? selectedRow)", controllerSource);
         Assert.Contains("public async Task BeginCreateAsync()", controllerSource);
@@ -599,10 +601,20 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public async Task DeleteSelectedAsync()", controllerSource);
         Assert.Contains("public async Task HandleEditorChangedAsync()", controllerSource);
         Assert.Contains("public void ApplyWorkspaceState()", controllerSource);
-        Assert.Contains("LoadAttachedVmNamesAsync", controllerSource);
-        Assert.Contains("RefreshValidationAsync", controllerSource);
-        Assert.Contains("ApplyDeleteAssessment", controllerSource);
+        Assert.Contains("_editorWorkflow = new AssetsSwitchesEditorWorkflow(capabilityService, workspace, host);", controllerSource);
         Assert.DoesNotContain("internal sealed class AssetsSwitchesWorkspaceHost", controllerSource);
+
+        Assert.Contains("internal sealed class AssetsSwitchesEditorWorkflow", editorWorkflowSource);
+        Assert.Contains("public async Task RestoreAfterInventoryRefreshAsync(bool forceRefresh, string? previousSelectionName)", editorWorkflowSource);
+        Assert.Contains("public async Task HandleSelectionChangedAsync(AssetsSwitchListRow? selectedRow)", editorWorkflowSource);
+        Assert.Contains("public async Task BeginCreateAsync()", editorWorkflowSource);
+        Assert.Contains("public async Task SaveDraftAsync(Func<Task> refreshInventoryAsync)", editorWorkflowSource);
+        Assert.Contains("public async Task HandleEditorChangedAsync()", editorWorkflowSource);
+        Assert.Contains("public void ApplyDeleteAssessment(AssetsSwitchDeleteAssessment assessment)", editorWorkflowSource);
+        Assert.Contains("public void ClearErrorState()", editorWorkflowSource);
+        Assert.Contains("LoadAttachedVmNamesAsync", editorWorkflowSource);
+        Assert.Contains("RefreshValidationAsync", editorWorkflowSource);
+        Assert.Contains("SetAttachedVmState", editorWorkflowSource);
 
         Assert.Contains("internal sealed class AssetsSwitchesWorkspaceComposition : IAssetsSwitchesWorkspaceHost", compositionSource);
         Assert.Contains("private readonly AssetsSwitchesView _view;", compositionSource);
@@ -2913,19 +2925,25 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadAssetsSwitchesWorkspaceViewModelSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadAssetsSwitchesWorkspaceControllerSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceController.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesEditorWorkflowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesEditorWorkflow.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadAssetsSwitchesWorkspaceCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

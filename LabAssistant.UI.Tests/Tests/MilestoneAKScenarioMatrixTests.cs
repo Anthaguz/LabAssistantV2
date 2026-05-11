@@ -56,6 +56,7 @@ public sealed class MilestoneAKScenarioMatrixTests
         var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
         var controllerSource = LoadAssetsSwitchesControllerSource();
+        var editorWorkflowSource = LoadAssetsSwitchesEditorWorkflowSource();
         var compositionSource = LoadAssetsSwitchesCompositionSource();
 
         Assert.Contains("ShowAssetsSwitchDeleteConfirmationDialogAsync", source);
@@ -70,7 +71,10 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("HandleSelectionChangedAsync", controllerSource);
         Assert.Contains("SaveDraftAsync", controllerSource);
         Assert.Contains("DeleteSelectedAsync", controllerSource);
-        Assert.Contains("ApplyDeleteAssessment", controllerSource);
+        Assert.Contains("private readonly AssetsSwitchesEditorWorkflow _editorWorkflow;", controllerSource);
+        Assert.Contains("_editorWorkflow = new AssetsSwitchesEditorWorkflow(capabilityService, workspace, host);", controllerSource);
+        Assert.Contains("internal sealed class AssetsSwitchesEditorWorkflow", editorWorkflowSource);
+        Assert.Contains("ApplyDeleteAssessment", editorWorkflowSource);
         Assert.Contains("public bool HasErrorState { get; set; }", workspaceSource);
         Assert.Contains("Delete is allowed only when no Hyper-V VM is attached to the switch.", source);
         Assert.Contains("Delete is blocked because at least one VM is attached to this switch.", capabilitySource);
@@ -86,6 +90,7 @@ public sealed class MilestoneAKScenarioMatrixTests
         var viewSource = LoadAssetsSwitchesViewXamlSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
         var controllerSource = LoadAssetsSwitchesControllerSource();
+        var editorWorkflowSource = LoadAssetsSwitchesEditorWorkflowSource();
         var compositionSource = LoadAssetsSwitchesCompositionSource();
 
         Assert.Contains("private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;", source);
@@ -96,10 +101,11 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("CaptureDraft(bool isNewOverride)", compositionSource);
         Assert.Contains("_view.UpdateWorkspaceState(BuildViewState(workspace, canValidateOrApply, isExternalSwitchTypeSelected));", compositionSource);
         Assert.Contains("internal sealed class AssetsSwitchesWorkspaceController", controllerSource);
-        Assert.Contains("RefreshValidationAsync", controllerSource);
-        Assert.Contains("LoadAttachedVmNamesAsync", controllerSource);
-        Assert.Contains("SetAttachedVmState", controllerSource);
-        Assert.Contains("ClearErrorState", controllerSource);
+        Assert.Contains("private readonly AssetsSwitchesEditorWorkflow _editorWorkflow;", controllerSource);
+        Assert.Contains("RefreshValidationAsync", editorWorkflowSource);
+        Assert.Contains("LoadAttachedVmNamesAsync", editorWorkflowSource);
+        Assert.Contains("SetAttachedVmState", editorWorkflowSource);
+        Assert.Contains("ClearErrorState", editorWorkflowSource);
         Assert.Contains("DataContext = _presentation;", LoadAssetsSwitchesViewCodeBehindSource());
         Assert.Contains("_presentation.Apply(state);", LoadAssetsSwitchesViewCodeBehindSource());
         Assert.DoesNotContain("AssetsSwitchesRefreshButton.IsEnabled =", LoadAssetsSwitchesViewCodeBehindSource());
@@ -108,9 +114,9 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("public AssetsSwitchDraft? PendingDraft { get; set; }", workspaceSource);
         Assert.Contains("public int ValidationRequestVersion { get; set; }", workspaceSource);
         Assert.Contains("public int AssessmentRequestVersion { get; set; }", workspaceSource);
-        Assert.Contains("The current new-switch draft was preserved.", controllerSource);
+        Assert.Contains("The current new-switch draft was preserved.", editorWorkflowSource);
         Assert.Contains("Delete blocked. Disconnect the attached VMs from this switch and refresh before trying again.", controllerSource);
-        Assert.Contains("Attached VMs currently using this switch.", controllerSource);
+        Assert.Contains("Attached VMs currently using this switch.", editorWorkflowSource);
         Assert.Contains("Select a switch or click New to begin.", LoadAssetsSwitchesViewCodeBehindSource());
         Assert.Contains("IsEnabled=\"{Binding CanRefresh, Mode=OneWay}\"", viewSource);
         Assert.Contains("Visibility=\"{Binding ErrorStateVisibility, Mode=OneWay}\"", viewSource);
@@ -129,6 +135,7 @@ public sealed class MilestoneAKScenarioMatrixTests
         var capabilitySource = LoadAssetsSwitchesCapabilityServiceSource();
         var workspaceSource = LoadAssetsSwitchesWorkspaceSource();
         var controllerSource = LoadAssetsSwitchesControllerSource();
+        var editorWorkflowSource = LoadAssetsSwitchesEditorWorkflowSource();
         var compositionSource = LoadAssetsSwitchesCompositionSource();
 
         Assert.Contains("public const string AssetsSwitches = \"assets.switches\";", LoadShellViewModelSource());
@@ -153,10 +160,10 @@ public sealed class MilestoneAKScenarioMatrixTests
         Assert.Contains("External adapter rebinding is not supported here. Create a new switch instead.", capabilitySource);
 
         Assert.Contains("public AssetsSwitchDraft? PendingDraft { get; set; }", workspaceSource);
-        Assert.Contains("RefreshValidationAsync", controllerSource);
-        Assert.Contains("LoadAttachedVmNamesAsync", controllerSource);
+        Assert.Contains("RefreshValidationAsync", editorWorkflowSource);
+        Assert.Contains("LoadAttachedVmNamesAsync", editorWorkflowSource);
         Assert.Contains("public bool HasErrorState { get; set; }", workspaceSource);
-        Assert.Contains("Attached VMs currently using this switch.", controllerSource);
+        Assert.Contains("Attached VMs currently using this switch.", editorWorkflowSource);
         Assert.Contains("internal sealed class AssetsSwitchesViewPresentationModel : INotifyPropertyChanged", LoadAssetsSwitchesViewCodeBehindSource());
         Assert.DoesNotContain("Delete eligibility is checked when you click Delete.", source);
         Assert.Contains("ContentTitleTextBlock.Text = _activeCapability.DisplayName;", source);
@@ -202,19 +209,25 @@ public sealed class MilestoneAKScenarioMatrixTests
 
     private static string LoadAssetsSwitchesWorkspaceSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesWorkspaceViewModel.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadAssetsSwitchesControllerSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceController.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesWorkspaceController.cs");
+        return File.ReadAllText(Path.GetFullPath(path));
+    }
+
+    private static string LoadAssetsSwitchesEditorWorkflowSource()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesEditorWorkflow.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
     private static string LoadAssetsSwitchesCompositionSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "AssetsSwitchesWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Assets", "Switches", "AssetsSwitchesWorkspaceComposition.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
