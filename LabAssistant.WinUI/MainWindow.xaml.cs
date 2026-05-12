@@ -38,7 +38,7 @@ public sealed partial class MainWindow : Window
     private readonly ITemplatesCapabilityService _templatesCapabilityService;
     private readonly IAssetsBaseDisksCapabilityService _assetsBaseDisksCapabilityService;
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
-    private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
+    private readonly MachinesCapabilityRuntime _machinesCapabilityRuntime;
     private readonly AssetsCapabilityRuntime _assetsCapabilityRuntime;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
@@ -79,13 +79,7 @@ public sealed partial class MainWindow : Window
         _templatesCapabilityService = App.Services.GetRequiredService<ITemplatesCapabilityService>();
         _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
-        _machinesWorkspaceComposition = new MachinesWorkspaceComposition(
-            _machinesCapabilityService,
-            MachinesOverviewViewHost,
-            new MachinesWorkspaceShellBridge(
-                () => IsMachinesOverviewActive,
-                UpdateReadinessPollingState,
-                () => RootLayout.XamlRoot));
+        _machinesCapabilityRuntime = CreateMachinesCapabilityRuntime();
         _assetsCapabilityRuntime = CreateAssetsCapabilityRuntime(
             out var assetsBaseDisksWorkspaceComposition,
             out var assetsSwitchesWorkspaceComposition);
@@ -107,7 +101,7 @@ public sealed partial class MainWindow : Window
         RootLayout.Loaded += async (_, _) =>
         {
             RootLayout.Focus(FocusState.Programmatic);
-            await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
+            await _machinesCapabilityRuntime.EnsureInventoryAsync(forceRefresh: true);
             await EnsureTemplateSwitchesAsync(forceRefresh: true);
             await EnsureTemplateVhdxCatalogOptionsAsync(forceRefresh: true);
             await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
@@ -153,6 +147,19 @@ public sealed partial class MainWindow : Window
             AssetsBaseDisksTabViewItem,
             AssetsSwitchesTabViewItem,
             capabilityHost,
+            capabilityShellBridge);
+    }
+
+    private MachinesCapabilityRuntime CreateMachinesCapabilityRuntime()
+    {
+        var capabilityShellBridge = new MachinesCapabilityShellBridge(
+            () => IsMachinesOverviewActive,
+            UpdateReadinessPollingState,
+            () => RootLayout.XamlRoot);
+
+        return new MachinesCapabilityRuntime(
+            _machinesCapabilityService,
+            MachinesOverviewViewHost,
             capabilityShellBridge);
     }
 
@@ -506,7 +513,7 @@ public sealed partial class MainWindow : Window
 
         QueueNavigationSelectionUpdate();
 
-        _machinesWorkspaceComposition.ApplyShellState();
+        _machinesCapabilityRuntime.ApplyShellState();
         _deployCapabilityRuntime.ApplyShellState();
         _assetsCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
@@ -648,7 +655,7 @@ public sealed partial class MainWindow : Window
 
         if (changedCapability || changedSubview)
         {
-            _machinesWorkspaceComposition.DiscardEditDraft();
+            _machinesCapabilityRuntime.DiscardEditDraft();
         }
 
         if (changedCapability)
@@ -663,7 +670,7 @@ public sealed partial class MainWindow : Window
 
         if (IsMachinesOverviewActive)
         {
-            _ = _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: false);
+            _ = _machinesCapabilityRuntime.EnsureInventoryAsync(forceRefresh: false);
         }
     }
 
@@ -1100,7 +1107,7 @@ public sealed partial class MainWindow : Window
     {
         _rdpReadinessTimer = DispatcherQueue.CreateTimer();
         _rdpReadinessTimer.Interval = TimeSpan.FromMinutes(5);
-        _rdpReadinessTimer.Tick += async (_, _) => await _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);
+        _rdpReadinessTimer.Tick += async (_, _) => await _machinesCapabilityRuntime.RefreshRdpReadinessAsync(selectedOnly: false);
     }
 
     private void UpdateReadinessPollingState()
@@ -1110,16 +1117,16 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (IsMachinesOverviewActive && _machinesWorkspaceComposition.HasInventory)
+        if (IsMachinesOverviewActive && _machinesCapabilityRuntime.HasInventory)
         {
             if (!_rdpReadinessTimer.IsRunning)
             {
                 _rdpReadinessTimer.Start();
 
                 // Run one pass when Machines becomes active, then fall back to periodic checks.
-                if (DateTimeOffset.UtcNow - _machinesWorkspaceComposition.LastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
+                if (DateTimeOffset.UtcNow - _machinesCapabilityRuntime.LastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
                 {
-                    _ = _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);
+                    _ = _machinesCapabilityRuntime.RefreshRdpReadinessAsync(selectedOnly: false);
                 }
             }
 

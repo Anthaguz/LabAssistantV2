@@ -5,7 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.ViewModels.Machines;
 
-internal interface IMachinesWorkspaceShellBridge
+internal interface IMachinesCapabilityShellBridge
 {
     bool IsMachinesOverviewActive { get; }
 
@@ -16,13 +16,13 @@ internal interface IMachinesWorkspaceShellBridge
     Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope);
 }
 
-internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge
+internal sealed class MachinesCapabilityShellBridge : IMachinesCapabilityShellBridge
 {
     private readonly Func<bool> _isMachinesOverviewActive;
     private readonly Action _updateReadinessPollingState;
     private readonly Func<XamlRoot?> _getXamlRoot;
 
-    public MachinesWorkspaceShellBridge(
+    public MachinesCapabilityShellBridge(
         Func<bool> isMachinesOverviewActive,
         Action updateReadinessPollingState,
         Func<XamlRoot?> getXamlRoot)
@@ -154,18 +154,18 @@ internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBrid
     }
 }
 
-internal sealed class MachinesWorkspaceComposition : IMachinesWorkspaceControllerHost
+internal sealed class MachinesCapabilityRuntime : IMachinesWorkspaceControllerHost
 {
     private readonly MachinesOverviewView _view;
     private readonly MachinesWorkspaceViewModel _workspace = new();
     private readonly MachinesWorkspaceController _controller;
-    private readonly IMachinesWorkspaceShellBridge _shellBridge;
+    private readonly IMachinesCapabilityShellBridge _shellBridge;
     private bool _isUpdatingMachineSelection;
 
-    public MachinesWorkspaceComposition(
+    public MachinesCapabilityRuntime(
         IMachinesCapabilityService machinesCapabilityService,
         MachinesOverviewView view,
-        IMachinesWorkspaceShellBridge shellBridge)
+        IMachinesCapabilityShellBridge shellBridge)
     {
         _view = view;
         _shellBridge = shellBridge;
