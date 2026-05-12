@@ -2352,22 +2352,23 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public const string DiagnosticsLogs = \"diagnostics.logs\";", shellViewModelSource);
         Assert.Contains("new ShellSubview(ShellRouteKeys.DiagnosticsOverview, \"Overview\"", shellViewModelSource);
         Assert.Contains("new ShellSubview(ShellRouteKeys.DiagnosticsLogs, \"Logs\"", shellViewModelSource);
-        Assert.Contains("private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;", mainWindowSource);
-        Assert.Contains("_diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("private readonly DiagnosticsCapabilityRuntime _diagnosticsCapabilityRuntime;", mainWindowSource);
+        Assert.Contains("_diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();", mainWindowSource);
+        Assert.Contains("private DiagnosticsCapabilityRuntime CreateDiagnosticsCapabilityRuntime()", mainWindowSource);
         Assert.Contains("DiagnosticsLocalNavigationPanel,", mainWindowSource);
         Assert.Contains("DiagnosticsOverviewViewHost,", mainWindowSource);
         Assert.Contains("DiagnosticsLogsViewHost,", mainWindowSource);
         Assert.Contains("DiagnosticsSubviewTabView,", mainWindowSource);
         Assert.Contains("DiagnosticsOverviewTabViewItem,", mainWindowSource);
         Assert.Contains("DiagnosticsLogsTabViewItem,", mainWindowSource);
-        Assert.Contains("new DiagnosticsWorkspaceHost(", mainWindowSource);
-        Assert.Contains("new DiagnosticsWorkspaceShellBridge(", mainWindowSource);
-        Assert.Contains("_diagnosticsWorkspaceComposition.ApplyShellState();", mainWindowSource);
+        Assert.Contains("new DiagnosticsCapabilityHost(", mainWindowSource);
+        Assert.Contains("new DiagnosticsCapabilityShellBridge(", mainWindowSource);
+        Assert.Contains("_diagnosticsCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("private string? TryOpenStructuredLogLocation(string filePath)", mainWindowSource);
-        Assert.Equal(1, CountOccurrences(mainWindowSource, "private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;"));
-        Assert.Equal(1, CountOccurrences(mainWindowSource, "_diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition("));
+        Assert.Equal(1, CountOccurrences(mainWindowSource, "private readonly DiagnosticsCapabilityRuntime _diagnosticsCapabilityRuntime;"));
+        Assert.Equal(1, CountOccurrences(mainWindowSource, "_diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();"));
 
-        Assert.DoesNotContain("IDiagnosticsWorkspaceHost", mainWindowSource);
+        Assert.DoesNotContain("IDiagnosticsCapabilityHost", mainWindowSource);
         Assert.DoesNotContain("private bool _isUpdatingDiagnosticsSubviewSelection;", mainWindowSource);
         Assert.DoesNotContain("private void WireDiagnosticsLogsHandlers()", mainWindowSource);
         Assert.DoesNotContain("private void WireOverviewHandlers()", mainWindowSource);
@@ -2383,7 +2384,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     public void DiagnosticsShellAndSharedComposition_PreserveLogsRouteAndDelegationBoundaries()
     {
         var mainWindowSource = LoadMainWindowSource();
-        var compositionSource = LoadDiagnosticsWorkspaceCompositionSource();
+        var compositionSource = LoadDiagnosticsCapabilityRuntimeSource();
         var overviewCompositionSource = LoadDiagnosticsOverviewWorkspaceCompositionSource();
         var overviewWorkspaceSource = LoadDiagnosticsOverviewWorkspaceViewModelSource();
         var overviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
@@ -2403,7 +2404,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private DiagnosticsOverviewView DiagnosticsOverviewView =>", mainWindowSource);
         Assert.DoesNotContain("private DiagnosticsLogsView DiagnosticsLogsView =>", mainWindowSource);
 
-        Assert.Contains("internal sealed class DiagnosticsWorkspaceComposition", compositionSource);
+        Assert.Contains("internal sealed class DiagnosticsCapabilityRuntime", compositionSource);
         Assert.Contains("private readonly FrameworkElement _localNavigationHost;", compositionSource);
         Assert.Contains("private readonly DiagnosticsOverviewWorkspaceComposition _overviewWorkspaceComposition;", compositionSource);
         Assert.Contains("private readonly DiagnosticsLogsWorkspaceComposition _logsWorkspaceComposition;", compositionSource);
@@ -2646,9 +2647,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadDiagnosticsWorkspaceCompositionSource()
+    private static string LoadDiagnosticsCapabilityRuntimeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsCapabilityRuntime.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

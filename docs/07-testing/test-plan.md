@@ -393,7 +393,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   5. Verify Logs filter/query, selection/detail, reload/clear/open-location sanity.
   6. Verify route switching preserves the long-lived Diagnostics workspace model and refresh/reconcile behavior rather than per-navigation recreation.
 - **Expected:**
-  - Shared `DiagnosticsWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of Diagnostics-local workflow/state ownership.
+  - Shared `DiagnosticsCapabilityRuntime` remains the shared capability runtime owner, while `MainWindow` remains out of Diagnostics-local workflow/state ownership.
   - `diagnostics.overview` remains the stable/default Diagnostics surface, while `diagnostics.logs` remains a distinct Diagnostics surface.
   - `DiagnosticsOverviewWorkspaceViewModel` and `DiagnosticsOverviewWorkspaceComposition` remain the Overview-local seams, with the narrowed Overview interaction/view surface still represented.
   - `DiagnosticsLogsWorkspaceViewModel`, `DiagnosticsLogsWorkspaceController`, and `DiagnosticsLogsWorkspaceComposition` remain the Logs-local seams, with the narrowed Logs interaction/view surface still represented.

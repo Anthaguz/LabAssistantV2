@@ -5,14 +5,14 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.ViewModels.Diagnostics;
 
-internal interface IDiagnosticsWorkspaceHost
+internal interface IDiagnosticsCapabilityHost
 {
     Task<StructuredLogViewerLoadResult> LoadStructuredLogsAsync(StructuredLogViewerFilter filter);
 
     string GetStructuredLogFilePath();
 }
 
-internal interface IDiagnosticsWorkspaceShellBridge
+internal interface IDiagnosticsCapabilityShellBridge
 {
     bool IsDiagnosticsCapabilityActive { get; }
 
@@ -25,11 +25,11 @@ internal interface IDiagnosticsWorkspaceShellBridge
     string? OpenStructuredLogLocation(string filePath);
 }
 
-internal sealed class DiagnosticsWorkspaceHost : IDiagnosticsWorkspaceHost
+internal sealed class DiagnosticsCapabilityHost : IDiagnosticsCapabilityHost
 {
     private readonly IStructuredLogViewerService _structuredLogViewerService;
 
-    public DiagnosticsWorkspaceHost(IStructuredLogViewerService structuredLogViewerService)
+    public DiagnosticsCapabilityHost(IStructuredLogViewerService structuredLogViewerService)
     {
         _structuredLogViewerService = structuredLogViewerService;
     }
@@ -39,7 +39,7 @@ internal sealed class DiagnosticsWorkspaceHost : IDiagnosticsWorkspaceHost
     public string GetStructuredLogFilePath() => _structuredLogViewerService.GetStructuredLogFilePath();
 }
 
-internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShellBridge
+internal sealed class DiagnosticsCapabilityShellBridge : IDiagnosticsCapabilityShellBridge
 {
     private readonly Func<bool> _isDiagnosticsCapabilityActive;
     private readonly Func<bool> _isDiagnosticsOverviewActive;
@@ -47,7 +47,7 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
     private readonly Action<string> _navigateToRoute;
     private readonly Func<string, string?> _openStructuredLogLocation;
 
-    public DiagnosticsWorkspaceShellBridge(
+    public DiagnosticsCapabilityShellBridge(
         Func<bool> isDiagnosticsCapabilityActive,
         Func<bool> isDiagnosticsOverviewActive,
         Func<bool> isDiagnosticsLogsActive,
@@ -72,7 +72,7 @@ internal sealed class DiagnosticsWorkspaceShellBridge : IDiagnosticsWorkspaceShe
     public string? OpenStructuredLogLocation(string filePath) => _openStructuredLogLocation(filePath);
 }
 
-internal sealed class DiagnosticsWorkspaceComposition
+internal sealed class DiagnosticsCapabilityRuntime
 {
     private readonly FrameworkElement _localNavigationHost;
     private readonly DiagnosticsOverviewWorkspaceComposition _overviewWorkspaceComposition;
@@ -80,19 +80,19 @@ internal sealed class DiagnosticsWorkspaceComposition
     private readonly TabView _subviewTabView;
     private readonly TabViewItem _overviewTabViewItem;
     private readonly TabViewItem _logsTabViewItem;
-    private readonly IDiagnosticsWorkspaceHost _host;
-    private readonly IDiagnosticsWorkspaceShellBridge _shellBridge;
+    private readonly IDiagnosticsCapabilityHost _host;
+    private readonly IDiagnosticsCapabilityShellBridge _shellBridge;
     private bool _isUpdatingDiagnosticsSubviewSelection;
 
-    public DiagnosticsWorkspaceComposition(
+    public DiagnosticsCapabilityRuntime(
         FrameworkElement localNavigationHost,
         DiagnosticsOverviewView overviewView,
         DiagnosticsLogsView logsView,
         TabView subviewTabView,
         TabViewItem overviewTabViewItem,
         TabViewItem logsTabViewItem,
-        IDiagnosticsWorkspaceHost host,
-        IDiagnosticsWorkspaceShellBridge shellBridge)
+        IDiagnosticsCapabilityHost host,
+        IDiagnosticsCapabilityShellBridge shellBridge)
     {
         _localNavigationHost = localNavigationHost;
         _subviewTabView = subviewTabView;

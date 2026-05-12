@@ -44,7 +44,7 @@ public sealed partial class MainWindow : Window
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
     private readonly DeployCapabilityRuntime _deployCapabilityRuntime;
-    private readonly DiagnosticsWorkspaceComposition _diagnosticsWorkspaceComposition;
+    private readonly DiagnosticsCapabilityRuntime _diagnosticsCapabilityRuntime;
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
     private ShellCapability _activeCapability;
@@ -93,20 +93,7 @@ public sealed partial class MainWindow : Window
         _assetsSwitchesWorkspaceComposition = assetsSwitchesWorkspaceComposition;
         _templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
-        _diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(
-            DiagnosticsLocalNavigationPanel,
-            DiagnosticsOverviewViewHost,
-            DiagnosticsLogsViewHost,
-            DiagnosticsSubviewTabView,
-            DiagnosticsOverviewTabViewItem,
-            DiagnosticsLogsTabViewItem,
-            new DiagnosticsWorkspaceHost(App.Services.GetRequiredService<IStructuredLogViewerService>()),
-            new DiagnosticsWorkspaceShellBridge(
-                () => IsDiagnosticsCapabilityActive,
-                () => IsDiagnosticsOverviewActive,
-                () => IsDiagnosticsLogsActive,
-                NavigateToRoute,
-                TryOpenStructuredLogLocation));
+        _diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         ConfigureShellIcons();
@@ -165,6 +152,27 @@ public sealed partial class MainWindow : Window
             AssetsOverviewTabViewItem,
             AssetsBaseDisksTabViewItem,
             AssetsSwitchesTabViewItem,
+            capabilityHost,
+            capabilityShellBridge);
+    }
+
+    private DiagnosticsCapabilityRuntime CreateDiagnosticsCapabilityRuntime()
+    {
+        var capabilityHost = new DiagnosticsCapabilityHost(App.Services.GetRequiredService<IStructuredLogViewerService>());
+        var capabilityShellBridge = new DiagnosticsCapabilityShellBridge(
+            () => IsDiagnosticsCapabilityActive,
+            () => IsDiagnosticsOverviewActive,
+            () => IsDiagnosticsLogsActive,
+            NavigateToRoute,
+            TryOpenStructuredLogLocation);
+
+        return new DiagnosticsCapabilityRuntime(
+            DiagnosticsLocalNavigationPanel,
+            DiagnosticsOverviewViewHost,
+            DiagnosticsLogsViewHost,
+            DiagnosticsSubviewTabView,
+            DiagnosticsOverviewTabViewItem,
+            DiagnosticsLogsTabViewItem,
             capabilityHost,
             capabilityShellBridge);
     }
@@ -502,7 +510,7 @@ public sealed partial class MainWindow : Window
         _deployCapabilityRuntime.ApplyShellState();
         _assetsCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
-        _diagnosticsWorkspaceComposition.ApplyShellState();
+        _diagnosticsCapabilityRuntime.ApplyShellState();
         if (IsSettingsMachinesActive)
         {
             _ = LoadMachinesDeletionPolicyAsync();
