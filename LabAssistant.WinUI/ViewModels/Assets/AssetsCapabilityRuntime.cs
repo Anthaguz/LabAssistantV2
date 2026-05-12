@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.ViewModels.Assets;
 
-internal interface IAssetsWorkspaceShellBridge
+internal interface IAssetsCapabilityShellBridge
 {
     bool IsAssetsCapabilityActive { get; }
 
@@ -16,11 +16,11 @@ internal interface IAssetsWorkspaceShellBridge
     void NavigateToRoute(string routeKey);
 }
 
-internal interface IAssetsWorkspaceHost
+internal interface IAssetsCapabilityHost
 {
 }
 
-internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
+internal sealed class AssetsCapabilityShellBridge : IAssetsCapabilityShellBridge
 {
     private readonly Func<bool> _isAssetsCapabilityActive;
     private readonly Func<bool> _isAssetsOverviewActive;
@@ -28,7 +28,7 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
     private readonly Func<bool> _isAssetsSwitchesActive;
     private readonly Action<string> _navigateToRoute;
 
-    public AssetsWorkspaceShellBridge(
+    public AssetsCapabilityShellBridge(
         Func<bool> isAssetsCapabilityActive,
         Func<bool> isAssetsOverviewActive,
         Func<bool> isAssetsBaseDisksActive,
@@ -53,11 +53,11 @@ internal sealed class AssetsWorkspaceShellBridge : IAssetsWorkspaceShellBridge
     public void NavigateToRoute(string routeKey) => _navigateToRoute(routeKey);
 }
 
-internal sealed class AssetsWorkspaceHost : IAssetsWorkspaceHost
+internal sealed class AssetsCapabilityHost : IAssetsCapabilityHost
 {
 }
 
-internal sealed class AssetsWorkspaceComposition
+internal sealed class AssetsCapabilityRuntime
 {
     private readonly AssetsBaseDisksWorkspaceComposition _baseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _switchesWorkspaceComposition;
@@ -66,11 +66,11 @@ internal sealed class AssetsWorkspaceComposition
     private readonly TabViewItem _baseDisksTabViewItem;
     private readonly TabViewItem _switchesTabViewItem;
     private readonly AssetsOverviewWorkspaceComposition _overviewWorkspaceComposition;
-    private readonly IAssetsWorkspaceHost _host;
-    private readonly IAssetsWorkspaceShellBridge _shellBridge;
+    private readonly IAssetsCapabilityHost _host;
+    private readonly IAssetsCapabilityShellBridge _shellBridge;
     private bool _isUpdatingAssetsSubviewSelection;
 
-    public AssetsWorkspaceComposition(
+    public AssetsCapabilityRuntime(
         AssetsOverviewView overviewView,
         AssetsBaseDisksWorkspaceComposition baseDisksWorkspaceComposition,
         AssetsSwitchesWorkspaceComposition switchesWorkspaceComposition,
@@ -78,8 +78,8 @@ internal sealed class AssetsWorkspaceComposition
         TabViewItem overviewTabViewItem,
         TabViewItem baseDisksTabViewItem,
         TabViewItem switchesTabViewItem,
-        IAssetsWorkspaceHost host,
-        IAssetsWorkspaceShellBridge shellBridge)
+        IAssetsCapabilityHost host,
+        IAssetsCapabilityShellBridge shellBridge)
     {
         _baseDisksWorkspaceComposition = baseDisksWorkspaceComposition;
         _switchesWorkspaceComposition = switchesWorkspaceComposition;

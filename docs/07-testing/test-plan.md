@@ -334,7 +334,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   6. Verify Switches route, selection, create/edit/delete, attached-VM display, validation, and blocked-delete sanity.
   7. Verify route switching preserves the long-lived Assets workspace model and refresh/reconcile behavior rather than per-navigation recreation.
 - **Expected:**
-  - Shared `AssetsWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of local Assets workflow/state ownership.
+  - Shared `AssetsCapabilityRuntime` remains the shared capability runtime owner, while `MainWindow` remains out of local Assets workflow/state ownership.
   - `AssetsOverviewWorkspaceComposition` and `AssetsOverviewWorkspaceViewModel` continue to own Overview-local summary behavior.
   - `AssetsBaseDisksWorkspaceViewModel`, `AssetsBaseDisksWorkspaceController`, and `AssetsBaseDisksWorkspaceComposition` remain the Base Disks-local seams, with the narrowed Base Disks view surface still represented.
   - `AssetsSwitchesWorkspaceViewModel`, `AssetsSwitchesWorkspaceController`, and `AssetsSwitchesWorkspaceComposition` remain the Switches-local seams, with the narrowed Switches presentation/view surface still represented.

@@ -61,7 +61,8 @@ public sealed class MilestoneAKScenarioMatrixTests
 
         Assert.Contains("ShowAssetsSwitchDeleteConfirmationDialogAsync", source);
         Assert.Contains("IAssetsSwitchesCapabilityService", source);
-        Assert.Contains("_assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(", source);
+        Assert.Contains("var switchesCompositionHost = new AssetsSwitchesCompositionHost(", source);
+        Assert.Contains("assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(", source);
         Assert.Contains("RefreshRequested += AssetsSwitchesRefreshRequested;", compositionSource);
         Assert.Contains("CreateRequested += AssetsSwitchesCreateRequested;", compositionSource);
         Assert.Contains("ApplyRequested += AssetsSwitchesApplyRequested;", compositionSource);

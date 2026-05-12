@@ -2738,7 +2738,7 @@ Each readiness result shall include, at minimum:
 - the narrow `Assets Overview` cleanup target is reviewed
 
 **Then**
-- `Assets Overview` remains under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface
+- `Assets Overview` remains under shared `AssetsCapabilityRuntime` rather than becoming a shell-owned surface
 - shared Assets composition remains responsible only for shared capability-level composition concerns
 - an Overview-local seam becomes the target home for Overview-specific state and UI coordination
 
@@ -2783,7 +2783,7 @@ Each readiness result shall include, at minimum:
 - runtime implementation, overview redesign beyond ownership cleanup, and performance redesign remain out of scope
 
 ## Expected Boundary
-- shared `AssetsWorkspaceComposition` remains the owner for shared capability-level composition only
+- shared `AssetsCapabilityRuntime` remains the owner for shared capability-level composition only
 - an Overview-local seam becomes the target home for Overview-specific state, composition, and interaction coordination
 - `MainWindow` remains shell-only and is not injected into Overview views
 - `Assets Overview` remains long-lived with route-activation refresh inside the existing Assets workspace
@@ -2811,7 +2811,7 @@ Each readiness result shall include, at minimum:
 - the narrow `Assets Base Disks` cleanup target is reviewed
 
 **Then**
-- `Assets Base Disks` remains under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface
+- `Assets Base Disks` remains under shared `AssetsCapabilityRuntime` rather than becoming a shell-owned surface
 - shared Assets composition remains responsible only for shared capability-level composition concerns
 - a Base Disks-local seam becomes the target home for Base Disks-specific state, orchestration, composition, and UI coordination
 
@@ -2828,7 +2828,7 @@ Each readiness result shall include, at minimum:
   - Base Disks-specific orchestration for refresh, import/register, edit/save, validate, and remove flows
   - Base Disks-local composition and interaction coordination for the `assets.base_disks` surface
   - cleanup or reduction of temporary Base Disks-specific host bridges or control exposure behind the Base Disks-local seam
-- shared `AssetsWorkspaceComposition` does not become the Base Disks workflow owner
+- shared `AssetsCapabilityRuntime` does not become the Base Disks workflow owner
 - shared Assets composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
 
 ### 3) MainWindow and route-activation boundaries remain explicit for assets.base_disks
@@ -2857,7 +2857,7 @@ Each readiness result shall include, at minimum:
 - runtime implementation, Base Disks behavior redesign, and performance redesign remain out of scope
 
 ## Expected Boundary
-- shared `AssetsWorkspaceComposition` remains the owner for shared capability-level composition only
+- shared `AssetsCapabilityRuntime` remains the owner for shared capability-level composition only
 - a Base Disks-local seam becomes the target home for Base Disks-specific state, orchestration, composition, and interaction coordination
 - `MainWindow` remains shell-only and is not injected into Base Disks views
 - `Assets Base Disks` remains long-lived with route-activation refresh inside the existing Assets workspace
@@ -2885,7 +2885,7 @@ Each readiness result shall include, at minimum:
 - the narrow `Assets Switches` cleanup target is reviewed
 
 **Then**
-- `Assets Switches` remains under shared `AssetsWorkspaceComposition` rather than becoming a shell-owned surface
+- `Assets Switches` remains under shared `AssetsCapabilityRuntime` rather than becoming a shell-owned surface
 - shared Assets composition remains responsible only for shared capability-level composition concerns
 - a Switches-local seam becomes the target home for Switches-specific state, orchestration, composition, and UI coordination
 
@@ -2902,7 +2902,7 @@ Each readiness result shall include, at minimum:
   - Switches-specific orchestration for refresh, create, edit, validate, and delete flows
   - Switches-local composition and interaction coordination for the `assets.switches` surface
   - cleanup or reduction of temporary Switches-specific host bridges or control exposure behind the Switches-local seam
-- shared `AssetsWorkspaceComposition` does not become the Switches workflow owner
+- shared `AssetsCapabilityRuntime` does not become the Switches workflow owner
 - shared Assets composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
 
 ### 3) MainWindow and route-activation boundaries remain explicit for assets.switches
@@ -2931,7 +2931,7 @@ Each readiness result shall include, at minimum:
 - runtime implementation, Switches behavior redesign, and performance redesign remain out of scope
 
 ## Expected Boundary
-- shared `AssetsWorkspaceComposition` remains the owner for shared capability-level composition only
+- shared `AssetsCapabilityRuntime` remains the owner for shared capability-level composition only
 - a Switches-local seam becomes the target home for Switches-specific state, orchestration, composition, and interaction coordination
 - `MainWindow` remains shell-only and is not injected into Switches views
 - `Assets Switches` remains long-lived with route-activation refresh inside the existing Assets workspace

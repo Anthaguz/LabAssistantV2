@@ -39,7 +39,7 @@ public sealed partial class MainWindow : Window
     private readonly IAssetsBaseDisksCapabilityService _assetsBaseDisksCapabilityService;
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
     private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;
-    private readonly AssetsWorkspaceComposition _assetsWorkspaceComposition;
+    private readonly AssetsCapabilityRuntime _assetsCapabilityRuntime;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
@@ -86,32 +86,11 @@ public sealed partial class MainWindow : Window
                 () => IsMachinesOverviewActive,
                 UpdateReadinessPollingState,
                 () => RootLayout.XamlRoot));
-        _assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(
-            _assetsBaseDisksCapabilityService,
-            AssetsBaseDisksViewHost,
-            new AssetsBaseDisksCompositionHost(
-                PickBaseDiskFilePath,
-                ShowAssetsBaseDiskRemoveConfirmationDialogAsync));
-        _assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(
-            _assetsSwitchesCapabilityService,
-            AssetsSwitchesViewHost,
-            new AssetsSwitchesCompositionHost(
-                ShowAssetsSwitchDeleteConfirmationDialogAsync));
-        _assetsWorkspaceComposition = new AssetsWorkspaceComposition(
-            AssetsOverviewViewHost,
-            _assetsBaseDisksWorkspaceComposition,
-            _assetsSwitchesWorkspaceComposition,
-            AssetsSubviewTabView,
-            AssetsOverviewTabViewItem,
-            AssetsBaseDisksTabViewItem,
-            AssetsSwitchesTabViewItem,
-            new AssetsWorkspaceHost(),
-            new AssetsWorkspaceShellBridge(
-                () => IsAssetsCapabilityActive,
-                () => IsAssetsOverviewActive,
-                () => IsAssetsBaseDisksActive,
-                () => IsAssetsSwitchesActive,
-                NavigateToRoute));
+        _assetsCapabilityRuntime = CreateAssetsCapabilityRuntime(
+            out var assetsBaseDisksWorkspaceComposition,
+            out var assetsSwitchesWorkspaceComposition);
+        _assetsBaseDisksWorkspaceComposition = assetsBaseDisksWorkspaceComposition;
+        _assetsSwitchesWorkspaceComposition = assetsSwitchesWorkspaceComposition;
         _templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
         _diagnosticsWorkspaceComposition = new DiagnosticsWorkspaceComposition(
@@ -149,6 +128,45 @@ public sealed partial class MainWindow : Window
             await LoadMachinesDeletionPolicyAsync();
         };
         ApplyState();
+    }
+
+    private AssetsCapabilityRuntime CreateAssetsCapabilityRuntime(
+        out AssetsBaseDisksWorkspaceComposition assetsBaseDisksWorkspaceComposition,
+        out AssetsSwitchesWorkspaceComposition assetsSwitchesWorkspaceComposition)
+    {
+        var baseDisksCompositionHost = new AssetsBaseDisksCompositionHost(
+            PickBaseDiskFilePath,
+            ShowAssetsBaseDiskRemoveConfirmationDialogAsync);
+        assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(
+            _assetsBaseDisksCapabilityService,
+            AssetsBaseDisksViewHost,
+            baseDisksCompositionHost);
+
+        var switchesCompositionHost = new AssetsSwitchesCompositionHost(
+            ShowAssetsSwitchDeleteConfirmationDialogAsync);
+        assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(
+            _assetsSwitchesCapabilityService,
+            AssetsSwitchesViewHost,
+            switchesCompositionHost);
+
+        var capabilityHost = new AssetsCapabilityHost();
+        var capabilityShellBridge = new AssetsCapabilityShellBridge(
+            () => IsAssetsCapabilityActive,
+            () => IsAssetsOverviewActive,
+            () => IsAssetsBaseDisksActive,
+            () => IsAssetsSwitchesActive,
+            NavigateToRoute);
+
+        return new AssetsCapabilityRuntime(
+            AssetsOverviewViewHost,
+            assetsBaseDisksWorkspaceComposition,
+            assetsSwitchesWorkspaceComposition,
+            AssetsSubviewTabView,
+            AssetsOverviewTabViewItem,
+            AssetsBaseDisksTabViewItem,
+            AssetsSwitchesTabViewItem,
+            capabilityHost,
+            capabilityShellBridge);
     }
 
     private TemplatesCapabilityRuntime CreateTemplatesCapabilityRuntime()
@@ -482,7 +500,7 @@ public sealed partial class MainWindow : Window
 
         _machinesWorkspaceComposition.ApplyShellState();
         _deployCapabilityRuntime.ApplyShellState();
-        _assetsWorkspaceComposition.ApplyShellState();
+        _assetsCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
         _diagnosticsWorkspaceComposition.ApplyShellState();
         if (IsSettingsMachinesActive)
