@@ -12,22 +12,23 @@ public sealed class MilestoneAMScenarioMatrixTests
         var shellViewModelSource = LoadShellViewModelSource();
 
         Assert.Contains("public sealed partial class MainWindow : Window", mainWindowSource);
-        Assert.Contains("private readonly MachinesWorkspaceComposition _machinesWorkspaceComposition;", mainWindowSource);
-        Assert.Contains("_machinesWorkspaceComposition = new MachinesWorkspaceComposition(", mainWindowSource);
-        Assert.Contains("new MachinesWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("private readonly MachinesCapabilityRuntime _machinesCapabilityRuntime;", mainWindowSource);
+        Assert.Contains("_machinesCapabilityRuntime = CreateMachinesCapabilityRuntime();", mainWindowSource);
+        Assert.Contains("private MachinesCapabilityRuntime CreateMachinesCapabilityRuntime()", mainWindowSource);
+        Assert.Contains("new MachinesCapabilityShellBridge(", mainWindowSource);
         Assert.Contains("() => IsMachinesOverviewActive,", mainWindowSource);
         Assert.Contains("UpdateReadinessPollingState,", mainWindowSource);
-        Assert.Contains("() => RootLayout.XamlRoot));", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
-        Assert.Contains("_ = _machinesWorkspaceComposition.EnsureInventoryAsync(forceRefresh: false);", mainWindowSource);
-        Assert.Contains("await _machinesWorkspaceComposition.RefreshRdpReadinessAsync(selectedOnly: false);", mainWindowSource);
-        Assert.Contains("_machinesWorkspaceComposition.ApplyShellState();", mainWindowSource);
-        Assert.Contains("_machinesWorkspaceComposition.DiscardEditDraft();", mainWindowSource);
+        Assert.Contains("() => RootLayout.XamlRoot);", mainWindowSource);
+        Assert.Contains("await _machinesCapabilityRuntime.EnsureInventoryAsync(forceRefresh: true);", mainWindowSource);
+        Assert.Contains("_ = _machinesCapabilityRuntime.EnsureInventoryAsync(forceRefresh: false);", mainWindowSource);
+        Assert.Contains("await _machinesCapabilityRuntime.RefreshRdpReadinessAsync(selectedOnly: false);", mainWindowSource);
+        Assert.Contains("_machinesCapabilityRuntime.ApplyShellState();", mainWindowSource);
+        Assert.Contains("_machinesCapabilityRuntime.DiscardEditDraft();", mainWindowSource);
         Assert.Contains("private FrameworkElement MachinesOverviewPanel => MachinesOverviewViewHost;", mainWindowSource);
         Assert.Contains("private bool IsMachinesOverviewActive =>", mainWindowSource);
         Assert.Contains("MachinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;", mainWindowSource);
 
-        Assert.DoesNotContain("public sealed partial class MainWindow : Window, IMachinesWorkspaceShellBridge", mainWindowSource);
+        Assert.DoesNotContain("public sealed partial class MainWindow : Window, IMachinesCapabilityShellBridge", mainWindowSource);
         Assert.DoesNotContain("private readonly MachinesWorkspaceViewModel _machinesWorkspace = new();", mainWindowSource);
         Assert.DoesNotContain("private readonly MachinesWorkspaceController _machinesWorkspaceController;", mainWindowSource);
         Assert.DoesNotContain("private async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(", mainWindowSource);
@@ -43,15 +44,15 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
-    public void MachinesWorkspaceComposition_IsTheEffectiveMachinesLocalCompositionOwner()
+    public void MachinesCapabilityRuntime_IsTheEffectiveMachinesLocalCompositionOwner()
     {
-        var compositionSource = LoadMachinesWorkspaceCompositionSource();
+        var compositionSource = LoadMachinesCapabilityRuntimeSource();
 
-        Assert.Contains("internal sealed class MachinesWorkspaceComposition : IMachinesWorkspaceControllerHost", compositionSource);
+        Assert.Contains("internal sealed class MachinesCapabilityRuntime : IMachinesWorkspaceControllerHost", compositionSource);
         Assert.Contains("private readonly MachinesOverviewView _view;", compositionSource);
         Assert.Contains("private readonly MachinesWorkspaceViewModel _workspace = new();", compositionSource);
         Assert.Contains("private readonly MachinesWorkspaceController _controller;", compositionSource);
-        Assert.Contains("private readonly IMachinesWorkspaceShellBridge _shellBridge;", compositionSource);
+        Assert.Contains("private readonly IMachinesCapabilityShellBridge _shellBridge;", compositionSource);
         Assert.Contains("_controller = new MachinesWorkspaceController(machinesCapabilityService, _workspace, this);", compositionSource);
         Assert.Contains("_view.SetInventorySource(_workspace.Inventory);", compositionSource);
         Assert.Contains("_view.SetStatusText(_workspace.StatusText);", compositionSource);
@@ -81,17 +82,17 @@ public sealed class MilestoneAMScenarioMatrixTests
     }
 
     [Fact]
-    public void MachinesShellBridge_RemainsNarrowAndShellOwned()
+    public void MachinesCapabilityShellBridge_RemainsNarrowAndShellOwned()
     {
-        var compositionSource = LoadMachinesWorkspaceCompositionSource();
+        var compositionSource = LoadMachinesCapabilityRuntimeSource();
         var shellBridgeInterfaceBlock = ExtractSection(
             compositionSource,
-            "internal interface IMachinesWorkspaceShellBridge",
-            "internal sealed class MachinesWorkspaceShellBridge");
+            "internal interface IMachinesCapabilityShellBridge",
+            "internal sealed class MachinesCapabilityShellBridge");
         var shellBridgeClassBlock = ExtractSection(
             compositionSource,
-            "internal sealed class MachinesWorkspaceShellBridge",
-            "internal sealed class MachinesWorkspaceComposition");
+            "internal sealed class MachinesCapabilityShellBridge",
+            "internal sealed class MachinesCapabilityRuntime");
 
         Assert.Contains("bool IsMachinesOverviewActive { get; }", shellBridgeInterfaceBlock);
         Assert.Contains("void UpdateReadinessPollingState();", shellBridgeInterfaceBlock);
@@ -104,7 +105,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("UpdateMachineEditDirtyIndicator", shellBridgeInterfaceBlock);
         Assert.DoesNotContain("SetSelectedMachineInView", shellBridgeInterfaceBlock);
 
-        Assert.Contains("internal sealed class MachinesWorkspaceShellBridge : IMachinesWorkspaceShellBridge", shellBridgeClassBlock);
+        Assert.Contains("internal sealed class MachinesCapabilityShellBridge : IMachinesCapabilityShellBridge", shellBridgeClassBlock);
         Assert.Contains("private readonly Func<bool> _isMachinesOverviewActive;", shellBridgeClassBlock);
         Assert.Contains("private readonly Action _updateReadinessPollingState;", shellBridgeClassBlock);
         Assert.Contains("private readonly Func<XamlRoot?> _getXamlRoot;", shellBridgeClassBlock);
@@ -154,7 +155,7 @@ public sealed class MilestoneAMScenarioMatrixTests
     [Fact]
     public void MachinesExtraction_StillProtectsStableRouteLifetimeAndBehaviorAnchors()
     {
-        var compositionSource = LoadMachinesWorkspaceCompositionSource();
+        var compositionSource = LoadMachinesCapabilityRuntimeSource();
         var machinesXaml = LoadMachinesOverviewXaml();
         var machinesCodeBehindSource = LoadMachinesOverviewCodeBehindSource();
 
@@ -2611,9 +2612,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadMachinesWorkspaceCompositionSource()
+    private static string LoadMachinesCapabilityRuntimeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Machines", "MachinesWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Machines", "MachinesCapabilityRuntime.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
