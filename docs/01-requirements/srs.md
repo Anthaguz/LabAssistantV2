@@ -724,7 +724,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** cleanup-target definition must preserve Diagnostics Overview as the route-entry surface, keep Diagnostics Logs as a child troubleshooting surface rather than a top-level shell destination, keep route activation refresh within the long-lived Diagnostics workspace rather than per-navigation recreation, and remain explicit that Diagnostics Overview extraction details, Diagnostics Logs extraction details, runtime implementation, Diagnostics workflow redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
-- **FR-170:** WinUI `Diagnostics Overview` cleanup shall remain under shared `DiagnosticsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Overview-specific state behind an Overview-local seam.
+- **FR-170:** WinUI `Diagnostics Overview` cleanup shall remain under shared `DiagnosticsCapabilityRuntime` rather than becoming a shell-owned surface, while converging Overview-specific state behind an Overview-local seam.
   - **Acceptance details:** the Diagnostics Overview cleanup target must explicitly keep shared Diagnostics composition responsible only for shared capability-level concerns, must keep `MainWindow` limited to shell ownership, and must make an Overview-local seam the target owner for Overview summary state, entry-surface state, and Overview-specific refresh or reconcile behavior triggered by `diagnostics.overview` activation.
   - **Priority:** P1
 
@@ -736,7 +736,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Diagnostics composition must not become the Overview workflow owner; temporary Overview-specific host bridges or control exposure remain migration cleanup targets behind the Overview-local seam; `diagnostics.overview` must not absorb Diagnostics Logs ownership; and the cleanup target must stay explicit that Diagnostics Logs extraction details, runtime implementation, Diagnostics behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
-- **FR-173:** WinUI `Diagnostics Logs` cleanup shall remain under shared `DiagnosticsWorkspaceComposition` rather than becoming a shell-owned surface, while converging Logs-specific state behind a Logs-local seam.
+- **FR-173:** WinUI `Diagnostics Logs` cleanup shall remain under shared `DiagnosticsCapabilityRuntime` rather than becoming a shell-owned surface, while converging Logs-specific state behind a Logs-local seam.
   - **Acceptance details:** the Diagnostics Logs cleanup target must explicitly keep shared Diagnostics composition responsible only for shared capability-level concerns, must keep `MainWindow` limited to shell ownership, and must make a Logs-local seam the target owner for Logs troubleshooting state, log-exploration state, and Logs-specific refresh or reconcile behavior triggered by `diagnostics.logs` activation.
   - **Priority:** P1
 

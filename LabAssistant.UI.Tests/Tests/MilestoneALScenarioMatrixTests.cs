@@ -52,7 +52,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var source = LoadMainWindowSource();
         var assetsCompositionSource = LoadAssetsCapabilityRuntimeSource();
         var deployCompositionSource = LoadDeployWorkspaceCompositionSource();
-        var diagnosticsCompositionSource = LoadDiagnosticsWorkspaceCompositionSource();
+        var diagnosticsCompositionSource = LoadDiagnosticsCapabilityRuntimeSource();
 
         Assert.NotNull(FindByName(xaml, "DeployLocalNavigationPanel"));
         Assert.NotNull(FindByName(xaml, "DeploySubviewTabView"));
@@ -79,7 +79,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("SyncDeploySubviewSelection()", deployCompositionSource);
         Assert.Contains("_assetsCapabilityRuntime.ApplyShellState();", source);
         Assert.Contains("SyncAssetsSubviewSelection();", assetsCompositionSource);
-        Assert.Contains("_diagnosticsWorkspaceComposition.ApplyShellState();", source);
+        Assert.Contains("_diagnosticsCapabilityRuntime.ApplyShellState();", source);
         Assert.Contains("SyncDiagnosticsSubviewSelection()", diagnosticsCompositionSource);
     }
 
@@ -121,7 +121,7 @@ public sealed class MilestoneALScenarioMatrixTests
         var deployOverviewCodeBehindSource = LoadDeployOverviewViewCodeBehindSource();
         var diagnosticsOverviewSource = LoadDiagnosticsOverviewViewXamlSource();
         var assetsCompositionSource = LoadAssetsCapabilityRuntimeSource();
-        var diagnosticsCompositionSource = LoadDiagnosticsWorkspaceCompositionSource();
+        var diagnosticsCompositionSource = LoadDiagnosticsCapabilityRuntimeSource();
         var diagnosticsOverviewCompositionSource = LoadDiagnosticsOverviewWorkspaceCompositionSource();
         var diagnosticsOverviewCodeBehindSource = LoadDiagnosticsOverviewCodeBehindSource();
 
@@ -564,9 +564,9 @@ public sealed class MilestoneALScenarioMatrixTests
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
-    private static string LoadDiagnosticsWorkspaceCompositionSource()
+    private static string LoadDiagnosticsCapabilityRuntimeSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsWorkspaceComposition.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Diagnostics", "DiagnosticsCapabilityRuntime.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

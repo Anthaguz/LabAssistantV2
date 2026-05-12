@@ -3575,13 +3575,13 @@ Each readiness result shall include, at minimum:
 
 ### 1) Diagnostics Overview stays under shared Diagnostics composition while converging Overview-local ownership
 **Given**
-- `Diagnostics` already has an approved shared composition boundary under `DiagnosticsWorkspaceComposition`
+- `Diagnostics` already has an approved shared capability boundary under `DiagnosticsCapabilityRuntime`
 
 **When**
 - the `Diagnostics Overview` cleanup target is defined
 
 **Then**
-- `Diagnostics Overview` remains under shared `DiagnosticsWorkspaceComposition`
+- `Diagnostics Overview` remains under shared `DiagnosticsCapabilityRuntime`
 - shared Diagnostics composition remains responsible only for shared capability-level concerns
 - an Overview-local seam becomes the target home for Overview-specific state, composition, and UI coordination
 - `MainWindow` remains responsible only for shell ownership and app-level workspace lifetime
@@ -3628,7 +3628,7 @@ Each readiness result shall include, at minimum:
 - Diagnostics Logs extraction details, runtime implementation, Diagnostics behavior redesign, and performance redesign remain out of scope
 
 ## Expected Boundary
-- shared `DiagnosticsWorkspaceComposition` continues to own shared Diagnostics capability composition, shared route participation, shared workspace hosting, and shared cross-surface coordination only where it is genuinely capability-level
+- shared `DiagnosticsCapabilityRuntime` continues to own shared Diagnostics capability composition, shared route participation, shared workspace hosting, and shared cross-surface coordination only where it is genuinely capability-level
 - an Overview-local seam becomes the target home for Overview-specific state, composition, interaction boundaries, UI coordination, and `diagnostics.overview` refresh or reconcile handling
 - `MainWindow` remains shell-only and is not injected into Overview views
 - Diagnostics Overview remains the route-entry surface inside the long-lived Diagnostics workspace
@@ -3651,13 +3651,13 @@ Each readiness result shall include, at minimum:
 
 ### 1) Diagnostics Logs stays under shared Diagnostics composition while converging Logs-local ownership
 **Given**
-- `Diagnostics` already has an approved shared composition boundary under `DiagnosticsWorkspaceComposition`
+- `Diagnostics` already has an approved shared capability boundary under `DiagnosticsCapabilityRuntime`
 
 **When**
 - the `Diagnostics Logs` cleanup target is defined
 
 **Then**
-- `Diagnostics Logs` remains under shared `DiagnosticsWorkspaceComposition`
+- `Diagnostics Logs` remains under shared `DiagnosticsCapabilityRuntime`
 - shared Diagnostics composition remains responsible only for shared capability-level concerns
 - a Logs-local seam becomes the target home for Logs-specific state, orchestration, composition, and UI coordination
 - `MainWindow` remains responsible only for shell ownership and app-level workspace lifetime
@@ -3704,7 +3704,7 @@ Each readiness result shall include, at minimum:
 - Diagnostics Overview extraction details, runtime implementation, Diagnostics behavior redesign, and performance redesign remain out of scope
 
 ## Expected Boundary
-- shared `DiagnosticsWorkspaceComposition` continues to own shared Diagnostics capability composition, shared route participation, shared workspace hosting, and shared cross-surface coordination only where it is genuinely capability-level
+- shared `DiagnosticsCapabilityRuntime` continues to own shared Diagnostics capability composition, shared route participation, shared workspace hosting, and shared cross-surface coordination only where it is genuinely capability-level
 - a Logs-local seam becomes the target home for Logs-specific state, orchestration, interaction boundaries, composition, UI coordination, and `diagnostics.logs` refresh or reconcile handling
 - `MainWindow` remains shell-only and is not injected into Logs views
 - Diagnostics Logs remains the child troubleshooting surface inside the long-lived Diagnostics workspace
