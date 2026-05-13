@@ -13,14 +13,13 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         Assert.Contains("private readonly DeployCapabilityRuntime _deployCapabilityRuntime;", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime = CreateDeployCapabilityRuntime();", mainWindowSource);
         Assert.Contains("private DeployCapabilityRuntime CreateDeployCapabilityRuntime()", mainWindowSource);
-        Assert.Contains("IServiceProvider services = App.Services;", mainWindowSource);
-        Assert.Contains("var bootstrapContext = new DeployCapabilityBootstrapContext", mainWindowSource);
-        Assert.Contains("return DeployCapabilityBootstrap.Bootstrap(services, bootstrapContext);", mainWindowSource);
         Assert.Contains("new DeployCapabilityShellBridge(", mainWindowSource);
-        Assert.Contains("private DeployCapabilityShellViewHosts CreateDeployCapabilityShellViewHosts()", mainWindowSource);
-        Assert.Contains("return new DeployCapabilityShellViewHosts", mainWindowSource);
         Assert.Contains("private DeployTemplatesShellAdapter CreateDeployTemplatesShellAdapter()", mainWindowSource);
         Assert.Contains("return new DeployTemplatesShellAdapter(", mainWindowSource);
+        Assert.Contains("var quickDeployLane = new DeployOnTheFlyWorkspaceOwner(", mainWindowSource);
+        Assert.Contains("var fromTemplateLane = new DeployFromTemplateWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("workspaceComposition = new DeployWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("var resultsPanelCoordinator = new DeployResultsPanelCoordinator(", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ResetRightPanelBehavior();", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.GetRightPanelTitleText();", mainWindowSource);
@@ -33,59 +32,33 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         Assert.DoesNotContain("private readonly DeployOnTheFlyWorkspaceOwner _deployOnTheFlyWorkspaceOwner;", mainWindowSource);
         Assert.DoesNotContain("private readonly DeployFromTemplateWorkspaceComposition _deployFromTemplateWorkspaceComposition;", mainWindowSource);
         Assert.DoesNotContain("private readonly DeployResultsPanelCoordinator _deployResultsPanelCoordinator;", mainWindowSource);
-        Assert.DoesNotContain("_deployWorkspaceComposition = new DeployWorkspaceComposition(", mainWindowSource);
-        Assert.DoesNotContain("_deployOnTheFlyWorkspaceOwner = new DeployOnTheFlyWorkspaceOwner(", mainWindowSource);
-        Assert.DoesNotContain("_deployResultsPanelCoordinator = new DeployResultsPanelCoordinator(", mainWindowSource);
+        Assert.DoesNotContain("DeployCapabilityBootstrap.Bootstrap(", mainWindowSource);
+        Assert.DoesNotContain("DeployCapabilityBootstrapContext", mainWindowSource);
+        Assert.DoesNotContain("private DeployCapabilityShellViewHosts CreateDeployCapabilityShellViewHosts()", mainWindowSource);
+        Assert.DoesNotContain("private DeployQuickDeployShellViewHosts CreateDeployQuickDeployShellViewHosts()", mainWindowSource);
+        Assert.DoesNotContain("private DeployFromTemplateShellViewHosts CreateDeployFromTemplateShellViewHosts()", mainWindowSource);
+        Assert.DoesNotContain("private DeployCapabilityShellNavigationHosts CreateDeployCapabilityShellNavigationHosts()", mainWindowSource);
         Assert.DoesNotContain("if (IsDeployFromTemplateActive)", mainWindowSource);
         Assert.DoesNotContain("_ = _deployFromTemplateWorkspaceComposition.EnsureTemplatesLoadedAsync(forceRefresh: false);", mainWindowSource);
     }
 
     [Fact]
-    public void DeployCapabilityBootstrapContext_GroupsShellOwnedInputs()
+    public void MainWindow_BuildsDeployThroughExplicitNamedAssemblySteps()
     {
-        var contextSource = LoadDeployCapabilityBootstrapContextSource();
+        var mainWindowSource = LoadMainWindowSource();
 
-        Assert.Contains("internal sealed class DeployCapabilityBootstrapContext", contextSource);
-        Assert.Contains("public DeployCapabilityShellBridge ShellBridge { get; init; } = null!;", contextSource);
-        Assert.Contains("public DeployCapabilityShellViewHosts ShellViewHosts { get; init; } = null!;", contextSource);
-        Assert.Contains("public DeployTemplatesShellAdapter Templates { get; init; } = null!;", contextSource);
-        Assert.DoesNotContain("public IServiceProvider Services", contextSource);
-        Assert.DoesNotContain("public FrameworkElement LocalNavigationHost", contextSource);
-        Assert.DoesNotContain("public object? TemplateItemsSource", contextSource);
-        Assert.DoesNotContain("public Func<bool> IsDeployFromTemplateActive", contextSource);
-    }
-
-    [Fact]
-    public void DeployCapabilityBootstrap_BuildsDeployThroughNamedAssemblySteps()
-    {
-        var bootstrapSource = LoadDeployCapabilityBootstrapSource();
-
-        Assert.Contains("internal static class DeployCapabilityBootstrap", bootstrapSource);
-        Assert.Contains("ValidateContext(context);", bootstrapSource);
-        Assert.Contains("public static DeployCapabilityRuntime Bootstrap(IServiceProvider services, DeployCapabilityBootstrapContext context)", bootstrapSource);
-        Assert.Contains("var serviceBundle = ResolveServices(services);", bootstrapSource);
-        Assert.Contains("var sharedSeams = BuildSharedDeploySeams(context, serviceBundle);", bootstrapSource);
-        Assert.Contains("var quickDeployLane = BuildQuickDeployLane(context, serviceBundle, sharedSeams);", bootstrapSource);
-        Assert.Contains("var fromTemplateLane = BuildFromTemplateLane(context, serviceBundle, sharedSeams);", bootstrapSource);
-        Assert.Contains("var workspace = BuildWorkspace(context, quickDeployLane, fromTemplateLane);", bootstrapSource);
-        Assert.Contains("var resultsPanelCoordinator = BuildResultsPanelCoordinator(context, quickDeployLane, fromTemplateLane);", bootstrapSource);
-        Assert.Contains("sharedSeams.UiHooks.AttachSharedUiRefresh(workspace.RefreshSharedUiState);", bootstrapSource);
-        Assert.Contains("sharedSeams.UiHooks.AttachResultsPanelRefresh(context.ShellBridge.RefreshResultsPanelState);", bootstrapSource);
-        Assert.Contains("private static DeploySharedSeams BuildSharedDeploySeams(", bootstrapSource);
-        Assert.Contains("private static IDeployQuickDeployLane BuildQuickDeployLane(", bootstrapSource);
-        Assert.Contains("private static IDeployFromTemplateLane BuildFromTemplateLane(", bootstrapSource);
-        Assert.Contains("private static DeployWorkspaceComposition BuildWorkspace(", bootstrapSource);
-        Assert.Contains("private static DeployResultsPanelCoordinator BuildResultsPanelCoordinator(", bootstrapSource);
-        Assert.Contains("private static DeployCapabilityRuntime BuildRuntime(", bootstrapSource);
-        Assert.Contains("new DeployReferenceDataService(", bootstrapSource);
-        Assert.Contains("new DeployResolveSuggestionsService()", bootstrapSource);
-        Assert.Contains("new DeployTemplateEditorLauncher(context.Templates)", bootstrapSource);
-        Assert.Contains("new DeployCapabilityUiHooks()", bootstrapSource);
-        Assert.Contains("new DeployOnTheFlyWorkspaceOwner(", bootstrapSource);
-        Assert.Contains("new DeployFromTemplateWorkspaceComposition(", bootstrapSource);
-        Assert.Contains("new DeployWorkspaceComposition(", bootstrapSource);
-        Assert.Contains("new DeployResultsPanelCoordinator(", bootstrapSource);
-        Assert.DoesNotContain("new DeployTemplateEditorLauncher(context.TemplatesWorkspaceComposition)", bootstrapSource);
+        Assert.Contains("var overviewView = DeployOverviewViewHost;", mainWindowSource);
+        Assert.Contains("var localNavigationHost = DeployLocalNavigationPanel;", mainWindowSource);
+        Assert.Contains("var quickDeployView = DeployOnTheFlyViewHost;", mainWindowSource);
+        Assert.Contains("var fromTemplateView = DeployFromTemplateViewHost;", mainWindowSource);
+        Assert.Contains("var referenceDataService = new DeployReferenceDataService(", mainWindowSource);
+        Assert.Contains("var resolveSuggestionsService = new DeployResolveSuggestionsService();", mainWindowSource);
+        Assert.Contains("var templateEditorLauncher = new DeployTemplateEditorLauncher(templatesShellAdapter);", mainWindowSource);
+        Assert.Contains("DeployWorkspaceComposition? workspaceComposition = null;", mainWindowSource);
+        Assert.Contains("Action refreshSharedUiState = () => workspaceComposition?.RefreshSharedUiState();", mainWindowSource);
+        Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
+        Assert.Contains("shellBridge.AttachProgressCallbacks,", mainWindowSource);
+        Assert.Contains("shellBridge.RequestResultsPanelToggle));", mainWindowSource);
     }
 
     [Fact]
@@ -107,7 +80,6 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         Assert.Contains("_fromTemplateLane.ReconcileSelection(items);", runtimeSource);
         Assert.Contains("_workspaceComposition.RefreshSharedUiState();", runtimeSource);
         Assert.DoesNotContain("DeployOnTheFlyWorkspaceOwner", runtimeSource);
-        Assert.DoesNotContain("DeployFromTemplateWorkspaceHost", runtimeSource);
         Assert.DoesNotContain("ShellRightPanelColumn", runtimeSource);
         Assert.DoesNotContain("InsightsPanel.Visibility", runtimeSource);
     }
@@ -167,18 +139,6 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         return File.ReadAllText(path);
     }
 
-    private static string LoadDeployCapabilityBootstrapContextSource()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployCapabilityBootstrapContext.cs");
-        return File.ReadAllText(path);
-    }
-
-    private static string LoadDeployCapabilityBootstrapSource()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployCapabilityBootstrap.cs");
-        return File.ReadAllText(path);
-    }
-
     private static string LoadDeployCapabilityRuntimeSource()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployCapabilityRuntime.cs");
@@ -187,7 +147,7 @@ public sealed class Issue674DeployCapabilityRuntimeTests
 
     private static string LoadDeployResultsPanelCoordinatorSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployResultsPanelCoordinator.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "ResultsPanel", "DeployResultsPanelCoordinator.cs");
         return File.ReadAllText(path);
     }
 

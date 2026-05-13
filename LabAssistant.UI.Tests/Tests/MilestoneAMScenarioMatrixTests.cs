@@ -1356,14 +1356,10 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("_deployCapabilityRuntime = CreateDeployCapabilityRuntime();", mainWindowSource);
         Assert.Contains("private DeployCapabilityRuntime CreateDeployCapabilityRuntime()", mainWindowSource);
         Assert.Contains("new DeployCapabilityShellBridge(", mainWindowSource);
-        Assert.Contains("private DeployCapabilityShellViewHosts CreateDeployCapabilityShellViewHosts()", mainWindowSource);
-        Assert.Contains("return new DeployCapabilityShellViewHosts", mainWindowSource);
-        Assert.Contains("private DeployQuickDeployShellViewHosts CreateDeployQuickDeployShellViewHosts()", mainWindowSource);
-        Assert.Contains("return new DeployQuickDeployShellViewHosts", mainWindowSource);
-        Assert.Contains("private DeployFromTemplateShellViewHosts CreateDeployFromTemplateShellViewHosts()", mainWindowSource);
-        Assert.Contains("return new DeployFromTemplateShellViewHosts", mainWindowSource);
-        Assert.Contains("private DeployCapabilityShellNavigationHosts CreateDeployCapabilityShellNavigationHosts()", mainWindowSource);
-        Assert.Contains("return new DeployCapabilityShellNavigationHosts", mainWindowSource);
+        Assert.Contains("var quickDeployLane = new DeployOnTheFlyWorkspaceOwner(", mainWindowSource);
+        Assert.Contains("var fromTemplateLane = new DeployFromTemplateWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("workspaceComposition = new DeployWorkspaceComposition(", mainWindowSource);
+        Assert.Contains("var resultsPanelCoordinator = new DeployResultsPanelCoordinator(", mainWindowSource);
         Assert.Contains("private DeployTemplatesShellAdapter CreateDeployTemplatesShellAdapter()", mainWindowSource);
         Assert.Contains("return new DeployTemplatesShellAdapter(", mainWindowSource);
         Assert.Contains("Func<IReadOnlyList<TemplateLibraryItem>> getLibraryItems = () => TemplatesLibraryItems.ToList();", mainWindowSource);
@@ -1662,9 +1658,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         var deployContextTypesSource = LoadDeployContextTypesSource();
 
         Assert.Contains("_deployCapabilityRuntime = CreateDeployCapabilityRuntime();", mainWindowSource);
-        Assert.DoesNotContain("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
-        Assert.DoesNotContain("new DeployReferenceDataService(", mainWindowSource);
-        Assert.DoesNotContain("var deployResolveSuggestionsService = new DeployResolveSuggestionsService();", mainWindowSource);
+        Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
+        Assert.Contains("new DeployReferenceDataService(", mainWindowSource);
+        Assert.Contains("var resolveSuggestionsService = new DeployResolveSuggestionsService();", mainWindowSource);
         Assert.Contains("Func<bool> isTemplatesLoading = () => _isTemplatesLoading;", mainWindowSource);
         Assert.Contains("Func<IReadOnlyList<TemplateLibraryItem>> getLibraryItems = () => TemplatesLibraryItems.ToList();", mainWindowSource);
         Assert.Contains("Func<bool, Task> ensureLibraryAsync = EnsureTemplatesLibraryAsync;", mainWindowSource);
@@ -1711,6 +1707,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompositionHost", fromTemplateHostSource);
         Assert.Contains("private readonly DeployReferenceDataService _referenceDataService;", fromTemplateHostSource);
         Assert.Contains("private readonly DeployResolveSuggestionsService _resolveSuggestionsService;", fromTemplateHostSource);
+        Assert.Contains("private readonly Action _refreshSharedUiState;", fromTemplateHostSource);
+        Assert.Contains("private readonly Action _refreshResultsPanelState;", fromTemplateHostSource);
         Assert.Contains("public Task EnsureReferenceDataAsync(bool forceRefresh) => _referenceDataService.EnsureAsync(forceRefresh);", fromTemplateHostSource);
         Assert.Contains("public async Task<int> ApplyResolveSuggestionsAsync(LabTemplate template)", fromTemplateHostSource);
 
@@ -1783,7 +1781,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         var fromTemplateCompositionHostSource = LoadDeployFromTemplateCompositionHostSource();
         var fromTemplateRightPanelViewCodeBehindSource = LoadDeployFromTemplateRightPanelViewCodeBehindSource();
 
-        Assert.DoesNotContain("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
+        Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
         Assert.DoesNotContain("UpdateDeployUi));", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ResetRightPanelBehavior();", mainWindowSource);
         Assert.DoesNotContain("DeployGlobalIssuesExpander.IsExpanded = false;", mainWindowSource);
@@ -1821,7 +1819,8 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public bool IsTemplatesLoading => _templatesShellAdapter.IsTemplatesLoading;", fromTemplateHostSource);
         Assert.Contains("public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _templatesShellAdapter.EnsureLibraryAsync(forceRefresh);", fromTemplateHostSource);
         Assert.Contains("public Task<TemplateEditorDocument> LoadTemplateForEditorAsync(string filePath) => _templatesShellAdapter.LoadTemplateForEditorAsync(filePath);", fromTemplateHostSource);
-        Assert.Contains("public void RefreshResultsPanelState() => _capabilityUiHooks.RefreshResultsPanelState();", fromTemplateHostSource);
+        Assert.Contains("public void RefreshSharedUiState() => _refreshSharedUiState();", fromTemplateHostSource);
+        Assert.Contains("public void RefreshResultsPanelState() => _refreshResultsPanelState();", fromTemplateHostSource);
         Assert.Contains("public void OnOpenResultsPanelRequested() => _onOpenResultsPanelRequested();", fromTemplateHostSource);
         Assert.Contains("public void ResetPanelState()", fromTemplateRightPanelViewCodeBehindSource);
         Assert.DoesNotContain("public Expander DeployGlobalIssuesExpanderControl =>", fromTemplateRightPanelViewCodeBehindSource);
@@ -2228,9 +2227,9 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("public sealed partial class MainWindow : Window, IDeployOnTheFlyWorkspaceControllerHost", mainWindowSource);
         Assert.Contains("private readonly DeployCapabilityRuntime _deployCapabilityRuntime;", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime = CreateDeployCapabilityRuntime();", mainWindowSource);
-        Assert.DoesNotContain("new DeployOnTheFlyWorkspaceOwner(", mainWindowSource);
-        Assert.DoesNotContain("new DeployOnTheFlyWorkspaceShellBridge(", mainWindowSource);
-        Assert.DoesNotContain("new DeployResultsPanelCoordinator(", mainWindowSource);
+        Assert.Contains("new DeployOnTheFlyWorkspaceOwner(", mainWindowSource);
+        Assert.Contains("new DeployOnTheFlyWorkspaceShellBridge(", mainWindowSource);
+        Assert.Contains("new DeployResultsPanelCoordinator(", mainWindowSource);
         Assert.DoesNotContain("IDeployOnTheFlyCompositionHost", mainWindowSource);
         Assert.DoesNotContain("new DeployOnTheFlyWorkspaceHost(", mainWindowSource);
         Assert.DoesNotContain("AttachComposition(", mainWindowSource);
@@ -2774,7 +2773,7 @@ public sealed class MilestoneAMScenarioMatrixTests
 
     private static string LoadDeployResultsPanelCoordinatorSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployResultsPanelCoordinator.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "ResultsPanel", "DeployResultsPanelCoordinator.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 

@@ -446,7 +446,7 @@ public sealed class MilestoneALScenarioMatrixTests
 
     private static string LoadDeployResultsPanelCoordinatorSource()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "DeployResultsPanelCoordinator.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LabAssistant.WinUI", "ViewModels", "Deploy", "ResultsPanel", "DeployResultsPanelCoordinator.cs");
         return File.ReadAllText(Path.GetFullPath(path));
     }
 
