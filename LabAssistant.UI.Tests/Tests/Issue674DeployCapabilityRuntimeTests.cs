@@ -24,8 +24,6 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         Assert.Contains("_deployCapabilityRuntime.ResetRightPanelBehavior();", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.GetRightPanelTitleText();", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.RefreshTemplatesLoadingState();", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.ReconcileTemplateSelection(items);", mainWindowSource);
 
         Assert.DoesNotContain("private readonly DeployWorkspaceComposition _deployWorkspaceComposition;", mainWindowSource);
         Assert.DoesNotContain("private readonly DeployReferenceDataService _deployReferenceDataService;", mainWindowSource);
@@ -59,6 +57,8 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
         Assert.Contains("shellBridge.AttachProgressCallbacks,", mainWindowSource);
         Assert.Contains("shellBridge.RequestResultsPanelToggle));", mainWindowSource);
+        Assert.Contains("_deployCapabilityRuntime.RefreshTemplatesLoadingState);", mainWindowSource);
+        Assert.Contains("items => _deployCapabilityRuntime.ReconcileTemplateSelection(items));", mainWindowSource);
     }
 
     [Fact]
