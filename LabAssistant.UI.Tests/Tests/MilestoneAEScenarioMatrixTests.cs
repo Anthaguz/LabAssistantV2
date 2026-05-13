@@ -69,8 +69,8 @@ public sealed class MilestoneAEScenarioMatrixTests
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
         var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
 
-        Assert.Contains("EnsureTemplateVhdxCatalogOptionsAsync", source);
-        Assert.Contains("SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);", source);
+        Assert.Contains("await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);", source);
+        Assert.Contains("loadVhdxCatalogOptionsAsync()", source);
         Assert.Contains("TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;", editorViewSource);
         Assert.Contains("Legacy path-based reference loaded. Select a catalog entry to normalize.", editorCompositionSource);
         Assert.Contains("No catalog entries available. Import base disks in Assets > Base Disks.", editorCompositionSource);
