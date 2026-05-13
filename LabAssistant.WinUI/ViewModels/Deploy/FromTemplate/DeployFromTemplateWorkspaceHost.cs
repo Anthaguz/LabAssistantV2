@@ -13,7 +13,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     private readonly DeployReferenceDataService _referenceDataService;
     private readonly DeployResolveSuggestionsService _resolveSuggestionsService;
     private readonly DeployTemplatesShellAdapter _templatesShellAdapter;
-    private readonly DeployCapabilityUiHooks _capabilityUiHooks;
+    private readonly Action _refreshSharedUiState;
+    private readonly Action _refreshResultsPanelState;
     private readonly Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> _runReadinessAsync;
     private readonly Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> _deployAllAsync;
     private readonly Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> _attachProgressCallbacks;
@@ -23,7 +24,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         DeployReferenceDataService referenceDataService,
         DeployResolveSuggestionsService resolveSuggestionsService,
         DeployTemplatesShellAdapter templatesShellAdapter,
-        DeployCapabilityUiHooks capabilityUiHooks,
+        Action refreshSharedUiState,
+        Action refreshResultsPanelState,
         Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> runReadinessAsync,
         Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> deployAllAsync,
         Action<MultiVmDeploymentContext, Action<string, string?>, Action<string, DeployStepStateUpdate>> attachProgressCallbacks,
@@ -32,7 +34,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         _referenceDataService = referenceDataService;
         _resolveSuggestionsService = resolveSuggestionsService;
         _templatesShellAdapter = templatesShellAdapter;
-        _capabilityUiHooks = capabilityUiHooks;
+        _refreshSharedUiState = refreshSharedUiState;
+        _refreshResultsPanelState = refreshResultsPanelState;
         _runReadinessAsync = runReadinessAsync;
         _attachProgressCallbacks = attachProgressCallbacks;
         _deployAllAsync = deployAllAsync;
@@ -69,9 +72,9 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
 
     public Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode) => _runReadinessAsync(context, mode);
 
-    public void RefreshSharedUiState() => _capabilityUiHooks.RefreshSharedUiState();
+    public void RefreshSharedUiState() => _refreshSharedUiState();
 
-    public void RefreshResultsPanelState() => _capabilityUiHooks.RefreshResultsPanelState();
+    public void RefreshResultsPanelState() => _refreshResultsPanelState();
 
     public Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context) => _deployAllAsync(context);
 

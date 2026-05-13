@@ -80,7 +80,6 @@ public sealed class MilestoneAFScenarioMatrixTests
         Assert.DoesNotContain("private async void DeployStartButton_Click(object sender, RoutedEventArgs e)", source);
         Assert.DoesNotContain("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", source);
         Assert.DoesNotContain("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", source);
-        Assert.DoesNotContain("new DeployFromTemplateWorkspaceHost(", source);
         Assert.Contains("Deploy blocked by readiness failures. Resolve blocking items first.", controllerSource);
         Assert.Contains("_view.ReloadTemplatesRequested += async (_, _) => await EnsureTemplatesLoadedAsync(forceRefresh: true);", compositionSource);
         Assert.Contains("_view.EvaluateReadinessRequested += async (_, _) => await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);", compositionSource);

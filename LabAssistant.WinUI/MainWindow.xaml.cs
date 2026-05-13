@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using LabAssistant.Business.Deployment;
+using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Business.Assets;
@@ -284,19 +285,102 @@ public sealed partial class MainWindow : Window
 
     private DeployCapabilityRuntime CreateDeployCapabilityRuntime()
     {
-        IServiceProvider services = App.Services;
         var shellBridge = CreateDeployCapabilityShellBridge();
-        var shellViewHosts = CreateDeployCapabilityShellViewHosts();
         var templatesShellAdapter = CreateDeployTemplatesShellAdapter();
+        var overviewView = DeployOverviewViewHost;
+        var localNavigationHost = DeployLocalNavigationPanel;
+        var subviewTabView = DeploySubviewTabView;
+        var overviewTabViewItem = DeployOverviewTabViewItem;
+        var quickDeployTabViewItem = DeployQuickDeployTabViewItem;
+        var fromTemplateTabViewItem = DeployFromTemplateTabViewItem;
+        var quickDeployView = DeployOnTheFlyViewHost;
+        var quickDeployRightPanelView = DeployOnTheFlyRightPanelViewHost;
+        var fromTemplateView = DeployFromTemplateViewHost;
+        var fromTemplateRightPanelView = DeployFromTemplateRightPanelViewHost;
 
-        var bootstrapContext = new DeployCapabilityBootstrapContext
-        {
-            ShellBridge = shellBridge,
-            ShellViewHosts = shellViewHosts,
-            Templates = templatesShellAdapter
-        };
+        var deploymentPreflightService = App.Services.GetRequiredService<IDeploymentPreflightService>();
+        var deploymentCoordinator = App.Services.GetRequiredService<IDeploymentCoordinator>();
+        var deploymentOutcomeSummaryBuilder = App.Services.GetRequiredService<IDeploymentOutcomeSummaryBuilder>();
+        var settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
+        var vhdxCatalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
 
-        return DeployCapabilityBootstrap.Bootstrap(services, bootstrapContext);
+        var referenceDataService = new DeployReferenceDataService(
+            settingsStore,
+            vhdxCatalogStore,
+            _machinesCapabilityService,
+            _templatesCapabilityService);
+        var resolveSuggestionsService = new DeployResolveSuggestionsService();
+        var templateEditorLauncher = new DeployTemplateEditorLauncher(templatesShellAdapter);
+
+        var quickDeployLane = new DeployOnTheFlyWorkspaceOwner(
+            quickDeployView,
+            quickDeployRightPanelView,
+            referenceDataService,
+            resolveSuggestionsService,
+            templateEditorLauncher,
+            new DeployOnTheFlyWorkspaceShellBridge(
+                shellBridge.DispatcherQueue,
+                () => shellBridge.XamlRoot,
+                shellBridge.RequestResultsPanelToggle,
+                shellBridge.RefreshResultsPanelState),
+            deploymentPreflightService,
+            deploymentCoordinator,
+            deploymentOutcomeSummaryBuilder);
+
+        DeployWorkspaceComposition? workspaceComposition = null;
+        Action refreshSharedUiState = () => workspaceComposition?.RefreshSharedUiState();
+
+        var fromTemplateLane = new DeployFromTemplateWorkspaceComposition(
+            fromTemplateView,
+            fromTemplateRightPanelView,
+            templatesShellAdapter.ItemsSource,
+            new DeployFromTemplateWorkspaceHost(
+                referenceDataService,
+                resolveSuggestionsService,
+                templatesShellAdapter,
+                refreshSharedUiState,
+                shellBridge.RefreshResultsPanelState,
+                (deploymentContext, mode) => deploymentPreflightService.RunAsync(deploymentContext, mode),
+                async deploymentContext =>
+                {
+                    await deploymentCoordinator.DeployAllAsync(deploymentContext);
+                    return deploymentOutcomeSummaryBuilder.Build(deploymentContext);
+                },
+                shellBridge.AttachProgressCallbacks,
+                shellBridge.RequestResultsPanelToggle));
+
+        workspaceComposition = new DeployWorkspaceComposition(
+            localNavigationHost,
+            overviewView,
+            quickDeployLane,
+            subviewTabView,
+            overviewTabViewItem,
+            quickDeployTabViewItem,
+            fromTemplateTabViewItem,
+            () => new DeployWorkspaceUiState(
+                QuickDeployDraftCount: quickDeployLane.DraftCount,
+                IsLoadingTemplates: fromTemplateLane.IsLoadingTemplates,
+                AvailableTemplateCount: templatesShellAdapter.GetLibraryItems().Count),
+            fromTemplateLane,
+            new DeployWorkspaceShellBridge(
+                () => shellBridge.IsDeployCapabilityActive,
+                () => shellBridge.IsDeployOverviewActive,
+                () => shellBridge.IsDeployOnTheFlyActive,
+                () => shellBridge.IsDeployFromTemplateActive,
+                shellBridge.NavigateToRoute));
+
+        var resultsPanelCoordinator = new DeployResultsPanelCoordinator(
+            quickDeployLane,
+            fromTemplateLane,
+            () => shellBridge.IsDeployOverviewActive,
+            () => shellBridge.IsDeployOnTheFlyActive,
+            () => shellBridge.IsDeployFromTemplateActive);
+
+        return new DeployCapabilityRuntime(
+            shellBridge,
+            fromTemplateLane,
+            workspaceComposition,
+            resultsPanelCoordinator);
     }
 
     private DeployCapabilityShellBridge CreateDeployCapabilityShellBridge()
@@ -321,64 +405,6 @@ public sealed partial class MainWindow : Window
             navigateToRoute,
             requestResultsPanelToggle,
             refreshResultsPanelState);
-    }
-
-    private DeployCapabilityShellViewHosts CreateDeployCapabilityShellViewHosts()
-    {
-        var localNavigationHost = DeployLocalNavigationPanel;
-        var overviewView = DeployOverviewViewHost;
-        var quickDeployHosts = CreateDeployQuickDeployShellViewHosts();
-        var fromTemplateHosts = CreateDeployFromTemplateShellViewHosts();
-        var navigationHosts = CreateDeployCapabilityShellNavigationHosts();
-
-        return new DeployCapabilityShellViewHosts
-        {
-            LocalNavigationHost = localNavigationHost,
-            OverviewView = overviewView,
-            QuickDeploy = quickDeployHosts,
-            FromTemplate = fromTemplateHosts,
-            Navigation = navigationHosts
-        };
-    }
-
-    private DeployQuickDeployShellViewHosts CreateDeployQuickDeployShellViewHosts()
-    {
-        var view = DeployOnTheFlyViewHost;
-        var rightPanelView = DeployOnTheFlyRightPanelViewHost;
-
-        return new DeployQuickDeployShellViewHosts
-        {
-            View = view,
-            RightPanelView = rightPanelView
-        };
-    }
-
-    private DeployFromTemplateShellViewHosts CreateDeployFromTemplateShellViewHosts()
-    {
-        var view = DeployFromTemplateViewHost;
-        var rightPanelView = DeployFromTemplateRightPanelViewHost;
-
-        return new DeployFromTemplateShellViewHosts
-        {
-            View = view,
-            RightPanelView = rightPanelView
-        };
-    }
-
-    private DeployCapabilityShellNavigationHosts CreateDeployCapabilityShellNavigationHosts()
-    {
-        var subviewTabView = DeploySubviewTabView;
-        var overviewTabViewItem = DeployOverviewTabViewItem;
-        var quickDeployTabViewItem = DeployQuickDeployTabViewItem;
-        var fromTemplateTabViewItem = DeployFromTemplateTabViewItem;
-
-        return new DeployCapabilityShellNavigationHosts
-        {
-            SubviewTabView = subviewTabView,
-            OverviewTabViewItem = overviewTabViewItem,
-            QuickDeployTabViewItem = quickDeployTabViewItem,
-            FromTemplateTabViewItem = fromTemplateTabViewItem
-        };
     }
 
     private DeployTemplatesShellAdapter CreateDeployTemplatesShellAdapter()
