@@ -1408,7 +1408,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("_ = _deployFromTemplateWorkspaceComposition.EnsureTemplatesLoadedAsync(forceRefresh: false);", mainWindowSource);
         Assert.DoesNotContain("private void RefreshDeploySharedUiState()", mainWindowSource);
         Assert.DoesNotContain("private void ReconcileDeployFromTemplateSelection(IReadOnlyList<TemplateLibraryItem> items)", mainWindowSource);
-        Assert.Contains("items => _deployCapabilityRuntime.ReconcileTemplateSelection(items)", mainWindowSource);
+        Assert.Contains("items => _deployCapabilityRuntime?.ReconcileTemplateSelection(items)", mainWindowSource);
         Assert.DoesNotContain("QuickDeployDraftCount: _deployOnTheFlyWorkspaceOwner.DraftCount,", mainWindowSource);
         Assert.DoesNotContain("private async Task EnsureDeployTemplatesLoadedAsync(bool forceRefresh)", mainWindowSource);
         Assert.DoesNotContain("private void UpdateDeployUi()", mainWindowSource);
@@ -1846,7 +1846,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private async void DeployStartButton_Click(object sender, RoutedEventArgs e)", mainWindowSource);
         Assert.DoesNotContain("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", mainWindowSource);
         Assert.DoesNotContain("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
+        Assert.Contains("deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
         Assert.DoesNotContain("private ComboBox DeployTemplateSelectorComboBox =>", mainWindowSource);
         Assert.DoesNotContain("private Button DeployReloadTemplatesButton =>", mainWindowSource);
         Assert.DoesNotContain("private TextBlock DeployResultsPanelSummaryTextBlock =>", mainWindowSource);
@@ -1910,7 +1910,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.DoesNotContain("private async void DeployStartButton_Click(object sender, RoutedEventArgs e)", mainWindowSource);
         Assert.DoesNotContain("private Task EvaluateDeployReadinessAsync(DeploymentPreflightMode mode) =>", mainWindowSource);
         Assert.DoesNotContain("private async Task OpenTemplateInEditorAsync(TemplateLibraryItem templateItem, bool fromDeploy)", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
+        Assert.Contains("deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
         Assert.DoesNotContain("private ComboBox DeployTemplateSelectorComboBox =>", mainWindowSource);
         Assert.DoesNotContain("private ListView DeployGlobalIssuesListView =>", mainWindowSource);
 
