@@ -75,6 +75,8 @@ public sealed partial class MainWindow : Window
         _templatesCapabilityService = App.Services.GetRequiredService<ITemplatesCapabilityService>();
         _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
+        _activeRouteKey = _shellViewModel.StartupRoute;
+        _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         _machinesCapabilityRuntime = CreateMachinesCapabilityRuntime();
         _assetsCapabilityRuntime = CreateAssetsCapabilityRuntime(
             out var assetsBaseDisksWorkspaceComposition,
@@ -84,8 +86,6 @@ public sealed partial class MainWindow : Window
         _templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
         _diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();
-        _activeRouteKey = _shellViewModel.StartupRoute;
-        _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         ConfigureShellIcons();
         ConfigureNavigationView();
         ApplyShellNavigationMode(1280);
