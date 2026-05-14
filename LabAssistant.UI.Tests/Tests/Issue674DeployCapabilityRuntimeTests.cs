@@ -22,8 +22,9 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         Assert.Contains("var resultsPanelCoordinator = new DeployResultsPanelCoordinator(", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("_deployCapabilityRuntime.ResetRightPanelBehavior();", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.GetRightPanelTitleText();", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
+        Assert.Contains("var deployCapabilityRuntime = _deployCapabilityRuntime;", mainWindowSource);
+        Assert.Contains("RightPanelTitleTextBlock.Text = deployCapabilityRuntime.GetRightPanelTitleText();", mainWindowSource);
+        Assert.Contains("deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);", mainWindowSource);
 
         Assert.DoesNotContain("private readonly DeployWorkspaceComposition _deployWorkspaceComposition;", mainWindowSource);
         Assert.DoesNotContain("private readonly DeployReferenceDataService _deployReferenceDataService;", mainWindowSource);
@@ -57,8 +58,8 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         Assert.Contains("new DeployFromTemplateWorkspaceHost(", mainWindowSource);
         Assert.Contains("shellBridge.AttachProgressCallbacks,", mainWindowSource);
         Assert.Contains("shellBridge.RequestResultsPanelToggle));", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.RefreshTemplatesLoadingState);", mainWindowSource);
-        Assert.Contains("items => _deployCapabilityRuntime.ReconcileTemplateSelection(items));", mainWindowSource);
+        Assert.Contains("() => _deployCapabilityRuntime?.RefreshTemplatesLoadingState());", mainWindowSource);
+        Assert.Contains("items => _deployCapabilityRuntime?.ReconcileTemplateSelection(items));", mainWindowSource);
     }
 
     [Fact]
@@ -104,13 +105,15 @@ public sealed class Issue674DeployCapabilityRuntimeTests
         var mainWindowSource = LoadMainWindowSource();
 
         Assert.Contains("private bool _isDeployRightPanelAutoOpenSuppressed;", mainWindowSource);
-        Assert.Contains("var shouldAutoOpenDeployRightPanel = CanActiveCapabilityOwnRightPanel() && _deployCapabilityRuntime.ShouldAutoOpenRightPanel();", mainWindowSource);
+        Assert.Contains("var deployCapabilityRuntime = _deployCapabilityRuntime;", mainWindowSource);
+        Assert.Contains("if (deployCapabilityRuntime is null)", mainWindowSource);
+        Assert.Contains("var shouldAutoOpenDeployRightPanel = CanActiveCapabilityOwnRightPanel() && deployCapabilityRuntime.ShouldAutoOpenRightPanel();", mainWindowSource);
         Assert.Contains("if (!shouldAutoOpenDeployRightPanel)", mainWindowSource);
         Assert.Contains("_isDeployRightPanelAutoOpenSuppressed = false;", mainWindowSource);
         Assert.Contains("if (shouldAutoOpenDeployRightPanel && !_isDeployRightPanelAutoOpenSuppressed)", mainWindowSource);
         Assert.Contains("private void SetRightPanelOpenFromUserToggle(bool isOpen)", mainWindowSource);
         Assert.Contains("_isDeployRightPanelAutoOpenSuppressed = !isOpen &&", mainWindowSource);
-        Assert.Contains("_deployCapabilityRuntime.ShouldAutoOpenRightPanel();", mainWindowSource);
+        Assert.Contains("deployCapabilityRuntime.ShouldAutoOpenRightPanel();", mainWindowSource);
         Assert.Contains("SetRightPanelOpenFromUserToggle(!_isShellRightPanelOpen);", mainWindowSource);
         Assert.Contains("SetRightPanelOpenFromUserToggle(false);", mainWindowSource);
         Assert.Contains("_shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(_activeCapability.Key);", mainWindowSource);

@@ -75,6 +75,8 @@ public sealed partial class MainWindow : Window
         _templatesCapabilityService = App.Services.GetRequiredService<ITemplatesCapabilityService>();
         _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
+        _activeRouteKey = _shellViewModel.StartupRoute;
+        _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         _machinesCapabilityRuntime = CreateMachinesCapabilityRuntime();
         _assetsCapabilityRuntime = CreateAssetsCapabilityRuntime(
             out var assetsBaseDisksWorkspaceComposition,
@@ -84,8 +86,6 @@ public sealed partial class MainWindow : Window
         _templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
         _diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();
-        _activeRouteKey = _shellViewModel.StartupRoute;
-        _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
         ConfigureShellIcons();
         ConfigureNavigationView();
         ApplyShellNavigationMode(1280);
@@ -189,7 +189,7 @@ public sealed partial class MainWindow : Window
             () => runtime?.ApplyUiState(),
             (document, statusText) => runtime?.ShowEditorDocumentAsync(document, statusText) ?? Task.CompletedTask,
             statusText => runtime?.SetEditorStatus(statusText),
-            items => _deployCapabilityRuntime.ReconcileTemplateSelection(items));
+            items => _deployCapabilityRuntime?.ReconcileTemplateSelection(items));
         var editorComposition = CreateTemplatesEditorWorkspaceComposition(
             () => runtime?.IsLoading ?? false,
             isLoading => runtime?.SetLoading(isLoading),
@@ -237,7 +237,7 @@ public sealed partial class MainWindow : Window
             shellBridge,
             loadAvailableVmSwitchesAsync,
             loadVhdxCatalogOptionsAsync,
-            _deployCapabilityRuntime.RefreshTemplatesLoadingState);
+            () => _deployCapabilityRuntime?.RefreshTemplatesLoadingState());
         return runtime;
     }
 
@@ -681,7 +681,22 @@ public sealed partial class MainWindow : Window
             _isShellRightPanelOpen = false;
         }
 
-        var shouldAutoOpenDeployRightPanel = CanActiveCapabilityOwnRightPanel() && _deployCapabilityRuntime.ShouldAutoOpenRightPanel();
+        var deployCapabilityRuntime = _deployCapabilityRuntime;
+        if (deployCapabilityRuntime is null)
+        {
+            InsightsPanel.Visibility = Visibility.Collapsed;
+            ShellRightPanelColumn.Width = new GridLength(0);
+            InsightsToggleButton.IsEnabled = false;
+            InsightsToggleButton.Opacity = 0.45;
+            ToolTipService.SetToolTip(InsightsToggleButton, "Toggle progress and results panel");
+            RightPanelTitleTextBlock.Text = "Deploy Progress / Results";
+            RightPanelEmptyStateBorder.Visibility = Visibility.Collapsed;
+            IssueBadge.Visibility = Visibility.Collapsed;
+            IssueBadgeTextBlock.Text = string.Empty;
+            return;
+        }
+
+        var shouldAutoOpenDeployRightPanel = CanActiveCapabilityOwnRightPanel() && deployCapabilityRuntime.ShouldAutoOpenRightPanel();
         if (!shouldAutoOpenDeployRightPanel)
         {
             _isDeployRightPanelAutoOpenSuppressed = false;
@@ -699,11 +714,11 @@ public sealed partial class MainWindow : Window
         InsightsToggleButton.IsEnabled = hasOwner && !_isShellRightPanelInCompactFallback;
         InsightsToggleButton.Opacity = InsightsToggleButton.IsEnabled ? 1.0 : 0.45;
         ToolTipService.SetToolTip(InsightsToggleButton, "Toggle progress and results panel");
-        RightPanelTitleTextBlock.Text = _deployCapabilityRuntime.GetRightPanelTitleText();
-        RightPanelEmptyStateBorder.Visibility = _deployCapabilityRuntime.ShouldShowRightPanelEmptyState(showPanel)
+        RightPanelTitleTextBlock.Text = deployCapabilityRuntime.GetRightPanelTitleText();
+        RightPanelEmptyStateBorder.Visibility = deployCapabilityRuntime.ShouldShowRightPanelEmptyState(showPanel)
             ? Visibility.Visible
             : Visibility.Collapsed;
-        _deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);
+        deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);
         IssueBadge.Visibility = Visibility.Collapsed;
         IssueBadgeTextBlock.Text = string.Empty;
     }
