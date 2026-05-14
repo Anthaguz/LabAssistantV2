@@ -72,10 +72,10 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("ExportTemplateButton.Click += ExportTemplateButton_Click;", libraryViewSource);
         Assert.Contains("public void UpdateViewState(TemplatesLibraryViewState state)", libraryViewSource);
         Assert.DoesNotContain("public Button OpenTemplateInEditorButtonControl =>", libraryViewSource);
-        Assert.Contains("private TemplatesEditorWorkspaceComposition CreateTemplatesEditorWorkspaceComposition()", source);
-        Assert.Contains("private TemplatesEditorWorkspaceHost CreateTemplatesEditorWorkspaceHost()", source);
-        Assert.Contains("Func<bool, Task<TemplatesEditorReferenceData>> loadReferenceDataAsync = LoadTemplateEditorReferenceDataAsync;", source);
-        Assert.Contains("NavigateToTemplatesEditor", source);
+        Assert.Contains("private TemplatesEditorWorkspaceComposition CreateTemplatesEditorWorkspaceComposition(", source);
+        Assert.Contains("private TemplatesEditorWorkspaceHost CreateTemplatesEditorWorkspaceHost(", source);
+        Assert.Contains("forceRefresh => runtime?.LoadEditorReferenceDataAsync(forceRefresh)", source);
+        Assert.DoesNotContain("NavigateToTemplatesEditor", source);
         Assert.Contains("Action navigateToLibrary = () => NavigateToRoute(ShellRouteKeys.TemplatesLibrary);", source);
         Assert.DoesNotContain("SaveTemplateButton.Click += SaveTemplateButton_Click;", source);
         Assert.DoesNotContain("SaveTemplateAsButton.Click += SaveTemplateAsButton_Click;", source);
@@ -195,7 +195,6 @@ public sealed class MilestoneADScenarioMatrixTests
         var editorControllerSource = LoadTemplatesEditorWorkspaceControllerSource();
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
 
-        Assert.Contains("SyncTemplateVmEntriesToDocument()", source);
         Assert.Contains("_controller.ApplySelectedVmDraft(showSuccessStatus: true);", editorCompositionSource);
         Assert.Contains("public bool AddVmEntry()", editorControllerSource);
         Assert.Contains("public async Task RemoveSelectedVmEntryAsync()", editorControllerSource);
@@ -230,8 +229,8 @@ public sealed class MilestoneADScenarioMatrixTests
         var editorCompositionSource = LoadTemplatesEditorWorkspaceCompositionSource();
         var editorViewSource = LoadTemplatesEditorViewCodeBehindSource();
 
-        Assert.Contains("EnsureTemplateVhdxCatalogOptionsAsync", source);
-        Assert.Contains("SetEditorVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);", source);
+        Assert.Contains("await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);", source);
+        Assert.Contains("loadVhdxCatalogOptionsAsync()", source);
         Assert.Contains("Legacy path-based reference loaded. Select a catalog entry to normalize.", editorCompositionSource);
         Assert.Contains("Catalog entry selected. Save to persist.", editorCompositionSource);
         Assert.Contains("TemplateVmVhdxCatalogComboBox.SelectionChanged += TemplateVmVhdxCatalogComboBox_SelectionChanged;", editorViewSource);

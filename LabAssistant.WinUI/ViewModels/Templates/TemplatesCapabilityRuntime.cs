@@ -43,17 +43,29 @@ internal sealed class TemplatesCapabilityRuntime
     private readonly TemplatesLibraryWorkspaceComposition _libraryComposition;
     private readonly TemplatesEditorWorkspaceComposition _editorComposition;
     private readonly ITemplatesWorkspaceShellBridge _shellBridge;
+    private readonly Func<Task<IReadOnlyList<string>>> _loadAvailableVmSwitchesAsync;
+    private readonly Func<Task<IReadOnlyList<TemplateVhdxCatalogOption>>> _loadVhdxCatalogOptionsAsync;
+    private readonly Action _refreshDeployTemplatesLoadingState;
+    private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
+    private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
+    private bool _isLoading;
 
     public TemplatesCapabilityRuntime(
         FrameworkElement workspaceHost,
         TemplatesLibraryWorkspaceComposition libraryComposition,
         TemplatesEditorWorkspaceComposition editorComposition,
-        ITemplatesWorkspaceShellBridge shellBridge)
+        ITemplatesWorkspaceShellBridge shellBridge,
+        Func<Task<IReadOnlyList<string>>> loadAvailableVmSwitchesAsync,
+        Func<Task<IReadOnlyList<TemplateVhdxCatalogOption>>> loadVhdxCatalogOptionsAsync,
+        Action refreshDeployTemplatesLoadingState)
     {
         _workspaceHost = workspaceHost;
         _libraryComposition = libraryComposition;
         _editorComposition = editorComposition;
         _shellBridge = shellBridge;
+        _loadAvailableVmSwitchesAsync = loadAvailableVmSwitchesAsync;
+        _loadVhdxCatalogOptionsAsync = loadVhdxCatalogOptionsAsync;
+        _refreshDeployTemplatesLoadingState = refreshDeployTemplatesLoadingState;
     }
 
     public IList<TemplateLibraryItem> LibraryItems => _libraryComposition.LibraryItems;
@@ -61,6 +73,8 @@ internal sealed class TemplatesCapabilityRuntime
     public string LibrarySearchQuery => _libraryComposition.SearchQuery;
 
     public TemplateLibraryItem? SelectedLibraryItem => _libraryComposition.SelectedItem;
+
+    public bool IsLoading => _isLoading;
 
     public bool HasActiveEditorDocument => _editorComposition.HasActiveDocument;
 
@@ -86,15 +100,6 @@ internal sealed class TemplatesCapabilityRuntime
 
     public Task RemoveSelectedEditorVmEntryAsync() => _editorComposition.RemoveSelectedVmEntryAsync();
 
-    public void RefreshEditorVmEntries() => _editorComposition.RefreshVmEntries();
-
-    public void SetEditorVmReferenceData(
-        IReadOnlyList<string> availableVmSwitches,
-        IReadOnlyList<TemplateVhdxCatalogOption> vmVhdxCatalogOptions) =>
-        _editorComposition.SetVmReferenceData(availableVmSwitches, vmVhdxCatalogOptions);
-
-    public void SyncEditorVmEntriesToDocument() => _editorComposition.SyncVmEntriesToDocument();
-
     public bool ApplySelectedEditorVmDraft(bool showSuccessStatus) => _editorComposition.ApplySelectedVmDraft(showSuccessStatus);
 
     public Task SaveEditorAsync() => _editorComposition.SaveAsync();
@@ -103,6 +108,25 @@ internal sealed class TemplatesCapabilityRuntime
 
     public Task ValidateEditorAsync() => _editorComposition.ValidateAsync();
 
+    public void SetLoading(bool isLoading)
+    {
+        _isLoading = isLoading;
+        ApplyUiState();
+        _refreshDeployTemplatesLoadingState();
+    }
+
+    public async Task EnsureEditorReferenceDataAsync(bool forceRefresh)
+    {
+        await EnsureAvailableVmSwitchesAsync(forceRefresh);
+        await EnsureVhdxCatalogOptionsAsync(forceRefresh);
+    }
+
+    public async Task<TemplatesEditorReferenceData> LoadEditorReferenceDataAsync(bool forceRefresh)
+    {
+        await EnsureEditorReferenceDataAsync(forceRefresh);
+        return new TemplatesEditorReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+    }
+
     public void ApplyShellState()
     {
         _workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
@@ -110,13 +134,38 @@ internal sealed class TemplatesCapabilityRuntime
         _libraryComposition.ApplyShellState(_shellBridge.IsTemplatesLibraryActive);
     }
 
-    public void ApplyUiState(TemplatesWorkspaceUiState state)
+    public void ApplyUiState()
     {
-        _libraryComposition.ApplyUiState(state.IsLoading, state.HasSelectedLibraryItem);
+        _libraryComposition.ApplyUiState(_isLoading, _libraryComposition.SelectedItem is not null);
         _editorComposition.RefreshUiState();
     }
-}
 
-internal readonly record struct TemplatesWorkspaceUiState(
-    bool IsLoading,
-    bool HasSelectedLibraryItem);
+    private async Task EnsureAvailableVmSwitchesAsync(bool forceRefresh)
+    {
+        if (!forceRefresh && _templateAvailableSwitches.Count > 0)
+        {
+            return;
+        }
+
+        _templateAvailableSwitches = await _loadAvailableVmSwitchesAsync();
+        ApplyEditorReferenceData();
+    }
+
+    private async Task EnsureVhdxCatalogOptionsAsync(bool forceRefresh)
+    {
+        if (!forceRefresh && _templateVhdxCatalogOptions.Count > 0)
+        {
+            return;
+        }
+
+        _templateVhdxCatalogOptions.Clear();
+        var items = await _loadVhdxCatalogOptionsAsync();
+        _templateVhdxCatalogOptions.AddRange(items);
+        ApplyEditorReferenceData();
+    }
+
+    private void ApplyEditorReferenceData()
+    {
+        _editorComposition.SetVmReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+    }
+}
