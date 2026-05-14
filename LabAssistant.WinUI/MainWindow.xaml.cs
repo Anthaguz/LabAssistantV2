@@ -83,6 +83,7 @@ public sealed partial class MainWindow : Window
         _assetsSwitchesWorkspaceComposition = assetsSwitchesWorkspaceComposition;
         _templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
+        _deployCapabilityRuntime.RefreshTemplatesLoadingState();
         _diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
@@ -189,7 +190,7 @@ public sealed partial class MainWindow : Window
             () => runtime?.ApplyUiState(),
             (document, statusText) => runtime?.ShowEditorDocumentAsync(document, statusText) ?? Task.CompletedTask,
             statusText => runtime?.SetEditorStatus(statusText),
-            items => _deployCapabilityRuntime.ReconcileTemplateSelection(items));
+            items => _deployCapabilityRuntime?.ReconcileTemplateSelection(items));
         var editorComposition = CreateTemplatesEditorWorkspaceComposition(
             () => runtime?.IsLoading ?? false,
             isLoading => runtime?.SetLoading(isLoading),
@@ -237,7 +238,7 @@ public sealed partial class MainWindow : Window
             shellBridge,
             loadAvailableVmSwitchesAsync,
             loadVhdxCatalogOptionsAsync,
-            _deployCapabilityRuntime.RefreshTemplatesLoadingState);
+            () => _deployCapabilityRuntime?.RefreshTemplatesLoadingState());
         return runtime;
     }
 
