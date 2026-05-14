@@ -99,6 +99,32 @@ public class PersistentPowerShellSessionTests
         Assert.True(host.DisposeCalled);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithRealPowerShellProcess_KeepsRepeatedOutputsAligned()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var session = new PersistentPowerShellSession();
+
+        var first = await session.ExecuteAsync("""
+            1..5 | ForEach-Object {
+                [PSCustomObject]@{
+                    Name = "item$_"
+                    Value = "xxxxx"
+                }
+            } | ConvertTo-Json -Compress
+            """);
+        var second = await session.ExecuteAsync("'SECOND'");
+
+        Assert.Contains(@"""Name"":""item1""", first.Output, StringComparison.Ordinal);
+        Assert.Equal("SECOND", second.Output.Trim());
+        Assert.DoesNotContain("PS ", first.Output, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("PS ", second.Output, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class FakeHost : IPersistentPowerShellHost
     {
         public RecordingTextWriter Input { get; } = new();
