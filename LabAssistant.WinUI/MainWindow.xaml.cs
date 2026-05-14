@@ -83,7 +83,6 @@ public sealed partial class MainWindow : Window
         _assetsSwitchesWorkspaceComposition = assetsSwitchesWorkspaceComposition;
         _templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
-        _deployCapabilityRuntime.RefreshTemplatesLoadingState();
         _diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();
         _activeRouteKey = _shellViewModel.StartupRoute;
         _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
