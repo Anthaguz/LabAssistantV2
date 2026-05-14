@@ -109,6 +109,12 @@ All user-initiated Machines operations shall emit structured logs with `operatio
 
 Destructive action logs should make action intent explicit.
 
+### 5.1 Hyper-V query/action execution model
+- Read-heavy Hyper-V host reads for Machines (inventory, edit snapshot, switch lists, attached VM lookup, IP lookup, and delete-preview classification reads) must use an explicit query execution seam that may reuse a PowerShell session across requests.
+- Repeated Machines reads must not hide a brand-new session-per-call pattern behind the admin service.
+- One-shot administrative actions (start/stop/restart/apply/delete/create-switch/rename-switch/delete-switch) may remain action-scoped isolated commands.
+- This Machines query/action model is intentionally separate from Deploy's one-persistent-session-per-VM workflow model.
+
 ---
 
 ## 6. Open Questions / TBDs

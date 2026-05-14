@@ -17,6 +17,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISessionResolver, SessionResolver>();
         services.AddTransient<IPersistentPowerShellSession, PersistentPowerShellSession>();
         services.AddSingleton<IPowerShellExecutor, PowerShellExecutor>();
+        services.AddSingleton<IHyperVQueryExecutor, HyperVQueryExecutor>();
+        services.AddSingleton<IHyperVAdministrativeCommandExecutor, HyperVAdministrativeCommandExecutor>();
 
         services.AddTransient<Func<IPersistentPowerShellSession>>(provider =>
             () => provider.GetRequiredService<IPersistentPowerShellSession>()

@@ -36,7 +36,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 
 # AC-001 — Deploy Lab From Template (Multi-VM)
 
-**Related FRs:** FR-022, FR-023, FR-024, FR-025, FR-026, FR-028, FR-031, FR-043, FR-044, FR-045, FR-046, FR-053, FR-055, FR-056, FR-057, FR-058, FR-059, FR-040, FR-041
+**Related FRs:** FR-022, FR-023, FR-024, FR-025, FR-026, FR-028, FR-031, FR-043, FR-044, FR-045, FR-046, FR-047, FR-049, FR-053, FR-055, FR-056, FR-057, FR-058, FR-059, FR-040, FR-041
 
 ## Scenarios
 
@@ -122,6 +122,31 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 - The readiness report shows warnings distinctly from blocking failures
 - Deployment is allowed to proceed
 - Structured logs record the warning outcome and deployment start
+
+### 7) Deploy PowerShell Execution Model - Per-VM Workflow Session Continuity
+**Given**
+- A Deploy operation creates one or more VM workflows
+
+**When**
+- A VM proceeds through create/configure/start steps and later cleanup if needed
+
+**Then**
+- That VM uses one persistent workflow-owned PowerShell session across its ordered Hyper-V commands
+- Cleanup for that VM uses the same workflow-owned execution channel rather than switching to a shared deploy shell
+- Other VM workflows remain isolated from that session
+- Crash/restart session resurrection is not required in the current scope
+
+### 8) Deploy Timing Diagnostics - Session and Command Visibility
+**Given**
+- A Deploy operation runs on a supported host
+
+**When**
+- Hyper-V workflow execution starts
+
+**Then**
+- Diagnostics capture workflow-session creation timing
+- Diagnostics capture command execution timing for workflow-bound Hyper-V commands
+- The timing data is available for later batch/concurrency evaluation without changing the user-facing Deploy contract
 
 ## Expected UI
 - Template selection UI + Deploy action
@@ -274,6 +299,8 @@ Each readiness result shall include, at minimum:
 - [ ] Progress UI updates reliably for multi-VM
 - [ ] Failure behavior conforms to GR-02
 - [ ] Logs conform to GR-03 with operationId
+- [ ] Deploy reuses one persistent PowerShell session per VM workflow across ordered steps and cleanup
+- [ ] Diagnostics capture workflow-session creation and command execution timing
 - [ ] Tests exist for validation + deployment orchestration (mocks acceptable for Hyper-V)
 - [ ] No orphaned resources without either rollback or explicit cleanup guidance
 
@@ -591,7 +618,7 @@ Each readiness result shall include, at minimum:
 
 # AC-006 — Machines (Hyper-V VM Administration, v1)
 
-**Related FRs:** FR-060, FR-061, FR-062, FR-063, FR-064, FR-065, FR-066, FR-040, FR-041
+**Related FRs:** FR-048, FR-049, FR-060, FR-061, FR-062, FR-063, FR-064, FR-065, FR-066, FR-040, FR-041
 
 ## Scenarios
 
@@ -732,6 +759,31 @@ Each readiness result shall include, at minimum:
 - UI does not report false success
 - Structured logs include operationId and failure context
 
+### 8) Machines Query Execution Model - Reusable Read Path
+**Given**
+- Machines loads Hyper-V-backed read data such as inventory, edit snapshots, switch lists, attached VM lists, or IP lists
+
+**When**
+- Those read operations are executed repeatedly during a normal app session
+
+**Then**
+- They use an explicit Hyper-V query execution seam that may reuse a PowerShell session across requests
+- They do not create a brand-new PowerShell session for every repeated read call
+- This read-query seam remains separate from Deploy's workflow-session model
+- One-shot Machines administrative actions may remain isolated action-scoped commands rather than joining the reusable read-query session
+
+### 9) Machines Timing Diagnostics - Query and Flow Visibility
+**Given**
+- Machines inventory or edit flows are used on a supported host
+
+**When**
+- Inventory loads, edit snapshots load, or Hyper-V-backed read queries run
+
+**Then**
+- Diagnostics capture reusable query-session creation timing
+- Diagnostics capture query command execution timing
+- Machines inventory load and edit snapshot load record flow duration so query-shape cost can be compared over time
+
 ## Expected UI
 - `Machines` capability entry and VM inventory/list
 - Selection model for VM operations
@@ -756,6 +808,8 @@ Each readiness result shall include, at minimum:
   - policy mode and disk classification context (for delete actions)
   - selected delete scope (for delete actions)
   - result and error details on failure
+- Diagnostics expectation:
+  - timing data is available for query-session creation, one-shot administrative session creation, and key read flows such as inventory and edit snapshot load
 
 ## Definition of Done
 - [ ] Machines inventory lists all host Hyper-V VMs
@@ -770,6 +824,8 @@ Each readiness result shall include, at minimum:
 - [ ] Delete-with-storage cleanup removes safe/owned VM folder artifacts or reports explicit actionable failure
 - [ ] Failure behavior is actionable and non-silent
 - [ ] Structured logging includes operationId and action context for Machines actions
+- [ ] Machines read-heavy Hyper-V queries do not create a brand-new PowerShell session for every repeated read call
+- [ ] Diagnostics capture query-session timing and key Machines read-flow duration
 
 ---
 

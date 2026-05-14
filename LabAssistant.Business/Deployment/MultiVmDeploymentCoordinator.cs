@@ -3,6 +3,7 @@ using LabAssistant.Models.PowerShell;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
+using System.Diagnostics;
 
 namespace LabAssistant.Business.Deployment;
 
@@ -43,7 +44,9 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             DebugLogger.Log($"Deploying VM: {context.VmName}");
 
             var handle = new PowerShellHandle();
+            var sessionCreationStopwatch = Stopwatch.StartNew();
             var session = _sessionFactory();
+            sessionCreationStopwatch.Stop();
             var hyperV = _hyperVFactory(session);
 
             _sessionResolver.RegisterSession(handle, session);
@@ -52,6 +55,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             context.StructuredEventEmitter = (eventName, level, result, extraContext) =>
                 EmitVmScopedEvent(eventName, level, multiContext, context, result, extraContext);
             EmitVmScopedEvent("VmDeployStarted", "info", multiContext, context, "started");
+            HyperVPowerShellTimingLogger.LogWorkflowSessionCreated(context.VmName, sessionCreationStopwatch.ElapsedMilliseconds);
 
             context.OnBlockingFailure = () =>
             {

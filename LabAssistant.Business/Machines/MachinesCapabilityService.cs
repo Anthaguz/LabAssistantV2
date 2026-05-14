@@ -37,6 +37,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
     public async Task<IReadOnlyList<MachineInventoryItem>> LoadInventoryAsync()
     {
         var operationId = Guid.NewGuid().ToString("N");
+        var stopwatch = Stopwatch.StartNew();
         _structuredLogger.Log(
             StructuredLogLevel.Info,
             "MachineInventoryLoadStarted",
@@ -56,19 +57,23 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
                 "success",
                 new Dictionary<string, object?>
                 {
-                    ["vmCount"] = mapped.Count
+                    ["vmCount"] = mapped.Count,
+                    ["durationMs"] = stopwatch.ElapsedMilliseconds
                 });
 
             return mapped;
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
             _structuredLogger.Log(
                 StructuredLogLevel.Error,
                 "MachineInventoryLoadFailed",
                 operationId,
                 "failed",
-                RuntimeErrorMetadataNormalizer.FromException(ex));
+                MergeFailureContext(
+                    new Dictionary<string, object?> { ["durationMs"] = stopwatch.ElapsedMilliseconds },
+                    ex));
             throw;
         }
     }
@@ -76,6 +81,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
     public async Task<MachineEditSnapshot?> LoadEditSnapshotAsync(MachineInventoryItem vm)
     {
         var operationId = Guid.NewGuid().ToString("N");
+        var stopwatch = Stopwatch.StartNew();
         var context = BuildVmContext(vm, "load_edit_snapshot");
         _structuredLogger.Log(
             StructuredLogLevel.Info,
@@ -94,7 +100,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
                     "MachineEditLoadCompleted",
                     operationId,
                     "not_found",
-                    context);
+                    AddDuration(context, stopwatch.ElapsedMilliseconds));
                 return null;
             }
 
@@ -104,17 +110,20 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
                 "MachineEditLoadCompleted",
                 operationId,
                 "success",
-                context);
+                AddDuration(context, stopwatch.ElapsedMilliseconds));
             return mapped;
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
             _structuredLogger.Log(
                 StructuredLogLevel.Error,
                 "MachineEditLoadFailed",
                 operationId,
                 "failed",
-                RuntimeErrorMetadataNormalizer.FromException(ex));
+                MergeFailureContext(
+                    AddDuration(context, stopwatch.ElapsedMilliseconds),
+                    ex));
             throw;
         }
     }
@@ -591,6 +600,27 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         return merged;
     }
 
+    private static IReadOnlyDictionary<string, object?> MergeFailureContext(
+        IReadOnlyDictionary<string, object?> context,
+        Exception exception)
+    {
+        var merged = new Dictionary<string, object?>(context);
+        foreach (var pair in RuntimeErrorMetadataNormalizer.FromException(exception))
+        {
+            if (!merged.ContainsKey(pair.Key))
+            {
+                merged[pair.Key] = pair.Value;
+            }
+        }
+
+        if (!merged.ContainsKey("errorMessage"))
+        {
+            merged["errorMessage"] = exception.Message;
+        }
+
+        return merged;
+    }
+
     private static MachineInventoryItem MapToInventoryItem(HyperVHostMachineVmInfo vm, string vmBasePath)
     {
         return new MachineInventoryItem
@@ -676,6 +706,18 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         }
 
         return baseMessage;
+    }
+
+    private static Dictionary<string, object?> AddDuration(
+        IReadOnlyDictionary<string, object?> context,
+        long durationMs)
+    {
+        var enriched = new Dictionary<string, object?>(context)
+        {
+            ["durationMs"] = durationMs
+        };
+
+        return enriched;
     }
 
     private MachineRdpReadinessResult LogReadinessResult(

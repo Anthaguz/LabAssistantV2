@@ -35,6 +35,15 @@
 - **Target:** Cancel request acknowledged in **<= 2 seconds** and operation stops in **<= 10 seconds** (TBD if needed)
 - **Verify:** Manual test (cancel mid-deploy) + logs show cancellation path
 
+### P-05 Hyper-V backend timing visibility
+- **Target:** Diagnostics distinguish:
+  - workflow-session creation cost
+  - query-session creation cost
+  - one-shot administrative session creation cost
+  - Hyper-V command/query execution cost
+  - key read-flow duration such as Machines inventory load and edit snapshot load
+- **Verify:** Inspect diagnostics/debug timing entries after Machines and Deploy flows
+
 ---
 
 ## Reliability / Resilience

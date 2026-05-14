@@ -1,6 +1,7 @@
 using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
+using System.Diagnostics;
 
 namespace LabAssistant.Services.HyperV;
 
@@ -18,7 +19,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount)
     {
         var script = $"New-VM -Name '{vmName}' -MemoryStartupBytes {memoryMb}MB -Generation 2 -BootDevice VHD -VHDPath '{vhdPath}' -Path '{vmPath}'";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("create_vm", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -26,7 +27,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> EnableGuestServicesAsync(string vmName)
     {
         var script = $"Enable-VMIntegrationService -VMName '{vmName}' -Name 'Guest Service Interface'";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("enable_guest_services", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -34,7 +35,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> StartVmAsync(string vmName)
     {
         var script = $"Start-VM -Name '{vmName}'";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("start_vm", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -42,7 +43,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> StopVmAsync(string vmName)
     {
         var script = $"Stop-VM -Name '{vmName}' -Force";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("stop_vm", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -50,7 +51,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> VmExistsAsync(string vmName)
     {
         var script = $"if (Get-VM -Name '{vmName}' -ErrorAction SilentlyContinue) {{ 'True' }} else {{ 'False' }}";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("vm_exists", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         if (!string.IsNullOrWhiteSpace(error))
         {
@@ -67,7 +68,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> IsVmRunningAsync(string vmName)
     {
         var script = $"$vm = Get-VM -Name '{vmName}' -ErrorAction SilentlyContinue; if ($null -eq $vm) {{ 'Missing' }} else {{ $vm.State.ToString() }}";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("is_vm_running", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         if (!string.IsNullOrWhiteSpace(error))
         {
@@ -84,7 +85,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> RemoveVmAsync(string vmName)
     {
         var script = $"Remove-VM -Name '{vmName}' -Force";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("remove_vm", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -92,7 +93,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath)
     {
         var script = $"New-VHD -ParentPath '{parentDiskPath}' -Path '{vhdPath}' -Differencing";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("create_vhd_differencing", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -100,7 +101,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> CreateVhdFixedSizeAsync(string vhdPath, long sizeBytes)
     {
         var script = $"New-VHD -Path '{vhdPath}' -SizeBytes {sizeBytes} -Fixed";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("create_vhd_fixed", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -108,7 +109,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> DisableVmCheckpointsAsync(string vmName)
     {
         var script = $"Set-VM -Name '{vmName}' -CheckpointType Disabled";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("disable_vm_checkpoints", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -116,7 +117,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<List<string>> GetVirtualSwitchNamesAsync()
     {
         var script = "Get-VMSwitch | Select-Object -ExpandProperty Name";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("get_virtual_switch_names", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
 
         output = PowerShellOutputCleaner.Clean(output);
@@ -136,7 +137,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     public async Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName)
     {
         var script = $"Connect-VMNetworkAdapter -VMName '{vmName}' -SwitchName '{switchName}'";
-        var (output, error) = await _session.ExecuteAsync(script);
+        var (output, error) = await ExecuteMeasuredAsync("add_virtual_switch_to_vm", script);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
@@ -156,5 +157,19 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
 
         LastFailureMetadata = RuntimeErrorMetadataNormalizer.FromPowerShellErrorText(error);
         return false;
+    }
+
+    private async Task<(string Output, string Error)> ExecuteMeasuredAsync(string commandName, string script)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var result = await _session.ExecuteAsync(script);
+        stopwatch.Stop();
+
+        HyperVPowerShellTimingLogger.LogWorkflowCommand(
+            commandName,
+            stopwatch.ElapsedMilliseconds,
+            string.IsNullOrWhiteSpace(result.Error));
+
+        return result;
     }
 }

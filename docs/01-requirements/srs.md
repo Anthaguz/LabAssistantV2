@@ -157,6 +157,18 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 - **FR-046:** The system shall present deployment readiness results in the Deploy UI with actionable summaries and likely cause/path hints, while detailed technical stderr remains primarily in diagnostics/debug logs.
   - **Priority:** P1
 
+- **FR-047:** The system shall execute Hyper-V Deploy workflow commands for a given VM through one persistent PowerShell session owned by that VM workflow.
+  - **Acceptance details:** The same workflow-owned session shall be reused across ordered create/configure/start steps and cleanup for that VM; session resurrection after app crash/restart is not required in the current scope.
+  - **Priority:** P1
+
+- **FR-048:** The system shall execute read-heavy Hyper-V queries through an explicit query execution seam that may reuse PowerShell sessions across requests instead of creating a brand-new session for every query call.
+  - **Acceptance details:** This query seam is intentionally separate from the Deploy workflow-session model and applies to Machines/admin read paths such as inventory, edit snapshot loading, switch listing, IP lookup, and comparable read-only Hyper-V probes.
+  - **Priority:** P1
+
+- **FR-049:** The system shall emit diagnostics that measure Hyper-V PowerShell session creation cost, command/query execution cost, and key read-flow duration before deeper backend changes are evaluated.
+  - **Acceptance details:** Diagnostics must make it possible to distinguish workflow-session creation, query-session creation, one-shot administrative session creation, and key read flows such as Machines inventory load and edit snapshot load.
+  - **Priority:** P1
+
 - **FR-055:** The system shall classify deployment guest-step execution options into:
   - mandatory implemented steps,
   - optional implemented steps,
@@ -873,7 +885,8 @@ Detailed schema contract:
 Detailed runtime policy:
 
 - See `docs/01-requirements/cleanup-cancellation-policy.md` for cleanup order, cancellation boundaries, residual status rules, and expected terminal outcomes.
-- See `docs/03-architecture/architecture.md` for the current implementation notes covering the persistent PowerShell wrapper and related runtime constraints.
+- See `docs/03-architecture/architecture.md` for current runtime structure notes.
+- See `docs/03-architecture/hyperv-powershell-interaction.md` for the current PowerShell workflow/query/admin execution model and call-site classification.
 
 ---
 
