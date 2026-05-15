@@ -13,15 +13,15 @@ internal readonly record struct DeployOnTheFlyEditorInteractionState(
     string VmName,
     string VmMemoryText,
     string VmCpuText,
-    object? SelectedSwitchItem,
+    IReadOnlyList<string> SelectedSwitches,
     TemplateVhdxCatalogOption? SelectedVhdxCatalogOption);
 
 internal readonly record struct DeployOnTheFlyEditorViewState(
     string VmName,
     string VmMemoryText,
     string VmCpuText,
-    IReadOnlyList<object> SwitchItems,
-    object? SelectedSwitchItem,
+    IReadOnlyList<string> AvailableSwitches,
+    IReadOnlyList<string> SelectedSwitches,
     string SwitchGuidanceText,
     IReadOnlyList<object> VhdxCatalogItems,
     object? SelectedVhdxCatalogItem,
@@ -46,8 +46,11 @@ public readonly record struct DeployOnTheFlyWorkspaceViewState(
 public sealed partial class DeployOnTheFlyView : UserControl
 {
     private const double CompactLayoutThreshold = 1120;
+    private const string SwitchPlaceholder = "(Select switch)";
     private bool _isUpdatingVmSelection;
     private bool _isUpdatingEditorState;
+    private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
+    private readonly List<ComboBox> _switchRowCombos = [];
 
     public event EventHandler? VmEntrySelectionChanged;
     public event Action<VmTemplate>? VmRemoveRequested;
@@ -86,7 +89,7 @@ public sealed partial class DeployOnTheFlyView : UserControl
             DeployOnTheFlyVmNameTextBox.Text,
             DeployOnTheFlyVmMemoryTextBox.Text,
             DeployOnTheFlyVmCpuTextBox.Text,
-            DeployOnTheFlyVmSwitchComboBox.SelectedItem,
+            CaptureSelectedSwitches(),
             DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem as TemplateVhdxCatalogOption);
     }
 
@@ -116,8 +119,8 @@ public sealed partial class DeployOnTheFlyView : UserControl
             DeployOnTheFlyVmNameTextBox.Text = state.VmName;
             DeployOnTheFlyVmMemoryTextBox.Text = state.VmMemoryText;
             DeployOnTheFlyVmCpuTextBox.Text = state.VmCpuText;
-            DeployOnTheFlyVmSwitchComboBox.ItemsSource = state.SwitchItems;
-            DeployOnTheFlyVmSwitchComboBox.SelectedItem = state.SelectedSwitchItem;
+            _availableSwitches = state.AvailableSwitches ?? Array.Empty<string>();
+            RenderSwitchRows(state.SelectedSwitches);
             DeployOnTheFlyVmSwitchGuidanceTextBlock.Text = state.SwitchGuidanceText;
             DeployOnTheFlyVmVhdxCatalogComboBox.ItemsSource = state.VhdxCatalogItems;
             DeployOnTheFlyVmVhdxCatalogComboBox.SelectedItem = state.SelectedVhdxCatalogItem;
@@ -163,7 +166,7 @@ public sealed partial class DeployOnTheFlyView : UserControl
         DeployOnTheFlyVmNameTextBox.TextChanged += DeployOnTheFlyEditorControl_Changed;
         DeployOnTheFlyVmMemoryTextBox.TextChanged += DeployOnTheFlyEditorControl_Changed;
         DeployOnTheFlyVmCpuTextBox.TextChanged += DeployOnTheFlyEditorControl_Changed;
-        DeployOnTheFlyVmSwitchComboBox.SelectionChanged += DeployOnTheFlyEditorControl_Changed;
+        DeployOnTheFlyAddVmSwitchRowButton.Click += DeployOnTheFlyAddVmSwitchRowButton_Click;
         DeployOnTheFlyVmVhdxCatalogComboBox.SelectionChanged += DeployOnTheFlyEditorControl_Changed;
         DeployOnTheFlyEvaluateButton.Click += (_, _) => EvaluateRequested?.Invoke(this, EventArgs.Empty);
         DeployOnTheFlyResolveSuggestionsButton.Click += (_, _) => ResolveSuggestionsRequested?.Invoke(this, EventArgs.Empty);
@@ -205,6 +208,52 @@ public sealed partial class DeployOnTheFlyView : UserControl
         VmDraftChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    private void DeployOnTheFlyAddVmSwitchRowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdatingEditorState)
+        {
+            return;
+        }
+
+        AddSwitchRow(null);
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void DeployOnTheFlyRemoveVmSwitchRowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ComboBox combo })
+        {
+            return;
+        }
+
+        _switchRowCombos.Remove(combo);
+
+        var rowToRemove = DeployOnTheFlyVmSwitchRowsPanel.Children
+            .OfType<Grid>()
+            .FirstOrDefault(grid => grid.Children.OfType<ComboBox>().Any(c => ReferenceEquals(c, combo)));
+        if (rowToRemove is not null)
+        {
+            DeployOnTheFlyVmSwitchRowsPanel.Children.Remove(rowToRemove);
+        }
+
+        if (_isUpdatingEditorState)
+        {
+            return;
+        }
+
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void DeployOnTheFlySwitchRowCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingEditorState)
+        {
+            return;
+        }
+
+        VmDraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private void UpdateLayoutMode(double width)
     {
         var useStackedLayout = width < CompactLayoutThreshold;
@@ -218,5 +267,66 @@ public sealed partial class DeployOnTheFlyView : UserControl
 
         Grid.SetRow(DeployOnTheFlyVmEditorPanel, useStackedLayout ? 1 : 0);
         Grid.SetColumn(DeployOnTheFlyVmEditorPanel, useStackedLayout ? 0 : 1);
+    }
+
+    private List<string> CaptureSelectedSwitches()
+    {
+        return _switchRowCombos
+            .Select(combo => combo.SelectedItem?.ToString())
+            .Select(value => string.Equals(value, SwitchPlaceholder, StringComparison.Ordinal)
+                ? string.Empty
+                : value?.Trim() ?? string.Empty)
+            .ToList();
+    }
+
+    private void RenderSwitchRows(IReadOnlyList<string> selectedSwitches)
+    {
+        DeployOnTheFlyVmSwitchRowsPanel.Children.Clear();
+        _switchRowCombos.Clear();
+
+        foreach (var selectedSwitch in selectedSwitches)
+        {
+            AddSwitchRow(selectedSwitch);
+        }
+    }
+
+    private void AddSwitchRow(string? selectedSwitch)
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 8
+        };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var combo = new ComboBox
+        {
+            MinWidth = 220
+        };
+        combo.Items.Add(SwitchPlaceholder);
+        foreach (var switchName in _availableSwitches)
+        {
+            combo.Items.Add(switchName);
+        }
+
+        var validSelection = !string.IsNullOrWhiteSpace(selectedSwitch) &&
+                             _availableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase);
+        combo.SelectedItem = validSelection ? selectedSwitch : SwitchPlaceholder;
+        combo.SelectionChanged += DeployOnTheFlySwitchRowCombo_SelectionChanged;
+        _switchRowCombos.Add(combo);
+        Grid.SetColumn(combo, 0);
+        row.Children.Add(combo);
+
+        var removeButton = new Button
+        {
+            Content = "-",
+            Tag = combo
+        };
+        ToolTipService.SetToolTip(removeButton, "Remove switch");
+        removeButton.Click += DeployOnTheFlyRemoveVmSwitchRowButton_Click;
+        Grid.SetColumn(removeButton, 1);
+        row.Children.Add(removeButton);
+
+        DeployOnTheFlyVmSwitchRowsPanel.Children.Add(row);
     }
 }

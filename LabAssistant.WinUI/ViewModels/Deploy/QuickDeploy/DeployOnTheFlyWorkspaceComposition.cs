@@ -13,7 +13,6 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 /// </summary>
 internal sealed class DeployOnTheFlyWorkspaceComposition
 {
-    private const string SwitchPlaceholder = "(No switch)";
     private const string VhdxPlaceholder = "(Select base disk)";
     private readonly DeployOnTheFlyView _view;
     private readonly DeployOnTheFlyRightPanelView _rightPanelView;
@@ -159,17 +158,12 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     /// </summary>
     public void SyncEditorDraft(DeployOnTheFlyEditorInteractionState interactionState)
     {
-        var selectedSwitch = interactionState.SelectedSwitchItem is string switchName &&
-                             !string.Equals(switchName, SwitchPlaceholder, StringComparison.Ordinal)
-            ? switchName
-            : null;
-
         var selectedCatalogOption = interactionState.SelectedVhdxCatalogOption;
         _workspace.UpdateEditorDraft(
             interactionState.VmName,
             interactionState.VmMemoryText,
             interactionState.VmCpuText,
-            selectedSwitch,
+            interactionState.SelectedSwitches,
             selectedCatalogOption?.Id,
             selectedCatalogOption?.Path,
             selectedCatalogOption?.Signature);
@@ -256,9 +250,6 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
 
     private DeployOnTheFlyEditorViewState BuildEditorViewState()
     {
-        var switchItems = new List<object> { SwitchPlaceholder };
-        switchItems.AddRange(_availableSwitches);
-
         var vhdItems = new List<object> { VhdxPlaceholder };
         vhdItems.AddRange(_availableVhdxCatalogOptions);
 
@@ -268,30 +259,27 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
                 _workspace.EditorVmNameDraft,
                 _workspace.EditorVmMemoryDraft,
                 _workspace.EditorVmCpuDraft,
-                switchItems,
-                SwitchPlaceholder,
+                _availableSwitches,
+                Array.Empty<string>(),
                 "Select a VM entry first.",
                 vhdItems,
                 VhdxPlaceholder,
                 "Select a VM entry first.");
         }
 
-        object selectedSwitchItem;
         string switchGuidanceText;
-        var selectedSwitch = _workspace.EditorSwitchNameDraft;
-        if (!string.IsNullOrWhiteSpace(selectedSwitch) &&
-            _availableSwitches.Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase))
+        var selectedSwitches = _workspace.EditorSwitchNamesDraft;
+        if (_availableSwitches.Count == 0)
         {
-            selectedSwitchItem = _availableSwitches.First(name =>
-                string.Equals(name, selectedSwitch, StringComparison.OrdinalIgnoreCase));
-            switchGuidanceText = "Switch selected from host inventory.";
+            switchGuidanceText = "No host switches available. Add a switch in Assets first.";
+        }
+        else if (selectedSwitches.Count == 0)
+        {
+            switchGuidanceText = "Switch selection is optional.";
         }
         else
         {
-            selectedSwitchItem = SwitchPlaceholder;
-            switchGuidanceText = _availableSwitches.Count == 0
-                ? "No host switches available. Add a switch in Assets first."
-                : "Switch selection is optional.";
+            switchGuidanceText = "Switch rows configured.";
         }
 
         var vhdSelection = string.IsNullOrWhiteSpace(_workspace.EditorVhdxIdDraft)
@@ -323,8 +311,8 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
             _workspace.EditorVmNameDraft,
             _workspace.EditorVmMemoryDraft,
             _workspace.EditorVmCpuDraft,
-            switchItems,
-            selectedSwitchItem,
+            _availableSwitches,
+            selectedSwitches,
             switchGuidanceText,
             vhdItems,
             selectedVhdxCatalogItem,
@@ -435,6 +423,8 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
             _workspace.EditorVmNameDraft,
             _workspace.EditorVmMemoryDraft,
             _workspace.EditorVmCpuDraft,
+            _workspace.EditorSwitchNamesDraft,
+            _availableSwitches,
             string.IsNullOrWhiteSpace(_workspace.EditorVhdxIdDraft) &&
             string.IsNullOrWhiteSpace(_workspace.EditorVhdPathDraft)
                 ? null
@@ -449,14 +439,28 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         var selectedCatalog = string.IsNullOrWhiteSpace(vmEntry.VhdxId) && string.IsNullOrWhiteSpace(vmEntry.VhdPath)
             ? null
             : new object();
+        IReadOnlyList<string> switchNames = vmEntry.SwitchNames?.Count > 0
+            ? vmEntry.SwitchNames
+            : string.IsNullOrWhiteSpace(vmEntry.SwitchName)
+                ? Array.Empty<string>()
+                : [vmEntry.SwitchName];
 
-        return GetDraftIssues(vmEntry.Name, memoryText, cpuText, selectedCatalog, availableCatalogCount: 1);
+        return GetDraftIssues(
+            vmEntry.Name,
+            memoryText,
+            cpuText,
+            switchNames,
+            switchNames,
+            selectedCatalog,
+            availableCatalogCount: 1);
     }
 
     private static List<(bool IsBlocking, string Message)> GetDraftIssues(
         string? vmName,
         string? memoryText,
         string? cpuText,
+        IReadOnlyList<string>? selectedSwitches,
+        IReadOnlyList<string>? availableSwitches,
         object? selectedCatalogItem,
         int availableCatalogCount)
     {
@@ -476,6 +480,27 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
             issues.Add((true, "CPU count must be a positive integer."));
         }
 
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var selectedSwitch in selectedSwitches ?? Array.Empty<string>())
+        {
+            if (string.IsNullOrWhiteSpace(selectedSwitch))
+            {
+                issues.Add((true, "Each switch row must have a selected host switch or be removed."));
+                continue;
+            }
+
+            if (!(availableSwitches ?? Array.Empty<string>()).Contains(selectedSwitch, StringComparer.OrdinalIgnoreCase))
+            {
+                issues.Add((true, $"Switch '{selectedSwitch}' is not available on this host."));
+                continue;
+            }
+
+            if (!seen.Add(selectedSwitch))
+            {
+                issues.Add((true, $"Duplicate switch '{selectedSwitch}' is not allowed."));
+            }
+        }
+
         if (selectedCatalogItem is null)
         {
             issues.Add((true, availableCatalogCount == 0
@@ -493,10 +518,14 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
             : string.IsNullOrWhiteSpace(vmEntry.VhdxId)
                 ? "Catalog disk selected"
                 : $"Disk: {vmEntry.VhdxId}";
-        var switchText = vmEntry.SwitchNames?.FirstOrDefault()
-                         ?? vmEntry.SwitchName
-                         ?? "No switch";
-        return $"{vmEntry.MemoryMb} MB | {vmEntry.CpuCount} vCPU | {diskText} | Switch: {switchText}";
+        var switches = vmEntry.SwitchNames?.Where(name => !string.IsNullOrWhiteSpace(name)).ToList() ?? [];
+        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(vmEntry.SwitchName))
+        {
+            switches.Add(vmEntry.SwitchName);
+        }
+
+        var switchText = switches.Count == 0 ? "No switch" : string.Join(", ", switches);
+        return $"{vmEntry.MemoryMb} MB | {vmEntry.CpuCount} vCPU | {diskText} | Switches: {switchText}";
     }
 
     private static string FormatIssueMessage(string message, string? guidance)

@@ -49,7 +49,8 @@ public sealed class MilestoneAGScenarioMatrixTests
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmMemoryTextBox"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmCpuTextBox"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmVhdxCatalogComboBox"));
-        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmSwitchComboBox"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmSwitchRowsPanel"));
+        Assert.NotNull(FindByName(xaml, "DeployOnTheFlyAddVmSwitchRowButton"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmSwitchGuidanceTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyVmVhdxGuidanceTextBlock"));
         Assert.NotNull(FindByName(xaml, "DeployOnTheFlyApplyVmChangesButton"));
@@ -145,6 +146,7 @@ public sealed class MilestoneAGScenarioMatrixTests
 
         Assert.Contains("public event EventHandler? VmDraftChanged;", viewSource);
         Assert.Contains("public void ApplyWorkspaceState(DeployOnTheFlyWorkspaceViewState state)", viewSource);
+        Assert.Contains("DeployOnTheFlyAddVmSwitchRowButton.Click += DeployOnTheFlyAddVmSwitchRowButton_Click;", viewSource);
         Assert.DoesNotContain("public TextBox DeployOnTheFlyVmNameTextBoxControl =>", viewSource);
     }
 

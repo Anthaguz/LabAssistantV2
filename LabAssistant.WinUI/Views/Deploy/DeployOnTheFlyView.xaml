@@ -289,9 +289,15 @@
                                     Grid.Row="4"
                                     Grid.Column="0"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="Switch" />
+                                    Text="Switches" />
                                 <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6">
-                                    <ComboBox x:Name="DeployOnTheFlyVmSwitchComboBox" />
+                                    <StackPanel
+                                        x:Name="DeployOnTheFlyVmSwitchRowsPanel"
+                                        Spacing="6" />
+                                    <Button
+                                        x:Name="DeployOnTheFlyAddVmSwitchRowButton"
+                                        HorizontalAlignment="Left"
+                                        Content="+ Add Switch" />
                                     <TextBlock
                                         x:Name="DeployOnTheFlyVmSwitchGuidanceTextBlock"
                                         Foreground="{StaticResource ShellTextSecondaryBrush}"

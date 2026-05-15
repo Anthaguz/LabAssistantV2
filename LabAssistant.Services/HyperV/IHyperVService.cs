@@ -14,4 +14,17 @@ public interface IHyperVService
     Task<bool> DisableVmCheckpointsAsync(string vmName);
     Task<List<string>> GetVirtualSwitchNamesAsync();
     Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName);
+
+    async Task<bool> AddVirtualSwitchesToVmAsync(string vmName, IReadOnlyList<string> switchNames)
+    {
+        foreach (var switchName in switchNames)
+        {
+            if (!await AddVirtualSwitchToVmAsync(vmName, switchName))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

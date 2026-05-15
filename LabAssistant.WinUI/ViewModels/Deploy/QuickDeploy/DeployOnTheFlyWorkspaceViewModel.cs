@@ -22,7 +22,7 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
 
     public string EditorVmCpuDraft { get; private set; } = string.Empty;
 
-    public string? EditorSwitchNameDraft { get; private set; }
+    public IReadOnlyList<string> EditorSwitchNamesDraft { get; private set; } = Array.Empty<string>();
 
     public string? EditorVhdxIdDraft { get; private set; }
 
@@ -166,7 +166,7 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         string? vmName,
         string? memoryText,
         string? cpuText,
-        string? selectedSwitchName,
+        IReadOnlyList<string> selectedSwitchNames,
         string? selectedVhdxId,
         string? selectedVhdPath,
         string? selectedVhdxSignature)
@@ -174,7 +174,7 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         EditorVmNameDraft = vmName ?? string.Empty;
         EditorVmMemoryDraft = memoryText ?? string.Empty;
         EditorVmCpuDraft = cpuText ?? string.Empty;
-        EditorSwitchNameDraft = NormalizeValue(selectedSwitchName);
+        EditorSwitchNamesDraft = NormalizeSwitchNames(selectedSwitchNames);
         EditorVhdxIdDraft = NormalizeValue(selectedVhdxId);
         EditorVhdPathDraft = NormalizeValue(selectedVhdPath);
         EditorVhdxSignatureDraft = NormalizeValue(selectedVhdxSignature);
@@ -191,10 +191,9 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         SelectedVmEntry.Name = EditorVmNameDraft.Trim();
         SelectedVmEntry.MemoryMb = int.Parse(EditorVmMemoryDraft);
         SelectedVmEntry.CpuCount = int.Parse(EditorVmCpuDraft);
-        SelectedVmEntry.SwitchName = EditorSwitchNameDraft;
-        SelectedVmEntry.SwitchNames = string.IsNullOrWhiteSpace(EditorSwitchNameDraft)
-            ? null
-            : [EditorSwitchNameDraft];
+        var normalizedSwitchNames = NormalizeSwitchNames(EditorSwitchNamesDraft);
+        SelectedVmEntry.SwitchName = normalizedSwitchNames.FirstOrDefault();
+        SelectedVmEntry.SwitchNames = normalizedSwitchNames.Count == 0 ? null : normalizedSwitchNames.ToList();
         SelectedVmEntry.VhdxId = EditorVhdxIdDraft;
         SelectedVmEntry.VhdPath = EditorVhdPathDraft;
         SelectedVmEntry.VhdxSignature = EditorVhdxSignatureDraft;
@@ -464,7 +463,7 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
             EditorVmNameDraft = string.Empty;
             EditorVmMemoryDraft = string.Empty;
             EditorVmCpuDraft = string.Empty;
-            EditorSwitchNameDraft = null;
+            EditorSwitchNamesDraft = Array.Empty<string>();
             EditorVhdxIdDraft = null;
             EditorVhdPathDraft = null;
             EditorVhdxSignatureDraft = null;
@@ -474,7 +473,11 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
         EditorVmNameDraft = SelectedVmEntry.Name;
         EditorVmMemoryDraft = SelectedVmEntry.MemoryMb.ToString();
         EditorVmCpuDraft = SelectedVmEntry.CpuCount.ToString();
-        EditorSwitchNameDraft = NormalizeValue(SelectedVmEntry.SwitchNames?.FirstOrDefault() ?? SelectedVmEntry.SwitchName);
+        EditorSwitchNamesDraft = NormalizeSwitchNames(SelectedVmEntry.SwitchNames?.Count > 0
+            ? SelectedVmEntry.SwitchNames
+            : string.IsNullOrWhiteSpace(SelectedVmEntry.SwitchName)
+                ? Array.Empty<string>()
+                : [SelectedVmEntry.SwitchName]);
         EditorVhdxIdDraft = NormalizeValue(SelectedVmEntry.VhdxId);
         EditorVhdPathDraft = NormalizeValue(SelectedVmEntry.VhdPath);
         EditorVhdxSignatureDraft = NormalizeValue(SelectedVmEntry.VhdxSignature);
@@ -483,6 +486,18 @@ internal sealed class DeployOnTheFlyWorkspaceViewModel
     private static string? NormalizeValue(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static IReadOnlyList<string> NormalizeSwitchNames(IEnumerable<string>? switchNames)
+    {
+        if (switchNames is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        return switchNames
+            .Select(name => string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim())
+            .ToList();
     }
 
     private static string FormatIssueMessage(string message, string? guidance)

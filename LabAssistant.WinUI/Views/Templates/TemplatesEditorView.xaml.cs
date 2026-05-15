@@ -343,9 +343,9 @@ public sealed partial class TemplatesEditorView : UserControl
     {
         return _templateVmSwitchRowCombos
             .Select(combo => combo.SelectedItem?.ToString())
-            .Where(value => !string.IsNullOrWhiteSpace(value) &&
-                            !string.Equals(value, TemplateSwitchPlaceholder, StringComparison.Ordinal))
-            .Select(value => value!.Trim())
+            .Select(value => string.Equals(value, TemplateSwitchPlaceholder, StringComparison.Ordinal)
+                ? string.Empty
+                : value?.Trim() ?? string.Empty)
             .ToList();
     }
 
