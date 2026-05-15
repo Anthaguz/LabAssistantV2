@@ -20,4 +20,9 @@
     <ProjectReference Include="..\LabAssistant\LabAssistant.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\ShellViewModel.cs" Link="WinUI\ShellViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\Theming\ShellIconCatalog.cs" Link="WinUI\ShellIconCatalog.cs" />
+  </ItemGroup>
+
 </Project>
