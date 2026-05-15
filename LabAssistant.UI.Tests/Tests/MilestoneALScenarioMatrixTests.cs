@@ -73,7 +73,7 @@ public sealed class MilestoneALScenarioMatrixTests
 
         Assert.Contains("if (_shellViewModel.TryResolveCapability(key, out var capability))", source);
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", source);
-        Assert.Contains("if (capability.HasOverview && string.Equals(subview.RouteKey, capability.DefaultSubview.RouteKey, StringComparison.Ordinal))", source);
+        Assert.DoesNotContain("parentItem.MenuItems.Add(childItem);", source);
         Assert.Contains("_deployCapabilityRuntime.ApplyShellState();", source);
         Assert.Contains("_subviewTabView.SelectionChanged += DeploySubviewTabView_SelectionChanged;", deployCompositionSource);
         Assert.Contains("SyncDeploySubviewSelection()", deployCompositionSource);
@@ -101,7 +101,7 @@ public sealed class MilestoneALScenarioMatrixTests
         Assert.Contains("new ShellSubview(ShellRouteKeys.TemplatesLibrary, \"Library\"", shellSource);
         Assert.Contains("new ShellSubview(ShellRouteKeys.TemplatesEditor, \"Editor\"", shellSource);
 
-        Assert.Contains("if (!capability.ShowChildRoutesInShell)", mainWindowSource);
+        Assert.DoesNotContain("parentItem.MenuItems.Add(childItem);", mainWindowSource);
         Assert.Contains("private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;", mainWindowSource);
         Assert.Contains("_templatesCapabilityRuntime.ApplyShellState();", mainWindowSource);
         Assert.Contains("_workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;", capabilityRuntimeSource);

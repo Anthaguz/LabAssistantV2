@@ -564,40 +564,15 @@ public sealed partial class MainWindow : Window
                 Icon = new FontIcon { Glyph = capability.Glyph }
             };
 
-            if (!capability.IsFooter)
+            foreach (var subview in capability.Subviews)
             {
-                foreach (var subview in capability.Subviews)
-                {
-                    if (!capability.ShowChildRoutesInShell)
-                    {
-                        _routeToNavigationItem[subview.RouteKey] = parentItem;
-                        _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
-                        continue;
-                    }
-
-                    if (capability.HasOverview && string.Equals(subview.RouteKey, capability.DefaultSubview.RouteKey, StringComparison.Ordinal))
-                    {
-                        _routeToNavigationItem[subview.RouteKey] = parentItem;
-                        _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
-                        continue;
-                    }
-
-                    var childItem = new NavigationViewItem
-                    {
-                        Content = subview.DisplayName,
-                        Tag = subview.RouteKey
-                    };
-                    parentItem.MenuItems.Add(childItem);
-                    _routeToNavigationItem[subview.RouteKey] = childItem;
-                    _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
-                }
+                _routeToNavigationItem[subview.RouteKey] = parentItem;
+                _routeToCapabilityNavigationItem[subview.RouteKey] = parentItem;
             }
 
             if (capability.IsFooter)
             {
                 GlobalNavigationView.FooterMenuItems.Add(parentItem);
-                _routeToNavigationItem[capability.DefaultSubview.RouteKey] = parentItem;
-                _routeToCapabilityNavigationItem[capability.DefaultSubview.RouteKey] = parentItem;
             }
             else
             {

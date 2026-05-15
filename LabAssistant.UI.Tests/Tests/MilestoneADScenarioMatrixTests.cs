@@ -47,7 +47,7 @@ public sealed class MilestoneADScenarioMatrixTests
         Assert.Contains("_view.Visibility = isLibraryActive ? Visibility.Visible : Visibility.Collapsed;", libraryCompositionSource);
         Assert.Contains("NavigateToRoute(ShellRouteKeys.TemplatesEditor);", source);
         Assert.Contains("() => NavigateToRoute(ShellRouteKeys.TemplatesLibrary)", source);
-        Assert.Contains("if (!capability.ShowChildRoutesInShell)", source);
+        Assert.DoesNotContain("parentItem.MenuItems.Add(childItem);", source);
     }
 
     [Fact]
