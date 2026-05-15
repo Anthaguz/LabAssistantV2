@@ -30,6 +30,7 @@ namespace LabAssistant.Models.Deployment
 
         //Network Configuration
         public string VirtualSwitchName { get; set; } = string.Empty;
+        public List<string> VirtualSwitchNames { get; set; } = new();
 
         public bool IsSuccess { get; set; } = true;
         public bool PerVmFailFast { get; set; } = true;

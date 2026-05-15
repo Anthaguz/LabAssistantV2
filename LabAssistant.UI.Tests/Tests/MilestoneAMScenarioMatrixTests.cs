@@ -2012,7 +2012,7 @@ public sealed class MilestoneAMScenarioMatrixTests
         Assert.Contains("public string EditorVmNameDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);
         Assert.Contains("public string EditorVmMemoryDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);
         Assert.Contains("public string EditorVmCpuDraft { get; private set; } = string.Empty;", onTheFlyWorkspaceSource);
-        Assert.Contains("public string? EditorSwitchNameDraft { get; private set; }", onTheFlyWorkspaceSource);
+        Assert.Contains("public IReadOnlyList<string> EditorSwitchNamesDraft { get; private set; } = Array.Empty<string>();", onTheFlyWorkspaceSource);
         Assert.Contains("public string? EditorVhdxIdDraft { get; private set; }", onTheFlyWorkspaceSource);
         Assert.Contains("public string? EditorVhdPathDraft { get; private set; }", onTheFlyWorkspaceSource);
         Assert.Contains("public string? EditorVhdxSignatureDraft { get; private set; }", onTheFlyWorkspaceSource);

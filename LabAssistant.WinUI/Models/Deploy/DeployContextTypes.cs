@@ -15,7 +15,7 @@ internal sealed record DeployDiskResolution(
     IReadOnlyList<DeployCompatibilityIssue> Issues);
 
 internal sealed record DeploySwitchResolution(
-    string EffectiveSwitch,
+    IReadOnlyList<string> EffectiveSwitches,
     IReadOnlyList<DeployCompatibilityIssue> Issues);
 
 internal sealed record DeployContextBuildResult(

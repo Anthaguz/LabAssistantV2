@@ -44,6 +44,7 @@ public sealed class MilestoneAEScenarioMatrixTests
         Assert.Contains("private string BuildSwitchGuidanceText(IReadOnlyList<string> selectedSwitches)", editorCompositionSource);
         Assert.Contains("AddTemplateVmSwitchRowButton.Click += AddTemplateVmSwitchRowButton_Click;", editorViewSource);
         Assert.Contains("private void RemoveTemplateVmSwitchRowButton_Click(object sender, RoutedEventArgs e)", editorViewSource);
+        Assert.Contains("string.Equals(value, TemplateSwitchPlaceholder, StringComparison.Ordinal)", editorViewSource);
         Assert.Contains("selectedVmEntry.SwitchNames = selectedSwitches.Count > 0 ? selectedSwitches : null;", editorControllerSource);
     }
 

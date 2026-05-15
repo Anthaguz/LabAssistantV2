@@ -32,21 +32,43 @@ public class AddNicToVmStep : DeploymentStep
 
         var session = _resolver.Resolve(context.PowerShellHandle);
         var hyperV = _hyperVFactory(session);
+        var switches = context.VirtualSwitchNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-        bool success = await hyperV.AddVirtualSwitchToVmAsync(
+        if (switches.Count == 0 && !string.IsNullOrWhiteSpace(context.VirtualSwitchName))
+        {
+            switches.Add(context.VirtualSwitchName.Trim());
+        }
+
+        if (switches.Count == 0)
+        {
+            const string skippedMessage = "Skipped network adapter attach because no switch assignments were provided.";
+            context.LogCallback?.Invoke(skippedMessage);
+            context.SetStepTerminalOverride(DeploymentStepKeys.AddNicToVm, DeployStepState.Skipped, skippedMessage);
+            return;
+        }
+
+        bool success = await hyperV.AddVirtualSwitchesToVmAsync(
             context.VmName,
-            context.VirtualSwitchName);
+            switches);
+
+        var switchSummary = switches.Count == 0
+            ? context.VirtualSwitchName
+            : string.Join(", ", switches);
 
         if (success)
         {
-            context.LogCallback?.Invoke($"✅ Added {context.VirtualSwitchName} to '{context.VmName}'.");
-            DebugLogger.Log($"Success: Added {context.VirtualSwitchName} to VM: {context.VmName}");
+            context.LogCallback?.Invoke($"✅ Added {switchSummary} to '{context.VmName}'.");
+            DebugLogger.Log($"Success: Added {switchSummary} to VM: {context.VmName}");
         }
         else
         {
-            context.LogCallback?.Invoke($"❌ Failed to add {context.VirtualSwitchName} to '{context.VmName}'.");
-            DebugLogger.Log($"Error: Failed to add {context.VirtualSwitchName} to VM: {context.VmName}");
-            context.MarkFailure(DeploymentStepKeys.AddNicToVm, $"Failed to add {context.VirtualSwitchName} to '{context.VmName}'.");
+            context.LogCallback?.Invoke($"❌ Failed to add {switchSummary} to '{context.VmName}'.");
+            DebugLogger.Log($"Error: Failed to add {switchSummary} to VM: {context.VmName}");
+            context.MarkFailure(DeploymentStepKeys.AddNicToVm, $"Failed to add {switchSummary} to '{context.VmName}'.");
         }
     }
 }

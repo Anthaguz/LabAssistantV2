@@ -42,7 +42,8 @@ internal static class DeployContextBuilder
                 BaseVhdPath = diskResolution.EffectiveBasePath,
                 VhdxId = diskResolution.EffectiveId,
                 VhdxSignature = diskResolution.EffectiveSignature,
-                VirtualSwitchName = switchResolution.EffectiveSwitch,
+                VirtualSwitchName = switchResolution.EffectiveSwitches.FirstOrDefault() ?? string.Empty,
+                VirtualSwitchNames = switchResolution.EffectiveSwitches.ToList(),
                 PerVmFailFast = settings.PerVmFailFast,
                 NonBlockingOptionalSteps = new List<string>(settings.NonBlockingOptionalSteps ?? []),
                 ConfigureTimeZone = vmTemplate.TimeZoneConfig?.Enabled == true,
@@ -146,18 +147,28 @@ internal static class DeployContextBuilder
         if (switches.Count == 0)
         {
             issues.Add(new DeployCompatibilityIssue(string.Empty, false, "No switch assigned.", "Assign a switch in Quick Deploy VM properties (or Templates editor) if networking is required."));
-            return new DeploySwitchResolution(string.Empty, issues);
+            return new DeploySwitchResolution(Array.Empty<string>(), issues);
         }
 
-        var available = switches
-            .Where(name => availableSwitches.Contains(name, StringComparer.OrdinalIgnoreCase))
-            .ToList();
-        var missing = switches.Where(name => !available.Contains(name, StringComparer.OrdinalIgnoreCase)).ToList();
+        var available = new List<string>();
+        var missing = new List<string>();
+        foreach (var switchName in switches)
+        {
+            if (availableSwitches.Contains(switchName, StringComparer.OrdinalIgnoreCase))
+            {
+                available.Add(switchName);
+            }
+            else
+            {
+                missing.Add(switchName);
+            }
+        }
+
         if (missing.Count > 0)
         {
-            issues.Add(new DeployCompatibilityIssue(string.Empty, false, $"Switch mapping partial/missing ({string.Join(", ", missing)}).", "Update switch mapping in Quick Deploy VM properties (or Templates editor)."));
+            issues.Add(new DeployCompatibilityIssue(string.Empty, true, $"Assigned switch mapping missing ({string.Join(", ", missing)}).", "Update switch mapping in Quick Deploy VM properties (or Templates editor)."));
         }
 
-        return new DeploySwitchResolution(available.FirstOrDefault() ?? string.Empty, issues);
+        return new DeploySwitchResolution(available, issues);
     }
 }

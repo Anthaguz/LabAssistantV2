@@ -66,6 +66,7 @@ public sealed class WinUIShellRegressionCoverageTests
         Assert.Equal("New Switch", FindByName(switches, "AssetsSwitchesCreateButton").Attribute("Content")?.Value);
         Assert.Equal("Delete Switch", FindByName(switches, "AssetsSwitchesDeleteButton").Attribute("Content")?.Value);
         Assert.Equal("Add VM", FindByName(quickDeploy, "DeployOnTheFlyAddVmButton").Attribute("Content")?.Value);
+        Assert.Equal("+ Add Switch", FindByName(quickDeploy, "DeployOnTheFlyAddVmSwitchRowButton").Attribute("Content")?.Value);
     }
 
     private static void AssertCapabilityDefault(ShellViewModel shell, string capabilityKey, string expectedRoute)

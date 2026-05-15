@@ -142,6 +142,30 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         return CaptureFailureMetadataAndReturnSuccess(error);
     }
 
+    public async Task<bool> AddVirtualSwitchesToVmAsync(string vmName, IReadOnlyList<string> switchNames)
+    {
+        if (switchNames is null || switchNames.Count == 0)
+        {
+            return true;
+        }
+
+        var commands = new List<string>
+        {
+            $"Connect-VMNetworkAdapter -VMName '{vmName}' -SwitchName '{switchNames[0]}'"
+        };
+
+        for (var index = 1; index < switchNames.Count; index++)
+        {
+            var adapterName = $"Network Adapter {index + 1}";
+            commands.Add($"Add-VMNetworkAdapter -VMName '{vmName}' -Name '{adapterName}' -SwitchName '{switchNames[index]}'");
+        }
+
+        var script = string.Join(Environment.NewLine, commands);
+        var (output, error) = await ExecuteMeasuredAsync("add_virtual_switches_to_vm", script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+        return CaptureFailureMetadataAndReturnSuccess(error);
+    }
+
     public void ClearLastFailureMetadata()
     {
         LastFailureMetadata = null;
