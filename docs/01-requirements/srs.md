@@ -349,8 +349,8 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 - **FR-074:** WinUI shell and migrated capability surfaces shall follow a documented layout constraints contract that defines bounded region sizing, explicit scroll ownership, overflow handling rules, and resize behavior expectations for compact/normal/wide widths.
   - **Priority:** P1
 
-- **FR-075:** WinUI shell shall use a global `NavigationView` (`LeftCompact`) for top-level capability navigation with hierarchical child actions/subviews per capability.
-  - **Acceptance details:** Expanded mode shows entity labels and child actions; compact mode remains icon-first and must provide a non-hover path to child actions.
+- **FR-075:** WinUI shell shall use a global `NavigationView` (`LeftCompact`) for top-level capability navigation, while capability-local navigation owns routine child surfaces within the active capability workspace.
+  - **Acceptance details:** Expanded mode shows capability labels; compact mode remains icon-first; parent capability selection must not depend on hover-only child menus or flyouts to reach the approved default surface.
   - **Priority:** P1
 
 - **FR-076:** WinUI shell navigation shall use canonical route keys in `capability.subview` format, with deterministic startup at `machines.overview`.

@@ -56,18 +56,18 @@ Required top-level capability set:
 Required navigation behavior:
 - route keys use canonical `capability.subview` format
 - selecting a parent capability routes deterministically to the approved default child or workspace
-- selecting a child route navigates directly to that child
+- top-level shell items represent capabilities rather than routine child-route shortcuts
 - default startup route is `machines.overview`
 - `Settings` is rendered as footer navigation, not mixed into the main capability list
 - shell navigation remains keyboard- and pointer-accessible in expanded, collapsed, and compact forms
 
 Expanded behavior:
-- capability labels and hierarchy remain visible
+- capability labels remain visible
 - parent rows remain clickable
 
 Collapsed and compact behavior:
-- child-route access must not depend on hover-only behavior
-- compact widths may replace a persistent rail with a hamburger-invoked drawer that shows the expanded capability tree
+- parent-click must route directly to the approved default capability surface
+- compact widths may replace a persistent rail with a hamburger-invoked drawer that shows the expanded capability list
 - when the compact drawer closes, workspace width returns to the active capability surface
 - compact drawer dismissal remains explicit and discoverable, including close-on-dismiss interactions such as outside-click or `Esc`
 
@@ -185,4 +185,3 @@ Do not create a new milestone-coded shell/navigation/layout contract for a rule 
 ## Open Questions / TBDs
 
 - `TBD:` Exact compact-width breakpoint values beyond the currently approved compact fallback behavior.
-- `TBD:` Whether compact child-route reveal should remain entirely built-in `NavigationView` behavior or later adopt a stronger custom affordance without changing the non-hover rule.

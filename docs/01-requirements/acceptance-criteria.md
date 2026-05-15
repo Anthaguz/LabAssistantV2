@@ -1107,22 +1107,22 @@ Each readiness result shall include, at minimum:
 **Then**
 - Shell uses a single global `NavigationView` in `LeftCompact` mode
 - Compact state is icon-first
-- Expanded state shows labels and hierarchical entity/action entries
+- Expanded state shows capability labels
 - Navigation remains keyboard- and pointer-accessible
 
-### 2) Entity and child-action routing
+### 2) Capability routing and canonical child-route ownership
 **Given**
-- Top-level entities have child actions/subviews
+- Capabilities have canonical child routes
 
 **When**
 - User selects navigation items
 
 **Then**
 - Selecting a parent entity routes to that entity's default child route
-- Selecting a child routes directly to that child
 - Canonical route keys use `capability.subview` format
+- Capability-local navigation owns routine child-surface selection inside the active capability workspace
 
-### 3) Compact-mode child access (non-hover)
+### 3) Compact-mode default entry behavior
 **Given**
 - Navigation is in compact icon-only mode
 
@@ -1130,8 +1130,8 @@ Each readiness result shall include, at minimum:
 - User selects an entity icon
 
 **Then**
-- Child actions become accessible via flyout/compact affordance
-- Child access does not depend on hover-only behavior
+- The capability routes directly to its approved default surface
+- Access to that default surface does not depend on hover-only behavior or a child-route pop-up
 
 ### 4) Startup and context defaults
 **Given**

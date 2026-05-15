@@ -87,12 +87,13 @@ public sealed class MilestoneACScenarioMatrixTests
     }
 
     [Fact]
-    public void MainWindow_ParentCapabilityClickRoutesToDefaultSubview()
+    public void MainWindow_ParentCapabilityClickRoutesToDefaultSubview_WithoutShellChildFlyouts()
     {
         var source = LoadMainWindowSource();
 
         Assert.Contains("if (_shellViewModel.TryResolveCapability(key, out var capability))", source);
         Assert.Contains("NavigateToRoute(capability.DefaultSubview.RouteKey);", source);
+        Assert.DoesNotContain("parentItem.MenuItems.Add(childItem);", source);
         Assert.DoesNotContain("isCollapsedCompactPane", source);
     }
 
