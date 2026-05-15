@@ -44,7 +44,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 **Given**
 - Hyper-V is enabled
 - All required base disks are available (or valid substitutes exist per base disk mapping rules)
-- Required virtual switches exist
+- All required virtual switches for each assigned VM switch row exist
 - A valid lab template is selected
 
 **When**
@@ -53,7 +53,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 **Then**
 - Differencing disks are created as required
 - All VMs are created and configured as defined
-- All VMs are attached to the required virtual switches
+- All VMs are attached to the required virtual switches, with one NIC created per assigned switch in listed order
 - Progress is shown for overall deployment and per-VM
 - Operation ends with success + a summary of created resources
 - Logs exist for start → each step → completion
@@ -73,7 +73,7 @@ It defines required behavior, failure handling, logs, and side effects in a way 
 
 ### 3) Environment Failure — Hyper-V Disabled / Missing Switch
 **Given**
-- Hyper-V is disabled OR a required switch is missing
+- Hyper-V is disabled OR one or more required assigned switches are missing
 
 **When**
 - User attempts to deploy
@@ -1362,6 +1362,7 @@ Each readiness result shall include, at minimum:
 - Switch controls render as selector rows populated from host switch discovery
 - If no host switches are available, UI shows explicit non-silent guidance
 - VM-level switch assignment remains optional unless rows are present
+- Newly added rows remain visible until user selects a switch or removes the row
 
 ### 2) Multi-switch row rules and persistence
 **Given**
@@ -1371,8 +1372,10 @@ Each readiness result shall include, at minimum:
 - User selects switch values and saves template
 
 **Then**
+- Zero switch rows remain valid
 - Each present row must have a selected switch value
 - Duplicate switch values are rejected with actionable validation feedback
+- Selected row order is preserved through save and reload
 - Persisted output uses `switchNames` as canonical list
 - Legacy `switchName` is dual-written from first `switchNames` entry for compatibility
 - Reload preserves selected switch rows/values
@@ -1476,7 +1479,7 @@ Each readiness result shall include, at minimum:
 - Deploy start is blocked until user resolves required disk identity
 - Blocking status is explicit and actionable
 
-### 3) Switch mapping compatibility with partial warnings
+### 3) Switch mapping compatibility and blocking missing assignments
 **Given**
 - Template VM switch data contains canonical `switchNames`, legacy `switchName`, or mixed compatibility state
 
@@ -1485,10 +1488,23 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - Mapping prefers `switchNames` and falls back to `switchName` when needed
-- Missing/partial switch mapping surfaces warning-level guidance when deploy can continue
-- Warning text identifies affected VM rows and correction path
+- Every assigned switch row is evaluated
+- Missing assigned switch mappings are blocking
+- Blocking text identifies affected VM rows and correction path
 
-### 4) Correction affordances for readiness failures
+### 4) Multi-switch deploy execution order
+**Given**
+- A selected template contains one or more VM entries with multiple assigned switch rows
+
+**When**
+- Deploy starts after readiness is unblocked
+
+**Then**
+- Deploy creates one NIC per assigned switch in listed order
+- The first assigned switch remains the compatibility/default switch reference for existing single-switch consumers and current guest-network placeholder expectations
+- Later assigned switches are not silently discarded
+
+### 5) Correction affordances for readiness failures
 **Given**
 - Deploy readiness reports blocking compatibility issues
 
@@ -1502,7 +1518,7 @@ Each readiness result shall include, at minimum:
 - UI provides explicit `Open in Templates Editor` correction action
 - Correction flow is non-silent and does not require guesswork
 
-### 5) Compact-first deploy result visibility
+### 6) Compact-first deploy result visibility
 **Given**
 - User starts a from-template deployment
 
@@ -1519,17 +1535,18 @@ Each readiness result shall include, at minimum:
 - In scope:
   - Deploy `from-template` route and workflow in WinUI
   - AE compatibility checks and readiness correction affordances
+  - ordered multi-switch NIC attach semantics
   - compact-first results presentation model
 - Out of scope:
   - Deploy `on-the-fly` migration
   - WPF Deploy changes
-  - new deployment semantics
   - schema/model changes unrelated to approved compatibility behavior
 
 ## Definition of Done
 - [ ] `deploy.from_template` route behavior is explicit and testable for AF
 - [ ] Required unresolved/ambiguous disk identity is blocking and actionable
 - [ ] Switch mapping compatibility behavior (`switchNames` preferred, `switchName` fallback) is explicit
+- [ ] Missing assigned switch rows are blocking and ordered multi-switch NIC attach semantics are defined
 - [ ] Auto-resolve suggestions and `Open in Templates Editor` correction action are defined
 - [ ] Compact-first results visibility with expandable details is defined
 - [ ] AF scope boundaries are explicit and enforceable
@@ -1563,6 +1580,8 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - Required inputs are validated before start (VM identity/config completeness, required disk identity, required switch selections)
+- Zero switch rows remain valid when networking is optional
+- If one or more switch rows are present, each selected switch must be valid and unique
 - Blocking vs warning outcomes are explicit
 - Blocking outcomes prevent deploy start
 
@@ -1587,8 +1606,8 @@ Each readiness result shall include, at minimum:
 - User starts on-the-fly deploy
 
 **Then**
-- Execution uses existing deployment orchestration semantics
-- No AG-only behavior invents new deploy runtime semantics
+- Execution creates one NIC per assigned switch in listed order
+- The first assigned switch remains the compatibility/default switch reference for legacy single-switch consumers and current guest-network placeholder expectations
 - Existing structured operation logging contract remains preserved
 
 ### 5) Compact-first results visibility parity
@@ -1612,6 +1631,7 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - Draft editing remains live in memory rather than requiring per-VM apply actions
+- Quick Deploy switch editing uses add/remove selector rows rather than a single fixed switch selector
 - Per-VM remove remains row-local rather than moving into global workflow chrome
 - Any template-authoring handoff for the current draft uses explicit save-to-template wording rather than an ambiguous editor-launch label
 
@@ -1630,7 +1650,7 @@ Each readiness result shall include, at minimum:
 - [ ] `deploy.on_the_fly` route behavior is explicit and testable for AG
 - [ ] Blocking vs warning readiness taxonomy is explicit for on-the-fly inputs
 - [ ] Correction affordances for blocking readiness issues are defined
-- [ ] Execution boundary preserves existing deployment orchestration semantics
+- [ ] Ordered multi-switch Quick Deploy readiness and execution semantics are explicit
 - [ ] Compact-first results parity contract is explicit and testable
 - [ ] Quick Deploy editing and template-authoring handoff behavior remain explicit
 - [ ] AG scope boundaries are explicit and enforceable
