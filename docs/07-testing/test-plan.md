@@ -312,7 +312,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   6. Verify From Template still reads as review/remediation/deploy rather than a duplicate editor.
   7. Verify action placement/iconography consistency across the migrated views reviewed in AL8.
   8. Verify compact-mode and scroll-ownership behavior across the migrated operational views from AL9.
-  9. Verify the WinUI shell uses the LabAssistant icon for native window/taskbar identity where supported and shows matching branding at the left edge of the custom top bar.
+  9. Verify the WinUI shell uses the LabAssistant icon for native window/taskbar identity where supported, shows the `LabAssistant` window title, and shows matching branding at the left edge of the custom top bar.
 - **Expected:**
   - Shell remains the owner of capability-level title/description context.
   - Assets/Deploy/Diagnostics remain Overview-first and route-bound, while Templates remains Library-first and editor-state driven.
@@ -320,7 +320,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Quick Deploy issue guidance remains local to VM rows/editor, and From Template remains review/remediation oriented.
   - Action placement and icon-first command chrome remain consistent with the approved AL rules.
   - Compact-mode and scroll ownership remain bounded and workspace-preserving without domain/workflow redesign.
-  - Native window/taskbar icon behavior and custom top-bar branding remain consistent with the LabAssistant app identity.
+  - Native window/taskbar icon behavior, window title, and custom top-bar branding remain consistent with the LabAssistant app identity.
   - AL closure evidence includes both automated structural checks and repeatable manual runtime verification.
 
 ## TC-020: Milestone AM Assets Extraction Closure Verification

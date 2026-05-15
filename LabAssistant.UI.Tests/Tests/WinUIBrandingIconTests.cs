@@ -29,7 +29,9 @@ public sealed class WinUIBrandingIconTests
         Assert.NotNull(FindByName(mainWindowXaml, "ShellBrandingImage"));
         Assert.Contains("private const string ShellBrandingIconRelativePath = @\"Assets\\Branding\\AppIcon.ico\";", mainWindowSource);
         Assert.Contains("private const string ShellBrandingImageRelativePath = @\"Assets\\Branding\\AppIcon.png\";", mainWindowSource);
+        Assert.Contains("private const string ShellApplicationTitle = \"LabAssistant\";", mainWindowSource);
         Assert.Contains("InitializeShellBranding();", mainWindowSource);
+        Assert.Contains("Title = ShellApplicationTitle;", mainWindowSource);
         Assert.Contains("TryApplyShellHeaderBranding(GetBrandingAssetPath(ShellBrandingImageRelativePath));", mainWindowSource);
         Assert.Contains("TryApplyNativeWindowIcon(GetBrandingAssetPath(ShellBrandingIconRelativePath));", mainWindowSource);
         Assert.Contains("appWindow?.SetIcon(iconPath);", mainWindowSource);
