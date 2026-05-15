@@ -2187,11 +2187,13 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - The native desktop window and taskbar identity use the LabAssistant application icon where the current platform supports it
+- The native window title presents the LabAssistant application name rather than the WinUI project name
 - The custom shell top bar shows the same LabAssistant branding icon at the left edge
 - WinUI owns the branding asset hookup and does not rely on the legacy WPF asset path at runtime
 
 ## Expected UI
 - LabAssistant branding icon at the left edge of the shell top bar
+- Native window title shows `LabAssistant`
 - Capability-level shell header with child-view orientation handled by local tabs, section labels, or workflow-state labels
 - Approved overview/index surfaces for `Assets`, `Deploy`, and `Diagnostics`
 - Deterministic parent capability navigation in expanded, collapsed, and compact shell modes

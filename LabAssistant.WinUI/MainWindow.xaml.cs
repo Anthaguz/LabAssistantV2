@@ -61,6 +61,7 @@ public sealed partial class MainWindow : Window
     private const double ShellNavigationDrawerThreshold = 1100;
     private const string ShellBrandingIconRelativePath = @"Assets\Branding\AppIcon.ico";
     private const string ShellBrandingImageRelativePath = @"Assets\Branding\AppIcon.png";
+    private const string ShellApplicationTitle = "LabAssistant";
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
@@ -92,7 +93,7 @@ public sealed partial class MainWindow : Window
         ConfigureShellIcons();
         ConfigureNavigationView();
         ApplyShellNavigationMode(1280);
-        Title = "LabAssistant.WinUI";
+        Title = ShellApplicationTitle;
         SetInitialSize(1280, 800);
         InitializeShellBranding();
         RootLayout.KeyDown += RootLayout_KeyDown;
