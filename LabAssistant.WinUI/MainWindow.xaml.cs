@@ -26,6 +26,7 @@ using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Machines;
 using LabAssistant.WinUI.Interop;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml.Media.Imaging;
 using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
@@ -58,6 +59,8 @@ public sealed partial class MainWindow : Window
     private const double ShellRightPanelCompactThreshold = 1200;
     private const double ShellRightPanelExpandedWidth = 380;
     private const double ShellNavigationDrawerThreshold = 1100;
+    private const string ShellBrandingIconRelativePath = @"Assets\Branding\AppIcon.ico";
+    private const string ShellBrandingImageRelativePath = @"Assets\Branding\AppIcon.png";
     private ElementTheme _theme = ElementTheme.Light;
     private DispatcherQueueTimer? _rdpReadinessTimer;
 
@@ -91,6 +94,7 @@ public sealed partial class MainWindow : Window
         ApplyShellNavigationMode(1280);
         Title = "LabAssistant.WinUI";
         SetInitialSize(1280, 800);
+        InitializeShellBranding();
         RootLayout.KeyDown += RootLayout_KeyDown;
         RootLayout.SizeChanged += RootLayout_SizeChanged;
         InitializeRdpReadinessTimer();
@@ -499,10 +503,48 @@ public sealed partial class MainWindow : Window
         appWindow?.Resize(new Windows.Graphics.SizeInt32(width, height));
     }
 
+    private void InitializeShellBranding()
+    {
+        TryApplyShellHeaderBranding(GetBrandingAssetPath(ShellBrandingImageRelativePath));
+        TryApplyNativeWindowIcon(GetBrandingAssetPath(ShellBrandingIconRelativePath));
+    }
+
     private void ConfigureShellIcons()
     {
         HamburgerButton.Content = CreateIconGlyph(ShellIconToken.Menu);
         InsightsToggleButton.Content = CreateIconGlyph(ShellIconToken.Insights);
+    }
+
+    private static string GetBrandingAssetPath(string relativePath)
+    {
+        return Path.Combine(AppContext.BaseDirectory, relativePath);
+    }
+
+    private void TryApplyShellHeaderBranding(string imagePath)
+    {
+        if (!File.Exists(imagePath))
+        {
+            Debug.WriteLine($"[ShellBranding] Header image asset not found: {imagePath}");
+            ShellBrandingImage.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ShellBrandingImage.Source = new BitmapImage(new Uri(imagePath, UriKind.Absolute));
+        ShellBrandingImage.Visibility = Visibility.Visible;
+    }
+
+    private void TryApplyNativeWindowIcon(string iconPath)
+    {
+        if (!File.Exists(iconPath))
+        {
+            Debug.WriteLine($"[ShellBranding] Native icon asset not found: {iconPath}");
+            return;
+        }
+
+        var hwnd = WindowNative.GetWindowHandle(this);
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+        var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+        appWindow?.SetIcon(iconPath);
     }
 
     private void ConfigureNavigationView()
