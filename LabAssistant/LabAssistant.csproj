@@ -42,7 +42,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Resource Include="Resources\LabAssistant.ico" />
+	  <Resource Include="..\LabAssistant.WinUI\Assets\Branding\AppIcon.ico">
+	    <Link>Resources\LabAssistant.ico</Link>
+	  </Resource>
 	</ItemGroup>
 
 	<ItemGroup>

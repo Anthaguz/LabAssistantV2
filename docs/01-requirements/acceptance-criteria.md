@@ -2073,7 +2073,7 @@ Each readiness result shall include, at minimum:
 
 # AC-021 - WinUI Shell and View Consistency Contract (AL1)
 
-**Related FRs:** FR-108, FR-109, FR-110, FR-111, FR-112, FR-074, FR-075, FR-097
+**Related FRs:** FR-108, FR-109, FR-110, FR-111, FR-112, FR-074, FR-075, FR-097, FR-190
 
 ## Scenarios
 
@@ -2178,7 +2178,20 @@ Each readiness result shall include, at minimum:
 - Overview/index surfaces may use more page-like scrolling when appropriate
 - Compact mode may shift to focus-mode or hamburger-invoked navigation to preserve workspace economy
 
+### 7) Shell branding remains consistent across native window identity and custom shell header
+**Given**
+- The WinUI app launches from the current unpackaged desktop workflow
+
+**When**
+- The shell window is shown to the user
+
+**Then**
+- The native desktop window and taskbar identity use the LabAssistant application icon where the current platform supports it
+- The custom shell top bar shows the same LabAssistant branding icon at the left edge
+- WinUI owns the branding asset hookup and does not rely on the legacy WPF asset path at runtime
+
 ## Expected UI
+- LabAssistant branding icon at the left edge of the shell top bar
 - Capability-level shell header with child-view orientation handled by local tabs, section labels, or workflow-state labels
 - Approved overview/index surfaces for `Assets`, `Deploy`, and `Diagnostics`
 - Deterministic parent capability navigation in expanded, collapsed, and compact shell modes
@@ -2190,6 +2203,7 @@ Each readiness result shall include, at minimum:
 - [ ] Parent-click and compact navigation behavior are explicit and testable
 - [ ] Overview-vs-non-overview capability policy is explicit and traceable
 - [ ] Shell header ownership and child-header suppression rules are explicit and testable
+- [ ] Native window/taskbar icon behavior and custom shell-header branding are explicit and testable
 - [ ] Right-panel capability ownership and secondary-context role are explicit and testable
 - [ ] Shared action-placement and iconography rules are explicit and testable
 - [ ] Compact-mode and scroll-ownership priorities are explicit and testable

@@ -816,6 +816,10 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** primary workflows must remain operable without hover-only or pointer-only dependency; compact/layout adaptations must not hide primary actions from keyboard users or break focus flow when text scaling or high-contrast presentation is applied.
   - **Priority:** P1
 
+- **FR-190:** WinUI shell startup shall present a consistent LabAssistant application identity across the unpackaged executable, native desktop window/taskbar icon, and custom shell header branding.
+  - **Acceptance details:** WinUI shall own its branding asset location, native icon configuration, and shell-header branding hookup without depending on the legacy WPF project path as the runtime source of truth; a repo-local asset derived from the existing LabAssistant icon is acceptable.
+  - **Priority:** P1
+
 Supporting authority:
 - See `docs/00-overview/authoritative-doc-map.md` for the current authority model and the rule that milestone-coded docs are historical, not live authority.
 - See `docs/01-requirements/machines-capability-contract.md` for v1 scope boundaries, safety constraints, and explicit TBDs.

@@ -22,14 +22,25 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
+                <Image
+                    x:Name="ShellBrandingImage"
+                    Grid.Column="0"
+                    Width="24"
+                    Height="24"
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="LabAssistant application icon"
+                    Visibility="Collapsed" />
+
                 <Button
                     x:Name="HamburgerButton"
-                    Grid.Column="0"
+                    Grid.Column="1"
                     Width="36"
                     Height="32"
                     Click="HamburgerButton_Click"
@@ -40,7 +51,7 @@
 
                 <TextBlock
                     x:Name="CurrentRouteTextBlock"
-                    Grid.Column="1"
+                    Grid.Column="2"
                     Margin="12,0,0,0"
                     VerticalAlignment="Center"
                     Foreground="{StaticResource ShellTopBarForegroundBrush}"
@@ -48,7 +59,7 @@
 
                 <Button
                     x:Name="ThemeToggleButton"
-                    Grid.Column="3"
+                    Grid.Column="4"
                     Margin="8,0,0,0"
                     Click="ThemeToggleButton_Click"
                     Foreground="{StaticResource ShellTopBarForegroundBrush}"
@@ -59,7 +70,7 @@
                     </Button.Resources>
                 </Button>
 
-                <Grid Grid.Column="4" Margin="8,0,0,0">
+                <Grid Grid.Column="5" Margin="8,0,0,0">
                     <Button
                         x:Name="InsightsToggleButton"
                         Width="44"

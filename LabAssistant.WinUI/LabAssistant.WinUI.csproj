@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <AssemblyName>LabAssistant</AssemblyName>
+    <ApplicationIcon>Assets\Branding\AppIcon.ico</ApplicationIcon>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <UseWinUI>true</UseWinUI>
@@ -27,6 +28,17 @@
     <ProjectReference Include="..\LabAssistant.Business\LabAssistant.Business.csproj" />
     <ProjectReference Include="..\LabAssistant.Models\LabAssistant.Models.csproj" />
     <ProjectReference Include="..\LabAssistant.Services\LabAssistant.Services.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Assets\Branding\AppIcon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="Assets\Branding\AppIcon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
   </ItemGroup>
 
   <Target Name="CopyAppPriToPublish" AfterTargets="Publish">
