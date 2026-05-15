@@ -210,7 +210,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Steps:**
   1. Run automated AE matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAEScenarioMatrixTests.cs`.
   2. Run the Milestone AE checklist in `docs/07-testing/Archived/milestone-ae-templates-selector-normalization-checklist.md`.
-  3. Verify switch selector rows (`add/remove`, `zero-row valid`, duplicate/empty-row guards, empty-host guidance).
+  3. Verify switch selector rows (`add/remove`, `zero-row valid`, duplicate/empty-row guards, blank-row preservation, empty-host guidance, order-preserving save/reload).
   4. Verify catalog-first VHDX selector behavior and path-first legacy compatibility guidance.
   5. Verify normalization conflict policy blocks save until catalog resolution when identities conflict.
   6. Verify save/reload determinism for switch compatibility and effective VHD identity.
@@ -229,16 +229,18 @@ This file is a practical baseline plan for recurring regression checks. It does 
   1. Run automated AF matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAFScenarioMatrixTests.cs`.
   2. Run the Milestone AF checklist in `docs/07-testing/Archived/milestone-af-deploy-from-template-checklist.md`.
   3. Verify Deploy parent scope defaults to `deploy.from_template` and on-the-fly remains deferred for AF.
-  4. Verify readiness/gating behavior (blocking disk identity conflicts, warning switch mapping states, gated deploy start).
+  4. Verify readiness/gating behavior (blocking disk identity conflicts, blocking missing assigned switch rows, gated deploy start).
   5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and route/context handoff.
-  6. Verify AF4 compact-first results UX (sticky compact strip, concise per-VM rows, collapsed-by-default details and global issues drawer, badge/count updates).
-  7. Verify layout sanity across compact/normal/wide window sizes with stable scroll ownership.
+  6. Verify deploy creates one NIC per assigned switch in listed order and does not silently discard later switch rows.
+  7. Verify AF4 compact-first results UX (sticky compact strip, concise per-VM rows, collapsed-by-default details and global issues drawer, badge/count updates).
+  8. Verify layout sanity across compact/normal/wide window sizes with stable scroll ownership.
 - **Expected:**
   - AF route/scope behavior remains deterministic and aligned with from-template-first contract.
   - Readiness classification and deploy gating enforce blocking vs warning conditions without silent fallback.
   - Correction actions are discoverable and preserve template context during handoff flows.
-- Compact-first results UX remains usable, dense-by-default, and expandable on demand.
-- AF closure evidence includes both automated structural checks and repeatable manual runtime verification.
+  - From Template deploy uses ordered multi-switch NIC attach semantics with first-switch compatibility preserved.
+  - Compact-first results UX remains usable, dense-by-default, and expandable on demand.
+  - AF closure evidence includes both automated structural checks and repeatable manual runtime verification.
 
 ## TC-016: Milestone AG Deploy On-the-Fly Convergence Verification
 - **Related AC:** `AC-015`, `FR-091`, `FR-092`, `FR-093`, `FR-094`
@@ -248,14 +250,17 @@ This file is a practical baseline plan for recurring regression checks. It does 
   1. Run automated AG matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAGScenarioMatrixTests.cs`.
   2. Run the Milestone AG checklist in `docs/07-testing/Archived/milestone-ag-deploy-on-the-fly-checklist.md`.
   3. Verify route/scope behavior (`deploy.on_the_fly`) and Deploy subview continuity.
-  4. Verify readiness gating (blocking vs warning) and deploy-start enablement rules.
+  4. Verify readiness gating (blocking vs warning) and deploy-start enablement rules, including duplicate/invalid multi-switch row handling.
   5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and context handoff.
-  6. Verify compact results behavior (sticky summary strip, per-VM rows, collapsed-by-default details, issue summary badge updates).
-  7. Verify layout/overflow/scroll behavior across compact/normal/wide windows.
+  6. Verify Quick Deploy multi-switch editing (`add/remove`, zero-row valid, ordered persistence into VM draft state).
+  7. Verify deploy creates one NIC per assigned switch in listed order.
+  8. Verify compact results behavior (sticky summary strip, per-VM rows, collapsed-by-default details, issue summary badge updates).
+  9. Verify layout/overflow/scroll behavior across compact/normal/wide windows.
 - **Expected:**
   - On-the-fly route and scaffold remain stable and contract-aligned.
   - Readiness classification enforces blocking conditions and preserves warning-only flow.
   - Correction actions are discoverable and functional with predictable context transfer.
+- Quick Deploy supports ordered multi-switch VM authoring with explicit guard rails.
 - Compact-first results remain readable with details available on demand.
   - AG closure evidence is supported by automated structural checks plus manual runtime verification.
 

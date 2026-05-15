@@ -392,7 +392,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-084:** WinUI `Templates` VM editor shall replace free-text switch entry with host-backed selector UX supporting optional multi-switch assignment.
-  - **Acceptance details:** Switch selection is optional at VM level; if one or more switch rows are present, each row must resolve to a valid host switch value and duplicate switch values are disallowed. Selector UX shall support add/remove row interactions.
+  - **Acceptance details:** Switch selection is optional at VM level; zero switch rows remain valid, but if one or more switch rows are present, each row must resolve to a valid host switch value, empty rows are invalid until removed or completed, duplicate switch values are disallowed, row order is preserved, and selector UX shall support add/remove row interactions.
   - **Schema note:** `switchNames` is the canonical multi-switch list with compatibility fallback to legacy `switchName`.
   - **Priority:** P1
 
@@ -409,7 +409,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-088:** WinUI Deploy `from-template` shall consume Templates AE compatibility semantics for disk and switch references.
-  - **Acceptance details:** Deploy compatibility handling prefers `switchNames` with fallback to legacy `switchName`; disk identity uses AE normalization semantics and required unresolved/ambiguous disk identity is blocking.
+  - **Acceptance details:** Deploy compatibility handling prefers `switchNames` with fallback to legacy `switchName`; disk identity uses AE normalization semantics and required unresolved/ambiguous disk identity is blocking; when one or more switch assignments are present, every assigned switch must resolve successfully before deploy may start; deploy execution creates one NIC per assigned switch in listed order, while the first assigned switch remains the compatibility/default switch for existing single-switch consumers and current guest-network placeholder expectations.
   - **Priority:** P1
 
 - **FR-089:** WinUI Deploy readiness for `from-template` shall provide explicit correction affordances when compatibility checks fail.
@@ -425,11 +425,11 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-092:** WinUI Deploy `on-the-fly` readiness shall classify input validation and environment checks as blocking or warning before start.
-  - **Acceptance details:** Required unresolved inputs (for example missing required disk identity, invalid VM entry state, or invalid required switch selection) are blocking; non-critical mapping issues are warning-only with actionable guidance.
+  - **Acceptance details:** Required unresolved inputs (for example missing required disk identity, invalid VM entry state, or invalid required switch selection) are blocking; Quick Deploy may keep zero switch rows when networking is optional, but if one or more switch rows are present each assigned switch must be valid and unique; non-critical mapping issues are warning-only with actionable guidance.
   - **Priority:** P1
 
 - **FR-093:** WinUI Deploy `on-the-fly` shall provide correction affordances for blocking readiness issues and gate execution until blocking issues are resolved.
-  - **Acceptance details:** readiness output provides explicit correction actions, should surface issues at field, group, or VM-row granularity where that improves fixability, and preserves existing deployment orchestration semantics once unblocked; Quick Deploy draft editing remains live draft state rather than a per-VM apply workflow, and the handoff for saving the current draft into template authoring should remain explicitly labeled as a save-to-template action rather than an ambiguous editor-launch label.
+  - **Acceptance details:** readiness output provides explicit correction actions, should surface issues at field, group, or VM-row granularity where that improves fixability, and once unblocked deploy execution creates one NIC per assigned switch in listed order while preserving the first-switch compatibility/default rule; Quick Deploy draft editing remains live draft state rather than a per-VM apply workflow, and the handoff for saving the current draft into template authoring should remain explicitly labeled as a save-to-template action rather than an ambiguous editor-launch label.
   - **Priority:** P1
 
 - **FR-094:** WinUI Deploy `on-the-fly` results UX shall follow compact-first visibility parity with AF results patterns.
