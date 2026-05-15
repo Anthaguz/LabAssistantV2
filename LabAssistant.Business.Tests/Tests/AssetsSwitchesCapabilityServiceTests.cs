@@ -61,6 +61,35 @@ public sealed class AssetsSwitchesCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ValidateAsync_UsesKnownInventoryWithoutListingHost()
+    {
+        var machineAdmin = new FakeHyperVMachineAdminService();
+        var service = CreateService(machineAdmin);
+        var knownInventory = new[]
+        {
+            new AssetsSwitchRecord
+            {
+                Name = "External Lab",
+                SwitchType = "External",
+                AdapterName = "Intel Ethernet"
+            }
+        };
+
+        var result = await service.ValidateAsync(
+            new AssetsSwitchDraft
+            {
+                IsNew = true,
+                Name = "External Lab",
+                SwitchType = "External",
+                AdapterName = "Intel Ethernet"
+            },
+            knownInventory);
+
+        Assert.Equal("Block", result.Severity);
+        Assert.Equal(0, machineAdmin.ListVirtualSwitchesCallCount);
+    }
+
+    [Fact]
     public async Task AssessDeleteAsync_BlocksWhenAttachedVmsExist()
     {
         var machineAdmin = new FakeHyperVMachineAdminService
@@ -89,6 +118,35 @@ public sealed class AssetsSwitchesCapabilityServiceTests
     }
 
     [Fact]
+    public async Task AssessDeleteAsync_UsesKnownInventoryWithoutListingHost()
+    {
+        var machineAdmin = new FakeHyperVMachineAdminService
+        {
+            AttachedVmNamesBySwitch =
+            {
+                ["External Lab"] = ["vm01"]
+            }
+        };
+        var service = CreateService(machineAdmin);
+        var knownInventory = new[]
+        {
+            new AssetsSwitchRecord
+            {
+                Name = "External Lab",
+                SwitchType = "External",
+                AdapterName = "Intel Ethernet"
+            }
+        };
+
+        var result = await service.AssessDeleteAsync("External Lab", knownInventory);
+
+        Assert.True(result.Exists);
+        Assert.False(result.CanDelete);
+        Assert.Equal(0, machineAdmin.ListVirtualSwitchesCallCount);
+        Assert.Equal(1, machineAdmin.GetAttachedVmNamesForSwitchCallCount);
+    }
+
+    [Fact]
     public async Task DeleteAsync_SucceedsWhenNoAttachedVmsExist()
     {
         var machineAdmin = new FakeHyperVMachineAdminService
@@ -111,6 +169,31 @@ public sealed class AssetsSwitchesCapabilityServiceTests
         Assert.Contains("deleted successfully", result.UserMessage, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task DeleteAsync_ReusesProvidedAssessmentWithoutRepeatingHostQueries()
+    {
+        var machineAdmin = new FakeHyperVMachineAdminService();
+        var service = CreateService(machineAdmin);
+
+        var assessment = new AssetsSwitchDeleteAssessment
+        {
+            Exists = true,
+            CanDelete = true,
+            Item = new AssetsSwitchRecord
+            {
+                Name = "Private Lab",
+                SwitchType = "Private"
+            }
+        };
+
+        var result = await service.DeleteAsync("Private Lab", assessment);
+
+        Assert.True(result.Success);
+        Assert.Equal("Private Lab", machineAdmin.DeletedSwitchName);
+        Assert.Equal(0, machineAdmin.ListVirtualSwitchesCallCount);
+        Assert.Equal(0, machineAdmin.GetAttachedVmNamesForSwitchCallCount);
+    }
+
     private static IAssetsSwitchesCapabilityService CreateService(
         FakeHyperVMachineAdminService machineAdmin,
         RecordingStructuredLogger? logger = null)
@@ -126,11 +209,24 @@ public sealed class AssetsSwitchesCapabilityServiceTests
 
         public string? DeletedSwitchName { get; private set; }
 
+        public int ListVirtualSwitchesCallCount { get; private set; }
+
+        public int GetAttachedVmNamesForSwitchCallCount { get; private set; }
+
         public Task<IReadOnlyList<HyperVHostMachineVmInfo>> ListHostVmsAsync() => Task.FromResult<IReadOnlyList<HyperVHostMachineVmInfo>>(Array.Empty<HyperVHostMachineVmInfo>());
         public Task<HyperVMachineEditSnapshot?> GetVmEditSnapshotAsync(string vmName) => Task.FromResult<HyperVMachineEditSnapshot?>(null);
         public Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync() => Task.FromResult<IReadOnlyList<string>>(Switches.Select(item => item.Name).ToList());
-        public Task<IReadOnlyList<HyperVVirtualSwitchInfo>> ListVirtualSwitchesAsync() => Task.FromResult<IReadOnlyList<HyperVVirtualSwitchInfo>>(Switches.ToList());
-        public Task<IReadOnlyList<string>> GetAttachedVmNamesForSwitchAsync(string switchName) => Task.FromResult(AttachedVmNamesBySwitch.TryGetValue(switchName, out var value) ? value : (IReadOnlyList<string>)Array.Empty<string>());
+        public Task<IReadOnlyList<HyperVVirtualSwitchInfo>> ListVirtualSwitchesAsync()
+        {
+            ListVirtualSwitchesCallCount++;
+            return Task.FromResult<IReadOnlyList<HyperVVirtualSwitchInfo>>(Switches.ToList());
+        }
+
+        public Task<IReadOnlyList<string>> GetAttachedVmNamesForSwitchAsync(string switchName)
+        {
+            GetAttachedVmNamesForSwitchCallCount++;
+            return Task.FromResult(AttachedVmNamesBySwitch.TryGetValue(switchName, out var value) ? value : (IReadOnlyList<string>)Array.Empty<string>());
+        }
 
         public Task<HyperVMachineActionResult> CreateVirtualSwitchAsync(HyperVVirtualSwitchCreateRequest request)
         {
