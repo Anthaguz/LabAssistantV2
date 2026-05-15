@@ -55,13 +55,10 @@
                             <Button
                                 x:Name="AssetsSwitchesRefreshButton"
                                 Grid.Column="1"
-                                Width="32"
-                                Height="32"
-                                Padding="0"
+                                Padding="12,6"
                                 IsEnabled="{Binding CanRefresh, Mode=OneWay}"
-                                ToolTipService.ToolTip="Refresh switch inventory">
-                                <FontIcon Glyph="&#xE72C;" />
-                            </Button>
+                                ToolTipService.ToolTip="Refresh switch inventory"
+                                Content="Refresh" />
                         </Grid>
                         <ListView
                             x:Name="AssetsSwitchesListView"
@@ -111,35 +108,27 @@
                                 <Button
                                     x:Name="AssetsSwitchesCreateButton"
                                     Grid.Column="1"
-                                    Width="32"
-                                    Height="32"
-                                    Padding="0"
+                                    Padding="12,6"
                                     Margin="0,0,8,0"
                                     IsEnabled="{Binding CanCreate, Mode=OneWay}"
-                                    ToolTipService.ToolTip="Create a new virtual switch">
-                                    <FontIcon Glyph="&#xE710;" />
-                                </Button>
+                                    ToolTipService.ToolTip="Create a new virtual switch"
+                                    Content="New Switch" />
                                 <Button
                                     x:Name="AssetsSwitchesApplyButton"
                                     Grid.Column="2"
-                                    Width="32"
-                                    Height="32"
-                                    Padding="0"
+                                    Padding="12,6"
                                     Margin="0,0,8,0"
                                     IsEnabled="{Binding CanApply, Mode=OneWay}"
-                                    ToolTipService.ToolTip="Apply switch changes">
-                                    <FontIcon Glyph="&#xE74E;" />
-                                </Button>
+                                    ToolTipService.ToolTip="Apply switch changes"
+                                    Content="Save Changes" />
                                 <Button
                                     x:Name="AssetsSwitchesDeleteButton"
                                     Grid.Column="3"
-                                    Width="32"
-                                    Height="32"
-                                    Padding="0"
+                                    Padding="12,6"
+                                    Foreground="{StaticResource ShellWarnBrush}"
                                     IsEnabled="{Binding CanDelete, Mode=OneWay}"
-                                    ToolTipService.ToolTip="Delete virtual switch">
-                                    <FontIcon Glyph="&#xE74D;" />
-                                </Button>
+                                    ToolTipService.ToolTip="Delete virtual switch"
+                                    Content="Delete Switch" />
                             </Grid>
                             <TextBlock
                                 x:Name="AssetsSwitchesStatusTextBlock"
