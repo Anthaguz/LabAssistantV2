@@ -11,6 +11,7 @@
 - **Integration-style tests (with fakes/mocks):**
   - Services and business coordination using mocked Hyper-V/PowerShell/filesystem abstractions
   - JSON persistence and diagnostics bundle generation against temp filesystem artifacts
+  - Hyper-V execution-pattern seams (workflow session vs reusable query session vs one-shot admin command path)
 - **End-to-end/manual validation (required on Hyper-V host):**
   - Real Hyper-V deployment and failure injection
   - Cleanup/cancellation behavior on real resources

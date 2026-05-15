@@ -52,13 +52,14 @@ Current authoritative WinUI architecture docs:
 
 Code documentation guidance for composition seams, workflow methods, and shell bridges is defined in `docs/03-architecture/code-documentation.md`.
 Code organization guidance for seam-heavy files is defined in `docs/03-architecture/code-organization.md`.
+Hyper-V execution-pattern authority is defined in `docs/03-architecture/hyperv-powershell-interaction.md`.
 
 ## 4. Key Workflows (end-to-end)
 ### Workflow: Deploy Lab (on-the-fly or template-based)
 1. UI/ViewModel maintains a deployment readiness report and triggers **quick preflight** on relevant configuration changes (debounced).
 2. On Deploy click, UI/ViewModel runs **full preflight** and blocks deployment start if any blocking readiness failures exist.
 3. UI creates `MultiVmDeploymentContext` and starts business coordinator only after full preflight passes (warnings-only is allowed).
-4. Business coordinator runs per-VM deployment pipelines using Hyper-V/PowerShell services.
+4. Business coordinator runs per-VM deployment pipelines using a workflow-owned persistent PowerShell session per VM plus Hyper-V services bound to that session.
 5. Runtime emits progress/log events and updates operation state (`Running`, `Cancelling`, etc.).
 6. On blocking failure or user cancellation, cleanup orchestration runs for affected VMs.
 7. Business builds structured outcome summary (per-VM + global + residuals) and emits structured failure context (paths/artifacts) when available.
@@ -116,9 +117,13 @@ Code organization guidance for seam-heavy files is defined in `docs/03-architect
   - Session disposal uses bounded waits and may kill the process tree to avoid shutdown hangs (`powershell.exe` / `conhost.exe`) if the child process does not exit promptly.
   - Wrapper protocol/lifecycle trace logging is disabled by default and can be enabled for troubleshooting with environment variable `LABASSISTANT_POWERSHELL_WRAPPER_TRACE` (writes to debug log path).
   - These behaviors were stabilized during Milestone U follow-up hotfix `#219` and should be preserved unless intentionally redesigned/tested.
+- **Hyper-V execution model**
+  - Deploy uses one persistent workflow-owned PowerShell session per VM.
+  - Read-heavy Hyper-V queries use a separate reusable query-session seam.
+  - One-shot administrative actions remain isolated from both Deploy workflow sessions and read-query sessions.
+  - Detailed call-site classification and non-goals live in `docs/03-architecture/hyperv-powershell-interaction.md`.
 
 ## Open Questions / TBDs
-- Whether to formalize PowerShell wrapper protocol/lifecycle details in a dedicated architecture/supportability doc beyond the summary above (planned in Milestone V).
 - Whether future switch management and guest configuration features should introduce new business workflow coordinators or extend current deployment pipeline abstractions.
 
 ## Historical Reference Aids

@@ -25,8 +25,9 @@ internal sealed class ProcessPersistentPowerShellHost : IPersistentPowerShellHos
             StartInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                // Keep the shell automation-safe and deterministic (no profile noise/PSReadLine host behavior).
-                Arguments = "-NoProfile -NonInteractive -NoLogo",
+                // Read commands from stdin as a script instead of an interactive prompt loop so
+                // repeated executions do not echo prompts or desynchronize stdout reads.
+                Arguments = "-NoProfile -NonInteractive -NoLogo -Command -",
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -128,7 +129,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             string? line;
             while ((line = await _output.ReadLineAsync().ConfigureAwait(false)) != null)
             {
-                if (line.Contains(OutputMarker))
+                if (string.Equals(line, OutputMarker, StringComparison.Ordinal))
                 {
                     PersistentPowerShellSessionTrace.Log("ExecuteAsync: output marker received.");
                     break;

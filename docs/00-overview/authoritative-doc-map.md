@@ -48,6 +48,7 @@ They do not override product behavior contracts; they define how behavior should
 - `docs/03-architecture/architecture.md`
 - `docs/03-architecture/code-documentation.md`
 - `docs/03-architecture/code-organization.md`
+- `docs/03-architecture/hyperv-powershell-interaction.md`
 - `docs/03-architecture/winui-shell-navigation-layout.md`
 - `docs/03-architecture/winui-shell-bootstrap-runtime.md`
 - `docs/03-architecture/winui-lane-architecture.md`
@@ -75,6 +76,7 @@ It must not silently override the repo rules, SRS, AC, or the canonical architec
 - shell navigation/layout changes update `docs/03-architecture/winui-shell-navigation-layout.md`
 - lane-local architecture changes update `docs/03-architecture/winui-lane-architecture.md`
 - shell/bootstrap/runtime boundary changes update `docs/03-architecture/winui-shell-bootstrap-runtime.md`
+- Hyper-V PowerShell interaction model changes update `docs/03-architecture/hyperv-powershell-interaction.md`
 - shared seam/helper ownership changes update `docs/03-architecture/winui-shared-seam-ownership.md`
 - repo-wide code documentation guidance changes update `docs/03-architecture/code-documentation.md`
 - repo-wide code organization guidance changes update `docs/03-architecture/code-organization.md`

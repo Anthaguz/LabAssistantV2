@@ -1,15 +1,15 @@
-using LabAssistant.Services.PowerShell;
 using LabAssistant.Services.Logging;
+using LabAssistant.Services.PowerShell;
 
 namespace LabAssistant.Services.HyperV;
 
 public sealed class PowerShellHyperVVhdxProbe : IHyperVVhdxProbe
 {
-    private readonly Func<IPersistentPowerShellSession> _sessionFactory;
+    private readonly IHyperVQueryExecutor _queryExecutor;
 
-    public PowerShellHyperVVhdxProbe(Func<IPersistentPowerShellSession> sessionFactory)
+    public PowerShellHyperVVhdxProbe(IHyperVQueryExecutor queryExecutor)
     {
-        _sessionFactory = sessionFactory;
+        _queryExecutor = queryExecutor;
     }
 
     public async Task<HyperVVhdxProbeResult> ProbeAsync(string path, CancellationToken cancellationToken = default)
@@ -28,11 +28,10 @@ public sealed class PowerShellHyperVVhdxProbe : IHyperVVhdxProbe
             "    $msg",
             "}");
 
-        using var session = _sessionFactory();
-        var (output, error) = await session.ExecuteAsync(script).ConfigureAwait(false);
-        DebugLogger.LogPowerShellOutput(script, output, error);
+        var execution = await _queryExecutor.ExecuteAsync("deploy_probe_vhdx", script, cancellationToken).ConfigureAwait(false);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
 
-        var lines = PowerShellOutputCleaner.Clean(output)
+        var lines = PowerShellOutputCleaner.Clean(execution.Output)
             .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Trim())
             .Where(line => !string.IsNullOrWhiteSpace(line))
@@ -65,7 +64,7 @@ public sealed class PowerShellHyperVVhdxProbe : IHyperVVhdxProbe
                 Status = HyperVVhdxProbeStatus.Unreadable,
                 Path = path ?? string.Empty,
                 Message = "Base VHDX is unreadable or inaccessible.",
-                Detail = string.IsNullOrWhiteSpace(detail) ? error : detail
+                Detail = string.IsNullOrWhiteSpace(detail) ? execution.Error : detail
             };
         }
 
@@ -74,7 +73,7 @@ public sealed class PowerShellHyperVVhdxProbe : IHyperVVhdxProbe
             Status = HyperVVhdxProbeStatus.Invalid,
             Path = path ?? string.Empty,
             Message = "Selected base disk is not a valid Hyper-V VHDX.",
-            Detail = string.IsNullOrWhiteSpace(detail) ? (string.IsNullOrWhiteSpace(error) ? marker : error) : detail
+            Detail = string.IsNullOrWhiteSpace(detail) ? (string.IsNullOrWhiteSpace(execution.Error) ? marker : execution.Error) : detail
         };
     }
 }

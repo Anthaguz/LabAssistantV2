@@ -396,9 +396,23 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Shared `DiagnosticsCapabilityRuntime` remains the shared capability runtime owner, while `MainWindow` remains out of Diagnostics-local workflow/state ownership.
   - `diagnostics.overview` remains the stable/default Diagnostics surface, while `diagnostics.logs` remains a distinct Diagnostics surface.
   - `DiagnosticsOverviewWorkspaceViewModel` and `DiagnosticsOverviewWorkspaceComposition` remain the Overview-local seams, with the narrowed Overview interaction/view surface still represented.
-  - `DiagnosticsLogsWorkspaceViewModel`, `DiagnosticsLogsWorkspaceController`, and `DiagnosticsLogsWorkspaceComposition` remain the Logs-local seams, with the narrowed Logs interaction/view surface still represented.
+- `DiagnosticsLogsWorkspaceViewModel`, `DiagnosticsLogsWorkspaceController`, and `DiagnosticsLogsWorkspaceComposition` remain the Logs-local seams, with the narrowed Logs interaction/view surface still represented.
   - Diagnostics remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
   - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Diagnostics changes.
+
+## TC-024: Hyper-V PowerShell Execution Model Verification
+- **Related AC:** `AC-001` (Scenarios 7-8), `AC-006` (Scenarios 8-9), `P-05`
+- **Type:** Manual (Hyper-V host) + automated coverage
+- **Steps:**
+  1. Run automated Services tests covering reusable query-session behavior and one-shot admin command behavior.
+  2. Open `Machines`, trigger inventory load, load an edit snapshot, and exercise switch-list reads.
+  3. Run a small Deploy flow or a mocked Deploy validation path that creates workflow sessions.
+  4. Inspect debug/diagnostics output for `HyperVPowerShellTiming` entries.
+- **Expected:**
+  - Repeated Machines read operations show reusable query-session behavior rather than one brand-new session per read call.
+  - One-shot Machines administrative actions show isolated action-scoped command timing.
+  - Deploy timing shows one workflow-session creation per VM workflow plus workflow command timing.
+  - Inventory load and edit snapshot load expose measurable flow duration.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.

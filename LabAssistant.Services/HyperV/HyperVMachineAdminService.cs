@@ -11,14 +11,17 @@ namespace LabAssistant.Services.HyperV;
 
 public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 {
-    private readonly Func<IPersistentPowerShellSession> _sessionFactory;
+    private readonly IHyperVQueryExecutor _queryExecutor;
+    private readonly IHyperVAdministrativeCommandExecutor _administrativeCommandExecutor;
     private readonly IAppSettingsStore _settingsStore;
 
     public HyperVMachineAdminService(
-        Func<IPersistentPowerShellSession> sessionFactory,
+        IHyperVQueryExecutor queryExecutor,
+        IHyperVAdministrativeCommandExecutor administrativeCommandExecutor,
         IAppSettingsStore settingsStore)
     {
-        _sessionFactory = sessionFactory;
+        _queryExecutor = queryExecutor;
+        _administrativeCommandExecutor = administrativeCommandExecutor;
         _settingsStore = settingsStore;
     }
 
@@ -38,15 +41,15 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             $items | ConvertTo-Json -Compress -Depth 4
             """;
 
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
+        var execution = await ExecuteQueryAsync("machines_list_host_vms", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
 
-        if (!string.IsNullOrWhiteSpace(error))
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
-            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(execution.Error));
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return Array.Empty<HyperVHostMachineVmInfo>();
@@ -66,19 +69,19 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
     public Task<HyperVMachineActionResult> StartVmAsync(string vmName)
     {
         var script = $"Start-VM -Name {Quote(vmName)} -ErrorAction Stop";
-        return ExecuteCommandAsync(script);
+        return ExecuteCommandAsync("machines_start_vm", script);
     }
 
     public Task<HyperVMachineActionResult> StopVmAsync(string vmName)
     {
         var script = $"Stop-VM -Name {Quote(vmName)} -Force -ErrorAction Stop";
-        return ExecuteCommandAsync(script);
+        return ExecuteCommandAsync("machines_stop_vm", script);
     }
 
     public Task<HyperVMachineActionResult> RestartVmAsync(string vmName)
     {
         var script = $"Restart-VM -Name {Quote(vmName)} -Force -ErrorAction Stop";
-        return ExecuteCommandAsync(script);
+        return ExecuteCommandAsync("machines_restart_vm", script);
     }
 
     public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName)
@@ -126,14 +129,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             } | ConvertTo-Json -Compress -Depth 5
             """;
 
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
-        if (!string.IsNullOrWhiteSpace(error))
+        var execution = await ExecuteQueryAsync("machines_get_edit_snapshot", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
-            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(execution.Error));
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return null;
@@ -160,14 +163,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
     public async Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync()
     {
         const string script = "Get-VMSwitch | Select-Object -ExpandProperty Name | ConvertTo-Json -Compress";
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
-        if (!string.IsNullOrWhiteSpace(error))
+        var execution = await ExecuteQueryAsync("machines_get_virtual_switch_names", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
-            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(execution.Error));
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return Array.Empty<string>();
@@ -200,14 +203,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             $items | ConvertTo-Json -Compress -Depth 4
             """;
 
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
-        if (!string.IsNullOrWhiteSpace(error))
+        var execution = await ExecuteQueryAsync("machines_list_virtual_switches", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
-            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(execution.Error));
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return Array.Empty<HyperVVirtualSwitchInfo>();
@@ -235,14 +238,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             $items | ConvertTo-Json -Compress
             """;
 
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
-        if (!string.IsNullOrWhiteSpace(error))
+        var execution = await ExecuteQueryAsync("machines_get_attached_vm_names_for_switch", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
-            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(execution.Error));
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return Array.Empty<string>();
@@ -267,19 +270,19 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         var script = string.Equals(request.SwitchType, "External", StringComparison.OrdinalIgnoreCase)
             ? $"New-VMSwitch -Name {Quote(request.Name)} -NetAdapterName {Quote(request.AdapterName ?? string.Empty)} -AllowManagementOS $true -ErrorAction Stop"
             : $"New-VMSwitch -Name {Quote(request.Name)} -SwitchType {Quote(request.SwitchType)} -ErrorAction Stop";
-        return ExecuteCommandAsync(script);
+        return ExecuteCommandAsync("machines_create_virtual_switch", script);
     }
 
     public Task<HyperVMachineActionResult> RenameVirtualSwitchAsync(string currentName, string newName)
     {
         var script = $"Rename-VMSwitch -Name {Quote(currentName)} -NewName {Quote(newName)} -ErrorAction Stop";
-        return ExecuteCommandAsync(script);
+        return ExecuteCommandAsync("machines_rename_virtual_switch", script);
     }
 
     public Task<HyperVMachineActionResult> DeleteVirtualSwitchAsync(string switchName)
     {
         var script = $"Remove-VMSwitch -Name {Quote(switchName)} -Force -ErrorAction Stop";
-        return ExecuteCommandAsync(script);
+        return ExecuteCommandAsync("machines_delete_virtual_switch", script);
     }
 
     public async Task<IReadOnlyList<HyperVMachineDiskClassificationResult>> ClassifyVmDisksAsync(
@@ -401,22 +404,22 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         if (!includeStorage)
         {
             var vmOnlyScript = $"Remove-VM -Name {Quote(vmName)} -Force -ErrorAction Stop";
-            return ExecuteCommandAsync(vmOnlyScript);
+            return ExecuteCommandAsync("machines_delete_vm_registration_only", vmOnlyScript);
         }
         return DeleteVmAndStorageAsync(vmName);
     }
 
-    private async Task<HyperVMachineActionResult> ExecuteCommandAsync(string script)
+    private async Task<HyperVMachineActionResult> ExecuteCommandAsync(string commandName, string script)
     {
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
+        var execution = await ExecuteAdministrativeCommandAsync(commandName, script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
 
-        if (string.IsNullOrWhiteSpace(error))
+        if (string.IsNullOrWhiteSpace(execution.Error))
         {
             return new HyperVMachineActionResult { Success = true };
         }
 
-        var cleanedError = PowerShellOutputCleaner.Clean(error);
+        var cleanedError = PowerShellOutputCleaner.Clean(execution.Error);
         return new HyperVMachineActionResult
         {
             Success = false,
@@ -433,14 +436,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             ConvertTo-Json -Compress
             """;
 
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
-        if (!string.IsNullOrWhiteSpace(error))
+        var execution = await ExecuteQueryAsync("machines_get_vm_ip_addresses", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
-            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(execution.Error));
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return Array.Empty<string>();
@@ -511,13 +514,13 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         }
 
         var script = string.Join(Environment.NewLine, lines);
-        return ExecuteCommandAsync(script);
+        return ExecuteCommandAsync("machines_apply_vm_edit", script);
     }
 
     private async Task<HyperVMachineActionResult> DeleteVmAndStorageAsync(string vmName)
     {
         var vmStorage = await GetVmStorageInfoAsync(vmName);
-        var removeVmResult = await ExecuteCommandAsync($"Remove-VM -Name {Quote(vmName)} -Force -ErrorAction Stop");
+        var removeVmResult = await ExecuteCommandAsync("machines_delete_vm_with_storage", $"Remove-VM -Name {Quote(vmName)} -Force -ErrorAction Stop");
         if (!removeVmResult.Success)
         {
             return removeVmResult;
@@ -624,10 +627,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         };
     }
 
-    private async Task<(string Output, string Error)> ExecuteWithFreshSessionAsync(string script)
+    private Task<HyperVPowerShellExecutionResult> ExecuteAdministrativeCommandAsync(string commandName, string script)
     {
-        using var session = _sessionFactory();
-        return await session.ExecuteAsync(script);
+        return _administrativeCommandExecutor.ExecuteAsync(commandName, script);
+    }
+
+    private Task<HyperVPowerShellExecutionResult> ExecuteQueryAsync(string queryName, string script)
+    {
+        return _queryExecutor.ExecuteAsync(queryName, script);
     }
 
     private static HyperVHostMachineVmInfo ParseVmInfo(JsonElement vmElement)
@@ -772,14 +779,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             } | ConvertTo-Json -Compress -Depth 4
             """;
 
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
-        if (!string.IsNullOrWhiteSpace(error))
+        var execution = await ExecuteQueryAsync("machines_get_vm_storage_info", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
-            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(error));
+            throw new InvalidOperationException(PowerShellOutputCleaner.Clean(execution.Error));
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return null;
@@ -808,14 +815,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
             Select-Object VhdType, ParentPath |
             ConvertTo-Json -Compress
             """;
-        var (output, error) = await ExecuteWithFreshSessionAsync(script);
-        DebugLogger.LogPowerShellOutput(script, output, error);
-        if (!string.IsNullOrWhiteSpace(error))
+        var execution = await ExecuteQueryAsync("machines_probe_vhd_info", script);
+        DebugLogger.LogPowerShellOutput(script, execution.Output, execution.Error);
+        if (!string.IsNullOrWhiteSpace(execution.Error))
         {
             return null;
         }
 
-        var cleanedOutput = PowerShellOutputCleaner.Clean(output);
+        var cleanedOutput = PowerShellOutputCleaner.Clean(execution.Output);
         if (string.IsNullOrWhiteSpace(cleanedOutput))
         {
             return null;
