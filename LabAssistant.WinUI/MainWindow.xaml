@@ -156,11 +156,20 @@
                                 Visibility="Collapsed">
                                 <TabView
                                     x:Name="DeploySubviewTabView"
-                                    Height="48"
                                     IsAddTabButtonVisible="False">
-                                    <TabViewItem x:Name="DeployOverviewTabViewItem" Header="Overview" IsClosable="False" />
-                                    <TabViewItem x:Name="DeployQuickDeployTabViewItem" Header="Quick Deploy" IsClosable="False" />
-                                    <TabViewItem x:Name="DeployFromTemplateTabViewItem" Header="From Template" IsClosable="False" />
+                                    <TabViewItem x:Name="DeployOverviewTabViewItem" Header="Overview" IsClosable="False">
+                                        <deployViews:DeployOverviewView x:Name="DeployOverviewViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="DeployQuickDeployTabViewItem" Header="Quick Deploy" IsClosable="False">
+                                        <deployViews:DeployOnTheFlyView
+                                            x:Name="DeployOnTheFlyViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="DeployFromTemplateTabViewItem" Header="From Template" IsClosable="False">
+                                        <deployViews:DeployFromTemplateView
+                                            x:Name="DeployFromTemplateViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
                                 </TabView>
                             </Border>
                             <Border
@@ -174,12 +183,21 @@
                                 Visibility="Collapsed">
                                 <TabView
                                     x:Name="AssetsSubviewTabView"
-                                    Height="48"
                                     IsAddTabButtonVisible="False"
                                     >
-                                    <TabViewItem x:Name="AssetsOverviewTabViewItem" Header="Overview" IsClosable="False" />
-                                    <TabViewItem x:Name="AssetsBaseDisksTabViewItem" Header="Base Disks" IsClosable="False" />
-                                    <TabViewItem x:Name="AssetsSwitchesTabViewItem" Header="Switches" IsClosable="False" />
+                                    <TabViewItem x:Name="AssetsOverviewTabViewItem" Header="Overview" IsClosable="False">
+                                        <assetsViews:AssetsOverviewView x:Name="AssetsOverviewViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="AssetsBaseDisksTabViewItem" Header="Base Disks" IsClosable="False">
+                                        <assetsViews:AssetsBaseDisksView
+                                            x:Name="AssetsBaseDisksViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="AssetsSwitchesTabViewItem" Header="Switches" IsClosable="False">
+                                        <assetsViews:AssetsSwitchesView
+                                            x:Name="AssetsSwitchesViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
                                 </TabView>
                             </Border>
                             <Border
@@ -193,59 +211,24 @@
                                 Visibility="Collapsed">
                                 <TabView
                                     x:Name="DiagnosticsSubviewTabView"
-                                    Height="48"
                                     IsAddTabButtonVisible="False">
-                                    <TabViewItem x:Name="DiagnosticsOverviewTabViewItem" Header="Overview" IsClosable="False" />
-                                    <TabViewItem x:Name="DiagnosticsLogsTabViewItem" Header="Logs" IsClosable="False" />
+                                    <TabViewItem x:Name="DiagnosticsOverviewTabViewItem" Header="Overview" IsClosable="False">
+                                        <diagViews:DiagnosticsOverviewView x:Name="DiagnosticsOverviewViewHost" />
+                                    </TabViewItem>
+                                    <TabViewItem x:Name="DiagnosticsLogsTabViewItem" Header="Logs" IsClosable="False">
+                                        <diagViews:DiagnosticsLogsView
+                                            x:Name="DiagnosticsLogsViewHost"
+                                            Visibility="Collapsed" />
+                                    </TabViewItem>
                                 </TabView>
                             </Border>
-                            <Grid Grid.Row="3" MinHeight="0">
+                            <Grid Grid.Row="3">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <deployViews:DeployOverviewView
-                                    x:Name="DeployOverviewViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <deployViews:DeployOnTheFlyView
-                                    x:Name="DeployOnTheFlyViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <deployViews:DeployFromTemplateView
-                                    x:Name="DeployFromTemplateViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <assetsViews:AssetsOverviewView
-                                    x:Name="AssetsOverviewViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <assetsViews:AssetsBaseDisksView
-                                    x:Name="AssetsBaseDisksViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <assetsViews:AssetsSwitchesView
-                                    x:Name="AssetsSwitchesViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <diagViews:DiagnosticsOverviewView
-                                    x:Name="DiagnosticsOverviewViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
-                                <diagViews:DiagnosticsLogsView
-                                    x:Name="DiagnosticsLogsViewHost"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed" />
                                 <machineViews:MachinesOverviewView
                                     x:Name="MachinesOverviewViewHost"
                                     Grid.Row="0"
@@ -285,33 +268,31 @@
                                     BorderThickness="1"
                                     CornerRadius="6"
                                     Visibility="Collapsed">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Spacing="10">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                            FontSize="16"
+                                            FontWeight="SemiBold"
+                                            Text="Machines Deletion Policy" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="Sets the default delete scope for Machines. Confirmation still shows effective scope before delete."
+                                            TextWrapping="Wrap" />
+                                        <ComboBox x:Name="MachinesDeletionPolicyComboBox" Width="420">
+                                            <ComboBoxItem Tag="AskEveryTime" Content="Ask every time (default)" />
+                                            <ComboBoxItem Tag="AlwaysDeleteDisks" Content="Always delete disks" />
+                                            <ComboBoxItem Tag="AlwaysDeleteDisksForLabAssistantProvisioned" Content="Always delete disks for LabAssistant-provisioned VMs" />
+                                            <ComboBoxItem Tag="AlwaysDeleteDisksForDifferencingOnly" Content="Always delete disks for differencing disks only" />
+                                        </ComboBox>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button x:Name="SaveMachinesDeletionPolicyButton" Click="SaveMachinesDeletionPolicyButton_Click" Content="Save policy" />
                                             <TextBlock
-                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                                FontSize="16"
-                                                FontWeight="SemiBold"
-                                                Text="Machines Deletion Policy" />
-                                            <TextBlock
+                                                x:Name="MachinesDeletionPolicyStatusTextBlock"
+                                                VerticalAlignment="Center"
                                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                Text="Sets the default delete scope for Machines. Confirmation still shows effective scope before delete."
-                                                TextWrapping="Wrap" />
-                                            <ComboBox x:Name="MachinesDeletionPolicyComboBox" Width="420">
-                                                <ComboBoxItem Tag="AskEveryTime" Content="Ask every time (default)" />
-                                                <ComboBoxItem Tag="AlwaysDeleteDisks" Content="Always delete disks" />
-                                                <ComboBoxItem Tag="AlwaysDeleteDisksForLabAssistantProvisioned" Content="Always delete disks for LabAssistant-provisioned VMs" />
-                                                <ComboBoxItem Tag="AlwaysDeleteDisksForDifferencingOnly" Content="Always delete disks for differencing disks only" />
-                                            </ComboBox>
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Button x:Name="SaveMachinesDeletionPolicyButton" Click="SaveMachinesDeletionPolicyButton_Click" Content="Save policy" />
-                                                <TextBlock
-                                                    x:Name="MachinesDeletionPolicyStatusTextBlock"
-                                                    VerticalAlignment="Center"
-                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                    Text="Policy not loaded." />
-                                            </StackPanel>
+                                                Text="Policy not loaded." />
                                         </StackPanel>
-                                    </ScrollViewer>
+                                    </StackPanel>
                                 </Border>
                                 <TextBlock
                                     x:Name="NonMachinesPlaceholderTextBlock"
