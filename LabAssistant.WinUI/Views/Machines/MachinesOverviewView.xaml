@@ -39,12 +39,9 @@
                         x:Name="RefreshMachinesButton"
                         Margin="12,0,0,0"
                         VerticalAlignment="Center"
-                        Width="32"
-                        Height="32"
-                        Padding="0"
-                        ToolTipService.ToolTip="Refresh machine inventory">
-                        <FontIcon Glyph="&#xE72C;" />
-                    </Button>
+                        Padding="12,6"
+                        ToolTipService.ToolTip="Refresh machine inventory"
+                        Content="Refresh" />
                 </StackPanel>
                 <ListView
                     x:Name="MachinesListView"
@@ -148,12 +145,9 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button
                         x:Name="ApplyMachineEditsButton"
-                        Width="32"
-                        Height="32"
-                        Padding="0"
-                        ToolTipService.ToolTip="Apply machine changes">
-                        <FontIcon Glyph="&#xE74E;" />
-                    </Button>
+                        Padding="12,6"
+                        ToolTipService.ToolTip="Apply machine changes"
+                        Content="Save Changes" />
                     <TextBlock
                         x:Name="MachineEditDirtyTextBlock"
                         Foreground="{StaticResource ShellWarnBrush}"
@@ -197,12 +191,10 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button
                                 x:Name="DeleteVmButton"
-                                Width="32"
-                                Height="32"
-                                Padding="0"
-                                ToolTipService.ToolTip="Delete virtual machine">
-                                <FontIcon Glyph="&#xE74D;" />
-                            </Button>
+                                Padding="12,6"
+                                Foreground="{StaticResource ShellWarnBrush}"
+                                ToolTipService.ToolTip="Delete virtual machine"
+                                Content="Delete VM" />
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>

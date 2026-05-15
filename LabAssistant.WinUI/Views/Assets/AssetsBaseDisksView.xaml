@@ -93,22 +93,16 @@
                             <Button
                                 x:Name="AssetsBaseDisksRefreshButton"
                                 Grid.Column="1"
-                                Width="32"
-                                Height="32"
-                                Padding="0"
+                                Padding="12,6"
                                 Margin="0,0,8,0"
-                                ToolTipService.ToolTip="Refresh base disk inventory">
-                                <FontIcon Glyph="&#xE72C;" />
-                            </Button>
+                                ToolTipService.ToolTip="Refresh base disk inventory"
+                                Content="Refresh" />
                             <Button
                                 x:Name="AssetsBaseDisksImportButton"
                                 Grid.Column="2"
-                                Width="32"
-                                Height="32"
-                                Padding="0"
-                                ToolTipService.ToolTip="Import or register base disk">
-                                <FontIcon Glyph="&#xE710;" />
-                            </Button>
+                                Padding="12,6"
+                                ToolTipService.ToolTip="Import or register base disk"
+                                Content="Import Disk" />
                         </Grid>
                         <ListView
                             x:Name="AssetsBaseDisksListView"
@@ -162,32 +156,24 @@
                                 <Button
                                     x:Name="AssetsBaseDisksValidateButton"
                                     Grid.Column="1"
-                                    Width="32"
-                                    Height="32"
-                                    Padding="0"
+                                    Padding="12,6"
                                     Margin="0,0,8,0"
-                                    ToolTipService.ToolTip="Validate selected base disk">
-                                    <FontIcon Glyph="&#xE73E;" />
-                                </Button>
+                                    ToolTipService.ToolTip="Validate selected base disk"
+                                    Content="Validate" />
                                 <Button
                                     x:Name="AssetsBaseDisksSaveMetadataButton"
                                     Grid.Column="2"
-                                    Width="32"
-                                    Height="32"
-                                    Padding="0"
+                                    Padding="12,6"
                                     Margin="0,0,8,0"
-                                    ToolTipService.ToolTip="Save base disk metadata">
-                                    <FontIcon Glyph="&#xE74E;" />
-                                </Button>
+                                    ToolTipService.ToolTip="Save base disk metadata"
+                                    Content="Save Metadata" />
                                 <Button
                                     x:Name="AssetsBaseDisksRemoveButton"
                                     Grid.Column="3"
-                                    Width="32"
-                                    Height="32"
-                                    Padding="0"
-                                    ToolTipService.ToolTip="Remove base disk from catalog">
-                                    <FontIcon Glyph="&#xE74D;" />
-                                </Button>
+                                    Padding="12,6"
+                                    Foreground="{StaticResource ShellWarnBrush}"
+                                    ToolTipService.ToolTip="Remove base disk from catalog"
+                                    Content="Remove from Catalog" />
                             </Grid>
                             <TextBlock
                                 x:Name="AssetsBaseDisksSelectedDiskSummaryTextBlock"

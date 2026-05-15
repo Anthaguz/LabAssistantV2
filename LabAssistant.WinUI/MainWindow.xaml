@@ -299,7 +299,7 @@
                                     Grid.Row="0"
                                     Grid.Column="0"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="Subview placeholder content."
+                                    Text="Select a capability to continue."
                                     TextWrapping="Wrap" />
                             </Grid>
                         </Grid>
@@ -337,13 +337,13 @@
                         <Button
                             x:Name="CloseRightPanelButton"
                             Grid.Column="1"
-                            Width="34"
+                            MinWidth="34"
                             Height="30"
-                            Padding="0"
-                            Content=""
-                            FontFamily="Segoe MDL2 Assets"
+                            Padding="8,0"
                             ToolTipService.ToolTip="Close details panel"
-                            Click="CloseRightPanelButton_Click" />
+                            Click="CloseRightPanelButton_Click">
+                            <FontIcon Glyph="&#xE711;" />
+                        </Button>
                     </Grid>
 
                     <ScrollViewer
@@ -366,7 +366,7 @@
                                 Visibility="Collapsed">
                                 <TextBlock
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="This capability does not own the shell details panel."
+                                    Text="Progress and results appear here when the active workflow uses the details panel."
                                     TextWrapping="Wrap" />
                             </Border>
                         </Grid>

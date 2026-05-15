@@ -607,7 +607,7 @@ public sealed partial class MainWindow : Window
                 ? "Configure Machines policy defaults."
                 : IsDiagnosticsCapabilityActive
                     ? "Inspect support-oriented diagnostics and structured log context from one capability surface."
-                : $"Subview: {_activeSubview.DisplayName}. Placeholder content until capability migration lands.";
+                : $"Use {_activeCapability.DisplayName} to continue to {_activeSubview.DisplayName}.";
         ThemeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
         RootLayout.RequestedTheme = _theme;
         ApplyRightPanelState();

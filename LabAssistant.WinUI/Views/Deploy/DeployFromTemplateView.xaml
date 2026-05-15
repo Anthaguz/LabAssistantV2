@@ -23,16 +23,13 @@
                 <ComboBox
                     x:Name="DeployTemplateSelectorComboBox"
                     Grid.Column="0"
-                    PlaceholderText="Select a template (AF3 wiring pending)" />
+                    PlaceholderText="Select a template" />
                 <Button
                     x:Name="DeployReloadTemplatesButton"
                     Grid.Column="1"
-                    Width="32"
-                    Height="32"
-                    Padding="0"
-                    ToolTipService.ToolTip="Reload templates">
-                    <FontIcon Glyph="&#xE72C;" />
-                </Button>
+                    MinWidth="86"
+                    Content="Reload"
+                    ToolTipService.ToolTip="Reload templates" />
                 <Button
                     x:Name="DeployEvaluateReadinessButton"
                     Grid.Column="2"
