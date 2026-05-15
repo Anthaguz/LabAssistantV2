@@ -76,11 +76,14 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         }
     }
 
-    public async Task<AssetsSwitchValidationResult> ValidateAsync(AssetsSwitchDraft draft, CancellationToken cancellationToken = default)
+    public async Task<AssetsSwitchValidationResult> ValidateAsync(
+        AssetsSwitchDraft draft,
+        IReadOnlyList<AssetsSwitchRecord>? knownInventory = null,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var operationId = Guid.NewGuid().ToString("N");
-        var inventory = await SafeListAsync();
+        var inventory = knownInventory ?? await LoadInventoryRecordsAsync();
         var result = ValidateCore(draft, inventory);
 
         _structuredLogger.Log(
@@ -171,7 +174,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
 
         try
         {
-            var inventory = await _machineAdminService.ListVirtualSwitchesAsync();
+            var inventory = await LoadInventoryRecordsAsync();
             var validation = ValidateCore(draft, inventory);
             if (!string.Equals(validation.Severity, "Pass", StringComparison.Ordinal))
             {
@@ -252,13 +255,16 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         }
     }
 
-    public async Task<AssetsSwitchDeleteAssessment> AssessDeleteAsync(string switchName, CancellationToken cancellationToken = default)
+    public async Task<AssetsSwitchDeleteAssessment> AssessDeleteAsync(
+        string switchName,
+        IReadOnlyList<AssetsSwitchRecord>? knownInventory = null,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var operationId = Guid.NewGuid().ToString("N");
         try
         {
-            var inventory = await SafeListAsync();
+            var inventory = knownInventory ?? await LoadInventoryRecordsAsync();
             var item = inventory.FirstOrDefault(entry => string.Equals(entry.Name, switchName, StringComparison.OrdinalIgnoreCase));
             if (item is null)
             {
@@ -266,6 +272,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                 {
                     OperationId = operationId,
                     Exists = false,
+                    Item = null,
                     CanDelete = false,
                     BlockingReasons = ["The selected virtual switch was not found."],
                     Summary = "No delete assessment available."
@@ -295,6 +302,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                 {
                     OperationId = operationId,
                     Exists = true,
+                    Item = item,
                     CanDelete = false,
                     BlockingReasons = blockingReasons,
                     AttachedVmNames = attachedVmNames,
@@ -306,6 +314,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             {
                 OperationId = operationId,
                 Exists = true,
+                Item = item,
                 CanDelete = true,
                 Summary = "No attached VMs found. Confirmation is still required before delete."
             };
@@ -316,6 +325,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             {
                 OperationId = operationId,
                 Exists = false,
+                Item = null,
                 CanDelete = false,
                 BlockingReasons = [ex.Message],
                 Summary = "Delete assessment failed."
@@ -323,7 +333,10 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         }
     }
 
-    public async Task<AssetsSwitchOperationResult> DeleteAsync(string switchName, CancellationToken cancellationToken = default)
+    public async Task<AssetsSwitchOperationResult> DeleteAsync(
+        string switchName,
+        AssetsSwitchDeleteAssessment? assessment = null,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var operationId = Guid.NewGuid().ToString("N");
@@ -340,7 +353,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
 
         try
         {
-            var assessment = await AssessDeleteAsync(switchName, cancellationToken);
+            assessment ??= await AssessDeleteAsync(switchName, cancellationToken: cancellationToken);
             if (!assessment.Exists || !assessment.CanDelete)
             {
                 _structuredLogger.Log(
@@ -362,9 +375,6 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                     Errors = assessment.BlockingReasons
                 };
             }
-
-            var inventory = await _machineAdminService.ListVirtualSwitchesAsync();
-            var item = inventory.FirstOrDefault(entry => string.Equals(entry.Name, switchName, StringComparison.OrdinalIgnoreCase));
 
             var result = await _machineAdminService.DeleteVirtualSwitchAsync(switchName);
             if (!result.Success)
@@ -397,7 +407,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                 new Dictionary<string, object?>
                 {
                     ["switchName"] = switchName,
-                    ["switchType"] = item?.SwitchType
+                    ["switchType"] = assessment.Item?.SwitchType
                 });
 
             return new AssetsSwitchOperationResult
@@ -405,7 +415,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                 Success = true,
                 OperationId = operationId,
                 UserMessage = "Virtual switch deleted successfully.",
-                Item = item is null ? null : MapRecord(item)
+                Item = assessment.Item
             };
         }
         catch (Exception ex)
@@ -431,12 +441,13 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             }
     }
 
-    private async Task<IReadOnlyList<HyperVVirtualSwitchInfo>> SafeListAsync()
+    private async Task<IReadOnlyList<AssetsSwitchRecord>> LoadInventoryRecordsAsync()
     {
-        return await _machineAdminService.ListVirtualSwitchesAsync();
+        var inventory = await _machineAdminService.ListVirtualSwitchesAsync();
+        return inventory.Select(MapRecord).ToList();
     }
 
-    private AssetsSwitchValidationResult ValidateCore(AssetsSwitchDraft draft, IReadOnlyList<HyperVVirtualSwitchInfo> inventory)
+    private AssetsSwitchValidationResult ValidateCore(AssetsSwitchDraft draft, IReadOnlyList<AssetsSwitchRecord> inventory)
     {
         var details = new List<string>();
         var name = draft.Name.Trim();

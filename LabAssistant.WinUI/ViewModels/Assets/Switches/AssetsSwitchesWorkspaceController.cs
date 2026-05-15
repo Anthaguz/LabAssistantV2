@@ -130,7 +130,15 @@ internal sealed class AssetsSwitchesWorkspaceController
 
         try
         {
-            var assessment = await _capabilityService.AssessDeleteAsync(_workspace.SelectedRow.Name);
+            var knownInventory = _workspace.Inventory
+                .Select(row => new AssetsSwitchRecord
+                {
+                    Name = row.Name,
+                    SwitchType = row.SwitchType,
+                    AdapterName = row.AdapterName
+                })
+                .ToList();
+            var assessment = await _capabilityService.AssessDeleteAsync(_workspace.SelectedRow.Name, knownInventory);
             _editorWorkflow.ApplyDeleteAssessment(assessment);
 
             if (!assessment.CanDelete)
@@ -149,7 +157,7 @@ internal sealed class AssetsSwitchesWorkspaceController
                 return;
             }
 
-            var result = await _capabilityService.DeleteAsync(_workspace.SelectedRow.Name);
+            var result = await _capabilityService.DeleteAsync(_workspace.SelectedRow.Name, assessment);
             _workspace.StatusText = result.UserMessage;
             if (!result.Success)
             {

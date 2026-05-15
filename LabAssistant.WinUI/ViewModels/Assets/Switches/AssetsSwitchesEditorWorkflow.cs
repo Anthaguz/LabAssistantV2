@@ -262,7 +262,7 @@ internal sealed class AssetsSwitchesEditorWorkflow
             return;
         }
 
-        var validation = await _capabilityService.ValidateAsync(draft);
+        var validation = await _capabilityService.ValidateAsync(draft, GetKnownInventorySnapshot());
         if (requestVersion != _workspace.ValidationRequestVersion)
         {
             return;
@@ -301,6 +301,18 @@ internal sealed class AssetsSwitchesEditorWorkflow
         }
 
         _workspace.AttachedVmHintText = hintText;
+    }
+
+    private IReadOnlyList<AssetsSwitchRecord> GetKnownInventorySnapshot()
+    {
+        return _workspace.Inventory
+            .Select(row => new AssetsSwitchRecord
+            {
+                Name = row.Name,
+                SwitchType = row.SwitchType,
+                AdapterName = row.AdapterName
+            })
+            .ToList();
     }
 
     private static string FormatValidationText(AssetsSwitchValidationResult validation)

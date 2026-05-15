@@ -8,13 +8,22 @@ public interface IAssetsSwitchesCapabilityService
 
     Task<IReadOnlyList<string>> GetAttachedVmNamesAsync(string switchName, CancellationToken cancellationToken = default);
 
-    Task<AssetsSwitchValidationResult> ValidateAsync(AssetsSwitchDraft draft, CancellationToken cancellationToken = default);
+    Task<AssetsSwitchValidationResult> ValidateAsync(
+        AssetsSwitchDraft draft,
+        IReadOnlyList<AssetsSwitchRecord>? knownInventory = null,
+        CancellationToken cancellationToken = default);
 
     Task<AssetsSwitchOperationResult> SaveAsync(AssetsSwitchDraft draft, CancellationToken cancellationToken = default);
 
-    Task<AssetsSwitchDeleteAssessment> AssessDeleteAsync(string switchName, CancellationToken cancellationToken = default);
+    Task<AssetsSwitchDeleteAssessment> AssessDeleteAsync(
+        string switchName,
+        IReadOnlyList<AssetsSwitchRecord>? knownInventory = null,
+        CancellationToken cancellationToken = default);
 
-    Task<AssetsSwitchOperationResult> DeleteAsync(string switchName, CancellationToken cancellationToken = default);
+    Task<AssetsSwitchOperationResult> DeleteAsync(
+        string switchName,
+        AssetsSwitchDeleteAssessment? assessment = null,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class AssetsSwitchRecord
@@ -77,6 +86,8 @@ public sealed class AssetsSwitchDeleteAssessment
     public string OperationId { get; init; } = string.Empty;
 
     public bool Exists { get; init; }
+
+    public AssetsSwitchRecord? Item { get; init; }
 
     public bool CanDelete { get; init; }
 
