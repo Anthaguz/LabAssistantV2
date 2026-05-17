@@ -1692,36 +1692,37 @@ function Build-Lab {
     # STAGE 4 - INDEPENDENT ROOT FORESTS
     ########################################################
 
-    $forestTasks = @(
-        New-LabTask `
-            -Name "Forest:Contoso" `
-            -ScriptBlock {
-                param($TaskDomainConfig, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential, [string]$TaskSafeModePassword)
+    $forestTasks = @()
 
-                Ensure-NewForest `
-                    -VMName $TaskDomainConfig.FirstDC `
-                    -DomainName $TaskDomainConfig.DomainName `
-                    -NetBIOSName $TaskDomainConfig.NetBIOS `
-                    -LocalCredential $TaskLocalCredential `
-                    -DomainAdministratorCredential $TaskDomainCredential `
-                    -SafeModePassword $TaskSafeModePassword
-            } `
-            -ArgumentList @($Config.Domains.Contoso, $localCredential, $contosoAdminCredential, $Config.Credentials.SafeModePassword),
-        New-LabTask `
-            -Name "Forest:Fabrikam" `
-            -ScriptBlock {
-                param($TaskDomainConfig, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential, [string]$TaskSafeModePassword)
+    $forestTasks += New-LabTask `
+        -Name "Forest:Contoso" `
+        -ScriptBlock {
+            param($TaskDomainConfig, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential, [string]$TaskSafeModePassword)
 
-                Ensure-NewForest `
-                    -VMName $TaskDomainConfig.FirstDC `
-                    -DomainName $TaskDomainConfig.DomainName `
-                    -NetBIOSName $TaskDomainConfig.NetBIOS `
-                    -LocalCredential $TaskLocalCredential `
-                    -DomainAdministratorCredential $TaskDomainCredential `
-                    -SafeModePassword $TaskSafeModePassword
-            } `
-            -ArgumentList @($Config.Domains.Fabrikam, $localCredential, $fabrikamAdminCredential, $Config.Credentials.SafeModePassword)
-    )
+            Ensure-NewForest `
+                -VMName $TaskDomainConfig.FirstDC `
+                -DomainName $TaskDomainConfig.DomainName `
+                -NetBIOSName $TaskDomainConfig.NetBIOS `
+                -LocalCredential $TaskLocalCredential `
+                -DomainAdministratorCredential $TaskDomainCredential `
+                -SafeModePassword $TaskSafeModePassword
+        } `
+        -ArgumentList @($Config.Domains.Contoso, $localCredential, $contosoAdminCredential, $Config.Credentials.SafeModePassword)
+
+    $forestTasks += New-LabTask `
+        -Name "Forest:Fabrikam" `
+        -ScriptBlock {
+            param($TaskDomainConfig, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential, [string]$TaskSafeModePassword)
+
+            Ensure-NewForest `
+                -VMName $TaskDomainConfig.FirstDC `
+                -DomainName $TaskDomainConfig.DomainName `
+                -NetBIOSName $TaskDomainConfig.NetBIOS `
+                -LocalCredential $TaskLocalCredential `
+                -DomainAdministratorCredential $TaskDomainCredential `
+                -SafeModePassword $TaskSafeModePassword
+        } `
+        -ArgumentList @($Config.Domains.Fabrikam, $localCredential, $fabrikamAdminCredential, $Config.Credentials.SafeModePassword)
 
     Invoke-LabTaskGroup -Name "IndependentForestCreation" -Tasks $forestTasks
 
@@ -1729,34 +1730,35 @@ function Build-Lab {
     # STAGE 5 - POST-FOREST ADMIN USERS
     ########################################################
 
-    $postForestAdminTasks = @(
-        New-LabTask `
-            -Name "AdminUser:Contoso" `
-            -ScriptBlock {
-                param([string]$TaskVMName, [PSCredential]$TaskDomainCredential, [string]$TaskDomainName, [string]$TaskUserName, [string]$TaskPassword)
+    $postForestAdminTasks = @()
 
-                Ensure-DomainAdminUser `
-                    -VMName $TaskVMName `
-                    -DomainAdministratorCredential $TaskDomainCredential `
-                    -DomainName $TaskDomainName `
-                    -UserName $TaskUserName `
-                    -Password $TaskPassword
-            } `
-            -ArgumentList @($Config.Domains.Contoso.FirstDC, $contosoAdminCredential, $contosoDomain, $Config.Credentials.ConvenienceAdminUser, $Config.Credentials.ConvenienceAdminPassword),
-        New-LabTask `
-            -Name "AdminUser:Fabrikam" `
-            -ScriptBlock {
-                param([string]$TaskVMName, [PSCredential]$TaskDomainCredential, [string]$TaskDomainName, [string]$TaskUserName, [string]$TaskPassword)
+    $postForestAdminTasks += New-LabTask `
+        -Name "AdminUser:Contoso" `
+        -ScriptBlock {
+            param([string]$TaskVMName, [PSCredential]$TaskDomainCredential, [string]$TaskDomainName, [string]$TaskUserName, [string]$TaskPassword)
 
-                Ensure-DomainAdminUser `
-                    -VMName $TaskVMName `
-                    -DomainAdministratorCredential $TaskDomainCredential `
-                    -DomainName $TaskDomainName `
-                    -UserName $TaskUserName `
-                    -Password $TaskPassword
-            } `
-            -ArgumentList @($Config.Domains.Fabrikam.FirstDC, $fabrikamAdminCredential, $fabrikamDomain, $Config.Credentials.ConvenienceAdminUser, $Config.Credentials.ConvenienceAdminPassword)
-    )
+            Ensure-DomainAdminUser `
+                -VMName $TaskVMName `
+                -DomainAdministratorCredential $TaskDomainCredential `
+                -DomainName $TaskDomainName `
+                -UserName $TaskUserName `
+                -Password $TaskPassword
+        } `
+        -ArgumentList @($Config.Domains.Contoso.FirstDC, $contosoAdminCredential, $contosoDomain, $Config.Credentials.ConvenienceAdminUser, $Config.Credentials.ConvenienceAdminPassword)
+
+    $postForestAdminTasks += New-LabTask `
+        -Name "AdminUser:Fabrikam" `
+        -ScriptBlock {
+            param([string]$TaskVMName, [PSCredential]$TaskDomainCredential, [string]$TaskDomainName, [string]$TaskUserName, [string]$TaskPassword)
+
+            Ensure-DomainAdminUser `
+                -VMName $TaskVMName `
+                -DomainAdministratorCredential $TaskDomainCredential `
+                -DomainName $TaskDomainName `
+                -UserName $TaskUserName `
+                -Password $TaskPassword
+        } `
+        -ArgumentList @($Config.Domains.Fabrikam.FirstDC, $fabrikamAdminCredential, $fabrikamDomain, $Config.Credentials.ConvenienceAdminUser, $Config.Credentials.ConvenienceAdminPassword)
 
     Invoke-LabTaskGroup -Name "PostForestAdminUsers" -Tasks $postForestAdminTasks
 
@@ -1784,32 +1786,33 @@ function Build-Lab {
 
     Invoke-LabTaskGroup -Name "ContosoReplicaPromotion" -Tasks $replicaTasks
 
-    $contosoDnsTasks = @(
-        New-LabTask `
-            -Name "Dns:ContosoDC1" `
-            -ScriptBlock {
-                param([string]$TaskVMName, [string]$TaskSwitchName, [string[]]$TaskDnsServers, [PSCredential]$TaskCredential)
+    $contosoDnsTasks = @()
 
-                Set-GuestDnsBySwitch `
-                    -VMName $TaskVMName `
-                    -SwitchName $TaskSwitchName `
-                    -DnsServers $TaskDnsServers `
-                    -Credential $TaskCredential
-            } `
-            -ArgumentList @("ContosoDC1", $Config.VMs.ContosoDC1.SwitchName, @("127.0.0.1", "10.0.0.3"), $contosoAdminCredential),
-        New-LabTask `
-            -Name "Dns:ContosoDC2" `
-            -ScriptBlock {
-                param([string]$TaskVMName, [string]$TaskSwitchName, [string[]]$TaskDnsServers, [PSCredential]$TaskCredential)
+    $contosoDnsTasks += New-LabTask `
+        -Name "Dns:ContosoDC1" `
+        -ScriptBlock {
+            param([string]$TaskVMName, [string]$TaskSwitchName, [string[]]$TaskDnsServers, [PSCredential]$TaskCredential)
 
-                Set-GuestDnsBySwitch `
-                    -VMName $TaskVMName `
-                    -SwitchName $TaskSwitchName `
-                    -DnsServers $TaskDnsServers `
-                    -Credential $TaskCredential
-            } `
-            -ArgumentList @("ContosoDC2", $Config.VMs.ContosoDC2.SwitchName, @("127.0.0.1", "10.0.0.2"), $contosoAdminCredential)
-    )
+            Set-GuestDnsBySwitch `
+                -VMName $TaskVMName `
+                -SwitchName $TaskSwitchName `
+                -DnsServers $TaskDnsServers `
+                -Credential $TaskCredential
+        } `
+        -ArgumentList @("ContosoDC1", $Config.VMs.ContosoDC1.SwitchName, @("127.0.0.1", "10.0.0.3"), $contosoAdminCredential)
+
+    $contosoDnsTasks += New-LabTask `
+        -Name "Dns:ContosoDC2" `
+        -ScriptBlock {
+            param([string]$TaskVMName, [string]$TaskSwitchName, [string[]]$TaskDnsServers, [PSCredential]$TaskCredential)
+
+            Set-GuestDnsBySwitch `
+                -VMName $TaskVMName `
+                -SwitchName $TaskSwitchName `
+                -DnsServers $TaskDnsServers `
+                -Credential $TaskCredential
+        } `
+        -ArgumentList @("ContosoDC2", $Config.VMs.ContosoDC2.SwitchName, @("127.0.0.1", "10.0.0.2"), $contosoAdminCredential)
 
     Invoke-LabTaskGroup -Name "ContosoDnsStabilization" -Tasks $contosoDnsTasks
 
@@ -1884,49 +1887,51 @@ function Build-Lab {
     # STAGE 9 - PKI ROLE INSTALLATION ONLY
     ########################################################
 
-    $pkiTasks = @(
-        New-LabTask `
-            -Name "PkiFeature:RootCA" `
-            -ScriptBlock {
-                param([string]$TaskVMName, [PSCredential]$TaskCredential)
+    $pkiTasks = @()
 
-                Ensure-WindowsFeatures `
-                    -VMName $TaskVMName `
-                    -Credential $TaskCredential `
-                    -FeatureNames @("ADCS-Cert-Authority") `
-                    -IncludeManagementTools
-            } `
-            -ArgumentList @("RootCA", $localCredential),
-        New-LabTask `
-            -Name "PkiFeature:ContSubCA" `
-            -ScriptBlock {
-                param([string]$TaskVMName, [PSCredential]$TaskCredential)
+    $pkiTasks += New-LabTask `
+        -Name "PkiFeature:RootCA" `
+        -ScriptBlock {
+            param([string]$TaskVMName, [PSCredential]$TaskCredential)
 
-                Ensure-WindowsFeatures `
-                    -VMName $TaskVMName `
-                    -Credential $TaskCredential `
-                    -FeatureNames @("ADCS-Cert-Authority") `
-                    -IncludeManagementTools
-            } `
-            -ArgumentList @("ContSubCA", $contosoAdminCredential),
-        New-LabTask `
-            -Name "PkiFeature:PKIOperations" `
-            -ScriptBlock {
-                param([string]$TaskVMName, [PSCredential]$TaskCredential)
+            Ensure-WindowsFeatures `
+                -VMName $TaskVMName `
+                -Credential $TaskCredential `
+                -FeatureNames @("ADCS-Cert-Authority") `
+                -IncludeManagementTools
+        } `
+        -ArgumentList @("RootCA", $localCredential)
 
-                Ensure-WindowsFeatures `
-                    -VMName $TaskVMName `
-                    -Credential $TaskCredential `
-                    -FeatureNames @(
-                        "Web-Server",
-                        "ADCS-Enroll-Web-Pol",
-                        "ADCS-Enroll-Web-Svc",
-                        "ADCS-Device-Enrollment"
-                    ) `
-                    -IncludeManagementTools
-            } `
-            -ArgumentList @("PKIOperations", $contosoAdminCredential)
-    )
+    $pkiTasks += New-LabTask `
+        -Name "PkiFeature:ContSubCA" `
+        -ScriptBlock {
+            param([string]$TaskVMName, [PSCredential]$TaskCredential)
+
+            Ensure-WindowsFeatures `
+                -VMName $TaskVMName `
+                -Credential $TaskCredential `
+                -FeatureNames @("ADCS-Cert-Authority") `
+                -IncludeManagementTools
+        } `
+        -ArgumentList @("ContSubCA", $contosoAdminCredential)
+
+    $pkiTasks += New-LabTask `
+        -Name "PkiFeature:PKIOperations" `
+        -ScriptBlock {
+            param([string]$TaskVMName, [PSCredential]$TaskCredential)
+
+            Ensure-WindowsFeatures `
+                -VMName $TaskVMName `
+                -Credential $TaskCredential `
+                -FeatureNames @(
+                    "Web-Server",
+                    "ADCS-Enroll-Web-Pol",
+                    "ADCS-Enroll-Web-Svc",
+                    "ADCS-Device-Enrollment"
+                ) `
+                -IncludeManagementTools
+        } `
+        -ArgumentList @("PKIOperations", $contosoAdminCredential)
 
     Invoke-LabTaskGroup -Name "PkiFeatureInstall" -Tasks $pkiTasks
 
