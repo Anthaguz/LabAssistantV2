@@ -855,7 +855,7 @@ function Enable-VMNat {
         }
     }
 
-    $internalMacsJson = $internalMacs | ConvertTo-Json -Depth 3
+    $internalMacsJson = ConvertTo-Json -InputObject $internalMacs -Compress
 
     Write-Info "Configuring RRAS NAT on $routerName."
 
@@ -865,7 +865,11 @@ function Enable-VMNat {
             [string]$InternalMacsJson
         )
 
-        $internalMacAddresses = @($InternalMacsJson | ConvertFrom-Json)
+        $internalMacAddresses = [System.Collections.Generic.List[string]]::new()
+
+        foreach ($mac in ($InternalMacsJson | ConvertFrom-Json)) {
+            $internalMacAddresses.Add([string]$mac)
+        }
 
         function Invoke-NetshNatCommand {
             param(
