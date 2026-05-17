@@ -14,6 +14,10 @@
     It intentionally disables Windows Firewall and RDP NLA for lab convenience.
 #>
 
+param(
+    [switch]$PlanOnly
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -1322,11 +1326,254 @@ function Set-GuestDnsBySwitch {
 }
 
 ############################################################
+# LAB TASK ORCHESTRATION
+############################################################
+
+function New-LabTask {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][scriptblock]$ScriptBlock,
+        [object[]]$ArgumentList = @()
+    )
+
+    return [pscustomobject]@{
+        Name         = $Name
+        ScriptBlock  = $ScriptBlock
+        ArgumentList = $ArgumentList
+    }
+}
+
+function New-LabJobInitializationScript {
+    $functionNames = @(
+        "Write-Stage",
+        "Write-Info",
+        "Write-Warn",
+        "Write-Fail",
+        "New-PlainTextCredential",
+        "Get-LocalCredential",
+        "Get-DomainAdministratorCredential",
+        "Get-ConvenienceDomainCredential",
+        "Invoke-WithRetry",
+        "Wait-ForPowerShellDirect",
+        "Test-IsExpectedRestartDisconnect",
+        "Write-ExpectedRestartWarning",
+        "Convert-ToGuestMacAddress",
+        "Get-VMNicMacBySwitch",
+        "Test-LabTopology",
+        "Initialize-VMNetworkBySwitch",
+        "Assert-VMNetworkState",
+        "Initialize-RouterNetwork",
+        "Enable-BaseRemoteAccess",
+        "Ensure-RouterRole",
+        "Enable-VMRouting",
+        "Enable-VMNat",
+        "Ensure-WindowsFeatures",
+        "Test-IsDomainControllerForDomain",
+        "Wait-ForDomainReady",
+        "Ensure-NewForest",
+        "Ensure-ReplicaDomainController",
+        "Ensure-ChildDomain",
+        "Ensure-DomainAdminUser",
+        "Ensure-DomainJoin",
+        "Set-GuestDnsBySwitch"
+    )
+
+    $definitions = foreach ($functionName in $functionNames) {
+        $command = Get-Command -Name $functionName -CommandType Function -ErrorAction Stop
+        "function $functionName {`n$($command.ScriptBlock.ToString())`n}"
+    }
+
+    return [scriptblock]::Create(($definitions -join "`n`n"))
+}
+
+function Invoke-LabTaskGroup {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][object[]]$Tasks,
+        [int]$TimeoutSeconds = 0
+    )
+
+    $taskList = @($Tasks)
+
+    if ($taskList.Count -eq 0) {
+        Write-Info "Task group '$Name' has no tasks. Skipping."
+        return
+    }
+
+    Write-Stage "TASK GROUP - $Name"
+    Write-Info "Starting $($taskList.Count) task(s): $((@($taskList | ForEach-Object { $_.Name })) -join ', ')"
+
+    $initializationScriptText = (New-LabJobInitializationScript).ToString()
+    $runningTasks = @()
+
+    try {
+        foreach ($task in $taskList) {
+            Write-Info "Queueing task '$($task.Name)'."
+
+            $runspace = [runspacefactory]::CreateRunspace()
+            $runspace.Open()
+
+            $powershell = [powershell]::Create()
+            $powershell.Runspace = $runspace
+
+            [void]$powershell.AddScript($initializationScriptText)
+            [void]$powershell.Invoke()
+
+            if ($powershell.HadErrors) {
+                $errors = @($powershell.Streams.Error | ForEach-Object { $_.Exception.Message }) -join "`n"
+                throw "Failed to initialize task '$($task.Name)' runspace. $errors"
+            }
+
+            $powershell.Commands.Clear()
+            $powershell.Streams.ClearStreams()
+
+            [void]$powershell.AddScript({
+                param(
+                    [string]$TaskName,
+                    [string]$TaskScriptText,
+                    [object[]]$TaskArguments
+                )
+
+                Set-StrictMode -Version Latest
+                $ErrorActionPreference = "Stop"
+
+                Write-Info "Task '$TaskName' started."
+                $taskScript = [scriptblock]::Create($TaskScriptText)
+                & $taskScript @TaskArguments
+                Write-Info "Task '$TaskName' completed."
+            })
+            [void]$powershell.AddArgument($task.Name)
+            [void]$powershell.AddArgument($task.ScriptBlock.ToString())
+            [void]$powershell.AddArgument(@($task.ArgumentList))
+
+            $runningTasks += [pscustomobject]@{
+                Name        = $task.Name
+                PowerShell  = $powershell
+                Runspace    = $runspace
+                AsyncResult = $powershell.BeginInvoke()
+                TimedOut    = $false
+            }
+        }
+
+        if ($TimeoutSeconds -gt 0) {
+            $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        }
+
+        do {
+            $incompleteTasks = @($runningTasks | Where-Object { -not $_.AsyncResult.IsCompleted })
+
+            if ($incompleteTasks.Count -eq 0) {
+                break
+            }
+
+            if (($TimeoutSeconds -gt 0) -and ([DateTime]::UtcNow -ge $deadline)) {
+                foreach ($runningTask in $incompleteTasks) {
+                    $runningTask.TimedOut = $true
+                    $runningTask.PowerShell.Stop()
+                }
+
+                break
+            }
+
+            Start-Sleep -Seconds 1
+        }
+        while ($true)
+
+        $failures = @()
+
+        foreach ($runningTask in $runningTasks) {
+            if ($runningTask.TimedOut) {
+                $failures += [pscustomobject]@{
+                    Name  = $runningTask.Name
+                    Error = "Task timed out after $TimeoutSeconds seconds."
+                }
+
+                continue
+            }
+
+            $endInvokeFailed = $false
+
+            try {
+                $output = $runningTask.PowerShell.EndInvoke($runningTask.AsyncResult)
+
+                foreach ($item in $output) {
+                    Write-Output $item
+                }
+            }
+            catch {
+                $failures += [pscustomobject]@{
+                    Name  = $runningTask.Name
+                    Error = $_.Exception.Message
+                }
+
+                $endInvokeFailed = $true
+            }
+
+            if ((-not $endInvokeFailed) -and $runningTask.PowerShell.HadErrors) {
+                $errorText = @($runningTask.PowerShell.Streams.Error | ForEach-Object { $_.Exception.Message }) -join "`n"
+
+                if (-not [string]::IsNullOrWhiteSpace($errorText)) {
+                    $failures += [pscustomobject]@{
+                        Name  = $runningTask.Name
+                        Error = $errorText
+                    }
+                }
+            }
+        }
+
+        if ($failures.Count -gt 0) {
+            $failureText = @($failures | ForEach-Object { "$($_.Name): $($_.Error)" }) -join "`n"
+            throw "Task group '$Name' failed:`n$failureText"
+        }
+
+        Write-Info "Task group '$Name' completed successfully."
+    }
+    finally {
+        foreach ($runningTask in $runningTasks) {
+            if ($runningTask.PowerShell) {
+                $runningTask.PowerShell.Dispose()
+            }
+
+            if ($runningTask.Runspace) {
+                $runningTask.Runspace.Close()
+                $runningTask.Runspace.Dispose()
+            }
+        }
+    }
+}
+
+function Show-LabExecutionPlan {
+    param([Parameter(Mandatory = $true)]$Config)
+
+    $contosoDomain = $Config.Domains.Contoso.DomainName
+
+    Write-Stage "LAB EXECUTION PLAN"
+    Write-Info "Stage 0: Preflight validation runs sequentially for deterministic topology and reachability failures."
+    Write-Info "Stage 1: NetworkInitialization runs guest VM network tasks plus router network initialization concurrently."
+    Write-Info "Stage 2: Router services run sequentially on $($Config.Router.Name), followed by base remote access configuration."
+    Write-Info "Stage 3: DomainFeatureInstall installs AD DS on DC candidates concurrently."
+    Write-Info "Stage 4: IndependentForestCreation creates Contoso and Fabrikam forests concurrently."
+    Write-Info "Stage 5: PostForestAdminUsers creates Contoso and Fabrikam convenience admins concurrently."
+    Write-Info "Stage 6: ContosoReplicaPromotion promotes Contoso replicas concurrently after $contosoDomain exists, then updates Contoso DC DNS."
+    Write-Info "Stage 7: Child domain creation waits for Contoso and remains sequential for its DC."
+    Write-Info "Stage 8: MemberDomainJoin joins Contoso member servers concurrently after Contoso DNS is stabilized."
+    Write-Info "Stage 9: PkiFeatureInstall installs PKI-related roles concurrently after member joins."
+}
+
+############################################################
 # MAIN ORCHESTRATION
 ############################################################
 
 function Build-Lab {
-    param([Parameter(Mandatory = $true)]$Config)
+    param(
+        [Parameter(Mandatory = $true)]$Config,
+        [switch]$PlanOnly
+    )
+
+    if ($PlanOnly) {
+        Show-LabExecutionPlan -Config $Config
+        return
+    }
 
     $localCredential = Get-LocalCredential -Config $Config
 
@@ -1343,32 +1590,48 @@ function Build-Lab {
     Test-LabTopology -Config $Config -Credential $localCredential
 
     ########################################################
-    # PHASE 1 - GUEST NETWORK INITIALIZATION
+    # STAGE 1 - GUEST NETWORK INITIALIZATION
     ########################################################
 
-    Write-Stage "PHASE 1 - GUEST NETWORK INITIALIZATION"
+    $networkTasks = @()
 
     foreach ($vmName in $Config.VMs.Keys) {
         $vm = $Config.VMs[$vmName]
 
-        Initialize-VMNetworkBySwitch `
-            -VMName $vmName `
-            -SwitchName $vm.SwitchName `
-            -IPAddress $vm.IP `
-            -PrefixLength ([int]$vm.PrefixLength) `
-            -DefaultGateway $vm.Gateway `
-            -DnsServers $vm.DNS `
-            -ComputerName $vmName `
-            -Credential $localCredential
+        $networkTasks += New-LabTask `
+            -Name "Network:$vmName" `
+            -ScriptBlock {
+                param($TaskVMName, $TaskVM, [PSCredential]$TaskCredential)
+
+                Initialize-VMNetworkBySwitch `
+                    -VMName $TaskVMName `
+                    -SwitchName $TaskVM.SwitchName `
+                    -IPAddress $TaskVM.IP `
+                    -PrefixLength ([int]$TaskVM.PrefixLength) `
+                    -DefaultGateway $TaskVM.Gateway `
+                    -DnsServers $TaskVM.DNS `
+                    -ComputerName $TaskVMName `
+                    -Credential $TaskCredential
+            } `
+            -ArgumentList @($vmName, $vm, $localCredential)
     }
 
-    Initialize-RouterNetwork -Config $Config -Credential $localCredential
+    $networkTasks += New-LabTask `
+        -Name "Network:$($Config.Router.Name)" `
+        -ScriptBlock {
+            param($TaskConfig, [PSCredential]$TaskCredential)
+
+            Initialize-RouterNetwork -Config $TaskConfig -Credential $TaskCredential
+        } `
+        -ArgumentList @($Config, $localCredential)
+
+    Invoke-LabTaskGroup -Name "NetworkInitialization" -Tasks $networkTasks
 
     ########################################################
-    # PHASE 2 - BASE REMOTE ACCESS AND ROUTER SERVICES
+    # STAGE 2 - BASE REMOTE ACCESS AND ROUTER SERVICES
     ########################################################
 
-    Write-Stage "PHASE 2 - BASE REMOTE ACCESS AND ROUTER SERVICES"
+    Write-Stage "STAGE 2 - ROUTER SERVICES"
 
     Ensure-RouterRole `
         -VMName $Config.Router.Name `
@@ -1383,6 +1646,8 @@ function Build-Lab {
         -Config $Config `
         -Credential $localCredential
 
+    Write-Stage "STAGE 2 - BASE REMOTE ACCESS"
+
     Enable-BaseRemoteAccess `
         -VMNames $allVmNames `
         -Credential $localCredential `
@@ -1390,10 +1655,8 @@ function Build-Lab {
         -DisableRdpNla ([bool]$Config.Behavior.DisableRdpNla)
 
     ########################################################
-    # PHASE 3 - AD DS ROLE INSTALLATION
+    # STAGE 3 - AD DS ROLE INSTALLATION
     ########################################################
-
-    Write-Stage "PHASE 3 - AD DS ROLE INSTALLATION"
 
     $domainControllerVMs = @(
         $Config.Domains.Contoso.FirstDC
@@ -1402,75 +1665,153 @@ function Build-Lab {
         $Config.Domains.Child.FirstDC
     )
 
+    $domainFeatureTasks = @()
+
     foreach ($dcVmName in $domainControllerVMs) {
-        Ensure-WindowsFeatures `
-            -VMName $dcVmName `
-            -Credential $localCredential `
-            -FeatureNames @("AD-Domain-Services") `
-            -IncludeManagementTools
+        $domainFeatureTasks += New-LabTask `
+            -Name "ADDSFeature:$dcVmName" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [PSCredential]$TaskCredential)
+
+                Ensure-WindowsFeatures `
+                    -VMName $TaskVMName `
+                    -Credential $TaskCredential `
+                    -FeatureNames @("AD-Domain-Services") `
+                    -IncludeManagementTools
+            } `
+            -ArgumentList @($dcVmName, $localCredential)
     }
 
-    ########################################################
-    # PHASE 4 - CONTOSO FOREST
-    ########################################################
-
-    Write-Stage "PHASE 4 - CONTOSO FOREST"
-
-    Ensure-NewForest `
-        -VMName $Config.Domains.Contoso.FirstDC `
-        -DomainName $Config.Domains.Contoso.DomainName `
-        -NetBIOSName $Config.Domains.Contoso.NetBIOS `
-        -LocalCredential $localCredential `
-        -DomainAdministratorCredential $contosoAdminCredential `
-        -SafeModePassword $Config.Credentials.SafeModePassword
-
-    Ensure-DomainAdminUser `
-        -VMName $Config.Domains.Contoso.FirstDC `
-        -DomainAdministratorCredential $contosoAdminCredential `
-        -DomainName $contosoDomain `
-        -UserName $Config.Credentials.ConvenienceAdminUser `
-        -Password $Config.Credentials.ConvenienceAdminPassword
+    Invoke-LabTaskGroup -Name "DomainFeatureInstall" -Tasks $domainFeatureTasks
 
     ########################################################
-    # PHASE 5 - CONTOSO REPLICA DOMAIN CONTROLLERS
+    # STAGE 4 - INDEPENDENT ROOT FORESTS
     ########################################################
 
-    Write-Stage "PHASE 5 - CONTOSO REPLICA DOMAIN CONTROLLERS"
+    $forestTasks = @(
+        New-LabTask `
+            -Name "Forest:Contoso" `
+            -ScriptBlock {
+                param($TaskDomainConfig, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential, [string]$TaskSafeModePassword)
+
+                Ensure-NewForest `
+                    -VMName $TaskDomainConfig.FirstDC `
+                    -DomainName $TaskDomainConfig.DomainName `
+                    -NetBIOSName $TaskDomainConfig.NetBIOS `
+                    -LocalCredential $TaskLocalCredential `
+                    -DomainAdministratorCredential $TaskDomainCredential `
+                    -SafeModePassword $TaskSafeModePassword
+            } `
+            -ArgumentList @($Config.Domains.Contoso, $localCredential, $contosoAdminCredential, $Config.Credentials.SafeModePassword),
+        New-LabTask `
+            -Name "Forest:Fabrikam" `
+            -ScriptBlock {
+                param($TaskDomainConfig, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential, [string]$TaskSafeModePassword)
+
+                Ensure-NewForest `
+                    -VMName $TaskDomainConfig.FirstDC `
+                    -DomainName $TaskDomainConfig.DomainName `
+                    -NetBIOSName $TaskDomainConfig.NetBIOS `
+                    -LocalCredential $TaskLocalCredential `
+                    -DomainAdministratorCredential $TaskDomainCredential `
+                    -SafeModePassword $TaskSafeModePassword
+            } `
+            -ArgumentList @($Config.Domains.Fabrikam, $localCredential, $fabrikamAdminCredential, $Config.Credentials.SafeModePassword)
+    )
+
+    Invoke-LabTaskGroup -Name "IndependentForestCreation" -Tasks $forestTasks
+
+    ########################################################
+    # STAGE 5 - POST-FOREST ADMIN USERS
+    ########################################################
+
+    $postForestAdminTasks = @(
+        New-LabTask `
+            -Name "AdminUser:Contoso" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [PSCredential]$TaskDomainCredential, [string]$TaskDomainName, [string]$TaskUserName, [string]$TaskPassword)
+
+                Ensure-DomainAdminUser `
+                    -VMName $TaskVMName `
+                    -DomainAdministratorCredential $TaskDomainCredential `
+                    -DomainName $TaskDomainName `
+                    -UserName $TaskUserName `
+                    -Password $TaskPassword
+            } `
+            -ArgumentList @($Config.Domains.Contoso.FirstDC, $contosoAdminCredential, $contosoDomain, $Config.Credentials.ConvenienceAdminUser, $Config.Credentials.ConvenienceAdminPassword),
+        New-LabTask `
+            -Name "AdminUser:Fabrikam" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [PSCredential]$TaskDomainCredential, [string]$TaskDomainName, [string]$TaskUserName, [string]$TaskPassword)
+
+                Ensure-DomainAdminUser `
+                    -VMName $TaskVMName `
+                    -DomainAdministratorCredential $TaskDomainCredential `
+                    -DomainName $TaskDomainName `
+                    -UserName $TaskUserName `
+                    -Password $TaskPassword
+            } `
+            -ArgumentList @($Config.Domains.Fabrikam.FirstDC, $fabrikamAdminCredential, $fabrikamDomain, $Config.Credentials.ConvenienceAdminUser, $Config.Credentials.ConvenienceAdminPassword)
+    )
+
+    Invoke-LabTaskGroup -Name "PostForestAdminUsers" -Tasks $postForestAdminTasks
+
+    ########################################################
+    # STAGE 6 - CONTOSO REPLICA DOMAIN CONTROLLERS
+    ########################################################
+
+    $replicaTasks = @()
 
     foreach ($replicaVmName in $Config.Domains.Contoso.ReplicaDCs) {
-        Ensure-ReplicaDomainController `
-            -VMName $replicaVmName `
-            -DomainName $contosoDomain `
-            -LocalCredential $localCredential `
-            -DomainAdministratorCredential $contosoAdminCredential `
-            -SafeModePassword $Config.Credentials.SafeModePassword
+        $replicaTasks += New-LabTask `
+            -Name "ReplicaDC:$replicaVmName" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [string]$TaskDomainName, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential, [string]$TaskSafeModePassword)
+
+                Ensure-ReplicaDomainController `
+                    -VMName $TaskVMName `
+                    -DomainName $TaskDomainName `
+                    -LocalCredential $TaskLocalCredential `
+                    -DomainAdministratorCredential $TaskDomainCredential `
+                    -SafeModePassword $TaskSafeModePassword
+            } `
+            -ArgumentList @($replicaVmName, $contosoDomain, $localCredential, $contosoAdminCredential, $Config.Credentials.SafeModePassword)
     }
 
-    Set-GuestDnsBySwitch `
-        -VMName "ContosoDC1" `
-        -SwitchName $Config.VMs.ContosoDC1.SwitchName `
-        -DnsServers @("127.0.0.1", "10.0.0.3") `
-        -Credential $contosoAdminCredential
+    Invoke-LabTaskGroup -Name "ContosoReplicaPromotion" -Tasks $replicaTasks
 
-    Set-GuestDnsBySwitch `
-        -VMName "ContosoDC2" `
-        -SwitchName $Config.VMs.ContosoDC2.SwitchName `
-        -DnsServers @("127.0.0.1", "10.0.0.2") `
-        -Credential $contosoAdminCredential
+    $contosoDnsTasks = @(
+        New-LabTask `
+            -Name "Dns:ContosoDC1" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [string]$TaskSwitchName, [string[]]$TaskDnsServers, [PSCredential]$TaskCredential)
+
+                Set-GuestDnsBySwitch `
+                    -VMName $TaskVMName `
+                    -SwitchName $TaskSwitchName `
+                    -DnsServers $TaskDnsServers `
+                    -Credential $TaskCredential
+            } `
+            -ArgumentList @("ContosoDC1", $Config.VMs.ContosoDC1.SwitchName, @("127.0.0.1", "10.0.0.3"), $contosoAdminCredential),
+        New-LabTask `
+            -Name "Dns:ContosoDC2" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [string]$TaskSwitchName, [string[]]$TaskDnsServers, [PSCredential]$TaskCredential)
+
+                Set-GuestDnsBySwitch `
+                    -VMName $TaskVMName `
+                    -SwitchName $TaskSwitchName `
+                    -DnsServers $TaskDnsServers `
+                    -Credential $TaskCredential
+            } `
+            -ArgumentList @("ContosoDC2", $Config.VMs.ContosoDC2.SwitchName, @("127.0.0.1", "10.0.0.2"), $contosoAdminCredential)
+    )
+
+    Invoke-LabTaskGroup -Name "ContosoDnsStabilization" -Tasks $contosoDnsTasks
 
     ########################################################
-    # PHASE 6 - FABRIKAM FOREST
+    # STAGE 6B - FABRIKAM DNS
     ########################################################
-
-    Write-Stage "PHASE 6 - FABRIKAM FOREST"
-
-    Ensure-NewForest `
-        -VMName $Config.Domains.Fabrikam.FirstDC `
-        -DomainName $Config.Domains.Fabrikam.DomainName `
-        -NetBIOSName $Config.Domains.Fabrikam.NetBIOS `
-        -LocalCredential $localCredential `
-        -DomainAdministratorCredential $fabrikamAdminCredential `
-        -SafeModePassword $Config.Credentials.SafeModePassword
 
     Set-GuestDnsBySwitch `
         -VMName $Config.Domains.Fabrikam.FirstDC `
@@ -1478,18 +1819,11 @@ function Build-Lab {
         -DnsServers @("127.0.0.1") `
         -Credential $fabrikamAdminCredential
 
-    Ensure-DomainAdminUser `
-        -VMName $Config.Domains.Fabrikam.FirstDC `
-        -DomainAdministratorCredential $fabrikamAdminCredential `
-        -DomainName $fabrikamDomain `
-        -UserName $Config.Credentials.ConvenienceAdminUser `
-        -Password $Config.Credentials.ConvenienceAdminPassword
-
     ########################################################
-    # PHASE 7 - CHILD DOMAIN
+    # STAGE 7 - CHILD DOMAIN
     ########################################################
 
-    Write-Stage "PHASE 7 - CHILD DOMAIN"
+    Write-Stage "STAGE 7 - CHILD DOMAIN"
 
     Ensure-ChildDomain `
         -VMName $Config.Domains.Child.FirstDC `
@@ -1516,51 +1850,81 @@ function Build-Lab {
         -Password $Config.Credentials.ConvenienceAdminPassword
 
     ########################################################
-    # PHASE 8 - CONTOSO MEMBER SERVER DOMAIN JOIN
+    # STAGE 8 - CONTOSO MEMBER SERVER DOMAIN JOIN
     ########################################################
 
-    Write-Stage "PHASE 8 - CONTOSO MEMBER SERVER DOMAIN JOIN"
+    $memberJoinTasks = @()
 
     foreach ($vmName in $Config.VMs.Keys) {
         $vm = $Config.VMs[$vmName]
 
         if ($vm.ContainsKey("DomainJoin") -and $vm.DomainJoin -eq $contosoDomain) {
-            Ensure-DomainJoin `
-                -VMName $vmName `
-                -DomainName $contosoDomain `
-                -LocalCredential $localCredential `
-                -DomainAdministratorCredential $contosoAdminCredential
+            $memberJoinTasks += New-LabTask `
+                -Name "DomainJoin:$vmName" `
+                -ScriptBlock {
+                    param([string]$TaskVMName, [string]$TaskDomainName, [PSCredential]$TaskLocalCredential, [PSCredential]$TaskDomainCredential)
+
+                    Ensure-DomainJoin `
+                        -VMName $TaskVMName `
+                        -DomainName $TaskDomainName `
+                        -LocalCredential $TaskLocalCredential `
+                        -DomainAdministratorCredential $TaskDomainCredential
+                } `
+                -ArgumentList @($vmName, $contosoDomain, $localCredential, $contosoAdminCredential)
         }
     }
 
+    Invoke-LabTaskGroup -Name "MemberDomainJoin" -Tasks $memberJoinTasks
+
     ########################################################
-    # PHASE 9 - PKI ROLE INSTALLATION ONLY
+    # STAGE 9 - PKI ROLE INSTALLATION ONLY
     ########################################################
 
-    Write-Stage "PHASE 9 - PKI ROLE INSTALLATION ONLY"
+    $pkiTasks = @(
+        New-LabTask `
+            -Name "PkiFeature:RootCA" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [PSCredential]$TaskCredential)
 
-    Ensure-WindowsFeatures `
-        -VMName "RootCA" `
-        -Credential $localCredential `
-        -FeatureNames @("ADCS-Cert-Authority") `
-        -IncludeManagementTools
+                Ensure-WindowsFeatures `
+                    -VMName $TaskVMName `
+                    -Credential $TaskCredential `
+                    -FeatureNames @("ADCS-Cert-Authority") `
+                    -IncludeManagementTools
+            } `
+            -ArgumentList @("RootCA", $localCredential),
+        New-LabTask `
+            -Name "PkiFeature:ContSubCA" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [PSCredential]$TaskCredential)
 
-    Ensure-WindowsFeatures `
-        -VMName "ContSubCA" `
-        -Credential $contosoAdminCredential `
-        -FeatureNames @("ADCS-Cert-Authority") `
-        -IncludeManagementTools
+                Ensure-WindowsFeatures `
+                    -VMName $TaskVMName `
+                    -Credential $TaskCredential `
+                    -FeatureNames @("ADCS-Cert-Authority") `
+                    -IncludeManagementTools
+            } `
+            -ArgumentList @("ContSubCA", $contosoAdminCredential),
+        New-LabTask `
+            -Name "PkiFeature:PKIOperations" `
+            -ScriptBlock {
+                param([string]$TaskVMName, [PSCredential]$TaskCredential)
 
-    Ensure-WindowsFeatures `
-        -VMName "PKIOperations" `
-        -Credential $contosoAdminCredential `
-        -FeatureNames @(
-            "Web-Server",
-            "ADCS-Enroll-Web-Pol",
-            "ADCS-Enroll-Web-Svc",
-            "ADCS-Device-Enrollment"
-        ) `
-        -IncludeManagementTools
+                Ensure-WindowsFeatures `
+                    -VMName $TaskVMName `
+                    -Credential $TaskCredential `
+                    -FeatureNames @(
+                        "Web-Server",
+                        "ADCS-Enroll-Web-Pol",
+                        "ADCS-Enroll-Web-Svc",
+                        "ADCS-Device-Enrollment"
+                    ) `
+                    -IncludeManagementTools
+            } `
+            -ArgumentList @("PKIOperations", $contosoAdminCredential)
+    )
+
+    Invoke-LabTaskGroup -Name "PkiFeatureInstall" -Tasks $pkiTasks
 
     ########################################################
     # COMPLETE
@@ -1578,4 +1942,4 @@ function Build-Lab {
 # EXECUTION
 ############################################################
 
-Build-Lab -Config $LabConfig
+Build-Lab -Config $LabConfig -PlanOnly:$PlanOnly
