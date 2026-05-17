@@ -254,6 +254,32 @@ function Wait-ForPowerShellDirect {
     Write-Info "$VMName is reachable through PowerShell Direct."
 }
 
+function Test-IsExpectedRestartDisconnect {
+    param([Parameter(Mandatory = $true)]$ErrorRecord)
+
+    $message = $ErrorRecord.Exception.Message
+
+    if ([string]::IsNullOrWhiteSpace($message)) {
+        return $false
+    }
+
+    return ($message -match 'reboot|restart|shut\s*down|connection.*(closed|lost|terminated)|client cannot connect|WSMan|WinRM|RPC server is unavailable|I/O operation has been aborted')
+}
+
+function Write-ExpectedRestartWarning {
+    param(
+        [Parameter(Mandatory = $true)][string]$Activity,
+        [Parameter(Mandatory = $true)]$ErrorRecord
+    )
+
+    if (-not (Test-IsExpectedRestartDisconnect -ErrorRecord $ErrorRecord)) {
+        throw "$Activity failed before the expected restart boundary. $($ErrorRecord.Exception.Message)"
+    }
+
+    Write-Warn "$Activity ended while the VM was restarting: $($ErrorRecord.Exception.Message)"
+    Write-Warn "Readiness validation will confirm whether the operation completed successfully."
+}
+
 function Convert-ToGuestMacAddress {
     param([Parameter(Mandatory = $true)][string]$MacAddress)
 
@@ -296,7 +322,10 @@ function Get-VMNicMacBySwitch {
 ############################################################
 
 function Test-LabTopology {
-    param([Parameter(Mandatory = $true)]$Config)
+    param(
+        [Parameter(Mandatory = $true)]$Config,
+        [Parameter(Mandatory = $true)][PSCredential]$Credential
+    )
 
     Write-Stage "PHASE 0 - PREFLIGHT VALIDATION"
 
@@ -319,8 +348,17 @@ function Test-LabTopology {
     }
 
     foreach ($vmName in $expectedVmNames) {
-        Get-VM -Name $vmName -ErrorAction Stop | Out-Null
+        $vm = Get-VM -Name $vmName -ErrorAction Stop
+
+        if ($vm.State -ne "Running") {
+            throw "VM '$vmName' must be running before lab configuration starts. Current state: $($vm.State)."
+        }
+
         Write-Info "Validated VM exists: $vmName"
+    }
+
+    foreach ($vmName in $expectedVmNames) {
+        Wait-ForPowerShellDirect -VMName $vmName -Credential $Credential -Retries 3 -DelaySeconds 5
     }
 
     $macOwners = @{}
@@ -569,12 +607,15 @@ function Initialize-RouterNetwork {
     $mappedNics = @()
 
     foreach ($nic in $Config.Router.NICs) {
+        $hasStaticIP = $nic.ContainsKey("IP") -and -not [string]::IsNullOrWhiteSpace($nic.IP)
+
         $mappedNics += @{
             SwitchName   = $nic.SwitchName
             MacAddress   = Get-VMNicMacBySwitch -VMName $routerName -SwitchName $nic.SwitchName
-            IP           = $nic.IP
-            PrefixLength = if ($nic.PrefixLength) { [int]$nic.PrefixLength } else { 24 }
-            DNS          = $nic.DNS
+            HasStaticIP  = $hasStaticIP
+            IP           = if ($hasStaticIP) { $nic.IP } else { $null }
+            PrefixLength = if ($nic.ContainsKey("PrefixLength") -and $nic.PrefixLength) { [int]$nic.PrefixLength } else { 24 }
+            DNS          = if ($nic.ContainsKey("DNS")) { @($nic.DNS) } else { @() }
         }
     }
 
@@ -596,7 +637,7 @@ function Initialize-RouterNetwork {
 
             $interfaceIndex = $adapter.ifIndex
 
-            if ($entry.IP) {
+            if ($entry.HasStaticIP) {
                 $existingAddresses = @(Get-NetIPAddress -InterfaceIndex $interfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {
                     $_.IPAddress -notlike '169.254.*'
                 })
@@ -631,6 +672,14 @@ function Initialize-RouterNetwork {
                 }
             }
             else {
+                Get-NetRoute -InterfaceIndex $interfaceIndex -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue | Where-Object {
+                    $_.Protocol -ne "Dhcp"
+                } | Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue
+
+                Get-NetIPAddress -InterfaceIndex $interfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {
+                    ($_.IPAddress -notlike '169.254.*') -and ($_.PrefixOrigin -ne "Dhcp")
+                } | Remove-NetIPAddress -Confirm:$false -ErrorAction SilentlyContinue
+
                 Set-NetIPInterface `
                     -InterfaceIndex $interfaceIndex `
                     -Dhcp Enabled `
@@ -814,6 +863,28 @@ function Enable-VMNat {
 
         $internalMacAddresses = @($InternalMacsJson | ConvertFrom-Json)
 
+        function Invoke-NetshNatCommand {
+            param(
+                [Parameter(Mandatory = $true)][string[]]$Arguments,
+                [switch]$IgnoreMissing
+            )
+
+            $output = & netsh @Arguments 2>&1
+            $exitCode = $LASTEXITCODE
+            $outputText = @($output) -join "`n"
+            $commandText = "netsh $($Arguments -join ' ')"
+
+            if ($exitCode -eq 0) {
+                return
+            }
+
+            if ($IgnoreMissing -and ($outputText -match 'not found|does not exist|not configured|not installed')) {
+                return
+            }
+
+            throw "$commandText failed with exit code $exitCode. Output: $outputText"
+        }
+
         $externalAdapter = Get-NetAdapter | Where-Object { $_.MacAddress -eq $ExternalMacAddress } | Select-Object -First 1
 
         if (-not $externalAdapter) {
@@ -832,14 +903,14 @@ function Enable-VMNat {
             $internalAdapters += $adapter
         }
 
-        netsh routing ip nat install | Out-Null
+        Invoke-NetshNatCommand -Arguments @("routing", "ip", "nat", "install")
 
-        netsh routing ip nat delete interface "$($externalAdapter.Name)" 2>$null | Out-Null
-        netsh routing ip nat add interface "$($externalAdapter.Name)" mode=full | Out-Null
+        Invoke-NetshNatCommand -Arguments @("routing", "ip", "nat", "delete", "interface", $externalAdapter.Name) -IgnoreMissing
+        Invoke-NetshNatCommand -Arguments @("routing", "ip", "nat", "add", "interface", $externalAdapter.Name, "mode=full")
 
         foreach ($adapter in $internalAdapters) {
-            netsh routing ip nat delete interface "$($adapter.Name)" 2>$null | Out-Null
-            netsh routing ip nat add interface "$($adapter.Name)" mode=private | Out-Null
+            Invoke-NetshNatCommand -Arguments @("routing", "ip", "nat", "delete", "interface", $adapter.Name) -IgnoreMissing
+            Invoke-NetshNatCommand -Arguments @("routing", "ip", "nat", "add", "interface", $adapter.Name, "mode=private")
         }
 
         Write-Output "NAT configured. External adapter: $($externalAdapter.Name). Internal adapters: $($internalAdapters.Name -join ', ')."
@@ -936,7 +1007,7 @@ function Wait-ForDomainReady {
                 param([string]$ExpectedDomainName)
 
                 Resolve-DnsName $ExpectedDomainName -ErrorAction Stop | Out-Null
-                Resolve-DnsName "_ldap._tcp.dc._msdcs.$ExpectedDomainName" -ErrorAction Stop | Out-Null
+                Resolve-DnsName "_ldap._tcp.dc._msdcs.$ExpectedDomainName" -Type SRV -ErrorAction Stop | Out-Null
 
                 Import-Module ActiveDirectory -ErrorAction Stop
                 $domain = Get-ADDomain -ErrorAction Stop
@@ -995,8 +1066,7 @@ function Ensure-NewForest {
         } -ArgumentList $DomainName, $NetBIOSName, $SafeModePassword -ErrorAction Stop
     }
     catch {
-        Write-Warn "Forest creation command for $VMName ended with: $($_.Exception.Message)"
-        Write-Warn "This can be expected when the VM restarts during promotion. Domain readiness will be validated next."
+        Write-ExpectedRestartWarning -Activity "Forest creation command for $VMName" -ErrorRecord $_
     }
 
     Wait-ForPowerShellDirect -VMName $VMName -Credential $DomainAdministratorCredential -Retries 90
@@ -1046,8 +1116,7 @@ function Ensure-ReplicaDomainController {
         } -ArgumentList $DomainName, $DomainAdministratorCredential, $SafeModePassword -ErrorAction Stop
     }
     catch {
-        Write-Warn "Replica promotion command for $VMName ended with: $($_.Exception.Message)"
-        Write-Warn "This can be expected when the VM restarts during promotion. Domain readiness will be validated next."
+        Write-ExpectedRestartWarning -Activity "Replica promotion command for $VMName" -ErrorRecord $_
     }
 
     Wait-ForPowerShellDirect -VMName $VMName -Credential $DomainAdministratorCredential -Retries 90
@@ -1106,8 +1175,7 @@ function Ensure-ChildDomain {
         } -ArgumentList $ParentDomainName, $NewDomainName, $ChildNetBIOSName, $ParentDomainAdministratorCredential, $SafeModePassword -ErrorAction Stop
     }
     catch {
-        Write-Warn "Child domain creation command for $VMName ended with: $($_.Exception.Message)"
-        Write-Warn "This can be expected when the VM restarts during promotion. Domain readiness will be validated next."
+        Write-ExpectedRestartWarning -Activity "Child domain creation command for $VMName" -ErrorRecord $_
     }
 
     Wait-ForPowerShellDirect -VMName $VMName -Credential $ChildDomainAdministratorCredential -Retries 90
@@ -1272,7 +1340,7 @@ function Build-Lab {
 
     $allVmNames = @($Config.VMs.Keys) + @($Config.Router.Name)
 
-    Test-LabTopology -Config $Config
+    Test-LabTopology -Config $Config -Credential $localCredential
 
     ########################################################
     # PHASE 1 - GUEST NETWORK INITIALIZATION
