@@ -1311,7 +1311,7 @@ function Ensure-DomainJoin {
     $isJoined = $false
 
     try {
-        $isJoined = Invoke-Command -VMName $VMName -Credential $DomainAdministratorCredential -ScriptBlock {
+        $isJoined = Invoke-Command -VMName $VMName -Credential $LocalCredential -ScriptBlock {
             param([string]$ExpectedDomain)
 
             $computerSystem = Get-CimInstance Win32_ComputerSystem
@@ -1319,7 +1319,17 @@ function Ensure-DomainJoin {
         } -ArgumentList $DomainName -ErrorAction Stop
     }
     catch {
-        $isJoined = $false
+        try {
+            $isJoined = Invoke-Command -VMName $VMName -Credential $DomainAdministratorCredential -ScriptBlock {
+                param([string]$ExpectedDomain)
+
+                $computerSystem = Get-CimInstance Win32_ComputerSystem
+                return ($computerSystem.PartOfDomain -and ($computerSystem.Domain -ieq $ExpectedDomain))
+            } -ArgumentList $DomainName -ErrorAction Stop
+        }
+        catch {
+            $isJoined = $false
+        }
     }
 
     if ($isJoined) {
@@ -1343,18 +1353,39 @@ function Ensure-DomainJoin {
         } -ArgumentList $DomainName, $DomainAdministratorCredential -ErrorAction Stop
     }
     catch {
-        Write-Warn "Domain join command for $VMName ended with: $($_.Exception.Message)"
-        Write-Warn "This can be expected when the VM restarts during domain join. Domain membership will be validated next."
+        Write-ExpectedRestartWarning -Activity "Domain join command for $VMName" -ErrorRecord $_
     }
 
-    Wait-ForPowerShellDirect -VMName $VMName -Credential $DomainAdministratorCredential -Retries 60
+    Wait-ForPowerShellDirect -VMName $VMName -Credential $LocalCredential -Retries 60
 
-    $joinedAfterRestart = Invoke-Command -VMName $VMName -Credential $DomainAdministratorCredential -ScriptBlock {
-        param([string]$ExpectedDomain)
+    $joinedAfterRestart = Invoke-WithRetry `
+        -Activity "Validating domain join for $VMName" `
+        -Retries 24 `
+        -DelaySeconds 5 `
+        -Script {
+            Invoke-Command -VMName $VMName -Credential $LocalCredential -ScriptBlock {
+                param([string]$ExpectedDomain)
 
-        $computerSystem = Get-CimInstance Win32_ComputerSystem
-        return ($computerSystem.PartOfDomain -and ($computerSystem.Domain -ieq $ExpectedDomain))
-    } -ArgumentList $DomainName -ErrorAction Stop
+                $computerSystem = Get-CimInstance Win32_ComputerSystem
+                return ($computerSystem.PartOfDomain -and ($computerSystem.Domain -ieq $ExpectedDomain))
+            } -ArgumentList $DomainName -ErrorAction Stop
+        }
+
+    Invoke-WithRetry `
+        -Activity "Validating domain credential for $VMName" `
+        -Retries 24 `
+        -DelaySeconds 5 `
+        -Script {
+            Invoke-Command -VMName $VMName -Credential $DomainAdministratorCredential -ScriptBlock {
+                param([string]$ExpectedDomain)
+
+                $computerSystem = Get-CimInstance Win32_ComputerSystem
+
+                if (-not ($computerSystem.PartOfDomain -and ($computerSystem.Domain -ieq $ExpectedDomain))) {
+                    throw "$env:COMPUTERNAME is not joined to $ExpectedDomain."
+                }
+            } -ArgumentList $DomainName -ErrorAction Stop
+        } | Out-Null
 
     if (-not $joinedAfterRestart) {
         throw "$VMName did not join domain $DomainName successfully."
