@@ -222,18 +222,27 @@ function Invoke-WithRetry {
     )
 
     $lastError = $null
+    $operationTimer = [System.Diagnostics.Stopwatch]::StartNew()
 
     for ($attempt = 1; $attempt -le $Retries; $attempt++) {
+        $attemptTimer = [System.Diagnostics.Stopwatch]::StartNew()
+
         try {
-            return & $Script
+            $result = & $Script
+            $attemptTimer.Stop()
+            $operationTimer.Stop()
+            Write-Info "$Activity succeeded on attempt $attempt after $([int]$attemptTimer.Elapsed.TotalSeconds)s. Total elapsed: $([int]$operationTimer.Elapsed.TotalSeconds)s."
+            return $result
         }
         catch {
+            $attemptTimer.Stop()
             $lastError = $_
-            Write-Warn "$Activity failed on attempt $attempt of $Retries. $($_.Exception.Message)"
+            Write-Warn "$Activity failed on attempt $attempt of $Retries after $([int]$attemptTimer.Elapsed.TotalSeconds)s. $($_.Exception.Message)"
             Start-Sleep -Seconds $DelaySeconds
         }
     }
 
+    $operationTimer.Stop()
     throw "$Activity failed after $Retries attempts. Last error: $($lastError.Exception.Message)"
 }
 
@@ -256,6 +265,24 @@ function Wait-ForPowerShellDirect {
         }
 
     Write-Info "$VMName is reachable through PowerShell Direct."
+}
+
+function Test-CanUsePowerShellDirect {
+    param(
+        [Parameter(Mandatory = $true)][string]$VMName,
+        [Parameter(Mandatory = $true)][PSCredential]$Credential
+    )
+
+    try {
+        Invoke-Command -VMName $VMName -Credential $Credential -ScriptBlock {
+            "ready"
+        } -ErrorAction Stop | Out-Null
+
+        return $true
+    }
+    catch {
+        return $false
+    }
 }
 
 function Test-IsExpectedRestartDisconnect {
@@ -1029,6 +1056,36 @@ function Wait-ForDomainReady {
     Write-Info "Domain is ready: $DomainName."
 }
 
+function Wait-ForDomainDnsReady {
+    param(
+        [Parameter(Mandatory = $true)][string]$VMName,
+        [Parameter(Mandatory = $true)][PSCredential]$Credential,
+        [Parameter(Mandatory = $true)][string]$DomainName,
+        [int]$Retries = 30,
+        [int]$DelaySeconds = 5
+    )
+
+    Write-Info "Waiting for DNS readiness for domain $DomainName from $VMName."
+
+    Invoke-WithRetry `
+        -Activity "Waiting for DNS records for $DomainName from $VMName" `
+        -Retries $Retries `
+        -DelaySeconds $DelaySeconds `
+        -Script {
+            Invoke-Command -VMName $VMName -Credential $Credential -ScriptBlock {
+                param([string]$ExpectedDomainName)
+
+                $dnsServers = @(Get-DnsClientServerAddress -AddressFamily IPv4 | Select-Object -ExpandProperty ServerAddresses)
+                Write-Output "Current DNS servers on $env:COMPUTERNAME: $($dnsServers -join ', ')"
+
+                Resolve-DnsName $ExpectedDomainName -QuickTimeout -ErrorAction Stop | Out-Null
+                Resolve-DnsName "_ldap._tcp.dc._msdcs.$ExpectedDomainName" -Type SRV -QuickTimeout -ErrorAction Stop | Out-Null
+            } -ArgumentList $DomainName -ErrorAction Stop
+        }
+
+    Write-Info "DNS records for $DomainName are resolvable from $VMName."
+}
+
 function Ensure-NewForest {
     param(
         [Parameter(Mandatory = $true)][string]$VMName,
@@ -1039,7 +1096,13 @@ function Ensure-NewForest {
         [Parameter(Mandatory = $true)][string]$SafeModePassword
     )
 
-    if (Test-IsDomainControllerForDomain -VMName $VMName -Credential $DomainAdministratorCredential -DomainName $DomainName) {
+    if (Test-CanUsePowerShellDirect -VMName $VMName -Credential $LocalCredential) {
+        if (Test-IsDomainControllerForDomain -VMName $VMName -Credential $LocalCredential -DomainName $DomainName) {
+            Write-Info "$VMName is already a domain controller for $DomainName. Skipping forest creation."
+            return
+        }
+    }
+    elseif (Test-IsDomainControllerForDomain -VMName $VMName -Credential $DomainAdministratorCredential -DomainName $DomainName) {
         Write-Info "$VMName is already a domain controller for $DomainName. Skipping forest creation."
         return
     }
@@ -1150,6 +1213,7 @@ function Ensure-ChildDomain {
     }
 
     Write-Info "Creating child domain '$ChildDomainName' on $VMName."
+    Wait-ForDomainDnsReady -VMName $VMName -Credential $LocalCredential -DomainName $ParentDomainName -Retries 24 -DelaySeconds 5
 
     try {
         Invoke-Command -VMName $VMName -Credential $LocalCredential -ScriptBlock {
@@ -1359,6 +1423,7 @@ function New-LabJobInitializationScript {
         "Get-ConvenienceDomainCredential",
         "Invoke-WithRetry",
         "Wait-ForPowerShellDirect",
+        "Test-CanUsePowerShellDirect",
         "Test-IsExpectedRestartDisconnect",
         "Write-ExpectedRestartWarning",
         "Convert-ToGuestMacAddress",
@@ -1374,6 +1439,7 @@ function New-LabJobInitializationScript {
         "Ensure-WindowsFeatures",
         "Test-IsDomainControllerForDomain",
         "Wait-ForDomainReady",
+        "Wait-ForDomainDnsReady",
         "Ensure-NewForest",
         "Ensure-ReplicaDomainController",
         "Ensure-ChildDomain",
@@ -1407,6 +1473,7 @@ function Invoke-LabTaskGroup {
     Write-Stage "TASK GROUP - $Name"
     Write-Info "Starting $($taskList.Count) task(s): $((@($taskList | ForEach-Object { $_.Name })) -join ', ')"
 
+    $groupTimer = [System.Diagnostics.Stopwatch]::StartNew()
     $initializationScriptText = (New-LabJobInitializationScript).ToString()
     $runningTasks = @()
 
@@ -1442,8 +1509,16 @@ function Invoke-LabTaskGroup {
                 $ErrorActionPreference = "Stop"
 
                 Write-Info "Task '$TaskName' started."
+                $taskTimer = [System.Diagnostics.Stopwatch]::StartNew()
                 $taskScript = [scriptblock]::Create($TaskScriptText)
-                & $taskScript @TaskArguments
+                try {
+                    & $taskScript @TaskArguments
+                }
+                finally {
+                    $taskTimer.Stop()
+                    Write-Info "Task '$TaskName' elapsed: $([int]$taskTimer.Elapsed.TotalSeconds)s."
+                }
+
                 Write-Info "Task '$TaskName' completed."
             })
             [void]$powershell.AddArgument($task.Name)
@@ -1526,11 +1601,13 @@ function Invoke-LabTaskGroup {
         }
 
         if ($failures.Count -gt 0) {
+            $groupTimer.Stop()
             $failureText = @($failures | ForEach-Object { "$($_.Name): $($_.Error)" }) -join "`n"
-            throw "Task group '$Name' failed:`n$failureText"
+            throw "Task group '$Name' failed after $([int]$groupTimer.Elapsed.TotalSeconds)s:`n$failureText"
         }
 
-        Write-Info "Task group '$Name' completed successfully."
+        $groupTimer.Stop()
+        Write-Info "Task group '$Name' completed successfully in $([int]$groupTimer.Elapsed.TotalSeconds)s."
     }
     finally {
         foreach ($runningTask in $runningTasks) {
@@ -1831,6 +1908,12 @@ function Build-Lab {
     ########################################################
 
     Write-Stage "STAGE 7 - CHILD DOMAIN"
+
+    Set-GuestDnsBySwitch `
+        -VMName $Config.Domains.Child.FirstDC `
+        -SwitchName $Config.VMs.ChildDC1.SwitchName `
+        -DnsServers @("10.0.0.2", "10.0.0.3") `
+        -Credential $localCredential
 
     Ensure-ChildDomain `
         -VMName $Config.Domains.Child.FirstDC `
