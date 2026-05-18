@@ -983,9 +983,16 @@ function Ensure-WindowsFeatures {
     )
 
     Write-Info "Ensuring Windows features are installed on ${VMName}: $($FeatureNames -join ', ')"
+    $featureNamesJson = ConvertTo-Json -InputObject $FeatureNames -Compress
 
     Invoke-Command -VMName $VMName -Credential $Credential -ScriptBlock {
-        param([string[]]$Names, [bool]$WithManagementTools)
+        param([string]$NamesJson, [bool]$WithManagementTools)
+
+        $Names = [System.Collections.Generic.List[string]]::new()
+
+        foreach ($featureName in ($NamesJson | ConvertFrom-Json)) {
+            $Names.Add([string]$featureName)
+        }
 
         $features = Get-WindowsFeature -Name $Names
         $foundNames = @($features | Select-Object -ExpandProperty Name)
@@ -1016,7 +1023,7 @@ function Ensure-WindowsFeatures {
         }
 
         Write-Output "Installed features: $($missing -join ', ')"
-    } -ArgumentList (, $FeatureNames), ([bool]$IncludeManagementTools) -ErrorAction Stop
+    } -ArgumentList $featureNamesJson, ([bool]$IncludeManagementTools) -ErrorAction Stop
 }
 
 ############################################################
