@@ -988,6 +988,13 @@ function Ensure-WindowsFeatures {
         param([string[]]$Names, [bool]$WithManagementTools)
 
         $features = Get-WindowsFeature -Name $Names
+        $foundNames = @($features | Select-Object -ExpandProperty Name)
+        $unknownNames = @($Names | Where-Object { $foundNames -notcontains $_ })
+
+        if ($unknownNames.Count -gt 0) {
+            throw "Unknown Windows feature name(s): $($unknownNames -join ', ')"
+        }
+
         $missing = @($features | Where-Object { $_.InstallState -ne "Installed" } | Select-Object -ExpandProperty Name)
 
         if ($missing.Count -eq 0) {
@@ -1000,6 +1007,12 @@ function Ensure-WindowsFeatures {
         }
         else {
             Install-WindowsFeature -Name $missing -ErrorAction Stop | Out-Null
+        }
+
+        $remainingMissing = @(Get-WindowsFeature -Name $Names | Where-Object { $_.InstallState -ne "Installed" } | Select-Object -ExpandProperty Name)
+
+        if ($remainingMissing.Count -gt 0) {
+            throw "Windows feature installation did not complete for: $($remainingMissing -join ', ')"
         }
 
         Write-Output "Installed features: $($missing -join ', ')"
@@ -2078,6 +2091,7 @@ function Build-Lab {
                 -VMName $TaskVMName `
                 -Credential $TaskCredential `
                 -FeatureNames @(
+                    "ADCS-Cert-Authority",
                     "Web-Server",
                     "ADCS-Enroll-Web-Pol",
                     "ADCS-Enroll-Web-Svc",
