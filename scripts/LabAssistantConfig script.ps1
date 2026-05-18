@@ -355,7 +355,7 @@ function Get-VMNicMacBySwitch {
 function Test-LabTopology {
     param(
         [Parameter(Mandatory = $true)]$Config,
-        [Parameter(Mandatory = $true)][PSCredential]$Credential
+        [Parameter(Mandatory = $true)][hashtable]$CredentialMap
     )
 
     Write-Stage "PHASE 0 - PREFLIGHT VALIDATION"
@@ -389,7 +389,25 @@ function Test-LabTopology {
     }
 
     foreach ($vmName in $expectedVmNames) {
-        Wait-ForPowerShellDirect -VMName $vmName -Credential $Credential -Retries 3 -DelaySeconds 5
+        $credentialsToTry = if ($CredentialMap.ContainsKey($vmName)) { @($CredentialMap[$vmName]) } else { @() }
+        $reachable = $false
+        $lastError = $null
+
+        foreach ($candidateCredential in $credentialsToTry) {
+            try {
+                Wait-ForPowerShellDirect -VMName $vmName -Credential $candidateCredential -Retries 1 -DelaySeconds 1
+                $reachable = $true
+                break
+            }
+            catch {
+                $lastError = $_
+                Write-Warn "Preflight PowerShell Direct check failed on $vmName for $($candidateCredential.UserName): $($_.Exception.Message)"
+            }
+        }
+
+        if (-not $reachable) {
+            throw "VM '$vmName' is not reachable through PowerShell Direct with any expected credential. Last error: $($lastError.Exception.Message)"
+        }
     }
 
     $macOwners = @{}
@@ -1698,8 +1716,30 @@ function Build-Lab {
     $childAdminCredential = Get-DomainAdministratorCredential -Config $Config -DomainName $childDomain
 
     $allVmNames = @($Config.VMs.Keys) + @($Config.Router.Name)
+    $preflightCredentialMap = @{}
 
-    Test-LabTopology -Config $Config -Credential $localCredential
+    foreach ($vmName in $allVmNames) {
+        $preflightCredentialMap[$vmName] = @($localCredential)
+    }
+
+    foreach ($vmName in $Config.VMs.Keys) {
+        $vm = $Config.VMs[$vmName]
+
+        if ($vm.ContainsKey("DomainJoin") -and $vm.DomainJoin -eq $contosoDomain) {
+            $preflightCredentialMap[$vmName] = @($localCredential, $contosoAdminCredential)
+        }
+    }
+
+    $preflightCredentialMap[$Config.Domains.Contoso.FirstDC] = @($localCredential, $contosoAdminCredential)
+
+    foreach ($replicaVmName in $Config.Domains.Contoso.ReplicaDCs) {
+        $preflightCredentialMap[$replicaVmName] = @($localCredential, $contosoAdminCredential)
+    }
+
+    $preflightCredentialMap[$Config.Domains.Fabrikam.FirstDC] = @($localCredential, $fabrikamAdminCredential)
+    $preflightCredentialMap[$Config.Domains.Child.FirstDC] = @($localCredential, $childAdminCredential, $contosoAdminCredential)
+
+    Test-LabTopology -Config $Config -CredentialMap $preflightCredentialMap
 
     ########################################################
     # STAGE 1 - GUEST NETWORK INITIALIZATION
