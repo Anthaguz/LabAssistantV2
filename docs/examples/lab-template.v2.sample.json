@@ -1,0 +1,139 @@
+{
+  "id": "8f0404f98844446a9f88f4f4d0ee13ff",
+  "name": "AD Core Lab V2",
+  "description": "Root DC, replica DC, router, and one member server",
+  "schemaVersion": "2.0.0",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "labNetworks": [
+    {
+      "networkId": "contoso-net",
+      "name": "Contoso",
+      "switchName": "Contoso",
+      "subnet": "10.0.0.0/24"
+    },
+    {
+      "networkId": "external-net",
+      "name": "External",
+      "switchName": "Default Switch"
+    }
+  ],
+  "vmTemplates": [
+    {
+      "vmId": "5aa04c2ad9c5418dbd8213f9f8a0ed7d",
+      "name": "ContosoDC1",
+      "memoryMb": 4096,
+      "cpuCount": 2,
+      "vhdxId": "win-server-2025-gen2-core",
+      "topologyRole": "RootDomainController",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.win-server-2025.local-admin",
+        "domainAdmin": "lab.contoso.domain-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "contoso-net",
+          "ipAddress": "10.0.0.2",
+          "prefixLength": 24,
+          "defaultGateway": "10.0.0.1",
+          "dnsServers": [
+            "10.0.0.2",
+            "10.0.0.3"
+          ]
+        }
+      ]
+    },
+    {
+      "vmId": "c1d2ba678f83411a846f8b4d0b870f2f",
+      "name": "ContosoDC2",
+      "memoryMb": 4096,
+      "cpuCount": 2,
+      "vhdxId": "win-server-2025-gen2-core",
+      "topologyRole": "ReplicaDomainController",
+      "capabilityRoles": [],
+      "dependsOn": [
+        "vm:ContosoDC1:domain-ready"
+      ],
+      "credentialSlots": {
+        "localBootstrap": "disk.win-server-2025.local-admin",
+        "domainAdmin": "lab.contoso.domain-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "contoso-net",
+          "ipAddress": "10.0.0.3",
+          "prefixLength": 24,
+          "defaultGateway": "10.0.0.1",
+          "dnsServers": [
+            "10.0.0.2",
+            "10.0.0.3"
+          ]
+        }
+      ]
+    },
+    {
+      "vmId": "79fbb408de6642e0b0f4a2a4b2d4c0ef",
+      "name": "Router",
+      "memoryMb": 4096,
+      "cpuCount": 2,
+      "vhdxId": "win-server-2025-gui-gen2",
+      "topologyRole": "Router",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.win-server-2025.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "contoso",
+          "networkId": "contoso-net",
+          "ipAddress": "10.0.0.1",
+          "prefixLength": 24,
+          "dnsServers": [
+            "10.0.0.2",
+            "10.0.0.3"
+          ]
+        },
+        {
+          "nicId": "external",
+          "networkId": "external-net"
+        }
+      ]
+    },
+    {
+      "vmId": "c0e676cae5ea471194975ef48347d7f1",
+      "name": "Member01",
+      "memoryMb": 4096,
+      "cpuCount": 2,
+      "vhdxId": "win-server-2025-gui-gen2",
+      "topologyRole": "MemberServer",
+      "capabilityRoles": [
+        "Sql"
+      ],
+      "dependsOn": [
+        "vm:ContosoDC1:domain-ready"
+      ],
+      "credentialSlots": {
+        "localBootstrap": "disk.win-server-2025.local-admin",
+        "domainJoin": "lab.contoso.domain-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "contoso-net",
+          "ipAddress": "10.0.0.10",
+          "prefixLength": 24,
+          "defaultGateway": "10.0.0.1",
+          "dnsServers": [
+            "10.0.0.2",
+            "10.0.0.3"
+          ]
+        }
+      ]
+    }
+  ]
+}

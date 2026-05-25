@@ -33,6 +33,8 @@ Use these only when the active slice directly depends on them or when `srs.md` /
 - `docs/01-requirements/logging-contract.md`
 - `docs/01-requirements/machines-capability-contract.md`
 - `docs/01-requirements/template-schema.md`
+- `docs/vhdx-catalog-schema.md`
+- `docs/04-data/v2-template-planning-contract.md`
 
 These define quality bars, specialized requirement boundaries, and domain-specific supporting contracts.
 They do not override `srs.md` / `acceptance-criteria.md` on user-visible behavior unless those files explicitly delegate.
@@ -49,6 +51,8 @@ They do not override product behavior contracts; they define how behavior should
 - `docs/03-architecture/code-documentation.md`
 - `docs/03-architecture/code-organization.md`
 - `docs/03-architecture/hyperv-powershell-interaction.md`
+- `docs/03-architecture/v2-unified-orchestration.md`
+- `docs/03-architecture/lab-config-script-behavior-inventory.md`
 - `docs/03-architecture/winui-shell-navigation-layout.md`
 - `docs/03-architecture/winui-shell-bootstrap-runtime.md`
 - `docs/03-architecture/winui-lane-architecture.md`

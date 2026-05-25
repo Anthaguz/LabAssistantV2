@@ -914,6 +914,46 @@ Detailed logging contract:
 
 ---
 
+## 6.2 Unified Lab Orchestration (V2 Requirements)
+
+- **FR-191:** The system shall support a `V2` lab-template orchestration model that plans host provisioning, readiness, and guest configuration in one unified deployment graph instead of treating them as fully separate phases.
+  - **Acceptance details:** The unified graph shall be a planning/runtime concern for `V2` templates only and shall not silently replace the current `V1` deployment engine.
+  - **Priority:** P1
+
+- **FR-192:** The system shall route templates to the deployment engine by schema-version compatibility and shall preserve the current deployment path for existing `V1` templates.
+  - **Acceptance details:** `V1` templates must remain deployable without requiring V2-only fields; `V2` templates must not fall back to the legacy engine silently.
+  - **Priority:** P0
+
+- **FR-193:** The system shall model `V2` VM intent using both topology roles and additive capability roles.
+  - **Acceptance details:** A VM may hold multiple roles simultaneously; additive capability roles must not imply exclusivity against topology roles.
+  - **Priority:** P1
+
+- **FR-194:** The system shall support first-class multi-NIC network intent in `V2` templates, including explicit per-NIC switch attachment and explicit per-NIC guest IP, gateway, and DNS authoring.
+  - **Acceptance details:** Router-style VMs with multiple attached switches/NICs are in scope for the V2 schema and planner baseline.
+  - **Priority:** P1
+
+- **FR-195:** The system shall support deployment-profile-based scheduling for `V2` orchestration with at least `Conservative`, `Balanced`, and `Aggressive` profiles.
+  - **Acceptance details:** Profiles tune overlap/resource behavior without changing dependency correctness.
+  - **Priority:** P1
+
+- **FR-196:** The system shall classify `V2` orchestration work into coarse workload classes for scheduling decisions.
+  - **Acceptance details:** The baseline classes are `HeavyHost`, `HeavyGuest`, `MediumGuest`, and `LightWaitValidation`.
+  - **Priority:** P1
+
+- **FR-197:** The system shall support credential-slot references in `V2` templates and bootstrap-profile metadata on VHDX catalog entries without exporting reusable secret values inside templates.
+  - **Acceptance details:** Template sharing must remain portable; unresolved credential slots may block V2 deployment but must not require secrets to be embedded in the exported JSON.
+  - **Priority:** P0
+
+- **FR-198:** The system shall provide a `Review and Resolve` planning surface for `V2` deployments before runtime execution begins.
+  - **Acceptance details:** The review surface shall show the computed orchestration graph/waves, unresolved credentials/bootstrap assumptions, dependency blockers, and selected deployment profile.
+  - **Priority:** P1
+
+- **FR-199:** The V2 guest execution baseline shall use Hyper-V PowerShell Direct for supported guest operations in the current scope.
+  - **Acceptance details:** Multi-hypervisor expansion is out of current scope and must not be assumed by the initial V2 contract.
+  - **Priority:** P1
+
+---
+
 ## 7. Acceptance Criteria Mapping
 
 Each functional requirement shall map to:

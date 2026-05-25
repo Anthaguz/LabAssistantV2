@@ -243,7 +243,7 @@ public class LabTemplateStoreTests
                                 {
                                   "id": "lab-major2",
                                   "name": "Lab Major 2",
-                                  "schemaVersion": "2.0.0",
+                                  "schemaVersion": "3.0.0",
                                   "templateRevision": 1,
                                   "createdWithAppVersion": "1.0.0",
                                   "templateType": "lab-template",
@@ -263,6 +263,134 @@ public class LabTemplateStoreTests
         var store = new LabTemplateStore();
         var ex = Assert.Throws<InvalidOperationException>(() => store.LoadFromFile(filePath));
         Assert.Contains("Please update LabAssistant", ex.Message);
+    }
+
+    [Fact]
+    public void LoadFromFile_V2Template_LoadsAndMarksExecutionEngine()
+    {
+        var folder = BuildTempRoot();
+        var filePath = Path.Combine(folder, "v2-template.json");
+        File.WriteAllText(filePath, """
+                                {
+                                  "id": "lab-v2",
+                                  "name": "Lab V2",
+                                  "schemaVersion": "2.0.0",
+                                  "templateRevision": 1,
+                                  "createdWithAppVersion": "1.0.0",
+                                  "templateType": "lab-template",
+                                  "deploymentProfile": "Balanced",
+                                  "labNetworks": [
+                                    {
+                                      "networkId": "contoso-net",
+                                      "name": "Contoso",
+                                      "switchName": "Contoso"
+                                    }
+                                  ],
+                                  "vmTemplates": [
+                                    {
+                                      "vmId": "vm-1",
+                                      "name": "dc1",
+                                      "memoryMb": 4096,
+                                      "cpuCount": 2,
+                                      "vhdxId": "win-server-2025-gen2-core",
+                                      "topologyRole": "RootDomainController",
+                                      "credentialSlots": {
+                                        "localBootstrap": "disk.win.local-admin"
+                                      },
+                                      "nics": [
+                                        {
+                                          "nicId": "primary",
+                                          "networkId": "contoso-net",
+                                          "ipAddress": "10.0.0.2",
+                                          "prefixLength": 24,
+                                          "dnsServers": [ "10.0.0.2" ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                                """);
+
+        var store = new LabTemplateStore();
+        var loaded = store.LoadFromFile(filePath);
+
+        Assert.Equal("2.0.0", loaded.SchemaVersion);
+        Assert.Equal(TemplateExecutionEngine.V2UnifiedPlanning, loaded.ExecutionEngine);
+        Assert.Equal("Balanced", loaded.DeploymentProfile);
+        Assert.Single(loaded.LabNetworks);
+        Assert.Equal("RootDomainController", loaded.VmTemplates[0].TopologyRole);
+        Assert.Equal("disk.win.local-admin", loaded.VmTemplates[0].CredentialSlots?.LocalBootstrap);
+        Assert.Single(loaded.VmTemplates[0].Nics);
+    }
+
+    [Fact]
+    public void SaveToFile_V2Template_PreservesV2SchemaAndPlanningFields()
+    {
+        var folder = BuildTempRoot();
+        var path = Path.Combine(folder, "v2-template.json");
+        var store = new LabTemplateStore();
+        var template = new LabTemplate
+        {
+            Id = "lab-v2",
+            Name = "Lab V2",
+            SchemaVersion = "2.0.0",
+            ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning,
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            DeploymentProfile = "Balanced",
+            LabNetworks =
+            [
+                new LabNetworkTemplate
+                {
+                    NetworkId = "contoso-net",
+                    Name = "Contoso",
+                    SwitchName = "Contoso"
+                }
+            ],
+            VmTemplates =
+            {
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "dc1",
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = "win-server-2025-gen2-core",
+                    TopologyRole = "RootDomainController",
+                    CapabilityRoles = ["Pki"],
+                    DependsOn = ["vm:router:ready"],
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = "disk.win.local-admin"
+                    },
+                    Nics =
+                    [
+                        new VmNetworkInterfaceTemplate
+                        {
+                            NicId = "primary",
+                            NetworkId = "contoso-net",
+                            IpAddress = "10.0.0.2",
+                            PrefixLength = 24,
+                            DnsServers = ["10.0.0.2"]
+                        }
+                    ]
+                }
+            }
+        };
+
+        store.SaveToFile(path, template);
+        var loaded = store.LoadFromFile(path);
+        var json = File.ReadAllText(path);
+
+        Assert.Equal("2.0.0", loaded.SchemaVersion);
+        Assert.Equal(TemplateExecutionEngine.V2UnifiedPlanning, loaded.ExecutionEngine);
+        Assert.Equal("Balanced", loaded.DeploymentProfile);
+        Assert.Equal(["Pki"], loaded.VmTemplates[0].CapabilityRoles);
+        Assert.Equal(["vm:router:ready"], loaded.VmTemplates[0].DependsOn);
+        Assert.Contains("\"deploymentProfile\": \"Balanced\"", json);
+        Assert.Contains("\"labNetworks\"", json);
+        Assert.Contains("\"nics\"", json);
     }
 
     [Fact]

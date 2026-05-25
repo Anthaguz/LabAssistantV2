@@ -7,7 +7,7 @@ namespace LabAssistant.Data.Templates;
 
 public class LabTemplateStore : ILabTemplateStore
 {
-    private static readonly Version CurrentSchemaVersion = new(LabTemplate.CurrentSchemaVersion);
+    private static readonly Version V1SchemaVersion = TemplateSchemaVersionCatalog.V1Schema;
     private static readonly JsonSerializerOptions SaveOptions = new()
     {
         WriteIndented = true,
@@ -71,6 +71,7 @@ public class LabTemplateStore : ILabTemplateStore
                     result.Warnings.Add($"{file}: {warning}");
                 }
 
+                normalized.ExecutionEngine = TemplateSchemaVersionCatalog.Classify(normalized.SchemaVersion, isLegacyV0);
                 var validation = LabTemplateValidator.Validate(normalized, catalogItems);
                 if (!validation.IsValid)
                 {
@@ -120,6 +121,7 @@ public class LabTemplateStore : ILabTemplateStore
             throw new InvalidOperationException(error);
         }
 
+        normalized.ExecutionEngine = TemplateSchemaVersionCatalog.Classify(normalized.SchemaVersion, isLegacyV0);
         LastLoadWarnings = warnings.ToList();
         return normalized;
     }
@@ -178,9 +180,44 @@ public class LabTemplateStore : ILabTemplateStore
     {
         warnings = new List<string>();
         error = string.Empty;
+        var executionEngine = TemplateSchemaVersionCatalog.Classify(template.SchemaVersion, isLegacyV0);
+
+        if (executionEngine == TemplateExecutionEngine.V2UnifiedPlanning)
+        {
+            if (!Version.TryParse(template.SchemaVersion, out var v2Version))
+            {
+                normalized = template;
+                error = $"Template schemaVersion '{template.SchemaVersion}' is invalid. Use semantic version format like '{TemplateSchemaVersionCatalog.V2SchemaVersion}'.";
+                return false;
+            }
+
+            if (v2Version.Major > TemplateSchemaVersionCatalog.V2Schema.Major)
+            {
+                normalized = template;
+                error = $"Template schemaVersion '{v2Version}' is newer than this LabAssistant version supports. Please update LabAssistant.";
+                return false;
+            }
+
+            if (v2Version.Major < TemplateSchemaVersionCatalog.V2Schema.Major)
+            {
+                normalized = template;
+                error = $"Template schemaVersion '{v2Version}' is not a supported V2 major. Open and resave it through the intended compatibility path first.";
+                return false;
+            }
+
+            if (v2Version > TemplateSchemaVersionCatalog.V2Schema)
+            {
+                warnings.Add($"Template schemaVersion '{v2Version}' is newer minor/patch than supported '{TemplateSchemaVersionCatalog.V2Schema}'. Continuing with compatible fields only.");
+            }
+
+            normalized = NormalizeForSave(template);
+            normalized.ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning;
+            return true;
+        }
+
         var compatibility = TemplateSchemaCompatibilityGate.Evaluate(
             template.SchemaVersion,
-            CurrentSchemaVersion,
+            V1SchemaVersion,
             isLegacyV0);
 
         if (compatibility.IsBlocked)
@@ -200,15 +237,19 @@ public class LabTemplateStore : ILabTemplateStore
             : template;
 
         normalized = NormalizeForSave(normalized);
+        normalized.ExecutionEngine = TemplateExecutionEngine.V1Deployment;
         return true;
     }
 
     private static LabTemplate NormalizeForSave(LabTemplate source)
     {
         var normalized = source;
+        var executionEngine = source.ExecutionEngine != default
+            ? source.ExecutionEngine
+            : TemplateSchemaVersionCatalog.Classify(source.SchemaVersion);
 
-        // Save/export always emits the current canonical schema major (N).
-        normalized.SchemaVersion = LabTemplate.CurrentSchemaVersion;
+        // Save/export emits the canonical schema version for the template's routed engine family.
+        normalized.SchemaVersion = TemplateSchemaVersionCatalog.GetCanonicalSchemaVersion(executionEngine);
 
         if (normalized.TemplateRevision <= 0)
         {
@@ -224,6 +265,9 @@ public class LabTemplateStore : ILabTemplateStore
         {
             normalized.TemplateType = LabTemplate.SupportedTemplateType;
         }
+
+        normalized.ExecutionEngine = executionEngine;
+        normalized.LabNetworks = normalized.LabNetworks?.Select(Clone).ToList();
 
         for (var i = 0; i < normalized.VmTemplates.Count; i++)
         {
@@ -249,7 +293,13 @@ public class LabTemplateStore : ILabTemplateStore
                 TimeZoneConfig = Clone(vm.TimeZoneConfig),
                 SoftwareConfig = Clone(vm.SoftwareConfig),
                 RoleConfig = Clone(vm.RoleConfig),
-                GuestNetworkConfig = Clone(vm.GuestNetworkConfig)
+                GuestNetworkConfig = Clone(vm.GuestNetworkConfig),
+                TopologyRole = vm.TopologyRole,
+                CapabilityRoles = vm.CapabilityRoles?.ToList(),
+                DependsOn = vm.DependsOn?.ToList(),
+                CredentialSlots = Clone(vm.CredentialSlots),
+                BootstrapProfileRef = vm.BootstrapProfileRef,
+                Nics = vm.Nics?.Select(Clone).ToList()
             };
         }
 
@@ -372,6 +422,48 @@ public class LabTemplateStore : ILabTemplateStore
         {
             Enabled = source.Enabled,
             IpAddress = source.IpAddress,
+            DefaultGateway = source.DefaultGateway,
+            DnsServers = source.DnsServers?.ToList()
+        };
+    }
+
+    private static LabNetworkTemplate Clone(LabNetworkTemplate source)
+    {
+        return new LabNetworkTemplate
+        {
+            NetworkId = source.NetworkId,
+            Name = source.Name,
+            SwitchName = source.SwitchName,
+            Subnet = source.Subnet,
+            Notes = source.Notes
+        };
+    }
+
+    private static VmCredentialSlotBindings? Clone(VmCredentialSlotBindings? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new VmCredentialSlotBindings
+        {
+            LocalBootstrap = source.LocalBootstrap,
+            DomainAdmin = source.DomainAdmin,
+            DomainJoin = source.DomainJoin
+        };
+    }
+
+    private static VmNetworkInterfaceTemplate Clone(VmNetworkInterfaceTemplate source)
+    {
+        return new VmNetworkInterfaceTemplate
+        {
+            NicId = source.NicId,
+            Name = source.Name,
+            NetworkId = source.NetworkId,
+            SwitchName = source.SwitchName,
+            IpAddress = source.IpAddress,
+            PrefixLength = source.PrefixLength,
             DefaultGateway = source.DefaultGateway,
             DnsServers = source.DnsServers?.ToList()
         };

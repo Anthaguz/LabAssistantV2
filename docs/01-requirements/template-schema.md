@@ -120,6 +120,90 @@ Future-friendly guest network config may exist as optional VM subobject:
 
 This is guest configuration intent, not Hyper-V topology control.
 
+## V2 Planning Direction
+
+`V2` is a schema evolution for unified orchestration planning, not a silent replacement for `V1`.
+
+### V2 compatibility rule
+
+- `V1` templates remain valid for the current engine.
+- `V2` templates are routed to the new orchestration planner by schema version.
+- `V2` fields must not be required for `V1` templates.
+
+### V2 first-class objects
+
+For `V2`, the schema direction expands the current model to include:
+
+- lab networks
+- VM NIC collections
+- explicit per-NIC guest addressing
+- topology roles
+- additive capability roles
+- dependency declarations
+- deployment profile selection
+- credential slot references
+- VHDX/bootstrap profile references
+
+### V2 topology vs capability roles
+
+Topology roles affect scheduling and dependency semantics:
+
+- `Router`
+- `RootDomainController`
+- `ReplicaDomainController`
+- `MemberServer`
+- `StandaloneServer`
+
+Capability roles request additive work without replacing topology roles:
+
+- `Pki`
+- `Sql`
+- `Web`
+- `Operations`
+
+Rule:
+
+- a VM may hold one topology role and multiple additive capability roles
+- a VM may also carry future topology/capability combinations when explicitly supported
+
+### V2 network authoring direction
+
+V2 uses a hybrid network model:
+
+- central network objects define shared validation and naming context
+- each VM NIC keeps explicit switch attachment and guest IP intent by default
+
+This avoids relying on hidden auto-allocation while still giving templates shared network structure.
+
+### V2 NIC direction
+
+Instead of only `switchName` / `switchNames`, a V2 VM entry may declare a NIC collection with:
+
+- stable NIC id or name
+- target lab network / switch attachment
+- guest IP address
+- prefix length
+- default gateway
+- DNS server list
+- optional router/dependency annotations where needed
+
+During transition:
+
+- `switchNames` remains the V1 canonical multi-NIC list
+- a later V2-compatible writer/reader may add richer NIC objects without breaking the V1 contract
+
+### V2 credentials and bootstrap references
+
+V2 templates must reference credentials by slot/label rather than embedding reusable secret values.
+
+Template-owned references may include:
+
+- local bootstrap credential slot reference
+- domain join credential slot reference
+- role-specific credential slot reference
+
+Reusable secret values remain a local-machine concern and must not travel in exported templates.
+
 ## Guest/Role Placeholder Sections
 
 The schema includes optional sections now for forward compatibility:
@@ -176,3 +260,5 @@ Rule:
 
 - Exact migration flow UX for schema upgrades.
 - Field-level compatibility matrix for minor schema version changes.
+- Whether deterministic auto-allocation should ever complement explicit per-NIC addressing in V2.
+- Exact child-domain/tree/extra-forest V2 field set beyond the reserved extension seam.
