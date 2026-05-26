@@ -1,0 +1,36 @@
+{
+  "version": "v0",
+  "items": [
+    {
+      "id": "win-server-2025-gen2-core",
+      "path": "C:/Lab/VHDX/WinServer2025-Core.vhdx",
+      "osName": "Windows Server",
+      "osVersion": "2025",
+      "generation": 2,
+      "sizeBytes": 42949672960,
+      "signature": "windows-server|2025|gen2|42949672960",
+      "notes": "Patched 2026-05, local Administrator prepared for PowerShell Direct",
+      "bootstrapProfile": {
+        "expectedLocalUser": "Administrator",
+        "localCredentialSlotRef": "disk.win-server-2025.local-admin",
+        "guestOsFamily": "WindowsServer",
+        "guestTransport": "powershell-direct",
+        "notes": "Sysprepped base image used for AD-core labs"
+      }
+    },
+    {
+      "id": "win-server-2025-gui-gen2",
+      "path": "C:/Lab/VHDX/WinServer2025-GUI.vhdx",
+      "osName": "Windows Server",
+      "osVersion": "2025",
+      "generation": 2,
+      "notes": "GUI image for utility or operations servers",
+      "bootstrapProfile": {
+        "expectedLocalUser": "Administrator",
+        "localCredentialSlotRef": "disk.win-server-2025.local-admin",
+        "guestOsFamily": "WindowsServer",
+        "guestTransport": "powershell-direct"
+      }
+    }
+  ]
+}

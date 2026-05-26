@@ -72,4 +72,34 @@ public class VmTemplate
     /// Optional future guest network payload. Placeholder-safe and omitted by default.
     /// </summary>
     public GuestNetworkStepConfig? GuestNetworkConfig { get; set; }
+
+    /// <summary>
+    /// Optional V2 topology role that influences orchestration ordering and dependency semantics.
+    /// </summary>
+    public string? TopologyRole { get; set; }
+
+    /// <summary>
+    /// Optional additive V2 capability roles that request additional guest work without replacing topology intent.
+    /// </summary>
+    public List<string>? CapabilityRoles { get; set; }
+
+    /// <summary>
+    /// Optional explicit dependency references for V2 planning.
+    /// </summary>
+    public List<string>? DependsOn { get; set; }
+
+    /// <summary>
+    /// Optional V2 template-side credential slot references.
+    /// </summary>
+    public VmCredentialSlotBindings? CredentialSlots { get; set; }
+
+    /// <summary>
+    /// Optional V2 bootstrap-profile reference associated with the selected base image.
+    /// </summary>
+    public string? BootstrapProfileRef { get; set; }
+
+    /// <summary>
+    /// Optional V2 NIC collection for explicit multi-NIC guest/network planning.
+    /// </summary>
+    public List<VmNetworkInterfaceTemplate>? Nics { get; set; }
 }

@@ -52,6 +52,8 @@ public sealed class TemplateLibraryItem
     public int TemplateRevision { get; init; }
 
     public string FilePath { get; init; } = string.Empty;
+
+    public TemplateExecutionEngine ExecutionEngine { get; init; }
 }
 
 public sealed class TemplateEditorDocument

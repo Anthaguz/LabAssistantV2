@@ -84,7 +84,8 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
                         VmCount = template.VmTemplates.Count,
                         SchemaVersion = template.SchemaVersion,
                         TemplateRevision = template.TemplateRevision,
-                        FilePath = filePath
+                        FilePath = filePath,
+                        ExecutionEngine = template.ExecutionEngine
                     });
                 }
                 catch (Exception ex)

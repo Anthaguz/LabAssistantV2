@@ -4301,3 +4301,134 @@ Each readiness result shall include, at minimum:
 - [ ] logical focus order and visible focus indication are explicit
 - [ ] supported text scaling and high-contrast resilience are explicit
 - [ ] non-color-only error communication is explicit
+
+# AC-048 - V2 Unified Orchestration Planning And Routing
+
+**Related FRs:** FR-191, FR-192, FR-193, FR-194, FR-195, FR-196, FR-197, FR-198, FR-199, FR-040, FR-041
+
+## Scenarios
+
+### 1) V1 compatibility - existing templates stay on the current engine
+**Given**
+- a template that only satisfies the current `V1` schema contract
+
+**When**
+- the user loads or deploys the template
+
+**Then**
+- the system routes it to the current deployment engine
+- V2-only routing, validation, and planning requirements do not silently block the template
+- any V2-only fields remain optional and absent
+
+### 2) V2 routing - new templates require the new planner
+**Given**
+- a template that declares the supported `V2` schema version
+
+**When**
+- the user requests deployment
+
+**Then**
+- the system routes the template to the V2 orchestration planner
+- the system does not silently downgrade to the V1 engine
+- if the V2 planner cannot support the template shape yet, deployment is blocked with actionable guidance
+
+### 3) Review and resolve - unresolved credential slots
+**Given**
+- a V2 template that references one or more credential slots
+- one or more required local slot mappings are unresolved on the current machine
+
+**When**
+- the user opens the V2 deployment review flow
+
+**Then**
+- the system identifies the unresolved slot(s)
+- the system shows which VM(s), bootstrap profile(s), or planned tasks require them
+- deployment does not start until all required slot mappings are resolved
+- the exported/shared template itself contains slot references and labels only, not reusable secret values
+
+### 4) Review and resolve - graph and dependency visibility
+**Given**
+- a valid V2 template with resolved references
+
+**When**
+- the system builds the V2 orchestration plan
+
+**Then**
+- the review surface shows the computed orchestration graph or scheduling waves
+- the review surface shows dependency blockers and gating conditions where relevant
+- the review surface shows the selected deployment profile
+- the same template input produces the same graph/waves deterministically
+
+### 5) Router optionality - no router, no router tasks
+**Given**
+- a V2 template that does not require cross-switch routing or outbound-router behavior
+
+**When**
+- the V2 plan is built
+
+**Then**
+- the graph does not introduce router provisioning or router-readiness tasks
+- non-router labs remain valid when all dependencies are otherwise satisfied
+
+### 6) Router dependency - cross-switch work waits for router readiness
+**Given**
+- a V2 template in which one or more tasks require communication across different lab switches
+
+**When**
+- the V2 plan is built
+
+**Then**
+- the graph contains router-related tasks only when required
+- cross-switch dependent tasks are blocked until router networking/routing/NAT readiness is satisfied
+- the dependency reason is visible in the review plan output
+
+### 7) Role composition - topology and capability roles coexist
+**Given**
+- a V2 template where a VM has both a topology role and one or more capability roles
+
+**When**
+- the template is validated and planned
+
+**Then**
+- validation accepts the combined role set when the combination is otherwise supported
+- planner output preserves both kinds of role intent
+- capability roles do not implicitly erase or replace topology roles
+
+### 8) Multi-NIC semantics - explicit NIC intent is preserved
+**Given**
+- a V2 template with a VM that declares multiple NICs
+
+**When**
+- the system validates and plans the template
+
+**Then**
+- NIC ordering and switch attachment intent are preserved
+- explicit per-NIC IP/gateway/DNS values are preserved
+- router-style VMs are supported by the schema/planner contract even before the full router runtime slice is implemented
+
+### 9) Scheduling profiles - overlap changes without breaking correctness
+**Given**
+- the same valid V2 template
+- two different deployment profiles
+
+**When**
+- the planner builds the orchestration plan for each profile
+
+**Then**
+- dependency correctness remains unchanged between profiles
+- overlap/concurrency opportunities may differ according to the profile
+- heavy workload classes are not scheduled beyond the profile's intended cap model
+
+## Expected UI
+- a V2 review-and-resolve surface that can show:
+  - orchestration graph or scheduling waves
+  - unresolved credential slots
+  - unresolved bootstrap assumptions
+  - dependency blockers
+  - selected deployment profile
+- blocking messages for unresolved V2 requirements before runtime start
+- concise, actionable summaries with deeper technical detail left to diagnostics/logs
+
+## Open Questions / TBDs
+- exact visual format of the orchestration graph/waves in the first user-facing V2 review surface
+- exact import-time vs deploy-time UX for remapping credential slots on a newly shared template

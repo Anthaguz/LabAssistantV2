@@ -57,6 +57,22 @@ public class LabTemplate
     public NetworkConfig? NetworkConfig { get; set; }
 
     /// <summary>
+    /// Optional V2 deployment-profile selection used by the unified orchestration planner.
+    /// </summary>
+    public string? DeploymentProfile { get; set; }
+
+    /// <summary>
+    /// Optional V2 network inventory for shared network validation and multi-NIC planning.
+    /// </summary>
+    public List<LabNetworkTemplate>? LabNetworks { get; set; }
+
+    /// <summary>
+    /// Runtime-only execution-engine classification resolved from schema-version routing.
+    /// </summary>
+    [JsonIgnore]
+    public TemplateExecutionEngine ExecutionEngine { get; set; }
+
+    /// <summary>
     /// Legacy alias kept for UI compatibility. Maps to <see cref="SchemaVersion"/>.
     /// </summary>
     [JsonIgnore]

@@ -13,6 +13,9 @@ public static class LabTemplateValidator
     {
         var result = new LabTemplateValidationResult();
         var catalogIds = new HashSet<string>(catalogItems.Select(item => item.Id), StringComparer.OrdinalIgnoreCase);
+        var executionEngine = template.ExecutionEngine != default
+            ? template.ExecutionEngine
+            : TemplateSchemaVersionCatalog.Classify(template.SchemaVersion);
 
         if (string.IsNullOrWhiteSpace(template.SchemaVersion))
         {
@@ -55,6 +58,11 @@ public static class LabTemplateValidator
         if (template.VmTemplates.Count == 0)
         {
             result.Errors.Add("At least one VM template is required.");
+        }
+
+        if (executionEngine == TemplateExecutionEngine.V2UnifiedPlanning)
+        {
+            ValidateV2Networks(template, result);
         }
 
         var vmNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -116,10 +124,91 @@ public static class LabTemplateValidator
                 }
             }
 
+            if (executionEngine == TemplateExecutionEngine.V2UnifiedPlanning)
+            {
+                ValidateV2VmShape(vm, result);
+            }
+
             ValidateGuestStepConfig(vm, result);
         }
 
         return result;
+    }
+
+    private static void ValidateV2Networks(LabTemplate template, LabTemplateValidationResult result)
+    {
+        if (template.LabNetworks == null)
+        {
+            return;
+        }
+
+        var networkIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var network in template.LabNetworks)
+        {
+            if (string.IsNullOrWhiteSpace(network.NetworkId))
+            {
+                result.Errors.Add("V2 labNetwork.networkId is required when labNetworks are provided.");
+                continue;
+            }
+
+            if (!networkIds.Add(network.NetworkId.Trim()))
+            {
+                result.Errors.Add($"Duplicate V2 lab network id: {network.NetworkId}.");
+            }
+        }
+    }
+
+    private static void ValidateV2VmShape(VmTemplate vm, LabTemplateValidationResult result)
+    {
+        var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name;
+
+        if (vm.CapabilityRoles != null)
+        {
+            if (vm.CapabilityRoles.Any(string.IsNullOrWhiteSpace))
+            {
+                result.Errors.Add($"VM '{vmName}' capabilityRoles must not contain empty values.");
+            }
+
+            var distinctRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var role in vm.CapabilityRoles.Where(role => !string.IsNullOrWhiteSpace(role)))
+            {
+                if (!distinctRoles.Add(role.Trim()))
+                {
+                    result.Errors.Add($"VM '{vmName}' capabilityRoles must not contain duplicates.");
+                    break;
+                }
+            }
+        }
+
+        if (vm.DependsOn != null && vm.DependsOn.Any(string.IsNullOrWhiteSpace))
+        {
+            result.Errors.Add($"VM '{vmName}' dependsOn must not contain empty values.");
+        }
+
+        if (vm.Nics == null)
+        {
+            return;
+        }
+
+        var nicIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var nic in vm.Nics)
+        {
+            if (string.IsNullOrWhiteSpace(nic.NicId))
+            {
+                result.Errors.Add($"VM '{vmName}' V2 nicId is required when nics are provided.");
+                continue;
+            }
+
+            if (!nicIds.Add(nic.NicId.Trim()))
+            {
+                result.Errors.Add($"VM '{vmName}' contains duplicate V2 nicId '{nic.NicId}'.");
+            }
+
+            if (nic.DnsServers != null && nic.DnsServers.Any(string.IsNullOrWhiteSpace))
+            {
+                result.Errors.Add($"VM '{vmName}' V2 nic '{nic.NicId}' dnsServers must not contain empty values.");
+            }
+        }
     }
 
     private static void ValidateGuestStepConfig(VmTemplate vm, LabTemplateValidationResult result)

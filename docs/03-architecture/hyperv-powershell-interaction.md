@@ -19,6 +19,15 @@
 - Failure isolation is per VM workflow; one VM workflow must not depend on a shared deploy shell used by other VMs.
 - Medium batch scale should be managed by coordinator policy and measurement, not by collapsing all deploy work into a shared shell.
 
+### PowerShell Direct guest-execution pattern (V2 direction)
+- Used for V2 guest-side orchestration inside Hyper-V guest VMs.
+- PowerShell Direct is the baseline guest execution transport for current scope.
+- Guest execution is a separate concern from host-side Hyper-V management:
+  - host-side Hyper-V commands provision and wire the VM
+  - guest-side PowerShell Direct commands configure the OS and domain/service behavior
+- V2 planning may interleave host provisioning and guest execution in one unified graph, but the execution seams must remain explicit so host-management failure analysis and guest-configuration failure analysis do not collapse into one generic shell path.
+- Future multi-hypervisor expansion must not be assumed by the initial V2 guest-execution seam.
+
 ### Query execution pattern
 - Used for read-heavy Hyper-V paths such as Machines inventory, edit snapshot loading, switch listing, attached-VM listing, IP lookup, VHD metadata lookup, and deploy-side VHD probe reads.
 - Query execution uses a reusable query-session seam instead of creating a brand-new PowerShell session for every read call.

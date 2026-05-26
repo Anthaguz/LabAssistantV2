@@ -14,6 +14,13 @@ internal static class DeployContextBuilder
         IReadOnlyList<VhdxCatalogItem> catalogItems,
         IReadOnlyList<string> availableSwitches)
     {
+        if (template.ExecutionEngine == TemplateExecutionEngine.V2UnifiedPlanning ||
+            TemplateSchemaVersionCatalog.Classify(template.SchemaVersion) == TemplateExecutionEngine.V2UnifiedPlanning)
+        {
+            throw new InvalidOperationException(
+                $"Template '{template.Name}' uses V2 schema '{template.SchemaVersion}' and must be routed through the V2 planner instead of the legacy deployment engine.");
+        }
+
         var contexts = new List<VmDeploymentContext>();
         var compatibilityIssues = new List<DeployCompatibilityIssue>();
 
