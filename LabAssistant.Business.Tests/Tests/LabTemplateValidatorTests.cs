@@ -317,4 +317,117 @@ public class LabTemplateValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains("VM 'dc1' credentialSlots.localBootstrap must not be empty.", result.Errors);
     }
+
+    [Theory]
+    [InlineData("Conservative")]
+    [InlineData("Balanced")]
+    [InlineData("Aggressive")]
+    public void Validate_V2Template_AllowsSupportedDeploymentProfiles(string deploymentProfile)
+    {
+        var template = CreateMinimalV2Template();
+        template.DeploymentProfile = deploymentProfile;
+
+        var result = LabTemplateValidator.Validate(template, CreateMinimalCatalog());
+
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, error => error.Contains("deploymentProfile", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Validate_V2Template_AllowsBlankDeploymentProfileForDeployTimeDefault(string deploymentProfile)
+    {
+        var template = CreateMinimalV2Template();
+        template.DeploymentProfile = deploymentProfile;
+
+        var result = LabTemplateValidator.Validate(template, CreateMinimalCatalog());
+
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, error => error.Contains("deploymentProfile", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_V2Template_RejectsUnknownDeploymentProfile()
+    {
+        var template = CreateMinimalV2Template();
+        template.DeploymentProfile = "Turbo";
+
+        var result = LabTemplateValidator.Validate(template, CreateMinimalCatalog());
+
+        Assert.False(result.IsValid);
+        Assert.Contains("V2 deploymentProfile must be one of: Conservative, Balanced, Aggressive.", result.Errors);
+    }
+
+    [Fact]
+    public void Validate_V1Template_DoesNotApplyV2DeploymentProfileValidation()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "1.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            DeploymentProfile = "Turbo",
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "vm1",
+                    MemoryMb = 1024,
+                    CpuCount = 1,
+                    VhdPath = "C:/base.vhdx",
+                    SwitchName = "Default Switch"
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, []);
+
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, error => error.Contains("deploymentProfile", StringComparison.Ordinal));
+    }
+
+    private static LabTemplate CreateMinimalV2Template()
+    {
+        return new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "2.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "dc1",
+                    MemoryMb = 2048,
+                    CpuCount = 2,
+                    VhdxId = "win-2025",
+                    TopologyRole = "RootDomainController"
+                }
+            ]
+        };
+    }
+
+    private static List<VhdxCatalogItem> CreateMinimalCatalog()
+    {
+        return
+        [
+            new VhdxCatalogItem
+            {
+                Id = "win-2025",
+                Path = "C:/base.vhdx",
+                OsName = "Windows Server",
+                OsVersion = "2025",
+                Generation = 2
+            }
+        ];
+    }
 }

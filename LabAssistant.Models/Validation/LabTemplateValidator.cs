@@ -62,6 +62,7 @@ public static class LabTemplateValidator
 
         if (executionEngine == TemplateExecutionEngine.V2UnifiedPlanning)
         {
+            ValidateV2DeploymentProfile(template, result);
             ValidateV2Networks(template, result);
         }
 
@@ -155,6 +156,20 @@ public static class LabTemplateValidator
             {
                 result.Errors.Add($"Duplicate V2 lab network id: {network.NetworkId}.");
             }
+        }
+    }
+
+    private static void ValidateV2DeploymentProfile(LabTemplate template, LabTemplateValidationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(template.DeploymentProfile))
+        {
+            return;
+        }
+
+        if (!V2SchedulerPolicyCatalog.IsSupportedProfile(template.DeploymentProfile))
+        {
+            var allowedProfiles = string.Join(", ", V2SchedulerPolicyCatalog.SupportedProfileNames);
+            result.Errors.Add($"V2 deploymentProfile must be one of: {allowedProfiles}.");
         }
     }
 

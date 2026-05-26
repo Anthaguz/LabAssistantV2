@@ -933,11 +933,11 @@ Detailed logging contract:
   - **Priority:** P1
 
 - **FR-195:** The system shall support deployment-profile-based scheduling for `V2` orchestration with at least `Conservative`, `Balanced`, and `Aggressive` profiles.
-  - **Acceptance details:** Profiles tune overlap/resource behavior without changing dependency correctness.
+  - **Acceptance details:** Profiles tune overlap/resource behavior without changing dependency correctness, and the persisted V2 template value remains a validated string contract rather than a runtime-only free-form hint.
   - **Priority:** P1
 
 - **FR-196:** The system shall classify `V2` orchestration work into coarse workload classes for scheduling decisions.
-  - **Acceptance details:** The baseline classes are `HeavyHost`, `HeavyGuest`, `MediumGuest`, and `LightWaitValidation`.
+  - **Acceptance details:** The baseline classes are `HeavyHost`, `HeavyGuest`, `MediumGuest`, and `LightWaitValidation`; they provide policy-level scheduling input and do not replace dependency gates.
   - **Priority:** P1
 
 - **FR-197:** The system shall support credential-slot references in `V2` templates and bootstrap-profile metadata on VHDX catalog entries without exporting reusable secret values inside templates.

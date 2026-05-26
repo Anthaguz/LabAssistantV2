@@ -73,6 +73,8 @@ Each V2 template may select a deployment profile or leave it to deploy-time defa
 
 Profiles affect overlap/resource policy, not correctness.
 
+The persisted `deploymentProfile` value remains a string in the V2 template JSON for portability, but it is a validated whitelist field that maps to typed planner policy. Blank or absent values mean "use the deploy-time default profile."
+
 ## Credential Slot References
 
 Templates may reference credential slots for:
