@@ -103,4 +103,14 @@ public sealed class TemplatesVhdxCatalogItem
     public int Generation { get; init; }
 
     public string? Signature { get; init; }
+
+    public string? BootstrapExpectedLocalUser { get; init; }
+
+    public string? BootstrapLocalCredentialSlotRef { get; init; }
+
+    public string? BootstrapGuestOsFamily { get; init; }
+
+    public string? BootstrapGuestTransport { get; init; }
+
+    public string? BootstrapNotes { get; init; }
 }

@@ -63,6 +63,16 @@ public sealed class VhdxCatalogPageViewModel
         selected.OsVersion = updated.OsVersion;
         selected.Generation = updated.Generation;
         selected.Notes = updated.Notes;
+        selected.BootstrapProfile = updated.BootstrapProfile == null
+            ? null
+            : new VhdxBootstrapProfile
+            {
+                ExpectedLocalUser = updated.BootstrapProfile.ExpectedLocalUser,
+                LocalCredentialSlotRef = updated.BootstrapProfile.LocalCredentialSlotRef,
+                GuestOsFamily = updated.BootstrapProfile.GuestOsFamily,
+                GuestTransport = updated.BootstrapProfile.GuestTransport,
+                Notes = updated.BootstrapProfile.Notes
+            };
 
         var save = SaveCatalog([selected]);
         if (!save.IsSuccess)
@@ -73,6 +83,16 @@ public sealed class VhdxCatalogPageViewModel
             selected.OsVersion = original.OsVersion;
             selected.Generation = original.Generation;
             selected.Notes = original.Notes;
+            selected.BootstrapProfile = original.BootstrapProfile == null
+                ? null
+                : new VhdxBootstrapProfile
+                {
+                    ExpectedLocalUser = original.BootstrapProfile.ExpectedLocalUser,
+                    LocalCredentialSlotRef = original.BootstrapProfile.LocalCredentialSlotRef,
+                    GuestOsFamily = original.BootstrapProfile.GuestOsFamily,
+                    GuestTransport = original.BootstrapProfile.GuestTransport,
+                    Notes = original.BootstrapProfile.Notes
+                };
         }
 
         return save;
@@ -114,7 +134,17 @@ public sealed class VhdxCatalogPageViewModel
             Generation = source.Generation,
             SizeBytes = source.SizeBytes,
             Signature = source.Signature,
-            Notes = source.Notes
+            Notes = source.Notes,
+            BootstrapProfile = source.BootstrapProfile == null
+                ? null
+                : new VhdxBootstrapProfile
+                {
+                    ExpectedLocalUser = source.BootstrapProfile.ExpectedLocalUser,
+                    LocalCredentialSlotRef = source.BootstrapProfile.LocalCredentialSlotRef,
+                    GuestOsFamily = source.BootstrapProfile.GuestOsFamily,
+                    GuestTransport = source.BootstrapProfile.GuestTransport,
+                    Notes = source.BootstrapProfile.Notes
+                }
         };
     }
 }

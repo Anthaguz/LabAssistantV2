@@ -44,4 +44,9 @@ public class VhdxCatalogItem
     /// Freeform notes about the image (optional).
     /// </summary>
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Optional bootstrap assumptions associated with the base image for V2 planning.
+    /// </summary>
+    public VhdxBootstrapProfile? BootstrapProfile { get; set; }
 }

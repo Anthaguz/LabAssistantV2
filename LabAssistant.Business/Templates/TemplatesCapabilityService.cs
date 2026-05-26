@@ -195,7 +195,12 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
                 OsName = item.OsName,
                 OsVersion = item.OsVersion,
                 Generation = item.Generation,
-                Signature = item.Signature
+                Signature = item.Signature,
+                BootstrapExpectedLocalUser = item.BootstrapProfile?.ExpectedLocalUser,
+                BootstrapLocalCredentialSlotRef = item.BootstrapProfile?.LocalCredentialSlotRef,
+                BootstrapGuestOsFamily = item.BootstrapProfile?.GuestOsFamily,
+                BootstrapGuestTransport = item.BootstrapProfile?.GuestTransport,
+                BootstrapNotes = item.BootstrapProfile?.Notes
             })
             .ToList();
 

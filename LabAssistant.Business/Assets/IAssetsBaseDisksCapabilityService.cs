@@ -41,6 +41,16 @@ public sealed class AssetsBaseDiskRecord
     public string? Signature { get; init; }
 
     public string? Notes { get; init; }
+
+    public string? BootstrapExpectedLocalUser { get; init; }
+
+    public string? BootstrapLocalCredentialSlotRef { get; init; }
+
+    public string? BootstrapGuestOsFamily { get; init; }
+
+    public string? BootstrapGuestTransport { get; init; }
+
+    public string? BootstrapNotes { get; init; }
 }
 
 public sealed class AssetsBaseDiskDraft
@@ -56,6 +66,16 @@ public sealed class AssetsBaseDiskDraft
     public int Generation { get; init; }
 
     public string? Notes { get; init; }
+
+    public string? BootstrapExpectedLocalUser { get; init; }
+
+    public string? BootstrapLocalCredentialSlotRef { get; init; }
+
+    public string? BootstrapGuestOsFamily { get; init; }
+
+    public string? BootstrapGuestTransport { get; init; }
+
+    public string? BootstrapNotes { get; init; }
 
     public bool IsNew { get; init; }
 }

@@ -185,6 +185,8 @@ public static class LabTemplateValidator
             result.Errors.Add($"VM '{vmName}' dependsOn must not contain empty values.");
         }
 
+        ValidateCredentialSlots(vm, result);
+
         if (vm.Nics == null)
         {
             return;
@@ -208,6 +210,30 @@ public static class LabTemplateValidator
             {
                 result.Errors.Add($"VM '{vmName}' V2 nic '{nic.NicId}' dnsServers must not contain empty values.");
             }
+        }
+    }
+
+    private static void ValidateCredentialSlots(VmTemplate vm, LabTemplateValidationResult result)
+    {
+        var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name;
+        if (vm.CredentialSlots == null)
+        {
+            return;
+        }
+
+        if (vm.CredentialSlots.LocalBootstrap != null && string.IsNullOrWhiteSpace(vm.CredentialSlots.LocalBootstrap))
+        {
+            result.Errors.Add($"VM '{vmName}' credentialSlots.localBootstrap must not be empty.");
+        }
+
+        if (vm.CredentialSlots.DomainAdmin != null && string.IsNullOrWhiteSpace(vm.CredentialSlots.DomainAdmin))
+        {
+            result.Errors.Add($"VM '{vmName}' credentialSlots.domainAdmin must not be empty.");
+        }
+
+        if (vm.CredentialSlots.DomainJoin != null && string.IsNullOrWhiteSpace(vm.CredentialSlots.DomainJoin))
+        {
+            result.Errors.Add($"VM '{vmName}' credentialSlots.domainJoin must not be empty.");
         }
     }
 

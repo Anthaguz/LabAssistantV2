@@ -96,6 +96,7 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
             existing.SizeBytes = normalized.SizeBytes;
             existing.Signature = normalized.Signature;
             existing.Notes = normalized.Notes;
+            existing.BootstrapProfile = CloneBootstrapProfile(normalized.BootstrapProfile);
         }
 
         var saveResult = _catalogService.SaveCatalog(workingItems, [normalized], operationId);
@@ -343,6 +344,7 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
             OsVersion = draft.OsVersion.Trim(),
             Generation = draft.Generation,
             Notes = string.IsNullOrWhiteSpace(draft.Notes) ? null : draft.Notes.Trim(),
+            BootstrapProfile = BuildBootstrapProfile(draft),
             SizeBytes = TryGetFileSize(normalizedPath),
             Signature = VhdxSignature.Build(new VhdxCatalogItem
             {
@@ -368,7 +370,12 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
             Generation = item.Generation,
             SizeBytes = item.SizeBytes,
             Signature = item.Signature,
-            Notes = item.Notes
+            Notes = item.Notes,
+            BootstrapExpectedLocalUser = item.BootstrapProfile?.ExpectedLocalUser,
+            BootstrapLocalCredentialSlotRef = item.BootstrapProfile?.LocalCredentialSlotRef,
+            BootstrapGuestOsFamily = item.BootstrapProfile?.GuestOsFamily,
+            BootstrapGuestTransport = item.BootstrapProfile?.GuestTransport,
+            BootstrapNotes = item.BootstrapProfile?.Notes
         };
     }
 
@@ -383,8 +390,58 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
             Generation = source.Generation,
             SizeBytes = source.SizeBytes,
             Signature = source.Signature,
+            Notes = source.Notes,
+            BootstrapProfile = CloneBootstrapProfile(source.BootstrapProfile)
+        };
+    }
+
+    private static VhdxBootstrapProfile? BuildBootstrapProfile(AssetsBaseDiskDraft draft)
+    {
+        var expectedLocalUser = NormalizeOptional(draft.BootstrapExpectedLocalUser);
+        var localCredentialSlotRef = NormalizeOptional(draft.BootstrapLocalCredentialSlotRef);
+        var guestOsFamily = NormalizeOptional(draft.BootstrapGuestOsFamily);
+        var guestTransport = NormalizeOptional(draft.BootstrapGuestTransport);
+        var notes = NormalizeOptional(draft.BootstrapNotes);
+
+        if (expectedLocalUser == null &&
+            localCredentialSlotRef == null &&
+            guestOsFamily == null &&
+            guestTransport == null &&
+            notes == null)
+        {
+            return null;
+        }
+
+        return new VhdxBootstrapProfile
+        {
+            ExpectedLocalUser = expectedLocalUser,
+            LocalCredentialSlotRef = localCredentialSlotRef,
+            GuestOsFamily = guestOsFamily,
+            GuestTransport = guestTransport,
+            Notes = notes
+        };
+    }
+
+    private static VhdxBootstrapProfile? CloneBootstrapProfile(VhdxBootstrapProfile? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new VhdxBootstrapProfile
+        {
+            ExpectedLocalUser = source.ExpectedLocalUser,
+            LocalCredentialSlotRef = source.LocalCredentialSlotRef,
+            GuestOsFamily = source.GuestOsFamily,
+            GuestTransport = source.GuestTransport,
             Notes = source.Notes
         };
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static AssetsBaseDiskOperationResult CreateFailure(string operationId, string userMessage, IReadOnlyList<string> errors)
