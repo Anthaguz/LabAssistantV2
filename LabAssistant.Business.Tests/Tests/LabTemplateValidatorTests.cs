@@ -269,4 +269,52 @@ public class LabTemplateValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.Contains("switchNames must not contain empty values.", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Validate_V2Template_RejectsEmptyCredentialSlotReferences()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab",
+            Name = "Lab",
+            SchemaVersion = "2.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "dc1",
+                    MemoryMb = 2048,
+                    CpuCount = 2,
+                    VhdxId = "win-2025",
+                    TopologyRole = "RootDomainController",
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = " ",
+                        DomainAdmin = "lab.contoso.domain-admin"
+                    }
+                }
+            ]
+        };
+
+        var catalog = new List<VhdxCatalogItem>
+        {
+            new()
+            {
+                Id = "win-2025",
+                Path = "C:/base.vhdx",
+                OsName = "Windows Server",
+                OsVersion = "2025",
+                Generation = 2
+            }
+        };
+
+        var result = LabTemplateValidator.Validate(template, catalog);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("VM 'dc1' credentialSlots.localBootstrap must not be empty.", result.Errors);
+    }
 }

@@ -35,7 +35,15 @@ public class VhdxCatalogStoreTests
                 Path = "C:/Lab/Win2022.vhdx",
                 OsName = "Windows Server",
                 OsVersion = "2022",
-                Generation = 2
+                Generation = 2,
+                BootstrapProfile = new VhdxBootstrapProfile
+                {
+                    ExpectedLocalUser = "Administrator",
+                    LocalCredentialSlotRef = "disk.win-2022.local-admin",
+                    GuestOsFamily = "WindowsServer",
+                    GuestTransport = "powershell-direct",
+                    Notes = "Prepared for PowerShell Direct"
+                }
             }
         };
 
@@ -46,6 +54,9 @@ public class VhdxCatalogStoreTests
         Assert.True(loadResult.IsValid);
         Assert.Single(loadResult.Items);
         Assert.Equal("win-2022", loadResult.Items[0].Id);
+        Assert.NotNull(loadResult.Items[0].BootstrapProfile);
+        Assert.Equal("disk.win-2022.local-admin", loadResult.Items[0].BootstrapProfile?.LocalCredentialSlotRef);
+        Assert.Equal("powershell-direct", loadResult.Items[0].BootstrapProfile?.GuestTransport);
     }
 
     [Fact]

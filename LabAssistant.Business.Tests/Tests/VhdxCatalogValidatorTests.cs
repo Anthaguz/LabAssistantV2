@@ -60,4 +60,57 @@ public class VhdxCatalogValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains("Duplicate catalog id: dup.", result.Errors);
     }
+
+    [Fact]
+    public void Validate_AllowsBootstrapProfile_WithReferenceOnlyMetadata()
+    {
+        var items = new List<VhdxCatalogItem>
+        {
+            new()
+            {
+                Id = "win-2025",
+                Path = "C:/base.vhdx",
+                OsName = "Windows Server",
+                OsVersion = "2025",
+                Generation = 2,
+                BootstrapProfile = new VhdxBootstrapProfile
+                {
+                    ExpectedLocalUser = "Administrator",
+                    LocalCredentialSlotRef = "disk.win-2025.local-admin",
+                    GuestOsFamily = "WindowsServer",
+                    GuestTransport = "powershell-direct"
+                }
+            }
+        };
+
+        var result = VhdxCatalogValidator.Validate(items);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_RejectsUnsupportedBootstrapTransport()
+    {
+        var items = new List<VhdxCatalogItem>
+        {
+            new()
+            {
+                Id = "win-2025",
+                Path = "C:/base.vhdx",
+                OsName = "Windows Server",
+                OsVersion = "2025",
+                Generation = 2,
+                BootstrapProfile = new VhdxBootstrapProfile
+                {
+                    LocalCredentialSlotRef = "disk.win-2025.local-admin",
+                    GuestTransport = "winrm"
+                }
+            }
+        };
+
+        var result = VhdxCatalogValidator.Validate(items);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("Catalog item 'win-2025' bootstrapProfile.guestTransport must be 'powershell-direct' in the current scope.", result.Errors);
+    }
 }
