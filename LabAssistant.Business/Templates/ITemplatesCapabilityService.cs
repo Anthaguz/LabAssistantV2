@@ -53,7 +53,7 @@ public sealed class TemplateLibraryItem
 
     public string FilePath { get; init; } = string.Empty;
 
-    public TemplateExecutionEngine ExecutionEngine { get; init; } = TemplateExecutionEngine.V1Deployment;
+    public TemplateExecutionEngine ExecutionEngine { get; init; }
 }
 
 public sealed class TemplateEditorDocument

@@ -5,6 +5,7 @@ namespace LabAssistant.Models.Templates;
 /// </summary>
 public enum TemplateExecutionEngine
 {
+    Unknown = 0,
     V1Deployment = 1,
     V2UnifiedPlanning = 2
 }

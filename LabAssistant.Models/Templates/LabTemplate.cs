@@ -70,7 +70,7 @@ public class LabTemplate
     /// Runtime-only execution-engine classification resolved from schema-version routing.
     /// </summary>
     [JsonIgnore]
-    public TemplateExecutionEngine ExecutionEngine { get; set; } = TemplateExecutionEngine.V1Deployment;
+    public TemplateExecutionEngine ExecutionEngine { get; set; }
 
     /// <summary>
     /// Legacy alias kept for UI compatibility. Maps to <see cref="SchemaVersion"/>.
