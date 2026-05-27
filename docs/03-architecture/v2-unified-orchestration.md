@@ -98,6 +98,8 @@ The initial scheduler supports three profiles:
 
 These profiles tune overlap limits without changing dependency correctness.
 
+V2 templates may persist the selected profile as a string field, but the planner/runtime contract treats it as a validated mapping to one of the canonical policy identifiers above.
+
 ### Workload classes
 - `HeavyHost`
   - differencing-disk creation
@@ -115,6 +117,31 @@ These profiles tune overlap limits without changing dependency correctness.
   - readiness waits
   - post-checks
 
+These workload classes are coarse scheduling inputs. They are not intended to be host-specific tuning knobs or user-authored micro-categories.
+
+### Profile intent contract
+- `Conservative`
+  - `HeavyHost` overlap posture is minimal
+  - `HeavyGuest` overlap posture is minimal
+  - medium-guest backfill during DC-first progression is disabled by default
+  - later VM provisioning backfill is disabled until critical DC work has progressed
+- `Balanced`
+  - `HeavyHost` overlap posture is moderate
+  - `HeavyGuest` overlap posture remains minimal
+  - medium-guest backfill during DC-first progression is allowed
+  - later VM provisioning backfill is allowed when dependency gates remain satisfied
+- `Aggressive`
+  - `HeavyHost` overlap posture is high
+  - `HeavyGuest` overlap posture is moderate
+  - medium-guest backfill during DC-first progression is allowed
+  - later VM provisioning backfill is allowed when dependency gates remain satisfied
+
+Across all profiles:
+
+- `LightWaitValidation` work is broadly overlap-safe
+- profile choice must not remove required readiness gates
+- profile choice must not change dependency correctness for the same template input
+
 ### Baseline policy
 - do not default to "deploy everything at once"
 - prefer conservative overlap until host measurements prove stronger defaults are safe
@@ -124,6 +151,9 @@ These profiles tune overlap limits without changing dependency correctness.
 - start critical DC guest work
 - begin provisioning later machines only when profile/workload caps allow it
 - keep domain-dependent guest work blocked until domain readiness gates pass
+- keep cross-switch dependent work blocked until router readiness gates pass
+
+This AD-core direction is a policy invariant. Later scheduler implementation may tune how much overlap is permitted, but must not invert the DC-first progression.
 
 ## Router Semantics
 

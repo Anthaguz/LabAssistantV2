@@ -4419,6 +4419,44 @@ Each readiness result shall include, at minimum:
 - overlap/concurrency opportunities may differ according to the profile
 - heavy workload classes are not scheduled beyond the profile's intended cap model
 
+### 10) Deployment profile validation - V2 accepts only supported policy identifiers
+**Given**
+- a V2 template with a non-empty `deploymentProfile` value
+
+**When**
+- the system validates the template
+
+**Then**
+- the value is accepted only when it maps to `Conservative`, `Balanced`, or `Aggressive`
+- blank or absent values remain valid and mean "use the deploy-time default"
+- unknown non-empty values are rejected with actionable validation feedback
+
+### 11) AD-core policy invariants - profile changes do not invert the deployment shape
+**Given**
+- a V2 template that includes root-domain-controller and dependent member-server work
+- any supported deployment profile
+
+**When**
+- the planner evaluates scheduler policy
+
+**Then**
+- DC provisioning and boot remain the first critical progression
+- critical DC guest work remains ahead of non-core guest work
+- domain-dependent work stays blocked on domain readiness
+- router-dependent cross-switch work stays blocked on router readiness
+
+### 12) Workload class contract - scheduler policy uses stable coarse categories
+**Given**
+- the V2 scheduler policy contract
+
+**When**
+- a later planner or runtime component consumes workload classification
+
+**Then**
+- the baseline workload classes are `HeavyHost`, `HeavyGuest`, `MediumGuest`, and `LightWaitValidation`
+- `LightWaitValidation` remains broadly overlap-safe
+- workload classes inform overlap posture but do not override explicit dependencies
+
 ## Expected UI
 - a V2 review-and-resolve surface that can show:
   - orchestration graph or scheduling waves
