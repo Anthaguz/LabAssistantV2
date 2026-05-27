@@ -62,6 +62,7 @@
 using LabAssistant.Business.Catalog;
 using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Machines;
+using LabAssistant.Business.Planning;
 using LabAssistant.Business.Templates;
 using LabAssistant.Business.Assets;
 using LabAssistant.Data.Catalog;
@@ -100,6 +101,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<TemplateSelectionService>();
         services.AddSingleton<TemplateValidationService>();
         services.AddSingleton<ITemplatesCapabilityService, TemplatesCapabilityService>();
+        services.AddSingleton<IV2PlanningCapabilityService, V2PlanningCapabilityService>();
 
         services.AddTransient<VirtualSwitchProvider>();
         services.AddTransient<DeploymentPipelineBuilder>();
