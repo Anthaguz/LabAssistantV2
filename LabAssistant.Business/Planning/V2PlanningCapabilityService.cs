@@ -1,0 +1,1104 @@
+using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Templates;
+using LabAssistant.Models.Validation;
+
+namespace LabAssistant.Business.Planning;
+
+public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
+{
+    private static readonly HashSet<string> KnownTopologyRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Router",
+        "RootDomainController",
+        "ReplicaDomainController",
+        "MemberServer",
+        "StandaloneServer"
+    };
+
+    private static readonly HashSet<string> KnownCapabilityRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Pki",
+        "Sql",
+        "Web",
+        "Operations"
+    };
+
+    public Task<V2PlanBuildResult> BuildPlanAsync(V2PlanBuildRequest request, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Template);
+
+        var template = request.Template;
+        var issues = new List<V2PlanIssue>();
+        var unresolved = new List<V2UnresolvedRequirement>();
+        var nodes = new List<V2PlanNode>();
+        var dependencies = new List<V2PlanDependency>();
+
+        var executionEngine = template.ExecutionEngine != default
+            ? template.ExecutionEngine
+            : TemplateSchemaVersionCatalog.Classify(template.SchemaVersion);
+
+        if (executionEngine != TemplateExecutionEngine.V2UnifiedPlanning)
+        {
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "v2-template-required",
+                Message = $"Template '{template.Name}' uses schema '{template.SchemaVersion}' and is not routed to the V2 planning engine.",
+                SuggestedAction = "Use a V2 template schema version before requesting a V2 orchestration plan."
+            });
+
+            return Task.FromResult(new V2PlanBuildResult
+            {
+                Success = false,
+                Context = new V2ResolvedPlanningContext
+                {
+                    ExecutionEngine = executionEngine,
+                    ResolvedDeploymentProfileName = ResolveDefaultProfileName(request.DefaultDeploymentProfile),
+                    ResolvedDeploymentProfile = ResolveDefaultProfile(request.DefaultDeploymentProfile),
+                    RouterSemanticsRequired = false,
+                    DomainSemanticsRequired = false
+                },
+                Issues = issues,
+                UnresolvedRequirements = unresolved
+            });
+        }
+
+        var validation = LabTemplateValidator.Validate(template, request.CatalogItems);
+        foreach (var error in validation.Errors)
+        {
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "template-validation",
+                Message = error,
+                SuggestedAction = "Correct the V2 template validation error and rebuild the plan."
+            });
+        }
+
+        var resolvedProfile = ResolveProfile(template.DeploymentProfile, request.DefaultDeploymentProfile, issues);
+        var labNetworks = (template.LabNetworks ?? [])
+            .Where(network => !string.IsNullOrWhiteSpace(network.NetworkId))
+            .GroupBy(network => network.NetworkId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var availableSwitches = new HashSet<string>(
+            request.AvailableSwitchNames.Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+        var resolvedSlots = new HashSet<string>(
+            request.ResolvedCredentialSlotKeys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => key.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+        var sortedVms = template.VmTemplates
+            .OrderBy(vm => string.IsNullOrWhiteSpace(vm.Name) ? "~" : vm.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(vm => vm.VmId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var states = sortedVms
+            .Select(vm => ResolveVmState(vm, request.CatalogItems, labNetworks, availableSwitches, resolvedSlots, issues, unresolved))
+            .ToList();
+
+        var hasRootDc = states.Any(state => state.TopologyRoleIs("RootDomainController"));
+        var hasReplicaDc = states.Any(state => state.TopologyRoleIs("ReplicaDomainController"));
+        var hasMemberServers = states.Any(state => state.TopologyRoleIs("MemberServer"));
+        var domainRequired = hasRootDc || hasReplicaDc || hasMemberServers;
+
+        var routerRequired = DetermineRouterRequirement(states, domainRequired);
+        if (routerRequired && !states.Any(state => state.IsRouterCapable))
+        {
+            unresolved.Add(new V2UnresolvedRequirement
+            {
+                Kind = V2UnresolvedRequirementKind.RouterRequirement,
+                Key = "router-required",
+                AffectedVmIds = states.Where(state => state.RequiresRouterDependency).Select(state => state.Vm.VmId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                Description = "Cross-switch domain-dependent work requires a router-capable VM, but none is present in the V2 template."
+            });
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "router-required",
+                Message = "Cross-switch dependent work requires a router-capable VM.",
+                SuggestedAction = "Add a Router topology-role VM or remove the cross-switch dependency."
+            });
+        }
+
+        var context = new V2ResolvedPlanningContext
+        {
+            ExecutionEngine = executionEngine,
+            ResolvedDeploymentProfile = resolvedProfile,
+            ResolvedDeploymentProfileName = V2SchedulerPolicyCatalog.GetCanonicalProfileName(resolvedProfile),
+            RouterSemanticsRequired = routerRequired,
+            DomainSemanticsRequired = domainRequired,
+            Vms = states.Select(state => state.ToContext()).ToArray()
+        };
+
+        EmitNodes(states, routerRequired, nodes);
+        EmitDependencies(states, routerRequired, dependencies);
+        ApplyWaveHints(nodes, dependencies, resolvedProfile, states);
+        var waves = BuildWaves(nodes);
+
+        var success = !issues.Any(issue => issue.Severity == V2PlanIssueSeverity.Blocking) &&
+                      unresolved.Count == 0;
+
+        return Task.FromResult(new V2PlanBuildResult
+        {
+            Success = success,
+            Context = context,
+            Nodes = nodes.OrderBy(node => node.WaveHint).ThenBy(node => node.NodeId, StringComparer.Ordinal).ToArray(),
+            Dependencies = dependencies
+                .OrderBy(dep => dep.ToNodeId, StringComparer.Ordinal)
+                .ThenBy(dep => dep.FromNodeId, StringComparer.Ordinal)
+                .ThenBy(dep => dep.ReasonCode)
+                .ToArray(),
+            Waves = waves,
+            Issues = issues
+                .OrderBy(issue => issue.Severity)
+                .ThenBy(issue => issue.VmName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(issue => issue.Code, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            UnresolvedRequirements = unresolved
+                .OrderBy(item => item.Kind)
+                .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+        });
+    }
+
+    private static ResolvedVmState ResolveVmState(
+        VmTemplate vm,
+        IReadOnlyList<VhdxCatalogItem> catalogItems,
+        IReadOnlyDictionary<string, LabNetworkTemplate> labNetworks,
+        ISet<string> availableSwitches,
+        ISet<string> resolvedSlots,
+        List<V2PlanIssue> issues,
+        List<V2UnresolvedRequirement> unresolved)
+    {
+        var topologyRole = Normalize(vm.TopologyRole);
+        var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name.Trim();
+
+        if (!string.IsNullOrWhiteSpace(topologyRole) && !KnownTopologyRoles.Contains(topologyRole))
+        {
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "unknown-topology-role",
+                VmId = vm.VmId,
+                VmName = vmName,
+                Message = $"VM '{vmName}' uses unsupported topology role '{vm.TopologyRole}'.",
+                SuggestedAction = "Use one of the supported V2 topology roles."
+            });
+        }
+
+        var knownCapabilities = new List<string>();
+        foreach (var capabilityRole in vm.CapabilityRoles ?? [])
+        {
+            var normalized = Normalize(capabilityRole);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                continue;
+            }
+
+            if (KnownCapabilityRoles.Contains(normalized))
+            {
+                knownCapabilities.Add(normalized);
+            }
+            else
+            {
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Warning,
+                    Code = "unknown-capability-role",
+                    VmId = vm.VmId,
+                    VmName = vmName,
+                    Message = $"VM '{vmName}' uses unknown capability role '{capabilityRole}'.",
+                    SuggestedAction = "Use a supported capability role or extend the planner/runtime contract later."
+                });
+            }
+        }
+
+        var catalogItem = ResolveCatalogItem(vm, catalogItems);
+        if (catalogItem is null)
+        {
+            unresolved.Add(new V2UnresolvedRequirement
+            {
+                Kind = V2UnresolvedRequirementKind.CatalogReference,
+                Key = string.IsNullOrWhiteSpace(vm.VhdxId) ? vm.VhdPath ?? vm.VmId : vm.VhdxId!,
+                AffectedVmIds = [vm.VmId],
+                Description = $"VM '{vmName}' could not resolve its base image from the VHDX catalog."
+            });
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "catalog-reference-missing",
+                VmId = vm.VmId,
+                VmName = vmName,
+                Message = $"VM '{vmName}' could not resolve its VHDX catalog reference.",
+                SuggestedAction = "Select a valid VHDX catalog item or update the template mapping."
+            });
+        }
+
+        var bootstrapProfile = catalogItem?.BootstrapProfile;
+        if (!string.IsNullOrWhiteSpace(vm.BootstrapProfileRef) && bootstrapProfile is null)
+        {
+            unresolved.Add(new V2UnresolvedRequirement
+            {
+                Kind = V2UnresolvedRequirementKind.BootstrapProfile,
+                Key = vm.BootstrapProfileRef!,
+                AffectedVmIds = [vm.VmId],
+                Description = $"VM '{vmName}' references bootstrap profile '{vm.BootstrapProfileRef}', but the selected base image does not expose bootstrap metadata."
+            });
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "bootstrap-profile-missing",
+                VmId = vm.VmId,
+                VmName = vmName,
+                Message = $"VM '{vmName}' requires bootstrap assumptions that are missing from the resolved VHDX catalog item.",
+                SuggestedAction = "Add bootstrap metadata to the VHDX catalog entry or choose a compatible base image."
+            });
+        }
+
+        var resolvedNics = ResolveNics(vm, labNetworks, availableSwitches, issues, unresolved);
+        var requiresGuestWork = DetermineGuestWorkRequirement(topologyRole, knownCapabilities, resolvedNics, vm);
+        var bootstrapSlot = Normalize(vm.CredentialSlots?.LocalBootstrap) ?? Normalize(bootstrapProfile?.LocalCredentialSlotRef);
+        var domainAdminSlot = Normalize(vm.CredentialSlots?.DomainAdmin);
+        var domainJoinSlot = Normalize(vm.CredentialSlots?.DomainJoin) ?? domainAdminSlot;
+
+        if (requiresGuestWork)
+        {
+            if (bootstrapProfile is null)
+            {
+                unresolved.Add(new V2UnresolvedRequirement
+                {
+                    Kind = V2UnresolvedRequirementKind.BootstrapProfile,
+                    Key = vm.VmId,
+                    AffectedVmIds = [vm.VmId],
+                    Description = $"VM '{vmName}' requires guest-side planning, but its resolved base image does not provide bootstrap assumptions."
+                });
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "bootstrap-profile-required",
+                    VmId = vm.VmId,
+                    VmName = vmName,
+                    Message = $"VM '{vmName}' requires bootstrap metadata before V2 guest work can be planned.",
+                    SuggestedAction = "Populate the VHDX bootstrap profile for the selected base image."
+                });
+            }
+
+            AddCredentialSlotRequirement(unresolved, issues, resolvedSlots, vm, vmName, bootstrapSlot, "local-bootstrap", "guest bootstrap access");
+        }
+
+        if (string.Equals(topologyRole, "ReplicaDomainController", StringComparison.OrdinalIgnoreCase))
+        {
+            AddCredentialSlotRequirement(unresolved, issues, resolvedSlots, vm, vmName, domainAdminSlot, "domain-admin", "replica promotion");
+        }
+
+        if (string.Equals(topologyRole, "MemberServer", StringComparison.OrdinalIgnoreCase))
+        {
+            AddCredentialSlotRequirement(unresolved, issues, resolvedSlots, vm, vmName, domainJoinSlot, "domain-join", "domain join");
+        }
+
+        var state = new ResolvedVmState(vm, topologyRole, knownCapabilities, catalogItem, bootstrapProfile, resolvedNics)
+        {
+            RequiresGuestWork = requiresGuestWork,
+            EffectiveBootstrapSlot = bootstrapSlot,
+            EffectiveDomainAdminSlot = domainAdminSlot,
+            EffectiveDomainJoinSlot = domainJoinSlot,
+            RequiresDomainJoin = string.Equals(topologyRole, "MemberServer", StringComparison.OrdinalIgnoreCase),
+            IsRouterCapable = string.Equals(topologyRole, "Router", StringComparison.OrdinalIgnoreCase)
+        };
+
+        return state;
+    }
+
+    private static void AddCredentialSlotRequirement(
+        List<V2UnresolvedRequirement> unresolved,
+        List<V2PlanIssue> issues,
+        ISet<string> resolvedSlots,
+        VmTemplate vm,
+        string vmName,
+        string? slotKey,
+        string slotPurpose,
+        string description)
+    {
+        if (string.IsNullOrWhiteSpace(slotKey))
+        {
+            unresolved.Add(new V2UnresolvedRequirement
+            {
+                Kind = V2UnresolvedRequirementKind.CredentialSlot,
+                Key = $"{slotPurpose}:{vm.VmId}",
+                AffectedVmIds = [vm.VmId],
+                Description = $"VM '{vmName}' is missing a credential-slot reference for {description}."
+            });
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "credential-slot-missing",
+                VmId = vm.VmId,
+                VmName = vmName,
+                Message = $"VM '{vmName}' requires a credential-slot reference for {description}.",
+                SuggestedAction = "Assign the required credential slot in the V2 template or base-image bootstrap metadata."
+            });
+            return;
+        }
+
+        if (resolvedSlots.Contains(slotKey))
+        {
+            return;
+        }
+
+        unresolved.Add(new V2UnresolvedRequirement
+        {
+            Kind = V2UnresolvedRequirementKind.CredentialSlot,
+            Key = slotKey,
+            AffectedVmIds = [vm.VmId],
+            Description = $"VM '{vmName}' requires credential slot '{slotKey}' for {description}, but it is unresolved on this machine."
+        });
+        issues.Add(new V2PlanIssue
+        {
+            Severity = V2PlanIssueSeverity.Blocking,
+            Code = "credential-slot-unresolved",
+            VmId = vm.VmId,
+            VmName = vmName,
+            Message = $"VM '{vmName}' requires unresolved credential slot '{slotKey}' for {description}.",
+            SuggestedAction = "Resolve the credential slot locally before starting V2 deployment."
+        });
+    }
+
+    private static List<V2ResolvedVmNetworkInterface> ResolveNics(
+        VmTemplate vm,
+        IReadOnlyDictionary<string, LabNetworkTemplate> labNetworks,
+        ISet<string> availableSwitches,
+        List<V2PlanIssue> issues,
+        List<V2UnresolvedRequirement> unresolved)
+    {
+        var result = new List<V2ResolvedVmNetworkInterface>();
+        var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "<unnamed VM>" : vm.Name.Trim();
+        var templateNics = vm.Nics;
+
+        if (templateNics is { Count: > 0 })
+        {
+            foreach (var nic in templateNics.OrderBy(nic => nic.NicId, StringComparer.OrdinalIgnoreCase))
+            {
+                var networkId = Normalize(nic.NetworkId);
+                LabNetworkTemplate? network = null;
+                if (!string.IsNullOrWhiteSpace(networkId) && !labNetworks.TryGetValue(networkId, out network))
+                {
+                    unresolved.Add(new V2UnresolvedRequirement
+                    {
+                        Kind = V2UnresolvedRequirementKind.LabNetwork,
+                        Key = networkId,
+                        AffectedVmIds = [vm.VmId],
+                        Description = $"VM '{vmName}' references lab network '{networkId}' on NIC '{nic.NicId}', but that network does not exist in the template."
+                    });
+                    issues.Add(new V2PlanIssue
+                    {
+                        Severity = V2PlanIssueSeverity.Blocking,
+                        Code = "lab-network-missing",
+                        VmId = vm.VmId,
+                        VmName = vmName,
+                        Message = $"VM '{vmName}' references missing lab network '{networkId}'.",
+                        SuggestedAction = "Define the missing lab network or update the NIC mapping."
+                    });
+                }
+
+                var effectiveSwitch = Normalize(nic.SwitchName) ?? Normalize(network?.SwitchName);
+                if (!string.IsNullOrWhiteSpace(effectiveSwitch) && !availableSwitches.Contains(effectiveSwitch))
+                {
+                    unresolved.Add(new V2UnresolvedRequirement
+                    {
+                        Kind = V2UnresolvedRequirementKind.SwitchReference,
+                        Key = effectiveSwitch,
+                        AffectedVmIds = [vm.VmId],
+                        Description = $"VM '{vmName}' requires switch '{effectiveSwitch}' on NIC '{nic.NicId}', but it is not available on the current host."
+                    });
+                    issues.Add(new V2PlanIssue
+                    {
+                        Severity = V2PlanIssueSeverity.Blocking,
+                        Code = "switch-reference-missing",
+                        VmId = vm.VmId,
+                        VmName = vmName,
+                        Message = $"VM '{vmName}' requires unavailable switch '{effectiveSwitch}'.",
+                        SuggestedAction = "Create the switch on this host or update the template NIC mapping."
+                    });
+                }
+
+                result.Add(new V2ResolvedVmNetworkInterface
+                {
+                    NicId = nic.NicId,
+                    Name = nic.Name,
+                    NetworkId = networkId,
+                    EffectiveSwitchName = effectiveSwitch,
+                    IpAddress = nic.IpAddress,
+                    PrefixLength = nic.PrefixLength,
+                    DefaultGateway = nic.DefaultGateway,
+                    DnsServers = nic.DnsServers?.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).ToArray() ?? Array.Empty<string>()
+                });
+            }
+
+            return result;
+        }
+
+        var fallbackSwitches = (vm.SwitchNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (fallbackSwitches.Count == 0 && !string.IsNullOrWhiteSpace(vm.SwitchName))
+        {
+            fallbackSwitches.Add(vm.SwitchName.Trim());
+        }
+
+        if (fallbackSwitches.Count == 0)
+        {
+            return result;
+        }
+
+        for (var index = 0; index < fallbackSwitches.Count; index++)
+        {
+            var switchName = fallbackSwitches[index];
+            if (!availableSwitches.Contains(switchName))
+            {
+                unresolved.Add(new V2UnresolvedRequirement
+                {
+                    Kind = V2UnresolvedRequirementKind.SwitchReference,
+                    Key = switchName,
+                    AffectedVmIds = [vm.VmId],
+                    Description = $"VM '{vmName}' references unavailable switch '{switchName}'."
+                });
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "switch-reference-missing",
+                    VmId = vm.VmId,
+                    VmName = vmName,
+                    Message = $"VM '{vmName}' references unavailable switch '{switchName}'.",
+                    SuggestedAction = "Create the switch on this host or update the template switch mapping."
+                });
+            }
+
+            result.Add(new V2ResolvedVmNetworkInterface
+            {
+                NicId = $"fallback-{index + 1}",
+                EffectiveSwitchName = switchName
+            });
+        }
+
+        return result;
+    }
+
+    private static bool DetermineGuestWorkRequirement(
+        string? topologyRole,
+        IReadOnlyCollection<string> knownCapabilities,
+        IReadOnlyCollection<V2ResolvedVmNetworkInterface> nics,
+        VmTemplate vm)
+    {
+        if (!string.IsNullOrWhiteSpace(topologyRole))
+        {
+            return true;
+        }
+
+        if (knownCapabilities.Count > 0)
+        {
+            return true;
+        }
+
+        if (nics.Any(nic =>
+                !string.IsNullOrWhiteSpace(nic.NetworkId) ||
+                !string.IsNullOrWhiteSpace(nic.IpAddress) ||
+                nic.PrefixLength.HasValue ||
+                !string.IsNullOrWhiteSpace(nic.DefaultGateway) ||
+                nic.DnsServers.Count > 0))
+        {
+            return true;
+        }
+
+        return vm.GuestNetworkConfig?.Enabled == true ||
+               vm.RoleConfig?.Enabled == true ||
+               vm.SoftwareConfig?.Enabled == true ||
+               vm.TimeZoneConfig?.Enabled == true;
+    }
+
+    private static bool DetermineRouterRequirement(IReadOnlyList<ResolvedVmState> states, bool domainRequired)
+    {
+        var routerRequired = states.Any(state => state.IsRouterCapable && state.NetworkKeys.Count > 1);
+        if (states.Any(state => state.IsRouterCapable && state.NetworkKeys.Count > 1))
+        {
+            routerRequired = true;
+        }
+
+        if (!domainRequired)
+        {
+            return routerRequired;
+        }
+
+        var rootNetworks = states
+            .Where(state => state.TopologyRoleIs("RootDomainController"))
+            .SelectMany(state => state.NetworkKeys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (rootNetworks.Count == 0)
+        {
+            return routerRequired;
+        }
+
+        foreach (var state in states.Where(state => state.TopologyRoleIs("ReplicaDomainController") || state.TopologyRoleIs("MemberServer")))
+        {
+            if (state.NetworkKeys.Count == 0)
+            {
+                continue;
+            }
+
+            if (state.NetworkKeys.Any(network => !rootNetworks.Contains(network)))
+            {
+                state.RequiresRouterDependency = true;
+                routerRequired = true;
+            }
+        }
+
+        return routerRequired;
+    }
+
+    private static void EmitNodes(IReadOnlyList<ResolvedVmState> states, bool routerRequired, List<V2PlanNode> nodes)
+    {
+        foreach (var state in states)
+        {
+            state.Nodes[V2PlanNodeKind.ProvisionVm] = AddNode(nodes, state, V2PlanNodeKind.ProvisionVm, "Provision VM", V2WorkloadClass.HeavyHost);
+            state.Nodes[V2PlanNodeKind.StartVm] = AddNode(nodes, state, V2PlanNodeKind.StartVm, "Start VM", V2WorkloadClass.HeavyHost);
+
+            if (state.RequiresGuestWork)
+            {
+                state.Nodes[V2PlanNodeKind.GuestTransportReady] = AddNode(nodes, state, V2PlanNodeKind.GuestTransportReady, "Wait for guest transport", V2WorkloadClass.LightWaitValidation);
+            }
+
+            if (state.RequiresNetworkBootstrap)
+            {
+                state.Nodes[V2PlanNodeKind.BootstrapGuestNetwork] = AddNode(nodes, state, V2PlanNodeKind.BootstrapGuestNetwork, "Bootstrap guest network", V2WorkloadClass.MediumGuest);
+            }
+
+            if (state.TopologyRoleIs("Router") && routerRequired)
+            {
+                state.Nodes[V2PlanNodeKind.RouterReady] = AddNode(nodes, state, V2PlanNodeKind.RouterReady, "Router ready", V2WorkloadClass.HeavyGuest);
+            }
+
+            if (state.TopologyRoleIs("RootDomainController"))
+            {
+                state.Nodes[V2PlanNodeKind.PromoteRootDomainController] = AddNode(nodes, state, V2PlanNodeKind.PromoteRootDomainController, "Promote root domain controller", V2WorkloadClass.HeavyGuest);
+                state.Nodes[V2PlanNodeKind.DomainReady] = AddNode(nodes, state, V2PlanNodeKind.DomainReady, "Domain ready", V2WorkloadClass.LightWaitValidation);
+            }
+
+            if (state.TopologyRoleIs("ReplicaDomainController"))
+            {
+                state.Nodes[V2PlanNodeKind.PromoteReplicaDomainController] = AddNode(nodes, state, V2PlanNodeKind.PromoteReplicaDomainController, "Promote replica domain controller", V2WorkloadClass.HeavyGuest);
+            }
+
+            if (state.TopologyRoleIs("MemberServer"))
+            {
+                state.Nodes[V2PlanNodeKind.JoinDomain] = AddNode(nodes, state, V2PlanNodeKind.JoinDomain, "Join domain", V2WorkloadClass.MediumGuest);
+            }
+
+            foreach (var capabilityRole in state.KnownCapabilityRoles)
+            {
+                var node = AddNode(nodes, state, V2PlanNodeKind.ApplyCapabilityRole, $"Apply {capabilityRole} capability", GetCapabilityWorkload(capabilityRole), capabilityRole);
+                state.CapabilityNodes[capabilityRole] = node;
+            }
+        }
+    }
+
+    private static void EmitDependencies(IReadOnlyList<ResolvedVmState> states, bool routerRequired, List<V2PlanDependency> dependencies)
+    {
+        var rootStates = states.Where(state => state.TopologyRoleIs("RootDomainController")).ToList();
+        var primaryRoot = rootStates
+            .OrderBy(state => state.Vm.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        var routerNode = states
+            .Where(state => state.IsRouterCapable)
+            .OrderBy(state => state.Vm.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase)
+            .Select(state => state.TryGetNode(V2PlanNodeKind.RouterReady))
+            .FirstOrDefault(node => node is not null);
+
+        foreach (var state in states)
+        {
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ProvisionVm), state.TryGetNode(V2PlanNodeKind.StartVm), V2PlanDependencyReasonCode.VmLifecycle, "VM must be provisioned before it can start.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.StartVm), state.TryGetNode(V2PlanNodeKind.GuestTransportReady), V2PlanDependencyReasonCode.VmLifecycle, "Guest transport requires a started VM.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.GuestTransportReady), state.TryGetNode(V2PlanNodeKind.BootstrapGuestNetwork), V2PlanDependencyReasonCode.VmLifecycle, "Guest networking bootstrap requires guest transport.", dependencies);
+
+            var guestAnchor = state.TryGetNode(V2PlanNodeKind.BootstrapGuestNetwork) ??
+                              state.TryGetNode(V2PlanNodeKind.GuestTransportReady) ??
+                              state.TryGetNode(V2PlanNodeKind.StartVm);
+
+            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness follows guest bootstrap on the router VM.", dependencies);
+            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Root promotion requires guest bootstrap.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), state.TryGetNode(V2PlanNodeKind.DomainReady), V2PlanDependencyReasonCode.DomainRequired, "Domain readiness follows root domain-controller promotion.", dependencies);
+            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Replica promotion requires guest bootstrap.", dependencies);
+            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.RoleOrdering, "Domain join requires guest bootstrap.", dependencies);
+
+            if (state.TopologyRoleIs("ReplicaDomainController") && primaryRoot is not null)
+            {
+                AddDependencyIfPresent(primaryRoot.TryGetNode(V2PlanNodeKind.DomainReady), state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.DomainRequired, "Replica promotion waits for domain readiness.", dependencies);
+            }
+
+            if (state.TopologyRoleIs("MemberServer") && primaryRoot is not null)
+            {
+                AddDependencyIfPresent(primaryRoot.TryGetNode(V2PlanNodeKind.DomainReady), state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.DomainRequired, "Domain join waits for domain readiness.", dependencies);
+            }
+
+            if (routerRequired && state.RequiresRouterDependency && routerNode is not null)
+            {
+                AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch domain work waits for router readiness.", dependencies);
+                AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch replica promotion waits for router readiness.", dependencies);
+            }
+
+            foreach (var explicitDependency in state.Vm.DependsOn ?? [])
+            {
+                var target = states.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Vm.VmId, explicitDependency, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(candidate.Vm.Name, explicitDependency, StringComparison.OrdinalIgnoreCase));
+                if (target is null)
+                {
+                    continue;
+                }
+
+                var targetAnchor = target.GetCompletionAnchor();
+                var sourceAnchor = state.GetGuestAnchor();
+                AddDependencyIfPresent(targetAnchor, sourceAnchor, V2PlanDependencyReasonCode.ExplicitDependsOn, $"VM '{state.Vm.Name}' explicitly depends on '{target.Vm.Name}'.", dependencies);
+            }
+
+            foreach (var capabilityNode in state.CapabilityNodes.Values)
+            {
+                if (state.TopologyRoleIs("MemberServer"))
+                {
+                    AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.JoinDomain), capabilityNode, V2PlanDependencyReasonCode.RoleOrdering, "Capability work on a member server waits for domain join.", dependencies);
+                }
+                else if (state.TopologyRoleIs("RootDomainController"))
+                {
+                    AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), capabilityNode, V2PlanDependencyReasonCode.RoleOrdering, "Capability work on a root domain controller waits for promotion.", dependencies);
+                }
+                else if (state.TopologyRoleIs("ReplicaDomainController"))
+                {
+                    AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), capabilityNode, V2PlanDependencyReasonCode.RoleOrdering, "Capability work on a replica domain controller waits for promotion.", dependencies);
+                }
+                else
+                {
+                    AddDependencyIfPresent(state.GetGuestAnchor(), capabilityNode, V2PlanDependencyReasonCode.RoleOrdering, "Capability work waits for guest readiness.", dependencies);
+                }
+            }
+        }
+    }
+
+    private static void AddDependencyIfPresent(
+        V2PlanNode? from,
+        V2PlanNode? to,
+        V2PlanDependencyReasonCode reasonCode,
+        string description,
+        List<V2PlanDependency> dependencies)
+    {
+        if (from is null || to is null)
+        {
+            return;
+        }
+
+        if (dependencies.Any(existing =>
+                existing.FromNodeId == from.NodeId &&
+                existing.ToNodeId == to.NodeId &&
+                existing.ReasonCode == reasonCode))
+        {
+            return;
+        }
+
+        dependencies.Add(new V2PlanDependency
+        {
+            FromNodeId = from.NodeId,
+            ToNodeId = to.NodeId,
+            ReasonCode = reasonCode,
+            Description = description,
+            IsBlockingGate = true
+        });
+    }
+
+    private static void ApplyWaveHints(
+        IReadOnlyList<V2PlanNode> nodes,
+        IReadOnlyList<V2PlanDependency> dependencies,
+        V2DeploymentProfile profile,
+        IReadOnlyList<ResolvedVmState> states)
+    {
+        var byId = nodes.ToDictionary(node => node.NodeId, StringComparer.Ordinal);
+        var stateByVmId = states.ToDictionary(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase);
+        var dependencyMap = dependencies
+            .GroupBy(dep => dep.ToNodeId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var cache = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var node in nodes)
+        {
+            node.WaveHint = ComputeWave(node.NodeId, profile, byId, stateByVmId, dependencyMap, cache);
+        }
+    }
+
+    private static int ComputeWave(
+        string nodeId,
+        V2DeploymentProfile profile,
+        IReadOnlyDictionary<string, V2PlanNode> nodes,
+        IReadOnlyDictionary<string, ResolvedVmState> stateByVmId,
+        IReadOnlyDictionary<string, V2PlanDependency[]> dependencyMap,
+        IDictionary<string, int> cache)
+    {
+        if (cache.TryGetValue(nodeId, out var wave))
+        {
+            return wave;
+        }
+
+        var node = nodes[nodeId];
+        var state = stateByVmId[node.VmId];
+        var baseWave = GetBaseWave(profile, state, node);
+        if (!dependencyMap.TryGetValue(nodeId, out var incoming) || incoming.Length == 0)
+        {
+            cache[nodeId] = baseWave;
+            return baseWave;
+        }
+
+        var dependencyWave = incoming.Max(dep => ComputeWave(dep.FromNodeId, profile, nodes, stateByVmId, dependencyMap, cache) + 1);
+        wave = Math.Max(baseWave, dependencyWave);
+        cache[nodeId] = wave;
+        return wave;
+    }
+
+    private static int GetBaseWave(V2DeploymentProfile profile, ResolvedVmState state, V2PlanNode node)
+    {
+        var roleOffset = profile switch
+        {
+            V2DeploymentProfile.Conservative => GetRoleOffsetConservative(state),
+            V2DeploymentProfile.Balanced => GetRoleOffsetBalanced(state),
+            _ => GetRoleOffsetAggressive(state)
+        };
+
+        return node.Kind switch
+        {
+            V2PlanNodeKind.ProvisionVm => 10 + roleOffset,
+            V2PlanNodeKind.StartVm => 20 + roleOffset,
+            V2PlanNodeKind.GuestTransportReady => 30 + roleOffset,
+            V2PlanNodeKind.BootstrapGuestNetwork => 40 + roleOffset,
+            V2PlanNodeKind.RouterReady => 55 + roleOffset,
+            V2PlanNodeKind.PromoteRootDomainController => 50 + roleOffset,
+            V2PlanNodeKind.DomainReady => 60 + roleOffset,
+            V2PlanNodeKind.PromoteReplicaDomainController => 70 + roleOffset,
+            V2PlanNodeKind.JoinDomain => 80 + roleOffset,
+            V2PlanNodeKind.ApplyCapabilityRole => 90 + roleOffset,
+            _ => 100 + roleOffset
+        };
+    }
+
+    private static int GetRoleOffsetConservative(ResolvedVmState state)
+    {
+        if (state.TopologyRoleIs("RootDomainController"))
+        {
+            return 0;
+        }
+
+        if (state.TopologyRoleIs("Router"))
+        {
+            return 5;
+        }
+
+        if (state.TopologyRoleIs("ReplicaDomainController"))
+        {
+            return 10;
+        }
+
+        if (state.TopologyRoleIs("MemberServer"))
+        {
+            return 30;
+        }
+
+        return 40;
+    }
+
+    private static int GetRoleOffsetBalanced(ResolvedVmState state)
+    {
+        if (state.TopologyRoleIs("RootDomainController"))
+        {
+            return 0;
+        }
+
+        if (state.TopologyRoleIs("Router"))
+        {
+            return 5;
+        }
+
+        if (state.TopologyRoleIs("ReplicaDomainController"))
+        {
+            return 10;
+        }
+
+        if (state.TopologyRoleIs("MemberServer"))
+        {
+            return 15;
+        }
+
+        return 20;
+    }
+
+    private static int GetRoleOffsetAggressive(ResolvedVmState state)
+    {
+        if (state.TopologyRoleIs("RootDomainController"))
+        {
+            return 0;
+        }
+
+        if (state.TopologyRoleIs("Router"))
+        {
+            return 2;
+        }
+
+        if (state.TopologyRoleIs("ReplicaDomainController"))
+        {
+            return 5;
+        }
+
+        if (state.TopologyRoleIs("MemberServer"))
+        {
+            return 8;
+        }
+
+        return 10;
+    }
+
+    private static IReadOnlyList<V2SchedulingWave> BuildWaves(IReadOnlyList<V2PlanNode> nodes)
+    {
+        return nodes
+            .GroupBy(node => node.WaveHint)
+            .OrderBy(group => group.Key)
+            .Select(group =>
+            {
+                var nodeIds = group.Select(node => node.NodeId).OrderBy(nodeId => nodeId, StringComparer.Ordinal).ToArray();
+                var workloadSummary = string.Join(", ", group.Select(node => node.WorkloadClass).Distinct().OrderBy(value => value));
+                return new V2SchedulingWave
+                {
+                    WaveNumber = group.Key,
+                    DisplayName = $"Wave {group.Key}",
+                    NodeIds = nodeIds,
+                    Summary = $"{group.Count()} node(s): {workloadSummary}"
+                };
+            })
+            .ToArray();
+    }
+
+    private static V2PlanNode AddNode(
+        List<V2PlanNode> nodes,
+        ResolvedVmState state,
+        V2PlanNodeKind kind,
+        string displayName,
+        V2WorkloadClass workloadClass,
+        string? capabilityRole = null)
+    {
+        var suffix = capabilityRole is null
+            ? kind.ToString()
+            : $"{kind}:{capabilityRole}";
+        var node = new V2PlanNode
+        {
+            NodeId = $"vm:{state.Vm.VmId}:{suffix}",
+            VmId = state.Vm.VmId,
+            VmName = state.Vm.Name,
+            Kind = kind,
+            DisplayName = displayName,
+            WorkloadClass = workloadClass,
+            CapabilityRole = capabilityRole,
+            RoleContext = new V2VmRoleContext
+            {
+                TopologyRole = state.TopologyRole,
+                CapabilityRoles = state.KnownCapabilityRoles.ToArray()
+            }
+        };
+        nodes.Add(node);
+        return node;
+    }
+
+    private static V2WorkloadClass GetCapabilityWorkload(string capabilityRole)
+    {
+        return capabilityRole switch
+        {
+            "Pki" => V2WorkloadClass.HeavyGuest,
+            "Sql" => V2WorkloadClass.HeavyGuest,
+            _ => V2WorkloadClass.MediumGuest
+        };
+    }
+
+    private static VhdxCatalogItem? ResolveCatalogItem(VmTemplate vm, IReadOnlyList<VhdxCatalogItem> catalogItems)
+    {
+        if (!string.IsNullOrWhiteSpace(vm.VhdxId))
+        {
+            return catalogItems.FirstOrDefault(item => string.Equals(item.Id, vm.VhdxId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(vm.VhdPath))
+        {
+            var byPath = catalogItems.FirstOrDefault(item => string.Equals(item.Path, vm.VhdPath, StringComparison.OrdinalIgnoreCase));
+            if (byPath is not null)
+            {
+                return byPath;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(vm.VhdxSignature))
+        {
+            var matches = VhdxSignature.FindMatches(vm.VhdxSignature, catalogItems).ToList();
+            if (matches.Count == 1)
+            {
+                return matches[0];
+            }
+        }
+
+        return null;
+    }
+
+    private static V2DeploymentProfile ResolveProfile(string? persistedValue, string? defaultValue, List<V2PlanIssue> issues)
+    {
+        if (!string.IsNullOrWhiteSpace(persistedValue) &&
+            V2SchedulerPolicyCatalog.TryResolveProfile(persistedValue, out var persistedProfile))
+        {
+            return persistedProfile;
+        }
+
+        if (!string.IsNullOrWhiteSpace(defaultValue) &&
+            V2SchedulerPolicyCatalog.TryResolveProfile(defaultValue, out var defaultProfile))
+        {
+            return defaultProfile;
+        }
+
+        if (!string.IsNullOrWhiteSpace(defaultValue))
+        {
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Warning,
+                Code = "deployment-profile-default-invalid",
+                Message = $"Default deployment profile '{defaultValue}' is invalid. Falling back to Conservative.",
+                SuggestedAction = "Use Conservative, Balanced, or Aggressive as the deploy-time default."
+            });
+        }
+
+        return V2DeploymentProfile.Conservative;
+    }
+
+    private static string ResolveDefaultProfileName(string? defaultValue)
+    {
+        return !string.IsNullOrWhiteSpace(defaultValue) &&
+               V2SchedulerPolicyCatalog.TryResolveProfile(defaultValue, out var profile)
+            ? V2SchedulerPolicyCatalog.GetCanonicalProfileName(profile)
+            : V2SchedulerPolicyCatalog.GetCanonicalProfileName(V2DeploymentProfile.Conservative);
+    }
+
+    private static V2DeploymentProfile ResolveDefaultProfile(string? defaultValue)
+    {
+        return !string.IsNullOrWhiteSpace(defaultValue) &&
+               V2SchedulerPolicyCatalog.TryResolveProfile(defaultValue, out var profile)
+            ? profile
+            : V2DeploymentProfile.Conservative;
+    }
+
+    private static string? Normalize(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class ResolvedVmState
+    {
+        public ResolvedVmState(
+            VmTemplate vm,
+            string? topologyRole,
+            IReadOnlyList<string> knownCapabilityRoles,
+            VhdxCatalogItem? catalogItem,
+            VhdxBootstrapProfile? bootstrapProfile,
+            IReadOnlyList<V2ResolvedVmNetworkInterface> resolvedNics)
+        {
+            Vm = vm;
+            TopologyRole = topologyRole;
+            KnownCapabilityRoles = knownCapabilityRoles;
+            CatalogItem = catalogItem;
+            BootstrapProfile = bootstrapProfile;
+            ResolvedNics = resolvedNics;
+            NetworkKeys = resolvedNics
+                .Select(nic => Normalize(nic.NetworkId) ?? Normalize(nic.EffectiveSwitchName))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToArray();
+        }
+
+        public VmTemplate Vm { get; }
+
+        public string? TopologyRole { get; }
+
+        public IReadOnlyList<string> KnownCapabilityRoles { get; }
+
+        public VhdxCatalogItem? CatalogItem { get; }
+
+        public VhdxBootstrapProfile? BootstrapProfile { get; }
+
+        public IReadOnlyList<V2ResolvedVmNetworkInterface> ResolvedNics { get; }
+
+        public IReadOnlyList<string> NetworkKeys { get; }
+
+        public Dictionary<V2PlanNodeKind, V2PlanNode> Nodes { get; } = new();
+
+        public Dictionary<string, V2PlanNode> CapabilityNodes { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public bool RequiresGuestWork { get; set; }
+
+        public bool RequiresDomainJoin { get; set; }
+
+        public bool IsRouterCapable { get; set; }
+
+        public bool RequiresRouterDependency { get; set; }
+
+        public string? EffectiveBootstrapSlot { get; set; }
+
+        public string? EffectiveDomainAdminSlot { get; set; }
+
+        public string? EffectiveDomainJoinSlot { get; set; }
+
+        public bool RequiresNetworkBootstrap => ResolvedNics.Count > 0;
+
+        public bool TopologyRoleIs(string role)
+            => string.Equals(TopologyRole, role, StringComparison.OrdinalIgnoreCase);
+
+        public V2PlanNode? TryGetNode(V2PlanNodeKind kind)
+            => Nodes.TryGetValue(kind, out var node) ? node : null;
+
+        public V2PlanNode? GetGuestAnchor()
+            => TryGetNode(V2PlanNodeKind.BootstrapGuestNetwork) ??
+               TryGetNode(V2PlanNodeKind.GuestTransportReady) ??
+               TryGetNode(V2PlanNodeKind.StartVm);
+
+        public V2PlanNode? GetCompletionAnchor()
+            => TryGetNode(V2PlanNodeKind.DomainReady) ??
+               TryGetNode(V2PlanNodeKind.RouterReady) ??
+               TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController) ??
+               TryGetNode(V2PlanNodeKind.JoinDomain) ??
+               CapabilityNodes.Values.OrderBy(node => node.NodeId, StringComparer.Ordinal).LastOrDefault() ??
+               GetGuestAnchor() ??
+               TryGetNode(V2PlanNodeKind.StartVm) ??
+               TryGetNode(V2PlanNodeKind.ProvisionVm);
+
+        public V2ResolvedVmPlanningContext ToContext()
+        {
+            return new V2ResolvedVmPlanningContext
+            {
+                VmId = Vm.VmId,
+                VmName = Vm.Name,
+                TopologyRole = TopologyRole,
+                CapabilityRoles = KnownCapabilityRoles.ToArray(),
+                ResolvedCatalogItemId = CatalogItem?.Id,
+                ResolvedCatalogPath = CatalogItem?.Path,
+                BootstrapProfileRef = Vm.BootstrapProfileRef,
+                HasBootstrapProfile = BootstrapProfile is not null,
+                EffectiveBootstrapUser = BootstrapProfile?.ExpectedLocalUser,
+                EffectiveBootstrapCredentialSlot = EffectiveBootstrapSlot,
+                EffectiveDomainAdminCredentialSlot = EffectiveDomainAdminSlot,
+                EffectiveDomainJoinCredentialSlot = EffectiveDomainJoinSlot,
+                RequiresGuestWork = RequiresGuestWork,
+                RequiresDomainJoin = RequiresDomainJoin,
+                IsRouterCapable = IsRouterCapable,
+                Nics = ResolvedNics.ToArray()
+            };
+        }
+    }
+}
