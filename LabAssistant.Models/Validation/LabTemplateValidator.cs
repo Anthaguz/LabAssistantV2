@@ -64,6 +64,7 @@ public static class LabTemplateValidator
         {
             ValidateV2DeploymentProfile(template, result);
             ValidateV2Networks(template, result);
+            ValidateV2ExtendedTopology(template, result);
         }
 
         var vmNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -170,6 +171,127 @@ public static class LabTemplateValidator
         {
             var allowedProfiles = string.Join(", ", V2SchedulerPolicyCatalog.SupportedProfileNames);
             result.Errors.Add($"V2 deploymentProfile must be one of: {allowedProfiles}.");
+        }
+    }
+
+    private static void ValidateV2ExtendedTopology(LabTemplate template, LabTemplateValidationResult result)
+    {
+        if (template.ExtendedTopology == null)
+        {
+            return;
+        }
+
+        var vmIds = template.VmTemplates
+            .Where(vm => !string.IsNullOrWhiteSpace(vm.VmId))
+            .Select(vm => vm.VmId.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        ValidateChildDomains(template.ExtendedTopology.ChildDomains, vmIds, result);
+        ValidateAdditionalForests(template.ExtendedTopology.AdditionalForests, vmIds, result);
+        ValidateTreeDomains(template.ExtendedTopology.TreeDomains, result);
+    }
+
+    private static void ValidateChildDomains(
+        List<V2ChildDomainTemplate>? childDomains,
+        ISet<string> vmIds,
+        LabTemplateValidationResult result)
+    {
+        if (childDomains == null)
+        {
+            return;
+        }
+
+        var topologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var childDomain in childDomains)
+        {
+            if (string.IsNullOrWhiteSpace(childDomain.TopologyId))
+            {
+                result.Errors.Add("V2 extendedTopology.childDomains.topologyId is required.");
+            }
+            else if (!topologyIds.Add(childDomain.TopologyId.Trim()))
+            {
+                result.Errors.Add($"Duplicate V2 child domain topology id: {childDomain.TopologyId}.");
+            }
+
+            if (string.IsNullOrWhiteSpace(childDomain.ParentDomainRef))
+            {
+                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' parentDomainRef is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(childDomain.ChildLabel))
+            {
+                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' childLabel is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(childDomain.FirstDomainControllerVmId))
+            {
+                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' firstDomainControllerVmId is required.");
+            }
+            else if (!vmIds.Contains(childDomain.FirstDomainControllerVmId.Trim()))
+            {
+                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' references unknown VM id '{childDomain.FirstDomainControllerVmId}'.");
+            }
+        }
+    }
+
+    private static void ValidateAdditionalForests(
+        List<V2AdditionalForestTemplate>? additionalForests,
+        ISet<string> vmIds,
+        LabTemplateValidationResult result)
+    {
+        if (additionalForests == null)
+        {
+            return;
+        }
+
+        var topologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var forest in additionalForests)
+        {
+            if (string.IsNullOrWhiteSpace(forest.TopologyId))
+            {
+                result.Errors.Add("V2 extendedTopology.additionalForests.topologyId is required.");
+            }
+            else if (!topologyIds.Add(forest.TopologyId.Trim()))
+            {
+                result.Errors.Add($"Duplicate V2 additional forest topology id: {forest.TopologyId}.");
+            }
+
+            if (string.IsNullOrWhiteSpace(forest.ForestRootDomainFqdn))
+            {
+                result.Errors.Add($"V2 additional forest '{forest.TopologyId}' forestRootDomainFqdn is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(forest.FirstDomainControllerVmId))
+            {
+                result.Errors.Add($"V2 additional forest '{forest.TopologyId}' firstDomainControllerVmId is required.");
+            }
+            else if (!vmIds.Contains(forest.FirstDomainControllerVmId.Trim()))
+            {
+                result.Errors.Add($"V2 additional forest '{forest.TopologyId}' references unknown VM id '{forest.FirstDomainControllerVmId}'.");
+            }
+        }
+    }
+
+    private static void ValidateTreeDomains(
+        List<V2TreeDomainTemplate>? treeDomains,
+        LabTemplateValidationResult result)
+    {
+        if (treeDomains == null)
+        {
+            return;
+        }
+
+        var topologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var treeDomain in treeDomains)
+        {
+            if (string.IsNullOrWhiteSpace(treeDomain.TopologyId))
+            {
+                result.Errors.Add("V2 extendedTopology.treeDomains.topologyId is required.");
+            }
+            else if (!topologyIds.Add(treeDomain.TopologyId.Trim()))
+            {
+                result.Errors.Add($"Duplicate V2 tree domain topology id: {treeDomain.TopologyId}.");
+            }
         }
     }
 

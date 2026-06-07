@@ -268,6 +268,7 @@ public class LabTemplateStore : ILabTemplateStore
 
         normalized.ExecutionEngine = executionEngine;
         normalized.LabNetworks = normalized.LabNetworks?.Select(Clone).ToList();
+        normalized.ExtendedTopology = Clone(normalized.ExtendedTopology);
 
         for (var i = 0; i < normalized.VmTemplates.Count; i++)
         {
@@ -466,6 +467,53 @@ public class LabTemplateStore : ILabTemplateStore
             PrefixLength = source.PrefixLength,
             DefaultGateway = source.DefaultGateway,
             DnsServers = source.DnsServers?.ToList()
+        };
+    }
+
+    private static V2ExtendedTopologyTemplate? Clone(V2ExtendedTopologyTemplate? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new V2ExtendedTopologyTemplate
+        {
+            ChildDomains = source.ChildDomains?.Select(Clone).ToList(),
+            AdditionalForests = source.AdditionalForests?.Select(Clone).ToList(),
+            TreeDomains = source.TreeDomains?.Select(Clone).ToList()
+        };
+    }
+
+    private static V2ChildDomainTemplate Clone(V2ChildDomainTemplate source)
+    {
+        return new V2ChildDomainTemplate
+        {
+            TopologyId = source.TopologyId,
+            ParentDomainRef = source.ParentDomainRef,
+            ChildLabel = source.ChildLabel,
+            DomainFqdn = source.DomainFqdn,
+            NetBiosName = source.NetBiosName,
+            FirstDomainControllerVmId = source.FirstDomainControllerVmId
+        };
+    }
+
+    private static V2AdditionalForestTemplate Clone(V2AdditionalForestTemplate source)
+    {
+        return new V2AdditionalForestTemplate
+        {
+            TopologyId = source.TopologyId,
+            ForestRootDomainFqdn = source.ForestRootDomainFqdn,
+            NetBiosName = source.NetBiosName,
+            FirstDomainControllerVmId = source.FirstDomainControllerVmId
+        };
+    }
+
+    private static V2TreeDomainTemplate Clone(V2TreeDomainTemplate source)
+    {
+        return new V2TreeDomainTemplate
+        {
+            TopologyId = source.TopologyId
         };
     }
 }

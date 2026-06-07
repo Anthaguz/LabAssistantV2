@@ -360,6 +360,93 @@ public class LabTemplateValidatorTests
     }
 
     [Fact]
+    public void Validate_V2Template_AllowsReservedExtendedTopologyShape()
+    {
+        var template = CreateMinimalV2Template();
+        template.ExtendedTopology = new V2ExtendedTopologyTemplate
+        {
+            ChildDomains =
+            [
+                new V2ChildDomainTemplate
+                {
+                    TopologyId = "child-contoso",
+                    ParentDomainRef = "contoso.com",
+                    ChildLabel = "child",
+                    DomainFqdn = "child.contoso.com",
+                    NetBiosName = "CHILD",
+                    FirstDomainControllerVmId = "vm-1"
+                }
+            ],
+            AdditionalForests =
+            [
+                new V2AdditionalForestTemplate
+                {
+                    TopologyId = "forest-fabrikam",
+                    ForestRootDomainFqdn = "fabrikam.com",
+                    NetBiosName = "FABRIKAM",
+                    FirstDomainControllerVmId = "vm-1"
+                }
+            ],
+            TreeDomains =
+            [
+                new V2TreeDomainTemplate
+                {
+                    TopologyId = "tree-tailspin"
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, CreateMinimalCatalog());
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_V2Template_RejectsInvalidExtendedTopologyReferences()
+    {
+        var template = CreateMinimalV2Template();
+        template.ExtendedTopology = new V2ExtendedTopologyTemplate
+        {
+            ChildDomains =
+            [
+                new V2ChildDomainTemplate
+                {
+                    TopologyId = "child-contoso",
+                    ParentDomainRef = " ",
+                    ChildLabel = "",
+                    FirstDomainControllerVmId = "missing-vm"
+                }
+            ],
+            AdditionalForests =
+            [
+                new V2AdditionalForestTemplate
+                {
+                    TopologyId = "forest-fabrikam",
+                    ForestRootDomainFqdn = "",
+                    FirstDomainControllerVmId = "missing-vm"
+                }
+            ],
+            TreeDomains =
+            [
+                new V2TreeDomainTemplate
+                {
+                    TopologyId = " "
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, CreateMinimalCatalog());
+
+        Assert.False(result.IsValid);
+        Assert.Contains("V2 child domain 'child-contoso' parentDomainRef is required.", result.Errors);
+        Assert.Contains("V2 child domain 'child-contoso' childLabel is required.", result.Errors);
+        Assert.Contains("V2 child domain 'child-contoso' references unknown VM id 'missing-vm'.", result.Errors);
+        Assert.Contains("V2 additional forest 'forest-fabrikam' forestRootDomainFqdn is required.", result.Errors);
+        Assert.Contains("V2 additional forest 'forest-fabrikam' references unknown VM id 'missing-vm'.", result.Errors);
+        Assert.Contains("V2 extendedTopology.treeDomains.topologyId is required.", result.Errors);
+    }
+
+    [Fact]
     public void Validate_V1Template_DoesNotApplyV2DeploymentProfileValidation()
     {
         var template = new LabTemplate
