@@ -16,6 +16,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly Func<IPersistentPowerShellSession> _sessionFactory;
     private readonly Func<IPersistentPowerShellSession, IHyperVService> _hyperVFactory;
     private readonly IGuestCommandExecutor _guestCommandExecutor;
+    private readonly V2RootForestRuntimeCoordinator _rootForestRuntimeCoordinator;
     private readonly IVmCleanupOrchestrator _cleanupOrchestrator;
     private readonly IStructuredLogger _structuredLogger;
 
@@ -29,6 +30,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         _sessionFactory = sessionFactory;
         _hyperVFactory = hyperVFactory;
         _guestCommandExecutor = guestCommandExecutor;
+        _rootForestRuntimeCoordinator = new V2RootForestRuntimeCoordinator(guestCommandExecutor);
         _cleanupOrchestrator = cleanupOrchestrator;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
     }
@@ -66,9 +68,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
         var deferredNodeIds = new HashSet<string>(
             request.Plan.Nodes
-                .Where(node => node.Kind is not V2PlanNodeKind.ProvisionVm
-                    and not V2PlanNodeKind.StartVm
-                    and not V2PlanNodeKind.GuestTransportReady)
+                .Where(node => node.Kind is V2PlanNodeKind.BootstrapGuestNetwork
+                    or V2PlanNodeKind.RouterReady
+                    or V2PlanNodeKind.PromoteReplicaDomainController
+                    or V2PlanNodeKind.JoinDomain
+                    or V2PlanNodeKind.ApplyCapabilityRole)
                 .Select(node => node.NodeId),
             StringComparer.Ordinal);
 
@@ -86,7 +90,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             if (rootStates.Count > 0)
             {
-                await ExecuteCriticalRootStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+                await ExecuteCriticalRootReadinessStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
             }
 
             var shouldContinue = !multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess);
@@ -96,15 +100,37 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     .Where(state => !string.Equals(state.PlanVm.TopologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-                await ExecuteRemainingStageAsync(
-                    request,
-                    multiContext,
-                    nonRootStates,
-                    stateByVmId,
-                    executedNodeIds,
-                    deferredNodeIds,
-                    rootStates.Select(state => state.PlanVm.VmId).ToHashSet(StringComparer.OrdinalIgnoreCase),
-                    cancellationToken);
+                if (request.Plan.Context.ResolvedDeploymentProfile == V2DeploymentProfile.Conservative)
+                {
+                    await ExecuteRootPromotionStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+                    if (!multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess))
+                    {
+                        await ExecuteRemainingStageAsync(
+                            request,
+                            multiContext,
+                            nonRootStates,
+                            stateByVmId,
+                            executedNodeIds,
+                            deferredNodeIds,
+                            rootStates.Select(state => state.PlanVm.VmId).ToHashSet(StringComparer.OrdinalIgnoreCase),
+                            cancellationToken);
+                    }
+                }
+                else
+                {
+                    var rootPromotionTask = ExecuteRootPromotionStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+                    var nonRootTask = ExecuteRemainingStageAsync(
+                        request,
+                        multiContext,
+                        nonRootStates,
+                        stateByVmId,
+                        executedNodeIds,
+                        deferredNodeIds,
+                        rootStates.Select(state => state.PlanVm.VmId).ToHashSet(StringComparer.OrdinalIgnoreCase),
+                        cancellationToken);
+
+                    await Task.WhenAll(rootPromotionTask, nonRootTask);
+                }
             }
 
             await CleanupFailedOrCancelledVmsAsync(multiContext, states);
@@ -133,7 +159,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         };
     }
 
-    private async Task ExecuteCriticalRootStageAsync(
+    private async Task ExecuteCriticalRootReadinessStageAsync(
         IReadOnlyList<RuntimeVmState> rootStates,
         V2RuntimeExecutionRequest request,
         MultiVmDeploymentContext multiContext,
@@ -144,6 +170,19 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.ProvisionVm, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.StartVm, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.GuestTransportReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+    }
+
+    private async Task ExecuteRootPromotionStageAsync(
+        IReadOnlyList<RuntimeVmState> rootStates,
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        ISet<string> executedNodeIds,
+        ISet<string> deferredNodeIds,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.InstallAdDomainServicesFeature, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.PromoteRootDomainController, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.DomainReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await EmitDeferredBootstrapStepsAsync(rootStates, multiContext, deferredNodeIds);
     }
 
@@ -343,6 +382,39 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     cancellationToken);
                 executedNodeIds.Add(node.NodeId);
                 break;
+
+            case V2PlanNodeKind.InstallAdDomainServicesFeature:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2InstallAdDomainServices,
+                    "Install AD DS feature",
+                    context => InstallAdDomainServicesFeatureAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.PromoteRootDomainController:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2PromoteRootDomainController,
+                    "Promote root forest",
+                    context => PromoteRootForestAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.DomainReady:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2DomainReady,
+                    "Wait for domain ready",
+                    context => WaitForDomainReadyAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
         }
     }
 
@@ -461,25 +533,169 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         context.VmStarted = true;
     }
 
+    private async Task InstallAdDomainServicesFeatureAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var credential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2InstallAdDomainServices,
+            "bootstrap");
+        if (credential is null)
+        {
+            return;
+        }
+
+        var result = await _rootForestRuntimeCoordinator.EnsureAdDomainServicesInstalledAsync(
+            context.VmName,
+            credential,
+            cancellationToken);
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2InstallAdDomainServices,
+                $"Failed to install AD DS on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    private async Task PromoteRootForestAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var domain = state.Domain;
+        if (domain is null)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2PromoteRootDomainController,
+                $"VM '{context.VmName}' is missing resolved root-domain topology.");
+            return;
+        }
+
+        var bootstrapCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2PromoteRootDomainController,
+            "bootstrap");
+        var dsrmCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveDsrmCredentialSlot,
+            context,
+            DeploymentStepKeys.V2PromoteRootDomainController,
+            "DSRM");
+        if (bootstrapCredential is null || dsrmCredential is null)
+        {
+            return;
+        }
+
+        var result = await _rootForestRuntimeCoordinator.PromoteRootForestAsync(
+            context.VmName,
+            bootstrapCredential,
+            domain,
+            dsrmCredential.Password,
+            cancellationToken);
+        if (result.Success || V2RootForestRuntimeCoordinator.IsExpectedRestartBoundaryError(result.Error))
+        {
+            return;
+        }
+
+        context.MarkFailure(
+            DeploymentStepKeys.V2PromoteRootDomainController,
+            $"Root forest promotion failed on '{context.VmName}'. {result.Error}".Trim());
+    }
+
+    private async Task WaitForDomainReadyAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var domain = state.Domain;
+        if (domain is null)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2DomainReady,
+                $"VM '{context.VmName}' is missing resolved root-domain topology.");
+            return;
+        }
+
+        var domainAdminCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveDomainAdminCredentialSlot,
+            context,
+            DeploymentStepKeys.V2DomainReady,
+            "domain-admin");
+        if (domainAdminCredential is null)
+        {
+            return;
+        }
+
+        string? lastError = null;
+        for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.ShouldAbort?.Invoke() == true)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            var verifyResult = await _rootForestRuntimeCoordinator.VerifyDomainControllerAsync(
+                context.VmName,
+                domainAdminCredential,
+                domain.DnsName,
+                cancellationToken);
+            if (!verifyResult.Success)
+            {
+                lastError = verifyResult.Error;
+                if (attempt < request.GuestTransportMaxRetries)
+                {
+                    await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+                }
+                continue;
+            }
+
+            var readyResult = await _rootForestRuntimeCoordinator.ProbeDomainReadyAsync(
+                context.VmName,
+                domainAdminCredential,
+                domain.DnsName,
+                cancellationToken);
+            if (readyResult.Success)
+            {
+                return;
+            }
+
+            lastError = readyResult.Error;
+            if (attempt < request.GuestTransportMaxRetries)
+            {
+                await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+            }
+        }
+
+        context.MarkFailure(
+            DeploymentStepKeys.V2DomainReady,
+            $"Domain '{domain.DnsName}' did not become ready on '{context.VmName}'. Last error: {lastError ?? "unknown"}");
+    }
+
     private async Task WaitForGuestTransportAsync(
         RuntimeVmState state,
         V2RuntimeExecutionRequest request,
         VmDeploymentContext context,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(state.PlanVm.EffectiveBootstrapCredentialSlot))
+        var credential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2GuestTransportReady,
+            "bootstrap");
+        if (credential is null)
         {
-            context.MarkFailure(
-                DeploymentStepKeys.V2GuestTransportReady,
-                $"VM '{context.VmName}' is missing a resolved bootstrap credential slot for PowerShell Direct access.");
-            return;
-        }
-
-        if (!request.CredentialSlotValues.TryGetValue(state.PlanVm.EffectiveBootstrapCredentialSlot, out var credential))
-        {
-            context.MarkFailure(
-                DeploymentStepKeys.V2GuestTransportReady,
-                $"VM '{context.VmName}' is missing runtime credential material for slot '{state.PlanVm.EffectiveBootstrapCredentialSlot}'.");
             return;
         }
 
@@ -515,6 +731,28 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         context.MarkFailure(
             DeploymentStepKeys.V2GuestTransportReady,
             $"PowerShell Direct did not become ready on '{context.VmName}'. Last error: {lastError ?? "unknown"}");
+    }
+
+    private static V2RuntimeCredential? ResolveCredential(
+        IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        string? slotKey,
+        VmDeploymentContext context,
+        string stepKey,
+        string purpose)
+    {
+        if (string.IsNullOrWhiteSpace(slotKey))
+        {
+            context.MarkFailure(stepKey, $"VM '{context.VmName}' is missing a resolved {purpose} credential slot.");
+            return null;
+        }
+
+        if (!credentialSlotValues.TryGetValue(slotKey, out var credential))
+        {
+            context.MarkFailure(stepKey, $"VM '{context.VmName}' is missing runtime credential material for slot '{slotKey}'.");
+            return null;
+        }
+
+        return credential;
     }
 
     private async Task ExecuteRuntimeStepAsync(
@@ -649,6 +887,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private static List<RuntimeVmState> BuildRuntimeStates(V2RuntimeExecutionRequest request, MultiVmDeploymentContext multiContext)
     {
         var planVmById = request.Plan.Context.Vms.ToDictionary(vm => vm.VmId, StringComparer.OrdinalIgnoreCase);
+        var domainById = request.Plan.Context.Domains.ToDictionary(domain => domain.DomainId, StringComparer.OrdinalIgnoreCase);
         var nodesByVmId = request.Plan.Nodes
             .GroupBy(node => node.VmId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
@@ -672,6 +911,9 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 .Select(name => name!.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var runtimeDomain = !string.IsNullOrWhiteSpace(planVm.DomainId) && domainById.TryGetValue(planVm.DomainId, out var resolvedDomain)
+                ? resolvedDomain
+                : null;
 
             var context = new VmDeploymentContext
             {
@@ -689,7 +931,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 PerVmFailFast = request.Settings.PerVmFailFast,
                 NonBlockingOptionalSteps = new List<string>(request.Settings.NonBlockingOptionalSteps ?? []),
                 V2TopologyRole = planVm.TopologyRole,
-                V2BootstrapCredentialSlot = planVm.EffectiveBootstrapCredentialSlot
+                V2DomainId = planVm.DomainId,
+                V2DomainDnsName = runtimeDomain?.DnsName,
+                V2ForestId = runtimeDomain?.ForestId,
+                V2BootstrapCredentialSlot = planVm.EffectiveBootstrapCredentialSlot,
+                V2DomainAdminCredentialSlot = planVm.EffectiveDomainAdminCredentialSlot,
+                V2DsrmCredentialSlot = planVm.EffectiveDsrmCredentialSlot
             };
 
             context.OperationId = multiContext.OperationId;
@@ -704,7 +951,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             multiContext.VmContexts.Add(context);
             nodesByVmId.TryGetValue(vm.VmId, out var nodes);
-            states.Add(new RuntimeVmState(context, vm, planVm, nodes ?? []));
+            states.Add(new RuntimeVmState(
+                context,
+                vm,
+                planVm,
+                runtimeDomain,
+                nodes ?? []));
         }
 
         return states;
@@ -871,11 +1123,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             VmDeploymentContext context,
             VmTemplate templateVm,
             V2ResolvedVmPlanningContext planVm,
+            V2ResolvedDomainPlanningContext? domain,
             IReadOnlyList<V2PlanNode> nodes)
         {
             Context = context;
             TemplateVm = templateVm;
             PlanVm = planVm;
+            Domain = domain;
             _nodes = nodes
                 .GroupBy(node => node.Kind)
                 .ToDictionary(group => group.Key, group => group.First());
@@ -886,6 +1140,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         public VmTemplate TemplateVm { get; }
 
         public V2ResolvedVmPlanningContext PlanVm { get; }
+
+        public V2ResolvedDomainPlanningContext? Domain { get; }
 
         public V2PlanNode? TryGetNode(V2PlanNodeKind kind) =>
             _nodes.TryGetValue(kind, out var node) ? node : null;

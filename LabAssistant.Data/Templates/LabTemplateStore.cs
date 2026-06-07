@@ -268,7 +268,7 @@ public class LabTemplateStore : ILabTemplateStore
 
         normalized.ExecutionEngine = executionEngine;
         normalized.LabNetworks = normalized.LabNetworks?.Select(Clone).ToList();
-        normalized.ExtendedTopology = Clone(normalized.ExtendedTopology);
+        normalized.DirectoryTopology = Clone(normalized.DirectoryTopology);
 
         for (var i = 0; i < normalized.VmTemplates.Count; i++)
         {
@@ -296,6 +296,7 @@ public class LabTemplateStore : ILabTemplateStore
                 RoleConfig = Clone(vm.RoleConfig),
                 GuestNetworkConfig = Clone(vm.GuestNetworkConfig),
                 TopologyRole = vm.TopologyRole,
+                DomainId = vm.DomainId,
                 CapabilityRoles = vm.CapabilityRoles?.ToList(),
                 DependsOn = vm.DependsOn?.ToList(),
                 CredentialSlots = Clone(vm.CredentialSlots),
@@ -451,7 +452,8 @@ public class LabTemplateStore : ILabTemplateStore
         {
             LocalBootstrap = source.LocalBootstrap,
             DomainAdmin = source.DomainAdmin,
-            DomainJoin = source.DomainJoin
+            DomainJoin = source.DomainJoin,
+            Dsrm = source.Dsrm
         };
     }
 
@@ -470,50 +472,53 @@ public class LabTemplateStore : ILabTemplateStore
         };
     }
 
-    private static V2ExtendedTopologyTemplate? Clone(V2ExtendedTopologyTemplate? source)
+    private static V2DirectoryTopologyTemplate? Clone(V2DirectoryTopologyTemplate? source)
     {
         if (source == null)
         {
             return null;
         }
 
-        return new V2ExtendedTopologyTemplate
+        return new V2DirectoryTopologyTemplate
         {
-            ChildDomains = source.ChildDomains?.Select(Clone).ToList(),
-            AdditionalForests = source.AdditionalForests?.Select(Clone).ToList(),
-            TreeDomains = source.TreeDomains?.Select(Clone).ToList()
+            Forests = source.Forests?.Select(Clone).ToList(),
+            Domains = source.Domains?.Select(Clone).ToList(),
+            Trusts = source.Trusts?.Select(Clone).ToList()
         };
     }
 
-    private static V2ChildDomainTemplate Clone(V2ChildDomainTemplate source)
+    private static V2ForestTemplate Clone(V2ForestTemplate source)
     {
-        return new V2ChildDomainTemplate
+        return new V2ForestTemplate
         {
-            TopologyId = source.TopologyId,
-            ParentDomainRef = source.ParentDomainRef,
-            ChildLabel = source.ChildLabel,
-            DomainFqdn = source.DomainFqdn,
+            ForestId = source.ForestId,
+            RootDomainId = source.RootDomainId
+        };
+    }
+
+    private static V2DomainTemplate Clone(V2DomainTemplate source)
+    {
+        return new V2DomainTemplate
+        {
+            DomainId = source.DomainId,
+            DnsName = source.DnsName,
             NetBiosName = source.NetBiosName,
+            ForestId = source.ForestId,
+            RelationKind = source.RelationKind,
+            ParentDomainId = source.ParentDomainId,
             FirstDomainControllerVmId = source.FirstDomainControllerVmId
         };
     }
 
-    private static V2AdditionalForestTemplate Clone(V2AdditionalForestTemplate source)
+    private static V2TrustTemplate Clone(V2TrustTemplate source)
     {
-        return new V2AdditionalForestTemplate
+        return new V2TrustTemplate
         {
-            TopologyId = source.TopologyId,
-            ForestRootDomainFqdn = source.ForestRootDomainFqdn,
-            NetBiosName = source.NetBiosName,
-            FirstDomainControllerVmId = source.FirstDomainControllerVmId
-        };
-    }
-
-    private static V2TreeDomainTemplate Clone(V2TreeDomainTemplate source)
-    {
-        return new V2TreeDomainTemplate
-        {
-            TopologyId = source.TopologyId
+            TrustId = source.TrustId,
+            SourceDomainId = source.SourceDomainId,
+            TargetDomainId = source.TargetDomainId,
+            TrustType = source.TrustType,
+            Direction = source.Direction
         };
     }
 }

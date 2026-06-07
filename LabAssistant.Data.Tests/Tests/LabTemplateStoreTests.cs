@@ -394,10 +394,10 @@ public class LabTemplateStoreTests
     }
 
     [Fact]
-    public void SaveToFile_V2Template_PreservesReservedExtendedTopologyShape()
+    public void SaveToFile_V2Template_PreservesDirectoryTopologyShape()
     {
         var folder = BuildTempRoot();
-        var path = Path.Combine(folder, "v2-extended-topology.json");
+        var path = Path.Combine(folder, "v2-directory-topology.json");
         var store = new LabTemplateStore();
         var template = new LabTemplate
         {
@@ -408,35 +408,45 @@ public class LabTemplateStoreTests
             CreatedWithAppVersion = "1.0.0",
             TemplateType = "lab-template",
             TemplateRevision = 1,
-            ExtendedTopology = new V2ExtendedTopologyTemplate
+            DirectoryTopology = new V2DirectoryTopologyTemplate
             {
-                ChildDomains =
+                Forests =
                 [
-                    new V2ChildDomainTemplate
+                    new V2ForestTemplate
                     {
-                        TopologyId = "child-contoso",
-                        ParentDomainRef = "contoso.com",
-                        ChildLabel = "child",
-                        DomainFqdn = "child.contoso.com",
+                        ForestId = "forest-contoso",
+                        RootDomainId = "domain-contoso"
+                    }
+                ],
+                Domains =
+                [
+                    new V2DomainTemplate
+                    {
+                        DomainId = "domain-contoso",
+                        DnsName = "contoso.com",
+                        NetBiosName = "CONTOSO",
+                        ForestId = "forest-contoso",
+                        RelationKind = V2DomainRelationKind.Root,
+                        FirstDomainControllerVmId = "vm-1"
+                    },
+                    new V2DomainTemplate
+                    {
+                        DomainId = "domain-child",
+                        DnsName = "child.contoso.com",
                         NetBiosName = "CHILD",
+                        ForestId = "forest-contoso",
+                        RelationKind = V2DomainRelationKind.Child,
+                        ParentDomainId = "domain-contoso",
                         FirstDomainControllerVmId = "vm-1"
                     }
                 ],
-                AdditionalForests =
+                Trusts =
                 [
-                    new V2AdditionalForestTemplate
+                    new V2TrustTemplate
                     {
-                        TopologyId = "forest-fabrikam",
-                        ForestRootDomainFqdn = "fabrikam.com",
-                        NetBiosName = "FABRIKAM",
-                        FirstDomainControllerVmId = "vm-1"
-                    }
-                ],
-                TreeDomains =
-                [
-                    new V2TreeDomainTemplate
-                    {
-                        TopologyId = "tree-tailspin"
+                        TrustId = "trust-contoso-child",
+                        SourceDomainId = "domain-contoso",
+                        TargetDomainId = "domain-child"
                     }
                 ]
             },
@@ -449,7 +459,8 @@ public class LabTemplateStoreTests
                     MemoryMb = 4096,
                     CpuCount = 2,
                     VhdxId = "win-server-2025-gen2-core",
-                    TopologyRole = "RootDomainController"
+                    TopologyRole = "RootDomainController",
+                    DomainId = "domain-contoso"
                 }
             }
         };
@@ -458,14 +469,14 @@ public class LabTemplateStoreTests
         var loaded = store.LoadFromFile(path);
         var json = File.ReadAllText(path);
 
-        Assert.NotNull(loaded.ExtendedTopology);
-        Assert.Equal("child-contoso", Assert.Single(loaded.ExtendedTopology!.ChildDomains!).TopologyId);
-        Assert.Equal("forest-fabrikam", Assert.Single(loaded.ExtendedTopology.AdditionalForests!).TopologyId);
-        Assert.Equal("tree-tailspin", Assert.Single(loaded.ExtendedTopology.TreeDomains!).TopologyId);
-        Assert.Contains("\"extendedTopology\"", json);
-        Assert.Contains("\"childDomains\"", json);
-        Assert.Contains("\"additionalForests\"", json);
-        Assert.Contains("\"treeDomains\"", json);
+        Assert.NotNull(loaded.DirectoryTopology);
+        Assert.Equal("forest-contoso", Assert.Single(loaded.DirectoryTopology!.Forests!).ForestId);
+        Assert.Equal("domain-contoso", loaded.DirectoryTopology.Domains![0].DomainId);
+        Assert.Equal("trust-contoso-child", Assert.Single(loaded.DirectoryTopology.Trusts!).TrustId);
+        Assert.Contains("\"directoryTopology\"", json);
+        Assert.Contains("\"forests\"", json);
+        Assert.Contains("\"domains\"", json);
+        Assert.Contains("\"trusts\"", json);
     }
 
     [Fact]

@@ -45,7 +45,12 @@ namespace LabAssistant.Models.Deployment
         public GuestNetworkStepConfig? GuestNetworkConfig { get; set; }
         public List<string> NonBlockingOptionalSteps { get; set; } = new();
         public string? V2TopologyRole { get; set; }
+        public string? V2DomainId { get; set; }
+        public string? V2DomainDnsName { get; set; }
+        public string? V2ForestId { get; set; }
         public string? V2BootstrapCredentialSlot { get; set; }
+        public string? V2DomainAdminCredentialSlot { get; set; }
+        public string? V2DsrmCredentialSlot { get; set; }
         public bool V2GuestTransportReady { get; set; }
 
         // Resource tracking for cleanup orchestration
@@ -205,7 +210,12 @@ namespace LabAssistant.Models.Deployment
             IsSuccess = true;
             GuestServicesEnabled = false;
             V2TopologyRole = null;
+            V2DomainId = null;
+            V2DomainDnsName = null;
+            V2ForestId = null;
             V2BootstrapCredentialSlot = null;
+            V2DomainAdminCredentialSlot = null;
+            V2DsrmCredentialSlot = null;
             V2GuestTransportReady = false;
             VmFolderCreated = false;
             DifferencingDiskCreated = false;

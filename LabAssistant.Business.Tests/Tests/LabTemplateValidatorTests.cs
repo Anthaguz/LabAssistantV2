@@ -291,13 +291,16 @@ public class LabTemplateValidatorTests
                     CpuCount = 2,
                     VhdxId = "win-2025",
                     TopologyRole = "RootDomainController",
+                    DomainId = "domain-contoso",
                     CredentialSlots = new VmCredentialSlotBindings
                     {
                         LocalBootstrap = " ",
-                        DomainAdmin = "lab.contoso.domain-admin"
+                        DomainAdmin = "lab.contoso.domain-admin",
+                        Dsrm = "lab.contoso.dsrm"
                     }
                 }
-            ]
+            ],
+            DirectoryTopology = CreateMinimalDirectoryTopology()
         };
 
         var catalog = new List<VhdxCatalogItem>
@@ -360,38 +363,50 @@ public class LabTemplateValidatorTests
     }
 
     [Fact]
-    public void Validate_V2Template_AllowsReservedExtendedTopologyShape()
+    public void Validate_V2Template_AllowsDirectoryTopologyShape()
     {
         var template = CreateMinimalV2Template();
-        template.ExtendedTopology = new V2ExtendedTopologyTemplate
+        template.DirectoryTopology = new V2DirectoryTopologyTemplate
         {
-            ChildDomains =
+            Forests =
             [
-                new V2ChildDomainTemplate
+                new V2ForestTemplate
                 {
-                    TopologyId = "child-contoso",
-                    ParentDomainRef = "contoso.com",
-                    ChildLabel = "child",
-                    DomainFqdn = "child.contoso.com",
+                    ForestId = "forest-contoso",
+                    RootDomainId = "domain-contoso"
+                }
+            ],
+            Domains =
+            [
+                new V2DomainTemplate
+                {
+                    DomainId = "domain-contoso",
+                    DnsName = "contoso.com",
+                    NetBiosName = "CONTOSO",
+                    ForestId = "forest-contoso",
+                    RelationKind = V2DomainRelationKind.Root,
+                    FirstDomainControllerVmId = "vm-1"
+                },
+                new V2DomainTemplate
+                {
+                    DomainId = "domain-child",
+                    DnsName = "child.contoso.com",
                     NetBiosName = "CHILD",
+                    ForestId = "forest-contoso",
+                    RelationKind = V2DomainRelationKind.Child,
+                    ParentDomainId = "domain-contoso",
                     FirstDomainControllerVmId = "vm-1"
                 }
             ],
-            AdditionalForests =
+            Trusts =
             [
-                new V2AdditionalForestTemplate
+                new V2TrustTemplate
                 {
-                    TopologyId = "forest-fabrikam",
-                    ForestRootDomainFqdn = "fabrikam.com",
-                    NetBiosName = "FABRIKAM",
-                    FirstDomainControllerVmId = "vm-1"
-                }
-            ],
-            TreeDomains =
-            [
-                new V2TreeDomainTemplate
-                {
-                    TopologyId = "tree-tailspin"
+                    TrustId = "trust-contoso-fabrikam",
+                    SourceDomainId = "domain-contoso",
+                    TargetDomainId = "domain-child",
+                    TrustType = V2TrustType.Forest,
+                    Direction = V2TrustDirection.Bidirectional
                 }
             ]
         };
@@ -402,35 +417,39 @@ public class LabTemplateValidatorTests
     }
 
     [Fact]
-    public void Validate_V2Template_RejectsInvalidExtendedTopologyReferences()
+    public void Validate_V2Template_RejectsInvalidDirectoryTopologyReferences()
     {
         var template = CreateMinimalV2Template();
-        template.ExtendedTopology = new V2ExtendedTopologyTemplate
+        template.DirectoryTopology = new V2DirectoryTopologyTemplate
         {
-            ChildDomains =
+            Forests =
             [
-                new V2ChildDomainTemplate
+                new V2ForestTemplate
                 {
-                    TopologyId = "child-contoso",
-                    ParentDomainRef = " ",
-                    ChildLabel = "",
+                    ForestId = "forest-contoso",
+                    RootDomainId = "missing-domain"
+                }
+            ],
+            Domains =
+            [
+                new V2DomainTemplate
+                {
+                    DomainId = "domain-contoso",
+                    DnsName = "",
+                    NetBiosName = "",
+                    ForestId = "forest-missing",
+                    RelationKind = V2DomainRelationKind.Child,
+                    ParentDomainId = "",
                     FirstDomainControllerVmId = "missing-vm"
                 }
             ],
-            AdditionalForests =
+            Trusts =
             [
-                new V2AdditionalForestTemplate
+                new V2TrustTemplate
                 {
-                    TopologyId = "forest-fabrikam",
-                    ForestRootDomainFqdn = "",
-                    FirstDomainControllerVmId = "missing-vm"
-                }
-            ],
-            TreeDomains =
-            [
-                new V2TreeDomainTemplate
-                {
-                    TopologyId = " "
+                    TrustId = "",
+                    SourceDomainId = "missing-source",
+                    TargetDomainId = "missing-target"
                 }
             ]
         };
@@ -438,12 +457,11 @@ public class LabTemplateValidatorTests
         var result = LabTemplateValidator.Validate(template, CreateMinimalCatalog());
 
         Assert.False(result.IsValid);
-        Assert.Contains("V2 child domain 'child-contoso' parentDomainRef is required.", result.Errors);
-        Assert.Contains("V2 child domain 'child-contoso' childLabel is required.", result.Errors);
-        Assert.Contains("V2 child domain 'child-contoso' references unknown VM id 'missing-vm'.", result.Errors);
-        Assert.Contains("V2 additional forest 'forest-fabrikam' forestRootDomainFqdn is required.", result.Errors);
-        Assert.Contains("V2 additional forest 'forest-fabrikam' references unknown VM id 'missing-vm'.", result.Errors);
-        Assert.Contains("V2 extendedTopology.treeDomains.topologyId is required.", result.Errors);
+        Assert.Contains("V2 forest 'forest-contoso' references unknown root domain id 'missing-domain'.", result.Errors);
+        Assert.Contains("V2 domain 'domain-contoso' dnsName is required.", result.Errors);
+        Assert.Contains("V2 domain 'domain-contoso' netBiosName is required.", result.Errors);
+        Assert.Contains("V2 domain 'domain-contoso' references unknown VM id 'missing-vm'.", result.Errors);
+        Assert.Contains("V2 trust '' references unknown source domain id 'missing-source'.", result.Errors);
     }
 
     [Fact]
@@ -497,7 +515,40 @@ public class LabTemplateValidatorTests
                     MemoryMb = 2048,
                     CpuCount = 2,
                     VhdxId = "win-2025",
-                    TopologyRole = "RootDomainController"
+                    TopologyRole = "RootDomainController",
+                    DomainId = "domain-contoso",
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        Dsrm = "lab.contoso.dsrm"
+                    }
+                }
+            ],
+            DirectoryTopology = CreateMinimalDirectoryTopology()
+        };
+    }
+
+    private static V2DirectoryTopologyTemplate CreateMinimalDirectoryTopology()
+    {
+        return new V2DirectoryTopologyTemplate
+        {
+            Forests =
+            [
+                new V2ForestTemplate
+                {
+                    ForestId = "forest-contoso",
+                    RootDomainId = "domain-contoso"
+                }
+            ],
+            Domains =
+            [
+                new V2DomainTemplate
+                {
+                    DomainId = "domain-contoso",
+                    DnsName = "contoso.com",
+                    NetBiosName = "CONTOSO",
+                    ForestId = "forest-contoso",
+                    RelationKind = V2DomainRelationKind.Root,
+                    FirstDomainControllerVmId = "vm-1"
                 }
             ]
         };

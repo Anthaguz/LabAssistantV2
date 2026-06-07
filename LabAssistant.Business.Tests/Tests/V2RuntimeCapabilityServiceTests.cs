@@ -59,7 +59,7 @@ public sealed class V2RuntimeCapabilityServiceTests
             Settings = CreateSettings(),
             CredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase)
             {
-                ["slot-local"] = new V2RuntimeCredential { Username = "Administrator", Password = "Password123!" }
+                ["slot-local"] = new() { Username = "Administrator", Password = "Password123!" }
             }
         });
 
@@ -78,9 +78,9 @@ public sealed class V2RuntimeCapabilityServiceTests
         var hyperV = new FakeHyperVService();
         var guestExecutor = new FakeGuestCommandExecutor
         {
-            OnExecuteAsync = async (vmName, _, cancellationToken) =>
+            OnExecuteAsync = async (vmName, _, script, cancellationToken) =>
             {
-                if (vmName == "dc01")
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
                 {
                     rootReadyEntered.TrySetResult(true);
                     await releaseRootReady.Task.WaitAsync(cancellationToken);
@@ -103,6 +103,20 @@ public sealed class V2RuntimeCapabilityServiceTests
         Assert.True(result.Success);
         Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-dc01:GuestTransportReady");
         Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-member01:ProvisionVm");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RootForestNodes_RunThroughV2RuntimePath()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        var service = CreateService(new FakeHyperVService(), new FakeGuestCommandExecutor());
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("vm:vm-dc01:InstallAdDomainServicesFeature", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-dc01:PromoteRootDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-dc01:DomainReady", result.ExecutedNodeIds);
     }
 
     [Fact]
@@ -174,9 +188,9 @@ public sealed class V2RuntimeCapabilityServiceTests
         var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var guestExecutor = new FakeGuestCommandExecutor
         {
-            OnExecuteAsync = async (vmName, _, cancellationToken) =>
+            OnExecuteAsync = async (vmName, _, script, cancellationToken) =>
             {
-                if (vmName == "dc01")
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
                 {
                     entered.TrySetResult(true);
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
@@ -238,7 +252,7 @@ public sealed class V2RuntimeCapabilityServiceTests
             Template = template,
             CatalogItems = catalogItems,
             AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge"],
-            ResolvedCredentialSlotKeys = ["slot-local", "slot-join"],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm"],
             DefaultDeploymentProfile = profile
         });
 
@@ -249,8 +263,10 @@ public sealed class V2RuntimeCapabilityServiceTests
             Settings = CreateSettings(),
             CredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase)
             {
-                ["slot-local"] = new V2RuntimeCredential { Username = "Administrator", Password = "Password123!" },
-                ["slot-join"] = new V2RuntimeCredential { Username = "LAB\\JoinUser", Password = "Password123!" }
+                ["slot-local"] = new() { Username = "Administrator", Password = "Password123!" },
+                ["slot-join"] = new() { Username = @"LAB\JoinUser", Password = "Password123!" },
+                ["slot-admin"] = new() { Username = "Administrator@contoso.com", Password = "Password123!" },
+                ["slot-dsrm"] = new() { Username = "DSRM", Password = "Password123!" }
             },
             GuestTransportMaxRetries = 1,
             GuestTransportRetryDelay = TimeSpan.FromMilliseconds(10)
@@ -274,6 +290,7 @@ public sealed class V2RuntimeCapabilityServiceTests
             Name = $"Template {profile}",
             SchemaVersion = "2.0.0",
             DeploymentProfile = profile,
+            DirectoryTopology = CreateDirectoryTopology("forest-contoso", "domain-contoso", "contoso.com", "CONTOSO", "vm-dc01"),
             LabNetworks =
             [
                 new LabNetworkTemplate
@@ -299,9 +316,12 @@ public sealed class V2RuntimeCapabilityServiceTests
             CpuCount = 2,
             VhdxId = "disk-dc",
             TopologyRole = "RootDomainController",
+            DomainId = "domain-contoso",
             CredentialSlots = new VmCredentialSlotBindings
             {
-                LocalBootstrap = "slot-local"
+                LocalBootstrap = "slot-local",
+                DomainAdmin = "slot-admin",
+                Dsrm = "slot-dsrm"
             },
             Nics =
             [
@@ -325,6 +345,7 @@ public sealed class V2RuntimeCapabilityServiceTests
             CpuCount = 2,
             VhdxId = "disk-member",
             TopologyRole = "MemberServer",
+            DomainId = "domain-contoso",
             CredentialSlots = new VmCredentialSlotBindings
             {
                 LocalBootstrap = "slot-local",
@@ -429,6 +450,38 @@ public sealed class V2RuntimeCapabilityServiceTests
         };
     }
 
+    private static V2DirectoryTopologyTemplate CreateDirectoryTopology(
+        string forestId,
+        string domainId,
+        string dnsName,
+        string netBiosName,
+        string firstDomainControllerVmId)
+    {
+        return new V2DirectoryTopologyTemplate
+        {
+            Forests =
+            [
+                new V2ForestTemplate
+                {
+                    ForestId = forestId,
+                    RootDomainId = domainId
+                }
+            ],
+            Domains =
+            [
+                new V2DomainTemplate
+                {
+                    DomainId = domainId,
+                    DnsName = dnsName,
+                    NetBiosName = netBiosName,
+                    ForestId = forestId,
+                    RelationKind = V2DomainRelationKind.Root,
+                    FirstDomainControllerVmId = firstDomainControllerVmId
+                }
+            ]
+        };
+    }
+
     private static async Task WaitForOperationAsync(ConcurrentQueue<string> operations, string expected)
     {
         for (var attempt = 0; attempt < 200; attempt++)
@@ -446,13 +499,13 @@ public sealed class V2RuntimeCapabilityServiceTests
 
     private sealed class FakeGuestCommandExecutor : IGuestCommandExecutor
     {
-        public Func<string, V2RuntimeCredential, CancellationToken, Task<GuestCommandResult>>? OnExecuteAsync { get; set; }
+        public Func<string, V2RuntimeCredential, string, CancellationToken, Task<GuestCommandResult>>? OnExecuteAsync { get; set; }
 
         public Task<GuestCommandResult> ExecutePowerShellDirectAsync(string vmName, V2RuntimeCredential credential, string script, CancellationToken cancellationToken = default)
         {
             if (OnExecuteAsync != null)
             {
-                return OnExecuteAsync(vmName, credential, cancellationToken);
+                return OnExecuteAsync(vmName, credential, script, cancellationToken);
             }
 
             return Task.FromResult(new GuestCommandResult

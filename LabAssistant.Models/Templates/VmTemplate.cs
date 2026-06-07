@@ -79,6 +79,11 @@ public class VmTemplate
     public string? TopologyRole { get; set; }
 
     /// <summary>
+    /// Optional V2 domain reference used to bind the VM to a canonical directory-topology domain.
+    /// </summary>
+    public string? DomainId { get; set; }
+
+    /// <summary>
     /// Optional additive V2 capability roles that request additional guest work without replacing topology intent.
     /// </summary>
     public List<string>? CapabilityRoles { get; set; }

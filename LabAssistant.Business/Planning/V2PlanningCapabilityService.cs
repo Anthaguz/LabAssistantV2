@@ -101,6 +101,38 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         var hasReplicaDc = states.Any(state => state.TopologyRoleIs("ReplicaDomainController"));
         var hasMemberServers = states.Any(state => state.TopologyRoleIs("MemberServer"));
         var domainRequired = hasRootDc || hasReplicaDc || hasMemberServers;
+        var topologyResolution = domainRequired
+            ? V2DirectoryTopologyResolver.Resolve(
+                template,
+                states.ToDictionary(
+                    state => state.Vm.VmId,
+                    state => new V2VmTopologyInfo(state.Vm.VmId, state.Vm.Name, state.TopologyRole, state.DomainId),
+                    StringComparer.OrdinalIgnoreCase),
+                issues)
+            : V2DirectoryTopologyResolution.Empty;
+
+        foreach (var state in states)
+        {
+            state.ResolvedDomain = topologyResolution.FindDomain(state.DomainId);
+            if (state.ResolvedDomain is not null)
+            {
+                state.ResolvedForest = topologyResolution.Forests.FirstOrDefault(forest =>
+                    string.Equals(forest.ForestId, state.ResolvedDomain.ForestId, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        foreach (var state in states.Where(state => state.ResolvedDomain is { RelationKind: not V2DomainRelationKind.Root }))
+        {
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "domain-relation-not-supported",
+                VmId = state.Vm.VmId,
+                VmName = state.Vm.Name,
+                Message = $"VM '{state.Vm.Name}' is assigned to non-root domain '{state.ResolvedDomain!.DomainId}' with relation '{state.ResolvedDomain.RelationKind}', which is not executable in V2 runtime yet.",
+                SuggestedAction = "Limit executable V2 runtime to root-domain topology for this issue."
+            });
+        }
 
         var routerRequired = DetermineRouterRequirement(states, domainRequired);
         if (routerRequired && !states.Any(state => state.IsRouterCapable))
@@ -128,6 +160,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             ResolvedDeploymentProfileName = V2SchedulerPolicyCatalog.GetCanonicalProfileName(resolvedProfile),
             RouterSemanticsRequired = routerRequired,
             DomainSemanticsRequired = domainRequired,
+            Forests = topologyResolution.Forests,
+            Domains = topologyResolution.Domains,
             Vms = states.Select(state => state.ToContext()).ToArray()
         };
 
@@ -261,6 +295,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         var bootstrapSlot = Normalize(vm.CredentialSlots?.LocalBootstrap) ?? Normalize(bootstrapProfile?.LocalCredentialSlotRef);
         var domainAdminSlot = Normalize(vm.CredentialSlots?.DomainAdmin);
         var domainJoinSlot = Normalize(vm.CredentialSlots?.DomainJoin) ?? domainAdminSlot;
+        var dsrmSlot = Normalize(vm.CredentialSlots?.Dsrm);
 
         if (requiresGuestWork)
         {
@@ -292,6 +327,12 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             AddCredentialSlotRequirement(unresolved, issues, resolvedSlots, vm, vmName, domainAdminSlot, "domain-admin", "replica promotion");
         }
 
+        if (string.Equals(topologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase))
+        {
+            AddCredentialSlotRequirement(unresolved, issues, resolvedSlots, vm, vmName, domainAdminSlot, "domain-admin", "root forest promotion");
+            AddCredentialSlotRequirement(unresolved, issues, resolvedSlots, vm, vmName, dsrmSlot, "dsrm", "root forest promotion");
+        }
+
         if (string.Equals(topologyRole, "MemberServer", StringComparison.OrdinalIgnoreCase))
         {
             AddCredentialSlotRequirement(unresolved, issues, resolvedSlots, vm, vmName, domainJoinSlot, "domain-join", "domain join");
@@ -300,9 +341,11 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         var state = new ResolvedVmState(vm, topologyRole, knownCapabilities, catalogItem, bootstrapProfile, resolvedNics)
         {
             RequiresGuestWork = requiresGuestWork,
+            DomainId = Normalize(vm.DomainId),
             EffectiveBootstrapSlot = bootstrapSlot,
             EffectiveDomainAdminSlot = domainAdminSlot,
             EffectiveDomainJoinSlot = domainJoinSlot,
+            EffectiveDsrmSlot = dsrmSlot,
             RequiresDomainJoin = string.Equals(topologyRole, "MemberServer", StringComparison.OrdinalIgnoreCase),
             IsRouterCapable = string.Equals(topologyRole, "Router", StringComparison.OrdinalIgnoreCase)
         };
@@ -575,6 +618,11 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 state.Nodes[V2PlanNodeKind.BootstrapGuestNetwork] = AddNode(nodes, state, V2PlanNodeKind.BootstrapGuestNetwork, "Bootstrap guest network", V2WorkloadClass.MediumGuest);
             }
 
+            if (state.TopologyRoleIs("RootDomainController") || state.TopologyRoleIs("ReplicaDomainController"))
+            {
+                state.Nodes[V2PlanNodeKind.InstallAdDomainServicesFeature] = AddNode(nodes, state, V2PlanNodeKind.InstallAdDomainServicesFeature, "Install AD DS feature", V2WorkloadClass.HeavyGuest);
+            }
+
             if (state.TopologyRoleIs("Router") && routerRequired)
             {
                 state.Nodes[V2PlanNodeKind.RouterReady] = AddNode(nodes, state, V2PlanNodeKind.RouterReady, "Router ready", V2WorkloadClass.HeavyGuest);
@@ -606,11 +654,9 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
     private static void EmitDependencies(IReadOnlyList<ResolvedVmState> states, bool routerRequired, List<V2PlanDependency> dependencies)
     {
-        var rootStates = states.Where(state => state.TopologyRoleIs("RootDomainController")).ToList();
-        var primaryRoot = rootStates
-            .OrderBy(state => state.Vm.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+        var domainReadyByDomainId = states
+            .Where(state => state.ResolvedDomain is not null && state.TryGetNode(V2PlanNodeKind.DomainReady) is not null)
+            .ToDictionary(state => state.ResolvedDomain!.DomainId, state => state.TryGetNode(V2PlanNodeKind.DomainReady)!, StringComparer.OrdinalIgnoreCase);
         var routerNode = states
             .Where(state => state.IsRouterCapable)
             .OrderBy(state => state.Vm.Name, StringComparer.OrdinalIgnoreCase)
@@ -629,19 +675,24 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                               state.TryGetNode(V2PlanNodeKind.StartVm);
 
             AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness follows guest bootstrap on the router VM.", dependencies);
-            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Root promotion requires guest bootstrap.", dependencies);
+            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.InstallAdDomainServicesFeature), V2PlanDependencyReasonCode.RoleOrdering, "AD DS feature installation requires guest bootstrap.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.InstallAdDomainServicesFeature), state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Root promotion requires AD DS feature installation.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), state.TryGetNode(V2PlanNodeKind.DomainReady), V2PlanDependencyReasonCode.DomainRequired, "Domain readiness follows root domain-controller promotion.", dependencies);
-            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Replica promotion requires guest bootstrap.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.InstallAdDomainServicesFeature), state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Replica promotion requires AD DS feature installation.", dependencies);
             AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.RoleOrdering, "Domain join requires guest bootstrap.", dependencies);
 
-            if (state.TopologyRoleIs("ReplicaDomainController") && primaryRoot is not null)
+            if (state.TopologyRoleIs("ReplicaDomainController") &&
+                state.DomainId is not null &&
+                domainReadyByDomainId.TryGetValue(state.DomainId, out var replicaDomainReady))
             {
-                AddDependencyIfPresent(primaryRoot.TryGetNode(V2PlanNodeKind.DomainReady), state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.DomainRequired, "Replica promotion waits for domain readiness.", dependencies);
+                AddDependencyIfPresent(replicaDomainReady, state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.DomainRequired, "Replica promotion waits for domain readiness.", dependencies);
             }
 
-            if (state.TopologyRoleIs("MemberServer") && primaryRoot is not null)
+            if (state.TopologyRoleIs("MemberServer") &&
+                state.DomainId is not null &&
+                domainReadyByDomainId.TryGetValue(state.DomainId, out var memberDomainReady))
             {
-                AddDependencyIfPresent(primaryRoot.TryGetNode(V2PlanNodeKind.DomainReady), state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.DomainRequired, "Domain join waits for domain readiness.", dependencies);
+                AddDependencyIfPresent(memberDomainReady, state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.DomainRequired, "Domain join waits for domain readiness.", dependencies);
             }
 
             if (routerRequired && state.RequiresRouterDependency && routerNode is not null)
@@ -779,6 +830,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             V2PlanNodeKind.StartVm => 20 + roleOffset,
             V2PlanNodeKind.GuestTransportReady => 30 + roleOffset,
             V2PlanNodeKind.BootstrapGuestNetwork => 40 + roleOffset,
+            V2PlanNodeKind.InstallAdDomainServicesFeature => 45 + roleOffset,
             V2PlanNodeKind.RouterReady => 55 + roleOffset,
             V2PlanNodeKind.PromoteRootDomainController => 50 + roleOffset,
             V2PlanNodeKind.DomainReady => 60 + roleOffset,
@@ -1027,6 +1079,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
         public string? TopologyRole { get; }
 
+        public string? DomainId { get; set; }
+
         public IReadOnlyList<string> KnownCapabilityRoles { get; }
 
         public VhdxCatalogItem? CatalogItem { get; }
@@ -1049,11 +1103,17 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
         public bool RequiresRouterDependency { get; set; }
 
+        public V2ResolvedDomainPlanningContext? ResolvedDomain { get; set; }
+
+        public V2ResolvedForestPlanningContext? ResolvedForest { get; set; }
+
         public string? EffectiveBootstrapSlot { get; set; }
 
         public string? EffectiveDomainAdminSlot { get; set; }
 
         public string? EffectiveDomainJoinSlot { get; set; }
+
+        public string? EffectiveDsrmSlot { get; set; }
 
         public bool RequiresNetworkBootstrap => ResolvedNics.Count > 0;
 
@@ -1085,6 +1145,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 VmId = Vm.VmId,
                 VmName = Vm.Name,
                 TopologyRole = TopologyRole,
+                DomainId = DomainId,
                 CapabilityRoles = KnownCapabilityRoles.ToArray(),
                 ResolvedCatalogItemId = CatalogItem?.Id,
                 ResolvedCatalogPath = CatalogItem?.Path,
@@ -1094,6 +1155,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 EffectiveBootstrapCredentialSlot = EffectiveBootstrapSlot,
                 EffectiveDomainAdminCredentialSlot = EffectiveDomainAdminSlot,
                 EffectiveDomainJoinCredentialSlot = EffectiveDomainJoinSlot,
+                EffectiveDsrmCredentialSlot = EffectiveDsrmSlot,
                 RequiresGuestWork = RequiresGuestWork,
                 RequiresDomainJoin = RequiresDomainJoin,
                 IsRouterCapable = IsRouterCapable,
