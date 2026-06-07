@@ -37,7 +37,8 @@ This is intentionally different from a simple "deploy VMs, then configure them l
 - post-change validation
 
 ### Guest configuration
-- guest network bootstrap
+- guest-access prerequisite enablement
+- guest network preparation
 - router/RRAS/NAT setup
 - Windows feature installation
 - domain promotion
@@ -70,10 +71,14 @@ The primary planning input is not a single numeric priority.
 - `Router`
 - `RootDomainController`
 - `ReplicaDomainController`
-- `MemberServer`
-- `StandaloneServer`
 
 Topology roles shape ordering and dependency semantics.
+
+### Membership mode
+- `DomainMember`
+- `Standalone`
+
+Membership mode decides whether an ordinary VM participates in domain-join execution. It is intentionally separate from topology roles so client VMs, generic servers, and capability-role machines can all join a domain without inventing fake topology roles.
 
 ### Capability roles
 - `Pki`
@@ -149,8 +154,10 @@ Across all profiles:
 ### AD-core baseline wave policy
 - provision and boot the DC set first
 - start critical DC guest work
+- complete guest NIC/IP/DNS preparation before replica promotion or joins on each VM
 - begin provisioning later machines only when profile/workload caps allow it
 - keep domain-dependent guest work blocked until domain readiness gates pass
+- keep member-join work blocked until per-domain DNS stabilization gates pass
 - keep cross-switch dependent work blocked until router readiness gates pass
 
 This AD-core direction is a policy invariant. Later scheduler implementation may tune how much overlap is permitted, but must not invert the DC-first progression.
@@ -179,6 +186,7 @@ If a task depends on cross-switch communication:
 
 - Hyper-V PowerShell Direct is the baseline guest execution transport
 - host-side Hyper-V execution and guest-side PowerShell Direct execution are separate seams, even when scheduled inside one graph
+- V2 uses an explicit graph planner/executor rather than a classic chain-of-responsibility pipeline; the old pipeline semantics are preserved by explicit nodes and dependencies
 
 ## Open Questions / TBDs
 

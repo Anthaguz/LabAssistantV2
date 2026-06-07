@@ -79,6 +79,11 @@ public class VmTemplate
     public string? TopologyRole { get; set; }
 
     /// <summary>
+    /// Optional V2 domain membership mode that controls whether the VM participates in domain-join progression.
+    /// </summary>
+    public string? MembershipMode { get; set; }
+
+    /// <summary>
     /// Optional V2 domain reference used to bind the VM to a canonical directory-topology domain.
     /// </summary>
     public string? DomainId { get; set; }

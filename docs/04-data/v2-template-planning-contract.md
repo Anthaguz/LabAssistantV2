@@ -42,8 +42,14 @@ Topology roles shape orchestration order and dependency semantics:
 - `Router`
 - `RootDomainController`
 - `ReplicaDomainController`
-- `MemberServer`
-- `StandaloneServer`
+
+Ordinary machines do not need a topology role. In V2, domain participation is modeled separately through `membershipMode`.
+
+### Membership mode
+Membership mode controls whether a VM participates in domain-join execution:
+
+- `DomainMember`
+- `Standalone`
 
 ### Capability roles
 Capability roles request additive guest work:
@@ -60,7 +66,7 @@ V2 may declare explicit dependencies when role-derived ordering is not enough.
 
 Examples:
 
-- a member server waits for a root domain controller domain-readiness gate
+- a domain-member VM waits for a root domain controller domain-readiness gate
 - a cross-switch task waits for router readiness
 - a capability-role task waits for a prior domain-join task
 
@@ -81,6 +87,7 @@ Templates may reference credential slots for:
 
 - local bootstrap access
 - domain-join access
+- DSRM access for domain-controller promotion
 - role-specific guest operations
 
 Each reference should carry:
@@ -91,6 +98,22 @@ Each reference should carry:
 - optional expected owner such as disk profile or template override
 
 Templates must not embed reusable secret values.
+
+## Current Planning And Runtime Boundary
+
+The current V2 slice executes explicit graph nodes for:
+
+- host-side guest-access prerequisites
+- guest transport readiness
+- guest NIC/IP/DNS preparation
+- AD DS feature installation
+- root domain-controller promotion
+- replica domain-controller promotion
+- per-domain DNS stabilization
+- domain joins
+- joined-state and domain-login validation
+
+Router guest runtime, child domains, tree domains, and trusts remain deferred to later slices.
 
 ## Bootstrap Profile References
 

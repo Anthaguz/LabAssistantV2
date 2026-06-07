@@ -294,6 +294,8 @@ public class LabTemplateStoreTests
                                       "cpuCount": 2,
                                       "vhdxId": "win-server-2025-gen2-core",
                                       "topologyRole": "RootDomainController",
+                                      "membershipMode": "DomainMember",
+                                      "domainId": "domain-contoso",
                                       "credentialSlots": {
                                         "localBootstrap": "disk.win.local-admin"
                                       },
@@ -319,6 +321,7 @@ public class LabTemplateStoreTests
         Assert.Equal("Balanced", loaded.DeploymentProfile);
         Assert.Single(loaded.LabNetworks);
         Assert.Equal("RootDomainController", loaded.VmTemplates[0].TopologyRole);
+        Assert.Equal("DomainMember", loaded.VmTemplates[0].MembershipMode);
         Assert.Equal("disk.win.local-admin", loaded.VmTemplates[0].CredentialSlots?.LocalBootstrap);
         Assert.Single(loaded.VmTemplates[0].Nics);
     }
@@ -358,6 +361,7 @@ public class LabTemplateStoreTests
                     CpuCount = 2,
                     VhdxId = "win-server-2025-gen2-core",
                     TopologyRole = "RootDomainController",
+                    MembershipMode = "DomainMember",
                     CapabilityRoles = ["Pki"],
                     DependsOn = ["vm:router:ready"],
                     CredentialSlots = new VmCredentialSlotBindings
@@ -388,7 +392,9 @@ public class LabTemplateStoreTests
         Assert.Equal("Balanced", loaded.DeploymentProfile);
         Assert.Equal(["Pki"], loaded.VmTemplates[0].CapabilityRoles);
         Assert.Equal(["vm:router:ready"], loaded.VmTemplates[0].DependsOn);
+        Assert.Equal("DomainMember", loaded.VmTemplates[0].MembershipMode);
         Assert.Contains("\"deploymentProfile\": \"Balanced\"", json);
+        Assert.Contains("\"membershipMode\": \"DomainMember\"", json);
         Assert.Contains("\"labNetworks\"", json);
         Assert.Contains("\"nics\"", json);
     }

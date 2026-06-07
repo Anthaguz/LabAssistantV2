@@ -151,8 +151,6 @@ Topology roles affect scheduling and dependency semantics:
 - `Router`
 - `RootDomainController`
 - `ReplicaDomainController`
-- `MemberServer`
-- `StandaloneServer`
 
 Capability roles request additive work without replacing topology roles:
 
@@ -165,6 +163,20 @@ Rule:
 
 - a VM may hold one topology role and multiple additive capability roles
 - a VM may also carry future topology/capability combinations when explicitly supported
+
+### V2 membership mode
+
+Domain participation is modeled separately from topology role:
+
+- `DomainMember`
+- `Standalone`
+
+Rules:
+
+- `DomainMember` requires `domainId`
+- `Standalone` must not emit domain-join execution
+- domain controllers still require `domainId` because their topology role drives promotion behavior
+- ordinary joinable machines do not need a dedicated topology role
 
 ### V2 network authoring direction
 
@@ -200,6 +212,7 @@ Template-owned references may include:
 
 - local bootstrap credential slot reference
 - domain join credential slot reference
+- DSRM credential slot reference
 - role-specific credential slot reference
 
 Reusable secret values remain a local-machine concern and must not travel in exported templates.
