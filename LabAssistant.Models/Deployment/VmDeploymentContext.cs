@@ -44,6 +44,9 @@ namespace LabAssistant.Models.Deployment
         public RoleStepConfig? RoleConfig { get; set; }
         public GuestNetworkStepConfig? GuestNetworkConfig { get; set; }
         public List<string> NonBlockingOptionalSteps { get; set; } = new();
+        public string? V2TopologyRole { get; set; }
+        public string? V2BootstrapCredentialSlot { get; set; }
+        public bool V2GuestTransportReady { get; set; }
 
         // Resource tracking for cleanup orchestration
         public bool VmFolderCreated { get; set; }
@@ -201,6 +204,9 @@ namespace LabAssistant.Models.Deployment
         {
             IsSuccess = true;
             GuestServicesEnabled = false;
+            V2TopologyRole = null;
+            V2BootstrapCredentialSlot = null;
+            V2GuestTransportReady = false;
             VmFolderCreated = false;
             DifferencingDiskCreated = false;
             VmRegistered = false;
