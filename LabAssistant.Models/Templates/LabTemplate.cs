@@ -67,6 +67,11 @@ public class LabTemplate
     public List<LabNetworkTemplate>? LabNetworks { get; set; }
 
     /// <summary>
+    /// Optional V2 reservation seam for future child-domain, tree-domain, and additional-forest declarations.
+    /// </summary>
+    public V2ExtendedTopologyTemplate? ExtendedTopology { get; set; }
+
+    /// <summary>
     /// Runtime-only execution-engine classification resolved from schema-version routing.
     /// </summary>
     [JsonIgnore]

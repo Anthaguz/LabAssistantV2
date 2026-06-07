@@ -119,6 +119,17 @@ The V2 contract should leave room for:
 - additional forests
 - tree domains
 
+Reserved shape direction for `#729`:
+
+- add an optional top-level `extendedTopology` object
+- reserve three future declaration collections:
+  - `childDomains`
+  - `additionalForests`
+  - `treeDomains`
+- treat the shape as non-executable in the current slice
+- allow only shape/reference validation for now
+- keep planner/runtime semantics deferred until later issues
+
 But the first executable V2 runtime slice does not need to implement those behaviors immediately.
 
 ## Open Questions / TBDs

@@ -394,6 +394,81 @@ public class LabTemplateStoreTests
     }
 
     [Fact]
+    public void SaveToFile_V2Template_PreservesReservedExtendedTopologyShape()
+    {
+        var folder = BuildTempRoot();
+        var path = Path.Combine(folder, "v2-extended-topology.json");
+        var store = new LabTemplateStore();
+        var template = new LabTemplate
+        {
+            Id = "lab-v2",
+            Name = "Lab V2",
+            SchemaVersion = "2.0.0",
+            ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning,
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            ExtendedTopology = new V2ExtendedTopologyTemplate
+            {
+                ChildDomains =
+                [
+                    new V2ChildDomainTemplate
+                    {
+                        TopologyId = "child-contoso",
+                        ParentDomainRef = "contoso.com",
+                        ChildLabel = "child",
+                        DomainFqdn = "child.contoso.com",
+                        NetBiosName = "CHILD",
+                        FirstDomainControllerVmId = "vm-1"
+                    }
+                ],
+                AdditionalForests =
+                [
+                    new V2AdditionalForestTemplate
+                    {
+                        TopologyId = "forest-fabrikam",
+                        ForestRootDomainFqdn = "fabrikam.com",
+                        NetBiosName = "FABRIKAM",
+                        FirstDomainControllerVmId = "vm-1"
+                    }
+                ],
+                TreeDomains =
+                [
+                    new V2TreeDomainTemplate
+                    {
+                        TopologyId = "tree-tailspin"
+                    }
+                ]
+            },
+            VmTemplates =
+            {
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "dc1",
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = "win-server-2025-gen2-core",
+                    TopologyRole = "RootDomainController"
+                }
+            }
+        };
+
+        store.SaveToFile(path, template);
+        var loaded = store.LoadFromFile(path);
+        var json = File.ReadAllText(path);
+
+        Assert.NotNull(loaded.ExtendedTopology);
+        Assert.Equal("child-contoso", Assert.Single(loaded.ExtendedTopology!.ChildDomains!).TopologyId);
+        Assert.Equal("forest-fabrikam", Assert.Single(loaded.ExtendedTopology.AdditionalForests!).TopologyId);
+        Assert.Equal("tree-tailspin", Assert.Single(loaded.ExtendedTopology.TreeDomains!).TopologyId);
+        Assert.Contains("\"extendedTopology\"", json);
+        Assert.Contains("\"childDomains\"", json);
+        Assert.Contains("\"additionalForests\"", json);
+        Assert.Contains("\"treeDomains\"", json);
+    }
+
+    [Fact]
     public void LoadFromFolder_NewerMinorSchema_WarnsAndContinues()
     {
         var folder = BuildTempRoot();

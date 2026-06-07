@@ -7,6 +7,31 @@
   "createdWithAppVersion": "0.0.0",
   "templateType": "lab-template",
   "deploymentProfile": "Balanced",
+  "extendedTopology": {
+    "childDomains": [
+      {
+        "topologyId": "child-contoso",
+        "parentDomainRef": "contoso.com",
+        "childLabel": "child",
+        "domainFqdn": "child.contoso.com",
+        "netBiosName": "CHILD",
+        "firstDomainControllerVmId": "childdc01"
+      }
+    ],
+    "additionalForests": [
+      {
+        "topologyId": "forest-fabrikam",
+        "forestRootDomainFqdn": "fabrikam.com",
+        "netBiosName": "FABRIKAM",
+        "firstDomainControllerVmId": "fabrikamdc01"
+      }
+    ],
+    "treeDomains": [
+      {
+        "topologyId": "tree-tailspin"
+      }
+    ]
+  },
   "labNetworks": [
     {
       "networkId": "contoso-net",
@@ -67,6 +92,61 @@
           "nicId": "primary",
           "networkId": "contoso-net",
           "ipAddress": "10.0.0.3",
+          "prefixLength": 24,
+          "defaultGateway": "10.0.0.1",
+          "dnsServers": [
+            "10.0.0.2",
+            "10.0.0.3"
+          ]
+        }
+      ]
+    },
+    {
+      "vmId": "childdc01",
+      "name": "ChildDC01",
+      "memoryMb": 4096,
+      "cpuCount": 2,
+      "vhdxId": "win-server-2025-gen2-core",
+      "topologyRole": "ReplicaDomainController",
+      "capabilityRoles": [],
+      "dependsOn": [
+        "vm:ContosoDC1:domain-ready"
+      ],
+      "credentialSlots": {
+        "localBootstrap": "disk.win-server-2025.local-admin",
+        "domainAdmin": "lab.contoso.domain-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "contoso-net",
+          "ipAddress": "10.0.0.4",
+          "prefixLength": 24,
+          "defaultGateway": "10.0.0.1",
+          "dnsServers": [
+            "10.0.0.2",
+            "10.0.0.3"
+          ]
+        }
+      ]
+    },
+    {
+      "vmId": "fabrikamdc01",
+      "name": "FabrikamDC01",
+      "memoryMb": 4096,
+      "cpuCount": 2,
+      "vhdxId": "win-server-2025-gen2-core",
+      "topologyRole": "RootDomainController",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.win-server-2025.local-admin",
+        "domainAdmin": "lab.fabrikam.domain-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "contoso-net",
+          "ipAddress": "10.0.0.5",
           "prefixLength": 24,
           "defaultGateway": "10.0.0.1",
           "dnsServers": [
