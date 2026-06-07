@@ -21,4 +21,7 @@ public static class DeploymentStepKeys
     public const string V2StartVm = "v2.start";
     public const string V2GuestTransportReady = "v2.guestTransportReady";
     public const string V2BootstrapGuestNetwork = "v2.bootstrapGuestNetwork";
+    public const string V2InstallAdDomainServices = "v2.installAdDomainServices";
+    public const string V2PromoteRootDomainController = "v2.promoteRootDomainController";
+    public const string V2DomainReady = "v2.domainReady";
 }

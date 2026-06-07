@@ -1,34 +1,57 @@
 {
   "id": "8f0404f98844446a9f88f4f4d0ee13ff",
   "name": "AD Core Lab V2",
-  "description": "Root DC, replica DC, router, and one member server",
+  "description": "Two independent root forests, one replica DC, one router, and one member server",
   "schemaVersion": "2.0.0",
   "templateRevision": 1,
   "createdWithAppVersion": "0.0.0",
   "templateType": "lab-template",
   "deploymentProfile": "Balanced",
-  "extendedTopology": {
-    "childDomains": [
+  "directoryTopology": {
+    "forests": [
       {
-        "topologyId": "child-contoso",
-        "parentDomainRef": "contoso.com",
-        "childLabel": "child",
-        "domainFqdn": "child.contoso.com",
+        "forestId": "forest-contoso",
+        "rootDomainId": "domain-contoso"
+      },
+      {
+        "forestId": "forest-fabrikam",
+        "rootDomainId": "domain-fabrikam"
+      }
+    ],
+    "domains": [
+      {
+        "domainId": "domain-contoso",
+        "dnsName": "contoso.com",
+        "netBiosName": "CONTOSO",
+        "forestId": "forest-contoso",
+        "relationKind": "Root",
+        "firstDomainControllerVmId": "5aa04c2ad9c5418dbd8213f9f8a0ed7d"
+      },
+      {
+        "domainId": "domain-fabrikam",
+        "dnsName": "fabrikam.com",
+        "netBiosName": "FABRIKAM",
+        "forestId": "forest-fabrikam",
+        "relationKind": "Root",
+        "firstDomainControllerVmId": "fabrikamdc01"
+      },
+      {
+        "domainId": "domain-child",
+        "dnsName": "child.contoso.com",
         "netBiosName": "CHILD",
+        "forestId": "forest-contoso",
+        "relationKind": "Child",
+        "parentDomainId": "domain-contoso",
         "firstDomainControllerVmId": "childdc01"
       }
     ],
-    "additionalForests": [
+    "trusts": [
       {
-        "topologyId": "forest-fabrikam",
-        "forestRootDomainFqdn": "fabrikam.com",
-        "netBiosName": "FABRIKAM",
-        "firstDomainControllerVmId": "fabrikamdc01"
-      }
-    ],
-    "treeDomains": [
-      {
-        "topologyId": "tree-tailspin"
+        "trustId": "trust-contoso-fabrikam",
+        "sourceDomainId": "domain-contoso",
+        "targetDomainId": "domain-fabrikam",
+        "trustType": "Forest",
+        "direction": "Bidirectional"
       }
     ]
   },
@@ -53,10 +76,12 @@
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gen2-core",
       "topologyRole": "RootDomainController",
+      "domainId": "domain-contoso",
       "capabilityRoles": [],
       "credentialSlots": {
         "localBootstrap": "disk.win-server-2025.local-admin",
-        "domainAdmin": "lab.contoso.domain-admin"
+        "domainAdmin": "lab.contoso.domain-admin",
+        "dsrm": "lab.contoso.dsrm"
       },
       "nics": [
         {
@@ -79,13 +104,15 @@
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gen2-core",
       "topologyRole": "ReplicaDomainController",
+      "domainId": "domain-contoso",
       "capabilityRoles": [],
       "dependsOn": [
         "vm:ContosoDC1:domain-ready"
       ],
       "credentialSlots": {
         "localBootstrap": "disk.win-server-2025.local-admin",
-        "domainAdmin": "lab.contoso.domain-admin"
+        "domainAdmin": "lab.contoso.domain-admin",
+        "dsrm": "lab.contoso.dsrm"
       },
       "nics": [
         {
@@ -108,13 +135,15 @@
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gen2-core",
       "topologyRole": "ReplicaDomainController",
+      "domainId": "domain-child",
       "capabilityRoles": [],
       "dependsOn": [
         "vm:ContosoDC1:domain-ready"
       ],
       "credentialSlots": {
         "localBootstrap": "disk.win-server-2025.local-admin",
-        "domainAdmin": "lab.contoso.domain-admin"
+        "domainAdmin": "lab.contoso.domain-admin",
+        "dsrm": "lab.contoso.dsrm"
       },
       "nics": [
         {
@@ -137,10 +166,12 @@
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gen2-core",
       "topologyRole": "RootDomainController",
+      "domainId": "domain-fabrikam",
       "capabilityRoles": [],
       "credentialSlots": {
         "localBootstrap": "disk.win-server-2025.local-admin",
-        "domainAdmin": "lab.fabrikam.domain-admin"
+        "domainAdmin": "lab.fabrikam.domain-admin",
+        "dsrm": "lab.fabrikam.dsrm"
       },
       "nics": [
         {
@@ -191,6 +222,7 @@
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gui-gen2",
       "topologyRole": "MemberServer",
+      "domainId": "domain-contoso",
       "capabilityRoles": [
         "Sql"
       ],

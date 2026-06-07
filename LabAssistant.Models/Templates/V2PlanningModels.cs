@@ -44,7 +44,35 @@ public sealed class V2ResolvedPlanningContext
 
     public bool DomainSemanticsRequired { get; init; }
 
+    public IReadOnlyList<V2ResolvedForestPlanningContext> Forests { get; init; } = Array.Empty<V2ResolvedForestPlanningContext>();
+
+    public IReadOnlyList<V2ResolvedDomainPlanningContext> Domains { get; init; } = Array.Empty<V2ResolvedDomainPlanningContext>();
+
     public IReadOnlyList<V2ResolvedVmPlanningContext> Vms { get; init; } = Array.Empty<V2ResolvedVmPlanningContext>();
+}
+
+public sealed class V2ResolvedForestPlanningContext
+{
+    public string ForestId { get; init; } = string.Empty;
+
+    public string RootDomainId { get; init; } = string.Empty;
+}
+
+public sealed class V2ResolvedDomainPlanningContext
+{
+    public string DomainId { get; init; } = string.Empty;
+
+    public string DnsName { get; init; } = string.Empty;
+
+    public string NetBiosName { get; init; } = string.Empty;
+
+    public string ForestId { get; init; } = string.Empty;
+
+    public V2DomainRelationKind RelationKind { get; init; }
+
+    public string? ParentDomainId { get; init; }
+
+    public string FirstDomainControllerVmId { get; init; } = string.Empty;
 }
 
 public sealed class V2ResolvedVmPlanningContext
@@ -54,6 +82,8 @@ public sealed class V2ResolvedVmPlanningContext
     public string VmName { get; init; } = string.Empty;
 
     public string? TopologyRole { get; init; }
+
+    public string? DomainId { get; init; }
 
     public IReadOnlyList<string> CapabilityRoles { get; init; } = Array.Empty<string>();
 
@@ -72,6 +102,8 @@ public sealed class V2ResolvedVmPlanningContext
     public string? EffectiveDomainAdminCredentialSlot { get; init; }
 
     public string? EffectiveDomainJoinCredentialSlot { get; init; }
+
+    public string? EffectiveDsrmCredentialSlot { get; init; }
 
     public bool RequiresGuestWork { get; init; }
 
@@ -107,12 +139,13 @@ public enum V2PlanNodeKind
     StartVm = 1,
     GuestTransportReady = 2,
     BootstrapGuestNetwork = 3,
-    RouterReady = 4,
-    DomainReady = 5,
-    PromoteRootDomainController = 6,
-    PromoteReplicaDomainController = 7,
-    JoinDomain = 8,
-    ApplyCapabilityRole = 9
+    InstallAdDomainServicesFeature = 4,
+    RouterReady = 5,
+    DomainReady = 6,
+    PromoteRootDomainController = 7,
+    PromoteReplicaDomainController = 8,
+    JoinDomain = 9,
+    ApplyCapabilityRole = 10
 }
 
 public sealed class V2PlanNode

@@ -111,26 +111,65 @@ Bootstrap profiles describe image facts, not lab/domain intent.
 - imported templates may remain editable even when local slot mappings are unresolved
 - deployment must block until required slot mappings are resolved locally
 
-## Child-Domain And Extended Topology Reservation
+## Directory Topology Contract
 
-The V2 contract should leave room for:
+The canonical V2 backend topology contract is a top-level `directoryTopology` object.
 
-- child domains
-- additional forests
-- tree domains
+It may declare:
 
-Reserved shape direction for `#729`:
+- `forests`
+- `domains`
+- `trusts`
 
-- add an optional top-level `extendedTopology` object
-- reserve three future declaration collections:
-  - `childDomains`
-  - `additionalForests`
-  - `treeDomains`
-- treat the shape as non-executable in the current slice
-- allow only shape/reference validation for now
-- keep planner/runtime semantics deferred until later issues
+The shape is designed so root forests are executable now, while child domains, tree domains, and trusts remain reserved for later runtime slices.
 
-But the first executable V2 runtime slice does not need to implement those behaviors immediately.
+### Forests
+
+Each forest declaration should carry:
+
+- `forestId`
+- `rootDomainId`
+
+### Domains
+
+Each domain declaration should carry:
+
+- `domainId`
+- `dnsName`
+- `netBiosName`
+- `forestId`
+- `relationKind`
+- `parentDomainId` when `relationKind` is `Child` or `Tree`
+- `firstDomainControllerVmId`
+
+Supported `relationKind` values are:
+
+- `Root`
+- `Child`
+- `Tree`
+
+Only `Root` is executable in the current slice.
+
+### Trusts
+
+Trust declarations are reserved contract data in the current slice.
+
+Each trust declaration may carry:
+
+- `trustId`
+- `sourceDomainId`
+- `targetDomainId`
+- `trustType`
+- `direction`
+
+Trusts validate shape and references only. They do not execute yet.
+
+### Current Execution Boundary
+
+- root forests execute in the current V2 slice
+- child domains remain known-but-non-executable
+- tree domains remain known-but-non-executable
+- trusts remain known-but-non-executable
 
 ## Open Questions / TBDs
 

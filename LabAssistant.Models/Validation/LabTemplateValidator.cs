@@ -64,7 +64,7 @@ public static class LabTemplateValidator
         {
             ValidateV2DeploymentProfile(template, result);
             ValidateV2Networks(template, result);
-            ValidateV2ExtendedTopology(template, result);
+            ValidateV2DirectoryTopology(template, result);
         }
 
         var vmNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -174,9 +174,9 @@ public static class LabTemplateValidator
         }
     }
 
-    private static void ValidateV2ExtendedTopology(LabTemplate template, LabTemplateValidationResult result)
+    private static void ValidateV2DirectoryTopology(LabTemplate template, LabTemplateValidationResult result)
     {
-        if (template.ExtendedTopology == null)
+        if (template.DirectoryTopology == null)
         {
             return;
         }
@@ -185,112 +185,102 @@ public static class LabTemplateValidator
             .Where(vm => !string.IsNullOrWhiteSpace(vm.VmId))
             .Select(vm => vm.VmId.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var forestIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var domainIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        ValidateChildDomains(template.ExtendedTopology.ChildDomains, vmIds, result);
-        ValidateAdditionalForests(template.ExtendedTopology.AdditionalForests, vmIds, result);
-        ValidateTreeDomains(template.ExtendedTopology.TreeDomains, result);
-    }
-
-    private static void ValidateChildDomains(
-        List<V2ChildDomainTemplate>? childDomains,
-        ISet<string> vmIds,
-        LabTemplateValidationResult result)
-    {
-        if (childDomains == null)
+        foreach (var forest in template.DirectoryTopology.Forests ?? [])
         {
-            return;
+            if (string.IsNullOrWhiteSpace(forest.ForestId))
+            {
+                result.Errors.Add("V2 directoryTopology.forests.forestId is required.");
+            }
+            else if (!forestIds.Add(forest.ForestId.Trim()))
+            {
+                result.Errors.Add($"Duplicate V2 forest id: {forest.ForestId}.");
+            }
+
+            if (string.IsNullOrWhiteSpace(forest.RootDomainId))
+            {
+                result.Errors.Add($"V2 forest '{forest.ForestId}' rootDomainId is required.");
+            }
         }
 
-        var topologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var childDomain in childDomains)
+        foreach (var domain in template.DirectoryTopology.Domains ?? [])
         {
-            if (string.IsNullOrWhiteSpace(childDomain.TopologyId))
+            if (string.IsNullOrWhiteSpace(domain.DomainId))
             {
-                result.Errors.Add("V2 extendedTopology.childDomains.topologyId is required.");
-            }
-            else if (!topologyIds.Add(childDomain.TopologyId.Trim()))
-            {
-                result.Errors.Add($"Duplicate V2 child domain topology id: {childDomain.TopologyId}.");
+                result.Errors.Add("V2 directoryTopology.domains.domainId is required.");
+                continue;
             }
 
-            if (string.IsNullOrWhiteSpace(childDomain.ParentDomainRef))
+            if (!domainIds.Add(domain.DomainId.Trim()))
             {
-                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' parentDomainRef is required.");
+                result.Errors.Add($"Duplicate V2 domain id: {domain.DomainId}.");
             }
 
-            if (string.IsNullOrWhiteSpace(childDomain.ChildLabel))
+            if (string.IsNullOrWhiteSpace(domain.DnsName))
             {
-                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' childLabel is required.");
+                result.Errors.Add($"V2 domain '{domain.DomainId}' dnsName is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(childDomain.FirstDomainControllerVmId))
+            if (string.IsNullOrWhiteSpace(domain.NetBiosName))
             {
-                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' firstDomainControllerVmId is required.");
+                result.Errors.Add($"V2 domain '{domain.DomainId}' netBiosName is required.");
             }
-            else if (!vmIds.Contains(childDomain.FirstDomainControllerVmId.Trim()))
+
+            if (string.IsNullOrWhiteSpace(domain.ForestId))
             {
-                result.Errors.Add($"V2 child domain '{childDomain.TopologyId}' references unknown VM id '{childDomain.FirstDomainControllerVmId}'.");
+                result.Errors.Add($"V2 domain '{domain.DomainId}' forestId is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(domain.FirstDomainControllerVmId))
+            {
+                result.Errors.Add($"V2 domain '{domain.DomainId}' firstDomainControllerVmId is required.");
+            }
+            else if (!vmIds.Contains(domain.FirstDomainControllerVmId.Trim()))
+            {
+                result.Errors.Add($"V2 domain '{domain.DomainId}' references unknown VM id '{domain.FirstDomainControllerVmId}'.");
+            }
+
+            if (domain.RelationKind is V2DomainRelationKind.Child or V2DomainRelationKind.Tree &&
+                string.IsNullOrWhiteSpace(domain.ParentDomainId))
+            {
+                result.Errors.Add($"V2 domain '{domain.DomainId}' parentDomainId is required for relation kind '{domain.RelationKind}'.");
             }
         }
-    }
 
-    private static void ValidateAdditionalForests(
-        List<V2AdditionalForestTemplate>? additionalForests,
-        ISet<string> vmIds,
-        LabTemplateValidationResult result)
-    {
-        if (additionalForests == null)
+        foreach (var forest in template.DirectoryTopology.Forests ?? [])
         {
-            return;
+            if (!string.IsNullOrWhiteSpace(forest.RootDomainId) &&
+                !domainIds.Contains(forest.RootDomainId.Trim()))
+            {
+                result.Errors.Add($"V2 forest '{forest.ForestId}' references unknown root domain id '{forest.RootDomainId}'.");
+            }
         }
 
-        var topologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var forest in additionalForests)
+        foreach (var trust in template.DirectoryTopology.Trusts ?? [])
         {
-            if (string.IsNullOrWhiteSpace(forest.TopologyId))
+            if (string.IsNullOrWhiteSpace(trust.TrustId))
             {
-                result.Errors.Add("V2 extendedTopology.additionalForests.topologyId is required.");
-            }
-            else if (!topologyIds.Add(forest.TopologyId.Trim()))
-            {
-                result.Errors.Add($"Duplicate V2 additional forest topology id: {forest.TopologyId}.");
+                result.Errors.Add("V2 directoryTopology.trusts.trustId is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(forest.ForestRootDomainFqdn))
+            if (string.IsNullOrWhiteSpace(trust.SourceDomainId))
             {
-                result.Errors.Add($"V2 additional forest '{forest.TopologyId}' forestRootDomainFqdn is required.");
+                result.Errors.Add($"V2 trust '{trust.TrustId}' sourceDomainId is required.");
+            }
+            else if (!domainIds.Contains(trust.SourceDomainId.Trim()))
+            {
+                result.Errors.Add($"V2 trust '{trust.TrustId}' references unknown source domain id '{trust.SourceDomainId}'.");
             }
 
-            if (string.IsNullOrWhiteSpace(forest.FirstDomainControllerVmId))
+            if (string.IsNullOrWhiteSpace(trust.TargetDomainId))
             {
-                result.Errors.Add($"V2 additional forest '{forest.TopologyId}' firstDomainControllerVmId is required.");
+                result.Errors.Add($"V2 trust '{trust.TrustId}' targetDomainId is required.");
             }
-            else if (!vmIds.Contains(forest.FirstDomainControllerVmId.Trim()))
+            else if (!domainIds.Contains(trust.TargetDomainId.Trim()))
             {
-                result.Errors.Add($"V2 additional forest '{forest.TopologyId}' references unknown VM id '{forest.FirstDomainControllerVmId}'.");
-            }
-        }
-    }
-
-    private static void ValidateTreeDomains(
-        List<V2TreeDomainTemplate>? treeDomains,
-        LabTemplateValidationResult result)
-    {
-        if (treeDomains == null)
-        {
-            return;
-        }
-
-        var topologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var treeDomain in treeDomains)
-        {
-            if (string.IsNullOrWhiteSpace(treeDomain.TopologyId))
-            {
-                result.Errors.Add("V2 extendedTopology.treeDomains.topologyId is required.");
-            }
-            else if (!topologyIds.Add(treeDomain.TopologyId.Trim()))
-            {
-                result.Errors.Add($"Duplicate V2 tree domain topology id: {treeDomain.TopologyId}.");
+                result.Errors.Add($"V2 trust '{trust.TrustId}' references unknown target domain id '{trust.TargetDomainId}'.");
             }
         }
     }
@@ -320,6 +310,12 @@ public static class LabTemplateValidator
         if (vm.DependsOn != null && vm.DependsOn.Any(string.IsNullOrWhiteSpace))
         {
             result.Errors.Add($"VM '{vmName}' dependsOn must not contain empty values.");
+        }
+
+        if (vm.TopologyRole is "RootDomainController" or "ReplicaDomainController" or "MemberServer" &&
+            string.IsNullOrWhiteSpace(vm.DomainId))
+        {
+            result.Errors.Add($"VM '{vmName}' domainId is required for topology role '{vm.TopologyRole}'.");
         }
 
         ValidateCredentialSlots(vm, result);
@@ -371,6 +367,11 @@ public static class LabTemplateValidator
         if (vm.CredentialSlots.DomainJoin != null && string.IsNullOrWhiteSpace(vm.CredentialSlots.DomainJoin))
         {
             result.Errors.Add($"VM '{vmName}' credentialSlots.domainJoin must not be empty.");
+        }
+
+        if (vm.CredentialSlots.Dsrm != null && string.IsNullOrWhiteSpace(vm.CredentialSlots.Dsrm))
+        {
+            result.Errors.Add($"VM '{vmName}' credentialSlots.dsrm must not be empty.");
         }
     }
 

@@ -15,4 +15,7 @@ public class VmCredentialSlotBindings
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DomainJoin { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Dsrm { get; set; }
 }

@@ -12,7 +12,7 @@ public sealed class V2PlanningCapabilityServiceTests
     [Fact]
     public async Task BuildPlanAsync_ProducesDeterministicGraphAndWaves()
     {
-        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin"]);
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
 
         var first = await _service.BuildPlanAsync(request);
         var second = await _service.BuildPlanAsync(request);
@@ -61,7 +61,7 @@ public sealed class V2PlanningCapabilityServiceTests
     [Fact]
     public async Task BuildPlanAsync_BlankDeploymentProfile_UsesDefaultDeploymentProfile()
     {
-        var request = CreateAdCoreRequest(null, ["slot-local", "slot-join", "slot-admin"]);
+        var request = CreateAdCoreRequest(null, ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
         request.DefaultDeploymentProfile = "Aggressive";
 
         var result = await _service.BuildPlanAsync(request);
@@ -74,8 +74,8 @@ public sealed class V2PlanningCapabilityServiceTests
     [Fact]
     public async Task BuildPlanAsync_DifferentProfiles_ChangeWavesWithoutChangingDependencies()
     {
-        var balanced = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin"]));
-        var aggressive = await _service.BuildPlanAsync(CreateAdCoreRequest("Aggressive", ["slot-local", "slot-join", "slot-admin"]));
+        var balanced = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]));
+        var aggressive = await _service.BuildPlanAsync(CreateAdCoreRequest("Aggressive", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]));
 
         Assert.Equal(
             balanced.Dependencies.Select(dep => $"{dep.FromNodeId}->{dep.ToNodeId}:{dep.ReasonCode}"),
@@ -88,7 +88,7 @@ public sealed class V2PlanningCapabilityServiceTests
     [Fact]
     public async Task BuildPlanAsync_UnresolvedBootstrapCredentialSlot_IsProjected()
     {
-        var result = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-join", "slot-admin"]));
+        var result = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-join", "slot-admin", "slot-dsrm"]));
 
         Assert.False(result.Success);
         Assert.Contains(result.UnresolvedRequirements, requirement => requirement.Kind == V2UnresolvedRequirementKind.CredentialSlot && requirement.Key == "slot-local");
@@ -128,14 +128,20 @@ public sealed class V2PlanningCapabilityServiceTests
     [Fact]
     public async Task BuildPlanAsync_RootAndMemberPlan_PreservesDomainReadyOrdering()
     {
-        var result = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin"]));
+        var result = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]));
         var domainReady = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.DomainReady));
         var joinDomain = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.JoinDomain));
+        var installAdDs = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.InstallAdDomainServicesFeature));
+        var promoteRoot = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.PromoteRootDomainController));
 
         Assert.Contains(result.Dependencies, dep =>
             dep.FromNodeId == domainReady.NodeId &&
             dep.ToNodeId == joinDomain.NodeId &&
             dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+        Assert.Contains(result.Dependencies, dep =>
+            dep.FromNodeId == installAdDs.NodeId &&
+            dep.ToNodeId == promoteRoot.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.RoleOrdering);
         Assert.True(domainReady.WaveHint < joinDomain.WaveHint);
     }
 
@@ -238,6 +244,7 @@ public sealed class V2PlanningCapabilityServiceTests
                 SwitchName = "vSwitch-Core"
             }
         ];
+        template.DirectoryTopology = CreateDirectoryTopology("forest-contoso", "domain-contoso", "contoso.com", "CONTOSO", "vm-dc01");
         template.VmTemplates =
         [
             new VmTemplate
@@ -248,9 +255,12 @@ public sealed class V2PlanningCapabilityServiceTests
                 CpuCount = 2,
                 VhdxId = "disk-dc",
                 TopologyRole = "RootDomainController",
+                DomainId = "domain-contoso",
                 CredentialSlots = new VmCredentialSlotBindings
                 {
-                    LocalBootstrap = "slot-local"
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-admin",
+                    Dsrm = "slot-dsrm"
                 },
                 Nics =
                 [
@@ -273,6 +283,7 @@ public sealed class V2PlanningCapabilityServiceTests
                 CpuCount = 2,
                 VhdxId = "disk-member",
                 TopologyRole = "MemberServer",
+                DomainId = "domain-contoso",
                 CredentialSlots = new VmCredentialSlotBindings
                 {
                     LocalBootstrap = "slot-local",
@@ -337,9 +348,12 @@ public sealed class V2PlanningCapabilityServiceTests
                 CpuCount = 2,
                 VhdxId = "disk-dc",
                 TopologyRole = "RootDomainController",
+                DomainId = "domain-contoso",
                 CredentialSlots = new VmCredentialSlotBindings
                 {
-                    LocalBootstrap = "slot-local"
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-admin",
+                    Dsrm = "slot-dsrm"
                 },
                 Nics =
                 [
@@ -362,6 +376,7 @@ public sealed class V2PlanningCapabilityServiceTests
                 CpuCount = 2,
                 VhdxId = "disk-member",
                 TopologyRole = "MemberServer",
+                DomainId = "domain-contoso",
                 CredentialSlots = new VmCredentialSlotBindings
                 {
                     LocalBootstrap = "slot-local",
@@ -417,6 +432,7 @@ public sealed class V2PlanningCapabilityServiceTests
         }
 
         template.VmTemplates = vmTemplates;
+        template.DirectoryTopology = CreateDirectoryTopology("forest-contoso", "domain-contoso", "contoso.com", "CONTOSO", "vm-root");
 
         return new V2PlanBuildRequest
         {
@@ -428,7 +444,7 @@ public sealed class V2PlanningCapabilityServiceTests
                 CreateCatalogItem("disk-router", "slot-local")
             ],
             AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge"],
-            ResolvedCredentialSlotKeys = ["slot-local", "slot-join"],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm"],
             DefaultDeploymentProfile = "Balanced"
         };
     }
@@ -464,6 +480,38 @@ public sealed class V2PlanningCapabilityServiceTests
                 GuestOsFamily = "windows",
                 GuestTransport = "powershell-direct"
             }
+        };
+    }
+
+    private static V2DirectoryTopologyTemplate CreateDirectoryTopology(
+        string forestId,
+        string domainId,
+        string dnsName,
+        string netBiosName,
+        string firstDomainControllerVmId)
+    {
+        return new V2DirectoryTopologyTemplate
+        {
+            Forests =
+            [
+                new V2ForestTemplate
+                {
+                    ForestId = forestId,
+                    RootDomainId = domainId
+                }
+            ],
+            Domains =
+            [
+                new V2DomainTemplate
+                {
+                    DomainId = domainId,
+                    DnsName = dnsName,
+                    NetBiosName = netBiosName,
+                    ForestId = forestId,
+                    RelationKind = V2DomainRelationKind.Root,
+                    FirstDomainControllerVmId = firstDomainControllerVmId
+                }
+            ]
         };
     }
 }
