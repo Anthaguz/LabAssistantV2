@@ -2,6 +2,7 @@ using LabAssistant.Models.PowerShell;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.FileSystem;
+using LabAssistant.Services.GuestExecution;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
@@ -19,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPowerShellExecutor, PowerShellExecutor>();
         services.AddSingleton<IHyperVQueryExecutor, HyperVQueryExecutor>();
         services.AddSingleton<IHyperVAdministrativeCommandExecutor, HyperVAdministrativeCommandExecutor>();
+        services.AddTransient<IGuestCommandExecutor, HyperVPowerShellDirectGuestCommandExecutor>();
 
         services.AddTransient<Func<IPersistentPowerShellSession>>(provider =>
             () => provider.GetRequiredService<IPersistentPowerShellSession>()

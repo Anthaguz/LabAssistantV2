@@ -16,4 +16,9 @@ public static class DeploymentStepKeys
     public const string InstallSoftware = "InstallSoftware";
     public const string InstallRole = "InstallRole";
     public const string ConfigureNetworkInformation = "ConfigureNetworkInformation";
+
+    public const string V2ProvisionVm = "v2.provision";
+    public const string V2StartVm = "v2.start";
+    public const string V2GuestTransportReady = "v2.guestTransportReady";
+    public const string V2BootstrapGuestNetwork = "v2.bootstrapGuestNetwork";
 }
