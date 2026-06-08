@@ -18,6 +18,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly IGuestCommandExecutor _guestCommandExecutor;
     private readonly V2RootForestRuntimeCoordinator _rootForestRuntimeCoordinator;
     private readonly V2DomainProgressionRuntimeCoordinator _domainProgressionRuntimeCoordinator;
+    private readonly V2RouterRuntimeCoordinator _routerRuntimeCoordinator;
     private readonly IVmCleanupOrchestrator _cleanupOrchestrator;
     private readonly IStructuredLogger _structuredLogger;
 
@@ -33,6 +34,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         _guestCommandExecutor = guestCommandExecutor;
         _rootForestRuntimeCoordinator = new V2RootForestRuntimeCoordinator(guestCommandExecutor);
         _domainProgressionRuntimeCoordinator = new V2DomainProgressionRuntimeCoordinator(guestCommandExecutor);
+        _routerRuntimeCoordinator = new V2RouterRuntimeCoordinator(guestCommandExecutor);
         _cleanupOrchestrator = cleanupOrchestrator;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
     }
@@ -69,8 +71,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
         var deferredNodeIds = new HashSet<string>(
             request.Plan.Nodes
-                .Where(node => node.Kind is V2PlanNodeKind.RouterReady
-                    or V2PlanNodeKind.ApplyCapabilityRole)
+                .Where(node => node.Kind == V2PlanNodeKind.ApplyCapabilityRole)
                 .Select(node => node.NodeId),
             StringComparer.Ordinal);
 
@@ -116,16 +117,26 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 else
                 {
                     var rootPromotionTask = ExecuteRootPromotionStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
-                    var nonRootTask = ExecuteRemainingStageAsync(
+                    var nonRootPreparationTask = ExecuteNonRootPreparationStageAsync(
                         request,
                         multiContext,
-                        rootStates,
                         nonRootStates,
                         executedNodeIds,
                         deferredNodeIds,
                         cancellationToken);
 
-                    await Task.WhenAll(rootPromotionTask, nonRootTask);
+                    await Task.WhenAll(rootPromotionTask, nonRootPreparationTask);
+                    if (!multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess))
+                    {
+                        await ExecutePostRootRouterAndDomainProgressionAsync(
+                            request,
+                            multiContext,
+                            rootStates,
+                            nonRootStates,
+                            executedNodeIds,
+                            deferredNodeIds,
+                            cancellationToken);
+                    }
                 }
             }
 
@@ -197,6 +208,28 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        await ExecuteNonRootPreparationStageAsync(request, multiContext, nonRootStates, executedNodeIds, deferredNodeIds, cancellationToken);
+        if (multiContext.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await ExecutePostRootRouterAndDomainProgressionAsync(request, multiContext, rootStates, nonRootStates, executedNodeIds, deferredNodeIds, cancellationToken);
+    }
+
+    private async Task ExecuteNonRootPreparationStageAsync(
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<RuntimeVmState> nonRootStates,
+        ISet<string> executedNodeIds,
+        ISet<string> deferredNodeIds,
+        CancellationToken cancellationToken)
+    {
+        if (nonRootStates.Count == 0)
+        {
+            return;
+        }
+
         switch (request.Plan.Context.ResolvedDeploymentProfile)
         {
             case V2DeploymentProfile.Conservative:
@@ -211,8 +244,26 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 await ExecuteNonRootPreparationAggressiveAsync(nonRootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
                 break;
         }
+    }
 
-        await EmitDeferredRouterStepsAsync(nonRootStates, multiContext, deferredNodeIds);
+    private async Task ExecutePostRootRouterAndDomainProgressionAsync(
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<RuntimeVmState> rootStates,
+        IReadOnlyList<RuntimeVmState> nonRootStates,
+        ISet<string> executedNodeIds,
+        ISet<string> deferredNodeIds,
+        CancellationToken cancellationToken)
+    {
+        var routerStates = nonRootStates.Where(state => state.PlanVm.TopologyRole == "Router").ToList();
+
+        await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.PrepareRouterNetwork, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.InstallRouterRemoteAccessFeature, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.EnableRouterRouting, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.ConfigureRouterNat, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.ValidateCrossSwitchRouting, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.ValidateRouterEgress, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.RouterReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecutePostRootDomainProgressionAsync(rootStates, nonRootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
     }
 
@@ -246,13 +297,31 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 .Where(node => node.Kind is V2PlanNodeKind.ProvisionVm
                     or V2PlanNodeKind.EnableGuestServices
                     or V2PlanNodeKind.StartVm
-                    or V2PlanNodeKind.GuestTransportReady
-                    or V2PlanNodeKind.PrepareGuestNetwork)
+                    or V2PlanNodeKind.GuestTransportReady)
                 .ToList();
 
             if (runnableNodes.Count > 0)
             {
                 await Task.WhenAll(runnableNodes.Select(node =>
+                    ExecutePlanNodeAsync(stateByVmId[node.VmId], node, request, multiContext, executedNodeIds, cancellationToken)));
+            }
+
+            var prepareNodes = waveNodes
+                .Where(node =>
+                {
+                    if (node.Kind != V2PlanNodeKind.PrepareGuestNetwork)
+                    {
+                        return false;
+                    }
+
+                    var state = stateByVmId[node.VmId];
+                    return !string.Equals(state.PlanVm.TopologyRole, "Router", StringComparison.OrdinalIgnoreCase);
+                })
+                .ToList();
+
+            if (prepareNodes.Count > 0)
+            {
+                await Task.WhenAll(prepareNodes.Select(node =>
                     ExecutePlanNodeAsync(stateByVmId[node.VmId], node, request, multiContext, executedNodeIds, cancellationToken)));
             }
         }
@@ -270,7 +339,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         await ExecuteNodeSetAsync(nonRootStates, V2PlanNodeKind.EnableGuestServices, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(nonRootStates, V2PlanNodeKind.StartVm, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(nonRootStates, V2PlanNodeKind.GuestTransportReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
-        await ExecuteNodeSetAsync(nonRootStates, V2PlanNodeKind.PrepareGuestNetwork, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(nonRootStates.Where(state => !string.Equals(state.PlanVm.TopologyRole, "Router", StringComparison.OrdinalIgnoreCase)).ToList(), V2PlanNodeKind.PrepareGuestNetwork, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
     }
 
     private async Task ExecuteNonRootPreparationAggressiveAsync(
@@ -290,6 +359,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             foreach (var kind in new[] { V2PlanNodeKind.ProvisionVm, V2PlanNodeKind.EnableGuestServices, V2PlanNodeKind.StartVm, V2PlanNodeKind.GuestTransportReady, V2PlanNodeKind.PrepareGuestNetwork })
             {
+                if (kind == V2PlanNodeKind.PrepareGuestNetwork &&
+                    string.Equals(state.PlanVm.TopologyRole, "Router", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 var node = state.TryGetNode(kind);
                 if (node is not null)
                 {
@@ -308,8 +383,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         ISet<string> deferredNodeIds,
         CancellationToken cancellationToken)
     {
-        var replicaStates = nonRootStates.Where(state => state.PlanVm.TopologyRole == "ReplicaDomainController" && !state.RequiresRouterDependency).ToList();
-        var memberStates = nonRootStates.Where(state => state.PlanVm.RequiresDomainJoin && !state.RequiresRouterDependency).ToList();
+        var replicaStates = nonRootStates.Where(state => state.PlanVm.TopologyRole == "ReplicaDomainController").ToList();
+        var memberStates = nonRootStates.Where(state => state.PlanVm.RequiresDomainJoin).ToList();
 
         await ExecuteNodeSetAsync(replicaStates, V2PlanNodeKind.InstallAdDomainServicesFeature, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(replicaStates, V2PlanNodeKind.PromoteReplicaDomainController, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
@@ -414,6 +489,72 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 executedNodeIds.Add(node.NodeId);
                 break;
 
+            case V2PlanNodeKind.PrepareRouterNetwork:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2PrepareRouterNetwork,
+                    "Prepare router network",
+                    context => PrepareRouterNetworkAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.InstallRouterRemoteAccessFeature:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2InstallRouterRemoteAccessFeature,
+                    "Install router remote-access feature",
+                    context => InstallRouterRemoteAccessFeatureAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.EnableRouterRouting:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2EnableRouterRouting,
+                    "Enable router routing",
+                    context => EnableRouterRoutingAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.ConfigureRouterNat:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2ConfigureRouterNat,
+                    "Configure router NAT",
+                    context => ConfigureRouterNatAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.ValidateCrossSwitchRouting:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+                    "Validate cross-switch routing",
+                    context => ValidateCrossSwitchRoutingAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.ValidateRouterEgress:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2ValidateRouterEgress,
+                    "Validate router egress",
+                    context => ValidateRouterEgressAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
             case V2PlanNodeKind.InstallAdDomainServicesFeature:
                 await ExecuteRuntimeStepAsync(
                     state.Context,
@@ -501,44 +642,18 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     cancellationToken);
                 executedNodeIds.Add(node.NodeId);
                 break;
-        }
-    }
 
-    private async Task EmitDeferredRouterStepsAsync(
-        IReadOnlyList<RuntimeVmState> states,
-        MultiVmDeploymentContext multiContext,
-        ISet<string> deferredNodeIds)
-    {
-        await Task.WhenAll(states.Select(state =>
-        {
-            var node = state.TryGetNode(V2PlanNodeKind.RouterReady);
-            return node is null
-                ? Task.CompletedTask
-                : EmitDeferredRouterStepAsync(state, node, multiContext, deferredNodeIds);
-        }));
-    }
-
-    private async Task EmitDeferredRouterStepAsync(
-        RuntimeVmState state,
-        V2PlanNode node,
-        MultiVmDeploymentContext multiContext,
-        ISet<string> deferredNodeIds)
-    {
-        deferredNodeIds.Add(node.NodeId);
-        await ExecuteRuntimeStepAsync(
-            state.Context,
-            DeploymentStepKeys.V2RouterReady,
-            "Router readiness",
-            context =>
-            {
-                context.SetStepTerminalOverride(
+            case V2PlanNodeKind.RouterReady:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
                     DeploymentStepKeys.V2RouterReady,
-                    DeployStepState.Skipped,
-                    "Deferred until V2 router runtime issue #738.");
-                return Task.CompletedTask;
-            },
-            multiContext,
-            CancellationToken.None);
+                    "Router ready",
+                    _ => Task.CompletedTask,
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+        }
     }
 
     private async Task ProvisionVmAsync(RuntimeVmState state, VmDeploymentContext context)
@@ -657,6 +772,302 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             context.MarkFailure(
                 DeploymentStepKeys.V2PrepareGuestNetwork,
                 $"Failed to prepare guest network on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    private async Task PrepareRouterNetworkAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var bootstrapCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2PrepareRouterNetwork,
+            "bootstrap");
+        if (bootstrapCredential is null)
+        {
+            return;
+        }
+
+        var nicPlans = await BuildRouterNicPlansAsync(state, context, cancellationToken);
+        if (!context.IsSuccess)
+        {
+            return;
+        }
+
+        var result = await _routerRuntimeCoordinator.PrepareRouterNetworkAsync(
+            context.VmName,
+            bootstrapCredential,
+            nicPlans,
+            cancellationToken);
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2PrepareRouterNetwork,
+                $"Failed to prepare router network on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    private async Task InstallRouterRemoteAccessFeatureAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var bootstrapCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2InstallRouterRemoteAccessFeature,
+            "bootstrap");
+        if (bootstrapCredential is null)
+        {
+            return;
+        }
+
+        var result = await _routerRuntimeCoordinator.InstallRemoteAccessFeatureAsync(
+            context.VmName,
+            bootstrapCredential,
+            cancellationToken);
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2InstallRouterRemoteAccessFeature,
+                $"Failed to install router remote-access features on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    private async Task EnableRouterRoutingAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var bootstrapCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2EnableRouterRouting,
+            "bootstrap");
+        if (bootstrapCredential is null)
+        {
+            return;
+        }
+
+        var adapters = await EnsureRouterAdapterInventoryAsync(state, context);
+        var externalAdapter = adapters
+            .FirstOrDefault(adapter => SwitchTypeIs(adapter.SwitchType, "External"));
+        if (externalAdapter is null)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2EnableRouterRouting,
+                $"Router VM '{context.VmName}' has no external switch attachment for routing.");
+            return;
+        }
+
+        var result = await _routerRuntimeCoordinator.EnableRoutingAsync(
+            context.VmName,
+            bootstrapCredential,
+            externalAdapter.MacAddress,
+            cancellationToken);
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2EnableRouterRouting,
+                $"Failed to enable routing on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    private async Task ConfigureRouterNatAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var bootstrapCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2ConfigureRouterNat,
+            "bootstrap");
+        if (bootstrapCredential is null)
+        {
+            return;
+        }
+
+        var adapters = await EnsureRouterAdapterInventoryAsync(state, context);
+        var externalAdapter = adapters
+            .FirstOrDefault(adapter => SwitchTypeIs(adapter.SwitchType, "External"));
+        var internalAdapters = adapters
+            .Where(adapter => !SwitchTypeIs(adapter.SwitchType, "External"))
+            .ToArray();
+        if (externalAdapter is null || internalAdapters.Length == 0)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2ConfigureRouterNat,
+                $"Router VM '{context.VmName}' must have one external and at least one internal NIC before NAT can be configured.");
+            return;
+        }
+
+        var result = await _routerRuntimeCoordinator.ConfigureNatAsync(
+            context.VmName,
+            bootstrapCredential,
+            externalAdapter.MacAddress,
+            internalAdapters.Select(adapter => adapter.MacAddress).ToArray(),
+            cancellationToken);
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2ConfigureRouterNat,
+                $"Failed to configure router NAT on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    private async Task ValidateCrossSwitchRoutingAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var targets = GetRouterCrossSwitchTargets(state, request);
+        if (targets.Count == 0)
+        {
+            context.SetStepTerminalOverride(
+                DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+                DeployStepState.Skipped,
+                "No cross-switch dependent guests require router validation.");
+            return;
+        }
+
+        foreach (var target in targets)
+        {
+            var bootstrapCredential = ResolveCredential(
+                request.CredentialSlotValues,
+                target.PlanVm.EffectiveBootstrapCredentialSlot,
+                target.Context,
+                DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+                "bootstrap");
+            if (bootstrapCredential is null)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+                    $"Cross-switch validation target '{target.Context.VmName}' is missing bootstrap credentials.");
+                return;
+            }
+
+            if (target.Domain is null)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+                    $"Cross-switch validation target '{target.Context.VmName}' is missing resolved domain topology.");
+                return;
+            }
+
+            var result = await _routerRuntimeCoordinator.ValidateCrossSwitchRoutingAsync(
+                target.Context.VmName,
+                bootstrapCredential,
+                target.Domain.DnsName,
+                cancellationToken);
+            if (!result.Success)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+                    $"Cross-switch validation failed from '{target.Context.VmName}'. {result.Error}".Trim());
+                return;
+            }
+        }
+    }
+
+    private async Task ValidateRouterEgressAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var egressTargets = GetRouterEgressTargets(state, request);
+        if (egressTargets.Count == 0)
+        {
+            context.SetStepTerminalOverride(
+                DeploymentStepKeys.V2ValidateRouterEgress,
+                DeployStepState.Skipped,
+                "No router-dependent guests require outbound egress validation.");
+            return;
+        }
+
+        var bootstrapCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2ValidateRouterEgress,
+            "bootstrap");
+        if (bootstrapCredential is null)
+        {
+            return;
+        }
+
+        var adapters = await EnsureRouterAdapterInventoryAsync(state, context);
+        var externalAdapter = adapters.FirstOrDefault(adapter => SwitchTypeIs(adapter.SwitchType, "External"));
+        if (externalAdapter is null)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2ValidateRouterEgress,
+                $"Router VM '{context.VmName}' has no external switch attachment for outbound validation.");
+            return;
+        }
+
+        var readiness = await _routerRuntimeCoordinator.ProbeExternalReadinessAsync(
+            context.VmName,
+            bootstrapCredential,
+            externalAdapter.MacAddress,
+            cancellationToken);
+        if (!readiness.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2ValidateRouterEgress,
+                $"Failed to probe router egress readiness on '{context.VmName}'. {readiness.Error}".Trim());
+            return;
+        }
+
+        if ((readiness.Output ?? string.Empty).Contains("HOST_OFFLINE", StringComparison.OrdinalIgnoreCase))
+        {
+            context.LogCallback?.Invoke($"Skipping outbound router validation on '{context.VmName}' because the host or external link appears offline.");
+            context.SetStepTerminalOverride(
+                DeploymentStepKeys.V2ValidateRouterEgress,
+                DeployStepState.Skipped,
+                "Host or external link appears offline; outbound validation was skipped.");
+            return;
+        }
+
+        foreach (var target in egressTargets)
+        {
+            var targetBootstrapCredential = ResolveCredential(
+                request.CredentialSlotValues,
+                target.PlanVm.EffectiveBootstrapCredentialSlot,
+                target.Context,
+                DeploymentStepKeys.V2ValidateRouterEgress,
+                "bootstrap");
+            if (targetBootstrapCredential is null)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2ValidateRouterEgress,
+                    $"Router egress validation target '{target.Context.VmName}' is missing bootstrap credentials.");
+                return;
+            }
+
+            var result = await _routerRuntimeCoordinator.ValidateRouterEgressAsync(
+                target.Context.VmName,
+                targetBootstrapCredential,
+                cancellationToken);
+            if (!result.Success)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2ValidateRouterEgress,
+                    $"Outbound router validation failed from '{target.Context.VmName}'. {result.Error}".Trim());
+                return;
+            }
         }
     }
 
@@ -1167,6 +1578,115 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             $"PowerShell Direct did not become ready on '{context.VmName}'. Last error: {lastError ?? "unknown"}");
     }
 
+    private async Task<IReadOnlyList<RuntimeRouterAdapter>> EnsureRouterAdapterInventoryAsync(
+        RuntimeVmState state,
+        VmDeploymentContext context)
+    {
+        if (state.RouterAdapters is not null)
+        {
+            return state.RouterAdapters;
+        }
+
+        var hyperV = state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory);
+        var adapters = await hyperV.GetVmNetworkAdaptersAsync(context.VmName);
+        var plans = state.PlanVm.Nics
+            .OrderBy(nic => nic.EffectiveSwitchName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(nic => nic.NicId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var adapterMap = adapters
+            .Where(adapter => !string.IsNullOrWhiteSpace(adapter.SwitchName))
+            .GroupBy(adapter => adapter.SwitchName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        var resolved = new List<RuntimeRouterAdapter>();
+        foreach (var nic in plans)
+        {
+            if (string.IsNullOrWhiteSpace(nic.EffectiveSwitchName) ||
+                !adapterMap.TryGetValue(nic.EffectiveSwitchName, out var adapter) ||
+                string.IsNullOrWhiteSpace(adapter.MacAddress))
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2PrepareRouterNetwork,
+                    $"Router VM '{context.VmName}' could not resolve a Hyper-V adapter for switch '{nic.EffectiveSwitchName ?? nic.NicId}'.");
+                return Array.Empty<RuntimeRouterAdapter>();
+            }
+
+            resolved.Add(new RuntimeRouterAdapter(
+                nic.EffectiveSwitchName,
+                nic.EffectiveSwitchType,
+                adapter.AdapterName,
+                adapter.MacAddress,
+                nic));
+        }
+
+        state.RouterAdapters = resolved;
+        return resolved;
+    }
+
+    private async Task<IReadOnlyList<RouterNicPlan>> BuildRouterNicPlansAsync(
+        RuntimeVmState state,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var adapters = await EnsureRouterAdapterInventoryAsync(state, context);
+        if (!context.IsSuccess)
+        {
+            return Array.Empty<RouterNicPlan>();
+        }
+
+        return adapters
+            .Select(adapter => new RouterNicPlan
+            {
+                SwitchName = adapter.SwitchName,
+                MacAddress = adapter.MacAddress,
+                IsExternal = SwitchTypeIs(adapter.SwitchType, "External"),
+                IpAddress = SwitchTypeIs(adapter.SwitchType, "External") ? null : adapter.Nic.IpAddress,
+                PrefixLength = SwitchTypeIs(adapter.SwitchType, "External") ? null : adapter.Nic.PrefixLength,
+                DnsServers = SwitchTypeIs(adapter.SwitchType, "External") ? Array.Empty<string>() : adapter.Nic.DnsServers
+            })
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RuntimeVmState> GetRouterCrossSwitchTargets(
+        RuntimeVmState routerState,
+        V2RuntimeExecutionRequest request)
+    {
+        return routerState.AllStates
+            .Where(state => state.RequiresRouterDependency && !state.PlanVm.IsRouterCapable)
+            .GroupBy(
+                state => state.PlanVm.Nics
+                    .Select(nic => nic.NetworkId ?? nic.EffectiveSwitchName)
+                    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? state.PlanVm.VmId,
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderBy(state => state.Context.VmName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(state => state.PlanVm.VmId, StringComparer.OrdinalIgnoreCase)
+                .First())
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RuntimeVmState> GetRouterEgressTargets(
+        RuntimeVmState routerState,
+        V2RuntimeExecutionRequest request)
+    {
+        return routerState.AllStates
+            .Where(state => state.ExpectsRouterEgress && !state.PlanVm.IsRouterCapable)
+            .GroupBy(
+                state => state.PlanVm.Nics
+                    .Select(nic => nic.NetworkId ?? nic.EffectiveSwitchName)
+                    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? state.PlanVm.VmId,
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderBy(state => state.Context.VmName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(state => state.PlanVm.VmId, StringComparer.OrdinalIgnoreCase)
+                .First())
+            .ToArray();
+    }
+
+    private static bool SwitchTypeIs(string? switchType, string expectedType)
+        => string.Equals(switchType, expectedType, StringComparison.OrdinalIgnoreCase);
+
     private static V2RuntimeCredential? ResolveCredential(
         IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
         string? slotKey,
@@ -1208,6 +1728,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 Name = nic.Name,
                 NetworkId = nic.NetworkId,
                 EffectiveSwitchName = nic.EffectiveSwitchName,
+                EffectiveSwitchType = nic.EffectiveSwitchType,
                 IpAddress = nic.IpAddress,
                 PrefixLength = nic.PrefixLength,
                 DefaultGateway = nic.DefaultGateway,
@@ -1497,16 +2018,19 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             multiContext.VmContexts.Add(context);
             nodesByVmId.TryGetValue(vm.VmId, out var nodes);
-            var requiresRouterDependency = request.Plan.Dependencies.Any(dep =>
-                dep.ReasonCode == V2PlanDependencyReasonCode.RouterRequired &&
-                string.Equals(dep.ToNodeId.Split(':')[1], vm.VmId, StringComparison.OrdinalIgnoreCase));
             states.Add(new RuntimeVmState(
                 context,
                 vm,
                 planVm,
                 runtimeDomain,
                 nodes ?? [],
-                requiresRouterDependency));
+                planVm.RequiresRouterDependency,
+                planVm.ExpectsRouterEgress));
+        }
+
+        foreach (var state in states)
+        {
+            state.AllStates = states;
         }
 
         return states;
@@ -1675,13 +2199,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             V2ResolvedVmPlanningContext planVm,
             V2ResolvedDomainPlanningContext? domain,
             IReadOnlyList<V2PlanNode> nodes,
-            bool requiresRouterDependency)
+            bool requiresRouterDependency,
+            bool expectsRouterEgress)
         {
             Context = context;
             TemplateVm = templateVm;
             PlanVm = planVm;
             Domain = domain;
             RequiresRouterDependency = requiresRouterDependency;
+            ExpectsRouterEgress = expectsRouterEgress;
             _nodes = nodes
                 .GroupBy(node => node.Kind)
                 .ToDictionary(group => group.Key, group => group.First());
@@ -1696,6 +2222,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         public V2ResolvedDomainPlanningContext? Domain { get; }
 
         public bool RequiresRouterDependency { get; }
+
+        public bool ExpectsRouterEgress { get; }
+
+        public IReadOnlyList<RuntimeVmState> AllStates { get; set; } = Array.Empty<RuntimeVmState>();
+
+        public IReadOnlyList<RuntimeRouterAdapter>? RouterAdapters { get; set; }
 
         public V2PlanNode? TryGetNode(V2PlanNodeKind kind) =>
             _nodes.TryGetValue(kind, out var node) ? node : null;
@@ -1719,4 +2251,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             _session?.Dispose();
         }
     }
+
+    private sealed record RuntimeRouterAdapter(
+        string SwitchName,
+        string? SwitchType,
+        string AdapterName,
+        string MacAddress,
+        V2ResolvedVmNetworkInterface Nic);
 }

@@ -112,6 +112,10 @@ public sealed class V2PlanningCapabilityServiceTests
 
         Assert.True(result.Context.RouterSemanticsRequired);
         var routerNode = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.RouterReady));
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.PrepareRouterNetwork);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.ConfigureRouterNat);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.ValidateCrossSwitchRouting);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.ValidateRouterEgress);
         Assert.Contains(result.Dependencies, dep => dep.FromNodeId == routerNode.NodeId && dep.ReasonCode == V2PlanDependencyReasonCode.RouterRequired);
     }
 
@@ -204,7 +208,7 @@ public sealed class V2PlanningCapabilityServiceTests
 
         Assert.Equal(2, routerVm.Nics.Count);
         Assert.Equal("lab-core", routerVm.Nics[0].NetworkId);
-        Assert.Equal("lab-edge", routerVm.Nics[1].NetworkId);
+        Assert.Equal("lab-external", routerVm.Nics[1].NetworkId);
     }
 
     [Fact]
@@ -278,6 +282,7 @@ public sealed class V2PlanningCapabilityServiceTests
                 CreateCatalogItem("disk-standalone", "slot-local")
             ],
             AvailableSwitchNames = ["vSwitch-Core"],
+            AvailableSwitches = [CreateSwitch("vSwitch-Core", "Internal")],
             ResolvedCredentialSlotKeys = ["slot-local"],
             DefaultDeploymentProfile = "Balanced"
         };
@@ -366,6 +371,7 @@ public sealed class V2PlanningCapabilityServiceTests
                 CreateCatalogItem("disk-member", "slot-local")
             ],
             AvailableSwitchNames = ["vSwitch-Core"],
+            AvailableSwitches = [CreateSwitch("vSwitch-Core", "Internal")],
             ResolvedCredentialSlotKeys = resolvedSlots,
             DefaultDeploymentProfile = "Balanced"
         };
@@ -387,6 +393,12 @@ public sealed class V2PlanningCapabilityServiceTests
                 NetworkId = "lab-edge",
                 Name = "Edge",
                 SwitchName = "vSwitch-Edge"
+            },
+            new LabNetworkTemplate
+            {
+                NetworkId = "lab-external",
+                Name = "External",
+                SwitchName = "vSwitch-External"
             }
         ];
 
@@ -476,9 +488,7 @@ public sealed class V2PlanningCapabilityServiceTests
                     new VmNetworkInterfaceTemplate
                     {
                         NicId = "nic-router-edge",
-                        NetworkId = "lab-edge",
-                        IpAddress = "10.0.1.1",
-                        PrefixLength = 24
+                        NetworkId = "lab-external"
                     }
                 ]
             });
@@ -496,7 +506,13 @@ public sealed class V2PlanningCapabilityServiceTests
                 CreateCatalogItem("disk-member", "slot-local"),
                 CreateCatalogItem("disk-router", "slot-local")
             ],
-            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge"],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
             ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm"],
             DefaultDeploymentProfile = "Balanced"
         };
@@ -567,4 +583,11 @@ public sealed class V2PlanningCapabilityServiceTests
             ]
         };
     }
+
+    private static V2AvailableSwitchInfo CreateSwitch(string name, string switchType)
+        => new()
+        {
+            Name = name,
+            SwitchType = switchType
+        };
 }

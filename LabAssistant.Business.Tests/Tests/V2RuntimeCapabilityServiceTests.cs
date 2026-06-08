@@ -172,7 +172,7 @@ public sealed class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_RouterAwarePlan_DefersRouterRuntimeWithoutExecutingRouterGuestNode()
+    public async Task ExecuteAsync_RouterAwarePlan_ExecutesRouterRuntimeAndCrossSwitchProgression()
     {
         var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: true);
         var hyperV = new FakeHyperVService();
@@ -181,8 +181,13 @@ public sealed class V2RuntimeCapabilityServiceTests
         var result = await service.ExecuteAsync(request);
 
         Assert.True(result.Success);
-        Assert.Contains(result.DeferredNodeIds, nodeId => nodeId == "vm:vm-router01:RouterReady");
-        Assert.DoesNotContain(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:RouterReady");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:PrepareRouterNetwork");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:InstallRouterRemoteAccessFeature");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:EnableRouterRouting");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:ConfigureRouterNat");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:ValidateCrossSwitchRouting");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:ValidateRouterEgress");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:RouterReady");
         Assert.Contains("CreateVm:router01", hyperV.Operations);
     }
 
@@ -257,7 +262,13 @@ public sealed class V2RuntimeCapabilityServiceTests
         {
             Template = template,
             CatalogItems = catalogItems,
-            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge"],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
             ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm"],
             DefaultDeploymentProfile = profile
         });
@@ -310,6 +321,12 @@ public sealed class V2RuntimeCapabilityServiceTests
                     NetworkId = "lab-edge",
                     Name = "Edge",
                     SwitchName = "vSwitch-Edge"
+                },
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-external",
+                    Name = "External",
+                    SwitchName = "vSwitch-External"
                 }
             ]
         };
@@ -456,9 +473,7 @@ public sealed class V2RuntimeCapabilityServiceTests
                     new VmNetworkInterfaceTemplate
                     {
                         NicId = "nic-router-edge",
-                        NetworkId = "lab-edge",
-                        IpAddress = "10.0.1.1",
-                        PrefixLength = 24
+                        NetworkId = "lab-external"
                     }
                 ]
             });
@@ -606,7 +621,25 @@ public sealed class V2RuntimeCapabilityServiceTests
             return Task.FromResult(true);
         }
 
-        public Task<List<string>> GetVirtualSwitchNamesAsync() => Task.FromResult(new List<string> { "vSwitch-Core", "vSwitch-Edge" });
+        public Task<List<string>> GetVirtualSwitchNamesAsync() => Task.FromResult(new List<string> { "vSwitch-Core", "vSwitch-Edge", "vSwitch-External" });
+
+        public Task<IReadOnlyList<HyperVVmNetworkAdapterInfo>> GetVmNetworkAdaptersAsync(string vmName)
+        {
+            IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters = vmName switch
+            {
+                "router01" =>
+                [
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "core", SwitchName = "vSwitch-Core", MacAddress = "00155D000001" },
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "external", SwitchName = "vSwitch-External", MacAddress = "00155D000002" }
+                ],
+                _ =>
+                [
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "primary", SwitchName = "vSwitch-Core", MacAddress = "00155D000010" }
+                ]
+            };
+
+            return Task.FromResult(adapters);
+        }
 
         public Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName)
         {
@@ -642,4 +675,11 @@ public sealed class V2RuntimeCapabilityServiceTests
         public Task<(string Output, string Error)> ExecuteAsync(string command) =>
             Task.FromResult<(string Output, string Error)>((string.Empty, string.Empty));
     }
+
+    private static V2AvailableSwitchInfo CreateSwitch(string name, string switchType)
+        => new()
+        {
+            Name = name,
+            SwitchType = switchType
+        };
 }

@@ -106,6 +106,12 @@ The current V2 slice executes explicit graph nodes for:
 - host-side guest-access prerequisites
 - guest transport readiness
 - guest NIC/IP/DNS preparation
+- router NIC configuration
+- router RRAS/RemoteAccess feature installation
+- router routing enablement
+- router NAT configuration
+- router cross-switch readiness validation
+- router outbound egress validation
 - AD DS feature installation
 - root domain-controller promotion
 - replica domain-controller promotion
@@ -113,7 +119,7 @@ The current V2 slice executes explicit graph nodes for:
 - domain joins
 - joined-state and domain-login validation
 
-Router guest runtime, child domains, tree domains, and trusts remain deferred to later slices.
+Child domains, tree domains, trusts, and base remote-access guest hardening remain deferred to later slices.
 
 ## Bootstrap Profile References
 

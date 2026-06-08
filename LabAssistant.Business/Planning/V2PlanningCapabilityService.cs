@@ -80,9 +80,17 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             .Where(network => !string.IsNullOrWhiteSpace(network.NetworkId))
             .GroupBy(network => network.NetworkId.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-        var availableSwitches = new HashSet<string>(
-            request.AvailableSwitchNames.Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Trim()),
-            StringComparer.OrdinalIgnoreCase);
+        var availableSwitches = request.AvailableSwitches
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => NormalizeSwitchType(group.First().SwitchType),
+                StringComparer.OrdinalIgnoreCase);
+        foreach (var switchName in request.AvailableSwitchNames.Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Trim()))
+        {
+            availableSwitches.TryAdd(switchName, null);
+        }
         var resolvedSlots = new HashSet<string>(
             request.ResolvedCredentialSlotKeys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => key.Trim()),
             StringComparer.OrdinalIgnoreCase);
@@ -198,7 +206,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         VmTemplate vm,
         IReadOnlyList<VhdxCatalogItem> catalogItems,
         IReadOnlyDictionary<string, LabNetworkTemplate> labNetworks,
-        ISet<string> availableSwitches,
+        IReadOnlyDictionary<string, string?> availableSwitches,
         ISet<string> resolvedSlots,
         List<V2PlanIssue> issues,
         List<V2UnresolvedRequirement> unresolved)
@@ -355,6 +363,9 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             RequiresDomainJoin = requiresDomainJoin,
             IsRouterCapable = string.Equals(topologyRole, "Router", StringComparison.OrdinalIgnoreCase)
         };
+        state.HasExternalSwitchAttachment = state.ResolvedNics.Any(nic => SwitchTypeIs(nic.EffectiveSwitchType, "External"));
+        state.HasNonExternalSwitchAttachment = state.ResolvedNics.Any(nic => !SwitchTypeIs(nic.EffectiveSwitchType, "External"));
+        state.RouterProvidesEgress = state.IsRouterCapable && state.HasExternalSwitchAttachment && state.HasNonExternalSwitchAttachment;
 
         return state;
     }
@@ -416,7 +427,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
     private static List<V2ResolvedVmNetworkInterface> ResolveNics(
         VmTemplate vm,
         IReadOnlyDictionary<string, LabNetworkTemplate> labNetworks,
-        ISet<string> availableSwitches,
+        IReadOnlyDictionary<string, string?> availableSwitches,
         List<V2PlanIssue> issues,
         List<V2UnresolvedRequirement> unresolved)
     {
@@ -451,7 +462,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 }
 
                 var effectiveSwitch = Normalize(nic.SwitchName) ?? Normalize(network?.SwitchName);
-                if (!string.IsNullOrWhiteSpace(effectiveSwitch) && !availableSwitches.Contains(effectiveSwitch))
+                string? effectiveSwitchType = null;
+                if (!string.IsNullOrWhiteSpace(effectiveSwitch) && !availableSwitches.TryGetValue(effectiveSwitch, out effectiveSwitchType))
                 {
                     unresolved.Add(new V2UnresolvedRequirement
                     {
@@ -477,6 +489,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                     Name = nic.Name,
                     NetworkId = networkId,
                     EffectiveSwitchName = effectiveSwitch,
+                    EffectiveSwitchType = effectiveSwitchType,
                     IpAddress = nic.IpAddress,
                     PrefixLength = nic.PrefixLength,
                     DefaultGateway = nic.DefaultGateway,
@@ -505,7 +518,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         for (var index = 0; index < fallbackSwitches.Count; index++)
         {
             var switchName = fallbackSwitches[index];
-            if (!availableSwitches.Contains(switchName))
+            if (!availableSwitches.TryGetValue(switchName, out var switchType))
             {
                 unresolved.Add(new V2UnresolvedRequirement
                 {
@@ -528,7 +541,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             result.Add(new V2ResolvedVmNetworkInterface
             {
                 NicId = $"fallback-{index + 1}",
-                EffectiveSwitchName = switchName
+                EffectiveSwitchName = switchName,
+                EffectiveSwitchType = switchType
             });
         }
 
@@ -575,37 +589,39 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
     private static bool DetermineRouterRequirement(IReadOnlyList<ResolvedVmState> states, bool domainRequired)
     {
-        var routerRequired = states.Any(state => state.IsRouterCapable && state.NetworkKeys.Count > 1);
-        if (states.Any(state => state.IsRouterCapable && state.NetworkKeys.Count > 1))
-        {
-            routerRequired = true;
-        }
-
-        if (!domainRequired)
-        {
-            return routerRequired;
-        }
+        var routerRequired = states.Any(state => state.RouterProvidesEgress || (state.IsRouterCapable && state.NetworkKeys.Count > 1));
 
         var rootNetworks = states
             .Where(state => state.TopologyRoleIs("RootDomainController"))
             .SelectMany(state => state.NetworkKeys)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (rootNetworks.Count == 0)
+        if (domainRequired && rootNetworks.Count > 0)
         {
-            return routerRequired;
+            foreach (var state in states.Where(state => state.TopologyRoleIs("ReplicaDomainController") || state.RequiresDomainJoin))
+            {
+                if (state.NetworkKeys.Count == 0)
+                {
+                    continue;
+                }
+
+                if (state.NetworkKeys.Any(network => !rootNetworks.Contains(network)))
+                {
+                    state.RequiresRouterDependency = true;
+                    routerRequired = true;
+                }
+            }
         }
 
-        foreach (var state in states.Where(state => state.TopologyRoleIs("ReplicaDomainController") || state.RequiresDomainJoin))
+        var routerProvidesEgress = states.Any(state => state.RouterProvidesEgress);
+        if (routerProvidesEgress)
         {
-            if (state.NetworkKeys.Count == 0)
+            foreach (var state in states.Where(state =>
+                         !state.IsRouterCapable &&
+                         !state.HasExternalSwitchAttachment &&
+                         state.HasNonExternalSwitchAttachment))
             {
-                continue;
-            }
-
-            if (state.NetworkKeys.Any(network => !rootNetworks.Contains(network)))
-            {
-                state.RequiresRouterDependency = true;
+                state.ExpectsRouterEgress = true;
                 routerRequired = true;
             }
         }
@@ -630,7 +646,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 state.Nodes[V2PlanNodeKind.StartVm] = AddNode(nodes, state, V2PlanNodeKind.StartVm, "Start VM", V2WorkloadClass.HeavyHost);
             }
 
-            if (state.RequiresNetworkBootstrap)
+            if (state.RequiresNetworkBootstrap && !state.TopologyRoleIs("Router"))
             {
                 state.Nodes[V2PlanNodeKind.PrepareGuestNetwork] = AddNode(nodes, state, V2PlanNodeKind.PrepareGuestNetwork, "Prepare guest network", V2WorkloadClass.MediumGuest);
             }
@@ -642,6 +658,15 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
             if (state.TopologyRoleIs("Router") && routerRequired)
             {
+                state.Nodes[V2PlanNodeKind.PrepareRouterNetwork] = AddNode(nodes, state, V2PlanNodeKind.PrepareRouterNetwork, "Prepare router network", V2WorkloadClass.MediumGuest);
+                state.Nodes[V2PlanNodeKind.InstallRouterRemoteAccessFeature] = AddNode(nodes, state, V2PlanNodeKind.InstallRouterRemoteAccessFeature, "Install router remote-access feature", V2WorkloadClass.HeavyGuest);
+                state.Nodes[V2PlanNodeKind.EnableRouterRouting] = AddNode(nodes, state, V2PlanNodeKind.EnableRouterRouting, "Enable router routing", V2WorkloadClass.HeavyGuest);
+                state.Nodes[V2PlanNodeKind.ConfigureRouterNat] = AddNode(nodes, state, V2PlanNodeKind.ConfigureRouterNat, "Configure router NAT", V2WorkloadClass.HeavyGuest);
+                state.Nodes[V2PlanNodeKind.ValidateCrossSwitchRouting] = AddNode(nodes, state, V2PlanNodeKind.ValidateCrossSwitchRouting, "Validate cross-switch routing", V2WorkloadClass.LightWaitValidation);
+                if (state.RouterProvidesEgress)
+                {
+                    state.Nodes[V2PlanNodeKind.ValidateRouterEgress] = AddNode(nodes, state, V2PlanNodeKind.ValidateRouterEgress, "Validate router egress", V2WorkloadClass.LightWaitValidation);
+                }
                 state.Nodes[V2PlanNodeKind.RouterReady] = AddNode(nodes, state, V2PlanNodeKind.RouterReady, "Router ready", V2WorkloadClass.HeavyGuest);
             }
 
@@ -710,7 +735,15 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                               state.TryGetNode(V2PlanNodeKind.GuestTransportReady) ??
                               state.TryGetNode(V2PlanNodeKind.StartVm);
 
-            AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness follows guest bootstrap on the router VM.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.GuestTransportReady), state.TryGetNode(V2PlanNodeKind.PrepareRouterNetwork), V2PlanDependencyReasonCode.VmLifecycle, "Router network preparation requires guest transport.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PrepareRouterNetwork), state.TryGetNode(V2PlanNodeKind.InstallRouterRemoteAccessFeature), V2PlanDependencyReasonCode.RoleOrdering, "Router role installation waits for router network preparation.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.InstallRouterRemoteAccessFeature), state.TryGetNode(V2PlanNodeKind.EnableRouterRouting), V2PlanDependencyReasonCode.RoleOrdering, "Router routing enablement waits for router role installation.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.EnableRouterRouting), state.TryGetNode(V2PlanNodeKind.ConfigureRouterNat), V2PlanDependencyReasonCode.RoleOrdering, "Router NAT configuration waits for routing enablement.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ConfigureRouterNat), state.TryGetNode(V2PlanNodeKind.ValidateCrossSwitchRouting), V2PlanDependencyReasonCode.RoleOrdering, "Cross-switch validation waits for router NAT configuration.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ConfigureRouterNat), state.TryGetNode(V2PlanNodeKind.ValidateRouterEgress), V2PlanDependencyReasonCode.RoleOrdering, "Router egress validation waits for router NAT configuration.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ValidateCrossSwitchRouting), state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness waits for cross-switch validation.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ValidateRouterEgress), state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness waits for egress validation.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ConfigureRouterNat), state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness waits for NAT configuration.", dependencies);
             AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.InstallAdDomainServicesFeature), V2PlanDependencyReasonCode.RoleOrdering, "AD DS feature installation requires guest bootstrap.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.InstallAdDomainServicesFeature), state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Root promotion requires AD DS feature installation.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), state.TryGetNode(V2PlanNodeKind.DomainReady), V2PlanDependencyReasonCode.DomainRequired, "Domain readiness follows root domain-controller promotion.", dependencies);
@@ -752,7 +785,19 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             {
                 AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch domain work waits for router readiness.", dependencies);
                 AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch replica promotion waits for router readiness.", dependencies);
-                AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.PrepareGuestNetwork), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch guest network preparation waits for router readiness.", dependencies);
+            }
+
+            if (state.TopologyRoleIs("Router"))
+            {
+                foreach (var target in GetRouterValidationTargets(states))
+                {
+                    AddDependencyIfPresent(target.TryGetNode(V2PlanNodeKind.PrepareGuestNetwork), state.TryGetNode(V2PlanNodeKind.ValidateCrossSwitchRouting), V2PlanDependencyReasonCode.RoleOrdering, $"Cross-switch routing validation waits for guest network preparation on '{target.Vm.Name}'.", dependencies);
+                }
+
+                foreach (var target in GetRouterEgressTargets(states))
+                {
+                    AddDependencyIfPresent(target.TryGetNode(V2PlanNodeKind.PrepareGuestNetwork), state.TryGetNode(V2PlanNodeKind.ValidateRouterEgress), V2PlanDependencyReasonCode.RoleOrdering, $"Router egress validation waits for guest network preparation on '{target.Vm.Name}'.", dependencies);
+                }
             }
 
             foreach (var explicitDependency in state.Vm.DependsOn ?? [])
@@ -885,16 +930,22 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             V2PlanNodeKind.StartVm => 30 + roleOffset,
             V2PlanNodeKind.GuestTransportReady => 40 + roleOffset,
             V2PlanNodeKind.PrepareGuestNetwork => 50 + roleOffset,
-            V2PlanNodeKind.InstallAdDomainServicesFeature => 55 + roleOffset,
-            V2PlanNodeKind.PromoteRootDomainController => 60 + roleOffset,
-            V2PlanNodeKind.DomainReady => 70 + roleOffset,
-            V2PlanNodeKind.RouterReady => 72 + roleOffset,
-            V2PlanNodeKind.PromoteReplicaDomainController => 80 + roleOffset,
-            V2PlanNodeKind.ReplicaDomainReady => 85 + roleOffset,
-            V2PlanNodeKind.StabilizeDomainDns => 90 + roleOffset,
-            V2PlanNodeKind.JoinDomain => 100 + roleOffset,
-            V2PlanNodeKind.JoinedDomainReady => 110 + roleOffset,
-            V2PlanNodeKind.ApplyCapabilityRole => 120 + roleOffset,
+            V2PlanNodeKind.PrepareRouterNetwork => 52 + roleOffset,
+            V2PlanNodeKind.InstallRouterRemoteAccessFeature => 54 + roleOffset,
+            V2PlanNodeKind.EnableRouterRouting => 56 + roleOffset,
+            V2PlanNodeKind.ConfigureRouterNat => 58 + roleOffset,
+            V2PlanNodeKind.ValidateCrossSwitchRouting => 60 + roleOffset,
+            V2PlanNodeKind.ValidateRouterEgress => 62 + roleOffset,
+            V2PlanNodeKind.InstallAdDomainServicesFeature => 65 + roleOffset,
+            V2PlanNodeKind.PromoteRootDomainController => 70 + roleOffset,
+            V2PlanNodeKind.DomainReady => 80 + roleOffset,
+            V2PlanNodeKind.RouterReady => 82 + roleOffset,
+            V2PlanNodeKind.PromoteReplicaDomainController => 90 + roleOffset,
+            V2PlanNodeKind.ReplicaDomainReady => 95 + roleOffset,
+            V2PlanNodeKind.StabilizeDomainDns => 100 + roleOffset,
+            V2PlanNodeKind.JoinDomain => 110 + roleOffset,
+            V2PlanNodeKind.JoinedDomainReady => 120 + roleOffset,
+            V2PlanNodeKind.ApplyCapabilityRole => 130 + roleOffset,
             _ => 100 + roleOffset
         };
     }
@@ -1110,6 +1161,44 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static string? NormalizeSwitchType(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool SwitchTypeIs(string? switchType, string expectedType)
+        => string.Equals(switchType, expectedType, StringComparison.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<ResolvedVmState> GetRouterValidationTargets(IReadOnlyList<ResolvedVmState> states)
+    {
+        return states
+            .Where(state => state.RequiresRouterDependency && !state.IsRouterCapable)
+            .GroupBy(
+                state => state.ResolvedNics
+                    .Select(nic => Normalize(nic.NetworkId) ?? Normalize(nic.EffectiveSwitchName))
+                    .FirstOrDefault(key => !string.IsNullOrWhiteSpace(key)) ?? state.Vm.VmId,
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderBy(state => state.Vm.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase)
+                .First())
+            .ToArray();
+    }
+
+    private static IReadOnlyList<ResolvedVmState> GetRouterEgressTargets(IReadOnlyList<ResolvedVmState> states)
+    {
+        return states
+            .Where(state => state.ExpectsRouterEgress && !state.IsRouterCapable)
+            .GroupBy(
+                state => state.ResolvedNics
+                    .Select(nic => Normalize(nic.NetworkId) ?? Normalize(nic.EffectiveSwitchName))
+                    .FirstOrDefault(key => !string.IsNullOrWhiteSpace(key)) ?? state.Vm.VmId,
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderBy(state => state.Vm.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase)
+                .First())
+            .ToArray();
+    }
+
     private static string? NormalizeTopologyRole(string? value)
     {
         var normalized = Normalize(value);
@@ -1202,6 +1291,14 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
         public bool RequiresRouterDependency { get; set; }
 
+        public bool ExpectsRouterEgress { get; set; }
+
+        public bool RouterProvidesEgress { get; set; }
+
+        public bool HasExternalSwitchAttachment { get; set; }
+
+        public bool HasNonExternalSwitchAttachment { get; set; }
+
         public V2ResolvedDomainPlanningContext? ResolvedDomain { get; set; }
 
         public V2ResolvedForestPlanningContext? ResolvedForest { get; set; }
@@ -1226,7 +1323,14 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             => TryGetNode(V2PlanNodeKind.JoinedDomainReady) ??
                TryGetNode(V2PlanNodeKind.ReplicaDomainReady) ??
                TryGetNode(V2PlanNodeKind.StabilizeDomainDns) ??
+               TryGetNode(V2PlanNodeKind.RouterReady) ??
                TryGetNode(V2PlanNodeKind.PrepareGuestNetwork) ??
+               TryGetNode(V2PlanNodeKind.ValidateRouterEgress) ??
+               TryGetNode(V2PlanNodeKind.ValidateCrossSwitchRouting) ??
+               TryGetNode(V2PlanNodeKind.ConfigureRouterNat) ??
+               TryGetNode(V2PlanNodeKind.EnableRouterRouting) ??
+               TryGetNode(V2PlanNodeKind.InstallRouterRemoteAccessFeature) ??
+               TryGetNode(V2PlanNodeKind.PrepareRouterNetwork) ??
                TryGetNode(V2PlanNodeKind.GuestTransportReady) ??
                TryGetNode(V2PlanNodeKind.StartVm);
 
@@ -1265,6 +1369,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 RequiresGuestWork = RequiresGuestWork,
                 RequiresDomainJoin = RequiresDomainJoin,
                 IsRouterCapable = IsRouterCapable,
+                RequiresRouterDependency = RequiresRouterDependency,
+                ExpectsRouterEgress = ExpectsRouterEgress,
                 Nics = ResolvedNics.ToArray()
             };
         }
