@@ -176,6 +176,14 @@ If a task depends on cross-switch communication:
 - router readiness must appear in the dependency chain
 - dependent work must wait until the router is configured and ready
 
+Router readiness in the current runtime slice means:
+
+- router NIC mapping/configuration is complete
+- RRAS/RemoteAccess and NAT are configured
+- representative cross-switch dependent guests can resolve domain-aware traffic through the router
+- router-provided outbound validation succeeds when the host/external link is online
+- outbound validation is skipped with a warning, rather than blocking deployment, when the host itself appears offline
+
 ## V1 / V2 Coexistence
 
 - V1 templates remain on the current engine
@@ -193,3 +201,4 @@ If a task depends on cross-switch communication:
 - Exact numeric scheduler caps for each deployment profile on representative hardware.
 - Exact review-surface visualization for graph vs wave display.
 - Exact runtime policy for workloads that partially overlap heavy guest and heavy host pressure.
+- Whether base remote-access guest behavior from the legacy script should return as its own explicit V2 runtime slice.

@@ -134,6 +134,53 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         return switches;
     }
 
+    public async Task<IReadOnlyList<HyperVVmNetworkAdapterInfo>> GetVmNetworkAdaptersAsync(string vmName)
+    {
+        var script = string.Join(
+            Environment.NewLine,
+            $"$items = Get-VMNetworkAdapter -VMName '{vmName}' -ErrorAction Stop |",
+            "    Select-Object @{Name='AdapterName';Expression={$_.Name}}, @{Name='SwitchName';Expression={$_.SwitchName}}, @{Name='MacAddress';Expression={$_.MacAddress}} |",
+            "    ConvertTo-Json -Depth 3");
+        var (output, error) = await ExecuteMeasuredAsync("get_vm_network_adapters", script);
+        DebugLogger.LogPowerShellOutput(script, output, error);
+
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            CaptureFailureMetadataAndReturnSuccess(error);
+            return Array.Empty<HyperVVmNetworkAdapterInfo>();
+        }
+
+        ClearLastFailureMetadata();
+        output = PowerShellOutputCleaner.Clean(output);
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return Array.Empty<HyperVVmNetworkAdapterInfo>();
+        }
+
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(output);
+            if (document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                return document.RootElement
+                    .EnumerateArray()
+                    .Select(MapVmNetworkAdapter)
+                    .ToArray();
+            }
+
+            if (document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                return [MapVmNetworkAdapter(document.RootElement)];
+            }
+        }
+        catch
+        {
+            // Let the empty result surface and fail later with explicit runtime diagnostics.
+        }
+
+        return Array.Empty<HyperVVmNetworkAdapterInfo>();
+    }
+
     public async Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName)
     {
         var script = $"Connect-VMNetworkAdapter -VMName '{vmName}' -SwitchName '{switchName}'";
@@ -195,5 +242,15 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
             string.IsNullOrWhiteSpace(result.Error));
 
         return result;
+    }
+
+    private static HyperVVmNetworkAdapterInfo MapVmNetworkAdapter(System.Text.Json.JsonElement element)
+    {
+        return new HyperVVmNetworkAdapterInfo
+        {
+            AdapterName = element.TryGetProperty("AdapterName", out var adapterName) ? adapterName.GetString() ?? string.Empty : string.Empty,
+            SwitchName = element.TryGetProperty("SwitchName", out var switchName) ? switchName.GetString() : null,
+            MacAddress = element.TryGetProperty("MacAddress", out var macAddress) ? macAddress.GetString() ?? string.Empty : string.Empty
+        };
     }
 }

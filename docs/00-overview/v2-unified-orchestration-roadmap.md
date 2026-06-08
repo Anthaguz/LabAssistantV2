@@ -40,6 +40,7 @@
 - child domain
 - tree/extra-forest if still desired
 - richer additive capability-role execution
+- separate follow-up for legacy base remote-access guest behavior if still desired after router runtime lands
 
 ## GitHub Epic Structure
 

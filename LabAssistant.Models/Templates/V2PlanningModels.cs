@@ -10,9 +10,18 @@ public sealed class V2PlanBuildRequest
 
     public IReadOnlyList<string> AvailableSwitchNames { get; set; } = Array.Empty<string>();
 
+    public IReadOnlyList<V2AvailableSwitchInfo> AvailableSwitches { get; set; } = Array.Empty<V2AvailableSwitchInfo>();
+
     public IReadOnlyCollection<string> ResolvedCredentialSlotKeys { get; set; } = Array.Empty<string>();
 
     public string? DefaultDeploymentProfile { get; set; }
+}
+
+public sealed class V2AvailableSwitchInfo
+{
+    public string Name { get; init; } = string.Empty;
+
+    public string SwitchType { get; init; } = string.Empty;
 }
 
 public sealed class V2PlanBuildResult
@@ -113,6 +122,10 @@ public sealed class V2ResolvedVmPlanningContext
 
     public bool IsRouterCapable { get; init; }
 
+    public bool RequiresRouterDependency { get; init; }
+
+    public bool ExpectsRouterEgress { get; init; }
+
     public IReadOnlyList<V2ResolvedVmNetworkInterface> Nics { get; init; } = Array.Empty<V2ResolvedVmNetworkInterface>();
 }
 
@@ -125,6 +138,8 @@ public sealed class V2ResolvedVmNetworkInterface
     public string? NetworkId { get; init; }
 
     public string? EffectiveSwitchName { get; init; }
+
+    public string? EffectiveSwitchType { get; init; }
 
     public string? IpAddress { get; init; }
 
@@ -142,16 +157,22 @@ public enum V2PlanNodeKind
     StartVm = 2,
     GuestTransportReady = 3,
     PrepareGuestNetwork = 4,
-    InstallAdDomainServicesFeature = 5,
-    RouterReady = 6,
-    DomainReady = 7,
-    PromoteRootDomainController = 8,
-    PromoteReplicaDomainController = 9,
-    ReplicaDomainReady = 10,
-    StabilizeDomainDns = 11,
-    JoinDomain = 12,
-    JoinedDomainReady = 13,
-    ApplyCapabilityRole = 14
+    PrepareRouterNetwork = 5,
+    InstallRouterRemoteAccessFeature = 6,
+    EnableRouterRouting = 7,
+    ConfigureRouterNat = 8,
+    ValidateCrossSwitchRouting = 9,
+    ValidateRouterEgress = 10,
+    InstallAdDomainServicesFeature = 11,
+    RouterReady = 12,
+    DomainReady = 13,
+    PromoteRootDomainController = 14,
+    PromoteReplicaDomainController = 15,
+    ReplicaDomainReady = 16,
+    StabilizeDomainDns = 17,
+    JoinDomain = 18,
+    JoinedDomainReady = 19,
+    ApplyCapabilityRole = 20
 }
 
 public sealed class V2PlanNode

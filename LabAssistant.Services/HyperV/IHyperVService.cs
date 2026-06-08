@@ -1,5 +1,14 @@
 ﻿namespace LabAssistant.Services.HyperV;
 
+public sealed class HyperVVmNetworkAdapterInfo
+{
+    public string AdapterName { get; init; } = string.Empty;
+
+    public string? SwitchName { get; init; }
+
+    public string MacAddress { get; init; } = string.Empty;
+}
+
 public interface IHyperVService
 {
     Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount);
@@ -13,6 +22,9 @@ public interface IHyperVService
     Task<bool> CreateVhdFixedSizeAsync(string vhdPath, long sizeBytes);
     Task<bool> DisableVmCheckpointsAsync(string vmName);
     Task<List<string>> GetVirtualSwitchNamesAsync();
+
+    Task<IReadOnlyList<HyperVVmNetworkAdapterInfo>> GetVmNetworkAdaptersAsync(string vmName)
+        => Task.FromResult<IReadOnlyList<HyperVVmNetworkAdapterInfo>>(Array.Empty<HyperVVmNetworkAdapterInfo>());
     Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName);
 
     async Task<bool> AddVirtualSwitchesToVmAsync(string vmName, IReadOnlyList<string> switchNames)

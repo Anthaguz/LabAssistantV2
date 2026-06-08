@@ -22,6 +22,12 @@ public static class DeploymentStepKeys
     public const string V2StartVm = "v2.start";
     public const string V2GuestTransportReady = "v2.guestTransportReady";
     public const string V2PrepareGuestNetwork = "v2.prepareGuestNetwork";
+    public const string V2PrepareRouterNetwork = "v2.prepareRouterNetwork";
+    public const string V2InstallRouterRemoteAccessFeature = "v2.installRouterRemoteAccessFeature";
+    public const string V2EnableRouterRouting = "v2.enableRouterRouting";
+    public const string V2ConfigureRouterNat = "v2.configureRouterNat";
+    public const string V2ValidateCrossSwitchRouting = "v2.validateCrossSwitchRouting";
+    public const string V2ValidateRouterEgress = "v2.validateRouterEgress";
     public const string V2InstallAdDomainServices = "v2.installAdDomainServices";
     public const string V2PromoteRootDomainController = "v2.promoteRootDomainController";
     public const string V2DomainReady = "v2.domainReady";
