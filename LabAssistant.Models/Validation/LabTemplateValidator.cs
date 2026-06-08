@@ -312,10 +312,26 @@ public static class LabTemplateValidator
             result.Errors.Add($"VM '{vmName}' dependsOn must not contain empty values.");
         }
 
-        if (vm.TopologyRole is "RootDomainController" or "ReplicaDomainController" or "MemberServer" &&
+        if (vm.MembershipMode != null && !V2MembershipModeCatalog.IsSupported(vm.MembershipMode))
+        {
+            result.Errors.Add($"VM '{vmName}' membershipMode must be one of: {string.Join(", ", V2MembershipModeCatalog.SupportedModes)}.");
+        }
+
+        if (vm.TopologyRole is "RootDomainController" or "ReplicaDomainController" &&
             string.IsNullOrWhiteSpace(vm.DomainId))
         {
             result.Errors.Add($"VM '{vmName}' domainId is required for topology role '{vm.TopologyRole}'.");
+        }
+
+        if (V2MembershipModeCatalog.IsDomainMember(vm.MembershipMode) && string.IsNullOrWhiteSpace(vm.DomainId))
+        {
+            result.Errors.Add($"VM '{vmName}' domainId is required when membershipMode is '{V2MembershipModeCatalog.DomainMember}'.");
+        }
+
+        if (string.Equals(vm.TopologyRole, "Router", StringComparison.OrdinalIgnoreCase) &&
+            V2MembershipModeCatalog.IsDomainMember(vm.MembershipMode))
+        {
+            result.Errors.Add($"VM '{vmName}' router topology must use membershipMode '{V2MembershipModeCatalog.Standalone}' in V2.");
         }
 
         ValidateCredentialSlots(vm, result);

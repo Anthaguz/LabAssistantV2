@@ -106,7 +106,7 @@ public sealed class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_RootForestNodes_RunThroughV2RuntimePath()
+    public async Task ExecuteAsync_PostRootDomainProgression_RunsThroughV2RuntimePath()
     {
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         var service = CreateService(new FakeHyperVService(), new FakeGuestCommandExecutor());
@@ -117,6 +117,11 @@ public sealed class V2RuntimeCapabilityServiceTests
         Assert.Contains("vm:vm-dc01:InstallAdDomainServicesFeature", result.ExecutedNodeIds);
         Assert.Contains("vm:vm-dc01:PromoteRootDomainController", result.ExecutedNodeIds);
         Assert.Contains("vm:vm-dc01:DomainReady", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-replica01:PromoteReplicaDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-replica01:ReplicaDomainReady", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-dc01:StabilizeDomainDns", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-member01:JoinDomain", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-member01:JoinedDomainReady", result.ExecutedNodeIds);
     }
 
     [Fact]
@@ -234,6 +239,7 @@ public sealed class V2RuntimeCapabilityServiceTests
         var catalogItems = new List<VhdxCatalogItem>
         {
             CreateCatalogItem("disk-dc", "slot-local"),
+            CreateCatalogItem("disk-replica", "slot-local"),
             CreateCatalogItem("disk-member", "slot-local")
         };
 
@@ -339,16 +345,46 @@ public sealed class V2RuntimeCapabilityServiceTests
 
         template.VmTemplates.Add(new VmTemplate
         {
+            VmId = "vm-replica01",
+            Name = "replica01",
+            MemoryMb = 4096,
+            CpuCount = 2,
+            VhdxId = "disk-replica",
+            TopologyRole = "ReplicaDomainController",
+            DomainId = "domain-contoso",
+            CredentialSlots = new VmCredentialSlotBindings
+            {
+                LocalBootstrap = "slot-local",
+                DomainAdmin = "slot-admin",
+                Dsrm = "slot-dsrm"
+            },
+            Nics =
+            [
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-replica",
+                    NetworkId = "lab-core",
+                    IpAddress = "10.0.0.11",
+                    PrefixLength = 24,
+                    DefaultGateway = "10.0.0.1",
+                    DnsServers = ["10.0.0.10", "8.8.8.8"]
+                }
+            ]
+        });
+
+        template.VmTemplates.Add(new VmTemplate
+        {
             VmId = "vm-member01",
             Name = "member01",
             MemoryMb = 4096,
             CpuCount = 2,
             VhdxId = "disk-member",
-            TopologyRole = "MemberServer",
+            MembershipMode = V2MembershipModeCatalog.DomainMember,
             DomainId = "domain-contoso",
             CredentialSlots = new VmCredentialSlotBindings
             {
                 LocalBootstrap = "slot-local",
+                DomainAdmin = "slot-admin",
                 DomainJoin = "slot-join"
             },
             Nics =
@@ -374,7 +410,7 @@ public sealed class V2RuntimeCapabilityServiceTests
                 MemoryMb = 2048,
                 CpuCount = 2,
                 VhdxId = "disk-standalone",
-                TopologyRole = "StandaloneServer",
+                MembershipMode = V2MembershipModeCatalog.Standalone,
                 CredentialSlots = new VmCredentialSlotBindings
                 {
                     LocalBootstrap = "slot-local"

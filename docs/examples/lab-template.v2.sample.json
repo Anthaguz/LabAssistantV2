@@ -194,6 +194,7 @@
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gui-gen2",
       "topologyRole": "Router",
+      "membershipMode": "Standalone",
       "capabilityRoles": [],
       "credentialSlots": {
         "localBootstrap": "disk.win-server-2025.local-admin"
@@ -221,13 +222,13 @@
       "memoryMb": 4096,
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gui-gen2",
-      "topologyRole": "MemberServer",
+      "membershipMode": "DomainMember",
       "domainId": "domain-contoso",
       "capabilityRoles": [
         "Sql"
       ],
       "dependsOn": [
-        "vm:ContosoDC1:domain-ready"
+        "vm:5aa04c2ad9c5418dbd8213f9f8a0ed7d:StabilizeDomainDns"
       ],
       "credentialSlots": {
         "localBootstrap": "disk.win-server-2025.local-admin",

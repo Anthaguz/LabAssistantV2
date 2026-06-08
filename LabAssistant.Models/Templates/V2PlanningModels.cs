@@ -83,6 +83,8 @@ public sealed class V2ResolvedVmPlanningContext
 
     public string? TopologyRole { get; init; }
 
+    public string? MembershipMode { get; init; }
+
     public string? DomainId { get; init; }
 
     public IReadOnlyList<string> CapabilityRoles { get; init; } = Array.Empty<string>();
@@ -136,16 +138,20 @@ public sealed class V2ResolvedVmNetworkInterface
 public enum V2PlanNodeKind
 {
     ProvisionVm = 0,
-    StartVm = 1,
-    GuestTransportReady = 2,
-    BootstrapGuestNetwork = 3,
-    InstallAdDomainServicesFeature = 4,
-    RouterReady = 5,
-    DomainReady = 6,
-    PromoteRootDomainController = 7,
-    PromoteReplicaDomainController = 8,
-    JoinDomain = 9,
-    ApplyCapabilityRole = 10
+    EnableGuestServices = 1,
+    StartVm = 2,
+    GuestTransportReady = 3,
+    PrepareGuestNetwork = 4,
+    InstallAdDomainServicesFeature = 5,
+    RouterReady = 6,
+    DomainReady = 7,
+    PromoteRootDomainController = 8,
+    PromoteReplicaDomainController = 9,
+    ReplicaDomainReady = 10,
+    StabilizeDomainDns = 11,
+    JoinDomain = 12,
+    JoinedDomainReady = 13,
+    ApplyCapabilityRole = 14
 }
 
 public sealed class V2PlanNode
@@ -172,6 +178,8 @@ public sealed class V2PlanNode
 public sealed class V2VmRoleContext
 {
     public string? TopologyRole { get; init; }
+
+    public string? MembershipMode { get; init; }
 
     public IReadOnlyList<string> CapabilityRoles { get; init; } = Array.Empty<string>();
 }

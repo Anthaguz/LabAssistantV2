@@ -240,6 +240,38 @@ public class LabTemplateValidatorTests
     }
 
     [Fact]
+    public void Validate_V2DomainMemberRequiresDomainId()
+    {
+        var template = new LabTemplate
+        {
+            Id = "lab-v2",
+            Name = "Lab V2",
+            SchemaVersion = "2.0.0",
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning,
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "member01",
+                    MemoryMb = 2048,
+                    CpuCount = 2,
+                    VhdPath = "C:/base.vhdx",
+                    MembershipMode = V2MembershipModeCatalog.DomainMember
+                }
+            ]
+        };
+
+        var result = LabTemplateValidator.Validate(template, []);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("domainId is required when membershipMode is 'DomainMember'", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validate_RejectsEmptySwitchNameValuesInSwitchNames()
     {
         var template = new LabTemplate

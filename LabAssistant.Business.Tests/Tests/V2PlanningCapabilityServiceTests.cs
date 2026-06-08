@@ -130,6 +130,7 @@ public sealed class V2PlanningCapabilityServiceTests
     {
         var result = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]));
         var domainReady = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.DomainReady));
+        var dnsGate = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.StabilizeDomainDns));
         var joinDomain = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.JoinDomain));
         var installAdDs = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.InstallAdDomainServicesFeature));
         var promoteRoot = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.PromoteRootDomainController));
@@ -142,7 +143,57 @@ public sealed class V2PlanningCapabilityServiceTests
             dep.FromNodeId == installAdDs.NodeId &&
             dep.ToNodeId == promoteRoot.NodeId &&
             dep.ReasonCode == V2PlanDependencyReasonCode.RoleOrdering);
-        Assert.True(domainReady.WaveHint < joinDomain.WaveHint);
+        Assert.Contains(result.Dependencies, dep =>
+            dep.FromNodeId == dnsGate.NodeId &&
+            dep.ToNodeId == joinDomain.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+        Assert.True(domainReady.WaveHint < dnsGate.WaveHint);
+        Assert.True(dnsGate.WaveHint < joinDomain.WaveHint);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_ReplicaAndMemberPlan_EmitPostRootNodes()
+    {
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        request.Template.VmTemplates.Insert(1, new VmTemplate
+        {
+            VmId = "vm-replica01",
+            Name = "replica01",
+            MemoryMb = 4096,
+            CpuCount = 2,
+            VhdxId = "disk-replica",
+            TopologyRole = "ReplicaDomainController",
+            DomainId = "domain-contoso",
+            CredentialSlots = new VmCredentialSlotBindings
+            {
+                LocalBootstrap = "slot-local",
+                DomainAdmin = "slot-admin",
+                Dsrm = "slot-dsrm"
+            },
+            Nics =
+            [
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-replica",
+                    NetworkId = "lab-core",
+                    IpAddress = "10.0.0.11",
+                    PrefixLength = 24,
+                    DefaultGateway = "10.0.0.1",
+                    DnsServers = ["10.0.0.10", "8.8.8.8"]
+                }
+            ]
+        });
+        request.CatalogItems = request.CatalogItems.Concat([CreateCatalogItem("disk-replica", "slot-local")]).ToArray();
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.EnableGuestServices);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.PrepareGuestNetwork);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.PromoteReplicaDomainController);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.ReplicaDomainReady);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.StabilizeDomainDns);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.JoinedDomainReady);
     }
 
     [Fact]
@@ -203,7 +254,7 @@ public sealed class V2PlanningCapabilityServiceTests
                 MemoryMb = 4096,
                 CpuCount = 2,
                 VhdxId = "disk-standalone",
-                TopologyRole = "StandaloneServer",
+                MembershipMode = V2MembershipModeCatalog.Standalone,
                 Nics =
                 [
                     new VmNetworkInterfaceTemplate
@@ -282,11 +333,12 @@ public sealed class V2PlanningCapabilityServiceTests
                 MemoryMb = 4096,
                 CpuCount = 2,
                 VhdxId = "disk-member",
-                TopologyRole = "MemberServer",
+                MembershipMode = V2MembershipModeCatalog.DomainMember,
                 DomainId = "domain-contoso",
                 CredentialSlots = new VmCredentialSlotBindings
                 {
                     LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-admin",
                     DomainJoin = "slot-join"
                 },
                 CapabilityRoles = ["Web"],
@@ -375,11 +427,12 @@ public sealed class V2PlanningCapabilityServiceTests
                 MemoryMb = 4096,
                 CpuCount = 2,
                 VhdxId = "disk-member",
-                TopologyRole = "MemberServer",
+                MembershipMode = V2MembershipModeCatalog.DomainMember,
                 DomainId = "domain-contoso",
                 CredentialSlots = new VmCredentialSlotBindings
                 {
                     LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-admin",
                     DomainJoin = "slot-join"
                 },
                 Nics =

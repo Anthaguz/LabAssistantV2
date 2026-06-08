@@ -296,6 +296,7 @@ public class LabTemplateStore : ILabTemplateStore
                 RoleConfig = Clone(vm.RoleConfig),
                 GuestNetworkConfig = Clone(vm.GuestNetworkConfig),
                 TopologyRole = vm.TopologyRole,
+                MembershipMode = vm.MembershipMode,
                 DomainId = vm.DomainId,
                 CapabilityRoles = vm.CapabilityRoles?.ToList(),
                 DependsOn = vm.DependsOn?.ToList(),
