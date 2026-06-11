@@ -30,6 +30,8 @@ public sealed partial class DeployFromTemplateView : UserControl
         DeployStartButton.Click += OnDeployStartRequested;
         DeployV2CredentialSlotsListView.SelectionChanged += OnDeployV2CredentialSlotSelectionChanged;
         DeployV2SaveCredentialSlotButton.Click += OnDeployV2SaveCredentialSlotRequested;
+        DeployV2DisableFirewallCheckBox.Click += OnDeployV2BaseRemoteAccessOptionsChanged;
+        DeployV2DisableRdpNlaCheckBox.Click += OnDeployV2BaseRemoteAccessOptionsChanged;
     }
 
     public event SelectionChangedEventHandler? TemplateSelectionChanged;
@@ -49,6 +51,8 @@ public sealed partial class DeployFromTemplateView : UserControl
     public event SelectionChangedEventHandler? V2CredentialSlotSelectionChanged;
 
     public event RoutedEventHandler? SaveV2CredentialSlotRequested;
+
+    public event RoutedEventHandler? V2BaseRemoteAccessOptionsChanged;
 
     public TemplateLibraryItem? SelectedTemplateLibraryItem
     {
@@ -148,12 +152,24 @@ public sealed partial class DeployFromTemplateView : UserControl
         DeployV2CredentialSlotPasswordBox.Password = string.Empty;
     }
 
+    internal void ApplyV2BaseRemoteAccessState(DeployV2BaseRemoteAccessRow row)
+    {
+        DeployV2EnableRemoteDesktopCheckBox.IsChecked = row.EnableRemoteDesktop;
+        DeployV2SetPrivateNetworkProfileCheckBox.IsChecked = row.SetPrivateNetworkProfile;
+        DeployV2DisableFirewallCheckBox.IsChecked = row.DisableFirewall;
+        DeployV2DisableRdpNlaCheckBox.IsChecked = row.DisableRdpNla;
+    }
+
     internal DeployV2CredentialSlotRow? SelectedV2CredentialSlotRow =>
         DeployV2CredentialSlotsListView.SelectedItem as DeployV2CredentialSlotRow;
 
     public string V2CredentialSlotUsername => DeployV2CredentialSlotUsernameTextBox.Text;
 
     public string V2CredentialSlotPassword => DeployV2CredentialSlotPasswordBox.Password;
+
+    public bool V2DisableFirewall => DeployV2DisableFirewallCheckBox.IsChecked == true;
+
+    public bool V2DisableRdpNla => DeployV2DisableRdpNlaCheckBox.IsChecked == true;
 
     public void SetResultsPanelLauncherState(string buttonText, bool isEnabled, string summaryText)
     {
@@ -205,5 +221,10 @@ public sealed partial class DeployFromTemplateView : UserControl
     private void OnDeployV2SaveCredentialSlotRequested(object sender, RoutedEventArgs e)
     {
         SaveV2CredentialSlotRequested?.Invoke(this, e);
+    }
+
+    private void OnDeployV2BaseRemoteAccessOptionsChanged(object sender, RoutedEventArgs e)
+    {
+        V2BaseRemoteAccessOptionsChanged?.Invoke(this, e);
     }
 }

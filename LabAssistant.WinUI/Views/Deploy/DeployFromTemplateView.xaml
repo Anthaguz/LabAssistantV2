@@ -156,6 +156,38 @@
                                 BorderBrush="{StaticResource ShellBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6">
+                                <StackPanel Spacing="8">
+                                    <TextBlock
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        FontWeight="SemiBold"
+                                        Text="Base Remote Access" />
+                                    <TextBlock
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="Legacy script defaults are enabled for this V2 deploy unless you change them here."
+                                        TextWrapping="Wrap" />
+                                    <CheckBox
+                                        x:Name="DeployV2EnableRemoteDesktopCheckBox"
+                                        Content="Enable Remote Desktop"
+                                        IsEnabled="False" />
+                                    <CheckBox
+                                        x:Name="DeployV2SetPrivateNetworkProfileCheckBox"
+                                        Content="Set network profile to Private"
+                                        IsEnabled="False" />
+                                    <CheckBox
+                                        x:Name="DeployV2DisableFirewallCheckBox"
+                                        Content="Disable Windows Firewall" />
+                                    <CheckBox
+                                        x:Name="DeployV2DisableRdpNlaCheckBox"
+                                        Content="Disable RDP NLA" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border
+                                Padding="10"
+                                Background="{StaticResource ShellBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
                                 <StackPanel Spacing="6">
                                     <TextBlock
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"

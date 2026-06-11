@@ -122,6 +122,9 @@ public sealed class V2RuntimeCapabilityServiceTests
         Assert.Contains("vm:vm-dc01:StabilizeDomainDns", result.ExecutedNodeIds);
         Assert.Contains("vm:vm-member01:JoinDomain", result.ExecutedNodeIds);
         Assert.Contains("vm:vm-member01:JoinedDomainReady", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-dc01:ConfigureBaseRemoteAccess", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-dc01:BaseRemoteAccessReady", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-member01:ConfigureBaseRemoteAccess", result.ExecutedNodeIds);
     }
 
     [Fact]
@@ -220,6 +223,41 @@ public sealed class V2RuntimeCapabilityServiceTests
         Assert.False(result.Success);
         Assert.Equal(DeploymentOperationState.Cancelled, result.DeploymentContext.OperationState);
         Assert.Contains(result.DeploymentContext.VmContexts, vm => vm.VmName == "dc01" && vm.WasCancelled);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BaseRemoteAccess_UsesDeployTimeOptions()
+    {
+        var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: false);
+        request.BaseRemoteAccessOptions = new V2BaseRemoteAccessOptions
+        {
+            EnableRemoteDesktop = true,
+            SetPrivateNetworkProfile = true,
+            DisableFirewall = false,
+            DisableRdpNla = false
+        };
+
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        var remoteAccessScript = scripts.First(entry =>
+            entry.VmName == "dc01" &&
+            entry.Script.Contains("Base remote access configured", StringComparison.Ordinal));
+        Assert.DoesNotContain("advfirewall", remoteAccessScript.Script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SetUserAuthenticationRequired", remoteAccessScript.Script, StringComparison.Ordinal);
+        Assert.Contains("fDenyTSConnections", remoteAccessScript.Script, StringComparison.Ordinal);
+        Assert.Contains("Set-NetConnectionProfile", remoteAccessScript.Script, StringComparison.Ordinal);
     }
 
     private static IV2RuntimeCapabilityService CreateService(

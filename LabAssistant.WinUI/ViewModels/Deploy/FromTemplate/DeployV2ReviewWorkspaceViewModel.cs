@@ -35,6 +35,8 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
 
     public bool CanStartDeploy { get; private set; }
 
+    public DeployV2BaseRemoteAccessRow BaseRemoteAccess { get; private set; } = CreateDefaultBaseRemoteAccess();
+
     public IReadOnlyDictionary<string, V2RuntimeCredential> ResolvedCredentialSlotValues { get; private set; } =
         new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase);
 
@@ -51,6 +53,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         SelectedCredentialSlotKey = string.Empty;
         SelectedCredentialSlotPurpose = "Select a slot below to create or update its local value.";
         SelectedCredentialSlotUsername = string.Empty;
+        BaseRemoteAccess = CreateDefaultBaseRemoteAccess();
         ClearRows();
     }
 
@@ -123,6 +126,26 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         BlockerRows.Add(new DeployV2BlockerRow("Block", "Global", message));
     }
 
+    public void UpdateBaseRemoteAccessOptions(bool disableFirewall, bool disableRdpNla)
+    {
+        BaseRemoteAccess = BaseRemoteAccess with
+        {
+            DisableFirewall = disableFirewall,
+            DisableRdpNla = disableRdpNla
+        };
+    }
+
+    public V2BaseRemoteAccessOptions CreateBaseRemoteAccessOptions()
+    {
+        return new V2BaseRemoteAccessOptions
+        {
+            EnableRemoteDesktop = BaseRemoteAccess.EnableRemoteDesktop,
+            SetPrivateNetworkProfile = BaseRemoteAccess.SetPrivateNetworkProfile,
+            DisableFirewall = BaseRemoteAccess.DisableFirewall,
+            DisableRdpNla = BaseRemoteAccess.DisableRdpNla
+        };
+    }
+
     public void SelectCredentialSlot(string? slotKey)
     {
         if (string.IsNullOrWhiteSpace(slotKey))
@@ -164,4 +187,11 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
             target.Add(item);
         }
     }
+
+    private static DeployV2BaseRemoteAccessRow CreateDefaultBaseRemoteAccess()
+        => new(
+            EnableRemoteDesktop: true,
+            SetPrivateNetworkProfile: true,
+            DisableFirewall: true,
+            DisableRdpNla: true);
 }

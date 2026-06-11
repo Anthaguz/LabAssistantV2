@@ -84,6 +84,7 @@ internal sealed class DeployV2ReviewWorkspaceController
             template,
             _workspace.CurrentPlan,
             _workspace.ResolvedCredentialSlotValues,
+            _workspace.CreateBaseRemoteAccessOptions(),
             new MultiVmDeploymentContext());
     }
 
@@ -121,6 +122,7 @@ internal interface IDeployFromTemplateV2ReviewHost
         LabTemplate template,
         V2PlanBuildResult plan,
         IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        V2BaseRemoteAccessOptions baseRemoteAccessOptions,
         MultiVmDeploymentContext deploymentContext);
 
     void ApplyWorkspaceState();

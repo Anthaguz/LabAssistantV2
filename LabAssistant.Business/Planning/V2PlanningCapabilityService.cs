@@ -651,6 +651,12 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 state.Nodes[V2PlanNodeKind.PrepareGuestNetwork] = AddNode(nodes, state, V2PlanNodeKind.PrepareGuestNetwork, "Prepare guest network", V2WorkloadClass.MediumGuest);
             }
 
+            if (state.RequiresGuestWork)
+            {
+                state.Nodes[V2PlanNodeKind.ConfigureBaseRemoteAccess] = AddNode(nodes, state, V2PlanNodeKind.ConfigureBaseRemoteAccess, "Configure base remote access", V2WorkloadClass.MediumGuest);
+                state.Nodes[V2PlanNodeKind.BaseRemoteAccessReady] = AddNode(nodes, state, V2PlanNodeKind.BaseRemoteAccessReady, "Base remote access ready", V2WorkloadClass.LightWaitValidation);
+            }
+
             if (state.TopologyRoleIs("RootDomainController") || state.TopologyRoleIs("ReplicaDomainController"))
             {
                 state.Nodes[V2PlanNodeKind.InstallAdDomainServicesFeature] = AddNode(nodes, state, V2PlanNodeKind.InstallAdDomainServicesFeature, "Install AD DS feature", V2WorkloadClass.HeavyGuest);
@@ -730,6 +736,9 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ProvisionVm), state.TryGetNode(V2PlanNodeKind.StartVm), V2PlanDependencyReasonCode.VmLifecycle, "VM must be provisioned before it can start.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.StartVm), state.TryGetNode(V2PlanNodeKind.GuestTransportReady), V2PlanDependencyReasonCode.VmLifecycle, "Guest transport requires a started VM.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.GuestTransportReady), state.TryGetNode(V2PlanNodeKind.PrepareGuestNetwork), V2PlanDependencyReasonCode.VmLifecycle, "Guest networking preparation requires guest transport.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PrepareGuestNetwork), state.TryGetNode(V2PlanNodeKind.ConfigureBaseRemoteAccess), V2PlanDependencyReasonCode.RoleOrdering, "Base remote access waits for guest network preparation.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.GuestTransportReady), state.TryGetNode(V2PlanNodeKind.ConfigureBaseRemoteAccess), V2PlanDependencyReasonCode.RoleOrdering, "Base remote access waits for guest transport.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ConfigureBaseRemoteAccess), state.TryGetNode(V2PlanNodeKind.BaseRemoteAccessReady), V2PlanDependencyReasonCode.RoleOrdering, "Base remote access readiness follows configuration.", dependencies);
 
             var guestAnchor = state.TryGetNode(V2PlanNodeKind.PrepareGuestNetwork) ??
                               state.TryGetNode(V2PlanNodeKind.GuestTransportReady) ??
@@ -744,6 +753,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ValidateCrossSwitchRouting), state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness waits for cross-switch validation.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ValidateRouterEgress), state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness waits for egress validation.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.ConfigureRouterNat), state.TryGetNode(V2PlanNodeKind.RouterReady), V2PlanDependencyReasonCode.RoleOrdering, "Router readiness waits for NAT configuration.", dependencies);
+            AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.RouterReady), state.TryGetNode(V2PlanNodeKind.ConfigureBaseRemoteAccess), V2PlanDependencyReasonCode.RoleOrdering, "Router base remote access waits for router readiness.", dependencies);
             AddDependencyIfPresent(guestAnchor, state.TryGetNode(V2PlanNodeKind.InstallAdDomainServicesFeature), V2PlanDependencyReasonCode.RoleOrdering, "AD DS feature installation requires guest bootstrap.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.InstallAdDomainServicesFeature), state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), V2PlanDependencyReasonCode.RoleOrdering, "Root promotion requires AD DS feature installation.", dependencies);
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.PromoteRootDomainController), state.TryGetNode(V2PlanNodeKind.DomainReady), V2PlanDependencyReasonCode.DomainRequired, "Domain readiness follows root domain-controller promotion.", dependencies);
@@ -930,6 +940,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             V2PlanNodeKind.StartVm => 30 + roleOffset,
             V2PlanNodeKind.GuestTransportReady => 40 + roleOffset,
             V2PlanNodeKind.PrepareGuestNetwork => 50 + roleOffset,
+            V2PlanNodeKind.ConfigureBaseRemoteAccess => 120 + roleOffset,
+            V2PlanNodeKind.BaseRemoteAccessReady => 121 + roleOffset,
             V2PlanNodeKind.PrepareRouterNetwork => 52 + roleOffset,
             V2PlanNodeKind.InstallRouterRemoteAccessFeature => 54 + roleOffset,
             V2PlanNodeKind.EnableRouterRouting => 56 + roleOffset,
@@ -1336,6 +1348,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
         public V2PlanNode? GetCompletionAnchor()
             => TryGetNode(V2PlanNodeKind.DomainReady) ??
+               TryGetNode(V2PlanNodeKind.BaseRemoteAccessReady) ??
                TryGetNode(V2PlanNodeKind.JoinedDomainReady) ??
                TryGetNode(V2PlanNodeKind.StabilizeDomainDns) ??
                TryGetNode(V2PlanNodeKind.ReplicaDomainReady) ??

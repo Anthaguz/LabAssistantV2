@@ -18,6 +18,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly IGuestCommandExecutor _guestCommandExecutor;
     private readonly V2RootForestRuntimeCoordinator _rootForestRuntimeCoordinator;
     private readonly V2DomainProgressionRuntimeCoordinator _domainProgressionRuntimeCoordinator;
+    private readonly V2BaseRemoteAccessRuntimeCoordinator _baseRemoteAccessRuntimeCoordinator;
     private readonly V2RouterRuntimeCoordinator _routerRuntimeCoordinator;
     private readonly IVmCleanupOrchestrator _cleanupOrchestrator;
     private readonly IStructuredLogger _structuredLogger;
@@ -34,6 +35,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         _guestCommandExecutor = guestCommandExecutor;
         _rootForestRuntimeCoordinator = new V2RootForestRuntimeCoordinator(guestCommandExecutor);
         _domainProgressionRuntimeCoordinator = new V2DomainProgressionRuntimeCoordinator(guestCommandExecutor);
+        _baseRemoteAccessRuntimeCoordinator = new V2BaseRemoteAccessRuntimeCoordinator(guestCommandExecutor);
         _routerRuntimeCoordinator = new V2RouterRuntimeCoordinator(guestCommandExecutor);
         _cleanupOrchestrator = cleanupOrchestrator;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
@@ -265,6 +267,24 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.ValidateRouterEgress, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(routerStates, V2PlanNodeKind.RouterReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecutePostRootDomainProgressionAsync(rootStates, nonRootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteBaseRemoteAccessStageAsync(rootStates.Concat(nonRootStates).ToList(), request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+    }
+
+    private async Task ExecuteBaseRemoteAccessStageAsync(
+        IReadOnlyList<RuntimeVmState> states,
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        ISet<string> executedNodeIds,
+        ISet<string> deferredNodeIds,
+        CancellationToken cancellationToken)
+    {
+        if (states.Count == 0)
+        {
+            return;
+        }
+
+        await ExecuteNodeSetAsync(states, V2PlanNodeKind.ConfigureBaseRemoteAccess, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(states, V2PlanNodeKind.BaseRemoteAccessReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
     }
 
     private async Task ExecuteNonRootPreparationConservativeAsync(
@@ -484,6 +504,28 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     DeploymentStepKeys.V2PrepareGuestNetwork,
                     "Prepare guest network",
                     context => PrepareGuestNetworkAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.ConfigureBaseRemoteAccess:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2ConfigureBaseRemoteAccess,
+                    "Configure base remote access",
+                    context => ConfigureBaseRemoteAccessAsync(state, request, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.BaseRemoteAccessReady:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2BaseRemoteAccessReady,
+                    "Base remote access ready",
+                    _ => Task.CompletedTask,
                     multiContext,
                     cancellationToken);
                 executedNodeIds.Add(node.NodeId);
@@ -772,6 +814,37 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             context.MarkFailure(
                 DeploymentStepKeys.V2PrepareGuestNetwork,
                 $"Failed to prepare guest network on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    private async Task ConfigureBaseRemoteAccessAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var credential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2ConfigureBaseRemoteAccess,
+            "bootstrap");
+        if (credential is null)
+        {
+            return;
+        }
+
+        var result = await _baseRemoteAccessRuntimeCoordinator.ConfigureBaseRemoteAccessAsync(
+            context.VmName,
+            credential,
+            request.BaseRemoteAccessOptions,
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2ConfigureBaseRemoteAccess,
+                $"Failed to configure base remote access on '{context.VmName}'. {result.Error}".Trim());
         }
     }
 

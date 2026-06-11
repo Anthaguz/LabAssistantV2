@@ -116,6 +116,7 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         LabTemplate template,
         V2PlanBuildResult plan,
         IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        V2BaseRemoteAccessOptions baseRemoteAccessOptions,
         MultiVmDeploymentContext deploymentContext)
     {
         return await _v2RuntimeCapabilityService.ExecuteAsync(new V2RuntimeExecutionRequest
@@ -124,6 +125,7 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
             Plan = plan,
             Settings = DeploymentSettings,
             CredentialSlotValues = credentialSlotValues,
+            BaseRemoteAccessOptions = baseRemoteAccessOptions,
             DeploymentContext = deploymentContext
         });
     }
