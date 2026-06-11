@@ -10,13 +10,16 @@ using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
-internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost, IDeployFromTemplateLane
+internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTemplateWorkspaceControllerHost, IDeployFromTemplateLane,
+    IDeployFromTemplateV2ReviewHost
 {
     private readonly DeployFromTemplateView _view;
     private readonly DeployFromTemplateRightPanelView _rightPanelView;
     private readonly IDeployFromTemplateCompositionHost _host;
     private readonly DeployFromTemplateWorkspaceViewModel _workspace = new();
     private readonly DeployFromTemplateWorkspaceController _controller;
+    private readonly DeployV2ReviewWorkspaceViewModel _v2ReviewWorkspace = new();
+    private readonly DeployV2ReviewWorkspaceController _v2ReviewController;
     private readonly List<DeployCompatibilityIssue> _compatibilityIssues = [];
     private DeploymentReadinessReport? _readinessReport;
     private bool _isLoadingTemplates;
@@ -31,9 +34,17 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _rightPanelView = rightPanelView;
         _host = host;
         _controller = new DeployFromTemplateWorkspaceController(_workspace, this);
+        _v2ReviewController = new DeployV2ReviewWorkspaceController(
+            _v2ReviewWorkspace,
+            new DeployV2ReviewProjectionService(),
+            this);
         _view.SetTemplateItemsSource(templateItemsSource);
         _view.SetTemplateSelectorDisplayMemberPath(nameof(TemplateLibraryItem.Name));
         _view.SetSharedIssueSummariesItemsSource(_workspace.SharedIssueSummaries);
+        _view.SetV2BlockersItemsSource(_v2ReviewWorkspace.BlockerRows);
+        _view.SetV2CredentialSlotsItemsSource(_v2ReviewWorkspace.CredentialSlotRows);
+        _view.SetV2WavesItemsSource(_v2ReviewWorkspace.WaveRows);
+        _view.SetV2DiagnosticsItemsSource(_v2ReviewWorkspace.DiagnosticRows);
         _rightPanelView.SetIssueRowsItemsSource(_workspace.IssueRows);
         _rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);
         _rightPanelView.ResetPanelState();
@@ -51,7 +62,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     public bool IsLoadingTemplates => _isLoadingTemplates;
 
-    public bool IsEvaluatingReadiness => _workspace.IsEvaluatingReadiness;
+    public bool IsEvaluatingReadiness => _workspace.IsEvaluatingReadiness || _v2ReviewWorkspace.IsPlanning;
 
     public bool IsStarting => _workspace.IsStarting;
 
@@ -80,13 +91,23 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _rightPanelView.ResetPanelState();
     }
 
-    public Task EvaluateReadinessAsync(DeploymentPreflightMode mode) => _controller.EvaluateReadinessAsync(mode);
+    public Task EvaluateReadinessAsync(DeploymentPreflightMode mode)
+    {
+        return IsActiveTemplateV2()
+            ? EvaluateV2PlanAsync()
+            : _controller.EvaluateReadinessAsync(mode);
+    }
 
     public Task EnsureTemplatesLoadedAsync(bool forceRefresh) => LoadTemplatesAsync(forceRefresh);
 
     public void RefreshUi() => UpdateUi();
 
-    public Task StartDeployAsync() => _controller.StartDeployAsync();
+    public Task StartDeployAsync()
+    {
+        return IsActiveTemplateV2()
+            ? StartV2DeployAsync()
+            : _controller.StartDeployAsync();
+    }
 
     public void SetSelectedTemplateLibraryItem(TemplateLibraryItem? selectedTemplateLibraryItem)
     {
@@ -97,6 +118,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
     public void ClearSelection(string actionStatusText)
     {
         _workspace.ClearSelection(actionStatusText);
+        _v2ReviewWorkspace.Hide();
         UpdateUi();
     }
 
@@ -109,6 +131,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
     public void SetSelectionLoadFailed(string actionStatusText)
     {
         _workspace.SetSelectionLoadFailed(actionStatusText);
+        _v2ReviewWorkspace.Hide();
         UpdateUi();
     }
 
@@ -170,18 +193,22 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
     public void SetInteractionState(bool isLoadingTemplates, bool hasBlockingFailures)
     {
         var hasTemplate = _workspace.ActiveTemplateDocument is not null;
+        var isV2Template = IsActiveTemplateV2();
+        _view.SetEvaluateButtonText(isV2Template ? "Refresh V2 Plan" : "Review Readiness");
         _view.SetInteractionState(
             isTemplateSelectorEnabled: !isLoadingTemplates && !_workspace.IsStarting,
             isReloadEnabled: !isLoadingTemplates && !_workspace.IsStarting,
-            isEvaluateReadinessEnabled: hasTemplate && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting,
-            isResolveSuggestionsEnabled: hasTemplate && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting,
+            isEvaluateReadinessEnabled: hasTemplate && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting && !_v2ReviewWorkspace.IsPlanning,
+            isResolveSuggestionsEnabled: hasTemplate && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting && !_v2ReviewWorkspace.IsPlanning,
             isOpenTemplateEditorEnabled: _workspace.SelectedTemplateLibraryItem is not null && !_workspace.IsStarting,
-            isStartDeployEnabled: hasTemplate && !hasBlockingFailures && !_workspace.IsEvaluatingReadiness && !_workspace.IsStarting);
+            isStartDeployEnabled: hasTemplate &&
+                                  !isLoadingTemplates &&
+                                  !_workspace.IsEvaluatingReadiness &&
+                                  !_workspace.IsStarting &&
+                                  !_v2ReviewWorkspace.IsPlanning &&
+                                  (isV2Template ? _v2ReviewWorkspace.CanStartDeploy : !hasBlockingFailures));
     }
 
-    /// <summary>
-    /// Applies the From Template lane-specific right-panel state while the shell retains the shared panel container and sizing mechanics.
-    /// </summary>
     public void ApplyResultsPanelState(bool isActive, bool showPanel, bool panelUnavailable)
     {
         _rightPanelView.Visibility = isActive && showPanel ? Visibility.Visible : Visibility.Collapsed;
@@ -201,6 +228,8 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
     AppSettings IDeployFromTemplateWorkspaceControllerHost.DeploymentSettings => _host.DeploymentSettings;
 
     IReadOnlyList<string> IDeployFromTemplateWorkspaceControllerHost.AvailableSwitches => _host.AvailableSwitches;
+
+    IReadOnlyList<V2AvailableSwitchInfo> IDeployFromTemplateWorkspaceControllerHost.AvailableSwitchInfo => _host.AvailableSwitchInfo;
 
     TemplateEditorDocument? IDeployFromTemplateWorkspaceControllerHost.ActiveTemplateDocument => _workspace.ActiveTemplateDocument;
 
@@ -238,6 +267,32 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => UpdateUi();
 
+    TemplateEditorDocument? IDeployFromTemplateV2ReviewHost.ActiveTemplateDocument => _workspace.ActiveTemplateDocument;
+
+    Task IDeployFromTemplateV2ReviewHost.EnsureReferenceDataAsync(bool forceRefresh) => _host.EnsureReferenceDataAsync(forceRefresh);
+
+    IReadOnlyList<LocalCredentialSlotDefinition> IDeployFromTemplateV2ReviewHost.LoadLocalCredentialSlotDefinitions() =>
+        _host.LoadLocalCredentialSlotDefinitions();
+
+    bool IDeployFromTemplateV2ReviewHost.TryGetLocalCredentialSlotValue(string slotKey, out V2RuntimeCredential credential) =>
+        _host.TryGetLocalCredentialSlotValue(slotKey, out credential);
+
+    void IDeployFromTemplateV2ReviewHost.UpsertLocalCredentialSlot(string slotKey, string username, string password) =>
+        _host.UpsertLocalCredentialSlot(slotKey, username, password);
+
+    Task<V2PlanBuildResult> IDeployFromTemplateV2ReviewHost.BuildV2PlanAsync(
+        LabTemplate template,
+        IReadOnlyCollection<string> resolvedCredentialSlotKeys) => _host.BuildV2PlanAsync(template, resolvedCredentialSlotKeys);
+
+    Task<V2RuntimeExecutionResult> IDeployFromTemplateV2ReviewHost.ExecuteV2DeployAsync(
+        LabTemplate template,
+        V2PlanBuildResult plan,
+        IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        MultiVmDeploymentContext deploymentContext) =>
+        _host.ExecuteV2DeployAsync(template, plan, credentialSlotValues, deploymentContext);
+
+    void IDeployFromTemplateV2ReviewHost.ApplyWorkspaceState() => UpdateUi();
+
     private void WireHandlers()
     {
         _view.ReloadTemplatesRequested += async (_, _) => await EnsureTemplatesLoadedAsync(forceRefresh: true);
@@ -247,6 +302,8 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _view.StartDeployRequested += async (_, _) => await StartDeployAsync();
         _view.TemplateSelectionChanged += async (_, _) => await HandleTemplateSelectionChangedAsync();
         _view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();
+        _view.V2CredentialSlotSelectionChanged += (_, _) => _v2ReviewController.SelectCredentialSlot(_view.SelectedV2CredentialSlotRow?.SlotKey);
+        _view.SaveV2CredentialSlotRequested += async (_, _) => await SaveSelectedCredentialSlotAsync();
     }
 
     private async Task ResolveSuggestionsAsync()
@@ -299,6 +356,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
             _workspace.ClearSelection("No template selected.");
             _readinessReport = null;
             _compatibilityIssues.Clear();
+            _v2ReviewWorkspace.Hide();
             _workspace.SetWorkflowState(
                 isEvaluatingReadiness: false,
                 isStarting: false,
@@ -315,21 +373,24 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
             var document = await _host.LoadTemplateForEditorAsync(selectedTemplate.FilePath);
             _workspace.SetLoadedTemplateDocument(
                 document,
-                $"Loaded '{selectedTemplate.Name}' for deploy readiness.");
+                $"Loaded '{selectedTemplate.Name}' for deploy review.");
             _workspace.SetWorkflowState(
                 isEvaluatingReadiness: false,
                 isStarting: false,
                 lifecycleState: "Ready",
                 progressPercent: 0,
                 progressSummary: $"Template '{selectedTemplate.Name}' loaded.");
+            _readinessReport = null;
+            _compatibilityIssues.Clear();
             UpdateUi();
-            await _controller.EvaluateReadinessAsync(DeploymentPreflightMode.Quick);
+            await EvaluateReadinessAsync(DeploymentPreflightMode.Quick);
         }
         catch (Exception ex)
         {
             _workspace.SetSelectionLoadFailed($"Failed to load selected template. {ex.Message}");
             _readinessReport = null;
             _compatibilityIssues.Clear();
+            _v2ReviewWorkspace.Hide();
             _workspace.SetWorkflowState(
                 isEvaluatingReadiness: false,
                 isStarting: false,
@@ -369,6 +430,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
                 _workspace.ClearSelection("No templates available for deploy.");
                 _readinessReport = null;
                 _compatibilityIssues.Clear();
+                _v2ReviewWorkspace.Hide();
                 _workspace.SetWorkflowState(
                     isEvaluatingReadiness: false,
                     isStarting: false,
@@ -410,21 +472,167 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         }
     }
 
+    private async Task EvaluateV2PlanAsync()
+    {
+        if (_workspace.ActiveTemplateDocument is null)
+        {
+            _workspace.SetActionStatus("Select a template first.");
+            UpdateUi();
+            return;
+        }
+
+        _workspace.SetWorkflowState(
+            isEvaluatingReadiness: false,
+            isStarting: false,
+            lifecycleState: "Evaluating",
+            progressPercent: 20,
+            progressSummary: "Reviewing V2 deployment plan...");
+        _workspace.SetActionStatus("Building V2 plan and review state...");
+        await _v2ReviewController.RefreshPlanAsync(_workspace.ActiveTemplateDocument.Template);
+        _workspace.SetWorkflowState(
+            isEvaluatingReadiness: false,
+            isStarting: false,
+            lifecycleState: _v2ReviewWorkspace.CanStartDeploy ? "Ready" : "Blocked",
+            progressPercent: _v2ReviewWorkspace.CanStartDeploy ? 35 : 25,
+            progressSummary: _v2ReviewWorkspace.StatusText);
+        UpdateUi();
+    }
+
+    private async Task SaveSelectedCredentialSlotAsync()
+    {
+        await _v2ReviewController.SaveCredentialSlotAsync(_view.V2CredentialSlotUsername, _view.V2CredentialSlotPassword);
+        _workspace.SetActionStatus("Saved local credential slot and refreshed the V2 plan.");
+        UpdateUi();
+    }
+
+    private async Task StartV2DeployAsync()
+    {
+        var activeTemplateDocument = _workspace.ActiveTemplateDocument;
+        if (activeTemplateDocument is null)
+        {
+            _workspace.SetActionStatus("Select a template first.");
+            return;
+        }
+
+        if (_v2ReviewWorkspace.CurrentPlan is null || !_v2ReviewWorkspace.CanStartDeploy)
+        {
+            await EvaluateV2PlanAsync();
+            if (_v2ReviewWorkspace.CurrentPlan is null || !_v2ReviewWorkspace.CanStartDeploy)
+            {
+                _workspace.SetActionStatus("V2 deploy is blocked until review items are resolved.");
+                UpdateUi();
+                return;
+            }
+        }
+
+        var plan = _v2ReviewWorkspace.CurrentPlan;
+        var deploymentContext = new MultiVmDeploymentContext();
+        _workspace.SetShowAllVmRows(true);
+        _workspace.ClearResultRows();
+        _workspace.InitializeProgressRows(plan);
+        _host.AttachProgressCallbacks(
+            deploymentContext,
+            (vmName, message) =>
+            {
+                _workspace.UpdateProgressMessage(vmName, message);
+                UpdateUi();
+            },
+            (vmName, update) =>
+            {
+                _workspace.ApplyProgressUpdate(vmName, update);
+                UpdateUi();
+            });
+        _workspace.SetWorkflowState(
+            isEvaluatingReadiness: false,
+            isStarting: true,
+            lifecycleState: "Running",
+            progressPercent: 60,
+            progressSummary: $"Running V2 deployment for {plan.Context.Vms.Count} VM(s)...");
+        _workspace.SetActionStatus("Starting V2 deployment...");
+        UpdateUi();
+
+        try
+        {
+            var result = await _host.ExecuteV2DeployAsync(
+                activeTemplateDocument.Template,
+                plan,
+                _v2ReviewWorkspace.ResolvedCredentialSlotValues,
+                deploymentContext);
+
+            var issueRows = result.BlockingMessages
+                .Select(message => new DeployIssueRow("Global", "Block", message))
+                .ToList();
+            if (issueRows.Count > 0)
+            {
+                _workspace.ReplaceIssueRows(issueRows);
+            }
+
+            _workspace.SetWorkflowState(
+                isEvaluatingReadiness: false,
+                isStarting: true,
+                lifecycleState: result.Success ? "Completed" : deploymentContext.IsCancellationRequested ? "Cancelled" : "Failed",
+                progressPercent: 100,
+                progressSummary: result.Success
+                    ? "V2 deployment completed."
+                    : result.BlockingMessages.Count > 0
+                        ? string.Join(" ", result.BlockingMessages)
+                        : "V2 deployment finished with failures.");
+            _workspace.SetActionStatus(
+                result.Success
+                    ? "V2 deployment finished successfully."
+                    : "V2 deployment finished with blocking issues. Review the results panel and blockers.");
+        }
+        catch (Exception ex)
+        {
+            _workspace.SetWorkflowState(
+                isEvaluatingReadiness: false,
+                isStarting: true,
+                lifecycleState: "Failed",
+                progressPercent: 100,
+                progressSummary: "V2 deployment failed.");
+            _workspace.SetActionStatus($"V2 deploy failed. {ex.Message}");
+        }
+        finally
+        {
+            _workspace.SetWorkflowState(
+                isEvaluatingReadiness: false,
+                isStarting: false,
+                lifecycleState: _workspace.LifecycleState,
+                progressPercent: _workspace.ProgressPercent,
+                progressSummary: _workspace.ProgressSummary);
+            UpdateUi();
+        }
+    }
+
     private void UpdateUi()
     {
         var activeTemplateDocument = _workspace.ActiveTemplateDocument;
-        var hasBlockingFailures = _compatibilityIssues.Any(issue => issue.IsBlocking) ||
-                                  (_readinessReport?.HasBlockingFailures ?? false);
+        var isV2Template = IsActiveTemplateV2();
+        var hasBlockingFailures = isV2Template
+            ? _v2ReviewWorkspace.HasBlockingItems
+            : _compatibilityIssues.Any(issue => issue.IsBlocking) || (_readinessReport?.HasBlockingFailures ?? false);
 
         SetInteractionState(_isLoadingTemplates || _host.IsTemplatesLoading, hasBlockingFailures);
         _workspace.RefreshReviewState(hasBlockingFailures);
 
         if (activeTemplateDocument is null)
         {
+            _v2ReviewWorkspace.Hide();
             _workspace.SetReadinessSummary("Select a template to evaluate readiness and run deploy.");
             _workspace.ClearGroupedIssueState();
             _workspace.RefreshResultRows(_compatibilityIssues, _readinessReport);
-            UpdateIssueRows();
+            ApplyWorkspaceState();
+            _host.RefreshResultsPanelState();
+            return;
+        }
+
+        if (isV2Template)
+        {
+            _workspace.SetReadinessSummary(_v2ReviewWorkspace.StatusText);
+            _workspace.ReplaceIssueRows(_v2ReviewWorkspace.BlockerRows
+                .Select(row => new DeployIssueRow(row.Scope, row.Severity, row.Message))
+                .ToList());
+            _workspace.RefreshResultRows([], null);
             ApplyWorkspaceState();
             _host.RefreshResultsPanelState();
             return;
@@ -491,5 +699,21 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
             _workspace.LifecycleState,
             _workspace.ProgressPercent,
             _workspace.ProgressSummary));
+        _view.ApplyV2ReviewState(_v2ReviewWorkspace.IsVisible, _v2ReviewWorkspace.StatusText, _v2ReviewWorkspace.PlanSummary);
+        _view.ApplyV2CredentialEditorState(_v2ReviewWorkspace.SelectedCredentialSlotPurpose, _v2ReviewWorkspace.SelectedCredentialSlotUsername);
+    }
+
+    private bool IsActiveTemplateV2()
+    {
+        var template = _workspace.ActiveTemplateDocument?.Template;
+        if (template is null)
+        {
+            return false;
+        }
+
+        var engine = template.ExecutionEngine != TemplateExecutionEngine.Unknown
+            ? template.ExecutionEngine
+            : TemplateSchemaVersionCatalog.Classify(template.SchemaVersion);
+        return engine == TemplateExecutionEngine.V2UnifiedPlanning;
     }
 }

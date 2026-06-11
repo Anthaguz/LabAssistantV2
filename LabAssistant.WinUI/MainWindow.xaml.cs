@@ -8,6 +8,8 @@ using LabAssistant.Business.Assets;
 using LabAssistant.Business.Machines;
 using LabAssistant.Services.Logging;
 using LabAssistant.Business.Templates;
+using LabAssistant.Business.Planning;
+using LabAssistant.Business.Runtime;
 using LabAssistant.Models.Templates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -25,6 +27,7 @@ using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Machines;
 using LabAssistant.WinUI.Interop;
+using LabAssistant.Services.HyperV;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media.Imaging;
 using WinRT.Interop;
@@ -371,13 +374,18 @@ public sealed partial class MainWindow : Window
         var deploymentCoordinator = App.Services.GetRequiredService<IDeploymentCoordinator>();
         var deploymentOutcomeSummaryBuilder = App.Services.GetRequiredService<IDeploymentOutcomeSummaryBuilder>();
         var settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
+        var localCredentialSlotStore = App.Services.GetRequiredService<ILocalCredentialSlotStore>();
         var vhdxCatalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
+        var v2PlanningCapabilityService = App.Services.GetRequiredService<IV2PlanningCapabilityService>();
+        var v2RuntimeCapabilityService = App.Services.GetRequiredService<IV2RuntimeCapabilityService>();
+        var hyperVMachineAdminService = App.Services.GetRequiredService<IHyperVMachineAdminService>();
 
         var referenceDataService = new DeployReferenceDataService(
             settingsStore,
             vhdxCatalogStore,
             _machinesCapabilityService,
-            _templatesCapabilityService);
+            _templatesCapabilityService,
+            hyperVMachineAdminService);
         var resolveSuggestionsService = new DeployResolveSuggestionsService();
         var templateEditorLauncher = new DeployTemplateEditorLauncher(templatesShellAdapter);
 
@@ -407,6 +415,9 @@ public sealed partial class MainWindow : Window
                 referenceDataService,
                 resolveSuggestionsService,
                 templatesShellAdapter,
+                v2PlanningCapabilityService,
+                v2RuntimeCapabilityService,
+                localCredentialSlotStore,
                 refreshSharedUiState,
                 shellBridge.RefreshResultsPanelState,
                 (deploymentContext, mode) => deploymentPreflightService.RunAsync(deploymentContext, mode),

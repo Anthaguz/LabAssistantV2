@@ -14,6 +14,8 @@ internal interface IDeployFromTemplateCompositionHost
 
     IReadOnlyList<string> AvailableSwitches { get; }
 
+    IReadOnlyList<V2AvailableSwitchInfo> AvailableSwitchInfo { get; }
+
     bool IsTemplatesLoading { get; }
 
     IReadOnlyList<TemplateLibraryItem> TemplateLibraryItems { get; }
@@ -21,6 +23,12 @@ internal interface IDeployFromTemplateCompositionHost
     IReadOnlyList<VhdxCatalogItem> LoadCatalogItems();
 
     Task EnsureReferenceDataAsync(bool forceRefresh);
+
+    IReadOnlyList<LocalCredentialSlotDefinition> LoadLocalCredentialSlotDefinitions();
+
+    bool TryGetLocalCredentialSlotValue(string slotKey, out V2RuntimeCredential credential);
+
+    void UpsertLocalCredentialSlot(string slotKey, string username, string password);
 
     Task EnsureTemplatesLibraryAsync(bool forceRefresh);
 
@@ -32,6 +40,8 @@ internal interface IDeployFromTemplateCompositionHost
 
     Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 
+    Task<V2PlanBuildResult> BuildV2PlanAsync(LabTemplate template, IReadOnlyCollection<string> resolvedCredentialSlotKeys);
+
     void RefreshSharedUiState();
 
     void RefreshResultsPanelState();
@@ -39,6 +49,12 @@ internal interface IDeployFromTemplateCompositionHost
     void OnOpenResultsPanelRequested();
 
     Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context);
+
+    Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
+        LabTemplate template,
+        V2PlanBuildResult plan,
+        IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        MultiVmDeploymentContext deploymentContext);
 
     void AttachProgressCallbacks(
         MultiVmDeploymentContext context,

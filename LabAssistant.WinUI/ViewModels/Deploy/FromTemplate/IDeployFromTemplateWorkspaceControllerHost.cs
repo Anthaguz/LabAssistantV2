@@ -14,6 +14,8 @@ internal interface IDeployFromTemplateWorkspaceControllerHost
 
     IReadOnlyList<string> AvailableSwitches { get; }
 
+    IReadOnlyList<V2AvailableSwitchInfo> AvailableSwitchInfo { get; }
+
     TemplateEditorDocument? ActiveTemplateDocument { get; }
 
     IReadOnlyList<VhdxCatalogItem> LoadCatalogItems();

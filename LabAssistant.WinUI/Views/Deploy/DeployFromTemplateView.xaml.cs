@@ -1,6 +1,7 @@
 using LabAssistant.Business.Templates;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.Views.Deploy;
 
@@ -27,6 +28,8 @@ public sealed partial class DeployFromTemplateView : UserControl
         DeployResolveSuggestionsButton.Click += OnDeployResolveSuggestionsRequested;
         DeployOpenTemplateEditorButton.Click += OnDeployOpenTemplateEditorRequested;
         DeployStartButton.Click += OnDeployStartRequested;
+        DeployV2CredentialSlotsListView.SelectionChanged += OnDeployV2CredentialSlotSelectionChanged;
+        DeployV2SaveCredentialSlotButton.Click += OnDeployV2SaveCredentialSlotRequested;
     }
 
     public event SelectionChangedEventHandler? TemplateSelectionChanged;
@@ -42,6 +45,10 @@ public sealed partial class DeployFromTemplateView : UserControl
     public event RoutedEventHandler? OpenTemplateEditorRequested;
 
     public event RoutedEventHandler? StartDeployRequested;
+
+    public event SelectionChangedEventHandler? V2CredentialSlotSelectionChanged;
+
+    public event RoutedEventHandler? SaveV2CredentialSlotRequested;
 
     public TemplateLibraryItem? SelectedTemplateLibraryItem
     {
@@ -62,6 +69,26 @@ public sealed partial class DeployFromTemplateView : UserControl
     public void SetSharedIssueSummariesItemsSource(object? itemsSource)
     {
         DeploySharedIssuesListView.ItemsSource = itemsSource;
+    }
+
+    public void SetV2BlockersItemsSource(object? itemsSource)
+    {
+        DeployV2BlockersListView.ItemsSource = itemsSource;
+    }
+
+    public void SetV2CredentialSlotsItemsSource(object? itemsSource)
+    {
+        DeployV2CredentialSlotsListView.ItemsSource = itemsSource;
+    }
+
+    public void SetV2WavesItemsSource(object? itemsSource)
+    {
+        DeployV2WavesListView.ItemsSource = itemsSource;
+    }
+
+    public void SetV2DiagnosticsItemsSource(object? itemsSource)
+    {
+        DeployV2DiagnosticsListView.ItemsSource = itemsSource;
     }
 
     public void ApplyWorkspaceState(DeployFromTemplateViewState state)
@@ -92,6 +119,41 @@ public sealed partial class DeployFromTemplateView : UserControl
         DeployOpenTemplateEditorButton.IsEnabled = isOpenTemplateEditorEnabled;
         DeployStartButton.IsEnabled = isStartDeployEnabled;
     }
+
+    public void SetEvaluateButtonText(string text)
+    {
+        DeployEvaluateReadinessButton.Content = text;
+    }
+
+    public void SetV2ReviewVisibility(bool isVisible)
+    {
+        DeployV2ReviewPanel.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    internal void ApplyV2ReviewState(bool isVisible, string statusText, DeployV2PlanSummaryRow? summary)
+    {
+        SetV2ReviewVisibility(isVisible);
+        DeployV2StatusTextBlock.Text = statusText;
+        DeployV2PlanSummaryTextBlock.Text = summary is null
+            ? "No V2 plan has been projected yet."
+            : $"{summary.TemplateName} | {summary.ExecutionEngine} | Profile: {summary.DeploymentProfile}\n" +
+              $"VMs: {summary.VmCount} | Nodes: {summary.NodeCount} | Unresolved: {summary.UnresolvedRequirementCount}\n" +
+              $"{summary.RouterSummary} | {summary.DomainSummary} | {summary.StartabilitySummary}";
+    }
+
+    internal void ApplyV2CredentialEditorState(string helpText, string username)
+    {
+        DeployV2CredentialSlotEditorTextBlock.Text = helpText;
+        DeployV2CredentialSlotUsernameTextBox.Text = username;
+        DeployV2CredentialSlotPasswordBox.Password = string.Empty;
+    }
+
+    internal DeployV2CredentialSlotRow? SelectedV2CredentialSlotRow =>
+        DeployV2CredentialSlotsListView.SelectedItem as DeployV2CredentialSlotRow;
+
+    public string V2CredentialSlotUsername => DeployV2CredentialSlotUsernameTextBox.Text;
+
+    public string V2CredentialSlotPassword => DeployV2CredentialSlotPasswordBox.Password;
 
     public void SetResultsPanelLauncherState(string buttonText, bool isEnabled, string summaryText)
     {
@@ -133,5 +195,15 @@ public sealed partial class DeployFromTemplateView : UserControl
     private void OnDeployStartRequested(object sender, RoutedEventArgs e)
     {
         StartDeployRequested?.Invoke(this, e);
+    }
+
+    private void OnDeployV2CredentialSlotSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        V2CredentialSlotSelectionChanged?.Invoke(this, e);
+    }
+
+    private void OnDeployV2SaveCredentialSlotRequested(object sender, RoutedEventArgs e)
+    {
+        SaveV2CredentialSlotRequested?.Invoke(this, e);
     }
 }

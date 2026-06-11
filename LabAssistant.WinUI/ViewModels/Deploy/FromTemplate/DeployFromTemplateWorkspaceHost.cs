@@ -1,4 +1,6 @@
 using LabAssistant.Business.Deployment;
+using LabAssistant.Business.Planning;
+using LabAssistant.Business.Runtime;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
@@ -13,6 +15,9 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     private readonly DeployReferenceDataService _referenceDataService;
     private readonly DeployResolveSuggestionsService _resolveSuggestionsService;
     private readonly DeployTemplatesShellAdapter _templatesShellAdapter;
+    private readonly IV2PlanningCapabilityService _v2PlanningCapabilityService;
+    private readonly IV2RuntimeCapabilityService _v2RuntimeCapabilityService;
+    private readonly ILocalCredentialSlotStore _localCredentialSlotStore;
     private readonly Action _refreshSharedUiState;
     private readonly Action _refreshResultsPanelState;
     private readonly Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> _runReadinessAsync;
@@ -24,6 +29,9 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         DeployReferenceDataService referenceDataService,
         DeployResolveSuggestionsService resolveSuggestionsService,
         DeployTemplatesShellAdapter templatesShellAdapter,
+        IV2PlanningCapabilityService v2PlanningCapabilityService,
+        IV2RuntimeCapabilityService v2RuntimeCapabilityService,
+        ILocalCredentialSlotStore localCredentialSlotStore,
         Action refreshSharedUiState,
         Action refreshResultsPanelState,
         Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> runReadinessAsync,
@@ -34,6 +42,9 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         _referenceDataService = referenceDataService;
         _resolveSuggestionsService = resolveSuggestionsService;
         _templatesShellAdapter = templatesShellAdapter;
+        _v2PlanningCapabilityService = v2PlanningCapabilityService;
+        _v2RuntimeCapabilityService = v2RuntimeCapabilityService;
+        _localCredentialSlotStore = localCredentialSlotStore;
         _refreshSharedUiState = refreshSharedUiState;
         _refreshResultsPanelState = refreshResultsPanelState;
         _runReadinessAsync = runReadinessAsync;
@@ -46,6 +57,8 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
 
     public IReadOnlyList<string> AvailableSwitches => _referenceDataService.AvailableSwitches;
 
+    public IReadOnlyList<V2AvailableSwitchInfo> AvailableSwitchInfo => _referenceDataService.AvailableSwitchInfo;
+
     public bool IsTemplatesLoading => _templatesShellAdapter.IsTemplatesLoading;
 
     public IReadOnlyList<TemplateLibraryItem> TemplateLibraryItems => _templatesShellAdapter.GetLibraryItems();
@@ -53,6 +66,14 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     public IReadOnlyList<VhdxCatalogItem> LoadCatalogItems() => _referenceDataService.CatalogItems;
 
     public Task EnsureReferenceDataAsync(bool forceRefresh) => _referenceDataService.EnsureAsync(forceRefresh);
+
+    public IReadOnlyList<LocalCredentialSlotDefinition> LoadLocalCredentialSlotDefinitions() => _localCredentialSlotStore.LoadDefinitions();
+
+    public bool TryGetLocalCredentialSlotValue(string slotKey, out V2RuntimeCredential credential) =>
+        _localCredentialSlotStore.TryGetCredential(slotKey, out credential);
+
+    public void UpsertLocalCredentialSlot(string slotKey, string username, string password) =>
+        _localCredentialSlotStore.Upsert(slotKey, username, password);
 
     public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => _templatesShellAdapter.EnsureLibraryAsync(forceRefresh);
 
@@ -72,11 +93,40 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
 
     public Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode) => _runReadinessAsync(context, mode);
 
+    public Task<V2PlanBuildResult> BuildV2PlanAsync(LabTemplate template, IReadOnlyCollection<string> resolvedCredentialSlotKeys)
+    {
+        return _v2PlanningCapabilityService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = template,
+            CatalogItems = _referenceDataService.CatalogItems,
+            AvailableSwitchNames = _referenceDataService.AvailableSwitches,
+            AvailableSwitches = _referenceDataService.AvailableSwitchInfo,
+            ResolvedCredentialSlotKeys = resolvedCredentialSlotKeys,
+            DefaultDeploymentProfile = "Balanced"
+        });
+    }
+
     public void RefreshSharedUiState() => _refreshSharedUiState();
 
     public void RefreshResultsPanelState() => _refreshResultsPanelState();
 
     public Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context) => _deployAllAsync(context);
+
+    public async Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
+        LabTemplate template,
+        V2PlanBuildResult plan,
+        IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        MultiVmDeploymentContext deploymentContext)
+    {
+        return await _v2RuntimeCapabilityService.ExecuteAsync(new V2RuntimeExecutionRequest
+        {
+            Template = template,
+            Plan = plan,
+            Settings = DeploymentSettings,
+            CredentialSlotValues = credentialSlotValues,
+            DeploymentContext = deploymentContext
+        });
+    }
 
     public void AttachProgressCallbacks(
         MultiVmDeploymentContext context,
