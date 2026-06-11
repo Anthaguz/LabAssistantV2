@@ -194,6 +194,8 @@ public sealed class V2PlanningCapabilityServiceTests
         Assert.True(result.Success);
         Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.EnableGuestServices);
         Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.PrepareGuestNetwork);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.ConfigureBaseRemoteAccess);
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.BaseRemoteAccessReady);
         Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.PromoteReplicaDomainController);
         Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.ReplicaDomainReady);
         Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.StabilizeDomainDns);

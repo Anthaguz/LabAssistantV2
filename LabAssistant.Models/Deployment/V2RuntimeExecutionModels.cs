@@ -14,11 +14,24 @@ public sealed class V2RuntimeExecutionRequest
     public IReadOnlyDictionary<string, V2RuntimeCredential> CredentialSlotValues { get; set; } =
         new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase);
 
+    public V2BaseRemoteAccessOptions BaseRemoteAccessOptions { get; set; } = new();
+
     public MultiVmDeploymentContext? DeploymentContext { get; set; }
 
     public int GuestTransportMaxRetries { get; set; } = 90;
 
     public TimeSpan GuestTransportRetryDelay { get; set; } = TimeSpan.FromSeconds(10);
+}
+
+public sealed class V2BaseRemoteAccessOptions
+{
+    public bool EnableRemoteDesktop { get; set; } = true;
+
+    public bool SetPrivateNetworkProfile { get; set; } = true;
+
+    public bool DisableFirewall { get; set; } = true;
+
+    public bool DisableRdpNla { get; set; } = true;
 }
 
 public sealed class V2RuntimeExecutionResult

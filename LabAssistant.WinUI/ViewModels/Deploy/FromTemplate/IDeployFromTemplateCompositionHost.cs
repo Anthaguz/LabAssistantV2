@@ -54,6 +54,7 @@ internal interface IDeployFromTemplateCompositionHost
         LabTemplate template,
         V2PlanBuildResult plan,
         IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        V2BaseRemoteAccessOptions baseRemoteAccessOptions,
         MultiVmDeploymentContext deploymentContext);
 
     void AttachProgressCallbacks(

@@ -288,8 +288,9 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         LabTemplate template,
         V2PlanBuildResult plan,
         IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+        V2BaseRemoteAccessOptions baseRemoteAccessOptions,
         MultiVmDeploymentContext deploymentContext) =>
-        _host.ExecuteV2DeployAsync(template, plan, credentialSlotValues, deploymentContext);
+        _host.ExecuteV2DeployAsync(template, plan, credentialSlotValues, baseRemoteAccessOptions, deploymentContext);
 
     void IDeployFromTemplateV2ReviewHost.ApplyWorkspaceState() => UpdateUi();
 
@@ -304,6 +305,11 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _view.OpenResultsPanelRequested += (_, _) => _host.OnOpenResultsPanelRequested();
         _view.V2CredentialSlotSelectionChanged += (_, _) => _v2ReviewController.SelectCredentialSlot(_view.SelectedV2CredentialSlotRow?.SlotKey);
         _view.SaveV2CredentialSlotRequested += async (_, _) => await SaveSelectedCredentialSlotAsync();
+        _view.V2BaseRemoteAccessOptionsChanged += (_, _) =>
+        {
+            _v2ReviewWorkspace.UpdateBaseRemoteAccessOptions(_view.V2DisableFirewall, _view.V2DisableRdpNla);
+            UpdateUi();
+        };
     }
 
     private async Task ResolveSuggestionsAsync()
@@ -557,6 +563,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
                 activeTemplateDocument.Template,
                 plan,
                 _v2ReviewWorkspace.ResolvedCredentialSlotValues,
+                _v2ReviewWorkspace.CreateBaseRemoteAccessOptions(),
                 deploymentContext);
 
             var issueRows = result.BlockingMessages
@@ -701,6 +708,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
             _workspace.ProgressSummary));
         _view.ApplyV2ReviewState(_v2ReviewWorkspace.IsVisible, _v2ReviewWorkspace.StatusText, _v2ReviewWorkspace.PlanSummary);
         _view.ApplyV2CredentialEditorState(_v2ReviewWorkspace.SelectedCredentialSlotPurpose, _v2ReviewWorkspace.SelectedCredentialSlotUsername);
+        _view.ApplyV2BaseRemoteAccessState(_v2ReviewWorkspace.BaseRemoteAccess);
     }
 
     private bool IsActiveTemplateV2()

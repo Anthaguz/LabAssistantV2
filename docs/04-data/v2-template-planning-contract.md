@@ -119,7 +119,9 @@ The current V2 slice executes explicit graph nodes for:
 - domain joins
 - joined-state and domain-login validation
 
-Child domains, tree domains, trusts, and base remote-access guest hardening remain deferred to later slices.
+Child domains, tree domains, and trusts remain deferred to later slices.
+
+Base remote-access guest hardening is now a deploy-time V2 review/runtime option and remains deferred only at the template-authoring/schema level.
 
 ## Bootstrap Profile References
 

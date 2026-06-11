@@ -32,3 +32,9 @@ internal sealed record DeployV2WaveRow(
 internal sealed record DeployV2DiagnosticRow(
     string Title,
     string Detail);
+
+internal sealed record DeployV2BaseRemoteAccessRow(
+    bool EnableRemoteDesktop,
+    bool SetPrivateNetworkProfile,
+    bool DisableFirewall,
+    bool DisableRdpNla);
