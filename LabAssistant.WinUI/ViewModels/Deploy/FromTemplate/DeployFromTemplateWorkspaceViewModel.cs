@@ -127,6 +127,25 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
         RefreshResultRows(compatibilityIssues: [], readinessReport: null);
     }
 
+    public void InitializeProgressRows(V2PlanBuildResult plan)
+    {
+        _progressByVm.Clear();
+
+        foreach (var vmGroup in plan.Nodes
+                     .GroupBy(node => string.IsNullOrWhiteSpace(node.VmName) ? "Unnamed-VM" : node.VmName.Trim(), StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var steps = vmGroup
+                .Select(node => new DeployTimelineStepDefinition(MapV2StepKey(node.Kind), node.DisplayName))
+                .GroupBy(step => step.StepKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            _progressByVm[vmGroup.Key] = new DeployVmProgressState(vmGroup.Key, steps);
+        }
+
+        RefreshResultRows(compatibilityIssues: [], readinessReport: null);
+    }
+
     public void UpdateProgressMessage(string vmName, string? message)
     {
         if (!_progressByVm.TryGetValue(vmName, out var state))
@@ -375,6 +394,34 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
         }
 
         return steps;
+    }
+
+    private static string MapV2StepKey(V2PlanNodeKind kind)
+    {
+        return kind switch
+        {
+            V2PlanNodeKind.ProvisionVm => DeploymentStepKeys.V2ProvisionVm,
+            V2PlanNodeKind.EnableGuestServices => DeploymentStepKeys.V2EnableGuestServices,
+            V2PlanNodeKind.StartVm => DeploymentStepKeys.V2StartVm,
+            V2PlanNodeKind.GuestTransportReady => DeploymentStepKeys.V2GuestTransportReady,
+            V2PlanNodeKind.PrepareGuestNetwork => DeploymentStepKeys.V2PrepareGuestNetwork,
+            V2PlanNodeKind.PrepareRouterNetwork => DeploymentStepKeys.V2PrepareRouterNetwork,
+            V2PlanNodeKind.InstallRouterRemoteAccessFeature => DeploymentStepKeys.V2InstallRouterRemoteAccessFeature,
+            V2PlanNodeKind.EnableRouterRouting => DeploymentStepKeys.V2EnableRouterRouting,
+            V2PlanNodeKind.ConfigureRouterNat => DeploymentStepKeys.V2ConfigureRouterNat,
+            V2PlanNodeKind.ValidateCrossSwitchRouting => DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+            V2PlanNodeKind.ValidateRouterEgress => DeploymentStepKeys.V2ValidateRouterEgress,
+            V2PlanNodeKind.InstallAdDomainServicesFeature => DeploymentStepKeys.V2InstallAdDomainServices,
+            V2PlanNodeKind.RouterReady => DeploymentStepKeys.V2RouterReady,
+            V2PlanNodeKind.DomainReady => DeploymentStepKeys.V2DomainReady,
+            V2PlanNodeKind.PromoteRootDomainController => DeploymentStepKeys.V2PromoteRootDomainController,
+            V2PlanNodeKind.PromoteReplicaDomainController => DeploymentStepKeys.V2PromoteReplicaDomainController,
+            V2PlanNodeKind.ReplicaDomainReady => DeploymentStepKeys.V2ReplicaDomainReady,
+            V2PlanNodeKind.StabilizeDomainDns => DeploymentStepKeys.V2StabilizeDomainDns,
+            V2PlanNodeKind.JoinDomain => DeploymentStepKeys.V2JoinDomain,
+            V2PlanNodeKind.JoinedDomainReady => DeploymentStepKeys.V2JoinedDomainReady,
+            _ => kind.ToString()
+        };
     }
 
     private static IReadOnlyList<DeployTimelineStepRow> CreateReadinessTimelineSteps(

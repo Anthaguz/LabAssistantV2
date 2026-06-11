@@ -125,6 +125,7 @@ public static class BusinessServiceCollectionExtensions
     {
         services.AddSingleton<IAppPaths, AppPaths>();
         services.AddSingleton<IAppSettingsStore, AppSettingsStore>();
+        services.AddSingleton<ILocalCredentialSlotStore, LocalCredentialSlotStore>();
         services.AddSingleton<IVhdxCatalogStore, VhdxCatalogStore>();
         services.AddSingleton<ILabTemplateStore, LabTemplateStore>();
         return services;
