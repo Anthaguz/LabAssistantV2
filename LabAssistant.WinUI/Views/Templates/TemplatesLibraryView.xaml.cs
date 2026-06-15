@@ -16,6 +16,8 @@ public readonly record struct TemplatesLibraryViewState(
     bool CanReload,
     bool CanOpenTemplate,
     bool CanCreateTemplate,
+    bool CanOpenTemplateInBuilder,
+    bool CanCreateBuilderTemplate,
     bool CanDeleteTemplate,
     bool CanImportTemplate,
     bool CanExportTemplate);
@@ -32,6 +34,8 @@ public sealed partial class TemplatesLibraryView : UserControl
     public event EventHandler? ReloadRequested;
     public event EventHandler? OpenTemplateRequested;
     public event EventHandler? CreateTemplateRequested;
+    public event EventHandler? OpenTemplateInBuilderRequested;
+    public event EventHandler? CreateBuilderTemplateRequested;
     public event EventHandler? DeleteTemplateRequested;
     public event EventHandler? ImportTemplateRequested;
     public event EventHandler? ExportTemplateRequested;
@@ -46,6 +50,8 @@ public sealed partial class TemplatesLibraryView : UserControl
         ReloadTemplatesButton.Click += ReloadTemplatesButton_Click;
         OpenTemplateInEditorButton.Click += OpenTemplateInEditorButton_Click;
         CreateTemplateButton.Click += CreateTemplateButton_Click;
+        OpenTemplateInBuilderButton.Click += OpenTemplateInBuilderButton_Click;
+        CreateV2BuilderTemplateButton.Click += CreateV2BuilderTemplateButton_Click;
         DeleteTemplateButton.Click += DeleteTemplateButton_Click;
         ImportTemplateButton.Click += ImportTemplateButton_Click;
         ExportTemplateButton.Click += ExportTemplateButton_Click;
@@ -73,6 +79,8 @@ public sealed partial class TemplatesLibraryView : UserControl
         ReloadTemplatesButton.IsEnabled = state.CanReload;
         OpenTemplateInEditorButton.IsEnabled = state.CanOpenTemplate;
         CreateTemplateButton.IsEnabled = state.CanCreateTemplate;
+        OpenTemplateInBuilderButton.IsEnabled = state.CanOpenTemplateInBuilder;
+        CreateV2BuilderTemplateButton.IsEnabled = state.CanCreateBuilderTemplate;
         DeleteTemplateButton.IsEnabled = state.CanDeleteTemplate;
         ImportTemplateButton.IsEnabled = state.CanImportTemplate;
         ExportTemplateButton.IsEnabled = state.CanExportTemplate;
@@ -121,6 +129,16 @@ public sealed partial class TemplatesLibraryView : UserControl
     private void CreateTemplateButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         CreateTemplateRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OpenTemplateInBuilderButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        OpenTemplateInBuilderRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CreateV2BuilderTemplateButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        CreateBuilderTemplateRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void DeleteTemplateButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

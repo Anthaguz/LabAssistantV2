@@ -25,6 +25,9 @@
     <Compile Include="..\LabAssistant.WinUI\Theming\ShellIconCatalog.cs" Link="WinUI\ShellIconCatalog.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployContextTypes.cs" Link="WinUI\DeployContextTypes.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\DeployContextBuilder.cs" Link="WinUI\DeployContextBuilder.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesEditorVmDraftModels.cs" Link="WinUI\TemplatesEditorVmDraftModels.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftModels.cs" Link="WinUI\TemplatesBuilderDraftModels.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftMapper.cs" Link="WinUI\TemplatesBuilderDraftMapper.cs" />
   </ItemGroup>
 
 </Project>

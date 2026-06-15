@@ -1,5 +1,6 @@
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Templates;
+using LabAssistant.WinUI.ViewModels.Templates.Builder;
 using LabAssistant.WinUI.Views.Templates;
 using Microsoft.UI.Xaml;
 
@@ -12,6 +13,8 @@ internal interface ITemplatesWorkspaceShellBridge
     bool IsTemplatesLibraryActive { get; }
 
     bool IsTemplatesEditorActive { get; }
+
+    bool IsTemplatesBuilderActive { get; }
 }
 
 internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBridge
@@ -19,15 +22,18 @@ internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBr
     private readonly Func<bool> _isTemplatesCapabilityActive;
     private readonly Func<bool> _isTemplatesLibraryActive;
     private readonly Func<bool> _isTemplatesEditorActive;
+    private readonly Func<bool> _isTemplatesBuilderActive;
 
     public TemplatesWorkspaceShellBridge(
         Func<bool> isTemplatesCapabilityActive,
         Func<bool> isTemplatesLibraryActive,
-        Func<bool> isTemplatesEditorActive)
+        Func<bool> isTemplatesEditorActive,
+        Func<bool> isTemplatesBuilderActive)
     {
         _isTemplatesCapabilityActive = isTemplatesCapabilityActive;
         _isTemplatesLibraryActive = isTemplatesLibraryActive;
         _isTemplatesEditorActive = isTemplatesEditorActive;
+        _isTemplatesBuilderActive = isTemplatesBuilderActive;
     }
 
     public bool IsTemplatesCapabilityActive => _isTemplatesCapabilityActive();
@@ -35,6 +41,8 @@ internal sealed class TemplatesWorkspaceShellBridge : ITemplatesWorkspaceShellBr
     public bool IsTemplatesLibraryActive => _isTemplatesLibraryActive();
 
     public bool IsTemplatesEditorActive => _isTemplatesEditorActive();
+
+    public bool IsTemplatesBuilderActive => _isTemplatesBuilderActive();
 }
 
 internal sealed class TemplatesCapabilityRuntime
@@ -42,6 +50,7 @@ internal sealed class TemplatesCapabilityRuntime
     private readonly FrameworkElement _workspaceHost;
     private readonly TemplatesLibraryWorkspaceComposition _libraryComposition;
     private readonly TemplatesEditorWorkspaceComposition _editorComposition;
+    private readonly TemplatesBuilderWorkspaceComposition _builderComposition;
     private readonly ITemplatesWorkspaceShellBridge _shellBridge;
     private readonly Func<Task<IReadOnlyList<string>>> _loadAvailableVmSwitchesAsync;
     private readonly Func<Task<IReadOnlyList<TemplateVhdxCatalogOption>>> _loadVhdxCatalogOptionsAsync;
@@ -54,6 +63,7 @@ internal sealed class TemplatesCapabilityRuntime
         FrameworkElement workspaceHost,
         TemplatesLibraryWorkspaceComposition libraryComposition,
         TemplatesEditorWorkspaceComposition editorComposition,
+        TemplatesBuilderWorkspaceComposition builderComposition,
         ITemplatesWorkspaceShellBridge shellBridge,
         Func<Task<IReadOnlyList<string>>> loadAvailableVmSwitchesAsync,
         Func<Task<IReadOnlyList<TemplateVhdxCatalogOption>>> loadVhdxCatalogOptionsAsync,
@@ -62,6 +72,7 @@ internal sealed class TemplatesCapabilityRuntime
         _workspaceHost = workspaceHost;
         _libraryComposition = libraryComposition;
         _editorComposition = editorComposition;
+        _builderComposition = builderComposition;
         _shellBridge = shellBridge;
         _loadAvailableVmSwitchesAsync = loadAvailableVmSwitchesAsync;
         _loadVhdxCatalogOptionsAsync = loadVhdxCatalogOptionsAsync;
@@ -89,6 +100,10 @@ internal sealed class TemplatesCapabilityRuntime
     public Task EnsureLibraryAsync(bool forceRefresh) => _libraryComposition.EnsureLibraryAsync(forceRefresh);
 
     public Task ShowEditorDocumentAsync(TemplateEditorDocument document, string statusText) => _editorComposition.ShowDocumentAsync(document, statusText);
+
+    public Task ShowBuilderDocumentAsync(TemplateEditorDocument document) => _builderComposition.ShowDocumentAsync(document);
+
+    public Task CreateBuilderDraftAsync() => _builderComposition.CreateDraftAsync();
 
     public void SetEditorStatus(string statusText) => _editorComposition.SetStatus(statusText);
 
@@ -127,10 +142,17 @@ internal sealed class TemplatesCapabilityRuntime
         return new TemplatesEditorReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
     }
 
+    public async Task<TemplatesBuilderReferenceData> LoadBuilderReferenceDataAsync(bool forceRefresh)
+    {
+        await EnsureEditorReferenceDataAsync(forceRefresh);
+        return new TemplatesBuilderReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+    }
+
     public void ApplyShellState()
     {
         _workspaceHost.Visibility = _shellBridge.IsTemplatesCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         _editorComposition.ApplyShellState(_shellBridge.IsTemplatesEditorActive);
+        _builderComposition.ApplyShellState(_shellBridge.IsTemplatesBuilderActive);
         _libraryComposition.ApplyShellState(_shellBridge.IsTemplatesLibraryActive);
     }
 
@@ -138,6 +160,7 @@ internal sealed class TemplatesCapabilityRuntime
     {
         _libraryComposition.ApplyUiState(_isLoading, _libraryComposition.SelectedItem is not null);
         _editorComposition.RefreshUiState();
+        _builderComposition.RefreshUiState();
     }
 
     private async Task EnsureAvailableVmSwitchesAsync(bool forceRefresh)

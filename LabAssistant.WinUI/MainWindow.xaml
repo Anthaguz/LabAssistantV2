@@ -256,6 +256,11 @@
                                             HorizontalAlignment="Stretch"
                                             VerticalAlignment="Stretch"
                                             Visibility="Collapsed" />
+                                        <templateViews:TemplatesBuilderView
+                                            x:Name="TemplatesBuilderViewHost"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch"
+                                            Visibility="Collapsed" />
                                     </Grid>
                                 </Border>
                                 <Border
