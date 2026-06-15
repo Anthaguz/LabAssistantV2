@@ -22,7 +22,7 @@ internal sealed class V2ForestTrustRuntimeCoordinator
         => _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             domainAdminCredential,
-            ForestTrustGuestScriptBuilder.BuildPrepareDnsForwarderScript(targetDomainName, targetDnsServers),
+            ForestTrustGuestCommandBuilder.BuildPrepareDnsForwarderCommand(targetDomainName, targetDnsServers),
             cancellationToken);
 
     public Task<GuestCommandResult> CreateBidirectionalForestTrustAsync(
@@ -34,7 +34,7 @@ internal sealed class V2ForestTrustRuntimeCoordinator
         => _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             sourceDomainAdminCredential,
-            ForestTrustGuestScriptBuilder.BuildCreateBidirectionalForestTrustScript(trust, targetDomainAdminCredential),
+            ForestTrustGuestCommandBuilder.BuildCreateBidirectionalForestTrustCommand(trust, targetDomainAdminCredential),
             cancellationToken);
 
     public Task<GuestCommandResult> ValidateForestTrustAsync(
@@ -45,7 +45,7 @@ internal sealed class V2ForestTrustRuntimeCoordinator
         => _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             domainAdminCredential,
-            ForestTrustGuestScriptBuilder.BuildValidateForestTrustScript(trustedDomainName),
+            ForestTrustGuestCommandBuilder.BuildValidateForestTrustCommand(trustedDomainName),
             cancellationToken);
 
     public Task<GuestCommandResult> CleanupForestTrustAsync(
@@ -56,6 +56,6 @@ internal sealed class V2ForestTrustRuntimeCoordinator
         => _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             domainAdminCredential,
-            ForestTrustGuestScriptBuilder.BuildCleanupForestTrustScript(trustedDomainName),
+            ForestTrustGuestCommandBuilder.BuildCleanupForestTrustCommand(trustedDomainName),
             cancellationToken);
 }

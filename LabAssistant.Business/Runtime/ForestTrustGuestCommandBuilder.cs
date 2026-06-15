@@ -3,9 +3,9 @@ using LabAssistant.Models.Templates;
 
 namespace LabAssistant.Business.Runtime;
 
-internal static class ForestTrustGuestScriptBuilder
+internal static class ForestTrustGuestCommandBuilder
 {
-    public static string BuildPrepareDnsForwarderScript(string targetDomainName, IReadOnlyList<string> targetDnsServers)
+    public static string BuildPrepareDnsForwarderCommand(string targetDomainName, IReadOnlyList<string> targetDnsServers)
     {
         var escapedServers = targetDnsServers
             .Where(server => !string.IsNullOrWhiteSpace(server))
@@ -28,7 +28,7 @@ internal static class ForestTrustGuestScriptBuilder
             "Write-Output \"DNS forwarder ready for $targetDomain\"");
     }
 
-    public static string BuildCreateBidirectionalForestTrustScript(
+    public static string BuildCreateBidirectionalForestTrustCommand(
         V2ResolvedTrustPlanningContext trust,
         V2RuntimeCredential targetDomainAdminCredential)
     {
@@ -46,7 +46,7 @@ internal static class ForestTrustGuestScriptBuilder
             "Write-Output \"Forest trust ready for $($targetForest.Name)\"");
     }
 
-    public static string BuildValidateForestTrustScript(string trustedDomainName)
+    public static string BuildValidateForestTrustCommand(string trustedDomainName)
     {
         return string.Join(
             Environment.NewLine,
@@ -58,7 +58,7 @@ internal static class ForestTrustGuestScriptBuilder
             "Write-Output \"Forest trust validated for $trustedDomain\"");
     }
 
-    public static string BuildCleanupForestTrustScript(string trustedDomainName)
+    public static string BuildCleanupForestTrustCommand(string trustedDomainName)
     {
         return string.Join(
             Environment.NewLine,
