@@ -456,7 +456,10 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 return;
             }
 
-            if (!stateByVmId.TryGetValue(trust.SourceAnchorVmId, out var sourceState))
+            if (!stateByVmId.TryGetValue(trust.SourceAnchorVmId, out var sourceState) ||
+                !stateByVmId.TryGetValue(trust.TargetAnchorVmId, out var targetState) ||
+                !IsTrustAnchorReady(sourceState) ||
+                !IsTrustAnchorReady(targetState))
             {
                 continue;
             }
@@ -905,6 +908,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        MarkTrustObjectsCreated(multiContext, trust.TrustId);
         var result = await _forestTrustRuntimeCoordinator.CreateBidirectionalForestTrustAsync(
             trust.SourceAnchorVmName,
             sourceCredential,
@@ -920,7 +924,6 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        MarkTrustObjectsCreated(multiContext, trust.TrustId);
         EmitTrustEvent("ForestTrustCreationCompleted", multiContext, trust, "create", "success");
     }
 
@@ -2426,7 +2429,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        foreach (var trustState in trustStates.Where(state => state.TrustObjectsCreated && !state.TrustReady))
+        foreach (var trustState in trustStates.Where(state => state.TrustObjectsCreated))
         {
             var trust = request.Plan.Context.Trusts.FirstOrDefault(candidate =>
                 string.Equals(candidate.TrustId, trustState.TrustId, StringComparison.OrdinalIgnoreCase));
@@ -2751,7 +2754,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             ["targetDomainId"] = trust.TargetDomainId,
             ["sourceDomainName"] = trust.SourceDomainDnsName,
             ["targetDomainName"] = trust.TargetDomainDnsName,
-            ["phase"] = phase
+            ["phase"] = phase,
+            ["stepKey"] = GetTrustStepKey(phase)
         };
 
         if (!string.IsNullOrWhiteSpace(error))
@@ -2761,6 +2765,18 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
     }
+
+    private static string GetTrustStepKey(string phase) => phase switch
+    {
+        "dns-prep" => DeploymentStepKeys.V2PrepareForestTrustDns,
+        "create" => DeploymentStepKeys.V2CreateForestTrust,
+        "validate" => DeploymentStepKeys.V2ValidateForestTrust,
+        "cleanup" => DeploymentStepKeys.V2CleanupForestTrust,
+        _ => phase
+    };
+
+    private static bool IsTrustAnchorReady(RuntimeVmState state) =>
+        state.Context.IsSuccess && !state.Context.WasCancelled;
 
     private void EmitVmTerminalEvent(MultiVmDeploymentContext multiContext, VmDeploymentContext vmContext)
     {
