@@ -26,6 +26,7 @@ Write-Output 'AD-Domain-Services ready'
         return domain.RelationKind switch
         {
             V2DomainRelationKind.Child => BuildPromoteChildDomainScript(domain, dsrmPassword, parentDomainAdminCredential, parentDomain),
+            V2DomainRelationKind.Tree => BuildPromoteTreeDomainScript(domain, dsrmPassword, parentDomainAdminCredential, parentDomain),
             _ => BuildPromoteRootForestScript(domain, dsrmPassword)
         };
     }
@@ -84,6 +85,38 @@ Write-Output 'AD-Domain-Services ready'
             "    -InstallDns:$true `",
             "    -LogPath 'C:\\Windows\\NTDS' `",
             $"    -NewDomainName '{EscapeSingleQuotedLiteral(GetChildLabel(domain.DnsName, parentDomain.DnsName))}' `",
+            $"    -NewDomainNetbiosName '{EscapeSingleQuotedLiteral(domain.NetBiosName)}' `",
+            "    -NoRebootOnCompletion:$false `",
+            $"    -ParentDomainName '{EscapeSingleQuotedLiteral(parentDomain.DnsName)}' `",
+            "    -SysvolPath 'C:\\Windows\\SYSVOL' `",
+            "    -SafeModeAdministratorPassword $secureDsrmPassword `",
+            "    -Force:$true");
+    }
+
+    private static string BuildPromoteTreeDomainScript(
+        V2ResolvedDomainPlanningContext domain,
+        string dsrmPassword,
+        V2RuntimeCredential? parentDomainAdminCredential,
+        V2ResolvedDomainPlanningContext? parentDomain)
+    {
+        ArgumentNullException.ThrowIfNull(parentDomainAdminCredential);
+        ArgumentNullException.ThrowIfNull(parentDomain);
+
+        return string.Join(
+            Environment.NewLine,
+            "Import-Module ADDSDeployment -ErrorAction Stop",
+            $"$parentDomainPassword = ConvertTo-SecureString '{EscapeSingleQuotedLiteral(parentDomainAdminCredential.Password)}' -AsPlainText -Force",
+            $"$parentDomainCredential = New-Object System.Management.Automation.PSCredential ('{EscapeSingleQuotedLiteral(parentDomainAdminCredential.Username)}', $parentDomainPassword)",
+            $"$secureDsrmPassword = ConvertTo-SecureString '{EscapeSingleQuotedLiteral(dsrmPassword)}' -AsPlainText -Force",
+            "Install-ADDSDomain `",
+            "    -CreateDnsDelegation:$false `",
+            "    -Credential $parentDomainCredential `",
+            "    -DatabasePath 'C:\\Windows\\NTDS' `",
+            "    -DomainMode 'WinThreshold' `",
+            "    -DomainType TreeDomain `",
+            "    -InstallDns:$true `",
+            "    -LogPath 'C:\\Windows\\NTDS' `",
+            $"    -NewDomainName '{EscapeSingleQuotedLiteral(domain.DnsName)}' `",
             $"    -NewDomainNetbiosName '{EscapeSingleQuotedLiteral(domain.NetBiosName)}' `",
             "    -NoRebootOnCompletion:$false `",
             $"    -ParentDomainName '{EscapeSingleQuotedLiteral(parentDomain.DnsName)}' `",

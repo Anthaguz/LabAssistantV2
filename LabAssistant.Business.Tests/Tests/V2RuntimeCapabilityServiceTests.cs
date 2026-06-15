@@ -291,6 +291,67 @@ public sealed class V2RuntimeCapabilityServiceTests
         Assert.Contains("-ParentDomainName 'contoso.com'", childPromotionScript.Script, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_TreeDomainProgression_UsesSharedPerDomainRuntime()
+    {
+        var request = await CreateRuntimeRequestWithTreeDomainAsync();
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("vm:vm-childdc01:PromoteFirstDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childdc01:DomainReady", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childreplica01:PromoteReplicaDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childdc01:StabilizeDomainDns", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childmember01:JoinDomain", result.ExecutedNodeIds);
+
+        var treePromotionScript = scripts.First(entry =>
+            entry.VmName == "childdc01" &&
+            entry.Script.Contains("Install-ADDSDomain", StringComparison.Ordinal));
+        Assert.Contains("-DomainType TreeDomain", treePromotionScript.Script, StringComparison.Ordinal);
+        Assert.Contains("-NewDomainName 'fabrikam.com'", treePromotionScript.Script, StringComparison.Ordinal);
+        Assert.Contains("-ParentDomainName 'contoso.com'", treePromotionScript.Script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MultipleIndependentRootForests_ExecuteEqualRootPaths()
+    {
+        var request = await CreateRuntimeRequestWithAdditionalForestAsync();
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("vm:vm-dc01:PromoteFirstDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-fabrikamdc01:PromoteFirstDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-dc01:DomainReady", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-fabrikamdc01:DomainReady", result.ExecutedNodeIds);
+
+        var fabrikamForestScript = scripts.First(entry =>
+            entry.VmName == "fabrikamdc01" &&
+            entry.Script.Contains("Install-ADDSForest", StringComparison.Ordinal));
+        Assert.Contains("-DomainName 'fabrikam.com'", fabrikamForestScript.Script, StringComparison.Ordinal);
+    }
+
     private static IV2RuntimeCapabilityService CreateService(
         FakeHyperVService hyperVService,
         FakeGuestCommandExecutor guestCommandExecutor,
@@ -888,6 +949,123 @@ public sealed class V2RuntimeCapabilityServiceTests
             ["slot-dsrm"] = new() { Username = "DSRM", Password = "Password123!" },
             ["slot-child-admin"] = new() { Username = "Administrator@child.contoso.com", Password = "Password123!" },
             ["slot-parent-admin"] = new() { Username = "Administrator@contoso.com", Password = "Password123!" }
+        };
+
+        return request;
+    }
+
+    private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithTreeDomainAsync()
+    {
+        var request = await CreateRuntimeRequestWithChildDomainAsync();
+        var treeDomain = Assert.Single(request.Template.DirectoryTopology!.Domains!.Where(domain => domain.DomainId == "domain-child"));
+        treeDomain.RelationKind = V2DomainRelationKind.Tree;
+        treeDomain.DnsName = "fabrikam.com";
+        treeDomain.NetBiosName = "FABRIKAM";
+
+        request.Plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = request.Template,
+            CatalogItems =
+            [
+                CreateCatalogItem("disk-dc", "slot-local"),
+                CreateCatalogItem("disk-replica", "slot-local"),
+                CreateCatalogItem("disk-member", "slot-local"),
+                CreateCatalogItem("disk-childdc", "slot-local"),
+                CreateCatalogItem("disk-childreplica", "slot-local"),
+                CreateCatalogItem("disk-childmember", "slot-local")
+            ],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-child-admin", "slot-parent-admin"],
+            DefaultDeploymentProfile = "Balanced"
+        });
+
+        request.CredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(request.CredentialSlotValues, StringComparer.OrdinalIgnoreCase)
+        {
+            ["slot-child-admin"] = new() { Username = "Administrator@fabrikam.com", Password = "Password123!" }
+        };
+        return request;
+    }
+
+    private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithAdditionalForestAsync()
+    {
+        var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: false);
+        request.Template.VmTemplates.Add(new VmTemplate
+        {
+            VmId = "vm-fabrikamdc01",
+            Name = "fabrikamdc01",
+            MemoryMb = 4096,
+            CpuCount = 2,
+            VhdxId = "disk-fabrikamdc",
+            TopologyRole = "FirstDomainController",
+            DomainId = "domain-fabrikam",
+            CredentialSlots = new VmCredentialSlotBindings
+            {
+                LocalBootstrap = "slot-local",
+                DomainAdmin = "slot-fabrikam-admin",
+                Dsrm = "slot-dsrm"
+            },
+            Nics =
+            [
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-fabrikamdc",
+                    NetworkId = "lab-core",
+                    IpAddress = "10.0.0.50",
+                    PrefixLength = 24,
+                    DefaultGateway = "10.0.0.1",
+                    DnsServers = ["10.0.0.50"]
+                }
+            ]
+        });
+        request.Template.DirectoryTopology!.Forests!.Add(new V2ForestTemplate
+        {
+            ForestId = "forest-fabrikam",
+            RootDomainId = "domain-fabrikam"
+        });
+        request.Template.DirectoryTopology.Domains!.Add(new V2DomainTemplate
+        {
+            DomainId = "domain-fabrikam",
+            DnsName = "fabrikam.com",
+            NetBiosName = "FABRIKAM",
+            ForestId = "forest-fabrikam",
+            RelationKind = V2DomainRelationKind.Root,
+            FirstDomainControllerVmId = "vm-fabrikamdc01"
+        });
+
+        request.Plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = request.Template,
+            CatalogItems =
+            [
+                CreateCatalogItem("disk-dc", "slot-local"),
+                CreateCatalogItem("disk-replica", "slot-local"),
+                CreateCatalogItem("disk-member", "slot-local"),
+                CreateCatalogItem("disk-fabrikamdc", "slot-local")
+            ],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"],
+            DefaultDeploymentProfile = "Balanced"
+        });
+
+        request.CredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(request.CredentialSlotValues, StringComparer.OrdinalIgnoreCase)
+        {
+            ["slot-fabrikam-admin"] = new()
+            {
+                Username = "Administrator@fabrikam.com",
+                Password = "Password123!"
+            }
         };
 
         return request;

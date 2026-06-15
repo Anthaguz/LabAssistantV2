@@ -126,7 +126,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                     string.Equals(forest.ForestId, state.ResolvedDomain.ForestId, StringComparison.OrdinalIgnoreCase));
 
                 if (state.TopologyRoleIs("FirstDomainController") &&
-                    state.ResolvedDomain.RelationKind == V2DomainRelationKind.Child)
+                    state.ResolvedDomain.RelationKind is V2DomainRelationKind.Child or V2DomainRelationKind.Tree)
                 {
                     AddCredentialSlotRequirement(
                         unresolved,
@@ -136,22 +136,9 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                         state.Vm.Name,
                         state.EffectiveParentDomainAdminSlot,
                         "parent-domain-admin",
-                        "child-domain creation");
+                        $"{state.ResolvedDomain.RelationKind.ToString().ToLowerInvariant()}-domain creation");
                 }
             }
-        }
-
-        foreach (var state in states.Where(state => state.ResolvedDomain?.RelationKind == V2DomainRelationKind.Tree))
-        {
-            issues.Add(new V2PlanIssue
-            {
-                Severity = V2PlanIssueSeverity.Blocking,
-                Code = "domain-relation-not-supported",
-                VmId = state.Vm.VmId,
-                VmName = state.Vm.Name,
-                Message = $"VM '{state.Vm.Name}' is assigned to tree domain '{state.ResolvedDomain!.DomainId}', which is not executable in V2 runtime yet.",
-                SuggestedAction = "Limit executable V2 runtime to root and child domains for this issue."
-            });
         }
 
         var routerRequired = DetermineRouterRequirement(states, domainRequired);
@@ -780,11 +767,11 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             AddDependencyIfPresent(state.TryGetNode(V2PlanNodeKind.JoinDomain), state.TryGetNode(V2PlanNodeKind.JoinedDomainReady), V2PlanDependencyReasonCode.DomainRequired, "Joined-domain readiness follows domain join.", dependencies);
 
             if (state.TopologyRoleIs("FirstDomainController") &&
-                state.ResolvedDomain?.RelationKind == V2DomainRelationKind.Child &&
+                state.ResolvedDomain?.RelationKind is V2DomainRelationKind.Child or V2DomainRelationKind.Tree &&
                 state.ResolvedDomain.ParentDomainId is not null &&
                 domainReadyByDomainId.TryGetValue(state.ResolvedDomain.ParentDomainId, out var parentDomainReady))
             {
-                AddDependencyIfPresent(parentDomainReady, state.TryGetNode(V2PlanNodeKind.PromoteFirstDomainController), V2PlanDependencyReasonCode.DomainRequired, "Child-domain creation waits for parent-domain readiness.", dependencies);
+                AddDependencyIfPresent(parentDomainReady, state.TryGetNode(V2PlanNodeKind.PromoteFirstDomainController), V2PlanDependencyReasonCode.DomainRequired, "Dependent-domain creation waits for parent-domain readiness.", dependencies);
             }
 
             if (state.TopologyRoleIs("ReplicaDomainController") &&
@@ -819,7 +806,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             {
                 AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.JoinDomain), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch domain work waits for router readiness.", dependencies);
                 AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.PromoteReplicaDomainController), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch replica promotion waits for router readiness.", dependencies);
-                AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.PromoteFirstDomainController), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch child-domain creation waits for router readiness.", dependencies);
+                AddDependencyIfPresent(routerNode, state.TryGetNode(V2PlanNodeKind.PromoteFirstDomainController), V2PlanDependencyReasonCode.RouterRequired, "Cross-switch dependent-domain creation waits for router readiness.", dependencies);
             }
 
             if (state.TopologyRoleIs("Router"))
@@ -1128,6 +1115,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         return state.ResolvedDomain?.RelationKind switch
         {
             V2DomainRelationKind.Child => "Create child domain controller",
+            V2DomainRelationKind.Tree => "Create tree domain controller",
             _ => "Create first domain controller"
         };
     }
