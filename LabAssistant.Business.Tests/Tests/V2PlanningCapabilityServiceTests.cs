@@ -242,16 +242,103 @@ public sealed class V2PlanningCapabilityServiceTests
     }
 
     [Fact]
-    public async Task BuildPlanAsync_TreeDomain_RemainsBlocking()
+    public async Task BuildPlanAsync_TreeDomain_EmitsSharedPerDomainProgression()
     {
         var request = CreateChildDomainRequest();
-        var childDomain = Assert.Single(request.Template.DirectoryTopology!.Domains!.Where(domain => domain.DomainId == "domain-child"));
-        childDomain.RelationKind = V2DomainRelationKind.Tree;
+        var treeDomain = Assert.Single(request.Template.DirectoryTopology!.Domains!.Where(domain => domain.DomainId == "domain-child"));
+        treeDomain.RelationKind = V2DomainRelationKind.Tree;
+        treeDomain.DnsName = "fabrikam.com";
+        treeDomain.NetBiosName = "FABRIKAM";
 
         var result = await _service.BuildPlanAsync(request);
 
-        Assert.False(result.Success);
-        Assert.Contains(result.Issues, issue => issue.Code == "domain-relation-not-supported" && issue.Severity == V2PlanIssueSeverity.Blocking);
+        Assert.True(result.Success);
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "domain-relation-not-supported");
+
+        var treeFirstPromotion = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.PromoteFirstDomainController &&
+            node.VmId == "vm-childdc01"));
+        var sponsorReady = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.DomainReady &&
+            node.VmId == "vm-dc01"));
+        var treeDnsGate = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.StabilizeDomainDns &&
+            node.VmId == "vm-childdc01"));
+        var treeReplicaPromotion = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.PromoteReplicaDomainController &&
+            node.VmId == "vm-childreplica01"));
+        var treeJoin = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.JoinDomain &&
+            node.VmId == "vm-childmember01"));
+
+        Assert.Contains(result.Dependencies, dep =>
+            dep.FromNodeId == sponsorReady.NodeId &&
+            dep.ToNodeId == treeFirstPromotion.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+        Assert.Contains(result.Dependencies, dep =>
+            dep.FromNodeId == treeDnsGate.NodeId &&
+            dep.ToNodeId == treeJoin.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+        Assert.Contains(result.Dependencies, dep =>
+            dep.ToNodeId == treeReplicaPromotion.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_MultipleIndependentRootForests_EmitEqualRootPaths()
+    {
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"]);
+        request.Template.VmTemplates.Add(new VmTemplate
+        {
+            VmId = "vm-fabrikamdc01",
+            Name = "fabrikamdc01",
+            MemoryMb = 4096,
+            CpuCount = 2,
+            VhdxId = "disk-fabrikamdc",
+            TopologyRole = "FirstDomainController",
+            DomainId = "domain-fabrikam",
+            CredentialSlots = new VmCredentialSlotBindings
+            {
+                LocalBootstrap = "slot-local",
+                DomainAdmin = "slot-fabrikam-admin",
+                Dsrm = "slot-dsrm"
+            },
+            Nics =
+            [
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-fabrikamdc",
+                    NetworkId = "lab-core",
+                    IpAddress = "10.0.0.50",
+                    PrefixLength = 24,
+                    DefaultGateway = "10.0.0.1",
+                    DnsServers = ["10.0.0.50"]
+                }
+            ]
+        });
+        request.Template.DirectoryTopology!.Forests!.Add(new V2ForestTemplate
+        {
+            ForestId = "forest-fabrikam",
+            RootDomainId = "domain-fabrikam"
+        });
+        request.Template.DirectoryTopology.Domains!.Add(new V2DomainTemplate
+        {
+            DomainId = "domain-fabrikam",
+            DnsName = "fabrikam.com",
+            NetBiosName = "FABRIKAM",
+            ForestId = "forest-fabrikam",
+            RelationKind = V2DomainRelationKind.Root,
+            FirstDomainControllerVmId = "vm-fabrikamdc01"
+        });
+        request.CatalogItems = request.CatalogItems.Concat([CreateCatalogItem("disk-fabrikamdc", "slot-local")]).ToArray();
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.Nodes.Count(node => node.Kind == V2PlanNodeKind.PromoteFirstDomainController));
+        Assert.Equal(2, result.Nodes.Count(node => node.Kind == V2PlanNodeKind.DomainReady));
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.PromoteFirstDomainController && node.VmId == "vm-dc01");
+        Assert.Contains(result.Nodes, node => node.Kind == V2PlanNodeKind.PromoteFirstDomainController && node.VmId == "vm-fabrikamdc01");
     }
 
     [Fact]
