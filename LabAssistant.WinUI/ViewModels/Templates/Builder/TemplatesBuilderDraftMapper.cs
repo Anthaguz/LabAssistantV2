@@ -93,7 +93,8 @@ internal static class TemplatesBuilderDraftMapper
         string templateId,
         int templateRevision,
         string createdWithAppVersion,
-        string? sourceFilePath)
+        string? sourceFilePath,
+        IReadOnlyList<V2TrustTemplate>? preservedTrusts = null)
     {
         var errors = new List<string>();
         var template = new LabTemplate
@@ -120,7 +121,8 @@ internal static class TemplatesBuilderDraftMapper
         template.DirectoryTopology = new V2DirectoryTopologyTemplate
         {
             Forests = ParseForests(draft.ForestsText, errors),
-            Domains = ParseDomains(draft.DomainsText, errors)
+            Domains = ParseDomains(draft.DomainsText, errors),
+            Trusts = CopyTrusts(preservedTrusts)
         };
         template.VmTemplates = ParseVms(draft.VmsText, errors);
         ApplyNics(template.VmTemplates, draft.NicsText, errors);
@@ -370,6 +372,25 @@ internal static class TemplatesBuilderDraftMapper
             .ToList() ?? [];
 
         return values.Count == 0 ? null : values;
+    }
+
+    private static List<V2TrustTemplate>? CopyTrusts(IReadOnlyList<V2TrustTemplate>? trusts)
+    {
+        if (trusts is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        return trusts
+            .Select(trust => new V2TrustTemplate
+            {
+                TrustId = trust.TrustId,
+                SourceDomainId = trust.SourceDomainId,
+                TargetDomainId = trust.TargetDomainId,
+                TrustType = trust.TrustType,
+                Direction = trust.Direction
+            })
+            .ToList();
     }
 
     private static string JoinRows(IEnumerable<string> rows)

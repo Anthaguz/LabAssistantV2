@@ -1,4 +1,5 @@
 using LabAssistant.Business.Templates;
+using LabAssistant.Models.Templates;
 
 namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
@@ -34,6 +35,8 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
 
     public bool HasStatusText { get; private set; }
 
+    public IReadOnlyList<V2TrustTemplate> PreservedTrusts { get; private set; } = Array.Empty<V2TrustTemplate>();
+
     public string ContextText { get; private set; } = "No Builder draft loaded.";
 
     public string StatusText { get; private set; } = "Create or open a V2 Builder draft.";
@@ -57,6 +60,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         TemplateRevision = 1;
         CreatedWithAppVersion = "1.0.0";
         SourceFilePath = null;
+        PreservedTrusts = Array.Empty<V2TrustTemplate>();
         ApplyDraft(draft with { IsSaveConfirmed = false });
         HasActiveDraft = true;
         ContextText = "Editing new V2 Builder draft.";
@@ -71,6 +75,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         TemplateRevision = document.Template.TemplateRevision;
         CreatedWithAppVersion = document.Template.CreatedWithAppVersion;
         SourceFilePath = document.SourceFilePath;
+        PreservedTrusts = CopyTrusts(document.Template.DirectoryTopology?.Trusts);
         ApplyDraft(TemplatesBuilderDraftMapper.FromTemplate(document.Template));
         HasActiveDraft = true;
         ContextText = string.IsNullOrWhiteSpace(SourceFilePath)
@@ -81,6 +86,16 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
 
     public void ApplyDraft(TemplatesBuilderDraftSnapshot draft)
     {
+        var editableContentChanged =
+            !string.Equals(TemplateName, draft.TemplateName, StringComparison.Ordinal) ||
+            !string.Equals(TemplateDescription, draft.TemplateDescription, StringComparison.Ordinal) ||
+            !string.Equals(DeploymentProfile, draft.DeploymentProfile, StringComparison.Ordinal) ||
+            !string.Equals(LabNetworksText, draft.LabNetworksText, StringComparison.Ordinal) ||
+            !string.Equals(ForestsText, draft.ForestsText, StringComparison.Ordinal) ||
+            !string.Equals(DomainsText, draft.DomainsText, StringComparison.Ordinal) ||
+            !string.Equals(VmsText, draft.VmsText, StringComparison.Ordinal) ||
+            !string.Equals(NicsText, draft.NicsText, StringComparison.Ordinal);
+
         TemplateName = draft.TemplateName;
         TemplateDescription = draft.TemplateDescription;
         DeploymentProfile = draft.DeploymentProfile;
@@ -89,7 +104,9 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         DomainsText = draft.DomainsText;
         VmsText = draft.VmsText;
         NicsText = draft.NicsText;
-        IsSaveConfirmed = draft.IsSaveConfirmed;
+        IsSaveConfirmed = editableContentChanged && IsSaveConfirmed
+            ? false
+            : draft.IsSaveConfirmed;
     }
 
     public TemplatesBuilderDraftSnapshot CaptureDraft()
@@ -112,6 +129,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         TemplateId = document.Template.Id;
         TemplateRevision = document.Template.TemplateRevision;
         CreatedWithAppVersion = document.Template.CreatedWithAppVersion;
+        PreservedTrusts = CopyTrusts(document.Template.DirectoryTopology?.Trusts);
         IsSaveConfirmed = false;
         ContextText = $"Editing V2 template: {filePath}";
     }
@@ -121,5 +139,23 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         StatusText = statusText;
         HasStatusText = !string.IsNullOrWhiteSpace(statusText);
     }
-}
 
+    private static IReadOnlyList<V2TrustTemplate> CopyTrusts(IEnumerable<V2TrustTemplate>? trusts)
+    {
+        if (trusts is null)
+        {
+            return Array.Empty<V2TrustTemplate>();
+        }
+
+        return trusts
+            .Select(trust => new V2TrustTemplate
+            {
+                TrustId = trust.TrustId,
+                SourceDomainId = trust.SourceDomainId,
+                TargetDomainId = trust.TargetDomainId,
+                TrustType = trust.TrustType,
+                Direction = trust.Direction
+            })
+            .ToList();
+    }
+}

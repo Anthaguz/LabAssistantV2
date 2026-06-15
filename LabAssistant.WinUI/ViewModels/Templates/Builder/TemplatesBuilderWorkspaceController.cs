@@ -217,6 +217,7 @@ internal sealed class TemplatesBuilderWorkspaceController
             _workspace.TemplateId,
             _workspace.TemplateRevision,
             _workspace.CreatedWithAppVersion,
-            _workspace.SourceFilePath);
+            _workspace.SourceFilePath,
+            _workspace.PreservedTrusts);
     }
 }
