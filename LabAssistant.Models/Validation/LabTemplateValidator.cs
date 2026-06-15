@@ -317,7 +317,7 @@ public static class LabTemplateValidator
             result.Errors.Add($"VM '{vmName}' membershipMode must be one of: {string.Join(", ", V2MembershipModeCatalog.SupportedModes)}.");
         }
 
-        if (vm.TopologyRole is "RootDomainController" or "ReplicaDomainController" &&
+        if (vm.TopologyRole is "FirstDomainController" or "RootDomainController" or "ReplicaDomainController" &&
             string.IsNullOrWhiteSpace(vm.DomainId))
         {
             result.Errors.Add($"VM '{vmName}' domainId is required for topology role '{vm.TopologyRole}'.");
@@ -388,6 +388,11 @@ public static class LabTemplateValidator
         if (vm.CredentialSlots.Dsrm != null && string.IsNullOrWhiteSpace(vm.CredentialSlots.Dsrm))
         {
             result.Errors.Add($"VM '{vmName}' credentialSlots.dsrm must not be empty.");
+        }
+
+        if (vm.CredentialSlots.ParentDomainAdmin != null && string.IsNullOrWhiteSpace(vm.CredentialSlots.ParentDomainAdmin))
+        {
+            result.Errors.Add($"VM '{vmName}' credentialSlots.parentDomainAdmin must not be empty.");
         }
     }
 

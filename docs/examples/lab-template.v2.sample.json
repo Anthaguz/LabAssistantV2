@@ -75,7 +75,7 @@
       "memoryMb": 4096,
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gen2-core",
-      "topologyRole": "RootDomainController",
+      "topologyRole": "FirstDomainController",
       "domainId": "domain-contoso",
       "capabilityRoles": [],
       "credentialSlots": {
@@ -134,7 +134,7 @@
       "memoryMb": 4096,
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gen2-core",
-      "topologyRole": "ReplicaDomainController",
+      "topologyRole": "FirstDomainController",
       "domainId": "domain-child",
       "capabilityRoles": [],
       "dependsOn": [
@@ -142,8 +142,9 @@
       ],
       "credentialSlots": {
         "localBootstrap": "disk.win-server-2025.local-admin",
-        "domainAdmin": "lab.contoso.domain-admin",
-        "dsrm": "lab.contoso.dsrm"
+        "domainAdmin": "lab.child.domain-admin",
+        "parentDomainAdmin": "lab.contoso.domain-admin",
+        "dsrm": "lab.child.dsrm"
       },
       "nics": [
         {
@@ -165,7 +166,7 @@
       "memoryMb": 4096,
       "cpuCount": 2,
       "vhdxId": "win-server-2025-gen2-core",
-      "topologyRole": "RootDomainController",
+      "topologyRole": "FirstDomainController",
       "domainId": "domain-fabrikam",
       "capabilityRoles": [],
       "credentialSlots": {

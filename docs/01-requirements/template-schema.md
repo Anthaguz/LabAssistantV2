@@ -149,8 +149,10 @@ For `V2`, the schema direction expands the current model to include:
 Topology roles affect scheduling and dependency semantics:
 
 - `Router`
-- `RootDomainController`
+- `FirstDomainController`
 - `ReplicaDomainController`
+
+`RootDomainController` is still accepted as a compatibility alias, but new V2 data should use `FirstDomainController`.
 
 Capability roles request additive work without replacing topology roles:
 

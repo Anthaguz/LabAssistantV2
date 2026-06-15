@@ -40,8 +40,10 @@ Each NIC may include:
 Topology roles shape orchestration order and dependency semantics:
 
 - `Router`
-- `RootDomainController`
+- `FirstDomainController`
 - `ReplicaDomainController`
+
+`RootDomainController` remains accepted as a backward-compatible alias, but new V2 templates should prefer `FirstDomainController`.
 
 Ordinary machines do not need a topology role. In V2, domain participation is modeled separately through `membershipMode`.
 
@@ -113,13 +115,13 @@ The current V2 slice executes explicit graph nodes for:
 - router cross-switch readiness validation
 - router outbound egress validation
 - AD DS feature installation
-- root domain-controller promotion
+- first domain-controller promotion
 - replica domain-controller promotion
 - per-domain DNS stabilization
 - domain joins
 - joined-state and domain-login validation
 
-Child domains, tree domains, and trusts remain deferred to later slices.
+Tree domains and trusts remain deferred to later slices. Child-domain execution now reuses the shared per-domain promotion, DNS stabilization, and join paths, with only first-domain creation varying by relation kind.
 
 Base remote-access guest hardening is now a deploy-time V2 review/runtime option and remains deferred only at the template-authoring/schema level.
 

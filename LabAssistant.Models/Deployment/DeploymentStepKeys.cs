@@ -31,7 +31,8 @@ public static class DeploymentStepKeys
     public const string V2ValidateCrossSwitchRouting = "v2.validateCrossSwitchRouting";
     public const string V2ValidateRouterEgress = "v2.validateRouterEgress";
     public const string V2InstallAdDomainServices = "v2.installAdDomainServices";
-    public const string V2PromoteRootDomainController = "v2.promoteRootDomainController";
+    public const string V2PromoteFirstDomainController = "v2.promoteFirstDomainController";
+    public const string V2PromoteRootDomainController = V2PromoteFirstDomainController;
     public const string V2DomainReady = "v2.domainReady";
     public const string V2RouterReady = "v2.routerReady";
     public const string V2PromoteReplicaDomainController = "v2.promoteReplicaDomainController";

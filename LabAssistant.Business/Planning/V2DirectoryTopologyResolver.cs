@@ -60,6 +60,18 @@ internal static class V2DirectoryTopologyResolver
                 continue;
             }
 
+            if (domain.RelationKind is V2DomainRelationKind.Child or V2DomainRelationKind.Tree &&
+                (string.IsNullOrWhiteSpace(domain.ParentDomainId) || !domains.ContainsKey(domain.ParentDomainId)))
+            {
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "domain-parent-missing",
+                    Message = $"Domain '{domain.DomainId}' references missing parent domain '{domain.ParentDomainId}'.",
+                    SuggestedAction = "Point parentDomainId to an existing domain."
+                });
+            }
+
             if (!vmById.TryGetValue(domain.FirstDomainControllerVmId, out var vm))
             {
                 issues.Add(new V2PlanIssue
@@ -85,17 +97,16 @@ internal static class V2DirectoryTopologyResolver
                 });
             }
 
-            if (domain.RelationKind == V2DomainRelationKind.Root &&
-                !string.Equals(vm.TopologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase))
+            if (!IsFirstDomainControllerRole(vm.TopologyRole))
             {
                 issues.Add(new V2PlanIssue
                 {
                     Severity = V2PlanIssueSeverity.Blocking,
                     VmId = vm.VmId,
                     VmName = vm.VmName,
-                    Code = "root-domain-first-dc-role-invalid",
-                    Message = $"Root domain '{domain.DomainId}' requires first domain controller '{vm.VmName}' to use topology role 'RootDomainController'.",
-                    SuggestedAction = "Set the VM topologyRole to RootDomainController or choose another VM."
+                    Code = "first-domain-controller-role-invalid",
+                    Message = $"Domain '{domain.DomainId}' requires first domain controller '{vm.VmName}' to use topology role 'FirstDomainController' (or legacy alias 'RootDomainController').",
+                    SuggestedAction = "Set the VM topologyRole to FirstDomainController or choose another VM."
                 });
             }
         }
@@ -118,6 +129,10 @@ internal static class V2DirectoryTopologyResolver
             }).ToArray() ?? Array.Empty<V2ResolvedDomainPlanningContext>(),
             topology.Trusts?.ToArray() ?? Array.Empty<V2TrustTemplate>());
     }
+
+    private static bool IsFirstDomainControllerRole(string? topologyRole)
+        => string.Equals(topologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(topologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed record V2DirectoryTopologyResolution(
