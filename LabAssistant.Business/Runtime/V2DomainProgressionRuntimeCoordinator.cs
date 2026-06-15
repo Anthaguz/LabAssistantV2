@@ -45,7 +45,7 @@ internal sealed class V2DomainProgressionRuntimeCoordinator
         => _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             domainAdminCredential,
-            RootForestGuestScriptBuilder.BuildVerifyDomainControllerScript(expectedDomainName),
+            FirstDomainControllerGuestScriptBuilder.BuildVerifyDomainControllerScript(expectedDomainName),
             cancellationToken);
 
     public Task<GuestCommandResult> ProbeReplicaDomainReadyAsync(
@@ -56,7 +56,7 @@ internal sealed class V2DomainProgressionRuntimeCoordinator
         => _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             domainAdminCredential,
-            RootForestGuestScriptBuilder.BuildDomainReadyProbeScript(expectedDomainName),
+            FirstDomainControllerGuestScriptBuilder.BuildDomainReadyProbeScript(expectedDomainName),
             cancellationToken);
 
     public Task<GuestCommandResult> StabilizeDomainDnsAsync(
@@ -105,5 +105,5 @@ internal sealed class V2DomainProgressionRuntimeCoordinator
             cancellationToken);
 
     public static bool IsExpectedRestartBoundaryError(string? error)
-        => V2RootForestRuntimeCoordinator.IsExpectedRestartBoundaryError(error);
+        => V2FirstDomainControllerRuntimeCoordinator.IsExpectedRestartBoundaryError(error);
 }

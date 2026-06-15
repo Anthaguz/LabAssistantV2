@@ -4,11 +4,11 @@ using LabAssistant.Services.GuestExecution;
 
 namespace LabAssistant.Business.Runtime;
 
-internal sealed class V2RootForestRuntimeCoordinator
+internal sealed class V2FirstDomainControllerRuntimeCoordinator
 {
     private readonly IGuestCommandExecutor _guestCommandExecutor;
 
-    public V2RootForestRuntimeCoordinator(IGuestCommandExecutor guestCommandExecutor)
+    public V2FirstDomainControllerRuntimeCoordinator(IGuestCommandExecutor guestCommandExecutor)
     {
         _guestCommandExecutor = guestCommandExecutor;
     }
@@ -21,21 +21,36 @@ internal sealed class V2RootForestRuntimeCoordinator
         return await _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             bootstrapCredential,
-            RootForestGuestScriptBuilder.BuildInstallAdDomainServicesFeatureScript(),
+            FirstDomainControllerGuestScriptBuilder.BuildInstallAdDomainServicesFeatureScript(),
             cancellationToken);
     }
 
-    public async Task<GuestCommandResult> PromoteRootForestAsync(
+    public async Task<GuestCommandResult> PromoteFirstDomainControllerAsync(
         string vmName,
         V2RuntimeCredential bootstrapCredential,
         V2ResolvedDomainPlanningContext domain,
         string dsrmPassword,
+        V2RuntimeCredential? parentDomainAdminCredential,
+        V2ResolvedDomainPlanningContext? parentDomain,
         CancellationToken cancellationToken)
     {
         return await _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             bootstrapCredential,
-            RootForestGuestScriptBuilder.BuildPromoteRootForestScript(domain, dsrmPassword),
+            FirstDomainControllerGuestScriptBuilder.BuildPromoteFirstDomainControllerScript(domain, dsrmPassword, parentDomainAdminCredential, parentDomain),
+            cancellationToken);
+    }
+
+    public async Task<GuestCommandResult> ProbeParentDomainDnsReadyAsync(
+        string vmName,
+        V2RuntimeCredential bootstrapCredential,
+        string parentDomainName,
+        CancellationToken cancellationToken)
+    {
+        return await _guestCommandExecutor.ExecutePowerShellDirectAsync(
+            vmName,
+            bootstrapCredential,
+            FirstDomainControllerGuestScriptBuilder.BuildWaitForParentDomainDnsScript(parentDomainName),
             cancellationToken);
     }
 
@@ -48,7 +63,7 @@ internal sealed class V2RootForestRuntimeCoordinator
         return await _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             domainAdminCredential,
-            RootForestGuestScriptBuilder.BuildVerifyDomainControllerScript(expectedDomainName),
+            FirstDomainControllerGuestScriptBuilder.BuildVerifyDomainControllerScript(expectedDomainName),
             cancellationToken);
     }
 
@@ -61,7 +76,7 @@ internal sealed class V2RootForestRuntimeCoordinator
         return await _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,
             domainAdminCredential,
-            RootForestGuestScriptBuilder.BuildDomainReadyProbeScript(expectedDomainName),
+            FirstDomainControllerGuestScriptBuilder.BuildDomainReadyProbeScript(expectedDomainName),
             cancellationToken);
     }
 

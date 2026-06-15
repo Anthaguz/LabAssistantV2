@@ -454,7 +454,8 @@ public class LabTemplateStore : ILabTemplateStore
             LocalBootstrap = source.LocalBootstrap,
             DomainAdmin = source.DomainAdmin,
             DomainJoin = source.DomainJoin,
-            Dsrm = source.Dsrm
+            Dsrm = source.Dsrm,
+            ParentDomainAdmin = source.ParentDomainAdmin
         };
     }
 

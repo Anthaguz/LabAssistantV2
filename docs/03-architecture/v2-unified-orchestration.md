@@ -69,10 +69,12 @@ The primary planning input is not a single numeric priority.
 
 ### Topology roles
 - `Router`
-- `RootDomainController`
+- `FirstDomainController`
 - `ReplicaDomainController`
 
 Topology roles shape ordering and dependency semantics.
+
+`RootDomainController` remains a compatibility alias for existing data, but the canonical V2 topology role is `FirstDomainController`.
 
 ### Membership mode
 - `DomainMember`

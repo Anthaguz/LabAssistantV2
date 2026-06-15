@@ -203,6 +203,58 @@ public sealed class V2PlanningCapabilityServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanAsync_ChildDomain_EmitsPerDomainCreationAndProgression()
+    {
+        var request = CreateChildDomainRequest();
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "domain-relation-not-supported");
+
+        var childFirstPromotion = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.PromoteFirstDomainController &&
+            node.VmId == "vm-childdc01"));
+        var parentReady = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.DomainReady &&
+            node.VmId == "vm-dc01"));
+        var childDnsGate = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.StabilizeDomainDns &&
+            node.VmId == "vm-childdc01"));
+        var childReplicaPromotion = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.PromoteReplicaDomainController &&
+            node.VmId == "vm-childreplica01"));
+        var childJoin = Assert.Single(result.Nodes.Where(node =>
+            node.Kind == V2PlanNodeKind.JoinDomain &&
+            node.VmId == "vm-childmember01"));
+
+        Assert.Contains(result.Dependencies, dep =>
+            dep.FromNodeId == parentReady.NodeId &&
+            dep.ToNodeId == childFirstPromotion.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+        Assert.Contains(result.Dependencies, dep =>
+            dep.FromNodeId == childDnsGate.NodeId &&
+            dep.ToNodeId == childJoin.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+        Assert.Contains(result.Dependencies, dep =>
+            dep.ToNodeId == childReplicaPromotion.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.DomainRequired);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_TreeDomain_RemainsBlocking()
+    {
+        var request = CreateChildDomainRequest();
+        var childDomain = Assert.Single(request.Template.DirectoryTopology!.Domains!.Where(domain => domain.DomainId == "domain-child"));
+        childDomain.RelationKind = V2DomainRelationKind.Tree;
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Code == "domain-relation-not-supported" && issue.Severity == V2PlanIssueSeverity.Blocking);
+    }
+
+    [Fact]
     public async Task BuildPlanAsync_PreservesExplicitMultiNicIntentInResolvedContext()
     {
         var result = await _service.BuildPlanAsync(CreateCrossSwitchRequest(includeRouter: true));
@@ -518,6 +570,122 @@ public sealed class V2PlanningCapabilityServiceTests
             ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm"],
             DefaultDeploymentProfile = "Balanced"
         };
+    }
+
+    private static V2PlanBuildRequest CreateChildDomainRequest()
+    {
+        var request = CreateAdCoreRequest(
+            "Balanced",
+            ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-child-admin", "slot-parent-admin"]);
+
+        request.Template.VmTemplates.AddRange(
+        [
+            new VmTemplate
+            {
+                VmId = "vm-childdc01",
+                Name = "childdc01",
+                MemoryMb = 4096,
+                CpuCount = 2,
+                VhdxId = "disk-childdc",
+                TopologyRole = "FirstDomainController",
+                DomainId = "domain-child",
+                CredentialSlots = new VmCredentialSlotBindings
+                {
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-child-admin",
+                    Dsrm = "slot-dsrm",
+                    ParentDomainAdmin = "slot-parent-admin"
+                },
+                Nics =
+                [
+                    new VmNetworkInterfaceTemplate
+                    {
+                        NicId = "nic-childdc",
+                        NetworkId = "lab-core",
+                        IpAddress = "10.0.0.30",
+                        PrefixLength = 24,
+                        DefaultGateway = "10.0.0.1",
+                        DnsServers = ["10.0.0.10"]
+                    }
+                ]
+            },
+            new VmTemplate
+            {
+                VmId = "vm-childreplica01",
+                Name = "childreplica01",
+                MemoryMb = 4096,
+                CpuCount = 2,
+                VhdxId = "disk-childreplica",
+                TopologyRole = "ReplicaDomainController",
+                DomainId = "domain-child",
+                CredentialSlots = new VmCredentialSlotBindings
+                {
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-child-admin",
+                    Dsrm = "slot-dsrm"
+                },
+                Nics =
+                [
+                    new VmNetworkInterfaceTemplate
+                    {
+                        NicId = "nic-childreplica",
+                        NetworkId = "lab-core",
+                        IpAddress = "10.0.0.31",
+                        PrefixLength = 24,
+                        DefaultGateway = "10.0.0.1",
+                        DnsServers = ["10.0.0.30", "10.0.0.10"]
+                    }
+                ]
+            },
+            new VmTemplate
+            {
+                VmId = "vm-childmember01",
+                Name = "childmember01",
+                MemoryMb = 4096,
+                CpuCount = 2,
+                VhdxId = "disk-childmember",
+                MembershipMode = V2MembershipModeCatalog.DomainMember,
+                DomainId = "domain-child",
+                CredentialSlots = new VmCredentialSlotBindings
+                {
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-child-admin",
+                    DomainJoin = "slot-join"
+                },
+                Nics =
+                [
+                    new VmNetworkInterfaceTemplate
+                    {
+                        NicId = "nic-childmember",
+                        NetworkId = "lab-core",
+                        IpAddress = "10.0.0.40",
+                        PrefixLength = 24,
+                        DefaultGateway = "10.0.0.1",
+                        DnsServers = ["10.0.0.30", "10.0.0.10"]
+                    }
+                ]
+            }
+        ]);
+
+        request.Template.DirectoryTopology!.Domains!.Add(new V2DomainTemplate
+        {
+            DomainId = "domain-child",
+            DnsName = "child.contoso.com",
+            NetBiosName = "CHILD",
+            ForestId = "forest-contoso",
+            RelationKind = V2DomainRelationKind.Child,
+            ParentDomainId = "domain-contoso",
+            FirstDomainControllerVmId = "vm-childdc01"
+        });
+
+        request.CatalogItems = request.CatalogItems.Concat(
+        [
+            CreateCatalogItem("disk-childdc", "slot-local"),
+            CreateCatalogItem("disk-childreplica", "slot-local"),
+            CreateCatalogItem("disk-childmember", "slot-local")
+        ]).ToArray();
+
+        return request;
     }
 
     private static LabTemplate CreateBaseTemplate(string? persistedProfile)

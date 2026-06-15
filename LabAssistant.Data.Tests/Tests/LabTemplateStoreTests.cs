@@ -366,7 +366,8 @@ public class LabTemplateStoreTests
                     DependsOn = ["vm:router:ready"],
                     CredentialSlots = new VmCredentialSlotBindings
                     {
-                        LocalBootstrap = "disk.win.local-admin"
+                        LocalBootstrap = "disk.win.local-admin",
+                        ParentDomainAdmin = "domain.parent.admin"
                     },
                     Nics =
                     [
@@ -393,6 +394,7 @@ public class LabTemplateStoreTests
         Assert.Equal(["Pki"], loaded.VmTemplates[0].CapabilityRoles);
         Assert.Equal(["vm:router:ready"], loaded.VmTemplates[0].DependsOn);
         Assert.Equal("DomainMember", loaded.VmTemplates[0].MembershipMode);
+        Assert.Equal("domain.parent.admin", loaded.VmTemplates[0].CredentialSlots?.ParentDomainAdmin);
         Assert.Contains("\"deploymentProfile\": \"Balanced\"", json);
         Assert.Contains("\"membershipMode\": \"DomainMember\"", json);
         Assert.Contains("\"labNetworks\"", json);

@@ -115,7 +115,7 @@ public sealed class V2RuntimeCapabilityServiceTests
 
         Assert.True(result.Success);
         Assert.Contains("vm:vm-dc01:InstallAdDomainServicesFeature", result.ExecutedNodeIds);
-        Assert.Contains("vm:vm-dc01:PromoteRootDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-dc01:PromoteFirstDomainController", result.ExecutedNodeIds);
         Assert.Contains("vm:vm-dc01:DomainReady", result.ExecutedNodeIds);
         Assert.Contains("vm:vm-replica01:PromoteReplicaDomainController", result.ExecutedNodeIds);
         Assert.Contains("vm:vm-replica01:ReplicaDomainReady", result.ExecutedNodeIds);
@@ -258,6 +258,37 @@ public sealed class V2RuntimeCapabilityServiceTests
         Assert.DoesNotContain("SetUserAuthenticationRequired", remoteAccessScript.Script, StringComparison.Ordinal);
         Assert.Contains("fDenyTSConnections", remoteAccessScript.Script, StringComparison.Ordinal);
         Assert.Contains("Set-NetConnectionProfile", remoteAccessScript.Script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ChildDomainProgression_UsesSharedPerDomainRuntime()
+    {
+        var request = await CreateRuntimeRequestWithChildDomainAsync();
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("vm:vm-childdc01:PromoteFirstDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childdc01:DomainReady", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childreplica01:PromoteReplicaDomainController", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childdc01:StabilizeDomainDns", result.ExecutedNodeIds);
+        Assert.Contains("vm:vm-childmember01:JoinDomain", result.ExecutedNodeIds);
+
+        var childPromotionScript = scripts.First(entry =>
+            entry.VmName == "childdc01" &&
+            entry.Script.Contains("Install-ADDSDomain", StringComparison.Ordinal));
+        Assert.Contains("-DomainType ChildDomain", childPromotionScript.Script, StringComparison.Ordinal);
+        Assert.Contains("-ParentDomainName 'contoso.com'", childPromotionScript.Script, StringComparison.Ordinal);
     }
 
     private static IV2RuntimeCapabilityService CreateService(
@@ -720,4 +751,145 @@ public sealed class V2RuntimeCapabilityServiceTests
             Name = name,
             SwitchType = switchType
         };
+
+    private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithChildDomainAsync()
+    {
+        var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: false);
+        request.Template.VmTemplates.AddRange(
+        [
+            new VmTemplate
+            {
+                VmId = "vm-childdc01",
+                Name = "childdc01",
+                MemoryMb = 4096,
+                CpuCount = 2,
+                VhdxId = "disk-childdc",
+                TopologyRole = "FirstDomainController",
+                DomainId = "domain-child",
+                CredentialSlots = new VmCredentialSlotBindings
+                {
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-child-admin",
+                    Dsrm = "slot-dsrm",
+                    ParentDomainAdmin = "slot-parent-admin"
+                },
+                Nics =
+                [
+                    new VmNetworkInterfaceTemplate
+                    {
+                        NicId = "nic-childdc",
+                        NetworkId = "lab-core",
+                        IpAddress = "10.0.0.30",
+                        PrefixLength = 24,
+                        DefaultGateway = "10.0.0.1",
+                        DnsServers = ["10.0.0.10"]
+                    }
+                ]
+            },
+            new VmTemplate
+            {
+                VmId = "vm-childreplica01",
+                Name = "childreplica01",
+                MemoryMb = 4096,
+                CpuCount = 2,
+                VhdxId = "disk-childreplica",
+                TopologyRole = "ReplicaDomainController",
+                DomainId = "domain-child",
+                CredentialSlots = new VmCredentialSlotBindings
+                {
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-child-admin",
+                    Dsrm = "slot-dsrm"
+                },
+                Nics =
+                [
+                    new VmNetworkInterfaceTemplate
+                    {
+                        NicId = "nic-childreplica",
+                        NetworkId = "lab-core",
+                        IpAddress = "10.0.0.31",
+                        PrefixLength = 24,
+                        DefaultGateway = "10.0.0.1",
+                        DnsServers = ["10.0.0.30", "10.0.0.10"]
+                    }
+                ]
+            },
+            new VmTemplate
+            {
+                VmId = "vm-childmember01",
+                Name = "childmember01",
+                MemoryMb = 4096,
+                CpuCount = 2,
+                VhdxId = "disk-childmember",
+                MembershipMode = V2MembershipModeCatalog.DomainMember,
+                DomainId = "domain-child",
+                CredentialSlots = new VmCredentialSlotBindings
+                {
+                    LocalBootstrap = "slot-local",
+                    DomainAdmin = "slot-child-admin",
+                    DomainJoin = "slot-join"
+                },
+                Nics =
+                [
+                    new VmNetworkInterfaceTemplate
+                    {
+                        NicId = "nic-childmember",
+                        NetworkId = "lab-core",
+                        IpAddress = "10.0.0.40",
+                        PrefixLength = 24,
+                        DefaultGateway = "10.0.0.1",
+                        DnsServers = ["10.0.0.30", "10.0.0.10"]
+                    }
+                ]
+            }
+        ]);
+
+        request.Template.DirectoryTopology!.Domains!.Add(new V2DomainTemplate
+        {
+            DomainId = "domain-child",
+            DnsName = "child.contoso.com",
+            NetBiosName = "CHILD",
+            ForestId = "forest-contoso",
+            RelationKind = V2DomainRelationKind.Child,
+            ParentDomainId = "domain-contoso",
+            FirstDomainControllerVmId = "vm-childdc01"
+        });
+
+        var catalogItems = new List<VhdxCatalogItem>
+        {
+            CreateCatalogItem("disk-dc", "slot-local"),
+            CreateCatalogItem("disk-replica", "slot-local"),
+            CreateCatalogItem("disk-member", "slot-local"),
+            CreateCatalogItem("disk-childdc", "slot-local"),
+            CreateCatalogItem("disk-childreplica", "slot-local"),
+            CreateCatalogItem("disk-childmember", "slot-local")
+        };
+
+        request.Plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = request.Template,
+            CatalogItems = catalogItems,
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-child-admin", "slot-parent-admin"],
+            DefaultDeploymentProfile = "Balanced"
+        });
+
+        request.CredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["slot-local"] = new() { Username = "Administrator", Password = "Password123!" },
+            ["slot-join"] = new() { Username = @"LAB\JoinUser", Password = "Password123!" },
+            ["slot-admin"] = new() { Username = "Administrator@contoso.com", Password = "Password123!" },
+            ["slot-dsrm"] = new() { Username = "DSRM", Password = "Password123!" },
+            ["slot-child-admin"] = new() { Username = "Administrator@child.contoso.com", Password = "Password123!" },
+            ["slot-parent-admin"] = new() { Username = "Administrator@contoso.com", Password = "Password123!" }
+        };
+
+        return request;
+    }
 }

@@ -16,7 +16,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly Func<IPersistentPowerShellSession> _sessionFactory;
     private readonly Func<IPersistentPowerShellSession, IHyperVService> _hyperVFactory;
     private readonly IGuestCommandExecutor _guestCommandExecutor;
-    private readonly V2RootForestRuntimeCoordinator _rootForestRuntimeCoordinator;
+    private readonly V2FirstDomainControllerRuntimeCoordinator _firstDomainControllerRuntimeCoordinator;
     private readonly V2DomainProgressionRuntimeCoordinator _domainProgressionRuntimeCoordinator;
     private readonly V2BaseRemoteAccessRuntimeCoordinator _baseRemoteAccessRuntimeCoordinator;
     private readonly V2RouterRuntimeCoordinator _routerRuntimeCoordinator;
@@ -33,7 +33,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         _sessionFactory = sessionFactory;
         _hyperVFactory = hyperVFactory;
         _guestCommandExecutor = guestCommandExecutor;
-        _rootForestRuntimeCoordinator = new V2RootForestRuntimeCoordinator(guestCommandExecutor);
+        _firstDomainControllerRuntimeCoordinator = new V2FirstDomainControllerRuntimeCoordinator(guestCommandExecutor);
         _domainProgressionRuntimeCoordinator = new V2DomainProgressionRuntimeCoordinator(guestCommandExecutor);
         _baseRemoteAccessRuntimeCoordinator = new V2BaseRemoteAccessRuntimeCoordinator(guestCommandExecutor);
         _routerRuntimeCoordinator = new V2RouterRuntimeCoordinator(guestCommandExecutor);
@@ -86,7 +86,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         try
         {
             var rootStates = states
-                .Where(state => string.Equals(state.PlanVm.TopologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase))
+                .Where(state => IsRootFirstDomainController(state))
                 .ToList();
 
             if (rootStates.Count > 0)
@@ -98,7 +98,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             if (shouldContinue)
             {
                 var nonRootStates = states
-                    .Where(state => !string.Equals(state.PlanVm.TopologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase))
+                    .Where(state => !IsRootFirstDomainController(state))
                     .ToList();
 
                 if (request.Plan.Context.ResolvedDeploymentProfile == V2DeploymentProfile.Conservative)
@@ -192,7 +192,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     {
         await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.PrepareGuestNetwork, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.InstallAdDomainServicesFeature, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
-        await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.PromoteRootDomainController, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.PromoteFirstDomainController, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.DomainReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
     }
 
@@ -403,13 +403,18 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         ISet<string> deferredNodeIds,
         CancellationToken cancellationToken)
     {
+        var childFirstDomainStates = nonRootStates.Where(IsChildFirstDomainController).ToList();
         var replicaStates = nonRootStates.Where(state => state.PlanVm.TopologyRole == "ReplicaDomainController").ToList();
         var memberStates = nonRootStates.Where(state => state.PlanVm.RequiresDomainJoin).ToList();
+        var dnsStates = rootStates.Concat(childFirstDomainStates).ToList();
 
+        await ExecuteNodeSetAsync(childFirstDomainStates, V2PlanNodeKind.InstallAdDomainServicesFeature, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(childFirstDomainStates, V2PlanNodeKind.PromoteFirstDomainController, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(childFirstDomainStates, V2PlanNodeKind.DomainReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(replicaStates, V2PlanNodeKind.InstallAdDomainServicesFeature, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(replicaStates, V2PlanNodeKind.PromoteReplicaDomainController, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(replicaStates, V2PlanNodeKind.ReplicaDomainReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
-        await ExecuteNodeSetAsync(rootStates, V2PlanNodeKind.StabilizeDomainDns, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteNodeSetAsync(dnsStates, V2PlanNodeKind.StabilizeDomainDns, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(memberStates, V2PlanNodeKind.JoinDomain, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(memberStates, V2PlanNodeKind.JoinedDomainReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
     }
@@ -608,12 +613,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 executedNodeIds.Add(node.NodeId);
                 break;
 
-            case V2PlanNodeKind.PromoteRootDomainController:
+            case V2PlanNodeKind.PromoteFirstDomainController:
                 await ExecuteRuntimeStepAsync(
                     state.Context,
-                    DeploymentStepKeys.V2PromoteRootDomainController,
-                    "Promote root forest",
-                    context => PromoteRootForestAsync(state, request, context, cancellationToken),
+                    DeploymentStepKeys.V2PromoteFirstDomainController,
+                    "Create first domain controller",
+                    context => PromoteFirstDomainControllerAsync(state, request, context, cancellationToken),
                     multiContext,
                     cancellationToken);
                 executedNodeIds.Add(node.NodeId);
@@ -1161,7 +1166,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await _rootForestRuntimeCoordinator.EnsureAdDomainServicesInstalledAsync(
+        var result = await _firstDomainControllerRuntimeCoordinator.EnsureAdDomainServicesInstalledAsync(
             context.VmName,
             credential,
             cancellationToken);
@@ -1173,7 +1178,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
     }
 
-    private async Task PromoteRootForestAsync(
+    private async Task PromoteFirstDomainControllerAsync(
         RuntimeVmState state,
         V2RuntimeExecutionRequest request,
         VmDeploymentContext context,
@@ -1183,8 +1188,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         if (domain is null)
         {
             context.MarkFailure(
-                DeploymentStepKeys.V2PromoteRootDomainController,
-                $"VM '{context.VmName}' is missing resolved root-domain topology.");
+                DeploymentStepKeys.V2PromoteFirstDomainController,
+                $"VM '{context.VmName}' is missing resolved domain topology.");
             return;
         }
 
@@ -1192,33 +1197,99 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             request.CredentialSlotValues,
             state.PlanVm.EffectiveBootstrapCredentialSlot,
             context,
-            DeploymentStepKeys.V2PromoteRootDomainController,
+            DeploymentStepKeys.V2PromoteFirstDomainController,
             "bootstrap");
         var dsrmCredential = ResolveCredential(
             request.CredentialSlotValues,
             state.PlanVm.EffectiveDsrmCredentialSlot,
             context,
-            DeploymentStepKeys.V2PromoteRootDomainController,
+            DeploymentStepKeys.V2PromoteFirstDomainController,
             "DSRM");
-        if (bootstrapCredential is null || dsrmCredential is null)
+        V2RuntimeCredential? parentDomainAdminCredential = null;
+        V2ResolvedDomainPlanningContext? parentDomain = null;
+        if (domain.RelationKind == V2DomainRelationKind.Child)
+        {
+            if (string.IsNullOrWhiteSpace(domain.ParentDomainId))
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2PromoteFirstDomainController,
+                    $"Child domain '{domain.DomainId}' is missing parent-domain topology.");
+                return;
+            }
+
+            parentDomain = request.Plan.Context.Domains.FirstOrDefault(candidate =>
+                string.Equals(candidate.DomainId, domain.ParentDomainId, StringComparison.OrdinalIgnoreCase));
+            if (parentDomain is null)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2PromoteFirstDomainController,
+                    $"Child domain '{domain.DomainId}' references missing parent domain '{domain.ParentDomainId}'.");
+                return;
+            }
+
+            parentDomainAdminCredential = ResolveCredential(
+                request.CredentialSlotValues,
+                state.PlanVm.EffectiveParentDomainAdminCredentialSlot,
+                context,
+                DeploymentStepKeys.V2PromoteFirstDomainController,
+                "parent-domain-admin");
+        }
+
+        if (bootstrapCredential is null || dsrmCredential is null || (domain.RelationKind == V2DomainRelationKind.Child && parentDomainAdminCredential is null))
         {
             return;
         }
 
-        var result = await _rootForestRuntimeCoordinator.PromoteRootForestAsync(
+        if (domain.RelationKind == V2DomainRelationKind.Child)
+        {
+            string? lastDnsError = null;
+            for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var dnsReadyResult = await _firstDomainControllerRuntimeCoordinator.ProbeParentDomainDnsReadyAsync(
+                    context.VmName,
+                    bootstrapCredential,
+                    parentDomain!.DnsName,
+                    cancellationToken);
+                if (dnsReadyResult.Success)
+                {
+                    lastDnsError = null;
+                    break;
+                }
+
+                lastDnsError = dnsReadyResult.Error;
+                if (attempt < request.GuestTransportMaxRetries)
+                {
+                    await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+                }
+            }
+
+            if (lastDnsError is not null)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2PromoteFirstDomainController,
+                    $"Child domain '{domain.DnsName}' could not resolve parent-domain DNS from '{context.VmName}'. Last error: {lastDnsError}");
+                return;
+            }
+        }
+
+        var result = await _firstDomainControllerRuntimeCoordinator.PromoteFirstDomainControllerAsync(
             context.VmName,
             bootstrapCredential,
             domain,
             dsrmCredential.Password,
+            parentDomainAdminCredential,
+            parentDomain,
             cancellationToken);
-        if (result.Success || V2RootForestRuntimeCoordinator.IsExpectedRestartBoundaryError(result.Error))
+        if (result.Success || V2FirstDomainControllerRuntimeCoordinator.IsExpectedRestartBoundaryError(result.Error))
         {
             return;
         }
 
         context.MarkFailure(
-            DeploymentStepKeys.V2PromoteRootDomainController,
-            $"Root forest promotion failed on '{context.VmName}'. {result.Error}".Trim());
+            DeploymentStepKeys.V2PromoteFirstDomainController,
+            $"First domain-controller creation failed on '{context.VmName}'. {result.Error}".Trim());
     }
 
     private async Task WaitForDomainReadyAsync(
@@ -1232,7 +1303,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         {
             context.MarkFailure(
                 DeploymentStepKeys.V2DomainReady,
-                $"VM '{context.VmName}' is missing resolved root-domain topology.");
+                $"VM '{context.VmName}' is missing resolved domain topology.");
             return;
         }
 
@@ -1256,7 +1327,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 throw new OperationCanceledException(cancellationToken);
             }
 
-            var verifyResult = await _rootForestRuntimeCoordinator.VerifyDomainControllerAsync(
+            var verifyResult = await _firstDomainControllerRuntimeCoordinator.VerifyDomainControllerAsync(
                 context.VmName,
                 domainAdminCredential,
                 domain.DnsName,
@@ -1271,7 +1342,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 continue;
             }
 
-            var readyResult = await _rootForestRuntimeCoordinator.ProbeDomainReadyAsync(
+            var readyResult = await _firstDomainControllerRuntimeCoordinator.ProbeDomainReadyAsync(
                 context.VmName,
                 domainAdminCredential,
                 domain.DnsName,
@@ -1448,7 +1519,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         var domainControllerTargets = request.Template.VmTemplates
             .Where(vm => string.Equals(vm.DomainId, domain.DomainId, StringComparison.OrdinalIgnoreCase) &&
-                         (string.Equals(vm.TopologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase) ||
+                         (string.Equals(vm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(vm.TopologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(vm.TopologyRole, "ReplicaDomainController", StringComparison.OrdinalIgnoreCase)))
             .OrderBy(vm => vm.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(vm => vm.VmId, StringComparer.OrdinalIgnoreCase)
@@ -1868,7 +1940,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         var dcVms = allPlanVms
             .Where(vm => string.Equals(vm.DomainId, targetVm.DomainId, StringComparison.OrdinalIgnoreCase) &&
-                         (string.Equals(vm.TopologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase) ||
+                         (string.Equals(vm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(vm.TopologyRole, "ReplicaDomainController", StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
@@ -1981,6 +2053,14 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         return (!context.IsSuccess || context.WasCancelled) &&
                (context.VmFolderCreated || context.DifferencingDiskCreated || context.VmRegistered || context.VmStarted);
     }
+
+    private static bool IsRootFirstDomainController(RuntimeVmState state)
+        => string.Equals(state.PlanVm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) &&
+           state.Domain?.RelationKind == V2DomainRelationKind.Root;
+
+    private static bool IsChildFirstDomainController(RuntimeVmState state)
+        => string.Equals(state.PlanVm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) &&
+           state.Domain?.RelationKind == V2DomainRelationKind.Child;
 
     private static List<string> ValidateRequest(V2RuntimeExecutionRequest request)
     {

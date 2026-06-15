@@ -116,6 +116,8 @@ public sealed class V2ResolvedVmPlanningContext
 
     public string? EffectiveDsrmCredentialSlot { get; init; }
 
+    public string? EffectiveParentDomainAdminCredentialSlot { get; init; }
+
     public bool RequiresGuestWork { get; init; }
 
     public bool RequiresDomainJoin { get; init; }
@@ -168,7 +170,8 @@ public enum V2PlanNodeKind
     InstallAdDomainServicesFeature = 13,
     RouterReady = 14,
     DomainReady = 15,
-    PromoteRootDomainController = 16,
+    PromoteFirstDomainController = 16,
+    PromoteRootDomainController = PromoteFirstDomainController,
     PromoteReplicaDomainController = 17,
     ReplicaDomainReady = 18,
     StabilizeDomainDns = 19,
