@@ -201,7 +201,7 @@ Domain declarations carry the durable identity and relationship fields used by t
 
 Supported `relationKind` values are `Root`, `Child`, and `Tree`.
 
-Trust declarations are persisted and validated by shape/reference today, but trust execution remains deferred until the explicit trust-runtime contract lands.
+Trust declarations persist durable intent using `trustId`, source/target domain references, trust type, and direction. The first executable trust slice is limited to bidirectional forest trusts between two LabAssistant-managed V2 domains/forests. External trusts, realm trusts, one-way directions, selective authentication details, SID-filter details, and unmanaged external domains remain unsupported and must block before runtime. The first slice uses existing per-domain domain-admin credential slots and does not add dedicated trust credential fields.
 
 ### V2 network authoring direction
 

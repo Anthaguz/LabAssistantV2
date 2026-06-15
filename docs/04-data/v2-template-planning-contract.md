@@ -122,7 +122,7 @@ The current V2 slice executes explicit graph nodes for:
 - domain joins
 - joined-state and domain-login validation
 
-Root domains, child domains, tree domains, and multiple independent root forests now execute through the V2 runtime path. Extended topology execution reuses the shared per-domain promotion, DNS stabilization, and join paths, with only first-domain creation varying by relation kind. Trusts remain known contract data only until the explicit trust-runtime slice lands.
+Root domains, child domains, tree domains, and multiple independent root forests now execute through the V2 runtime path. Extended topology execution reuses the shared per-domain promotion, DNS stabilization, and join paths, with only first-domain creation varying by relation kind. The approved first trust runtime contract is limited to resolved trust contexts for managed bidirectional forest trusts between two LabAssistant-managed V2 domains/forests.
 
 Base remote-access guest hardening is now a deploy-time V2 review/runtime option and remains deferred only at the template-authoring/schema level.
 
@@ -155,7 +155,7 @@ It may declare:
 - `domains`
 - `trusts`
 
-The current runtime executes root, child, tree, and additional independent root-forest domain creation paths. Trusts remain reserved for a later runtime slice.
+The current domain runtime executes root, child, tree, and additional independent root-forest domain creation paths. The first trust runtime slice is limited to bidirectional forest trusts between two LabAssistant-managed V2 domains/forests.
 
 ### Forests
 
@@ -186,7 +186,7 @@ All supported `relationKind` values are executable in the current V2 backend run
 
 ### Trusts
 
-Trust declarations are reserved contract data in the current slice.
+Trust declarations are durable template intent. Runtime execution must consume a resolved trust context built from the template declaration, resolved domain/forest records, readiness gates, credential-slot mappings, DNS prep decisions, and cleanup ownership. Runtime must not execute directly from raw template trust rows.
 
 Each trust declaration may carry:
 
@@ -196,7 +196,31 @@ Each trust declaration may carry:
 - `trustType`
 - `direction`
 
-Trusts validate shape and references only. They do not execute yet.
+The first executable trust shape is:
+
+- `trustType`: forest trust
+- `direction`: bidirectional
+- source and target: LabAssistant-managed V2 domains/forests in the same resolved deployment plan
+
+External trusts, realm trusts, one-way directions, selective authentication details, SID-filter details, and unmanaged external domains are out of scope for the first trust runtime slice and must block before runtime with actionable guidance.
+
+The resolved trust context must include:
+
+- trust identity
+- source and target domain identity
+- source and target anchor domain controllers
+- existing per-domain domain-admin credential slots for both participating domains
+- `DomainReady` prerequisites for both participating domains
+- cross-forest DNS forwarding/reachability preparation before trust creation
+- source-DC anchored trust creation work
+- validation from both participating sides
+- cleanup ownership for LabAssistant-created trust objects
+
+Trust creation uses the existing per-domain domain-admin credential slots. The first slice must not add dedicated trust credential fields.
+
+If trust objects are created and the operation later fails or is cancelled, cleanup must attempt to delete the LabAssistant-created trust objects. DNS forwarders or equivalent DNS prep remain in place for retry and diagnosis.
+
+Structured logs with `operationId` are required for DNS prep, trust creation, both-side validation, and cleanup.
 
 ### Current Execution Boundary
 
@@ -204,7 +228,8 @@ Trusts validate shape and references only. They do not execute yet.
 - child domains execute through the shared per-domain runtime path
 - tree domains execute through the shared per-domain runtime path
 - additional independent root forests execute as peer first-domain creation paths
-- trusts remain known-but-non-executable
+- managed bidirectional forest trusts are the first approved executable trust shape and execute through resolved trust contexts after both participating domains are `DomainReady`
+- unsupported trust shapes remain validation/planning blockers and are not partially executed
 
 ## Open Questions / TBDs
 

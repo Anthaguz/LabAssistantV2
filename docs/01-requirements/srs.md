@@ -952,6 +952,10 @@ Detailed logging contract:
   - **Acceptance details:** Multi-hypervisor expansion is out of current scope and must not be assumed by the initial V2 contract.
   - **Priority:** P1
 
+- **FR-200:** The V2 orchestration runtime shall support a first executable trust slice for bidirectional forest trusts between two managed V2 domains/forests.
+  - **Acceptance details:** The first slice supports only bidirectional forest trusts between LabAssistant-managed V2 domains/forests. External trusts, realm trusts, one-way directions, selective authentication details, SID-filter details, and unmanaged external domains are out of scope. Trust execution waits until both participating domains are `DomainReady`, uses existing per-domain domain-admin credential slots, prepares cross-forest DNS forwarding/reachability before trust creation, validates the trust from both participating sides before marking it ready, emits structured logs with `operationId` for DNS prep, trust creation, validation, and cleanup, and attempts to delete LabAssistant-created trust objects on later failure or cancellation while leaving DNS forwarders in place for retry and diagnosis.
+  - **Priority:** P1
+
 ---
 
 ## 7. Acceptance Criteria Mapping
