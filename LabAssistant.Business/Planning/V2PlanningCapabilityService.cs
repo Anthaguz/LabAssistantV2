@@ -141,6 +141,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             }
         }
 
+        var resolvedTrusts = ResolveTrusts(topologyResolution, states, resolvedSlots, issues, unresolved);
         var routerRequired = DetermineRouterRequirement(states, domainRequired);
         if (routerRequired && !states.Any(state => state.IsRouterCapable))
         {
@@ -169,11 +170,14 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             DomainSemanticsRequired = domainRequired,
             Forests = topologyResolution.Forests,
             Domains = topologyResolution.Domains,
+            Trusts = resolvedTrusts,
             Vms = states.Select(state => state.ToContext()).ToArray()
         };
 
         EmitNodes(states, routerRequired, nodes);
+        EmitTrustNodes(resolvedTrusts, nodes);
         EmitDependencies(states, routerRequired, dependencies);
+        EmitTrustDependencies(resolvedTrusts, nodes, states, dependencies);
         ApplyWaveHints(nodes, dependencies, resolvedProfile, states);
         var waves = BuildWaves(nodes);
 
@@ -371,6 +375,118 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         state.RouterProvidesEgress = state.IsRouterCapable && state.HasExternalSwitchAttachment && state.HasNonExternalSwitchAttachment;
 
         return state;
+    }
+
+    private static IReadOnlyList<V2ResolvedTrustPlanningContext> ResolveTrusts(
+        V2DirectoryTopologyResolution topology,
+        IReadOnlyList<ResolvedVmState> states,
+        ISet<string> resolvedSlots,
+        List<V2PlanIssue> issues,
+        List<V2UnresolvedRequirement> unresolved)
+    {
+        if (topology.Trusts.Count == 0)
+        {
+            return Array.Empty<V2ResolvedTrustPlanningContext>();
+        }
+
+        var domainsById = topology.Domains.ToDictionary(domain => domain.DomainId, StringComparer.OrdinalIgnoreCase);
+        var statesByVmId = states.ToDictionary(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase);
+        var resolvedTrusts = new List<V2ResolvedTrustPlanningContext>();
+
+        foreach (var trust in topology.Trusts.OrderBy(item => item.TrustId, StringComparer.OrdinalIgnoreCase))
+        {
+            var trustId = Normalize(trust.TrustId) ?? "<unnamed-trust>";
+            if (trust.TrustType != V2TrustType.Forest || trust.Direction != V2TrustDirection.Bidirectional)
+            {
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "trust-shape-unsupported",
+                    Message = $"Trust '{trustId}' uses unsupported type '{trust.TrustType}' or direction '{trust.Direction}'.",
+                    SuggestedAction = "Use a bidirectional forest trust between two managed V2 domains/forests for the first executable trust slice."
+                });
+                continue;
+            }
+
+            if (!domainsById.TryGetValue(trust.SourceDomainId, out var sourceDomain) ||
+                !domainsById.TryGetValue(trust.TargetDomainId, out var targetDomain))
+            {
+                continue;
+            }
+
+            if (string.Equals(sourceDomain.DomainId, targetDomain.DomainId, StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "trust-self-reference",
+                    Message = $"Trust '{trustId}' must reference two different managed domains.",
+                    SuggestedAction = "Point the trust source and target to distinct V2 domains."
+                });
+                continue;
+            }
+
+            if (string.Equals(sourceDomain.ForestId, targetDomain.ForestId, StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "trust-forest-reference-unsupported",
+                    Message = $"Trust '{trustId}' references domains in the same forest.",
+                    SuggestedAction = "Use a bidirectional forest trust between two managed V2 forests."
+                });
+                continue;
+            }
+
+            if (!statesByVmId.TryGetValue(sourceDomain.FirstDomainControllerVmId, out var sourceState) ||
+                !statesByVmId.TryGetValue(targetDomain.FirstDomainControllerVmId, out var targetState))
+            {
+                continue;
+            }
+
+            AddCredentialSlotRequirement(
+                unresolved,
+                issues,
+                resolvedSlots,
+                sourceState.Vm,
+                sourceState.Vm.Name,
+                sourceState.EffectiveDomainAdminSlot,
+                "domain-admin",
+                $"forest trust '{trustId}' source domain '{sourceDomain.DnsName}'");
+            AddCredentialSlotRequirement(
+                unresolved,
+                issues,
+                resolvedSlots,
+                targetState.Vm,
+                targetState.Vm.Name,
+                targetState.EffectiveDomainAdminSlot,
+                "domain-admin",
+                $"forest trust '{trustId}' target domain '{targetDomain.DnsName}'");
+
+            resolvedTrusts.Add(new V2ResolvedTrustPlanningContext
+            {
+                TrustId = trustId,
+                TrustType = trust.TrustType,
+                Direction = trust.Direction,
+                SourceDomainId = sourceDomain.DomainId,
+                SourceDomainDnsName = sourceDomain.DnsName,
+                SourceForestId = sourceDomain.ForestId,
+                SourceAnchorVmId = sourceState.Vm.VmId,
+                SourceAnchorVmName = sourceState.Vm.Name,
+                SourceDomainAdminCredentialSlot = sourceState.EffectiveDomainAdminSlot,
+                TargetDomainId = targetDomain.DomainId,
+                TargetDomainDnsName = targetDomain.DnsName,
+                TargetForestId = targetDomain.ForestId,
+                TargetAnchorVmId = targetState.Vm.VmId,
+                TargetAnchorVmName = targetState.Vm.Name,
+                TargetDomainAdminCredentialSlot = targetState.EffectiveDomainAdminSlot,
+                PrepareDnsNodeId = BuildTrustNodeId(trustId, V2PlanNodeKind.PrepareForestTrustDns),
+                CreateTrustNodeId = BuildTrustNodeId(trustId, V2PlanNodeKind.CreateForestTrust),
+                ValidateTrustNodeId = BuildTrustNodeId(trustId, V2PlanNodeKind.ValidateForestTrust)
+            });
+        }
+
+        return resolvedTrusts.ToArray();
     }
 
     private static void AddCredentialSlotRequirement(
@@ -717,6 +833,16 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         }
     }
 
+    private static void EmitTrustNodes(IReadOnlyList<V2ResolvedTrustPlanningContext> trusts, List<V2PlanNode> nodes)
+    {
+        foreach (var trust in trusts)
+        {
+            AddTrustNode(nodes, trust, V2PlanNodeKind.PrepareForestTrustDns, "Prepare forest trust DNS", V2WorkloadClass.MediumGuest);
+            AddTrustNode(nodes, trust, V2PlanNodeKind.CreateForestTrust, "Create forest trust", V2WorkloadClass.HeavyGuest);
+            AddTrustNode(nodes, trust, V2PlanNodeKind.ValidateForestTrust, "Validate forest trust", V2WorkloadClass.LightWaitValidation);
+        }
+    }
+
     private static void EmitDependencies(IReadOnlyList<ResolvedVmState> states, bool routerRequired, List<V2PlanDependency> dependencies)
     {
         var domainReadyByDomainId = states
@@ -859,6 +985,43 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         }
     }
 
+    private static void EmitTrustDependencies(
+        IReadOnlyList<V2ResolvedTrustPlanningContext> trusts,
+        IReadOnlyList<V2PlanNode> nodes,
+        IReadOnlyList<ResolvedVmState> states,
+        List<V2PlanDependency> dependencies)
+    {
+        if (trusts.Count == 0)
+        {
+            return;
+        }
+
+        var nodeById = nodes.ToDictionary(node => node.NodeId, StringComparer.Ordinal);
+        var domainReadyByDomainId = states
+            .Where(state => state.ResolvedDomain is not null && state.TryGetNode(V2PlanNodeKind.DomainReady) is not null)
+            .ToDictionary(state => state.ResolvedDomain!.DomainId, state => state.TryGetNode(V2PlanNodeKind.DomainReady)!, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var trust in trusts)
+        {
+            nodeById.TryGetValue(trust.PrepareDnsNodeId, out var prepareDns);
+            nodeById.TryGetValue(trust.CreateTrustNodeId, out var createTrust);
+            nodeById.TryGetValue(trust.ValidateTrustNodeId, out var validateTrust);
+
+            if (domainReadyByDomainId.TryGetValue(trust.SourceDomainId, out var sourceReady))
+            {
+                AddDependencyIfPresent(sourceReady, prepareDns, V2PlanDependencyReasonCode.TrustRequired, "Forest trust DNS preparation waits for source domain readiness.", dependencies);
+            }
+
+            if (domainReadyByDomainId.TryGetValue(trust.TargetDomainId, out var targetReady))
+            {
+                AddDependencyIfPresent(targetReady, prepareDns, V2PlanDependencyReasonCode.TrustRequired, "Forest trust DNS preparation waits for target domain readiness.", dependencies);
+            }
+
+            AddDependencyIfPresent(prepareDns, createTrust, V2PlanDependencyReasonCode.TrustRequired, "Forest trust creation waits for DNS forwarding preparation.", dependencies);
+            AddDependencyIfPresent(createTrust, validateTrust, V2PlanDependencyReasonCode.TrustRequired, "Forest trust validation waits for trust creation.", dependencies);
+        }
+    }
+
     private static void AddDependencyIfPresent(
         V2PlanNode? from,
         V2PlanNode? to,
@@ -970,6 +1133,9 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             V2PlanNodeKind.JoinDomain => 110 + roleOffset,
             V2PlanNodeKind.JoinedDomainReady => 120 + roleOffset,
             V2PlanNodeKind.ApplyCapabilityRole => 130 + roleOffset,
+            V2PlanNodeKind.PrepareForestTrustDns => 122 + roleOffset,
+            V2PlanNodeKind.CreateForestTrust => 123 + roleOffset,
+            V2PlanNodeKind.ValidateForestTrust => 124 + roleOffset,
             _ => 100 + roleOffset
         };
     }
@@ -1099,6 +1265,38 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         nodes.Add(node);
         return node;
     }
+
+    private static V2PlanNode AddTrustNode(
+        List<V2PlanNode> nodes,
+        V2ResolvedTrustPlanningContext trust,
+        V2PlanNodeKind kind,
+        string displayName,
+        V2WorkloadClass workloadClass)
+    {
+        var nodeId = kind switch
+        {
+            V2PlanNodeKind.PrepareForestTrustDns => trust.PrepareDnsNodeId,
+            V2PlanNodeKind.CreateForestTrust => trust.CreateTrustNodeId,
+            V2PlanNodeKind.ValidateForestTrust => trust.ValidateTrustNodeId,
+            _ => BuildTrustNodeId(trust.TrustId, kind)
+        };
+
+        var node = new V2PlanNode
+        {
+            NodeId = nodeId,
+            VmId = trust.SourceAnchorVmId,
+            VmName = trust.SourceAnchorVmName,
+            Kind = kind,
+            DisplayName = displayName,
+            WorkloadClass = workloadClass,
+            TrustId = trust.TrustId
+        };
+        nodes.Add(node);
+        return node;
+    }
+
+    private static string BuildTrustNodeId(string trustId, V2PlanNodeKind kind)
+        => $"trust:{trustId}:{kind}";
 
     private static V2WorkloadClass GetCapabilityWorkload(string capabilityRole)
     {

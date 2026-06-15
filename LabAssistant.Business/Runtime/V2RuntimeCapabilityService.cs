@@ -20,6 +20,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly V2DomainProgressionRuntimeCoordinator _domainProgressionRuntimeCoordinator;
     private readonly V2BaseRemoteAccessRuntimeCoordinator _baseRemoteAccessRuntimeCoordinator;
     private readonly V2RouterRuntimeCoordinator _routerRuntimeCoordinator;
+    private readonly V2ForestTrustRuntimeCoordinator _forestTrustRuntimeCoordinator;
     private readonly IVmCleanupOrchestrator _cleanupOrchestrator;
     private readonly IStructuredLogger _structuredLogger;
 
@@ -37,6 +38,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         _domainProgressionRuntimeCoordinator = new V2DomainProgressionRuntimeCoordinator(guestCommandExecutor);
         _baseRemoteAccessRuntimeCoordinator = new V2BaseRemoteAccessRuntimeCoordinator(guestCommandExecutor);
         _routerRuntimeCoordinator = new V2RouterRuntimeCoordinator(guestCommandExecutor);
+        _forestTrustRuntimeCoordinator = new V2ForestTrustRuntimeCoordinator(guestCommandExecutor);
         _cleanupOrchestrator = cleanupOrchestrator;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
     }
@@ -71,6 +73,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = BuildRuntimeTrustStates(request, states, multiContext);
         var deferredNodeIds = new HashSet<string>(
             request.Plan.Nodes
                 .Where(node => node.Kind == V2PlanNodeKind.ApplyCapabilityRole)
@@ -142,6 +145,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 }
             }
 
+            await CleanupFailedOrCancelledTrustsAsync(request, multiContext, trustStates);
             await CleanupFailedOrCancelledVmsAsync(multiContext, states);
         }
         finally
@@ -153,7 +157,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             var hasFailures = multiContext.VmContexts.Any(vm => !vm.IsSuccess);
-            var hasCleanupResiduals = multiContext.CleanupResults.Any(result => result.HasResiduals);
+            var hasCleanupResiduals = multiContext.CleanupResults.Any(result => result.HasResiduals) ||
+                                      multiContext.V2TrustContexts.Any(trust => trust.CleanupResidual);
             multiContext.CompleteTerminalState(hasFailures, hasCleanupResiduals);
             EmitDeployTerminalEvent(multiContext);
         }
@@ -207,6 +212,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     {
         if (nonRootStates.Count == 0)
         {
+            await ExecuteForestTrustStageAsync(
+                request,
+                multiContext,
+                rootStates.Concat(nonRootStates).ToList(),
+                executedNodeIds,
+                cancellationToken);
             return;
         }
 
@@ -417,6 +428,56 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         await ExecuteNodeSetAsync(dnsStates, V2PlanNodeKind.StabilizeDomainDns, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(memberStates, V2PlanNodeKind.JoinDomain, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(memberStates, V2PlanNodeKind.JoinedDomainReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteForestTrustStageAsync(
+            request,
+            multiContext,
+            rootStates.Concat(nonRootStates).ToList(),
+            executedNodeIds,
+            cancellationToken);
+    }
+
+    private async Task ExecuteForestTrustStageAsync(
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<RuntimeVmState> states,
+        ISet<string> executedNodeIds,
+        CancellationToken cancellationToken)
+    {
+        if (multiContext.IsCancellationRequested || request.Plan.Context.Trusts.Count == 0)
+        {
+            return;
+        }
+
+        var stateByVmId = states.ToDictionary(state => state.PlanVm.VmId, StringComparer.OrdinalIgnoreCase);
+        foreach (var trust in request.Plan.Context.Trusts.OrderBy(item => item.TrustId, StringComparer.OrdinalIgnoreCase))
+        {
+            if (multiContext.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (!stateByVmId.TryGetValue(trust.SourceAnchorVmId, out var sourceState))
+            {
+                continue;
+            }
+
+            foreach (var kind in new[] { V2PlanNodeKind.PrepareForestTrustDns, V2PlanNodeKind.CreateForestTrust, V2PlanNodeKind.ValidateForestTrust })
+            {
+                var node = request.Plan.Nodes.FirstOrDefault(candidate =>
+                    candidate.Kind == kind &&
+                    string.Equals(candidate.TrustId, trust.TrustId, StringComparison.OrdinalIgnoreCase));
+                if (node is null)
+                {
+                    continue;
+                }
+
+                await ExecutePlanNodeAsync(sourceState, node, request, multiContext, executedNodeIds, cancellationToken);
+                if (!sourceState.Context.IsSuccess || multiContext.IsCancellationRequested)
+                {
+                    return;
+                }
+            }
+        }
     }
 
     private async Task ExecuteNodeSetAsync(
@@ -700,7 +761,231 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     cancellationToken);
                 executedNodeIds.Add(node.NodeId);
                 break;
+
+            case V2PlanNodeKind.PrepareForestTrustDns:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2PrepareForestTrustDns,
+                    "Prepare forest trust DNS",
+                    context => PrepareForestTrustDnsAsync(node, request, multiContext, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.CreateForestTrust:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2CreateForestTrust,
+                    "Create forest trust",
+                    context => CreateForestTrustAsync(node, request, multiContext, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
+
+            case V2PlanNodeKind.ValidateForestTrust:
+                await ExecuteRuntimeStepAsync(
+                    state.Context,
+                    DeploymentStepKeys.V2ValidateForestTrust,
+                    "Validate forest trust",
+                    context => ValidateForestTrustAsync(node, request, multiContext, context, cancellationToken),
+                    multiContext,
+                    cancellationToken);
+                executedNodeIds.Add(node.NodeId);
+                break;
         }
+    }
+
+    private async Task PrepareForestTrustDnsAsync(
+        V2PlanNode node,
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var trust = ResolveTrust(node, request, context, DeploymentStepKeys.V2PrepareForestTrustDns);
+        if (trust is null)
+        {
+            return;
+        }
+
+        EmitTrustEvent("ForestTrustDnsPreparationStarted", multiContext, trust, "dns-prep", "started");
+        var sourceCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            trust.SourceDomainAdminCredentialSlot,
+            context,
+            DeploymentStepKeys.V2PrepareForestTrustDns,
+            "source domain-admin");
+        var targetCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            trust.TargetDomainAdminCredentialSlot,
+            context,
+            DeploymentStepKeys.V2PrepareForestTrustDns,
+            "target domain-admin");
+        if (sourceCredential is null || targetCredential is null)
+        {
+            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "warn", "Missing source or target domain-admin credential material.");
+            return;
+        }
+
+        var sourceDnsServers = GetDomainControllerDnsServers(trust.SourceDomainId, request.Plan.Context.Vms);
+        var targetDnsServers = GetDomainControllerDnsServers(trust.TargetDomainId, request.Plan.Context.Vms);
+        if (sourceDnsServers.Count == 0 || targetDnsServers.Count == 0)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2PrepareForestTrustDns,
+                $"Trust '{trust.TrustId}' could not resolve source and target domain-controller DNS server IPs.");
+            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "error", "Domain-controller DNS server IPs could not be resolved.");
+            return;
+        }
+
+        var sourceResult = await _forestTrustRuntimeCoordinator.PrepareDnsForwarderAsync(
+            trust.SourceAnchorVmName,
+            sourceCredential,
+            trust.TargetDomainDnsName,
+            targetDnsServers,
+            cancellationToken);
+        if (!sourceResult.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2PrepareForestTrustDns,
+                $"Failed to prepare source-side DNS forwarding for trust '{trust.TrustId}'. {sourceResult.Error}".Trim());
+            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "error", sourceResult.Error);
+            return;
+        }
+
+        var targetResult = await _forestTrustRuntimeCoordinator.PrepareDnsForwarderAsync(
+            trust.TargetAnchorVmName,
+            targetCredential,
+            trust.SourceDomainDnsName,
+            sourceDnsServers,
+            cancellationToken);
+        if (!targetResult.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2PrepareForestTrustDns,
+                $"Failed to prepare target-side DNS forwarding for trust '{trust.TrustId}'. {targetResult.Error}".Trim());
+            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "error", targetResult.Error);
+            return;
+        }
+
+        EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "success");
+    }
+
+    private async Task CreateForestTrustAsync(
+        V2PlanNode node,
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var trust = ResolveTrust(node, request, context, DeploymentStepKeys.V2CreateForestTrust);
+        if (trust is null)
+        {
+            return;
+        }
+
+        EmitTrustEvent("ForestTrustCreationStarted", multiContext, trust, "create", "started");
+        var sourceCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            trust.SourceDomainAdminCredentialSlot,
+            context,
+            DeploymentStepKeys.V2CreateForestTrust,
+            "source domain-admin");
+        var targetCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            trust.TargetDomainAdminCredentialSlot,
+            context,
+            DeploymentStepKeys.V2CreateForestTrust,
+            "target domain-admin");
+        if (sourceCredential is null || targetCredential is null)
+        {
+            EmitTrustEvent("ForestTrustCreationCompleted", multiContext, trust, "create", "failed", "warn", "Missing source or target domain-admin credential material.");
+            return;
+        }
+
+        var result = await _forestTrustRuntimeCoordinator.CreateBidirectionalForestTrustAsync(
+            trust.SourceAnchorVmName,
+            sourceCredential,
+            trust,
+            targetCredential,
+            cancellationToken);
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2CreateForestTrust,
+                $"Failed to create forest trust '{trust.TrustId}'. {result.Error}".Trim());
+            EmitTrustEvent("ForestTrustCreationCompleted", multiContext, trust, "create", "failed", "error", result.Error);
+            return;
+        }
+
+        MarkTrustObjectsCreated(multiContext, trust.TrustId);
+        EmitTrustEvent("ForestTrustCreationCompleted", multiContext, trust, "create", "success");
+    }
+
+    private async Task ValidateForestTrustAsync(
+        V2PlanNode node,
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var trust = ResolveTrust(node, request, context, DeploymentStepKeys.V2ValidateForestTrust);
+        if (trust is null)
+        {
+            return;
+        }
+
+        EmitTrustEvent("ForestTrustValidationStarted", multiContext, trust, "validate", "started");
+        var sourceCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            trust.SourceDomainAdminCredentialSlot,
+            context,
+            DeploymentStepKeys.V2ValidateForestTrust,
+            "source domain-admin");
+        var targetCredential = ResolveCredential(
+            request.CredentialSlotValues,
+            trust.TargetDomainAdminCredentialSlot,
+            context,
+            DeploymentStepKeys.V2ValidateForestTrust,
+            "target domain-admin");
+        if (sourceCredential is null || targetCredential is null)
+        {
+            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "warn", "Missing source or target domain-admin credential material.");
+            return;
+        }
+
+        var sourceResult = await _forestTrustRuntimeCoordinator.ValidateForestTrustAsync(
+            trust.SourceAnchorVmName,
+            sourceCredential,
+            trust.TargetDomainDnsName,
+            cancellationToken);
+        if (!sourceResult.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2ValidateForestTrust,
+                $"Source-side validation failed for forest trust '{trust.TrustId}'. {sourceResult.Error}".Trim());
+            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", sourceResult.Error);
+            return;
+        }
+
+        var targetResult = await _forestTrustRuntimeCoordinator.ValidateForestTrustAsync(
+            trust.TargetAnchorVmName,
+            targetCredential,
+            trust.SourceDomainDnsName,
+            cancellationToken);
+        if (!targetResult.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2ValidateForestTrust,
+                $"Target-side validation failed for forest trust '{trust.TrustId}'. {targetResult.Error}".Trim());
+            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", targetResult.Error);
+            return;
+        }
+
+        MarkTrustReady(multiContext, trust.TrustId);
+        EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "success");
     }
 
     private async Task ProvisionVmAsync(RuntimeVmState state, VmDeploymentContext context)
@@ -2098,10 +2383,156 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         return messages.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    private static V2ResolvedTrustPlanningContext? ResolveTrust(
+        V2PlanNode node,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        string stepKey)
+    {
+        if (string.IsNullOrWhiteSpace(node.TrustId))
+        {
+            context.MarkFailure(stepKey, $"Trust runtime node '{node.NodeId}' is missing a resolved trust id.");
+            return null;
+        }
+
+        var trust = request.Plan.Context.Trusts.FirstOrDefault(candidate =>
+            string.Equals(candidate.TrustId, node.TrustId, StringComparison.OrdinalIgnoreCase));
+        if (trust is null)
+        {
+            context.MarkFailure(stepKey, $"Trust runtime node '{node.NodeId}' references unknown trust '{node.TrustId}'.");
+            return null;
+        }
+
+        return trust;
+    }
+
+    private static void MarkTrustObjectsCreated(MultiVmDeploymentContext multiContext, string trustId)
+    {
+        var context = multiContext.V2TrustContexts.FirstOrDefault(candidate =>
+            string.Equals(candidate.TrustId, trustId, StringComparison.OrdinalIgnoreCase));
+        if (context is not null)
+        {
+            context.TrustObjectsCreated = true;
+        }
+    }
+
+    private async Task CleanupFailedOrCancelledTrustsAsync(
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<V2TrustRuntimeContext> trustStates)
+    {
+        if (!multiContext.IsCancellationRequested && multiContext.VmContexts.All(vm => vm.IsSuccess))
+        {
+            return;
+        }
+
+        foreach (var trustState in trustStates.Where(state => state.TrustObjectsCreated && !state.TrustReady))
+        {
+            var trust = request.Plan.Context.Trusts.FirstOrDefault(candidate =>
+                string.Equals(candidate.TrustId, trustState.TrustId, StringComparison.OrdinalIgnoreCase));
+            if (trust is null)
+            {
+                continue;
+            }
+
+            multiContext.MarkCleanupInProgress();
+            trustState.CleanupAttempted = true;
+            EmitTrustEvent("ForestTrustCleanupStarted", multiContext, trust, "cleanup", "started");
+
+            var sourceCredentialAvailable = request.CredentialSlotValues.TryGetValue(trust.SourceDomainAdminCredentialSlot ?? string.Empty, out var sourceCredential);
+            var targetCredentialAvailable = request.CredentialSlotValues.TryGetValue(trust.TargetDomainAdminCredentialSlot ?? string.Empty, out var targetCredential);
+            if (!sourceCredentialAvailable || !targetCredentialAvailable)
+            {
+                trustState.CleanupResidual = true;
+                EmitTrustEvent("ForestTrustCleanupCompleted", multiContext, trust, "cleanup", "failed", "error", "Missing source or target domain-admin credential material for trust cleanup.");
+                continue;
+            }
+
+            var sourceResult = await _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
+                trust.SourceAnchorVmName,
+                sourceCredential!,
+                trust.TargetDomainDnsName,
+                CancellationToken.None);
+            var targetResult = await _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
+                trust.TargetAnchorVmName,
+                targetCredential!,
+                trust.SourceDomainDnsName,
+                CancellationToken.None);
+
+            trustState.CleanupResidual = !sourceResult.Success || !targetResult.Success;
+            var error = string.Join(
+                " ",
+                new[] { sourceResult.Error, targetResult.Error }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            EmitTrustEvent(
+                "ForestTrustCleanupCompleted",
+                multiContext,
+                trust,
+                "cleanup",
+                trustState.CleanupResidual ? "failed" : "success",
+                trustState.CleanupResidual ? "error" : "info",
+                string.IsNullOrWhiteSpace(error) ? null : error);
+        }
+    }
+
+    private static void MarkTrustReady(MultiVmDeploymentContext multiContext, string trustId)
+    {
+        var context = multiContext.V2TrustContexts.FirstOrDefault(candidate =>
+            string.Equals(candidate.TrustId, trustId, StringComparison.OrdinalIgnoreCase));
+        if (context is not null)
+        {
+            context.TrustReady = true;
+        }
+    }
+
+    private static IReadOnlyList<string> GetDomainControllerDnsServers(
+        string domainId,
+        IReadOnlyList<V2ResolvedVmPlanningContext> planVms)
+    {
+        return planVms
+            .Where(vm => string.Equals(vm.DomainId, domainId, StringComparison.OrdinalIgnoreCase) &&
+                         (string.Equals(vm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(vm.TopologyRole, "ReplicaDomainController", StringComparison.OrdinalIgnoreCase)))
+            .SelectMany(vm => vm.Nics)
+            .Select(nic => nic.IpAddress)
+            .Where(ip => !string.IsNullOrWhiteSpace(ip))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     private static void InitializeDeploymentContext(MultiVmDeploymentContext multiContext, AppSettings settings)
     {
         multiContext.VmContexts.Clear();
+        multiContext.V2TrustContexts.Clear();
         multiContext.StopAllOnAnyVmFailure = settings.StopAllOnAnyVmFailure;
+    }
+
+    private static IReadOnlyList<V2TrustRuntimeContext> BuildRuntimeTrustStates(
+        V2RuntimeExecutionRequest request,
+        IReadOnlyList<RuntimeVmState> states,
+        MultiVmDeploymentContext multiContext)
+    {
+        var statesByVmId = states.ToDictionary(state => state.PlanVm.VmId, StringComparer.OrdinalIgnoreCase);
+        var contexts = new List<V2TrustRuntimeContext>();
+        foreach (var trust in request.Plan.Context.Trusts)
+        {
+            if (!statesByVmId.ContainsKey(trust.SourceAnchorVmId) ||
+                !statesByVmId.ContainsKey(trust.TargetAnchorVmId))
+            {
+                continue;
+            }
+
+            var context = new V2TrustRuntimeContext
+            {
+                TrustId = trust.TrustId,
+                SourceDomainId = trust.SourceDomainId,
+                TargetDomainId = trust.TargetDomainId
+            };
+            multiContext.V2TrustContexts.Add(context);
+            contexts.Add(context);
+        }
+
+        return contexts;
     }
 
     private static List<RuntimeVmState> BuildRuntimeStates(V2RuntimeExecutionRequest request, MultiVmDeploymentContext multiContext)
@@ -2298,6 +2729,34 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             {
                 context[pair.Key] = pair.Value;
             }
+        }
+
+        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
+    }
+
+    private void EmitTrustEvent(
+        string eventName,
+        MultiVmDeploymentContext multiContext,
+        V2ResolvedTrustPlanningContext trust,
+        string phase,
+        string result,
+        string level = "info",
+        string? error = null)
+    {
+        var context = new Dictionary<string, object?>
+        {
+            ["executionEngine"] = "V2",
+            ["trustId"] = trust.TrustId,
+            ["sourceDomainId"] = trust.SourceDomainId,
+            ["targetDomainId"] = trust.TargetDomainId,
+            ["sourceDomainName"] = trust.SourceDomainDnsName,
+            ["targetDomainName"] = trust.TargetDomainDnsName,
+            ["phase"] = phase
+        };
+
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            context["error"] = error;
         }
 
         _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);

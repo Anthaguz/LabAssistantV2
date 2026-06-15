@@ -40,4 +40,8 @@ public static class DeploymentStepKeys
     public const string V2StabilizeDomainDns = "v2.stabilizeDomainDns";
     public const string V2JoinDomain = "v2.joinDomain";
     public const string V2JoinedDomainReady = "v2.joinedDomainReady";
+    public const string V2PrepareForestTrustDns = "v2.prepareForestTrustDns";
+    public const string V2CreateForestTrust = "v2.createForestTrust";
+    public const string V2ValidateForestTrust = "v2.validateForestTrust";
+    public const string V2CleanupForestTrust = "v2.cleanupForestTrust";
 }

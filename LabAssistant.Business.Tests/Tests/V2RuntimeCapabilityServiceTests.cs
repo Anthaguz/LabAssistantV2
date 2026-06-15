@@ -352,6 +352,129 @@ public sealed class V2RuntimeCapabilityServiceTests
         Assert.Contains("-DomainName 'fabrikam.com'", fabrikamForestScript.Script, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ManagedBidirectionalForestTrust_PreparesDnsCreatesTrustAndValidatesBothSides()
+    {
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var logger = new RecordingStructuredLogger();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor, logger);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("trust:trust-contoso-fabrikam:PrepareForestTrustDns", result.ExecutedNodeIds);
+        Assert.Contains("trust:trust-contoso-fabrikam:CreateForestTrust", result.ExecutedNodeIds);
+        Assert.Contains("trust:trust-contoso-fabrikam:ValidateForestTrust", result.ExecutedNodeIds);
+
+        var scriptList = scripts.ToList();
+        var firstDns = scriptList.FindIndex(entry => entry.Script.Contains("Add-DnsServerConditionalForwarderZone", StringComparison.Ordinal));
+        var createTrust = scriptList.FindIndex(entry => entry.VmName == "dc01" && entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
+        var sourceValidation = scriptList.FindIndex(entry => entry.VmName == "dc01" && entry.Script.Contains("Forest trust validated", StringComparison.Ordinal));
+        var targetValidation = scriptList.FindIndex(entry => entry.VmName == "fabrikamdc01" && entry.Script.Contains("Forest trust validated", StringComparison.Ordinal));
+
+        Assert.True(firstDns >= 0);
+        Assert.True(createTrust > firstDns);
+        Assert.True(sourceValidation > createTrust);
+        Assert.True(targetValidation > createTrust);
+        Assert.Contains(scriptList, entry => entry.VmName == "dc01" && entry.Script.Contains("fabrikam.com", StringComparison.Ordinal));
+        Assert.Contains(scriptList, entry => entry.VmName == "fabrikamdc01" && entry.Script.Contains("contoso.com", StringComparison.Ordinal));
+        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal));
+
+        var trustContext = Assert.Single(result.DeploymentContext.V2TrustContexts);
+        Assert.True(trustContext.TrustObjectsCreated);
+        Assert.True(trustContext.TrustReady);
+        Assert.False(trustContext.CleanupAttempted);
+        Assert.Contains(logger.Events, item =>
+            item.Event == "ForestTrustCreationCompleted" &&
+            item.OperationId == result.DeploymentContext.OperationId &&
+            item.Result == "success" &&
+            item.Context != null &&
+            item.Context.TryGetValue("trustId", out var trustId) &&
+            string.Equals(trustId?.ToString(), "trust-contoso-fabrikam", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ManagedForestTrustValidationFailure_CleansTrustObjectsAndLeavesDnsForwarders()
+    {
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                if (vmName == "fabrikamdc01" && script.Contains("Forest trust validated", StringComparison.Ordinal))
+                {
+                    return Task.FromResult(new GuestCommandResult { Success = false, Error = "target trust validation failed" });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Equal(DeploymentOperationState.Failed, result.DeploymentContext.OperationState);
+        var trustContext = Assert.Single(result.DeploymentContext.V2TrustContexts);
+        Assert.True(trustContext.TrustObjectsCreated);
+        Assert.False(trustContext.TrustReady);
+        Assert.True(trustContext.CleanupAttempted);
+        Assert.False(trustContext.CleanupResidual);
+
+        var scriptList = scripts.ToList();
+        Assert.Contains(scriptList, entry => entry.Script.Contains("Add-DnsServerConditionalForwarderZone", StringComparison.Ordinal));
+        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal)));
+        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-DnsServerZone", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ManagedForestTrustCancellationAfterCreation_CleansTrustObjects()
+    {
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        using var cts = new CancellationTokenSource();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                if (vmName == "dc01" && script.Contains("New-ADTrust", StringComparison.Ordinal))
+                {
+                    cts.Cancel();
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request, cts.Token);
+
+        Assert.False(result.Success);
+        Assert.Equal(DeploymentOperationState.Cancelled, result.DeploymentContext.OperationState);
+        var trustContext = Assert.Single(result.DeploymentContext.V2TrustContexts);
+        Assert.True(trustContext.TrustObjectsCreated);
+        Assert.False(trustContext.TrustReady);
+        Assert.True(trustContext.CleanupAttempted);
+        Assert.False(trustContext.CleanupResidual);
+
+        var scriptList = scripts.ToList();
+        Assert.Contains(scriptList, entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
+        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal)));
+        Assert.DoesNotContain(result.ExecutedNodeIds, nodeId => nodeId == "trust:trust-contoso-fabrikam:ValidateForestTrust");
+    }
+
     private static IV2RuntimeCapabilityService CreateService(
         FakeHyperVService hyperVService,
         FakeGuestCommandExecutor guestCommandExecutor,
@@ -813,6 +936,26 @@ public sealed class V2RuntimeCapabilityServiceTests
             SwitchType = switchType
         };
 
+    private sealed class RecordingStructuredLogger : IStructuredLogger
+    {
+        public ConcurrentQueue<StructuredLogEvent> Events { get; } = new();
+
+        public void Log(StructuredLogEvent logEvent)
+        {
+            Events.Enqueue(logEvent);
+        }
+
+        public void Log(
+            StructuredLogLevel level,
+            string eventName,
+            string operationId,
+            string? result = null,
+            IReadOnlyDictionary<string, object?>? context = null)
+        {
+            Events.Enqueue(StructuredLogEvent.Create(level, eventName, operationId, result, context));
+        }
+    }
+
     private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithChildDomainAsync()
     {
         var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: false);
@@ -1067,6 +1210,45 @@ public sealed class V2RuntimeCapabilityServiceTests
                 Password = "Password123!"
             }
         };
+
+        return request;
+    }
+
+    private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithForestTrustAsync()
+    {
+        var request = await CreateRuntimeRequestWithAdditionalForestAsync();
+        request.Template.DirectoryTopology!.Trusts =
+        [
+            new V2TrustTemplate
+            {
+                TrustId = "trust-contoso-fabrikam",
+                SourceDomainId = "domain-contoso",
+                TargetDomainId = "domain-fabrikam",
+                TrustType = V2TrustType.Forest,
+                Direction = V2TrustDirection.Bidirectional
+            }
+        ];
+
+        request.Plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = request.Template,
+            CatalogItems =
+            [
+                CreateCatalogItem("disk-dc", "slot-local"),
+                CreateCatalogItem("disk-replica", "slot-local"),
+                CreateCatalogItem("disk-member", "slot-local"),
+                CreateCatalogItem("disk-fabrikamdc", "slot-local")
+            ],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"],
+            DefaultDeploymentProfile = "Balanced"
+        });
 
         return request;
     }

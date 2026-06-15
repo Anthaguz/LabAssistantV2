@@ -9,6 +9,7 @@ public class MultiVmDeploymentContext
 
     public string OperationId { get; set; } = Guid.NewGuid().ToString("N");
     public List<VmDeploymentContext> VmContexts { get; set; } = new();
+    public List<V2TrustRuntimeContext> V2TrustContexts { get; } = new();
     public bool StopAllOnAnyVmFailure { get; set; }
     public List<VmCleanupResult> CleanupResults { get; } = new();
     public bool UserCancellationRequested { get; private set; }
@@ -68,4 +69,21 @@ public class MultiVmDeploymentContext
         OperationState = state;
         OperationStateChanged?.Invoke(this, new DeploymentOperationStateChangedEventArgs(state));
     }
+}
+
+public sealed class V2TrustRuntimeContext
+{
+    public string TrustId { get; init; } = string.Empty;
+
+    public string SourceDomainId { get; init; } = string.Empty;
+
+    public string TargetDomainId { get; init; } = string.Empty;
+
+    public bool TrustObjectsCreated { get; set; }
+
+    public bool TrustReady { get; set; }
+
+    public bool CleanupAttempted { get; set; }
+
+    public bool CleanupResidual { get; set; }
 }
