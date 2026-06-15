@@ -164,6 +164,30 @@ Across all profiles:
 
 This AD-core direction is a policy invariant. Later scheduler implementation may tune how much overlap is permitted, but must not invert the DC-first progression.
 
+## Trust Runtime Semantics
+
+The first executable trust slice supports only bidirectional forest trusts between two LabAssistant-managed V2 domains/forests. External trusts, realm trusts, one-way trust directions, selective authentication details, SID-filter details, and unmanaged external domains are outside the first runtime shape and must block before runtime with actionable guidance.
+
+Trust execution must be planned from a resolved trust context rather than directly from raw template trust rows. The resolved context should include:
+
+- trust identity
+- source and target domain identity
+- source and target forest identity when available
+- resolved source and target anchor domain controllers
+- required per-domain domain-admin credential slots
+- DNS forwarding/reachability preparation work
+- trust creation work
+- both-side validation work
+- cleanup ownership for LabAssistant-created trust objects
+
+The first trust runtime slice is source-DC anchored. Trust creation runs from the resolved source domain controller through the existing Hyper-V PowerShell Direct guest execution baseline. The target domain controller remains part of the resolved context for credential/context validation and both-side trust validation. The first slice does not introduce a separate non-VM/global runtime node path for trust creation.
+
+Trust creation is blocked until both participating domains are `DomainReady`. Cross-forest DNS forwarding or equivalent reachability preparation must appear before trust creation. Both participating sides must validate successfully before the trust is marked ready.
+
+If LabAssistant creates trust objects and the operation later fails or is cancelled, cleanup attempts to delete the LabAssistant-created trust objects and reports residuals when deletion fails. DNS forwarders or equivalent DNS prep remain in place for retry and diagnosis.
+
+Structured logs with `operationId` are required for DNS prep, trust creation, both-side validation, and cleanup stages. Logs must identify the trust, source/target domains, stage, result, and failure details without recording passwords, secure strings, or reusable secret values.
+
 ## Router Semantics
 
 Router behavior is optional.

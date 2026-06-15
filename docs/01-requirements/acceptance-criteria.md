@@ -4470,3 +4470,131 @@ Each readiness result shall include, at minimum:
 ## Open Questions / TBDs
 - future visualization beyond the current deploy-time V2 wave/detail review surface
 - exact import-time vs deploy-time UX for remapping credential slots on a newly shared template
+
+# AC-049 - V2 Managed Forest Trust Runtime Slice
+
+**Related FRs:** FR-200, FR-191, FR-197, FR-198, FR-199
+
+## Scenarios
+
+### 1) Supported shape - managed bidirectional forest trust
+**Given**
+- a valid V2 template declares a trust between two LabAssistant-managed V2 domains or forests
+- the trust declaration resolves to a forest trust
+- the trust direction resolves to bidirectional
+- both participating domains have managed first domain controllers in the same V2 orchestration plan
+
+**When**
+- the V2 plan is built
+
+**Then**
+- the planner may represent the trust as executable runtime work
+- the trust work is based on a resolved trust context, not raw template trust rows
+- the resolved trust context identifies the source domain, target domain, source anchor domain controller, target anchor domain controller, required domain-admin credential slots, DNS prep work, trust creation work, validation work, and cleanup ownership
+- no dedicated trust credential fields are required for the first slice
+
+### 2) Unsupported trust shapes block before runtime
+**Given**
+- a V2 template declares a trust shape outside the first executable trust slice
+
+**When**
+- the V2 template is validated or planned
+
+**Then**
+- external trusts, realm trusts, one-way trust directions, selective authentication details, SID-filter details, and unmanaged external domains are rejected or blocked with actionable guidance
+- deployment does not start by silently downgrading or partially executing the unsupported trust shape
+- the unsupported trust shape does not require runtime implementers to infer future behavior
+
+### 3) Credential slots - per-domain admin credentials are required
+**Given**
+- a supported managed bidirectional forest trust declaration
+- one or both participating domains lack a resolved domain-admin credential slot
+
+**When**
+- the V2 review-and-resolve flow evaluates the plan
+
+**Then**
+- the unresolved domain-admin slot blocks deployment before runtime
+- the review surface identifies the participating domain that needs credential resolution
+- no trust-specific username, password, or secret-bearing template field is requested for the first trust slice
+
+### 4) Readiness and DNS - trust work waits for both domains and DNS prep
+**Given**
+- a supported managed bidirectional forest trust declaration
+
+**When**
+- the V2 orchestration graph is built
+
+**Then**
+- trust creation depends on both participating domains reaching `DomainReady`
+- cross-forest DNS forwarding or equivalent reachability preparation is represented before trust creation
+- trust creation does not execute directly from domain declarations or raw trust rows without the resolved DNS and domain-readiness context
+
+### 5) Runtime ownership - trust work is source-DC anchored
+**Given**
+- a supported managed bidirectional forest trust declaration
+- both participating domains are `DomainReady`
+- required DNS prep has completed
+
+**When**
+- the executor runs trust creation
+
+**Then**
+- trust creation is anchored on the resolved source domain controller through the existing Hyper-V PowerShell Direct guest execution baseline
+- target-side access is used for target credential/context validation and both-side trust validation
+- the first slice does not introduce a separate non-VM/global execution node for trust creation
+
+### 6) Validation - both participating sides must pass
+**Given**
+- trust creation has completed for a supported managed bidirectional forest trust
+
+**When**
+- the runtime validates the trust
+
+**Then**
+- validation runs from both participating domain sides
+- the trust is marked ready only after both-side validation succeeds
+- a one-sided success remains not ready and is reported with actionable failure context
+
+### 7) Cleanup - trust objects are removed, DNS prep remains
+**Given**
+- LabAssistant has created one or more trust objects during a supported managed bidirectional forest trust operation
+
+**When**
+- the operation later fails or is cancelled before successful completion
+
+**Then**
+- cleanup attempts to delete LabAssistant-created trust objects
+- cleanup logs each trust cleanup attempt and residual result
+- DNS forwarders or equivalent DNS prep remain in place for retry and diagnosis
+- any trust objects that cannot be removed are reported as residuals according to the cleanup and cancellation policy
+
+### 8) Diagnostics - trust stages emit structured logs
+**Given**
+- a supported managed bidirectional forest trust operation runs
+
+**When**
+- DNS prep, trust creation, validation, or cleanup starts, completes, fails, or is skipped
+
+**Then**
+- structured logs include `operationId`
+- logs include enough context to identify the trust, source and target domains, stage, result, and failure details
+- logs do not include passwords, secure strings, or reusable secret values
+
+## Expected UI
+- the existing V2 review-and-resolve surface can show trust blockers and trust runtime stages when present in the resolved plan
+- unsupported trust shapes are surfaced as blocking validation/planning issues before runtime
+- no trust authoring UI is required by this slice
+
+## Implementation Test Expectations
+- unit or planner tests verify supported bidirectional managed forest trusts produce resolved trust context and executable trust work
+- validation/planner tests verify unsupported trust shapes block before runtime
+- review/resolve tests verify missing per-domain domain-admin credential slots block deployment
+- graph dependency tests verify trust work waits for both domains to reach `DomainReady` and for DNS prep to complete
+- runtime seam tests verify source-DC anchored execution is selected for trust creation
+- validation tests verify both participating sides must pass before the trust is marked ready
+- cleanup tests verify LabAssistant-created trust objects are deleted on later failure/cancel and DNS forwarders remain
+- logging tests verify `operationId` and trust-stage context are emitted without secrets
+
+## Open Questions / TBDs
+- none for the first executable managed bidirectional forest trust slice
