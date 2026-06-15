@@ -1233,12 +1233,14 @@ Each readiness result shall include, at minimum:
 - Canonical child routes:
   - `templates.library` (default)
   - `templates.editor`
+  - `templates.builder`
 - `templates.details` deferred unless approved by future milestone contract
 - Unified Templates capability context for library + editor + import/export entry points
+- `templates.editor` remains the V1/simple/legacy editing destination; `templates.builder` is the V2 template authoring destination
 
 ## Definition of Done
 - [ ] Parent `Templates` routes deterministically to `templates.library`
-- [ ] `templates.library` and `templates.editor` routes are explicit in contract/docs
+- [ ] `templates.library`, `templates.editor`, and `templates.builder` routes are explicit in contract/docs
 - [ ] Unified library-to-editor workflow continuity is documented and testable
 - [ ] Import/export discoverability is defined within Templates capability context
 - [ ] No AC-010 global navigation behavior is contradicted
@@ -4598,3 +4600,126 @@ Each readiness result shall include, at minimum:
 
 ## Open Questions / TBDs
 - none for the first executable managed bidirectional forest trust slice
+
+# AC-050 - WinUI Templates V2 Builder Workflow Contract
+
+**Related FRs:** FR-201, FR-202, FR-203, FR-204, FR-077, FR-078, FR-191, FR-192, FR-193, FR-194, FR-195, FR-197, FR-198
+
+## Scenarios
+
+### 1) Distinct Templates workflow - Builder does not replace the current editor
+**Given**
+- the user is in the `Templates` capability
+- the user chooses to create or edit a V2 template
+
+**When**
+- navigation enters the V2 authoring workflow
+
+**Then**
+- navigation resolves to `templates.builder` or an equivalent Templates-local Builder route
+- the Builder remains inside the long-lived Templates workspace
+- the current `templates.editor` remains available for V1/simple/legacy template editing
+- V2 topology complexity is not pushed into the current Templates Editor
+- selecting parent `Templates` still routes to `templates.library`
+
+### 2) Topology-first authoring order
+**Given**
+- the Builder opens a new or existing V2 template draft
+
+**When**
+- the user progresses through first-slice authoring
+
+**Then**
+- the workflow orders authoring as:
+  - schema/profile
+  - lab networks
+  - forests/domains
+  - VM assignments
+- VM assignment choices are made with the selected schema/profile, lab networks, and directory topology visible enough to validate the draft
+- the Builder does not require users to infer topology from per-VM rows alone
+
+### 3) First-slice V2 fields
+**Given**
+- the user edits a V2 Builder draft
+
+**When**
+- the Builder exposes first-slice authoring fields
+
+**Then**
+- the draft supports schema/profile selection
+- the draft supports lab network authoring
+- the draft supports forest/domain authoring
+- each VM can carry topology role, membership mode, and domain assignment intent
+- credential slot references can be selected or recorded without embedding reusable secret values
+- each VM can author per-NIC switch/network, IP, DNS, and gateway intent
+- unsupported or incomplete required combinations block save with actionable validation feedback
+
+### 4) Deterministic suggestions require explicit confirmation before save
+**Given**
+- the Builder can derive deterministic suggestions for a V2 draft
+
+**When**
+- suggestions are available for fields such as networks, domains, assignments, credential references, or NIC addressing
+
+**Then**
+- suggestions may prefill, preview, or propose changes
+- suggested values are distinguishable from user-confirmed draft intent
+- saving requires explicit user confirmation of the resulting draft
+- the Builder does not persist hidden auto-allocation or unconfirmed inferred topology
+
+### 5) Builder output remains deploy/planner compatible
+**Given**
+- the user saves a V2 template from Builder
+
+**When**
+- the template is later opened by Deploy From Template review or the V2 planner
+
+**Then**
+- the output satisfies the V2 schema and planning contracts for first-slice fields
+- Deploy From Template review can show unresolved credentials, bootstrap assumptions, dependency blockers, selected profile, and graph/wave information when applicable
+- planner output can preserve topology roles, membership mode, domain assignment, lab network, and per-NIC addressing intent
+- V2 templates do not silently fall back to the V1 deployment engine
+
+### 6) Builder ownership boundary
+**Given**
+- implementation work begins for the Builder workflow
+
+**When**
+- state, orchestration, composition, and view interaction seams are assigned
+
+**Then**
+- Builder-specific draft state and validation orchestration live behind Builder-local workspace/viewmodel/controller seams
+- Builder-specific view composition and UI coordination live behind Builder-local composition/view seams
+- shared Templates composition owns only Templates-level route activation, workspace participation, and cross-surface coordination
+- `MainWindow` remains limited to shell routing, shell chrome, shell containers, and app-level workspace lifetime
+- the current Templates Editor does not become the Builder workflow owner
+
+### 7) Trust authoring remains out of first Builder slice
+**Given**
+- trust runtime support exists for the first managed bidirectional forest trust shape
+
+**When**
+- the first Builder authoring slice is implemented
+
+**Then**
+- trust authoring UI is not required
+- the Builder first slice does not expose trust-specific fields or trust-specific credentials
+- future trust authoring requires a separate approved contract slice
+
+## Expected UI
+- `templates.builder` or equivalent Templates-local route for V2 template authoring
+- `templates.library` remains the parent/default Templates route
+- `templates.editor` remains the V1/simple/legacy editing route
+- Builder presents topology-first authoring rather than a flat per-VM-only editor
+- save action reflects explicit user-confirmed draft intent
+
+## Implementation Test Expectations
+- route/workspace tests verify Builder is a distinct Templates workflow-state destination and parent `Templates` still defaults to `templates.library`
+- non-regression tests verify the current Templates Editor remains available for V1/simple/legacy editing
+- Builder seam tests verify Builder state/orchestration/composition does not accumulate in `MainWindow`, shared Templates composition, or the current Editor
+- schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values
+- validation tests verify unconfirmed suggestions are not silently persisted and invalid required combinations block save
+- planner/review compatibility tests verify saved Builder output can feed Deploy From Template review and V2 planning
+
+## Open Questions / TBDs
+- none for the first V2 Builder contract slice; trust authoring is intentionally deferred to a later approved issue

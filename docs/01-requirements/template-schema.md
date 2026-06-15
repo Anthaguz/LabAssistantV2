@@ -244,6 +244,30 @@ Template-owned references may include:
 
 Reusable secret values remain a local-machine concern and must not travel in exported templates.
 
+### V2 Builder authoring contract
+
+The Templates V2 Builder is the authoring workflow for V2 templates. It must preserve the current Templates Editor for V1/simple/legacy editing while producing V2 template output compatible with Deploy From Template review and V2 planning.
+
+The first Builder slice authors V2 intent in topology-first order:
+
+1. schema/profile
+2. lab networks
+3. forests/domains
+4. VM assignments
+
+The first Builder slice may author:
+
+- schema/profile
+- lab networks
+- forests/domains
+- VM topology role
+- membership mode
+- domain assignment
+- credential slot references
+- per-VM NIC/IP/DNS/gateway intent
+
+Deterministic suggestions are allowed for these fields, but saved template output must reflect explicit user-confirmed draft intent. Trust authoring is out of scope for the first Builder slice; future trust authoring requires a separate approved contract.
+
 ## Guest/Role Placeholder Sections
 
 The schema includes optional sections now for forward compatibility:

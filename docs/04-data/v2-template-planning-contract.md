@@ -145,6 +145,18 @@ Bootstrap profiles describe image facts, not lab/domain intent.
 - imported templates may remain editable even when local slot mappings are unresolved
 - deployment must block until required slot mappings are resolved locally
 
+## Builder Output Compatibility
+
+The Templates V2 Builder is an authoring surface for producing planner-compatible V2 template JSON, not a separate planning dialect. Saved Builder output must remain consumable by:
+
+- V2 schema validation
+- Deploy From Template review and resolve
+- V2 orchestration planning
+
+The first Builder slice authors schema/profile, lab networks, forests/domains, VM topology role, membership mode, domain assignment, credential slot references, and per-VM NIC/IP/DNS/gateway intent. Deterministic suggestions may help populate those fields, but only explicit user-confirmed draft values become persisted template intent.
+
+Trust authoring is outside the first Builder slice. The existing trust runtime contract remains a planner/runtime capability for templates that already declare supported trust intent; adding first-class Builder trust authoring requires a later approved issue.
+
 ## Directory Topology Contract
 
 The canonical V2 backend topology contract is a top-level `directoryTopology` object.

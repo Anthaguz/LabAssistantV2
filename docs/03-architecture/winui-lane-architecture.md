@@ -10,7 +10,8 @@
 
 **Source basis:**
 - `docs/01-requirements/srs.md` (`FR-116`..`FR-118`, `FR-176`..`FR-178`)
-- `docs/01-requirements/acceptance-criteria.md` (`AC-023`, `AC-043`)
+- `docs/01-requirements/srs.md` (`FR-201`..`FR-204`)
+- `docs/01-requirements/acceptance-criteria.md` (`AC-023`, `AC-043`, `AC-050`)
 - `docs/03-architecture/winui-shell-bootstrap-runtime.md`
 
 ## 1) Core Rule
@@ -147,7 +148,15 @@ This doc does not require:
 - per-navigation lane recreation
 - product behavior redesign
 
-## 7) Update Rule
+## 7) Templates V2 Builder Application
+
+`templates.builder` is a non-trivial Templates workflow-state destination and should use the full lane/workspace split when implemented.
+
+Builder-specific draft state, validation flow, deterministic-suggestion confirmation, save orchestration, and V2 topology authoring sequence belong behind Builder-local workspace/viewmodel/controller seams. Builder-specific view composition and UI coordination belong behind Builder-local composition/view seams.
+
+Shared Templates composition remains responsible only for Templates-level workspace participation, route activation, and cross-surface coordination. `MainWindow` remains shell-only, and the current Templates Editor remains the V1/simple/legacy editing destination rather than becoming the Builder workflow owner.
+
+## 8) Update Rule
 
 If the durable lane-local rule changes, update this file in place.
 Do not create a new milestone-coded lane architecture contract for a rule that should survive beyond that slice.

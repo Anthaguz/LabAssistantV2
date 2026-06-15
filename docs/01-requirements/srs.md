@@ -360,12 +360,13 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 - **FR-077:** WinUI `Templates` capability shall use canonical child routes with deterministic parent default routing:
   - `templates.library` (default child)
   - `templates.editor`
+  - `templates.builder`
   - `templates.details` is deferred unless explicitly approved in a future milestone contract.
-  - **Acceptance details:** Selecting parent `Templates` routes to `templates.library` and remains consistent with global navigation rules from FR-075/FR-076.
+  - **Acceptance details:** Selecting parent `Templates` routes to `templates.library` and remains consistent with global navigation rules from FR-075/FR-076. `templates.editor` and `templates.builder` are workflow-state destinations entered from explicit actions rather than stable/default peer routes.
   - **Priority:** P1
 
 - **FR-078:** WinUI `Templates` capability shall provide a unified workflow surface that keeps template library and template editing in one coherent capability context.
-  - **Acceptance details:** Users can list/search/select templates, open selected template into editor, and perform create/edit/save flows without leaving `Templates` capability context.
+  - **Acceptance details:** Users can list/search/select templates, open selected V1/simple/legacy templates into the current editor, open V2 template authoring into the Builder workflow, and perform create/edit/save flows without leaving `Templates` capability context.
   - **Priority:** P1
 
 - **FR-079:** WinUI `Templates` capability shall keep import/export entry points discoverable within `Templates` capability context and shall not require file-hunt-first workflow as the primary edit path.
@@ -954,6 +955,22 @@ Detailed logging contract:
 
 - **FR-200:** The V2 orchestration runtime shall support a first executable trust slice for bidirectional forest trusts between two managed V2 domains/forests.
   - **Acceptance details:** The first slice supports only bidirectional forest trusts between LabAssistant-managed V2 domains/forests. External trusts, realm trusts, one-way directions, selective authentication details, SID-filter details, and unmanaged external domains are out of scope. Trust execution waits until both participating domains are `DomainReady`, uses existing per-domain domain-admin credential slots, prepares cross-forest DNS forwarding/reachability before trust creation, validates the trust from both participating sides before marking it ready, emits structured logs with `operationId` for DNS prep, trust creation, validation, and cleanup, and attempts to delete LabAssistant-created trust objects on later failure or cancellation while leaving DNS forwarders in place for retry and diagnosis.
+  - **Priority:** P1
+
+- **FR-201:** WinUI `Templates` shall define a distinct V2 Builder workflow for creating and editing V2 templates under the Templates capability without replacing the current Templates Editor.
+  - **Acceptance details:** The Builder is a Templates-local workflow-state destination, expected to use `templates.builder` or an equivalent Templates-local route key. The current `templates.editor` remains the V1/simple/legacy editing surface for existing schema editing and must not absorb V2 topology orchestration.
+  - **Priority:** P1
+
+- **FR-202:** The V2 Builder first authoring slice shall use topology-first ordering and expose only the approved first-slice V2 fields.
+  - **Acceptance details:** The authoring order is schema/profile, lab networks, forests/domains, then VM assignments. First-slice fields are schema/profile, lab networks, forests/domains, VM topology role, membership mode, domain assignment, credential slot references, and per-VM NIC/IP/DNS/gateway authoring. Trust authoring is out of this first Builder slice even though trust runtime support exists.
+  - **Priority:** P1
+
+- **FR-203:** The V2 Builder shall keep deterministic suggestions separate from persisted user intent and require explicit user confirmation before save.
+  - **Acceptance details:** Builder suggestions may prefill or propose derived values such as network/domain/assignment defaults, but save output is based on the user-confirmed draft. Builder output must remain compatible with Deploy From Template review and V2 planning contracts.
+  - **Priority:** P1
+
+- **FR-204:** The V2 Builder implementation target shall preserve Templates and shell ownership boundaries.
+  - **Acceptance details:** Builder state, workflow orchestration, validation sequencing, composition, and view coordination belong behind Builder-local workspace/viewmodel/controller/composition/view seams under the long-lived Templates workspace. `MainWindow`, shared Templates composition, and the current Templates Editor must not become the Builder workflow owner.
   - **Priority:** P1
 
 ---
