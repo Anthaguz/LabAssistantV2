@@ -57,6 +57,8 @@ public sealed class V2ResolvedPlanningContext
 
     public IReadOnlyList<V2ResolvedDomainPlanningContext> Domains { get; init; } = Array.Empty<V2ResolvedDomainPlanningContext>();
 
+    public IReadOnlyList<V2ResolvedTrustPlanningContext> Trusts { get; init; } = Array.Empty<V2ResolvedTrustPlanningContext>();
+
     public IReadOnlyList<V2ResolvedVmPlanningContext> Vms { get; init; } = Array.Empty<V2ResolvedVmPlanningContext>();
 }
 
@@ -82,6 +84,48 @@ public sealed class V2ResolvedDomainPlanningContext
     public string? ParentDomainId { get; init; }
 
     public string FirstDomainControllerVmId { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Resolved executable trust context built from template intent plus domain, VM, credential-slot, and ordering data.
+/// </summary>
+public sealed class V2ResolvedTrustPlanningContext
+{
+    public string TrustId { get; init; } = string.Empty;
+
+    public V2TrustType TrustType { get; init; }
+
+    public V2TrustDirection Direction { get; init; }
+
+    public string SourceDomainId { get; init; } = string.Empty;
+
+    public string SourceDomainDnsName { get; init; } = string.Empty;
+
+    public string? SourceForestId { get; init; }
+
+    public string SourceAnchorVmId { get; init; } = string.Empty;
+
+    public string SourceAnchorVmName { get; init; } = string.Empty;
+
+    public string? SourceDomainAdminCredentialSlot { get; init; }
+
+    public string TargetDomainId { get; init; } = string.Empty;
+
+    public string TargetDomainDnsName { get; init; } = string.Empty;
+
+    public string? TargetForestId { get; init; }
+
+    public string TargetAnchorVmId { get; init; } = string.Empty;
+
+    public string TargetAnchorVmName { get; init; } = string.Empty;
+
+    public string? TargetDomainAdminCredentialSlot { get; init; }
+
+    public string PrepareDnsNodeId { get; init; } = string.Empty;
+
+    public string CreateTrustNodeId { get; init; } = string.Empty;
+
+    public string ValidateTrustNodeId { get; init; } = string.Empty;
 }
 
 public sealed class V2ResolvedVmPlanningContext
@@ -177,7 +221,10 @@ public enum V2PlanNodeKind
     StabilizeDomainDns = 19,
     JoinDomain = 20,
     JoinedDomainReady = 21,
-    ApplyCapabilityRole = 22
+    ApplyCapabilityRole = 22,
+    PrepareForestTrustDns = 23,
+    CreateForestTrust = 24,
+    ValidateForestTrust = 25
 }
 
 public sealed class V2PlanNode
@@ -198,6 +245,8 @@ public sealed class V2PlanNode
 
     public string? CapabilityRole { get; init; }
 
+    public string? TrustId { get; init; }
+
     public int WaveHint { get; set; }
 }
 
@@ -217,7 +266,8 @@ public enum V2PlanDependencyReasonCode
     RouterRequired = 2,
     DomainRequired = 3,
     RoleOrdering = 4,
-    ProfileWavePolicy = 5
+    ProfileWavePolicy = 5,
+    TrustRequired = 6
 }
 
 public sealed class V2PlanDependency

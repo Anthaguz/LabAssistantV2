@@ -15,7 +15,7 @@ using Xunit;
 
 namespace LabAssistant.Business.Tests.Tests;
 
-public sealed class V2RuntimeCapabilityServiceTests
+public sealed partial class V2RuntimeCapabilityServiceTests
 {
     private readonly IV2PlanningCapabilityService _planningService = new V2PlanningCapabilityService();
 
@@ -350,6 +350,32 @@ public sealed class V2RuntimeCapabilityServiceTests
             entry.VmName == "fabrikamdc01" &&
             entry.Script.Contains("Install-ADDSForest", StringComparison.Ordinal));
         Assert.Contains("-DomainName 'fabrikam.com'", fabrikamForestScript.Script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ManagedBidirectionalForestTrust_InvokesTrustStageAfterAnchorDomainsReady()
+    {
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("trust:trust-contoso-fabrikam:PrepareForestTrustDns", result.ExecutedNodeIds);
+        Assert.Contains("trust:trust-contoso-fabrikam:CreateForestTrust", result.ExecutedNodeIds);
+        Assert.Contains("trust:trust-contoso-fabrikam:ValidateForestTrust", result.ExecutedNodeIds);
+        var scriptList = scripts.ToList();
+        Assert.Contains(scriptList, entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
+        Assert.Contains(scriptList, entry => entry.Script.Contains("Forest trust validated", StringComparison.Ordinal));
     }
 
     private static IV2RuntimeCapabilityService CreateService(
@@ -813,6 +839,26 @@ public sealed class V2RuntimeCapabilityServiceTests
             SwitchType = switchType
         };
 
+    private sealed class RecordingStructuredLogger : IStructuredLogger
+    {
+        public ConcurrentQueue<StructuredLogEvent> Events { get; } = new();
+
+        public void Log(StructuredLogEvent logEvent)
+        {
+            Events.Enqueue(logEvent);
+        }
+
+        public void Log(
+            StructuredLogLevel level,
+            string eventName,
+            string operationId,
+            string? result = null,
+            IReadOnlyDictionary<string, object?>? context = null)
+        {
+            Events.Enqueue(StructuredLogEvent.Create(level, eventName, operationId, result, context));
+        }
+    }
+
     private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithChildDomainAsync()
     {
         var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: false);
@@ -1067,6 +1113,92 @@ public sealed class V2RuntimeCapabilityServiceTests
                 Password = "Password123!"
             }
         };
+
+        return request;
+    }
+
+    private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithForestTrustAsync()
+    {
+        var request = await CreateRuntimeRequestWithAdditionalForestAsync();
+        request.Template.DirectoryTopology!.Trusts =
+        [
+            new V2TrustTemplate
+            {
+                TrustId = "trust-contoso-fabrikam",
+                SourceDomainId = "domain-contoso",
+                TargetDomainId = "domain-fabrikam",
+                TrustType = V2TrustType.Forest,
+                Direction = V2TrustDirection.Bidirectional
+            }
+        ];
+
+        request.Plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = request.Template,
+            CatalogItems =
+            [
+                CreateCatalogItem("disk-dc", "slot-local"),
+                CreateCatalogItem("disk-replica", "slot-local"),
+                CreateCatalogItem("disk-member", "slot-local"),
+                CreateCatalogItem("disk-fabrikamdc", "slot-local")
+            ],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"],
+            DefaultDeploymentProfile = "Balanced"
+        });
+
+        return request;
+    }
+
+    private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestWithTwoForestTrustsAsync()
+    {
+        var request = await CreateRuntimeRequestWithAdditionalForestAsync();
+        request.Template.DirectoryTopology!.Trusts =
+        [
+            new V2TrustTemplate
+            {
+                TrustId = "trust-a-contoso-fabrikam",
+                SourceDomainId = "domain-contoso",
+                TargetDomainId = "domain-fabrikam",
+                TrustType = V2TrustType.Forest,
+                Direction = V2TrustDirection.Bidirectional
+            },
+            new V2TrustTemplate
+            {
+                TrustId = "trust-b-contoso-fabrikam",
+                SourceDomainId = "domain-contoso",
+                TargetDomainId = "domain-fabrikam",
+                TrustType = V2TrustType.Forest,
+                Direction = V2TrustDirection.Bidirectional
+            }
+        ];
+
+        request.Plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = request.Template,
+            CatalogItems =
+            [
+                CreateCatalogItem("disk-dc", "slot-local"),
+                CreateCatalogItem("disk-replica", "slot-local"),
+                CreateCatalogItem("disk-member", "slot-local"),
+                CreateCatalogItem("disk-fabrikamdc", "slot-local")
+            ],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitches =
+            [
+                CreateSwitch("vSwitch-Core", "Internal"),
+                CreateSwitch("vSwitch-Edge", "Internal"),
+                CreateSwitch("vSwitch-External", "External")
+            ],
+            ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"],
+            DefaultDeploymentProfile = "Balanced"
+        });
 
         return request;
     }

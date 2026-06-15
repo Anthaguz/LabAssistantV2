@@ -342,6 +342,70 @@ public sealed class V2PlanningCapabilityServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanAsync_ManagedBidirectionalForestTrust_EmitsResolvedContextAndOrderedTrustNodes()
+    {
+        var request = CreateManagedForestTrustRequest(["slot-local", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"]);
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        var trust = Assert.Single(result.Context.Trusts);
+        Assert.Equal("trust-contoso-fabrikam", trust.TrustId);
+        Assert.Equal("domain-contoso", trust.SourceDomainId);
+        Assert.Equal("domain-fabrikam", trust.TargetDomainId);
+        Assert.Equal("vm-dc01", trust.SourceAnchorVmId);
+        Assert.Equal("vm-fabrikamdc01", trust.TargetAnchorVmId);
+        Assert.Equal("slot-admin", trust.SourceDomainAdminCredentialSlot);
+        Assert.Equal("slot-fabrikam-admin", trust.TargetDomainAdminCredentialSlot);
+
+        var prepareDns = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.PrepareForestTrustDns));
+        var createTrust = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.CreateForestTrust));
+        var validateTrust = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.ValidateForestTrust));
+        var contosoReady = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.DomainReady && node.VmId == "vm-dc01"));
+        var fabrikamReady = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.DomainReady && node.VmId == "vm-fabrikamdc01"));
+
+        Assert.Equal("trust-contoso-fabrikam", prepareDns.TrustId);
+        Assert.Equal("vm-dc01", prepareDns.VmId);
+        Assert.Contains(result.Dependencies, dep => dep.FromNodeId == contosoReady.NodeId && dep.ToNodeId == prepareDns.NodeId && dep.ReasonCode == V2PlanDependencyReasonCode.TrustRequired);
+        Assert.Contains(result.Dependencies, dep => dep.FromNodeId == fabrikamReady.NodeId && dep.ToNodeId == prepareDns.NodeId && dep.ReasonCode == V2PlanDependencyReasonCode.TrustRequired);
+        Assert.Contains(result.Dependencies, dep => dep.FromNodeId == prepareDns.NodeId && dep.ToNodeId == createTrust.NodeId && dep.ReasonCode == V2PlanDependencyReasonCode.TrustRequired);
+        Assert.Contains(result.Dependencies, dep => dep.FromNodeId == createTrust.NodeId && dep.ToNodeId == validateTrust.NodeId && dep.ReasonCode == V2PlanDependencyReasonCode.TrustRequired);
+        Assert.True(contosoReady.WaveHint < prepareDns.WaveHint);
+        Assert.True(fabrikamReady.WaveHint < prepareDns.WaveHint);
+        Assert.True(prepareDns.WaveHint < createTrust.WaveHint);
+        Assert.True(createTrust.WaveHint < validateTrust.WaveHint);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_ManagedForestTrustMissingDomainAdminSlot_BlocksBeforeRuntime()
+    {
+        var request = CreateManagedForestTrustRequest(["slot-local", "slot-admin", "slot-dsrm"]);
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.UnresolvedRequirements, requirement =>
+            requirement.Kind == V2UnresolvedRequirementKind.CredentialSlot &&
+            requirement.Key == "slot-fabrikam-admin");
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == "credential-slot-unresolved" &&
+            issue.Message.Contains("forest trust 'trust-contoso-fabrikam' target domain", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_UnsupportedTrustShape_BlocksBeforeRuntime()
+    {
+        var request = CreateManagedForestTrustRequest(["slot-local", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"]);
+        request.Template.DirectoryTopology!.Trusts![0].Direction = V2TrustDirection.Outbound;
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Code == "trust-shape-unsupported" && issue.Severity == V2PlanIssueSeverity.Blocking);
+        Assert.DoesNotContain(result.Nodes, node => node.Kind == V2PlanNodeKind.CreateForestTrust);
+    }
+
+    [Fact]
     public async Task BuildPlanAsync_PreservesExplicitMultiNicIntentInResolvedContext()
     {
         var result = await _service.BuildPlanAsync(CreateCrossSwitchRequest(includeRouter: true));
@@ -771,6 +835,69 @@ public sealed class V2PlanningCapabilityServiceTests
             CreateCatalogItem("disk-childreplica", "slot-local"),
             CreateCatalogItem("disk-childmember", "slot-local")
         ]).ToArray();
+
+        return request;
+    }
+
+    private static V2PlanBuildRequest CreateManagedForestTrustRequest(IReadOnlyCollection<string> resolvedSlots)
+    {
+        var request = CreateAdCoreRequest("Balanced", resolvedSlots);
+        request.Template.VmTemplates.RemoveAll(vm => vm.VmId == "vm-member01");
+        request.Template.VmTemplates.Add(new VmTemplate
+        {
+            VmId = "vm-fabrikamdc01",
+            Name = "fabrikamdc01",
+            MemoryMb = 4096,
+            CpuCount = 2,
+            VhdxId = "disk-fabrikamdc",
+            TopologyRole = "FirstDomainController",
+            DomainId = "domain-fabrikam",
+            CredentialSlots = new VmCredentialSlotBindings
+            {
+                LocalBootstrap = "slot-local",
+                DomainAdmin = "slot-fabrikam-admin",
+                Dsrm = "slot-dsrm"
+            },
+            Nics =
+            [
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-fabrikamdc",
+                    NetworkId = "lab-core",
+                    IpAddress = "10.0.0.50",
+                    PrefixLength = 24,
+                    DefaultGateway = "10.0.0.1",
+                    DnsServers = ["10.0.0.50"]
+                }
+            ]
+        });
+        request.Template.DirectoryTopology!.Forests!.Add(new V2ForestTemplate
+        {
+            ForestId = "forest-fabrikam",
+            RootDomainId = "domain-fabrikam"
+        });
+        request.Template.DirectoryTopology.Domains!.Add(new V2DomainTemplate
+        {
+            DomainId = "domain-fabrikam",
+            DnsName = "fabrikam.com",
+            NetBiosName = "FABRIKAM",
+            ForestId = "forest-fabrikam",
+            RelationKind = V2DomainRelationKind.Root,
+            FirstDomainControllerVmId = "vm-fabrikamdc01"
+        });
+        request.Template.DirectoryTopology.Trusts =
+        [
+            new V2TrustTemplate
+            {
+                TrustId = "trust-contoso-fabrikam",
+                SourceDomainId = "domain-contoso",
+                TargetDomainId = "domain-fabrikam",
+                TrustType = V2TrustType.Forest,
+                Direction = V2TrustDirection.Bidirectional
+            }
+        ];
+        request.CatalogItems = request.CatalogItems.Concat([CreateCatalogItem("disk-fabrikamdc", "slot-local")]).ToArray();
+        request.ResolvedCredentialSlotKeys = resolvedSlots;
 
         return request;
     }

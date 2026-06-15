@@ -20,6 +20,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly V2DomainProgressionRuntimeCoordinator _domainProgressionRuntimeCoordinator;
     private readonly V2BaseRemoteAccessRuntimeCoordinator _baseRemoteAccessRuntimeCoordinator;
     private readonly V2RouterRuntimeCoordinator _routerRuntimeCoordinator;
+    private readonly V2ForestTrustRuntimeStage _forestTrustRuntimeStage;
     private readonly IVmCleanupOrchestrator _cleanupOrchestrator;
     private readonly IStructuredLogger _structuredLogger;
 
@@ -37,6 +38,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         _domainProgressionRuntimeCoordinator = new V2DomainProgressionRuntimeCoordinator(guestCommandExecutor);
         _baseRemoteAccessRuntimeCoordinator = new V2BaseRemoteAccessRuntimeCoordinator(guestCommandExecutor);
         _routerRuntimeCoordinator = new V2RouterRuntimeCoordinator(guestCommandExecutor);
+        _forestTrustRuntimeStage = new V2ForestTrustRuntimeStage(guestCommandExecutor, structuredLogger);
         _cleanupOrchestrator = cleanupOrchestrator;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
     }
@@ -71,6 +73,10 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = _forestTrustRuntimeStage.InitializeRuntimeState(
+            request,
+            BuildForestTrustAnchorStates(states),
+            multiContext);
         var deferredNodeIds = new HashSet<string>(
             request.Plan.Nodes
                 .Where(node => node.Kind == V2PlanNodeKind.ApplyCapabilityRole)
@@ -142,6 +148,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 }
             }
 
+            await _forestTrustRuntimeStage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
             await CleanupFailedOrCancelledVmsAsync(multiContext, states);
         }
         finally
@@ -153,7 +160,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             var hasFailures = multiContext.VmContexts.Any(vm => !vm.IsSuccess);
-            var hasCleanupResiduals = multiContext.CleanupResults.Any(result => result.HasResiduals);
+            var hasCleanupResiduals = multiContext.CleanupResults.Any(result => result.HasResiduals) ||
+                                      multiContext.V2TrustContexts.Any(trust => trust.CleanupResidual);
             multiContext.CompleteTerminalState(hasFailures, hasCleanupResiduals);
             EmitDeployTerminalEvent(multiContext);
         }
@@ -207,6 +215,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     {
         if (nonRootStates.Count == 0)
         {
+            await ExecuteForestTrustStageAsync(
+                request,
+                multiContext,
+                rootStates.Concat(nonRootStates).ToList(),
+                executedNodeIds,
+                cancellationToken);
             return;
         }
 
@@ -417,6 +431,27 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         await ExecuteNodeSetAsync(dnsStates, V2PlanNodeKind.StabilizeDomainDns, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(memberStates, V2PlanNodeKind.JoinDomain, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
         await ExecuteNodeSetAsync(memberStates, V2PlanNodeKind.JoinedDomainReady, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+        await ExecuteForestTrustStageAsync(
+            request,
+            multiContext,
+            rootStates.Concat(nonRootStates).ToList(),
+            executedNodeIds,
+            cancellationToken);
+    }
+
+    private async Task ExecuteForestTrustStageAsync(
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<RuntimeVmState> states,
+        ISet<string> executedNodeIds,
+        CancellationToken cancellationToken)
+    {
+        await _forestTrustRuntimeStage.ExecuteAsync(
+            request,
+            multiContext,
+            BuildForestTrustAnchorStates(states),
+            executedNodeIds,
+            cancellationToken);
     }
 
     private async Task ExecuteNodeSetAsync(
@@ -700,6 +735,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     cancellationToken);
                 executedNodeIds.Add(node.NodeId);
                 break;
+
         }
     }
 
@@ -2101,8 +2137,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private static void InitializeDeploymentContext(MultiVmDeploymentContext multiContext, AppSettings settings)
     {
         multiContext.VmContexts.Clear();
+        multiContext.V2TrustContexts.Clear();
         multiContext.StopAllOnAnyVmFailure = settings.StopAllOnAnyVmFailure;
     }
+
+    private static IReadOnlyList<V2ForestTrustAnchorState> BuildForestTrustAnchorStates(
+        IReadOnlyList<RuntimeVmState> states)
+        => states
+            .Select(state => new V2ForestTrustAnchorState(state.PlanVm.VmId, state.Context))
+            .ToArray();
 
     private static List<RuntimeVmState> BuildRuntimeStates(V2RuntimeExecutionRequest request, MultiVmDeploymentContext multiContext)
     {
