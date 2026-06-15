@@ -201,6 +201,5 @@ Router readiness in the current runtime slice means:
 ## Open Questions / TBDs
 
 - Exact numeric scheduler caps for each deployment profile on representative hardware.
-- Exact review-surface visualization for graph vs wave display.
+- Exact future visualization beyond the current deploy-time wave/detail review surface.
 - Exact runtime policy for workloads that partially overlap heavy guest and heavy host pressure.
-- Whether base remote-access guest behavior from the legacy script should return as its own explicit V2 runtime slice.

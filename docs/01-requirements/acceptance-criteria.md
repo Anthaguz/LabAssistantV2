@@ -4404,7 +4404,7 @@ Each readiness result shall include, at minimum:
 **Then**
 - NIC ordering and switch attachment intent are preserved
 - explicit per-NIC IP/gateway/DNS values are preserved
-- router-style VMs are supported by the schema/planner contract even before the full router runtime slice is implemented
+- router-style VMs are supported by the schema/planner contract and router-required work is represented by explicit router runtime nodes when routing is required
 
 ### 9) Scheduling profiles - overlap changes without breaking correctness
 **Given**
@@ -4468,5 +4468,5 @@ Each readiness result shall include, at minimum:
 - concise, actionable summaries with deeper technical detail left to diagnostics/logs
 
 ## Open Questions / TBDs
-- exact visual format of the orchestration graph/waves in the first user-facing V2 review surface
+- future visualization beyond the current deploy-time V2 wave/detail review surface
 - exact import-time vs deploy-time UX for remapping credential slots on a newly shared template

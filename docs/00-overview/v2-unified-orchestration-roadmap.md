@@ -37,8 +37,11 @@
 - member join path
 
 ### Milestone 6: Extended Topologies
-- child domain
-- tree/extra-forest if still desired
+- child domain runtime execution
+- tree-domain runtime execution
+- additional independent root-forest runtime execution
+- trust runtime as the remaining explicit topology runtime gap
+- V2 Builder authoring so users can create/edit the backend model without hand-authored JSON
 - richer additive capability-role execution
 - separate follow-up for persisting base remote-access guest behavior in V2 template authoring after deploy-time validation lands
 
@@ -85,8 +88,28 @@ GitHub: `#722`
 1. child-domain contract issue
 2. child-domain runtime issue
 3. extra-forest/tree follow-up issue
+4. trust runtime follow-up issue
 
-## Initial Recommended Issue Chain
+## Current Backend State
+
+The backend V2 runtime now executes:
+
+- root domain and root forest creation
+- child domain creation
+- tree domain creation
+- multiple independent root forests
+- replica domain-controller promotion
+- per-domain DNS stabilization
+- domain-member joins
+- router guest configuration and routed readiness gates
+- deploy-time V2 review-and-resolve planning
+- deploy-time base remote-access guest configuration
+
+Trust declarations remain persisted and validated contract data only. They are not represented as executable plan nodes and do not run in the current runtime path.
+
+## Historical Initial Recommended Issue Chain
+
+This chain records the original issue setup. It is historical by default and should not be treated as the current next-action list.
 
 1. `#716` `Epic: V2 Unified Orchestration Architecture`
 2. `#723` `Architecture: Inventory LabAssistantConfig script behavior and implicit scheduling waves`
@@ -103,7 +126,14 @@ GitHub: `#722`
 13. `#722` `Epic: V2 Extended Domain Topologies`
 14. `#729` `Contract: Reserve child-domain and extra-forest extension seam for V2`
 
+## Current Recommended Issue Chain
+
+1. `#750` `Mismatch: docs vs code - V2 extended topology execution boundary`
+2. `#751` `Contract: Define first V2 forest-trust runtime slice`
+3. `#753` `Runtime: Execute bidirectional managed-forest V2 trust path`
+4. `#754` `Contract: Define Templates V2 Builder workflow`
+5. `#755` `UX: Add Templates V2 Builder topology-first authoring surface`
+
 ## Open Questions / TBDs
 
-- Exact milestone sizing once Milestone 2 code seams are estimated against the current repo.
-- Whether some contract issues should remain docs-only or immediately include code contracts in the same slice.
+- Whether V2 Builder should eventually replace the current Templates Editor for all templates or remain only the V2 authoring surface.

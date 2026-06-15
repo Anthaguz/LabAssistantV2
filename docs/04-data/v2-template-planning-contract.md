@@ -108,6 +108,7 @@ The current V2 slice executes explicit graph nodes for:
 - host-side guest-access prerequisites
 - guest transport readiness
 - guest NIC/IP/DNS preparation
+- base remote-access guest configuration when enabled at deploy time
 - router NIC configuration
 - router RRAS/RemoteAccess feature installation
 - router routing enablement
@@ -121,7 +122,7 @@ The current V2 slice executes explicit graph nodes for:
 - domain joins
 - joined-state and domain-login validation
 
-Tree domains and trusts remain deferred to later slices. Child-domain execution now reuses the shared per-domain promotion, DNS stabilization, and join paths, with only first-domain creation varying by relation kind.
+Root domains, child domains, tree domains, and multiple independent root forests now execute through the V2 runtime path. Extended topology execution reuses the shared per-domain promotion, DNS stabilization, and join paths, with only first-domain creation varying by relation kind. Trusts remain known contract data only until the explicit trust-runtime slice lands.
 
 Base remote-access guest hardening is now a deploy-time V2 review/runtime option and remains deferred only at the template-authoring/schema level.
 
@@ -154,7 +155,7 @@ It may declare:
 - `domains`
 - `trusts`
 
-The shape is designed so root forests are executable now, while child domains, tree domains, and trusts remain reserved for later runtime slices.
+The current runtime executes root, child, tree, and additional independent root-forest domain creation paths. Trusts remain reserved for a later runtime slice.
 
 ### Forests
 
@@ -181,7 +182,7 @@ Supported `relationKind` values are:
 - `Child`
 - `Tree`
 
-Only `Root` is executable in the current slice.
+All supported `relationKind` values are executable in the current V2 backend runtime. Root domains create or extend independent forests according to their forest declaration; child and tree domains require a valid parent-domain reference and wait for the parent domain readiness gate.
 
 ### Trusts
 
@@ -200,11 +201,12 @@ Trusts validate shape and references only. They do not execute yet.
 ### Current Execution Boundary
 
 - root forests execute in the current V2 slice
-- child domains remain known-but-non-executable
-- tree domains remain known-but-non-executable
+- child domains execute through the shared per-domain runtime path
+- tree domains execute through the shared per-domain runtime path
+- additional independent root forests execute as peer first-domain creation paths
 - trusts remain known-but-non-executable
 
 ## Open Questions / TBDs
 
-- Exact field names for child-domain and extra-forest declarations.
 - Whether future V2 authoring should support deterministic auto-allocation alongside explicit per-NIC guest addressing.
+- Whether future trust slices need schema fields beyond the current `trustId`, source/target domain, type, and direction shape.
