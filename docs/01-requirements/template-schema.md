@@ -141,6 +141,7 @@ For `V2`, the schema direction expands the current model to include:
 - additive capability roles
 - dependency declarations
 - deployment profile selection
+- directory topology with forests, domains, and trusts
 - credential slot references
 - VHDX/bootstrap profile references
 
@@ -180,6 +181,28 @@ Rules:
 - domain controllers still require `domainId` because their topology role drives promotion behavior
 - ordinary joinable machines do not need a dedicated topology role
 
+### V2 directory topology
+
+V2 lab templates may declare a top-level `directoryTopology` object with:
+
+- `forests`
+- `domains`
+- `trusts`
+
+Domain declarations carry the durable identity and relationship fields used by the planner/runtime:
+
+- `domainId`
+- `dnsName`
+- `netBiosName`
+- `forestId`
+- `relationKind`
+- `parentDomainId` when `relationKind` is `Child` or `Tree`
+- `firstDomainControllerVmId`
+
+Supported `relationKind` values are `Root`, `Child`, and `Tree`.
+
+Trust declarations are persisted and validated by shape/reference today, but trust execution remains deferred until the explicit trust-runtime contract lands.
+
 ### V2 network authoring direction
 
 V2 uses a hybrid network model:
@@ -213,8 +236,10 @@ V2 templates must reference credentials by slot/label rather than embedding reus
 Template-owned references may include:
 
 - local bootstrap credential slot reference
+- domain administrator credential slot reference
 - domain join credential slot reference
 - DSRM credential slot reference
+- parent domain administrator credential slot reference for dependent-domain creation
 - role-specific credential slot reference
 
 Reusable secret values remain a local-machine concern and must not travel in exported templates.
@@ -276,4 +301,3 @@ Rule:
 - Exact migration flow UX for schema upgrades.
 - Field-level compatibility matrix for minor schema version changes.
 - Whether deterministic auto-allocation should ever complement explicit per-NIC addressing in V2.
-- Exact child-domain/tree/extra-forest V2 field set beyond the reserved extension seam.
