@@ -188,6 +188,25 @@ internal static class TemplatesBuilderDraftMapper
         IReadOnlyList<TemplatesBuilderVmDraft> vmDrafts,
         List<string> errors)
     {
+        if (domainDrafts.Count == 0)
+        {
+            foreach (var vm in vmDrafts)
+            {
+                var membershipMode = V2MembershipModeCatalog.Normalize(vm.MembershipMode);
+                if (V2MembershipModeCatalog.IsDomainMember(membershipMode))
+                {
+                    errors.Add($"VM '{vm.Name}' cannot use DomainMember membership without a declared domain.");
+                }
+
+                if (vm.IsActiveDirectoryDomainController)
+                {
+                    errors.Add($"VM '{vm.Name}' cannot be assigned the Active Directory Domain Controller role without a declared domain.");
+                }
+            }
+
+            return [];
+        }
+
         var dcByDomain = vmDrafts
             .Where(vm => vm.IsActiveDirectoryDomainController && !string.IsNullOrWhiteSpace(vm.DomainId))
             .GroupBy(vm => vm.DomainId.Trim(), StringComparer.OrdinalIgnoreCase)

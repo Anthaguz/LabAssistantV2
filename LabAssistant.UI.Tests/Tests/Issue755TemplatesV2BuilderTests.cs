@@ -48,21 +48,47 @@ public sealed class Issue755TemplatesV2BuilderTests
     }
 
     [Fact]
-    public void TemplatesBuilderView_UsesStructuredResourceBoard_NotPipeDelimitedAuthoringTextBoxes()
+    public void TemplatesBuilderView_UsesStepWorkflow_WithOneActivePanel()
     {
         var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
         var builderModels = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderDraftModels.cs")));
 
-        Assert.NotNull(FindByName(builder, "BuilderProfileSection"));
+        Assert.NotNull(FindByName(builder, "BuilderLeftStepper"));
+        Assert.NotNull(FindByName(builder, "BuilderActiveStepPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderGeneralSection"));
         Assert.NotNull(FindByName(builder, "BuilderNetworksSection"));
-        Assert.NotNull(FindByName(builder, "BuilderCredentialsSection"));
         Assert.NotNull(FindByName(builder, "BuilderForestsDomainsSection"));
+        Assert.NotNull(FindByName(builder, "BuilderCredentialsSection"));
         Assert.NotNull(FindByName(builder, "BuilderVmsSection"));
         Assert.NotNull(FindByName(builder, "BuilderReviewSection"));
-        Assert.NotNull(FindByName(builder, "BuilderNetworksPanel"));
-        Assert.NotNull(FindByName(builder, "BuilderDomainsPanel"));
-        Assert.NotNull(FindByName(builder, "BuilderVmsPanel"));
+        Assert.DoesNotContain(builder.Descendants().Attributes().Select(attribute => attribute.Value), value => value == "BuilderProfileSection");
+        Assert.Equal(
+            ["General", "Networks", "Forests & Domains", "Credentials", "VMs", "Review"],
+            FindByName(builder, "BuilderLeftStepper")
+                .Descendants()
+                .Where(element => element.Name.LocalName == "Button")
+                .Select(element => element.Attribute("Content")?.Value ?? string.Empty)
+                .ToArray());
+        Assert.Contains("BuilderWorkflowStep.General", builderSource);
+        Assert.Contains("BuilderWorkflowStep.Networks", builderSource);
+        Assert.Contains("BuilderWorkflowStep.ForestsDomains", builderSource);
+        Assert.Contains("BuilderWorkflowStep.Credentials", builderSource);
+        Assert.Contains("BuilderWorkflowStep.Vms", builderSource);
+        Assert.Contains("BuilderWorkflowStep.Review", builderSource);
+        Assert.DoesNotContain("BuilderProfileSection", builderSource);
+        Assert.DoesNotContain("BuilderNetworksPanel", builder.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("BuilderDomainsPanel", builder.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("BuilderVmsPanel", builder.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("BuilderVmsPanel", builderSource, StringComparison.Ordinal);
+        Assert.NotNull(FindByName(builder, "BuilderNetworksListPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderSelectedNetworkDetailPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderForestDomainResourcesListPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderSelectedForestDomainDetailPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderCredentialSlotsListPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderSelectedCredentialSlotDetailPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderVmNameListPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderSelectedVmDetailPanel"));
         Assert.Contains("Basics", builderSource);
         Assert.Contains("Compute", builderSource);
         Assert.Contains("Membership", builderSource);
@@ -79,6 +105,21 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.DoesNotContain("VmsText", builderModels);
         Assert.DoesNotContain("NicsText", builderModels);
         Assert.DoesNotContain("topologyRole", builder.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        var confirmation = FindByName(builder, "BuilderConfirmSaveCheckBox");
+        Assert.Contains(confirmation.Ancestors(), ancestor => HasName(ancestor, "BuilderReviewSection"));
+        Assert.Equal("Back", FindByName(builder, "BuilderBackToLibraryButton").Attribute("Content")?.Value);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_DraftEditsRefreshResourceLists_WithoutFullDetailRerender()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var notifyDraftChangedBody = ExtractMethodBody(builderSource, "private void NotifyDraftChanged()");
+
+        Assert.Contains("RenderResourceLists();", notifyDraftChangedBody);
+        Assert.DoesNotContain("RenderDraftResources();", notifyDraftChangedBody);
+        Assert.Contains("RenderSelectedVmDetail();", ExtractMethodBody(builderSource, "private void RenderDraftResources()"));
     }
 
     [Fact]
@@ -120,6 +161,103 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         Assert.Null(build.Document);
         Assert.Contains(build.Errors, error => error.Contains("Active Directory Domain Controller role", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task BuilderDraftMapper_AllowsZeroDomainStandaloneVmTemplate_ToPlan()
+    {
+        var draft = CreateConfirmedBuilderDraft();
+        var standaloneVm = draft.Vms[0] with
+        {
+            MembershipMode = V2MembershipModeCatalog.Standalone,
+            DomainId = string.Empty,
+            IsActiveDirectoryDomainController = false,
+            CredentialSlots = new TemplatesBuilderVmCredentialSlotDraft("slot-local", string.Empty, string.Empty, string.Empty, string.Empty)
+        };
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft with
+            {
+                Forests = [],
+                Domains = [],
+                Vms = [standaloneVm]
+            },
+            templateId: "template-v2-standalone",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Empty(build.Errors);
+        var document = Assert.IsType<TemplateEditorDocument>(build.Document);
+        Assert.Empty(document.Template.DirectoryTopology!.Domains!);
+
+        var planner = new V2PlanningCapabilityService();
+        var plan = await planner.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = document.Template,
+            CatalogItems = [CreateCatalogItem("disk-dc", @"C:\base\disk-dc.vhdx", "sig-dc")],
+            AvailableSwitchNames = ["vSwitch-Core"],
+            AvailableSwitches = [new V2AvailableSwitchInfo { Name = "vSwitch-Core", SwitchType = "Internal" }],
+            ResolvedCredentialSlotKeys = ["slot-local"],
+            DefaultDeploymentProfile = "Balanced"
+        });
+
+        Assert.True(plan.Success);
+        Assert.False(plan.Context.DomainSemanticsRequired);
+    }
+
+    [Fact]
+    public void BuilderDraftMapper_BlocksDomainMemberVm_WhenNoDomainIsDeclared()
+    {
+        var draft = CreateConfirmedBuilderDraft();
+        var domainMemberVm = draft.Vms[1] with
+        {
+            MembershipMode = V2MembershipModeCatalog.DomainMember,
+            DomainId = "domain-contoso",
+            IsActiveDirectoryDomainController = false
+        };
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft with
+            {
+                Forests = [],
+                Domains = [],
+                Vms = [domainMemberVm]
+            },
+            templateId: "template-v2-builder",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Null(build.Document);
+        Assert.Contains(build.Errors, error => error.Contains("DomainMember membership without a declared domain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuilderDraftMapper_BlocksAdDcRoleVm_WhenNoDomainIsDeclared()
+    {
+        var draft = CreateConfirmedBuilderDraft();
+        var dcVm = draft.Vms[0] with
+        {
+            MembershipMode = V2MembershipModeCatalog.DomainMember,
+            DomainId = "domain-contoso",
+            IsActiveDirectoryDomainController = true
+        };
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft with
+            {
+                Forests = [],
+                Domains = [],
+                Vms = [dcVm]
+            },
+            templateId: "template-v2-builder",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Null(build.Document);
+        Assert.Contains(build.Errors, error => error.Contains("Active Directory Domain Controller role without a declared domain", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -401,6 +539,30 @@ public sealed class Issue755TemplatesV2BuilderTests
         return xaml
             .Descendants()
             .Single(element => element.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == name);
+    }
+
+    private static bool HasName(XElement element, string name)
+        => element.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == name;
+
+    private static string ExtractMethodBody(string source, string signature)
+    {
+        var start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Could not find method signature '{signature}'.");
+        var braceStart = source.IndexOf('{', start);
+        Assert.True(braceStart >= 0, $"Could not find method body for '{signature}'.");
+
+        var depth = 0;
+        for (var i = braceStart; i < source.Length; i++)
+        {
+            depth += source[i] == '{' ? 1 : 0;
+            depth -= source[i] == '}' ? 1 : 0;
+            if (depth == 0)
+            {
+                return source.Substring(braceStart, i - braceStart + 1);
+            }
+        }
+
+        throw new InvalidOperationException($"Could not read method body for '{signature}'.");
     }
 
     private sealed class RecordingTemplatesCapabilityService : ITemplatesCapabilityService

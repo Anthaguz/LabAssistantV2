@@ -34,138 +34,199 @@
                     TextWrapping="Wrap" />
             </StackPanel>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="10" Margin="0,0,10,0">
-                    <Border
-                        x:Name="BuilderProfileSection"
-                        Padding="8"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Spacing="6">
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Profile" />
-                                <TextBox x:Name="BuilderTemplateNameTextBox" Header="Template Name" PlaceholderText="Template name" />
-                                <TextBox
-                                    x:Name="BuilderTemplateDescriptionTextBox"
-                                    Header="Description"
-                                    AcceptsReturn="True"
-                                    MinHeight="56"
-                                    MaxHeight="96"
+            <Grid
+                Grid.Row="1"
+                x:Name="BuilderStepWorkflowGrid"
+                ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="190" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    x:Name="BuilderLeftStepper"
+                    Grid.Column="0"
+                    Padding="8"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <StackPanel Spacing="6">
+                        <Button x:Name="BuilderGeneralStepButton" Content="General" HorizontalAlignment="Stretch" />
+                        <Button x:Name="BuilderNetworksStepButton" Content="Networks" HorizontalAlignment="Stretch" />
+                        <Button x:Name="BuilderForestsDomainsStepButton" Content="Forests &amp; Domains" HorizontalAlignment="Stretch" />
+                        <Button x:Name="BuilderCredentialsStepButton" Content="Credentials" HorizontalAlignment="Stretch" />
+                        <Button x:Name="BuilderVmsStepButton" Content="VMs" HorizontalAlignment="Stretch" />
+                        <Button x:Name="BuilderReviewStepButton" Content="Review" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer
+                    x:Name="BuilderActiveStepScrollViewer"
+                    Grid.Column="1"
+                    VerticalScrollBarVisibility="Auto">
+                    <Grid x:Name="BuilderActiveStepPanel" Margin="0,0,10,0">
+                        <Border
+                            x:Name="BuilderGeneralSection"
+                            Padding="8"
+                            Background="{StaticResource ShellContentBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="6">
+                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="General" />
+                                    <TextBox x:Name="BuilderTemplateNameTextBox" Header="Template Name" PlaceholderText="Template name" />
+                                    <TextBox
+                                        x:Name="BuilderTemplateDescriptionTextBox"
+                                        Header="Description"
+                                        AcceptsReturn="True"
+                                        MinHeight="56"
+                                        MaxHeight="96"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="6">
+                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Deployment Profile" />
+                                    <ComboBox x:Name="BuilderDeploymentProfileComboBox">
+                                        <ComboBoxItem Content="Conservative" />
+                                        <ComboBoxItem Content="Balanced" />
+                                        <ComboBoxItem Content="Aggressive" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            x:Name="BuilderNetworksSection"
+                            Padding="8"
+                            Background="{StaticResource ShellContentBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Networks" />
+                                    <Button x:Name="BuilderAddNetworkButton" Content="Add Network" />
+                                </StackPanel>
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" x:Name="BuilderNetworksListPanel" Spacing="6" />
+                                    <StackPanel Grid.Column="1" x:Name="BuilderSelectedNetworkDetailPanel" Spacing="8" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            x:Name="BuilderForestsDomainsSection"
+                            Padding="8"
+                            Background="{StaticResource ShellContentBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="10">
+                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Forests &amp; Domains" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="BuilderAddForestButton" Content="Add Forest" />
+                                    <Button x:Name="BuilderAddDomainButton" Content="Add Domain" />
+                                </StackPanel>
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="240" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" x:Name="BuilderForestDomainResourcesListPanel" Spacing="6" />
+                                    <StackPanel Grid.Column="1" x:Name="BuilderSelectedForestDomainDetailPanel" Spacing="8" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            x:Name="BuilderCredentialsSection"
+                            Padding="8"
+                            Background="{StaticResource ShellContentBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Credentials" />
+                                    <Button x:Name="BuilderAddCredentialSlotButton" Content="Add Slot Reference" />
+                                </StackPanel>
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" x:Name="BuilderCredentialSlotsListPanel" Spacing="6" />
+                                    <StackPanel Grid.Column="1" x:Name="BuilderSelectedCredentialSlotDetailPanel" Spacing="8" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            x:Name="BuilderVmsSection"
+                            Padding="8"
+                            Background="{StaticResource ShellContentBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="VMs" />
+                                    <Button x:Name="BuilderAddVmButton" Content="Add VM" />
+                                </StackPanel>
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" x:Name="BuilderVmNameListPanel" Spacing="6" />
+                                    <StackPanel Grid.Column="1" x:Name="BuilderSelectedVmDetailPanel" Spacing="8" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            x:Name="BuilderReviewSection"
+                            Padding="8"
+                            Background="{StaticResource ShellContentBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="6">
+                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Review" />
+                                <TextBlock
+                                    x:Name="BuilderReviewSummaryTextBlock"
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     TextWrapping="Wrap" />
+                                <CheckBox
+                                    x:Name="BuilderConfirmSaveCheckBox"
+                                    Content="I confirm this visible V2 Builder draft should be persisted." />
                             </StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="6">
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Deployment Profile" />
-                                <ComboBox x:Name="BuilderDeploymentProfileComboBox">
-                                    <ComboBoxItem Content="Conservative" />
-                                    <ComboBoxItem Content="Balanced" />
-                                    <ComboBoxItem Content="Aggressive" />
-                                </ComboBox>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <Border
-                        x:Name="BuilderNetworksSection"
-                        Padding="8"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <StackPanel Spacing="8">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Networks" />
-                                <Button x:Name="BuilderAddNetworkButton" Content="Add Network" />
-                            </StackPanel>
-                            <StackPanel x:Name="BuilderNetworksPanel" Spacing="8" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border
-                        x:Name="BuilderCredentialsSection"
-                        Padding="8"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <StackPanel Spacing="8">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Credentials" />
-                                <Button x:Name="BuilderAddCredentialSlotButton" Content="Add Slot Reference" />
-                            </StackPanel>
-                            <StackPanel x:Name="BuilderCredentialSlotsPanel" Spacing="8" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border
-                        x:Name="BuilderForestsDomainsSection"
-                        Padding="8"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <StackPanel Spacing="10">
-                            <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Forests &amp; Domains" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="BuilderAddForestButton" Content="Add Forest" />
-                                <Button x:Name="BuilderAddDomainButton" Content="Add Domain" />
-                            </StackPanel>
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Forests" />
-                            <StackPanel x:Name="BuilderForestsPanel" Spacing="8" />
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Domains" />
-                            <StackPanel x:Name="BuilderDomainsPanel" Spacing="8" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border
-                        x:Name="BuilderVmsSection"
-                        Padding="8"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <StackPanel Spacing="8">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="VMs" />
-                                <Button x:Name="BuilderAddVmButton" Content="Add VM" />
-                            </StackPanel>
-                            <StackPanel x:Name="BuilderVmsPanel" Spacing="10" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border
-                        x:Name="BuilderReviewSection"
-                        Padding="8"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <StackPanel Spacing="6">
-                            <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Review" />
-                            <TextBlock
-                                x:Name="BuilderReviewSummaryTextBlock"
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
 
             <StackPanel Grid.Row="2" Spacing="6">
-                <CheckBox
-                    x:Name="BuilderConfirmSaveCheckBox"
-                    Content="I confirm this visible V2 Builder draft should be persisted." />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button x:Name="BuilderApplySuggestionsButton" Content="Apply Suggestions" />
                     <Button x:Name="BuilderValidateButton" Content="Validate" />
                     <Button x:Name="BuilderSaveButton" Content="Save" />
                     <Button x:Name="BuilderSaveAsButton" Content="Save As" />
-                    <Button x:Name="BuilderBackToLibraryButton" Content="Back to Library" />
+                    <Button x:Name="BuilderBackToLibraryButton" Content="Back" />
                 </StackPanel>
                 <TextBlock
                     x:Name="BuilderStatusTextBlock"
