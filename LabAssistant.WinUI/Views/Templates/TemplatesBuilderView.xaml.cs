@@ -24,6 +24,13 @@ internal readonly record struct TemplatesBuilderActionState(
 public sealed partial class TemplatesBuilderView : UserControl
 {
     private bool _isUpdatingDraft;
+    private BuilderWorkflowStep _selectedStep = BuilderWorkflowStep.General;
+    private TemplatesBuilderDraftSnapshot _draft = CreateEmptyDraft();
+    private int _selectedNetworkIndex;
+    private int _selectedCredentialSlotIndex;
+    private int _selectedVmIndex;
+    private BuilderForestDomainResourceKind _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
+    private int _selectedForestDomainIndex;
 
     public event EventHandler? DraftChanged;
     public event EventHandler? ApplySuggestionsRequested;
@@ -41,6 +48,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderDeploymentProfileComboBox.SelectionChanged += BuilderSelectionControl_Changed;
         BuilderConfirmSaveCheckBox.Checked += BuilderConfirmSaveCheckBox_Changed;
         BuilderConfirmSaveCheckBox.Unchecked += BuilderConfirmSaveCheckBox_Changed;
+        BuilderGeneralStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.General);
+        BuilderNetworksStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Networks);
+        BuilderForestsDomainsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.ForestsDomains);
+        BuilderCredentialsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Credentials);
+        BuilderVmsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Vms);
+        BuilderReviewStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Review);
         BuilderAddNetworkButton.Click += BuilderAddNetworkButton_Click;
         BuilderAddCredentialSlotButton.Click += BuilderAddCredentialSlotButton_Click;
         BuilderAddForestButton.Click += BuilderAddForestButton_Click;
@@ -51,20 +64,13 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderSaveButton.Click += BuilderSaveButton_Click;
         BuilderSaveAsButton.Click += BuilderSaveAsButton_Click;
         BuilderBackToLibraryButton.Click += BuilderBackToLibraryButton_Click;
+        RenderSelectedStep();
     }
 
     internal TemplatesBuilderDraftSnapshot CaptureDraft()
     {
-        return new TemplatesBuilderDraftSnapshot(
-            BuilderTemplateNameTextBox.Text,
-            BuilderTemplateDescriptionTextBox.Text,
-            GetSelectedProfile(),
-            BuilderNetworksPanel.Children.OfType<StackPanel>().Select(ReadNetwork).ToList(),
-            BuilderCredentialSlotsPanel.Children.OfType<StackPanel>().Select(ReadCredentialSlot).ToList(),
-            BuilderForestsPanel.Children.OfType<StackPanel>().Select(ReadForest).ToList(),
-            BuilderDomainsPanel.Children.OfType<StackPanel>().Select(ReadDomain).ToList(),
-            BuilderVmsPanel.Children.OfType<StackPanel>().Select(ReadVm).ToList(),
-            BuilderConfirmSaveCheckBox.IsChecked == true);
+        UpdateWorkingDraftFromVisibleControls();
+        return _draft;
     }
 
     internal void UpdateViewState(TemplatesBuilderViewState state)
@@ -72,17 +78,19 @@ public sealed partial class TemplatesBuilderView : UserControl
         _isUpdatingDraft = true;
         try
         {
+            _draft = state.Draft;
+            EnsureSelectedResourcesInBounds();
+
             SetTextIfChanged(BuilderContextTextBlock, state.ContextText);
             SetTextIfChanged(BuilderReferenceTextBlock, state.ReferenceText);
             SetTextIfChanged(BuilderStatusTextBlock, state.StatusText);
             BuilderStatusTextBlock.Visibility = state.IsStatusVisible ? Visibility.Visible : Visibility.Collapsed;
 
-            SetTextIfChanged(BuilderTemplateNameTextBox, state.Draft.TemplateName);
-            SetTextIfChanged(BuilderTemplateDescriptionTextBox, state.Draft.TemplateDescription);
-            SetSelectedProfile(state.Draft.DeploymentProfile);
-            RenderDraftRows(state.Draft);
-            BuilderConfirmSaveCheckBox.IsChecked = state.Draft.IsSaveConfirmed;
-            BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(state.Draft);
+            SetTextIfChanged(BuilderTemplateNameTextBox, _draft.TemplateName);
+            SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
+            SetSelectedProfile(_draft.DeploymentProfile);
+            BuilderConfirmSaveCheckBox.IsChecked = _draft.IsSaveConfirmed;
+            RenderDraftResources();
         }
         finally
         {
@@ -102,6 +110,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderSaveButton.IsEnabled = state.CanSave;
         BuilderSaveAsButton.IsEnabled = state.CanSaveAs;
         BuilderBackToLibraryButton.IsEnabled = state.CanBackToLibrary;
+        BuilderGeneralStepButton.IsEnabled = state.CanValidate;
+        BuilderNetworksStepButton.IsEnabled = state.CanValidate;
+        BuilderForestsDomainsStepButton.IsEnabled = state.CanValidate;
+        BuilderCredentialsStepButton.IsEnabled = state.CanValidate;
+        BuilderVmsStepButton.IsEnabled = state.CanValidate;
+        BuilderReviewStepButton.IsEnabled = state.CanValidate;
     }
 
     internal void UpdateConfirmationState(bool isSaveConfirmed)
@@ -110,6 +124,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         try
         {
             BuilderConfirmSaveCheckBox.IsChecked = isSaveConfirmed;
+            _draft = _draft with { IsSaveConfirmed = isSaveConfirmed };
         }
         finally
         {
@@ -117,119 +132,246 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
     }
 
-    private void RenderDraftRows(TemplatesBuilderDraftSnapshot draft)
+    private void SelectStep(BuilderWorkflowStep step)
     {
-        RenderRows(BuilderNetworksPanel, draft.LabNetworks, CreateNetworkRow);
-        RenderRows(BuilderCredentialSlotsPanel, draft.CredentialSlots, CreateCredentialSlotRow);
-        RenderRows(BuilderForestsPanel, draft.Forests, CreateForestRow);
-        RenderRows(BuilderDomainsPanel, draft.Domains, CreateDomainRow);
-        RenderVmRows(draft.Vms);
+        UpdateWorkingDraftFromVisibleControls();
+        _selectedStep = step;
+        RenderSelectedStep();
+        RenderDraftResources();
     }
 
-    private static void RenderRows<T>(StackPanel panel, IReadOnlyList<T> items, Func<T, StackPanel> createRow)
+    private void RenderSelectedStep()
     {
-        panel.Children.Clear();
-        foreach (var item in items)
+        BuilderGeneralSection.Visibility = _selectedStep == BuilderWorkflowStep.General ? Visibility.Visible : Visibility.Collapsed;
+        BuilderNetworksSection.Visibility = _selectedStep == BuilderWorkflowStep.Networks ? Visibility.Visible : Visibility.Collapsed;
+        BuilderForestsDomainsSection.Visibility = _selectedStep == BuilderWorkflowStep.ForestsDomains ? Visibility.Visible : Visibility.Collapsed;
+        BuilderCredentialsSection.Visibility = _selectedStep == BuilderWorkflowStep.Credentials ? Visibility.Visible : Visibility.Collapsed;
+        BuilderVmsSection.Visibility = _selectedStep == BuilderWorkflowStep.Vms ? Visibility.Visible : Visibility.Collapsed;
+        BuilderReviewSection.Visibility = _selectedStep == BuilderWorkflowStep.Review ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void RenderDraftResources()
+    {
+        EnsureSelectedResourcesInBounds();
+        RenderNetworkList();
+        RenderCredentialSlotList();
+        RenderForestDomainList();
+        RenderVmNameList();
+        RenderSelectedNetworkDetail();
+        RenderSelectedCredentialSlotDetail();
+        RenderSelectedForestDomainDetail();
+        RenderSelectedVmDetail();
+        BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
+    }
+
+    private void RenderNetworkList()
+    {
+        BuilderNetworksListPanel.Children.Clear();
+        for (var i = 0; i < _draft.LabNetworks.Count; i++)
         {
-            panel.Children.Add(createRow(item));
+            var index = i;
+            var network = _draft.LabNetworks[i];
+            BuilderNetworksListPanel.Children.Add(CreateResourceButton(
+                FormatResourceName(network.Name, network.NetworkId),
+                index == _selectedNetworkIndex,
+                () =>
+                {
+                    UpdateWorkingDraftFromVisibleControls();
+                    _selectedNetworkIndex = index;
+                    RenderNetworkList();
+                    RenderSelectedNetworkDetail();
+                }));
         }
     }
 
-    private void RenderVmRows(IReadOnlyList<TemplatesBuilderVmDraft> vms)
+    private void RenderCredentialSlotList()
     {
-        BuilderVmsPanel.Children.Clear();
-        for (var i = 0; i < vms.Count; i++)
+        BuilderCredentialSlotsListPanel.Children.Clear();
+        for (var i = 0; i < _draft.CredentialSlots.Count; i++)
         {
-            BuilderVmsPanel.Children.Add(CreateVmRow(vms[i], i));
+            var index = i;
+            var slot = _draft.CredentialSlots[i];
+            BuilderCredentialSlotsListPanel.Children.Add(CreateResourceButton(
+                FormatResourceName(slot.Label, slot.SlotKey),
+                index == _selectedCredentialSlotIndex,
+                () =>
+                {
+                    UpdateWorkingDraftFromVisibleControls();
+                    _selectedCredentialSlotIndex = index;
+                    RenderCredentialSlotList();
+                    RenderSelectedCredentialSlotDetail();
+                }));
         }
     }
 
-    private StackPanel CreateNetworkRow(TemplatesBuilderLabNetworkDraft network)
+    private void RenderForestDomainList()
     {
-        var row = CreateRow();
-        row.Children.Add(CreateRowTitle("Network"));
-        row.Children.Add(CreateFieldGrid(
+        BuilderForestDomainResourcesListPanel.Children.Clear();
+        for (var i = 0; i < _draft.Forests.Count; i++)
+        {
+            var index = i;
+            var forest = _draft.Forests[i];
+            BuilderForestDomainResourcesListPanel.Children.Add(CreateResourceButton(
+                $"Forest: {FormatResourceName(forest.ForestId, forest.RootDomainId)}",
+                _selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && index == _selectedForestDomainIndex,
+                () =>
+                {
+                    UpdateWorkingDraftFromVisibleControls();
+                    _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
+                    _selectedForestDomainIndex = index;
+                    RenderForestDomainList();
+                    RenderSelectedForestDomainDetail();
+                }));
+        }
+
+        for (var i = 0; i < _draft.Domains.Count; i++)
+        {
+            var index = i;
+            var domain = _draft.Domains[i];
+            BuilderForestDomainResourcesListPanel.Children.Add(CreateResourceButton(
+                $"Domain: {FormatResourceName(domain.DnsName, domain.DomainId)}",
+                _selectedForestDomainKind == BuilderForestDomainResourceKind.Domain && index == _selectedForestDomainIndex,
+                () =>
+                {
+                    UpdateWorkingDraftFromVisibleControls();
+                    _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
+                    _selectedForestDomainIndex = index;
+                    RenderForestDomainList();
+                    RenderSelectedForestDomainDetail();
+                }));
+        }
+    }
+
+    private void RenderVmNameList()
+    {
+        BuilderVmNameListPanel.Children.Clear();
+        for (var i = 0; i < _draft.Vms.Count; i++)
+        {
+            var index = i;
+            var vm = _draft.Vms[i];
+            BuilderVmNameListPanel.Children.Add(CreateResourceButton(
+                FormatResourceName(vm.Name, vm.VmId),
+                index == _selectedVmIndex,
+                () =>
+                {
+                    UpdateWorkingDraftFromVisibleControls();
+                    _selectedVmIndex = index;
+                    RenderVmNameList();
+                    RenderSelectedVmDetail();
+                }));
+        }
+    }
+
+    private void RenderSelectedNetworkDetail()
+    {
+        BuilderSelectedNetworkDetailPanel.Children.Clear();
+        if (_draft.LabNetworks.Count == 0)
+        {
+            BuilderSelectedNetworkDetailPanel.Children.Add(CreateEmptyDetailText("No network selected."));
+            return;
+        }
+
+        var network = _draft.LabNetworks[_selectedNetworkIndex];
+        BuilderSelectedNetworkDetailPanel.Children.Add(CreateRowTitle("Selected Network Detail"));
+        BuilderSelectedNetworkDetailPanel.Children.Add(CreateFieldGrid(
             CreateTextBox("Network ID", "network.NetworkId", network.NetworkId),
             CreateTextBox("Name", "network.Name", network.Name),
             CreateTextBox("Switch", "network.SwitchName", network.SwitchName),
             CreateTextBox("Subnet", "network.Subnet", network.Subnet),
             CreateTextBox("Notes", "network.Notes", network.Notes)));
-        return row;
     }
 
-    private StackPanel CreateCredentialSlotRow(TemplatesBuilderCredentialSlotDraft slot)
+    private void RenderSelectedCredentialSlotDetail()
     {
-        var row = CreateRow();
-        row.Children.Add(CreateRowTitle("Credential Slot Reference"));
-        row.Children.Add(CreateFieldGrid(
+        BuilderSelectedCredentialSlotDetailPanel.Children.Clear();
+        if (_draft.CredentialSlots.Count == 0)
+        {
+            BuilderSelectedCredentialSlotDetailPanel.Children.Add(CreateEmptyDetailText("No credential slot selected."));
+            return;
+        }
+
+        var slot = _draft.CredentialSlots[_selectedCredentialSlotIndex];
+        BuilderSelectedCredentialSlotDetailPanel.Children.Add(CreateRowTitle("Selected Slot Detail"));
+        BuilderSelectedCredentialSlotDetailPanel.Children.Add(CreateFieldGrid(
             CreateTextBox("Slot Key", "credential.SlotKey", slot.SlotKey),
             CreateTextBox("Label", "credential.Label", slot.Label),
             CreateTextBox("Scope", "credential.ScopeHint", slot.ScopeHint)));
-        return row;
     }
 
-    private StackPanel CreateForestRow(TemplatesBuilderForestDraft forest)
+    private void RenderSelectedForestDomainDetail()
     {
-        var row = CreateRow();
-        row.Children.Add(CreateRowTitle("Forest"));
-        row.Children.Add(CreateFieldGrid(
-            CreateTextBox("Forest ID", "forest.ForestId", forest.ForestId),
-            CreateTextBox("Root Domain ID", "forest.RootDomainId", forest.RootDomainId)));
-        return row;
+        BuilderSelectedForestDomainDetailPanel.Children.Clear();
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count > 0)
+        {
+            var forest = _draft.Forests[_selectedForestDomainIndex];
+            BuilderSelectedForestDomainDetailPanel.Children.Add(CreateRowTitle("Selected Forest Detail"));
+            BuilderSelectedForestDomainDetailPanel.Children.Add(CreateFieldGrid(
+                CreateTextBox("Forest ID", "forest.ForestId", forest.ForestId),
+                CreateTextBox("Root Domain ID", "forest.RootDomainId", forest.RootDomainId)));
+            return;
+        }
+
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain && _draft.Domains.Count > 0)
+        {
+            var domain = _draft.Domains[_selectedForestDomainIndex];
+            BuilderSelectedForestDomainDetailPanel.Children.Add(CreateRowTitle("Selected Domain Detail"));
+            BuilderSelectedForestDomainDetailPanel.Children.Add(CreateFieldGrid(
+                CreateTextBox("Domain ID", "domain.DomainId", domain.DomainId),
+                CreateTextBox("DNS Name", "domain.DnsName", domain.DnsName),
+                CreateTextBox("NetBIOS", "domain.NetBiosName", domain.NetBiosName),
+                CreateTextBox("Forest ID", "domain.ForestId", domain.ForestId),
+                CreateComboBox("Relation", "domain.RelationKind", domain.RelationKind, nameof(V2DomainRelationKind.Root), nameof(V2DomainRelationKind.Child), nameof(V2DomainRelationKind.Tree)),
+                CreateTextBox("Parent Domain ID", "domain.ParentDomainId", domain.ParentDomainId)));
+            return;
+        }
+
+        BuilderSelectedForestDomainDetailPanel.Children.Add(CreateEmptyDetailText("No forest or domain selected."));
     }
 
-    private StackPanel CreateDomainRow(TemplatesBuilderDomainDraft domain)
+    private void RenderSelectedVmDetail()
     {
-        var row = CreateRow();
-        row.Children.Add(CreateRowTitle("Domain"));
-        row.Children.Add(CreateFieldGrid(
-            CreateTextBox("Domain ID", "domain.DomainId", domain.DomainId),
-            CreateTextBox("DNS Name", "domain.DnsName", domain.DnsName),
-            CreateTextBox("NetBIOS", "domain.NetBiosName", domain.NetBiosName),
-            CreateTextBox("Forest ID", "domain.ForestId", domain.ForestId),
-            CreateComboBox("Relation", "domain.RelationKind", domain.RelationKind, nameof(V2DomainRelationKind.Root), nameof(V2DomainRelationKind.Child), nameof(V2DomainRelationKind.Tree)),
-            CreateTextBox("Parent Domain ID", "domain.ParentDomainId", domain.ParentDomainId)));
-        return row;
-    }
+        BuilderSelectedVmDetailPanel.Children.Clear();
+        if (_draft.Vms.Count == 0)
+        {
+            BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText("No VM selected."));
+            return;
+        }
 
-    private StackPanel CreateVmRow(TemplatesBuilderVmDraft vm, int vmIndex)
-    {
-        var row = CreateRow();
-        row.Children.Add(CreateRowTitle($"VM {vmIndex + 1}"));
-        row.Children.Add(CreateSubhead("Basics"));
-        row.Children.Add(CreateFieldGrid(
+        var vm = _draft.Vms[_selectedVmIndex];
+        BuilderSelectedVmDetailPanel.Children.Add(CreateRowTitle("Selected VM Detail"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Basics"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
             CreateTextBox("VM ID", "vm.VmId", vm.VmId),
             CreateTextBox("Name", "vm.Name", vm.Name),
             CreateTextBox("VHDX ID", "vm.VhdxId", vm.VhdxId)));
-        row.Children.Add(CreateSubhead("Compute"));
-        row.Children.Add(CreateFieldGrid(
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Compute"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
             CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb.ToString()),
             CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount.ToString())));
-        row.Children.Add(CreateSubhead("Membership"));
-        row.Children.Add(CreateFieldGrid(
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Membership"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
             CreateComboBox("Membership", "vm.MembershipMode", vm.MembershipMode, V2MembershipModeCatalog.DomainMember, V2MembershipModeCatalog.Standalone),
             CreateTextBox("Domain ID", "vm.DomainId", vm.DomainId)));
-        row.Children.Add(CreateSubhead("Roles"));
-        row.Children.Add(CreateCheckBox("Active Directory Domain Controller", "vm.IsActiveDirectoryDomainController", vm.IsActiveDirectoryDomainController));
-        row.Children.Add(CreateSubhead("Credentials"));
-        row.Children.Add(CreateFieldGrid(
-            CreateTextBox("Local Bootstrap Slot", "vm.LocalBootstrap", vm.CredentialSlots.LocalBootstrap),
-            CreateTextBox("Domain Admin Slot", "vm.DomainAdmin", vm.CredentialSlots.DomainAdmin),
-            CreateTextBox("Domain Join Slot", "vm.DomainJoin", vm.CredentialSlots.DomainJoin),
-            CreateTextBox("DSRM Slot", "vm.Dsrm", vm.CredentialSlots.Dsrm),
-            CreateTextBox("Parent Domain Admin Slot", "vm.ParentDomainAdmin", vm.CredentialSlots.ParentDomainAdmin)));
-        row.Children.Add(CreateSubhead("Networking"));
-        var addNicButton = new Button { Content = "Add NIC", Tag = vmIndex };
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Roles"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateCheckBox("Active Directory Domain Controller", "vm.IsActiveDirectoryDomainController", vm.IsActiveDirectoryDomainController));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Networking"));
+        var addNicButton = new Button { Content = "Add NIC", Tag = _selectedVmIndex };
         addNicButton.Click += BuilderAddNicButton_Click;
-        row.Children.Add(addNicButton);
+        BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
         var nicsPanel = new StackPanel { Spacing = 6, Tag = "vm.NicsPanel" };
         foreach (var nic in vm.Nics)
         {
             nicsPanel.Children.Add(CreateNicRow(nic));
         }
 
-        row.Children.Add(nicsPanel);
-        return row;
+        BuilderSelectedVmDetailPanel.Children.Add(nicsPanel);
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Credentials"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
+            CreateTextBox("Local Bootstrap Slot", "vm.LocalBootstrap", vm.CredentialSlots.LocalBootstrap),
+            CreateTextBox("Domain Admin Slot", "vm.DomainAdmin", vm.CredentialSlots.DomainAdmin),
+            CreateTextBox("Domain Join Slot", "vm.DomainJoin", vm.CredentialSlots.DomainJoin),
+            CreateTextBox("DSRM Slot", "vm.Dsrm", vm.CredentialSlots.Dsrm),
+            CreateTextBox("Parent Domain Admin Slot", "vm.ParentDomainAdmin", vm.CredentialSlots.ParentDomainAdmin)));
     }
 
     private StackPanel CreateNicRow(TemplatesBuilderNicDraft nic)
@@ -248,52 +390,131 @@ public sealed partial class TemplatesBuilderView : UserControl
         return row;
     }
 
-    private TemplatesBuilderLabNetworkDraft ReadNetwork(StackPanel row)
-        => new(
-            GetText(row, "network.NetworkId"),
-            GetText(row, "network.Name"),
-            GetText(row, "network.SwitchName"),
-            GetText(row, "network.Subnet"),
-            GetText(row, "network.Notes"));
-
-    private TemplatesBuilderCredentialSlotDraft ReadCredentialSlot(StackPanel row)
-        => new(
-            GetText(row, "credential.SlotKey"),
-            GetText(row, "credential.Label"),
-            GetText(row, "credential.ScopeHint"));
-
-    private TemplatesBuilderForestDraft ReadForest(StackPanel row)
-        => new(GetText(row, "forest.ForestId"), GetText(row, "forest.RootDomainId"));
-
-    private TemplatesBuilderDomainDraft ReadDomain(StackPanel row)
-        => new(
-            GetText(row, "domain.DomainId"),
-            GetText(row, "domain.DnsName"),
-            GetText(row, "domain.NetBiosName"),
-            GetText(row, "domain.ForestId"),
-            GetComboValue(row, "domain.RelationKind"),
-            GetText(row, "domain.ParentDomainId"));
-
-    private TemplatesBuilderVmDraft ReadVm(StackPanel row)
+    private void UpdateWorkingDraftFromVisibleControls()
     {
-        var nicsPanel = FindDescendants<StackPanel>(row).FirstOrDefault(panel => string.Equals(panel.Tag as string, "vm.NicsPanel", StringComparison.Ordinal));
+        if (_isUpdatingDraft)
+        {
+            return;
+        }
+
+        var draft = _draft with
+        {
+            TemplateName = BuilderTemplateNameTextBox.Text,
+            TemplateDescription = BuilderTemplateDescriptionTextBox.Text,
+            DeploymentProfile = GetSelectedProfile(),
+            IsSaveConfirmed = BuilderConfirmSaveCheckBox.IsChecked == true
+        };
+
+        draft = UpdateSelectedNetwork(draft);
+        draft = UpdateSelectedCredentialSlot(draft);
+        draft = UpdateSelectedForestOrDomain(draft);
+        draft = UpdateSelectedVm(draft);
+        _draft = draft;
+    }
+
+    private TemplatesBuilderDraftSnapshot UpdateSelectedNetwork(TemplatesBuilderDraftSnapshot draft)
+    {
+        if (_selectedNetworkIndex < 0 ||
+            _selectedNetworkIndex >= draft.LabNetworks.Count ||
+            FindDescendants<TextBox>(BuilderSelectedNetworkDetailPanel).All(textBox => !string.Equals(textBox.Tag as string, "network.NetworkId", StringComparison.Ordinal)))
+        {
+            return draft;
+        }
+
+        var networks = draft.LabNetworks.ToList();
+        networks[_selectedNetworkIndex] = new TemplatesBuilderLabNetworkDraft(
+            GetText(BuilderSelectedNetworkDetailPanel, "network.NetworkId"),
+            GetText(BuilderSelectedNetworkDetailPanel, "network.Name"),
+            GetText(BuilderSelectedNetworkDetailPanel, "network.SwitchName"),
+            GetText(BuilderSelectedNetworkDetailPanel, "network.Subnet"),
+            GetText(BuilderSelectedNetworkDetailPanel, "network.Notes"));
+        return draft with { LabNetworks = networks };
+    }
+
+    private TemplatesBuilderDraftSnapshot UpdateSelectedCredentialSlot(TemplatesBuilderDraftSnapshot draft)
+    {
+        if (_selectedCredentialSlotIndex < 0 ||
+            _selectedCredentialSlotIndex >= draft.CredentialSlots.Count ||
+            FindDescendants<TextBox>(BuilderSelectedCredentialSlotDetailPanel).All(textBox => !string.Equals(textBox.Tag as string, "credential.SlotKey", StringComparison.Ordinal)))
+        {
+            return draft;
+        }
+
+        var slots = draft.CredentialSlots.ToList();
+        slots[_selectedCredentialSlotIndex] = new TemplatesBuilderCredentialSlotDraft(
+            GetText(BuilderSelectedCredentialSlotDetailPanel, "credential.SlotKey"),
+            GetText(BuilderSelectedCredentialSlotDetailPanel, "credential.Label"),
+            GetText(BuilderSelectedCredentialSlotDetailPanel, "credential.ScopeHint"));
+        return draft with { CredentialSlots = slots };
+    }
+
+    private TemplatesBuilderDraftSnapshot UpdateSelectedForestOrDomain(TemplatesBuilderDraftSnapshot draft)
+    {
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest &&
+            _selectedForestDomainIndex >= 0 &&
+            _selectedForestDomainIndex < draft.Forests.Count &&
+            FindDescendants<TextBox>(BuilderSelectedForestDomainDetailPanel).Any(textBox => string.Equals(textBox.Tag as string, "forest.ForestId", StringComparison.Ordinal)))
+        {
+            var forests = draft.Forests.ToList();
+            forests[_selectedForestDomainIndex] = new TemplatesBuilderForestDraft(
+                GetText(BuilderSelectedForestDomainDetailPanel, "forest.ForestId"),
+                GetText(BuilderSelectedForestDomainDetailPanel, "forest.RootDomainId"));
+            return draft with { Forests = forests };
+        }
+
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain &&
+            _selectedForestDomainIndex >= 0 &&
+            _selectedForestDomainIndex < draft.Domains.Count &&
+            FindDescendants<TextBox>(BuilderSelectedForestDomainDetailPanel).Any(textBox => string.Equals(textBox.Tag as string, "domain.DomainId", StringComparison.Ordinal)))
+        {
+            var domains = draft.Domains.ToList();
+            domains[_selectedForestDomainIndex] = new TemplatesBuilderDomainDraft(
+                GetText(BuilderSelectedForestDomainDetailPanel, "domain.DomainId"),
+                GetText(BuilderSelectedForestDomainDetailPanel, "domain.DnsName"),
+                GetText(BuilderSelectedForestDomainDetailPanel, "domain.NetBiosName"),
+                GetText(BuilderSelectedForestDomainDetailPanel, "domain.ForestId"),
+                GetComboValue(BuilderSelectedForestDomainDetailPanel, "domain.RelationKind"),
+                GetText(BuilderSelectedForestDomainDetailPanel, "domain.ParentDomainId"));
+            return draft with { Domains = domains };
+        }
+
+        return draft;
+    }
+
+    private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)
+    {
+        if (_selectedVmIndex < 0 ||
+            _selectedVmIndex >= draft.Vms.Count ||
+            FindDescendants<TextBox>(BuilderSelectedVmDetailPanel).All(textBox => !string.Equals(textBox.Tag as string, "vm.VmId", StringComparison.Ordinal)))
+        {
+            return draft;
+        }
+
+        var vms = draft.Vms.ToList();
+        vms[_selectedVmIndex] = ReadVm(BuilderSelectedVmDetailPanel);
+        return draft with { Vms = vms };
+    }
+
+    private TemplatesBuilderVmDraft ReadVm(DependencyObject root)
+    {
+        var nicsPanel = FindDescendants<StackPanel>(root).FirstOrDefault(panel => string.Equals(panel.Tag as string, "vm.NicsPanel", StringComparison.Ordinal));
         var nics = nicsPanel?.Children.OfType<StackPanel>().Select(ReadNic).ToList() ?? [];
 
         return new TemplatesBuilderVmDraft(
-            GetText(row, "vm.VmId"),
-            GetText(row, "vm.Name"),
-            ParsePositiveInt(GetText(row, "vm.MemoryMb")),
-            ParsePositiveInt(GetText(row, "vm.CpuCount")),
-            GetText(row, "vm.VhdxId"),
-            GetComboValue(row, "vm.MembershipMode"),
-            GetText(row, "vm.DomainId"),
-            GetCheckBoxValue(row, "vm.IsActiveDirectoryDomainController"),
+            GetText(root, "vm.VmId"),
+            GetText(root, "vm.Name"),
+            ParsePositiveInt(GetText(root, "vm.MemoryMb")),
+            ParsePositiveInt(GetText(root, "vm.CpuCount")),
+            GetText(root, "vm.VhdxId"),
+            GetComboValue(root, "vm.MembershipMode"),
+            GetText(root, "vm.DomainId"),
+            GetCheckBoxValue(root, "vm.IsActiveDirectoryDomainController"),
             new TemplatesBuilderVmCredentialSlotDraft(
-                GetText(row, "vm.LocalBootstrap"),
-                GetText(row, "vm.DomainAdmin"),
-                GetText(row, "vm.DomainJoin"),
-                GetText(row, "vm.Dsrm"),
-                GetText(row, "vm.ParentDomainAdmin")),
+                GetText(root, "vm.LocalBootstrap"),
+                GetText(root, "vm.DomainAdmin"),
+                GetText(root, "vm.DomainJoin"),
+                GetText(root, "vm.Dsrm"),
+                GetText(root, "vm.ParentDomainAdmin")),
             nics);
     }
 
@@ -326,50 +547,51 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void BuilderAddNetworkButton_Click(object sender, RoutedEventArgs e)
     {
         var draft = CaptureDraft();
-        RenderAndNotify(draft with
-        {
-            LabNetworks = draft.LabNetworks.Append(new TemplatesBuilderLabNetworkDraft($"lab-network-{draft.LabNetworks.Count + 1}", "Network", string.Empty, string.Empty, string.Empty)).ToList(),
-            IsSaveConfirmed = false
-        });
+        var networks = draft.LabNetworks
+            .Append(new TemplatesBuilderLabNetworkDraft($"lab-network-{draft.LabNetworks.Count + 1}", "Network", string.Empty, string.Empty, string.Empty))
+            .ToList();
+        _selectedNetworkIndex = networks.Count - 1;
+        RenderAndNotify(draft with { LabNetworks = networks, IsSaveConfirmed = false });
     }
 
     private void BuilderAddCredentialSlotButton_Click(object sender, RoutedEventArgs e)
     {
         var draft = CaptureDraft();
-        RenderAndNotify(draft with
-        {
-            CredentialSlots = draft.CredentialSlots.Append(new TemplatesBuilderCredentialSlotDraft($"slot-{draft.CredentialSlots.Count + 1}", "Credential slot", "template reference")).ToList(),
-            IsSaveConfirmed = false
-        });
+        var slots = draft.CredentialSlots
+            .Append(new TemplatesBuilderCredentialSlotDraft($"slot-{draft.CredentialSlots.Count + 1}", "Credential slot", "template reference"))
+            .ToList();
+        _selectedCredentialSlotIndex = slots.Count - 1;
+        RenderAndNotify(draft with { CredentialSlots = slots, IsSaveConfirmed = false });
     }
 
     private void BuilderAddForestButton_Click(object sender, RoutedEventArgs e)
     {
         var draft = CaptureDraft();
-        RenderAndNotify(draft with
-        {
-            Forests = draft.Forests.Append(new TemplatesBuilderForestDraft($"forest-{draft.Forests.Count + 1}", string.Empty)).ToList(),
-            IsSaveConfirmed = false
-        });
+        var forests = draft.Forests
+            .Append(new TemplatesBuilderForestDraft($"forest-{draft.Forests.Count + 1}", string.Empty))
+            .ToList();
+        _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
+        _selectedForestDomainIndex = forests.Count - 1;
+        RenderAndNotify(draft with { Forests = forests, IsSaveConfirmed = false });
     }
 
     private void BuilderAddDomainButton_Click(object sender, RoutedEventArgs e)
     {
         var draft = CaptureDraft();
         var forestId = draft.Forests.FirstOrDefault().ForestId;
-        RenderAndNotify(draft with
-        {
-            Domains = draft.Domains.Append(new TemplatesBuilderDomainDraft($"domain-{draft.Domains.Count + 1}", "example.local", "EXAMPLE", forestId, nameof(V2DomainRelationKind.Root), string.Empty)).ToList(),
-            IsSaveConfirmed = false
-        });
+        var domains = draft.Domains
+            .Append(new TemplatesBuilderDomainDraft($"domain-{draft.Domains.Count + 1}", "example.local", "EXAMPLE", forestId, nameof(V2DomainRelationKind.Root), string.Empty))
+            .ToList();
+        _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
+        _selectedForestDomainIndex = domains.Count - 1;
+        RenderAndNotify(draft with { Domains = domains, IsSaveConfirmed = false });
     }
 
     private void BuilderAddVmButton_Click(object sender, RoutedEventArgs e)
     {
         var draft = CaptureDraft();
-        RenderAndNotify(draft with
-        {
-            Vms = draft.Vms.Append(new TemplatesBuilderVmDraft(
+        var vms = draft.Vms
+            .Append(new TemplatesBuilderVmDraft(
                 $"vm-{draft.Vms.Count + 1}",
                 "new-vm",
                 4096,
@@ -379,9 +601,10 @@ public sealed partial class TemplatesBuilderView : UserControl
                 string.Empty,
                 false,
                 new TemplatesBuilderVmCredentialSlotDraft(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty),
-                [])).ToList(),
-            IsSaveConfirmed = false
-        });
+                []))
+            .ToList();
+        _selectedVmIndex = vms.Count - 1;
+        RenderAndNotify(draft with { Vms = vms, IsSaveConfirmed = false });
     }
 
     private void BuilderAddNicButton_Click(object sender, RoutedEventArgs e)
@@ -435,9 +658,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         _isUpdatingDraft = true;
         try
         {
-            RenderDraftRows(draft);
-            BuilderConfirmSaveCheckBox.IsChecked = draft.IsSaveConfirmed;
-            BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(draft);
+            _draft = draft;
+            SetTextIfChanged(BuilderTemplateNameTextBox, _draft.TemplateName);
+            SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
+            SetSelectedProfile(_draft.DeploymentProfile);
+            BuilderConfirmSaveCheckBox.IsChecked = _draft.IsSaveConfirmed;
+            RenderDraftResources();
         }
         finally
         {
@@ -454,8 +680,30 @@ public sealed partial class TemplatesBuilderView : UserControl
             return;
         }
 
-        BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(CaptureDraft());
+        UpdateWorkingDraftFromVisibleControls();
+        BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
         DraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void EnsureSelectedResourcesInBounds()
+    {
+        _selectedNetworkIndex = ClampIndex(_selectedNetworkIndex, _draft.LabNetworks.Count);
+        _selectedCredentialSlotIndex = ClampIndex(_selectedCredentialSlotIndex, _draft.CredentialSlots.Count);
+        _selectedVmIndex = ClampIndex(_selectedVmIndex, _draft.Vms.Count);
+
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count == 0 && _draft.Domains.Count > 0)
+        {
+            _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
+        }
+        else if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain && _draft.Domains.Count == 0 && _draft.Forests.Count > 0)
+        {
+            _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
+        }
+
+        var forestDomainCount = _selectedForestDomainKind == BuilderForestDomainResourceKind.Forest
+            ? _draft.Forests.Count
+            : _draft.Domains.Count;
+        _selectedForestDomainIndex = ClampIndex(_selectedForestDomainIndex, forestDomainCount);
     }
 
     private string GetSelectedProfile()
@@ -530,18 +778,29 @@ public sealed partial class TemplatesBuilderView : UserControl
         return checkBox;
     }
 
+    private Button CreateResourceButton(string content, bool isSelected, Action select)
+    {
+        var button = new Button
+        {
+            Content = isSelected ? $"> {content}" : content,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        button.Click += (_, _) => select();
+        return button;
+    }
+
     private static StackPanel CreateRow()
         => new()
         {
             Spacing = 6,
             Padding = new Thickness(8),
-            Background = Application.Current.Resources["ShellBackgroundBrush"] as Microsoft.UI.Xaml.Media.Brush
+            Background = Application.Current.Resources["ShellBackgroundBrush"] as Brush
         };
 
     private static TextBlock CreateRowTitle(string text)
         => new()
         {
-            Foreground = Application.Current.Resources["ShellTextPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush,
+            Foreground = Application.Current.Resources["ShellTextPrimaryBrush"] as Brush,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Text = text
         };
@@ -549,9 +808,17 @@ public sealed partial class TemplatesBuilderView : UserControl
     private static TextBlock CreateSubhead(string text)
         => new()
         {
-            Foreground = Application.Current.Resources["ShellTextSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush,
+            Foreground = Application.Current.Resources["ShellTextSecondaryBrush"] as Brush,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Text = text
+        };
+
+    private static TextBlock CreateEmptyDetailText(string text)
+        => new()
+        {
+            Foreground = Application.Current.Resources["ShellTextSecondaryBrush"] as Brush,
+            Text = text,
+            TextWrapping = TextWrapping.Wrap
         };
 
     private static Grid CreateFieldGrid(params FrameworkElement[] fields)
@@ -643,6 +910,16 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
     }
 
+    private static int ClampIndex(int index, int count)
+    {
+        if (count <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(index, 0, count - 1);
+    }
+
     private static int ParsePositiveInt(string value)
         => int.TryParse(value, out var parsed) ? parsed : 0;
 
@@ -660,5 +937,43 @@ public sealed partial class TemplatesBuilderView : UserControl
         var dcCount = draft.Vms.Count(vm => vm.IsActiveDirectoryDomainController);
         var nicCount = draft.Vms.Sum(vm => vm.Nics.Count);
         return $"{draft.LabNetworks.Count} networks, {draft.CredentialSlots.Count} credential slot references, {draft.Forests.Count} forests, {draft.Domains.Count} domains, {draft.Vms.Count} VMs, {dcCount} Active Directory Domain Controller role assignments, {nicCount} NICs.";
+    }
+
+    private static string FormatResourceName(string primary, string fallback)
+    {
+        if (!string.IsNullOrWhiteSpace(primary))
+        {
+            return primary.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(fallback) ? "(unnamed)" : fallback.Trim();
+    }
+
+    private static TemplatesBuilderDraftSnapshot CreateEmptyDraft()
+        => new(
+            string.Empty,
+            string.Empty,
+            "Balanced",
+            [],
+            [],
+            [],
+            [],
+            [],
+            false);
+
+    private enum BuilderWorkflowStep
+    {
+        General,
+        Networks,
+        ForestsDomains,
+        Credentials,
+        Vms,
+        Review
+    }
+
+    private enum BuilderForestDomainResourceKind
+    {
+        Forest,
+        Domain
     }
 }
