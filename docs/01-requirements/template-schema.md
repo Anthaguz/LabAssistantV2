@@ -250,7 +250,7 @@ Reusable secret values remain a local-machine concern in the DPAPI-backed creden
 
 The Templates V2 Builder is the authoring workflow for V2 templates. It must preserve the current Templates Editor for V1/simple/legacy editing while producing V2 template output compatible with Deploy From Template review and V2 planning.
 
-The first Builder slice authors V2 intent through a structured step-based workflow with a left stepper and one active step at a time rather than an all-sections scroll:
+The first Builder slice authors V2 intent through a structured step-based workflow with a left active workflow tree and one active top-level step at a time rather than an all-sections scroll:
 
 1. General
 2. Networks
@@ -260,6 +260,10 @@ The first Builder slice authors V2 intent through a structured step-based workfl
 6. Review
 
 General contains template name, description, deployment profile, and read-only schema/version metadata if shown. This does not rename persisted schema/version fields. Deployment profile remains the Conservative/Balanced/Aggressive field.
+
+Active top-level state uses existing shell resources, including `ShellAccentBrush`, selected background, and selected border treatment. Completion/error badges are deferred to a later Review/validation UX slice.
+
+Previous and Next controls live in the Builder command area and move only across top-level steps in this order: General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> Review. Previous is disabled on General, Next is disabled on Review, and neither control iterates through VM children.
 
 The first Builder slice may author:
 
@@ -273,11 +277,15 @@ The first Builder slice may author:
 - Active Directory Domain Controller VM role assignment
 - per-VM NIC/IP/DNS/gateway intent
 
-Networks, Forests & Domains, Credentials, and VMs use list plus selected-detail layouts. The VM list shows VM name only, and selected VM detail is grouped into Basics, Compute, Membership, Roles, Networking, and Credentials.
+Networks, Forests & Domains, and Credentials use list plus selected-detail layouts. The `VMs` row expands to show VM child items by VM name. Clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list. Clicking a VM child opens that VM detail on `Basics`.
+
+The `VMs` nav row includes a small borderless right-aligned `+` button. The VM overview also includes Add VM. New VM drafts use neutral incrementing names from the existing draft set, such as `vm-1` / `VM 1`, `vm-2` / `VM 2`, and so on. After adding a VM, the Builder selects the new VM child and opens `Basics`.
+
+Selected VM detail has an internal left mini-nav: Basics, Resources, Membership, Roles, Networking, and Credentials. Resources contains RAM, CPU, and base disk/VHDX fields. Networking owns NIC list/detail; NICs do not become global left-nav children. The previous right-side VM selector list is not part of the Builder contract.
 
 The Builder must not use multiline pipe-delimited text fields as V2 resource authoring controls. Matrix views may support review or comparison, but they are not the primary authoring UI.
 
-Deterministic suggestions are allowed for these fields, but saved template output must reflect explicit user-confirmed draft intent. The Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, and Back, and Save confirmation belongs in the Review step. Builder save maps Active Directory Domain Controller role assignments to current backend topology fields and derives `firstDomainControllerVmId` from ordered DC assignments. Trust authoring is out of scope for the first Builder slice; existing trust declarations in opened V2 templates must be preserved on save as deferred/read-only intent, and future trust authoring requires a separate approved contract.
+Deterministic suggestions are allowed for these fields, but saved template output must reflect explicit user-confirmed draft intent. The Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next, and Save confirmation belongs in the Review step. Builder save maps Active Directory Domain Controller role assignments to current backend topology fields and derives `firstDomainControllerVmId` from ordered DC assignments. Domain/forest editor redesign, credential semantic redesign, Review validation redesign, runtime/schema/trust/WPF work, and completion/error badges are out of scope for this navigation contract slice. Trust authoring remains out of scope for the first Builder slice; existing trust declarations in opened V2 templates must be preserved on save as deferred/read-only intent, and future trust authoring requires a separate approved contract.
 
 ## Guest/Role Placeholder Sections
 

@@ -4631,26 +4631,37 @@ Each readiness result shall include, at minimum:
 - the user progresses through first-slice authoring
 
 **Then**
-- the Builder presents a structured step-based workflow ordered exactly as:
+- the Builder presents an active workflow tree ordered exactly as:
   - General
   - Networks
   - Forests & Domains
   - Credentials
   - VMs
   - Review
-- the Builder uses a left stepper and one active step at a time rather than an all-sections scroll
+- the Builder uses the left workflow tree and one active top-level step at a time rather than an all-sections scroll
+- active top-level state is explicit and uses existing shell resources, including `ShellAccentBrush`, selected background, and selected border treatment
+- completion/error badges are deferred to a later Review/validation UX slice
+- the `VMs` row expands to show VM child items by VM name
+- clicking `VMs` opens a compact VM overview
+- clicking a VM child opens that VM's detail editor on `Basics`
 - General contains template name, description, deployment profile, and read-only schema/version metadata if shown
 - deployment profile remains the Conservative/Balanced/Aggressive field
 - resource-heavy steps use a resource list plus selected-detail layout:
   - Networks uses a network list plus selected network detail
   - Forests & Domains uses a forest/domain list plus selected forest/domain detail
   - Credentials uses a slot-reference list plus selected slot detail
-  - VMs uses a VM-name-only list plus selected VM detail
-- VM detail is grouped into Basics, Compute, Membership, Roles, Networking, and Credentials
+- the VMs overview shows total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
+- editing a VM happens by selecting a VM child in the workflow tree, not by using a right-side VM selector list
+- selected VM detail has an internal left mini-nav: Basics, Resources, Membership, Roles, Networking, and Credentials
+- selecting a VM opens Basics by default
+- Resources contains RAM, CPU, and base disk/VHDX fields
+- Networking owns NIC list/detail; NICs do not become global left-nav children
 - VM role and assignment choices are made with lab networks, directory topology, credentials, and the selected deployment profile visible enough to validate the draft
 - the Builder does not use multiline pipe-delimited authoring fields
 - a matrix may support review or comparison, but it is not the primary authoring UI
-- the Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, and Back
+- the Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next
+- Previous and Next are step-level controls only and move through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> Review
+- Previous is disabled on General, Next is disabled on Review, and neither control iterates through VM children
 - Save confirmation is shown in the Review step
 
 ### 3) First-slice V2 fields
@@ -4678,6 +4689,22 @@ Each readiness result shall include, at minimum:
 - domains present plus each domain having at least one Active Directory Domain Controller role VM is valid
 - domains present plus any domain without an Active Directory Domain Controller role VM blocks save
 - PDC emulator/FSMO selection or transfer is out of scope
+- domain/forest editor redesign, credential semantic redesign, Review validation redesign, runtime/schema/trust/WPF work, and completion/error badges are out of scope for this contract slice
+
+### 3a) VM creation and navigation affordances
+**Given**
+- the Builder draft already contains zero or more VM drafts
+- the user is in the Builder workflow tree or VM overview
+
+**When**
+- the user uses the small borderless right-aligned `+` button on the `VMs` nav row or Add VM in the VM overview
+
+**Then**
+- the Builder creates a VM with neutral incrementing internal/display names based on the existing draft set, such as `vm-1` / `VM 1`, `vm-2` / `VM 2`, and so on
+- the new VM appears as a child item under `VMs`
+- the Builder selects the new VM child
+- the selected VM detail opens on `Basics`
+- adding a VM does not introduce NICs as global workflow-tree children
 
 ### 4) Deterministic suggestions require explicit confirmation before save
 **Given**
@@ -4738,10 +4765,17 @@ Each readiness result shall include, at minimum:
 - `templates.builder` or equivalent Templates-local route for V2 template authoring
 - `templates.library` remains the parent/default Templates route
 - `templates.editor` remains the V1/simple/legacy editing route
-- Builder presents the General, Networks, Forests & Domains, Credentials, VMs, Review step-based workflow with a left stepper and one active step at a time
-- Builder presents a persistent command bar with Apply Suggestions, Validate, Save, Save As, and Back
+- Builder presents the General, Networks, Forests & Domains, Credentials, VMs, Review active workflow tree with one active top-level step at a time
+- active top-level workflow state uses `ShellAccentBrush`, selected background, and selected border treatment
+- `VMs` expands to VM child items by VM name and includes a small borderless right-aligned `+` button
+- clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
+- clicking a VM child opens that VM detail on `Basics`
+- selected VM detail uses an internal left mini-nav for Basics, Resources, Membership, Roles, Networking, and Credentials
+- Resources contains RAM, CPU, and base disk/VHDX; Networking owns NIC list/detail
+- Builder presents a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next
+- Previous/Next move only across top-level steps and do not iterate through VM children
 - Save confirmation lives in the Review step
-- Networks, Forests & Domains, Credentials, and VMs use list plus selected-detail layouts; the VM list shows VM names only
+- Networks, Forests & Domains, and Credentials use list plus selected-detail layouts; VM editing happens through VM children under `VMs`, not a right-side selector list
 - Builder does not rely on multiline pipe-delimited text fields for authoring V2 resources
 - a matrix is not the primary authoring UI
 - save action reflects explicit user-confirmed draft intent
@@ -4750,6 +4784,8 @@ Each readiness result shall include, at minimum:
 - route/workspace tests verify Builder is a distinct Templates workflow-state destination and parent `Templates` still defaults to `templates.library`
 - non-regression tests verify the current Templates Editor remains available for V1/simple/legacy editing
 - Builder seam tests verify Builder state/orchestration/composition does not accumulate in `MainWindow`, shared Templates composition, or the current Editor
+- workflow navigation tests verify active top-level state, Previous/Next step-level behavior, VM child navigation, and the VM inline plus affordance
+- VM detail navigation tests verify Basics opens by default, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC list/detail, and NICs do not become global workflow-tree children
 - schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values, and that secrets remain in the local DPAPI-backed store
 - save/load tests verify existing trust declarations are preserved even though trust authoring is deferred
 - validation tests verify VM-only standalone templates are valid, domain-dependent VMs require domains, each saved domain requires at least one Active Directory Domain Controller VM role assignment, and `firstDomainControllerVmId` is derived from ordered DC assignments
