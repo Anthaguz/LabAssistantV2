@@ -112,6 +112,17 @@ public sealed class Issue755TemplatesV2BuilderTests
     }
 
     [Fact]
+    public void TemplatesBuilderView_DraftEditsRefreshResourceLists_WithoutFullDetailRerender()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var notifyDraftChangedBody = ExtractMethodBody(builderSource, "private void NotifyDraftChanged()");
+
+        Assert.Contains("RenderResourceLists();", notifyDraftChangedBody);
+        Assert.DoesNotContain("RenderDraftResources();", notifyDraftChangedBody);
+        Assert.Contains("RenderSelectedVmDetail();", ExtractMethodBody(builderSource, "private void RenderDraftResources()"));
+    }
+
+    [Fact]
     public void BuilderDraftMapper_SavesAdDcRoleAssignments_ToBackendCompatibleFields()
     {
         var draft = CreateConfirmedBuilderDraft();
@@ -532,6 +543,27 @@ public sealed class Issue755TemplatesV2BuilderTests
 
     private static bool HasName(XElement element, string name)
         => element.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == name;
+
+    private static string ExtractMethodBody(string source, string signature)
+    {
+        var start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Could not find method signature '{signature}'.");
+        var braceStart = source.IndexOf('{', start);
+        Assert.True(braceStart >= 0, $"Could not find method body for '{signature}'.");
+
+        var depth = 0;
+        for (var i = braceStart; i < source.Length; i++)
+        {
+            depth += source[i] == '{' ? 1 : 0;
+            depth -= source[i] == '}' ? 1 : 0;
+            if (depth == 0)
+            {
+                return source.Substring(braceStart, i - braceStart + 1);
+            }
+        }
+
+        throw new InvalidOperationException($"Could not read method body for '{signature}'.");
+    }
 
     private sealed class RecordingTemplatesCapabilityService : ITemplatesCapabilityService
     {

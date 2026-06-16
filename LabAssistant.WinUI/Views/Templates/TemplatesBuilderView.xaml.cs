@@ -153,15 +153,20 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void RenderDraftResources()
     {
         EnsureSelectedResourcesInBounds();
-        RenderNetworkList();
-        RenderCredentialSlotList();
-        RenderForestDomainList();
-        RenderVmNameList();
+        RenderResourceLists();
         RenderSelectedNetworkDetail();
         RenderSelectedCredentialSlotDetail();
         RenderSelectedForestDomainDetail();
         RenderSelectedVmDetail();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
+    }
+
+    private void RenderResourceLists()
+    {
+        RenderNetworkList();
+        RenderCredentialSlotList();
+        RenderForestDomainList();
+        RenderVmNameList();
     }
 
     private void RenderNetworkList()
@@ -681,6 +686,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         UpdateWorkingDraftFromVisibleControls();
+        RenderResourceLists();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
         DraftChanged?.Invoke(this, EventArgs.Empty);
     }
