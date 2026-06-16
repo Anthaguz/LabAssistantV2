@@ -4384,9 +4384,9 @@ Each readiness result shall include, at minimum:
 - cross-switch dependent tasks are blocked until router networking/routing/NAT readiness is satisfied
 - the dependency reason is visible in the review plan output
 
-### 7) Role composition - topology and capability roles coexist
+### 7) Role composition - backend topology and approved VM roles coexist
 **Given**
-- a V2 template where a VM has both a topology role and one or more capability roles
+- a V2 template where a VM has both a backend topology role and one or more approved VM role assignments
 
 **When**
 - the template is validated and planned
@@ -4394,7 +4394,8 @@ Each readiness result shall include, at minimum:
 **Then**
 - validation accepts the combined role set when the combination is otherwise supported
 - planner output preserves both kinds of role intent
-- capability roles do not implicitly erase or replace topology roles
+- Builder-authored VM roles do not implicitly erase or replace backend topology roles
+- future role extension points do not become authorable until a separate approved contract defines them
 
 ### 8) Multi-NIC semantics - explicit NIC intent is preserved
 **Given**
@@ -4622,7 +4623,7 @@ Each readiness result shall include, at minimum:
 - V2 topology complexity is not pushed into the current Templates Editor
 - selecting parent `Templates` still routes to `templates.library`
 
-### 2) Topology-first authoring order
+### 2) Resource-board authoring order
 **Given**
 - the Builder opens a new or existing V2 template draft
 
@@ -4630,13 +4631,17 @@ Each readiness result shall include, at minimum:
 - the user progresses through first-slice authoring
 
 **Then**
-- the workflow orders authoring as:
-  - schema/profile
-  - lab networks
-  - forests/domains
-  - VM assignments
-- VM assignment choices are made with the selected schema/profile, lab networks, and directory topology visible enough to validate the draft
+- the Builder presents a structured resource-board workflow ordered as:
+  - Profile
+  - Networks
+  - Credentials
+  - Forests & Domains
+  - VMs
+  - Review
+- VM role and assignment choices are made with the selected profile, lab networks, credentials, and directory topology visible enough to validate the draft
 - the Builder does not require users to infer topology from per-VM rows alone
+- the Builder does not use multiline pipe-delimited authoring fields
+- a matrix may support review or comparison, but it is not the primary authoring UI
 
 ### 3) First-slice V2 fields
 **Given**
@@ -4648,11 +4653,17 @@ Each readiness result shall include, at minimum:
 **Then**
 - the draft supports schema/profile selection
 - the draft supports lab network authoring
+- the draft supports reusable credential slot references without exposing or storing reusable secret values
 - the draft supports forest/domain authoring
-- each VM can carry topology role, membership mode, and domain assignment intent
-- credential slot references can be selected or recorded without embedding reusable secret values
+- membership mode choices are limited to `DomainMember` and `Standalone`
+- Domain Controller is modeled as a VM role, not as a membership mode
+- the first executable Builder-authored VM role is Active Directory Domain Controller
+- Root CA, SQL, Web, and Operations are future role extension points and are not authorable in this slice
+- each VM can carry membership mode, domain assignment, and approved VM role intent
 - each VM can author per-NIC switch/network, IP, DNS, and gateway intent
 - unsupported or incomplete required combinations block save with actionable validation feedback
+- each saved domain must have at least one VM assigned the Active Directory Domain Controller role
+- PDC emulator/FSMO selection or transfer is out of scope
 
 ### 4) Deterministic suggestions require explicit confirmation before save
 **Given**
@@ -4677,7 +4688,9 @@ Each readiness result shall include, at minimum:
 **Then**
 - the output satisfies the V2 schema and planning contracts for first-slice fields
 - Deploy From Template review can show unresolved credentials, bootstrap assumptions, dependency blockers, selected profile, and graph/wave information when applicable
-- planner output can preserve topology roles, membership mode, domain assignment, lab network, and per-NIC addressing intent
+- planner output can preserve backend topology role compatibility, Builder-authored VM role intent, membership mode, domain assignment, lab network, and per-NIC addressing intent
+- Builder hides backend `topologyRole` details during authoring and maps Active Directory Domain Controller role assignments to the current persisted/runtime fields on save
+- `firstDomainControllerVmId` is derived from ordered Active Directory Domain Controller role assignments for each domain
 - V2 templates do not silently fall back to the V1 deployment engine
 
 ### 6) Builder ownership boundary
@@ -4704,20 +4717,25 @@ Each readiness result shall include, at minimum:
 **Then**
 - trust authoring UI is not required
 - the Builder first slice does not expose trust-specific fields or trust-specific credentials
+- existing trust declarations in an opened V2 template are preserved on save unless a later approved trust-authoring slice changes that contract
 - future trust authoring requires a separate approved contract slice
 
 ## Expected UI
 - `templates.builder` or equivalent Templates-local route for V2 template authoring
 - `templates.library` remains the parent/default Templates route
 - `templates.editor` remains the V1/simple/legacy editing route
-- Builder presents topology-first authoring rather than a flat per-VM-only editor
+- Builder presents the Profile, Networks, Credentials, Forests & Domains, VMs, Review resource-board workflow rather than a flat per-VM-only editor
+- Builder does not rely on multiline pipe-delimited text fields for authoring V2 resources
+- a matrix is not the primary authoring UI
 - save action reflects explicit user-confirmed draft intent
 
 ## Implementation Test Expectations
 - route/workspace tests verify Builder is a distinct Templates workflow-state destination and parent `Templates` still defaults to `templates.library`
 - non-regression tests verify the current Templates Editor remains available for V1/simple/legacy editing
 - Builder seam tests verify Builder state/orchestration/composition does not accumulate in `MainWindow`, shared Templates composition, or the current Editor
-- schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values
+- schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values, and that secrets remain in the local DPAPI-backed store
+- save/load tests verify existing trust declarations are preserved even though trust authoring is deferred
+- validation tests verify each saved domain requires at least one Active Directory Domain Controller VM role assignment and derives `firstDomainControllerVmId` from ordered DC assignments
 - validation tests verify unconfirmed suggestions are not silently persisted and invalid required combinations block save
 - planner/review compatibility tests verify saved Builder output can feed Deploy From Template review and V2 planning
 

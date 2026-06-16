@@ -925,8 +925,8 @@ Detailed logging contract:
   - **Acceptance details:** `V1` templates must remain deployable without requiring V2-only fields; `V2` templates must not fall back to the legacy engine silently.
   - **Priority:** P0
 
-- **FR-193:** The system shall model `V2` VM intent using both topology roles and additive capability roles.
-  - **Acceptance details:** A VM may hold multiple roles simultaneously; additive capability roles must not imply exclusivity against topology roles.
+- **FR-193:** The system shall model `V2` VM intent with explicit backend topology fields plus Builder-facing VM role intent.
+  - **Acceptance details:** Backend planning may continue to use topology-role fields for routing and dependency compatibility, but Builder authoring must not expose backend `topologyRole` as the primary user concept. Membership mode is limited to `DomainMember` or `Standalone`; Domain Controller is a VM role, not a membership mode.
   - **Priority:** P1
 
 - **FR-194:** The system shall support first-class multi-NIC network intent in `V2` templates, including explicit per-NIC switch attachment and explicit per-NIC guest IP, gateway, and DNS authoring.
@@ -942,7 +942,7 @@ Detailed logging contract:
   - **Priority:** P1
 
 - **FR-197:** The system shall support credential-slot references in `V2` templates and bootstrap-profile metadata on VHDX catalog entries without exporting reusable secret values inside templates.
-  - **Acceptance details:** Template sharing must remain portable; unresolved credential slots may block V2 deployment but must not require secrets to be embedded in the exported JSON.
+  - **Acceptance details:** Template sharing must remain portable; templates store credential slot references only. Reusable secrets stay in the local DPAPI-backed credential store and unresolved slots are resolved during Deploy Review before V2 runtime execution.
   - **Priority:** P0
 
 - **FR-198:** The system shall provide a `Review and Resolve` planning surface for `V2` deployments before runtime execution begins.
@@ -961,12 +961,12 @@ Detailed logging contract:
   - **Acceptance details:** The Builder is a Templates-local workflow-state destination, expected to use `templates.builder` or an equivalent Templates-local route key. The current `templates.editor` remains the V1/simple/legacy editing surface for existing schema editing and must not absorb V2 topology orchestration.
   - **Priority:** P1
 
-- **FR-202:** The V2 Builder first authoring slice shall use topology-first ordering and expose only the approved first-slice V2 fields.
-  - **Acceptance details:** The authoring order is schema/profile, lab networks, forests/domains, then VM assignments. First-slice fields are schema/profile, lab networks, forests/domains, VM topology role, membership mode, domain assignment, credential slot references, and per-VM NIC/IP/DNS/gateway authoring. Trust authoring is out of this first Builder slice even though trust runtime support exists.
+- **FR-202:** The V2 Builder first authoring slice shall use a structured resource-board workflow and expose only the approved first-slice V2 fields.
+  - **Acceptance details:** The Builder resource board is ordered as Profile, Networks, Credentials, Forests & Domains, VMs, and Review. First-slice authoring fields are schema/profile, lab networks, reusable credential slot references, forests/domains, VM membership mode, VM domain assignment, the Active Directory Domain Controller VM role, and per-VM NIC/IP/DNS/gateway authoring. Root CA, SQL, Web, and Operations roles are future extension points and are not authorable now. Trust authoring is out of this first Builder slice even though trust runtime support exists; existing trust data must be preserved when an existing V2 template is opened and saved.
   - **Priority:** P1
 
 - **FR-203:** The V2 Builder shall keep deterministic suggestions separate from persisted user intent and require explicit user confirmation before save.
-  - **Acceptance details:** Builder suggestions may prefill or propose derived values such as network/domain/assignment defaults, but save output is based on the user-confirmed draft. Builder output must remain compatible with Deploy From Template review and V2 planning contracts.
+  - **Acceptance details:** Builder suggestions may prefill or propose derived values such as network/domain/assignment defaults, but save output is based on the user-confirmed draft. Builder output must remain compatible with Deploy From Template review and V2 planning contracts. On save, Builder hides backend topology-role details and maps ordered Active Directory Domain Controller role assignments to the current persisted/runtime fields, including deriving each domain's `firstDomainControllerVmId`. Each saved domain must have at least one VM assigned the Active Directory Domain Controller role. PDC emulator/FSMO selection or transfer is out of scope.
   - **Priority:** P1
 
 - **FR-204:** The V2 Builder implementation target shall preserve Templates and shell ownership boundaries.
