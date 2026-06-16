@@ -150,7 +150,13 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
     private void TemplatesBuilderView_DraftChanged(object? sender, EventArgs e)
     {
         _workspace.ApplyDraft(_view.CaptureDraft());
-        RefreshUiState();
+        _view.UpdateConfirmationState(_workspace.IsSaveConfirmed);
+        _view.UpdateActionState(new TemplatesBuilderActionState(
+            CanApplySuggestions: !_host.IsTemplatesLoading,
+            CanValidate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
+            CanSave: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
+            CanSaveAs: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
+            CanBackToLibrary: !_host.IsTemplatesLoading));
     }
 
     private async void TemplatesBuilderView_ApplySuggestionsRequested(object? sender, EventArgs e)
@@ -178,4 +184,3 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
         _host.NavigateToLibrary();
     }
 }
-

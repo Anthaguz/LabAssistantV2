@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using System.Text.Json;
 using LabAssistant.Business.Planning;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
@@ -44,6 +45,102 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("IsTemplatesBuilderActive", mainWindowSource);
         Assert.DoesNotContain("TemplatesBuilderWorkspaceViewModel", mainWindowSource);
         Assert.DoesNotContain("TemplatesBuilderWorkspaceController", mainWindowSource);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_UsesStructuredResourceBoard_NotPipeDelimitedAuthoringTextBoxes()
+    {
+        var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var builderModels = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderDraftModels.cs")));
+
+        Assert.NotNull(FindByName(builder, "BuilderProfileSection"));
+        Assert.NotNull(FindByName(builder, "BuilderNetworksSection"));
+        Assert.NotNull(FindByName(builder, "BuilderCredentialsSection"));
+        Assert.NotNull(FindByName(builder, "BuilderForestsDomainsSection"));
+        Assert.NotNull(FindByName(builder, "BuilderVmsSection"));
+        Assert.NotNull(FindByName(builder, "BuilderReviewSection"));
+        Assert.NotNull(FindByName(builder, "BuilderNetworksPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderDomainsPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderVmsPanel"));
+        Assert.Contains("Basics", builderSource);
+        Assert.Contains("Compute", builderSource);
+        Assert.Contains("Membership", builderSource);
+        Assert.Contains("Networking", builderSource);
+        Assert.Contains("Roles", builderSource);
+        Assert.Contains("Credentials", builderSource);
+        Assert.Contains("Active Directory Domain Controller", builderSource);
+        Assert.DoesNotContain("BuilderLabNetworksTextBox", builderSource);
+        Assert.DoesNotContain("BuilderDomainsTextBox", builderSource);
+        Assert.DoesNotContain("BuilderVmsTextBox", builderSource);
+        Assert.DoesNotContain("BuilderNicsTextBox", builderSource);
+        Assert.DoesNotContain("LabNetworksText", builderModels);
+        Assert.DoesNotContain("DomainsText", builderModels);
+        Assert.DoesNotContain("VmsText", builderModels);
+        Assert.DoesNotContain("NicsText", builderModels);
+        Assert.DoesNotContain("topologyRole", builder.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuilderDraftMapper_SavesAdDcRoleAssignments_ToBackendCompatibleFields()
+    {
+        var draft = CreateConfirmedBuilderDraft();
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft,
+            templateId: "template-v2-builder",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Empty(build.Errors);
+        var template = Assert.IsType<TemplateEditorDocument>(build.Document).Template;
+        var domain = Assert.Single(template.DirectoryTopology!.Domains!);
+        var dc = Assert.Single(template.VmTemplates, vm => vm.TopologyRole == "FirstDomainController");
+        Assert.Equal("vm-dc01", dc.VmId);
+        Assert.Equal("vm-dc01", domain.FirstDomainControllerVmId);
+        Assert.Equal("DomainMember", dc.MembershipMode);
+        Assert.DoesNotContain(template.VmTemplates, vm => vm.TopologyRole == "RootDomainController");
+    }
+
+    [Fact]
+    public void BuilderDraftMapper_BlocksSave_WhenDomainHasNoAdDcRoleAssignment()
+    {
+        var draft = CreateConfirmedBuilderDraft();
+        var vmsWithoutDcRole = draft.Vms
+            .Select(vm => vm with { IsActiveDirectoryDomainController = false })
+            .ToList();
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft with { Vms = vmsWithoutDcRole },
+            templateId: "template-v2-builder",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Null(build.Document);
+        Assert.Contains(build.Errors, error => error.Contains("Active Directory Domain Controller role", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuilderDraftMapper_PersistsCredentialSlotReferencesOnly()
+    {
+        var draft = CreateConfirmedBuilderDraft();
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft,
+            templateId: "template-v2-builder",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Empty(build.Errors);
+        var json = JsonSerializer.Serialize(Assert.IsType<TemplateEditorDocument>(build.Document).Template);
+        Assert.Contains("slot-local", json);
+        Assert.Contains("slot-admin", json);
+        Assert.DoesNotContain("password", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secureString", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
 internal static class TemplatesBuilderDraftMapper
 {
+    private const string ActiveDirectoryDomainControllerTopologyRole = "FirstDomainController";
     private const string DefaultCreatedWithAppVersion = "1.0.0";
 
     public static TemplatesBuilderDraftSnapshot CreateSuggestedDraft(TemplatesBuilderReferenceData referenceData)
@@ -17,17 +18,54 @@ internal static class TemplatesBuilderDraftMapper
             TemplateName: "V2 Topology Template",
             TemplateDescription: "Topology-first V2 template draft.",
             DeploymentProfile: "Balanced",
-            LabNetworksText: $"lab-core|Core|{switchName}|10.0.0.0/24|Core lab network",
-            ForestsText: "forest-contoso|domain-contoso",
-            DomainsText: "domain-contoso|contoso.com|CONTOSO|forest-contoso|Root||vm-dc01",
-            VmsText: string.Join(
-                Environment.NewLine,
-                $"vm-dc01|dc01|4096|2|{dcDisk}|FirstDomainController||domain-contoso|slot-local|slot-admin||slot-dsrm|",
-                $"vm-member01|member01|4096|2|{memberDisk}||DomainMember|domain-contoso|slot-local|slot-admin|slot-join||"),
-            NicsText: string.Join(
-                Environment.NewLine,
-                "vm-dc01|nic-dc|Domain|lab-core||10.0.0.10|24|10.0.0.1|10.0.0.10",
-                "vm-member01|nic-member|Domain|lab-core||10.0.0.20|24|10.0.0.1|10.0.0.10"),
+            LabNetworks:
+            [
+                new TemplatesBuilderLabNetworkDraft("lab-core", "Core", switchName, "10.0.0.0/24", "Core lab network")
+            ],
+            CredentialSlots:
+            [
+                new TemplatesBuilderCredentialSlotDraft("slot-local", "Local bootstrap", "local bootstrap"),
+                new TemplatesBuilderCredentialSlotDraft("slot-admin", "Domain admin", "domain administration"),
+                new TemplatesBuilderCredentialSlotDraft("slot-join", "Domain join", "domain join"),
+                new TemplatesBuilderCredentialSlotDraft("slot-dsrm", "DSRM", "domain controller recovery")
+            ],
+            Forests:
+            [
+                new TemplatesBuilderForestDraft("forest-contoso", "domain-contoso")
+            ],
+            Domains:
+            [
+                new TemplatesBuilderDomainDraft("domain-contoso", "contoso.com", "CONTOSO", "forest-contoso", nameof(V2DomainRelationKind.Root), string.Empty)
+            ],
+            Vms:
+            [
+                new TemplatesBuilderVmDraft(
+                    "vm-dc01",
+                    "dc01",
+                    4096,
+                    2,
+                    dcDisk,
+                    V2MembershipModeCatalog.DomainMember,
+                    "domain-contoso",
+                    IsActiveDirectoryDomainController: true,
+                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", string.Empty, "slot-dsrm", string.Empty),
+                    [
+                        new TemplatesBuilderNicDraft("nic-dc", "Domain", "lab-core", string.Empty, "10.0.0.10", 24, "10.0.0.1", ["10.0.0.10"])
+                    ]),
+                new TemplatesBuilderVmDraft(
+                    "vm-member01",
+                    "member01",
+                    4096,
+                    2,
+                    memberDisk,
+                    V2MembershipModeCatalog.DomainMember,
+                    "domain-contoso",
+                    IsActiveDirectoryDomainController: false,
+                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", "slot-join", string.Empty, string.Empty),
+                    [
+                        new TemplatesBuilderNicDraft("nic-member", "Domain", "lab-core", string.Empty, "10.0.0.20", 24, "10.0.0.1", ["10.0.0.10"])
+                    ])
+            ],
             IsSaveConfirmed: false);
     }
 
@@ -39,52 +77,11 @@ internal static class TemplatesBuilderDraftMapper
             TemplateName: template.Name,
             TemplateDescription: template.Description ?? string.Empty,
             DeploymentProfile: template.DeploymentProfile ?? "Balanced",
-            LabNetworksText: JoinRows((template.LabNetworks ?? []).Select(network => string.Join(
-                "|",
-                network.NetworkId,
-                network.Name,
-                network.SwitchName,
-                network.Subnet,
-                network.Notes))),
-            ForestsText: JoinRows((template.DirectoryTopology?.Forests ?? []).Select(forest => string.Join(
-                "|",
-                forest.ForestId,
-                forest.RootDomainId))),
-            DomainsText: JoinRows((template.DirectoryTopology?.Domains ?? []).Select(domain => string.Join(
-                "|",
-                domain.DomainId,
-                domain.DnsName,
-                domain.NetBiosName,
-                domain.ForestId,
-                domain.RelationKind,
-                domain.ParentDomainId,
-                domain.FirstDomainControllerVmId))),
-            VmsText: JoinRows(template.VmTemplates.Select(vm => string.Join(
-                "|",
-                vm.VmId,
-                vm.Name,
-                vm.MemoryMb,
-                vm.CpuCount,
-                vm.VhdxId,
-                vm.TopologyRole,
-                vm.MembershipMode,
-                vm.DomainId,
-                vm.CredentialSlots?.LocalBootstrap,
-                vm.CredentialSlots?.DomainAdmin,
-                vm.CredentialSlots?.DomainJoin,
-                vm.CredentialSlots?.Dsrm,
-                vm.CredentialSlots?.ParentDomainAdmin))),
-            NicsText: JoinRows(template.VmTemplates.SelectMany(vm => (vm.Nics ?? []).Select(nic => string.Join(
-                "|",
-                vm.VmId,
-                nic.NicId,
-                nic.Name,
-                nic.NetworkId,
-                nic.SwitchName,
-                nic.IpAddress,
-                nic.PrefixLength,
-                nic.DefaultGateway,
-                nic.DnsServers is null ? null : string.Join(",", nic.DnsServers))))),
+            LabNetworks: CopyLabNetworks(template.LabNetworks),
+            CredentialSlots: BuildCredentialSlotReferences(template.VmTemplates),
+            Forests: CopyForests(template.DirectoryTopology?.Forests),
+            Domains: CopyDomains(template.DirectoryTopology?.Domains),
+            Vms: CopyVms(template.VmTemplates),
             IsSaveConfirmed: false);
     }
 
@@ -117,15 +114,14 @@ internal static class TemplatesBuilderDraftMapper
             errors.Add("Template name is required.");
         }
 
-        template.LabNetworks = ParseLabNetworks(draft.LabNetworksText, errors);
+        template.LabNetworks = MapLabNetworks(draft.LabNetworks, errors);
         template.DirectoryTopology = new V2DirectoryTopologyTemplate
         {
-            Forests = ParseForests(draft.ForestsText, errors),
-            Domains = ParseDomains(draft.DomainsText, errors),
+            Forests = MapForests(draft.Forests, errors),
+            Domains = MapDomains(draft.Domains, draft.Vms, errors),
             Trusts = CopyTrusts(preservedTrusts)
         };
-        template.VmTemplates = ParseVms(draft.VmsText, errors);
-        ApplyNics(template.VmTemplates, draft.NicsText, errors);
+        template.VmTemplates = MapVms(draft.Vms, errors);
 
         if (errors.Count > 0)
         {
@@ -142,190 +138,209 @@ internal static class TemplatesBuilderDraftMapper
         };
     }
 
-    private static List<LabNetworkTemplate> ParseLabNetworks(string text, List<string> errors)
+    private static List<LabNetworkTemplate> MapLabNetworks(IReadOnlyList<TemplatesBuilderLabNetworkDraft> drafts, List<string> errors)
     {
         var networks = new List<LabNetworkTemplate>();
-        foreach (var (fields, lineNumber) in EnumerateRows(text))
+        foreach (var network in drafts)
         {
-            if (fields.Length < 2)
+            if (string.IsNullOrWhiteSpace(network.NetworkId) || string.IsNullOrWhiteSpace(network.Name))
             {
-                errors.Add($"Lab network row {lineNumber} must include networkId and name.");
+                errors.Add("Each lab network requires a network id and name.");
                 continue;
             }
 
             networks.Add(new LabNetworkTemplate
             {
-                NetworkId = fields[0],
-                Name = fields[1],
-                SwitchName = Optional(fields, 2),
-                Subnet = Optional(fields, 3),
-                Notes = Optional(fields, 4)
+                NetworkId = network.NetworkId.Trim(),
+                Name = network.Name.Trim(),
+                SwitchName = Optional(network.SwitchName),
+                Subnet = Optional(network.Subnet),
+                Notes = Optional(network.Notes)
             });
         }
 
         return networks;
     }
 
-    private static List<V2ForestTemplate> ParseForests(string text, List<string> errors)
+    private static List<V2ForestTemplate> MapForests(IReadOnlyList<TemplatesBuilderForestDraft> drafts, List<string> errors)
     {
         var forests = new List<V2ForestTemplate>();
-        foreach (var (fields, lineNumber) in EnumerateRows(text))
+        foreach (var forest in drafts)
         {
-            if (fields.Length < 2)
+            if (string.IsNullOrWhiteSpace(forest.ForestId) || string.IsNullOrWhiteSpace(forest.RootDomainId))
             {
-                errors.Add($"Forest row {lineNumber} must include forestId and rootDomainId.");
+                errors.Add("Each forest requires a forest id and root domain id.");
                 continue;
             }
 
             forests.Add(new V2ForestTemplate
             {
-                ForestId = fields[0],
-                RootDomainId = fields[1]
+                ForestId = forest.ForestId.Trim(),
+                RootDomainId = forest.RootDomainId.Trim()
             });
         }
 
         return forests;
     }
 
-    private static List<V2DomainTemplate> ParseDomains(string text, List<string> errors)
+    private static List<V2DomainTemplate> MapDomains(
+        IReadOnlyList<TemplatesBuilderDomainDraft> domainDrafts,
+        IReadOnlyList<TemplatesBuilderVmDraft> vmDrafts,
+        List<string> errors)
     {
+        var dcByDomain = vmDrafts
+            .Where(vm => vm.IsActiveDirectoryDomainController && !string.IsNullOrWhiteSpace(vm.DomainId))
+            .GroupBy(vm => vm.DomainId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var domains = new List<V2DomainTemplate>();
-        foreach (var (fields, lineNumber) in EnumerateRows(text))
+
+        foreach (var domain in domainDrafts)
         {
-            if (fields.Length < 7)
+            if (string.IsNullOrWhiteSpace(domain.DomainId) ||
+                string.IsNullOrWhiteSpace(domain.DnsName) ||
+                string.IsNullOrWhiteSpace(domain.NetBiosName) ||
+                string.IsNullOrWhiteSpace(domain.ForestId))
             {
-                errors.Add($"Domain row {lineNumber} must include domainId, DNS name, NetBIOS name, forestId, relation kind, parent domain, and first DC VM id.");
+                errors.Add("Each domain requires domain id, DNS name, NetBIOS name, and forest id.");
                 continue;
             }
 
-            if (!Enum.TryParse<V2DomainRelationKind>(fields[4], ignoreCase: true, out var relationKind))
+            if (!Enum.TryParse<V2DomainRelationKind>(domain.RelationKind, ignoreCase: true, out var relationKind))
             {
-                errors.Add($"Domain row {lineNumber} relation kind must be Root, Child, or Tree.");
+                errors.Add($"Domain '{domain.DomainId}' relation kind must be Root, Child, or Tree.");
+                continue;
+            }
+
+            if (!dcByDomain.TryGetValue(domain.DomainId.Trim(), out var firstDc))
+            {
+                errors.Add($"Domain '{domain.DomainId}' requires at least one VM assigned the Active Directory Domain Controller role.");
                 continue;
             }
 
             domains.Add(new V2DomainTemplate
             {
-                DomainId = fields[0],
-                DnsName = fields[1],
-                NetBiosName = fields[2],
-                ForestId = fields[3],
+                DomainId = domain.DomainId.Trim(),
+                DnsName = domain.DnsName.Trim(),
+                NetBiosName = domain.NetBiosName.Trim(),
+                ForestId = domain.ForestId.Trim(),
                 RelationKind = relationKind,
-                ParentDomainId = Optional(fields, 5),
-                FirstDomainControllerVmId = fields[6]
+                ParentDomainId = Optional(domain.ParentDomainId),
+                FirstDomainControllerVmId = firstDc.VmId.Trim()
             });
         }
 
         return domains;
     }
 
-    private static List<VmTemplate> ParseVms(string text, List<string> errors)
+    private static List<VmTemplate> MapVms(IReadOnlyList<TemplatesBuilderVmDraft> drafts, List<string> errors)
     {
         var vms = new List<VmTemplate>();
-        foreach (var (fields, lineNumber) in EnumerateRows(text))
+        foreach (var vm in drafts)
         {
-            if (fields.Length < 13)
+            if (string.IsNullOrWhiteSpace(vm.VmId) || string.IsNullOrWhiteSpace(vm.Name))
             {
-                errors.Add($"VM row {lineNumber} must include vmId, name, memory, CPU, disk, topology, membership, domain, and credential slot columns.");
+                errors.Add("Each VM requires a VM id and name.");
                 continue;
             }
 
-            if (!int.TryParse(fields[2], out var memoryMb) || memoryMb <= 0)
+            if (vm.MemoryMb <= 0)
             {
-                errors.Add($"VM row {lineNumber} memory must be a positive integer.");
+                errors.Add($"VM '{vm.Name}' memory must be a positive integer.");
                 continue;
             }
 
-            if (!int.TryParse(fields[3], out var cpuCount) || cpuCount <= 0)
+            if (vm.CpuCount <= 0)
             {
-                errors.Add($"VM row {lineNumber} CPU count must be a positive integer.");
+                errors.Add($"VM '{vm.Name}' CPU count must be a positive integer.");
                 continue;
             }
 
+            var membershipMode = V2MembershipModeCatalog.Normalize(vm.MembershipMode);
+            if (membershipMode is null)
+            {
+                errors.Add($"VM '{vm.Name}' membership must be DomainMember or Standalone.");
+                continue;
+            }
+
+            if (vm.IsActiveDirectoryDomainController && !V2MembershipModeCatalog.IsDomainMember(membershipMode))
+            {
+                errors.Add($"VM '{vm.Name}' must use DomainMember membership when assigned the Active Directory Domain Controller role.");
+                continue;
+            }
+
+            if (V2MembershipModeCatalog.IsDomainMember(membershipMode) && string.IsNullOrWhiteSpace(vm.DomainId))
+            {
+                errors.Add($"VM '{vm.Name}' requires a domain assignment when membership is DomainMember.");
+                continue;
+            }
+
+            if (V2MembershipModeCatalog.IsStandalone(membershipMode) && !string.IsNullOrWhiteSpace(vm.DomainId))
+            {
+                errors.Add($"VM '{vm.Name}' must not carry a domain assignment when membership is Standalone.");
+                continue;
+            }
+
+            var nics = MapNics(vm, errors);
             vms.Add(new VmTemplate
             {
-                VmId = fields[0],
-                Name = fields[1],
-                MemoryMb = memoryMb,
-                CpuCount = cpuCount,
-                VhdxId = Optional(fields, 4),
-                TopologyRole = Optional(fields, 5),
-                MembershipMode = Optional(fields, 6),
-                DomainId = Optional(fields, 7),
-                CredentialSlots = CreateCredentialSlots(fields)
+                VmId = vm.VmId.Trim(),
+                Name = vm.Name.Trim(),
+                MemoryMb = vm.MemoryMb,
+                CpuCount = vm.CpuCount,
+                VhdxId = Optional(vm.VhdxId),
+                TopologyRole = vm.IsActiveDirectoryDomainController ? ActiveDirectoryDomainControllerTopologyRole : null,
+                MembershipMode = membershipMode,
+                DomainId = V2MembershipModeCatalog.IsDomainMember(membershipMode) ? vm.DomainId.Trim() : null,
+                CredentialSlots = CreateCredentialSlots(vm.CredentialSlots),
+                Nics = nics.Count == 0 ? null : nics
             });
         }
 
         return vms;
     }
 
-    private static void ApplyNics(List<VmTemplate> vms, string text, List<string> errors)
+    private static List<VmNetworkInterfaceTemplate> MapNics(TemplatesBuilderVmDraft vm, List<string> errors)
     {
-        var vmsById = new Dictionary<string, VmTemplate>(StringComparer.OrdinalIgnoreCase);
-        foreach (var vm in vms)
+        var nics = new List<VmNetworkInterfaceTemplate>();
+        foreach (var nic in vm.Nics)
         {
-            if (string.IsNullOrWhiteSpace(vm.VmId))
+            if (string.IsNullOrWhiteSpace(nic.NicId))
             {
-                errors.Add($"VM '{vm.Name}' vmId is required before NIC rows can be assigned.");
+                errors.Add($"VM '{vm.Name}' has a NIC without a NIC id.");
                 continue;
             }
 
-            if (!vmsById.TryAdd(vm.VmId, vm))
+            if (nic.PrefixLength is < 0 or > 128)
             {
-                errors.Add($"Duplicate VM id '{vm.VmId}' is not allowed.");
-            }
-        }
-
-        foreach (var (fields, lineNumber) in EnumerateRows(text))
-        {
-            if (fields.Length < 9)
-            {
-                errors.Add($"NIC row {lineNumber} must include vmId, nicId, name, networkId, switchName, IP, prefix, gateway, and DNS servers.");
+                errors.Add($"VM '{vm.Name}' NIC '{nic.NicId}' prefix length must be 0 through 128.");
                 continue;
             }
 
-            if (!vmsById.TryGetValue(fields[0], out var vm))
+            nics.Add(new VmNetworkInterfaceTemplate
             {
-                errors.Add($"NIC row {lineNumber} references unknown VM '{fields[0]}'.");
-                continue;
-            }
-
-            int? prefixLength = null;
-            if (!string.IsNullOrWhiteSpace(fields[6]))
-            {
-                if (!int.TryParse(fields[6], out var parsedPrefix) || parsedPrefix < 0 || parsedPrefix > 128)
-                {
-                    errors.Add($"NIC row {lineNumber} prefix length must be 0 through 128.");
-                    continue;
-                }
-
-                prefixLength = parsedPrefix;
-            }
-
-            vm.Nics ??= [];
-            vm.Nics.Add(new VmNetworkInterfaceTemplate
-            {
-                NicId = fields[1],
-                Name = Optional(fields, 2),
-                NetworkId = Optional(fields, 3),
-                SwitchName = Optional(fields, 4),
-                IpAddress = Optional(fields, 5),
-                PrefixLength = prefixLength,
-                DefaultGateway = Optional(fields, 7),
-                DnsServers = SplitList(Optional(fields, 8))
+                NicId = nic.NicId.Trim(),
+                Name = Optional(nic.Name),
+                NetworkId = Optional(nic.NetworkId),
+                SwitchName = Optional(nic.SwitchName),
+                IpAddress = Optional(nic.IpAddress),
+                PrefixLength = nic.PrefixLength,
+                DefaultGateway = Optional(nic.DefaultGateway),
+                DnsServers = CopyList(nic.DnsServers)
             });
         }
+
+        return nics;
     }
 
-    private static VmCredentialSlotBindings? CreateCredentialSlots(string[] fields)
+    private static VmCredentialSlotBindings? CreateCredentialSlots(TemplatesBuilderVmCredentialSlotDraft draft)
     {
         var slots = new VmCredentialSlotBindings
         {
-            LocalBootstrap = Optional(fields, 8),
-            DomainAdmin = Optional(fields, 9),
-            DomainJoin = Optional(fields, 10),
-            Dsrm = Optional(fields, 11),
-            ParentDomainAdmin = Optional(fields, 12)
+            LocalBootstrap = Optional(draft.LocalBootstrap),
+            DomainAdmin = Optional(draft.DomainAdmin),
+            DomainJoin = Optional(draft.DomainJoin),
+            Dsrm = Optional(draft.Dsrm),
+            ParentDomainAdmin = Optional(draft.ParentDomainAdmin)
         };
 
         return slots.LocalBootstrap is null &&
@@ -337,42 +352,110 @@ internal static class TemplatesBuilderDraftMapper
             : slots;
     }
 
-    private static IEnumerable<(string[] Fields, int LineNumber)> EnumerateRows(string text)
-    {
-        var lines = (text ?? string.Empty)
-            .Split(["\r\n", "\n"], StringSplitOptions.None);
-
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i].Trim();
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
-            {
-                continue;
-            }
-
-            yield return (line.Split('|').Select(field => field.Trim()).ToArray(), i + 1);
-        }
-    }
-
-    private static string? Optional(string[] fields, int index)
-    {
-        if (index >= fields.Length || string.IsNullOrWhiteSpace(fields[index]))
-        {
-            return null;
-        }
-
-        return fields[index].Trim();
-    }
-
-    private static List<string>? SplitList(string? value)
-    {
-        var values = value?
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
+    private static IReadOnlyList<TemplatesBuilderLabNetworkDraft> CopyLabNetworks(IEnumerable<LabNetworkTemplate>? networks)
+        => networks?
+            .Select(network => new TemplatesBuilderLabNetworkDraft(
+                network.NetworkId,
+                network.Name,
+                network.SwitchName ?? string.Empty,
+                network.Subnet ?? string.Empty,
+                network.Notes ?? string.Empty))
             .ToList() ?? [];
 
-        return values.Count == 0 ? null : values;
+    private static IReadOnlyList<TemplatesBuilderForestDraft> CopyForests(IEnumerable<V2ForestTemplate>? forests)
+        => forests?
+            .Select(forest => new TemplatesBuilderForestDraft(forest.ForestId, forest.RootDomainId))
+            .ToList() ?? [];
+
+    private static IReadOnlyList<TemplatesBuilderDomainDraft> CopyDomains(IEnumerable<V2DomainTemplate>? domains)
+        => domains?
+            .Select(domain => new TemplatesBuilderDomainDraft(
+                domain.DomainId,
+                domain.DnsName,
+                domain.NetBiosName,
+                domain.ForestId,
+                domain.RelationKind.ToString(),
+                domain.ParentDomainId ?? string.Empty))
+            .ToList() ?? [];
+
+    private static IReadOnlyList<TemplatesBuilderVmDraft> CopyVms(IEnumerable<VmTemplate> vms)
+        => vms
+            .Select(vm => new TemplatesBuilderVmDraft(
+                vm.VmId,
+                vm.Name,
+                vm.MemoryMb,
+                vm.CpuCount,
+                vm.VhdxId ?? string.Empty,
+                ResolveMembershipMode(vm),
+                vm.DomainId ?? string.Empty,
+                IsActiveDirectoryDomainController(vm.TopologyRole),
+                new TemplatesBuilderVmCredentialSlotDraft(
+                    vm.CredentialSlots?.LocalBootstrap ?? string.Empty,
+                    vm.CredentialSlots?.DomainAdmin ?? string.Empty,
+                    vm.CredentialSlots?.DomainJoin ?? string.Empty,
+                    vm.CredentialSlots?.Dsrm ?? string.Empty,
+                    vm.CredentialSlots?.ParentDomainAdmin ?? string.Empty),
+                CopyNics(vm.Nics)))
+            .ToList();
+
+    private static IReadOnlyList<TemplatesBuilderNicDraft> CopyNics(IEnumerable<VmNetworkInterfaceTemplate>? nics)
+        => nics?
+            .Select(nic => new TemplatesBuilderNicDraft(
+                nic.NicId,
+                nic.Name ?? string.Empty,
+                nic.NetworkId ?? string.Empty,
+                nic.SwitchName ?? string.Empty,
+                nic.IpAddress ?? string.Empty,
+                nic.PrefixLength,
+                nic.DefaultGateway ?? string.Empty,
+                nic.DnsServers ?? []))
+            .ToList() ?? [];
+
+    private static IReadOnlyList<TemplatesBuilderCredentialSlotDraft> BuildCredentialSlotReferences(IEnumerable<VmTemplate> vms)
+    {
+        var slots = new Dictionary<string, TemplatesBuilderCredentialSlotDraft>(StringComparer.OrdinalIgnoreCase);
+        foreach (var vm in vms)
+        {
+            AddSlot(slots, vm.CredentialSlots?.LocalBootstrap, "Local bootstrap", "local bootstrap");
+            AddSlot(slots, vm.CredentialSlots?.DomainAdmin, "Domain admin", "domain administration");
+            AddSlot(slots, vm.CredentialSlots?.DomainJoin, "Domain join", "domain join");
+            AddSlot(slots, vm.CredentialSlots?.Dsrm, "DSRM", "domain controller recovery");
+            AddSlot(slots, vm.CredentialSlots?.ParentDomainAdmin, "Parent domain admin", "dependent-domain creation");
+        }
+
+        return slots.Values.OrderBy(slot => slot.SlotKey, StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    private static void AddSlot(
+        IDictionary<string, TemplatesBuilderCredentialSlotDraft> slots,
+        string? key,
+        string label,
+        string scopeHint)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        slots.TryAdd(key.Trim(), new TemplatesBuilderCredentialSlotDraft(key.Trim(), label, scopeHint));
+    }
+
+    private static string ResolveMembershipMode(VmTemplate vm)
+    {
+        var normalized = V2MembershipModeCatalog.Normalize(vm.MembershipMode);
+        if (normalized is not null)
+        {
+            return normalized;
+        }
+
+        return !string.IsNullOrWhiteSpace(vm.DomainId) || IsActiveDirectoryDomainController(vm.TopologyRole)
+            ? V2MembershipModeCatalog.DomainMember
+            : V2MembershipModeCatalog.Standalone;
+    }
+
+    private static bool IsActiveDirectoryDomainController(string? topologyRole)
+        => string.Equals(topologyRole, ActiveDirectoryDomainControllerTopologyRole, StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(topologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase);
 
     private static List<V2TrustTemplate>? CopyTrusts(IReadOnlyList<V2TrustTemplate>? trusts)
     {
@@ -393,6 +476,16 @@ internal static class TemplatesBuilderDraftMapper
             .ToList();
     }
 
-    private static string JoinRows(IEnumerable<string> rows)
-        => string.Join(Environment.NewLine, rows);
+    private static List<string>? CopyList(IEnumerable<string>? values)
+    {
+        var result = values?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .ToList() ?? [];
+
+        return result.Count == 0 ? null : result;
+    }
+
+    private static string? Optional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

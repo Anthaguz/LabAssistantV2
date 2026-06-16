@@ -19,15 +19,15 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
 
     public string DeploymentProfile { get; private set; } = "Balanced";
 
-    public string LabNetworksText { get; private set; } = string.Empty;
+    public IReadOnlyList<TemplatesBuilderLabNetworkDraft> LabNetworks { get; private set; } = [];
 
-    public string ForestsText { get; private set; } = string.Empty;
+    public IReadOnlyList<TemplatesBuilderCredentialSlotDraft> CredentialSlots { get; private set; } = [];
 
-    public string DomainsText { get; private set; } = string.Empty;
+    public IReadOnlyList<TemplatesBuilderForestDraft> Forests { get; private set; } = [];
 
-    public string VmsText { get; private set; } = string.Empty;
+    public IReadOnlyList<TemplatesBuilderDomainDraft> Domains { get; private set; } = [];
 
-    public string NicsText { get; private set; } = string.Empty;
+    public IReadOnlyList<TemplatesBuilderVmDraft> Vms { get; private set; } = [];
 
     public bool IsSaveConfirmed { get; private set; }
 
@@ -90,20 +90,20 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
             !string.Equals(TemplateName, draft.TemplateName, StringComparison.Ordinal) ||
             !string.Equals(TemplateDescription, draft.TemplateDescription, StringComparison.Ordinal) ||
             !string.Equals(DeploymentProfile, draft.DeploymentProfile, StringComparison.Ordinal) ||
-            !string.Equals(LabNetworksText, draft.LabNetworksText, StringComparison.Ordinal) ||
-            !string.Equals(ForestsText, draft.ForestsText, StringComparison.Ordinal) ||
-            !string.Equals(DomainsText, draft.DomainsText, StringComparison.Ordinal) ||
-            !string.Equals(VmsText, draft.VmsText, StringComparison.Ordinal) ||
-            !string.Equals(NicsText, draft.NicsText, StringComparison.Ordinal);
+            !LabNetworks.SequenceEqual(draft.LabNetworks) ||
+            !CredentialSlots.SequenceEqual(draft.CredentialSlots) ||
+            !Forests.SequenceEqual(draft.Forests) ||
+            !Domains.SequenceEqual(draft.Domains) ||
+            !Vms.SequenceEqual(draft.Vms);
 
         TemplateName = draft.TemplateName;
         TemplateDescription = draft.TemplateDescription;
         DeploymentProfile = draft.DeploymentProfile;
-        LabNetworksText = draft.LabNetworksText;
-        ForestsText = draft.ForestsText;
-        DomainsText = draft.DomainsText;
-        VmsText = draft.VmsText;
-        NicsText = draft.NicsText;
+        LabNetworks = draft.LabNetworks.ToList();
+        CredentialSlots = draft.CredentialSlots.ToList();
+        Forests = draft.Forests.ToList();
+        Domains = draft.Domains.ToList();
+        Vms = draft.Vms.ToList();
         IsSaveConfirmed = editableContentChanged && IsSaveConfirmed
             ? false
             : draft.IsSaveConfirmed;
@@ -115,11 +115,11 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
             TemplateName,
             TemplateDescription,
             DeploymentProfile,
-            LabNetworksText,
-            ForestsText,
-            DomainsText,
-            VmsText,
-            NicsText,
+            LabNetworks,
+            CredentialSlots,
+            Forests,
+            Domains,
+            Vms,
             IsSaveConfirmed);
     }
 
