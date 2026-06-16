@@ -36,8 +36,8 @@ Each NIC may include:
 - DNS servers
 - optional flags such as "requires router path"
 
-### Topology roles
-Topology roles shape orchestration order and dependency semantics:
+### Backend topology roles
+Backend topology roles shape orchestration order and dependency semantics:
 
 - `Router`
 - `FirstDomainController`
@@ -47,30 +47,33 @@ Topology roles shape orchestration order and dependency semantics:
 
 Ordinary machines do not need a topology role. In V2, domain participation is modeled separately through `membershipMode`.
 
+The Templates V2 Builder must hide backend `topologyRole` details during authoring and map Builder VM role assignments to these backend fields on save.
+
 ### Membership mode
 Membership mode controls whether a VM participates in domain-join execution:
 
 - `DomainMember`
 - `Standalone`
 
-### Capability roles
-Capability roles request additive guest work:
+Membership mode is limited to those two values. Domain Controller is a VM role, not a membership mode.
 
-- `Pki`
-- `Sql`
-- `Web`
-- `Operations`
+### Builder VM roles
+Builder VM roles are the user-facing role assignments in the first structured authoring workflow.
 
-Capability roles are additive and may coexist with topology roles.
+The first executable Builder-authored VM role is:
+
+- Active Directory Domain Controller
+
+Root CA, SQL, Web, and Operations are future Builder role extension points and are not authorable in the first Builder slice. Future roles require a separate approved contract before they become authorable.
 
 ### Dependencies
 V2 may declare explicit dependencies when role-derived ordering is not enough.
 
 Examples:
 
-- a domain-member VM waits for a root domain controller domain-readiness gate
+- a domain-member VM waits for a domain-controller domain-readiness gate
 - a cross-switch task waits for router readiness
-- a capability-role task waits for a prior domain-join task
+- a future approved role task waits for a prior domain-join task
 
 ### Deployment profile
 Each V2 template may select a deployment profile or leave it to deploy-time default:
@@ -99,7 +102,7 @@ Each reference should carry:
 - scope hint
 - optional expected owner such as disk profile or template override
 
-Templates must not embed reusable secret values.
+Templates must not embed reusable secret values. Reusable secrets stay in the local DPAPI-backed credential store and unresolved slot mappings are resolved during Deploy From Template review before V2 runtime execution.
 
 ## Current Planning And Runtime Boundary
 
@@ -143,7 +146,7 @@ Bootstrap profiles describe image facts, not lab/domain intent.
 
 - exported templates carry slot references and labels only
 - imported templates may remain editable even when local slot mappings are unresolved
-- deployment must block until required slot mappings are resolved locally
+- Deploy From Template review must resolve required local slot mappings before runtime execution starts
 
 ## Builder Output Compatibility
 
@@ -153,9 +156,13 @@ The Templates V2 Builder is an authoring surface for producing planner-compatibl
 - Deploy From Template review and resolve
 - V2 orchestration planning
 
-The first Builder slice authors schema/profile, lab networks, forests/domains, VM topology role, membership mode, domain assignment, credential slot references, and per-VM NIC/IP/DNS/gateway intent. Deterministic suggestions may help populate those fields, but only explicit user-confirmed draft values become persisted template intent.
+The first Builder slice uses a structured resource-board workflow: Profile, Networks, Credentials, Forests & Domains, VMs, and Review. It authors schema/profile, lab networks, reusable credential slot references, forests/domains, VM membership mode, domain assignment, Active Directory Domain Controller VM role assignment, and per-VM NIC/IP/DNS/gateway intent. Deterministic suggestions may help populate those fields, but only explicit user-confirmed draft values become persisted template intent.
 
-Trust authoring is outside the first Builder slice. The existing trust runtime contract remains a planner/runtime capability for templates that already declare supported trust intent; adding first-class Builder trust authoring requires a later approved issue.
+The Builder must not use multiline pipe-delimited fields as V2 resource authoring controls. Matrix views may support review or comparison, but they are not the primary authoring UI.
+
+Builder output hides backend `topologyRole` details while preserving planner compatibility. On save, ordered Active Directory Domain Controller role assignments map to the current backend fields, including each domain's derived `firstDomainControllerVmId`.
+
+Trust authoring is outside the first Builder slice. The existing trust runtime contract remains a planner/runtime capability for templates that already declare supported trust intent; existing trust declarations must be preserved when a V2 template is opened and saved by Builder. Adding first-class Builder trust authoring requires a later approved issue.
 
 ## Directory Topology Contract
 
@@ -195,6 +202,8 @@ Supported `relationKind` values are:
 - `Tree`
 
 All supported `relationKind` values are executable in the current V2 backend runtime. Root domains create or extend independent forests according to their forest declaration; child and tree domains require a valid parent-domain reference and wait for the parent domain readiness gate.
+
+Each saved domain must have at least one VM assigned the Active Directory Domain Controller role. The first domain controller is derived from ordered DC role assignments and persisted as `firstDomainControllerVmId`. PDC emulator/FSMO selection or transfer is out of scope.
 
 ### Trusts
 

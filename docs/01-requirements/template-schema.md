@@ -137,17 +137,17 @@ For `V2`, the schema direction expands the current model to include:
 - lab networks
 - VM NIC collections
 - explicit per-NIC guest addressing
-- topology roles
-- additive capability roles
+- backend topology-role compatibility fields
+- Builder-facing VM role intent
 - dependency declarations
 - deployment profile selection
 - directory topology with forests, domains, and trusts
 - credential slot references
 - VHDX/bootstrap profile references
 
-### V2 topology vs capability roles
+### V2 backend topology fields vs Builder VM roles
 
-Topology roles affect scheduling and dependency semantics:
+Backend topology-role fields affect scheduling and dependency semantics:
 
 - `Router`
 - `FirstDomainController`
@@ -155,21 +155,20 @@ Topology roles affect scheduling and dependency semantics:
 
 `RootDomainController` is still accepted as a compatibility alias, but new V2 data should use `FirstDomainController`.
 
-Capability roles request additive work without replacing topology roles:
+The Builder must hide backend `topologyRole` details from first-slice authoring. Builder users assign VM roles, and the first executable Builder-authored VM role is:
 
-- `Pki`
-- `Sql`
-- `Web`
-- `Operations`
+- Active Directory Domain Controller
 
 Rule:
 
-- a VM may hold one topology role and multiple additive capability roles
-- a VM may also carry future topology/capability combinations when explicitly supported
+- Active Directory Domain Controller is a VM role, not a membership mode
+- Builder maps ordered Active Directory Domain Controller role assignments to current backend topology fields on save
+- Root CA, SQL, Web, and Operations are future Builder role extension points and are not authorable in the first Builder slice
+- future topology/capability combinations require an approved contract before they become authorable
 
 ### V2 membership mode
 
-Domain participation is modeled separately from topology role:
+Domain participation is modeled separately from VM role and backend topology role:
 
 - `DomainMember`
 - `Standalone`
@@ -178,8 +177,9 @@ Rules:
 
 - `DomainMember` requires `domainId`
 - `Standalone` must not emit domain-join execution
-- domain controllers still require `domainId` because their topology role drives promotion behavior
+- Active Directory Domain Controller VMs require `domainId` because their VM role drives promotion behavior through backend topology compatibility fields
 - ordinary joinable machines do not need a dedicated topology role
+- membership mode must not include Domain Controller or other role names
 
 ### V2 directory topology
 
@@ -200,6 +200,8 @@ Domain declarations carry the durable identity and relationship fields used by t
 - `firstDomainControllerVmId`
 
 Supported `relationKind` values are `Root`, `Child`, and `Tree`.
+
+Each saved domain must have at least one VM assigned the Active Directory Domain Controller role. `firstDomainControllerVmId` is derived from the ordered Active Directory Domain Controller role assignments for that domain. PDC emulator/FSMO selection or transfer is out of scope for the Builder first slice.
 
 Trust declarations persist durable intent using `trustId`, source/target domain references, trust type, and direction. The first executable trust slice is limited to bidirectional forest trusts between two LabAssistant-managed V2 domains/forests. External trusts, realm trusts, one-way directions, selective authentication details, SID-filter details, and unmanaged external domains remain unsupported and must block before runtime. The first slice uses existing per-domain domain-admin credential slots and does not add dedicated trust credential fields.
 
@@ -242,31 +244,35 @@ Template-owned references may include:
 - parent domain administrator credential slot reference for dependent-domain creation
 - role-specific credential slot reference
 
-Reusable secret values remain a local-machine concern and must not travel in exported templates.
+Reusable secret values remain a local-machine concern in the DPAPI-backed credential store and must not travel in exported templates. Missing local slot mappings are resolved during Deploy From Template review before V2 runtime execution.
 
 ### V2 Builder authoring contract
 
 The Templates V2 Builder is the authoring workflow for V2 templates. It must preserve the current Templates Editor for V1/simple/legacy editing while producing V2 template output compatible with Deploy From Template review and V2 planning.
 
-The first Builder slice authors V2 intent in topology-first order:
+The first Builder slice authors V2 intent through a structured resource-board workflow:
 
-1. schema/profile
-2. lab networks
-3. forests/domains
-4. VM assignments
+1. Profile
+2. Networks
+3. Credentials
+4. Forests & Domains
+5. VMs
+6. Review
 
 The first Builder slice may author:
 
 - schema/profile
 - lab networks
+- credential slot references
 - forests/domains
-- VM topology role
 - membership mode
 - domain assignment
-- credential slot references
+- Active Directory Domain Controller VM role assignment
 - per-VM NIC/IP/DNS/gateway intent
 
-Deterministic suggestions are allowed for these fields, but saved template output must reflect explicit user-confirmed draft intent. Trust authoring is out of scope for the first Builder slice; future trust authoring requires a separate approved contract.
+The Builder must not use multiline pipe-delimited text fields as V2 resource authoring controls. Matrix views may support review or comparison, but they are not the primary authoring UI.
+
+Deterministic suggestions are allowed for these fields, but saved template output must reflect explicit user-confirmed draft intent. Builder save maps Active Directory Domain Controller role assignments to current backend topology fields and derives `firstDomainControllerVmId` from ordered DC assignments. Trust authoring is out of scope for the first Builder slice; existing trust declarations in opened V2 templates must be preserved on save, and future trust authoring requires a separate approved contract.
 
 ## Guest/Role Placeholder Sections
 
