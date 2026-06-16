@@ -55,6 +55,7 @@ public sealed class Issue755TemplatesV2BuilderTests
         var builderModels = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderDraftModels.cs")));
 
         Assert.NotNull(FindByName(builder, "BuilderLeftStepper"));
+        Assert.NotNull(FindByName(builder, "BuilderWorkflowTreePanel"));
         Assert.NotNull(FindByName(builder, "BuilderActiveStepPanel"));
         Assert.NotNull(FindByName(builder, "BuilderGeneralSection"));
         Assert.NotNull(FindByName(builder, "BuilderNetworksSection"));
@@ -65,11 +66,17 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.DoesNotContain(builder.Descendants().Attributes().Select(attribute => attribute.Value), value => value == "BuilderProfileSection");
         Assert.Equal(
             ["General", "Networks", "Forests & Domains", "Credentials", "VMs", "Review"],
-            FindByName(builder, "BuilderLeftStepper")
-                .Descendants()
-                .Where(element => element.Name.LocalName == "Button")
-                .Select(element => element.Attribute("Content")?.Value ?? string.Empty)
-                .ToArray());
+            [
+                FindByName(builder, "BuilderGeneralStepButton").Attribute("Content")?.Value ?? string.Empty,
+                FindByName(builder, "BuilderNetworksStepButton").Attribute("Content")?.Value ?? string.Empty,
+                FindByName(builder, "BuilderForestsDomainsStepButton").Attribute("Content")?.Value ?? string.Empty,
+                FindByName(builder, "BuilderCredentialsStepButton").Attribute("Content")?.Value ?? string.Empty,
+                FindByName(builder, "BuilderVmsStepButton").Attribute("Content")?.Value ?? string.Empty,
+                FindByName(builder, "BuilderReviewStepButton").Attribute("Content")?.Value ?? string.Empty
+            ]);
+        Assert.Contains("ApplyNavButtonState", builderSource);
+        Assert.Contains("ShellAccentBrush", builderSource);
+        Assert.Contains("ShellBackgroundBrush", builderSource);
         Assert.Contains("BuilderWorkflowStep.General", builderSource);
         Assert.Contains("BuilderWorkflowStep.Networks", builderSource);
         Assert.Contains("BuilderWorkflowStep.ForestsDomains", builderSource);
@@ -87,15 +94,44 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.NotNull(FindByName(builder, "BuilderSelectedForestDomainDetailPanel"));
         Assert.NotNull(FindByName(builder, "BuilderCredentialSlotsListPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedCredentialSlotDetailPanel"));
-        Assert.NotNull(FindByName(builder, "BuilderVmNameListPanel"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderVmNameListPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderVmsNavRow"));
+        Assert.NotNull(FindByName(builder, "BuilderVmNavChildrenPanel"));
+        Assert.Equal("+", FindByName(builder, "BuilderAddVmFromNavButton").Attribute("Content")?.Value);
+        Assert.Equal("0", FindByName(builder, "BuilderAddVmFromNavButton").Attribute("BorderThickness")?.Value);
+        Assert.Equal("Transparent", FindByName(builder, "BuilderAddVmFromNavButton").Attribute("Background")?.Value);
+        Assert.NotNull(FindByName(builder, "BuilderVmOverviewPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderVmTotalCountTextBlock"));
+        Assert.NotNull(FindByName(builder, "BuilderVmMembershipCountsTextBlock"));
+        Assert.NotNull(FindByName(builder, "BuilderVmAdDcCountTextBlock"));
+        Assert.NotNull(FindByName(builder, "BuilderVmOverviewListPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderSelectedVmDetailHost"));
+        Assert.NotNull(FindByName(builder, "BuilderVmDetailCategoryNavPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedVmDetailPanel"));
         Assert.Contains("Basics", builderSource);
-        Assert.Contains("Compute", builderSource);
+        Assert.Contains("Resources", builderSource);
         Assert.Contains("Membership", builderSource);
         Assert.Contains("Networking", builderSource);
         Assert.Contains("Roles", builderSource);
         Assert.Contains("Credentials", builderSource);
+        Assert.DoesNotContain("Compute", builderSource);
+        Assert.Contains("Base Disk / VHDX ID", builderSource);
         Assert.Contains("Active Directory Domain Controller", builderSource);
+        Assert.Contains("BuilderVmDetailCategory.Basics", builderSource);
+        Assert.Contains("BuilderVmDetailCategory.Resources", builderSource);
+        Assert.Contains("BuilderVmDetailCategory.Membership", builderSource);
+        Assert.Contains("BuilderVmDetailCategory.Roles", builderSource);
+        Assert.Contains("BuilderVmDetailCategory.Networking", builderSource);
+        Assert.Contains("BuilderVmDetailCategory.Credentials", builderSource);
+        Assert.Contains("BuilderVmNavChildrenPanel.Children.Add", builderSource);
+        Assert.Contains("SelectVmChild(index)", builderSource);
+        Assert.Contains("_selectedVmDetailCategory = BuilderVmDetailCategory.Basics", builderSource);
+        Assert.Contains("FindNextVmNumber", builderSource);
+        Assert.Contains("$\"vm-{nextVmNumber}\"", builderSource);
+        Assert.Contains("$\"VM {nextVmNumber}\"", builderSource);
+        Assert.Contains("_isVmOverviewSelected = false", builderSource);
+        Assert.Contains("ReadNics(BuilderSelectedVmDetailPanel)", builderSource);
+        Assert.DoesNotContain("BuilderVmNameListPanel", builderSource);
         Assert.DoesNotContain("BuilderLabNetworksTextBox", builderSource);
         Assert.DoesNotContain("BuilderDomainsTextBox", builderSource);
         Assert.DoesNotContain("BuilderVmsTextBox", builderSource);
@@ -109,6 +145,14 @@ public sealed class Issue755TemplatesV2BuilderTests
         var confirmation = FindByName(builder, "BuilderConfirmSaveCheckBox");
         Assert.Contains(confirmation.Ancestors(), ancestor => HasName(ancestor, "BuilderReviewSection"));
         Assert.Equal("Back", FindByName(builder, "BuilderBackToLibraryButton").Attribute("Content")?.Value);
+        Assert.Equal("Previous", FindByName(builder, "BuilderPreviousStepButton").Attribute("Content")?.Value);
+        Assert.Equal("Next", FindByName(builder, "BuilderNextStepButton").Attribute("Content")?.Value);
+        Assert.Contains("SelectAdjacentStep(-1)", builderSource);
+        Assert.Contains("SelectAdjacentStep(1)", builderSource);
+        Assert.Contains("WorkflowStepOrder", builderSource);
+        Assert.Contains("BuilderPreviousStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.General", builderSource);
+        Assert.Contains("BuilderNextStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.Review", builderSource);
+        Assert.Contains("_isVmOverviewSelected = step == BuilderWorkflowStep.Vms", builderSource);
     }
 
     [Fact]
@@ -539,6 +583,13 @@ public sealed class Issue755TemplatesV2BuilderTests
         return xaml
             .Descendants()
             .Single(element => element.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == name);
+    }
+
+    private static XElement? FindByNameOrDefault(XDocument xaml, string name)
+    {
+        return xaml
+            .Descendants()
+            .SingleOrDefault(element => element.Attribute(XName.Get("Name", "http://schemas.microsoft.com/winfx/2006/xaml"))?.Value == name);
     }
 
     private static bool HasName(XElement element, string name)

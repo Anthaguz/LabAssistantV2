@@ -23,12 +23,25 @@ internal readonly record struct TemplatesBuilderActionState(
 
 public sealed partial class TemplatesBuilderView : UserControl
 {
+    private static readonly BuilderWorkflowStep[] WorkflowStepOrder =
+    [
+        BuilderWorkflowStep.General,
+        BuilderWorkflowStep.Networks,
+        BuilderWorkflowStep.ForestsDomains,
+        BuilderWorkflowStep.Credentials,
+        BuilderWorkflowStep.Vms,
+        BuilderWorkflowStep.Review
+    ];
+
     private bool _isUpdatingDraft;
+    private bool _canNavigateWorkflow;
     private BuilderWorkflowStep _selectedStep = BuilderWorkflowStep.General;
+    private BuilderVmDetailCategory _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
     private TemplatesBuilderDraftSnapshot _draft = CreateEmptyDraft();
     private int _selectedNetworkIndex;
     private int _selectedCredentialSlotIndex;
     private int _selectedVmIndex;
+    private bool _isVmOverviewSelected = true;
     private BuilderForestDomainResourceKind _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
     private int _selectedForestDomainIndex;
 
@@ -52,18 +65,21 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderNetworksStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Networks);
         BuilderForestsDomainsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.ForestsDomains);
         BuilderCredentialsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Credentials);
-        BuilderVmsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Vms);
+        BuilderVmsStepButton.Click += (_, _) => SelectVmOverview();
         BuilderReviewStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Review);
         BuilderAddNetworkButton.Click += BuilderAddNetworkButton_Click;
         BuilderAddCredentialSlotButton.Click += BuilderAddCredentialSlotButton_Click;
         BuilderAddForestButton.Click += BuilderAddForestButton_Click;
         BuilderAddDomainButton.Click += BuilderAddDomainButton_Click;
         BuilderAddVmButton.Click += BuilderAddVmButton_Click;
+        BuilderAddVmFromNavButton.Click += BuilderAddVmButton_Click;
         BuilderApplySuggestionsButton.Click += BuilderApplySuggestionsButton_Click;
         BuilderValidateButton.Click += BuilderValidateButton_Click;
         BuilderSaveButton.Click += BuilderSaveButton_Click;
         BuilderSaveAsButton.Click += BuilderSaveAsButton_Click;
         BuilderBackToLibraryButton.Click += BuilderBackToLibraryButton_Click;
+        BuilderPreviousStepButton.Click += (_, _) => SelectAdjacentStep(-1);
+        BuilderNextStepButton.Click += (_, _) => SelectAdjacentStep(1);
         RenderSelectedStep();
     }
 
@@ -100,11 +116,13 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     internal void UpdateActionState(TemplatesBuilderActionState state)
     {
+        _canNavigateWorkflow = state.CanValidate;
         BuilderAddNetworkButton.IsEnabled = state.CanValidate;
         BuilderAddCredentialSlotButton.IsEnabled = state.CanValidate;
         BuilderAddForestButton.IsEnabled = state.CanValidate;
         BuilderAddDomainButton.IsEnabled = state.CanValidate;
         BuilderAddVmButton.IsEnabled = state.CanValidate;
+        BuilderAddVmFromNavButton.IsEnabled = state.CanValidate;
         BuilderApplySuggestionsButton.IsEnabled = state.CanApplySuggestions;
         BuilderValidateButton.IsEnabled = state.CanValidate;
         BuilderSaveButton.IsEnabled = state.CanSave;
@@ -116,6 +134,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderCredentialsStepButton.IsEnabled = state.CanValidate;
         BuilderVmsStepButton.IsEnabled = state.CanValidate;
         BuilderReviewStepButton.IsEnabled = state.CanValidate;
+        UpdateStepCommandState();
     }
 
     internal void UpdateConfirmationState(bool isSaveConfirmed)
@@ -136,8 +155,48 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         UpdateWorkingDraftFromVisibleControls();
         _selectedStep = step;
+        _isVmOverviewSelected = step == BuilderWorkflowStep.Vms;
         RenderSelectedStep();
         RenderDraftResources();
+    }
+
+    private void SelectVmOverview()
+    {
+        UpdateWorkingDraftFromVisibleControls();
+        _selectedStep = BuilderWorkflowStep.Vms;
+        _isVmOverviewSelected = true;
+        RenderSelectedStep();
+        RenderDraftResources();
+    }
+
+    private void SelectVmChild(int index)
+    {
+        UpdateWorkingDraftFromVisibleControls();
+        _selectedStep = BuilderWorkflowStep.Vms;
+        _selectedVmIndex = index;
+        _isVmOverviewSelected = false;
+        _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
+        RenderSelectedStep();
+        RenderDraftResources();
+    }
+
+    private void SelectVmDetailCategory(BuilderVmDetailCategory category)
+    {
+        UpdateWorkingDraftFromVisibleControls();
+        _selectedVmDetailCategory = category;
+        RenderSelectedVmDetail();
+    }
+
+    private void SelectAdjacentStep(int offset)
+    {
+        var currentIndex = Array.IndexOf(WorkflowStepOrder, _selectedStep);
+        var targetIndex = currentIndex + offset;
+        if (targetIndex < 0 || targetIndex >= WorkflowStepOrder.Length)
+        {
+            return;
+        }
+
+        SelectStep(WorkflowStepOrder[targetIndex]);
     }
 
     private void RenderSelectedStep()
@@ -148,6 +207,27 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderCredentialsSection.Visibility = _selectedStep == BuilderWorkflowStep.Credentials ? Visibility.Visible : Visibility.Collapsed;
         BuilderVmsSection.Visibility = _selectedStep == BuilderWorkflowStep.Vms ? Visibility.Visible : Visibility.Collapsed;
         BuilderReviewSection.Visibility = _selectedStep == BuilderWorkflowStep.Review ? Visibility.Visible : Visibility.Collapsed;
+        BuilderVmOverviewPanel.Visibility = _selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
+        BuilderSelectedVmDetailHost.Visibility = _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
+
+        RenderWorkflowTreeState();
+        UpdateStepCommandState();
+    }
+
+    private void RenderWorkflowTreeState()
+    {
+        ApplyNavButtonState(BuilderGeneralStepButton, _selectedStep == BuilderWorkflowStep.General);
+        ApplyNavButtonState(BuilderNetworksStepButton, _selectedStep == BuilderWorkflowStep.Networks);
+        ApplyNavButtonState(BuilderForestsDomainsStepButton, _selectedStep == BuilderWorkflowStep.ForestsDomains);
+        ApplyNavButtonState(BuilderCredentialsStepButton, _selectedStep == BuilderWorkflowStep.Credentials);
+        ApplyNavButtonState(BuilderVmsStepButton, _selectedStep == BuilderWorkflowStep.Vms);
+        ApplyNavButtonState(BuilderReviewStepButton, _selectedStep == BuilderWorkflowStep.Review);
+    }
+
+    private void UpdateStepCommandState()
+    {
+        BuilderPreviousStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.General;
+        BuilderNextStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.Review;
     }
 
     private void RenderDraftResources()
@@ -157,8 +237,32 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderSelectedNetworkDetail();
         RenderSelectedCredentialSlotDetail();
         RenderSelectedForestDomainDetail();
+        RenderVmOverview();
         RenderSelectedVmDetail();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
+    }
+
+    private void RenderVmOverview()
+    {
+        BuilderVmTotalCountTextBlock.Text = _draft.Vms.Count.ToString();
+        var standaloneCount = _draft.Vms.Count(vm => string.Equals(vm.MembershipMode, V2MembershipModeCatalog.Standalone, StringComparison.OrdinalIgnoreCase));
+        var domainMemberCount = _draft.Vms.Count(vm => string.Equals(vm.MembershipMode, V2MembershipModeCatalog.DomainMember, StringComparison.OrdinalIgnoreCase));
+        BuilderVmMembershipCountsTextBlock.Text = $"Standalone {standaloneCount} / Domain {domainMemberCount}";
+        BuilderVmAdDcCountTextBlock.Text = _draft.Vms.Count(vm => vm.IsActiveDirectoryDomainController).ToString();
+
+        BuilderVmOverviewListPanel.Children.Clear();
+        if (_draft.Vms.Count == 0)
+        {
+            BuilderVmOverviewListPanel.Children.Add(CreateEmptyDetailText("No VMs in this draft."));
+            return;
+        }
+
+        foreach (var vm in _draft.Vms)
+        {
+            var role = vm.IsActiveDirectoryDomainController ? ", AD DC" : string.Empty;
+            BuilderVmOverviewListPanel.Children.Add(CreateEmptyDetailText(
+                $"{FormatResourceName(vm.Name, vm.VmId)} - {FormatResourceName(vm.MembershipMode, V2MembershipModeCatalog.Standalone)}, {vm.Nics.Count} NICs{role}"));
+        }
     }
 
     private void RenderResourceLists()
@@ -166,7 +270,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderNetworkList();
         RenderCredentialSlotList();
         RenderForestDomainList();
-        RenderVmNameList();
+        RenderVmNavChildren();
     }
 
     private void RenderNetworkList()
@@ -247,23 +351,18 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
     }
 
-    private void RenderVmNameList()
+    private void RenderVmNavChildren()
     {
-        BuilderVmNameListPanel.Children.Clear();
+        BuilderVmNavChildrenPanel.Children.Clear();
         for (var i = 0; i < _draft.Vms.Count; i++)
         {
             var index = i;
             var vm = _draft.Vms[i];
-            BuilderVmNameListPanel.Children.Add(CreateResourceButton(
+            var button = CreateResourceButton(
                 FormatResourceName(vm.Name, vm.VmId),
-                index == _selectedVmIndex,
-                () =>
-                {
-                    UpdateWorkingDraftFromVisibleControls();
-                    _selectedVmIndex = index;
-                    RenderVmNameList();
-                    RenderSelectedVmDetail();
-                }));
+                _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected && index == _selectedVmIndex,
+                () => SelectVmChild(index));
+            BuilderVmNavChildrenPanel.Children.Add(button);
         }
     }
 
@@ -336,6 +435,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void RenderSelectedVmDetail()
     {
         BuilderSelectedVmDetailPanel.Children.Clear();
+        BuilderVmDetailCategoryNavPanel.Children.Clear();
         if (_draft.Vms.Count == 0)
         {
             BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText("No VM selected."));
@@ -343,40 +443,64 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         var vm = _draft.Vms[_selectedVmIndex];
-        BuilderSelectedVmDetailPanel.Children.Add(CreateRowTitle("Selected VM Detail"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Basics"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-            CreateTextBox("VM ID", "vm.VmId", vm.VmId),
-            CreateTextBox("Name", "vm.Name", vm.Name),
-            CreateTextBox("VHDX ID", "vm.VhdxId", vm.VhdxId)));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Compute"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-            CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb.ToString()),
-            CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount.ToString())));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Membership"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-            CreateComboBox("Membership", "vm.MembershipMode", vm.MembershipMode, V2MembershipModeCatalog.DomainMember, V2MembershipModeCatalog.Standalone),
-            CreateTextBox("Domain ID", "vm.DomainId", vm.DomainId)));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Roles"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateCheckBox("Active Directory Domain Controller", "vm.IsActiveDirectoryDomainController", vm.IsActiveDirectoryDomainController));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Networking"));
-        var addNicButton = new Button { Content = "Add NIC", Tag = _selectedVmIndex };
-        addNicButton.Click += BuilderAddNicButton_Click;
-        BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
-        var nicsPanel = new StackPanel { Spacing = 6, Tag = "vm.NicsPanel" };
-        foreach (var nic in vm.Nics)
-        {
-            nicsPanel.Children.Add(CreateNicRow(nic));
-        }
+        RenderVmDetailCategoryNav();
+        BuilderSelectedVmDetailPanel.Children.Add(CreateRowTitle($"Selected VM Detail: {FormatResourceName(vm.Name, vm.VmId)}"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead(GetVmDetailCategoryLabel(_selectedVmDetailCategory)));
 
-        BuilderSelectedVmDetailPanel.Children.Add(nicsPanel);
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead("Credentials"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-            CreateTextBox("Local Bootstrap Slot", "vm.LocalBootstrap", vm.CredentialSlots.LocalBootstrap),
-            CreateTextBox("Domain Admin Slot", "vm.DomainAdmin", vm.CredentialSlots.DomainAdmin),
-            CreateTextBox("Domain Join Slot", "vm.DomainJoin", vm.CredentialSlots.DomainJoin),
-            CreateTextBox("DSRM Slot", "vm.Dsrm", vm.CredentialSlots.Dsrm),
-            CreateTextBox("Parent Domain Admin Slot", "vm.ParentDomainAdmin", vm.CredentialSlots.ParentDomainAdmin)));
+        switch (_selectedVmDetailCategory)
+        {
+            case BuilderVmDetailCategory.Basics:
+                BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
+                    CreateTextBox("VM ID", "vm.VmId", vm.VmId),
+                    CreateTextBox("Name", "vm.Name", vm.Name)));
+                break;
+            case BuilderVmDetailCategory.Resources:
+                BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
+                    CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb.ToString()),
+                    CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount.ToString()),
+                    CreateTextBox("Base Disk / VHDX ID", "vm.VhdxId", vm.VhdxId)));
+                break;
+            case BuilderVmDetailCategory.Membership:
+                BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
+                    CreateComboBox("Membership", "vm.MembershipMode", vm.MembershipMode, V2MembershipModeCatalog.DomainMember, V2MembershipModeCatalog.Standalone),
+                    CreateTextBox("Domain ID", "vm.DomainId", vm.DomainId)));
+                break;
+            case BuilderVmDetailCategory.Roles:
+                BuilderSelectedVmDetailPanel.Children.Add(CreateCheckBox("Active Directory Domain Controller", "vm.IsActiveDirectoryDomainController", vm.IsActiveDirectoryDomainController));
+                break;
+            case BuilderVmDetailCategory.Networking:
+                var addNicButton = new Button { Content = "Add NIC", Tag = _selectedVmIndex };
+                addNicButton.Click += BuilderAddNicButton_Click;
+                BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
+                var nicsPanel = new StackPanel { Spacing = 6, Tag = "vm.NicsPanel" };
+                foreach (var nic in vm.Nics)
+                {
+                    nicsPanel.Children.Add(CreateNicRow(nic));
+                }
+
+                BuilderSelectedVmDetailPanel.Children.Add(nicsPanel);
+                break;
+            case BuilderVmDetailCategory.Credentials:
+                BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
+                    CreateTextBox("Local Bootstrap Slot", "vm.LocalBootstrap", vm.CredentialSlots.LocalBootstrap),
+                    CreateTextBox("Domain Admin Slot", "vm.DomainAdmin", vm.CredentialSlots.DomainAdmin),
+                    CreateTextBox("Domain Join Slot", "vm.DomainJoin", vm.CredentialSlots.DomainJoin),
+                    CreateTextBox("DSRM Slot", "vm.Dsrm", vm.CredentialSlots.Dsrm),
+                    CreateTextBox("Parent Domain Admin Slot", "vm.ParentDomainAdmin", vm.CredentialSlots.ParentDomainAdmin)));
+                break;
+        }
+    }
+
+    private void RenderVmDetailCategoryNav()
+    {
+        foreach (var category in Enum.GetValues<BuilderVmDetailCategory>())
+        {
+            var selectedCategory = category;
+            BuilderVmDetailCategoryNavPanel.Children.Add(CreateResourceButton(
+                GetVmDetailCategoryLabel(selectedCategory),
+                selectedCategory == _selectedVmDetailCategory,
+                () => SelectVmDetailCategory(selectedCategory)));
+        }
     }
 
     private StackPanel CreateNicRow(TemplatesBuilderNicDraft nic)
@@ -488,39 +612,63 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)
     {
+        if (_isVmOverviewSelected)
+        {
+            return draft;
+        }
+
         if (_selectedVmIndex < 0 ||
-            _selectedVmIndex >= draft.Vms.Count ||
-            FindDescendants<TextBox>(BuilderSelectedVmDetailPanel).All(textBox => !string.Equals(textBox.Tag as string, "vm.VmId", StringComparison.Ordinal)))
+            _selectedVmIndex >= draft.Vms.Count)
         {
             return draft;
         }
 
         var vms = draft.Vms.ToList();
-        vms[_selectedVmIndex] = ReadVm(BuilderSelectedVmDetailPanel);
+        var vm = vms[_selectedVmIndex];
+        vms[_selectedVmIndex] = _selectedVmDetailCategory switch
+        {
+            BuilderVmDetailCategory.Basics when HasTextBox(BuilderSelectedVmDetailPanel, "vm.VmId") => vm with
+            {
+                VmId = GetText(BuilderSelectedVmDetailPanel, "vm.VmId"),
+                Name = GetText(BuilderSelectedVmDetailPanel, "vm.Name")
+            },
+            BuilderVmDetailCategory.Resources when HasTextBox(BuilderSelectedVmDetailPanel, "vm.MemoryMb") => vm with
+            {
+                MemoryMb = ParsePositiveInt(GetText(BuilderSelectedVmDetailPanel, "vm.MemoryMb")),
+                CpuCount = ParsePositiveInt(GetText(BuilderSelectedVmDetailPanel, "vm.CpuCount")),
+                VhdxId = GetText(BuilderSelectedVmDetailPanel, "vm.VhdxId")
+            },
+            BuilderVmDetailCategory.Membership when HasComboBox(BuilderSelectedVmDetailPanel, "vm.MembershipMode") => vm with
+            {
+                MembershipMode = GetComboValue(BuilderSelectedVmDetailPanel, "vm.MembershipMode"),
+                DomainId = GetText(BuilderSelectedVmDetailPanel, "vm.DomainId")
+            },
+            BuilderVmDetailCategory.Roles when HasCheckBox(BuilderSelectedVmDetailPanel, "vm.IsActiveDirectoryDomainController") => vm with
+            {
+                IsActiveDirectoryDomainController = GetCheckBoxValue(BuilderSelectedVmDetailPanel, "vm.IsActiveDirectoryDomainController")
+            },
+            BuilderVmDetailCategory.Networking when HasNicsPanel(BuilderSelectedVmDetailPanel) => vm with
+            {
+                Nics = ReadNics(BuilderSelectedVmDetailPanel)
+            },
+            BuilderVmDetailCategory.Credentials when HasTextBox(BuilderSelectedVmDetailPanel, "vm.LocalBootstrap") => vm with
+            {
+                CredentialSlots = new TemplatesBuilderVmCredentialSlotDraft(
+                    GetText(BuilderSelectedVmDetailPanel, "vm.LocalBootstrap"),
+                    GetText(BuilderSelectedVmDetailPanel, "vm.DomainAdmin"),
+                    GetText(BuilderSelectedVmDetailPanel, "vm.DomainJoin"),
+                    GetText(BuilderSelectedVmDetailPanel, "vm.Dsrm"),
+                    GetText(BuilderSelectedVmDetailPanel, "vm.ParentDomainAdmin"))
+            },
+            _ => vm
+        };
         return draft with { Vms = vms };
     }
 
-    private TemplatesBuilderVmDraft ReadVm(DependencyObject root)
+    private List<TemplatesBuilderNicDraft> ReadNics(DependencyObject root)
     {
         var nicsPanel = FindDescendants<StackPanel>(root).FirstOrDefault(panel => string.Equals(panel.Tag as string, "vm.NicsPanel", StringComparison.Ordinal));
-        var nics = nicsPanel?.Children.OfType<StackPanel>().Select(ReadNic).ToList() ?? [];
-
-        return new TemplatesBuilderVmDraft(
-            GetText(root, "vm.VmId"),
-            GetText(root, "vm.Name"),
-            ParsePositiveInt(GetText(root, "vm.MemoryMb")),
-            ParsePositiveInt(GetText(root, "vm.CpuCount")),
-            GetText(root, "vm.VhdxId"),
-            GetComboValue(root, "vm.MembershipMode"),
-            GetText(root, "vm.DomainId"),
-            GetCheckBoxValue(root, "vm.IsActiveDirectoryDomainController"),
-            new TemplatesBuilderVmCredentialSlotDraft(
-                GetText(root, "vm.LocalBootstrap"),
-                GetText(root, "vm.DomainAdmin"),
-                GetText(root, "vm.DomainJoin"),
-                GetText(root, "vm.Dsrm"),
-                GetText(root, "vm.ParentDomainAdmin")),
-            nics);
+        return nicsPanel?.Children.OfType<StackPanel>().Select(ReadNic).ToList() ?? [];
     }
 
     private TemplatesBuilderNicDraft ReadNic(StackPanel row)
@@ -595,10 +743,11 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void BuilderAddVmButton_Click(object sender, RoutedEventArgs e)
     {
         var draft = CaptureDraft();
+        var nextVmNumber = FindNextVmNumber(draft.Vms);
         var vms = draft.Vms
             .Append(new TemplatesBuilderVmDraft(
-                $"vm-{draft.Vms.Count + 1}",
-                "new-vm",
+                $"vm-{nextVmNumber}",
+                $"VM {nextVmNumber}",
                 4096,
                 2,
                 string.Empty,
@@ -609,6 +758,9 @@ public sealed partial class TemplatesBuilderView : UserControl
                 []))
             .ToList();
         _selectedVmIndex = vms.Count - 1;
+        _selectedStep = BuilderWorkflowStep.Vms;
+        _isVmOverviewSelected = false;
+        _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
         RenderAndNotify(draft with { Vms = vms, IsSaveConfirmed = false });
     }
 
@@ -669,6 +821,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             SetSelectedProfile(_draft.DeploymentProfile);
             BuilderConfirmSaveCheckBox.IsChecked = _draft.IsSaveConfirmed;
             RenderDraftResources();
+            RenderSelectedStep();
         }
         finally
         {
@@ -687,6 +840,7 @@ public sealed partial class TemplatesBuilderView : UserControl
 
         UpdateWorkingDraftFromVisibleControls();
         RenderResourceLists();
+        RenderVmOverview();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
         DraftChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -696,6 +850,11 @@ public sealed partial class TemplatesBuilderView : UserControl
         _selectedNetworkIndex = ClampIndex(_selectedNetworkIndex, _draft.LabNetworks.Count);
         _selectedCredentialSlotIndex = ClampIndex(_selectedCredentialSlotIndex, _draft.CredentialSlots.Count);
         _selectedVmIndex = ClampIndex(_selectedVmIndex, _draft.Vms.Count);
+        if (_draft.Vms.Count == 0)
+        {
+            _isVmOverviewSelected = true;
+            _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
+        }
 
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count == 0 && _draft.Domains.Count > 0)
         {
@@ -788,9 +947,10 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         var button = new Button
         {
-            Content = isSelected ? $"> {content}" : content,
+            Content = content,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
+        ApplyNavButtonState(button, isSelected);
         button.Click += (_, _) => select();
         return button;
     }
@@ -868,6 +1028,18 @@ public sealed partial class TemplatesBuilderView : UserControl
     private static string GetText(DependencyObject root, string tag)
         => FindDescendants<TextBox>(root).FirstOrDefault(textBox => string.Equals(textBox.Tag as string, tag, StringComparison.Ordinal))?.Text ?? string.Empty;
 
+    private static bool HasTextBox(DependencyObject root, string tag)
+        => FindDescendants<TextBox>(root).Any(textBox => string.Equals(textBox.Tag as string, tag, StringComparison.Ordinal));
+
+    private static bool HasComboBox(DependencyObject root, string tag)
+        => FindDescendants<ComboBox>(root).Any(comboBox => string.Equals(comboBox.Tag as string, tag, StringComparison.Ordinal));
+
+    private static bool HasCheckBox(DependencyObject root, string tag)
+        => FindDescendants<CheckBox>(root).Any(checkBox => string.Equals(checkBox.Tag as string, tag, StringComparison.Ordinal));
+
+    private static bool HasNicsPanel(DependencyObject root)
+        => FindDescendants<StackPanel>(root).Any(panel => string.Equals(panel.Tag as string, "vm.NicsPanel", StringComparison.Ordinal));
+
     private static string GetComboValue(DependencyObject root, string tag)
     {
         var comboBox = FindDescendants<ComboBox>(root).FirstOrDefault(item => string.Equals(item.Tag as string, tag, StringComparison.Ordinal));
@@ -897,6 +1069,17 @@ public sealed partial class TemplatesBuilderView : UserControl
 
         comboBox.SelectedIndex = comboBox.Items.Count > 0 ? 0 : -1;
     }
+
+    private static void ApplyNavButtonState(Button button, bool isSelected)
+    {
+        button.Background = GetBrush(isSelected ? "ShellBackgroundBrush" : "ShellContentBackgroundBrush");
+        button.BorderBrush = GetBrush(isSelected ? "ShellAccentBrush" : "ShellBorderBrush");
+        button.BorderThickness = new Thickness(isSelected ? 2 : 1);
+        button.Foreground = GetBrush(isSelected ? "ShellAccentBrush" : "ShellTextPrimaryBrush");
+    }
+
+    private static Brush? GetBrush(string resourceKey)
+        => Application.Current.Resources[resourceKey] as Brush;
 
     private static IEnumerable<T> FindDescendants<T>(DependencyObject root)
         where T : DependencyObject
@@ -938,6 +1121,28 @@ public sealed partial class TemplatesBuilderView : UserControl
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .ToList();
 
+    private static int FindNextVmNumber(IReadOnlyList<TemplatesBuilderVmDraft> vms)
+    {
+        var largestNumber = 0;
+        foreach (var vm in vms)
+        {
+            largestNumber = Math.Max(largestNumber, ExtractTrailingVmNumber(vm.VmId, "vm-"));
+            largestNumber = Math.Max(largestNumber, ExtractTrailingVmNumber(vm.Name, "VM "));
+        }
+
+        return largestNumber + 1;
+    }
+
+    private static int ExtractTrailingVmNumber(string value, string prefix)
+    {
+        if (!value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        return int.TryParse(value[prefix.Length..].Trim(), out var number) ? number : 0;
+    }
+
     private static string BuildReviewSummary(TemplatesBuilderDraftSnapshot draft)
     {
         var dcCount = draft.Vms.Count(vm => vm.IsActiveDirectoryDomainController);
@@ -954,6 +1159,18 @@ public sealed partial class TemplatesBuilderView : UserControl
 
         return string.IsNullOrWhiteSpace(fallback) ? "(unnamed)" : fallback.Trim();
     }
+
+    private static string GetVmDetailCategoryLabel(BuilderVmDetailCategory category)
+        => category switch
+        {
+            BuilderVmDetailCategory.Basics => "Basics",
+            BuilderVmDetailCategory.Resources => "Resources",
+            BuilderVmDetailCategory.Membership => "Membership",
+            BuilderVmDetailCategory.Roles => "Roles",
+            BuilderVmDetailCategory.Networking => "Networking",
+            BuilderVmDetailCategory.Credentials => "Credentials",
+            _ => category.ToString()
+        };
 
     private static TemplatesBuilderDraftSnapshot CreateEmptyDraft()
         => new(
@@ -981,5 +1198,15 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         Forest,
         Domain
+    }
+
+    private enum BuilderVmDetailCategory
+    {
+        Basics,
+        Resources,
+        Membership,
+        Roles,
+        Networking,
+        Credentials
     }
 }

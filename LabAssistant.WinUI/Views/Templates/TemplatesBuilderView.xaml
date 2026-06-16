@@ -51,12 +51,32 @@
                     BorderBrush="{StaticResource ShellBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
-                    <StackPanel Spacing="6">
+                    <StackPanel x:Name="BuilderWorkflowTreePanel" Spacing="6">
                         <Button x:Name="BuilderGeneralStepButton" Content="General" HorizontalAlignment="Stretch" />
                         <Button x:Name="BuilderNetworksStepButton" Content="Networks" HorizontalAlignment="Stretch" />
                         <Button x:Name="BuilderForestsDomainsStepButton" Content="Forests &amp; Domains" HorizontalAlignment="Stretch" />
                         <Button x:Name="BuilderCredentialsStepButton" Content="Credentials" HorizontalAlignment="Stretch" />
-                        <Button x:Name="BuilderVmsStepButton" Content="VMs" HorizontalAlignment="Stretch" />
+                        <Grid x:Name="BuilderVmsNavRow" ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                x:Name="BuilderVmsStepButton"
+                                Grid.Column="0"
+                                Content="VMs"
+                                HorizontalAlignment="Stretch" />
+                            <Button
+                                x:Name="BuilderAddVmFromNavButton"
+                                Grid.Column="1"
+                                MinWidth="28"
+                                Padding="6,0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Content="+"
+                                ToolTipService.ToolTip="Add VM" />
+                        </Grid>
+                        <StackPanel x:Name="BuilderVmNavChildrenPanel" Margin="14,0,0,0" Spacing="4" />
                         <Button x:Name="BuilderReviewStepButton" Content="Review" HorizontalAlignment="Stretch" />
                     </StackPanel>
                 </Border>
@@ -182,16 +202,48 @@
                             CornerRadius="6"
                             Visibility="Collapsed">
                             <StackPanel Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="VMs" />
-                                    <Button x:Name="BuilderAddVmButton" Content="Add VM" />
+                                <StackPanel x:Name="BuilderVmOverviewPanel" Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="VM Overview" />
+                                        <Button x:Name="BuilderAddVmButton" Content="Add VM" />
+                                    </StackPanel>
+                                    <Grid ColumnSpacing="8" RowSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Padding="8" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="4">
+                                            <StackPanel>
+                                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Total VMs" />
+                                                <TextBlock x:Name="BuilderVmTotalCountTextBlock" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="0" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" Padding="8" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="4">
+                                            <StackPanel>
+                                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Membership" />
+                                                <TextBlock x:Name="BuilderVmMembershipCountsTextBlock" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Standalone 0 / Domain 0" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="2" Padding="8" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="4">
+                                            <StackPanel>
+                                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="AD DC Roles" />
+                                                <TextBlock x:Name="BuilderVmAdDcCountTextBlock" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="0" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                    <StackPanel x:Name="BuilderVmOverviewListPanel" Spacing="6" />
                                 </StackPanel>
-                                <Grid ColumnSpacing="10">
+
+                                <Grid
+                                    x:Name="BuilderSelectedVmDetailHost"
+                                    ColumnSpacing="10"
+                                    Visibility="Collapsed">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="150" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" x:Name="BuilderVmNameListPanel" Spacing="6" />
+                                    <StackPanel Grid.Column="0" x:Name="BuilderVmDetailCategoryNavPanel" Spacing="6" />
                                     <StackPanel Grid.Column="1" x:Name="BuilderSelectedVmDetailPanel" Spacing="8" />
                                 </Grid>
                             </StackPanel>
@@ -227,6 +279,8 @@
                     <Button x:Name="BuilderSaveButton" Content="Save" />
                     <Button x:Name="BuilderSaveAsButton" Content="Save As" />
                     <Button x:Name="BuilderBackToLibraryButton" Content="Back" />
+                    <Button x:Name="BuilderPreviousStepButton" Content="Previous" />
+                    <Button x:Name="BuilderNextStepButton" Content="Next" />
                 </StackPanel>
                 <TextBlock
                     x:Name="BuilderStatusTextBlock"
