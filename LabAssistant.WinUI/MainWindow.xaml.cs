@@ -24,6 +24,7 @@ using LabAssistant.WinUI.ViewModels.Diagnostics;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
+using LabAssistant.WinUI.ViewModels.Templates.Builder;
 using LabAssistant.WinUI.Views.Deploy;
 using LabAssistant.WinUI.Views.Machines;
 using LabAssistant.WinUI.Interop;
@@ -205,6 +206,13 @@ public sealed partial class MainWindow : Window
             forceRefresh => runtime?.EnsureLibraryAsync(forceRefresh) ?? Task.CompletedTask,
             forceRefresh => runtime?.LoadEditorReferenceDataAsync(forceRefresh)
                 ?? Task.FromResult(new TemplatesEditorReferenceData(Array.Empty<string>(), Array.Empty<TemplateVhdxCatalogOption>())));
+        var builderComposition = CreateTemplatesBuilderWorkspaceComposition(
+            () => runtime?.IsLoading ?? false,
+            isLoading => runtime?.SetLoading(isLoading),
+            () => runtime?.ApplyUiState(),
+            forceRefresh => runtime?.EnsureLibraryAsync(forceRefresh) ?? Task.CompletedTask,
+            forceRefresh => runtime?.LoadBuilderReferenceDataAsync(forceRefresh)
+                ?? Task.FromResult(new TemplatesBuilderReferenceData(Array.Empty<string>(), Array.Empty<TemplateVhdxCatalogOption>())));
         var shellBridge = CreateTemplatesWorkspaceShellBridge();
 
         async Task<IReadOnlyList<string>> loadAvailableVmSwitchesAsync()
@@ -242,6 +250,7 @@ public sealed partial class MainWindow : Window
             workspaceHost,
             libraryComposition,
             editorComposition,
+            builderComposition,
             shellBridge,
             loadAvailableVmSwitchesAsync,
             loadVhdxCatalogOptionsAsync,
@@ -264,6 +273,8 @@ public sealed partial class MainWindow : Window
             setTemplatesLoading,
             applyTemplatesWorkspaceUiState,
             showTemplateEditorAsync,
+            document => _templatesCapabilityRuntime?.ShowBuilderDocumentAsync(document) ?? Task.CompletedTask,
+            () => _templatesCapabilityRuntime?.CreateBuilderDraftAsync() ?? Task.CompletedTask,
             setTemplateEditorStatus,
             reconcileDeployTemplateSelection);
 
@@ -278,6 +289,8 @@ public sealed partial class MainWindow : Window
         Action<bool> setTemplatesLoading,
         Action applyTemplatesWorkspaceUiState,
         Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync,
+        Func<TemplateEditorDocument, Task> showTemplateBuilderAsync,
+        Func<Task> createTemplateBuilderDraftAsync,
         Action<string> setTemplateEditorStatus,
         Action<IReadOnlyList<TemplateLibraryItem>> reconcileDeployTemplateSelection)
     {
@@ -290,6 +303,8 @@ public sealed partial class MainWindow : Window
             setTemplatesLoading,
             applyTemplatesWorkspaceUiState,
             showTemplateEditorAsync,
+            showTemplateBuilderAsync,
+            createTemplateBuilderDraftAsync,
             setTemplateEditorStatus,
             pickTemplateFileForOpenAsync,
             pickTemplateFileForSaveAsync,
@@ -343,16 +358,62 @@ public sealed partial class MainWindow : Window
             navigateToLibrary);
     }
 
+    private TemplatesBuilderWorkspaceComposition CreateTemplatesBuilderWorkspaceComposition(
+        Func<bool> isTemplatesLoading,
+        Action<bool> setTemplatesLoading,
+        Action applyTemplatesWorkspaceUiState,
+        Func<bool, Task> ensureTemplatesLibraryAsync,
+        Func<bool, Task<TemplatesBuilderReferenceData>> loadReferenceDataAsync)
+    {
+        ITemplatesCapabilityService templatesCapabilityService = _templatesCapabilityService;
+        var view = TemplatesBuilderViewHost;
+        var host = CreateTemplatesBuilderWorkspaceHost(
+            isTemplatesLoading,
+            setTemplatesLoading,
+            applyTemplatesWorkspaceUiState,
+            ensureTemplatesLibraryAsync,
+            loadReferenceDataAsync);
+
+        return new TemplatesBuilderWorkspaceComposition(
+            templatesCapabilityService,
+            view,
+            host);
+    }
+
+    private TemplatesBuilderWorkspaceHost CreateTemplatesBuilderWorkspaceHost(
+        Func<bool> isTemplatesLoading,
+        Action<bool> setTemplatesLoading,
+        Action applyTemplatesWorkspaceUiState,
+        Func<bool, Task> ensureTemplatesLibraryAsync,
+        Func<bool, Task<TemplatesBuilderReferenceData>> loadReferenceDataAsync)
+    {
+        Func<string, Task<string?>> pickTemplateFileForSaveAsync = PickTemplateFileForSaveAsync;
+        Action navigateToBuilder = () => NavigateToRoute(ShellRouteKeys.TemplatesBuilder);
+        Action navigateToLibrary = () => NavigateToRoute(ShellRouteKeys.TemplatesLibrary);
+
+        return new TemplatesBuilderWorkspaceHost(
+            isTemplatesLoading,
+            setTemplatesLoading,
+            applyTemplatesWorkspaceUiState,
+            ensureTemplatesLibraryAsync,
+            loadReferenceDataAsync,
+            pickTemplateFileForSaveAsync,
+            navigateToBuilder,
+            navigateToLibrary);
+    }
+
     private TemplatesWorkspaceShellBridge CreateTemplatesWorkspaceShellBridge()
     {
         Func<bool> isTemplatesCapabilityActive = () => IsTemplatesCapabilityActive;
         Func<bool> isTemplatesLibraryActive = () => IsTemplatesLibraryActive;
         Func<bool> isTemplatesEditorActive = () => IsTemplatesEditorActive;
+        Func<bool> isTemplatesBuilderActive = () => IsTemplatesBuilderActive;
 
         return new TemplatesWorkspaceShellBridge(
             isTemplatesCapabilityActive,
             isTemplatesLibraryActive,
-            isTemplatesEditorActive);
+            isTemplatesEditorActive,
+            isTemplatesBuilderActive);
     }
 
     private DeployCapabilityRuntime CreateDeployCapabilityRuntime()
@@ -1059,6 +1120,9 @@ public sealed partial class MainWindow : Window
     private bool IsTemplatesEditorActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesEditor, StringComparison.Ordinal);
 
+    private bool IsTemplatesBuilderActive =>
+        string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesBuilder, StringComparison.Ordinal);
+
     private bool IsAssetsOverviewActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.AssetsOverview, StringComparison.Ordinal);
 
@@ -1072,7 +1136,7 @@ public sealed partial class MainWindow : Window
         IsAssetsOverviewActive || IsAssetsBaseDisksActive || IsAssetsSwitchesActive;
 
     private bool IsTemplatesCapabilityActive =>
-        IsTemplatesLibraryActive || IsTemplatesEditorActive;
+        IsTemplatesLibraryActive || IsTemplatesEditorActive || IsTemplatesBuilderActive;
 
     private bool IsSettingsMachinesActive =>
         string.Equals(_activeRouteKey, ShellRouteKeys.SettingsMachines, StringComparison.Ordinal);

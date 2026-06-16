@@ -31,6 +31,7 @@ public sealed class WinUIShellRegressionCoverageTests
         AssertRoute(shell, ShellRouteKeys.DeployFromTemplate, "deploy", "From Template");
         AssertRoute(shell, ShellRouteKeys.TemplatesLibrary, "templates", "Library");
         AssertRoute(shell, ShellRouteKeys.TemplatesEditor, "templates", "Editor");
+        AssertRoute(shell, ShellRouteKeys.TemplatesBuilder, "templates", "Builder");
         AssertRoute(shell, ShellRouteKeys.AssetsBaseDisks, "assets", "Base Disks");
         AssertRoute(shell, ShellRouteKeys.AssetsSwitches, "assets", "Virtual Switches");
         AssertRoute(shell, ShellRouteKeys.DiagnosticsLogs, "diagnostics", "Logs");

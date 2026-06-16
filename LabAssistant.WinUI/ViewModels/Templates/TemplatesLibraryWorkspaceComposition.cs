@@ -15,6 +15,10 @@ internal interface ITemplatesLibraryWorkspaceHost
 
     Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText);
 
+    Task ShowTemplateBuilderAsync(TemplateEditorDocument document);
+
+    Task CreateTemplateBuilderDraftAsync();
+
     void SetTemplateEditorStatus(string statusText);
 
     Task<string?> PickTemplateFileForOpenAsync();
@@ -32,6 +36,8 @@ internal sealed class TemplatesLibraryWorkspaceHost : ITemplatesLibraryWorkspace
     private readonly Action<bool> _setTemplatesLoading;
     private readonly Action _applyTemplatesWorkspaceUiState;
     private readonly Func<TemplateEditorDocument, string, Task> _showTemplateEditorAsync;
+    private readonly Func<TemplateEditorDocument, Task> _showTemplateBuilderAsync;
+    private readonly Func<Task> _createTemplateBuilderDraftAsync;
     private readonly Action<string> _setTemplateEditorStatus;
     private readonly Func<Task<string?>> _pickTemplateFileForOpenAsync;
     private readonly Func<string, Task<string?>> _pickTemplateFileForSaveAsync;
@@ -43,6 +49,8 @@ internal sealed class TemplatesLibraryWorkspaceHost : ITemplatesLibraryWorkspace
         Action<bool> setTemplatesLoading,
         Action applyTemplatesWorkspaceUiState,
         Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync,
+        Func<TemplateEditorDocument, Task> showTemplateBuilderAsync,
+        Func<Task> createTemplateBuilderDraftAsync,
         Action<string> setTemplateEditorStatus,
         Func<Task<string?>> pickTemplateFileForOpenAsync,
         Func<string, Task<string?>> pickTemplateFileForSaveAsync,
@@ -53,6 +61,8 @@ internal sealed class TemplatesLibraryWorkspaceHost : ITemplatesLibraryWorkspace
         _setTemplatesLoading = setTemplatesLoading;
         _applyTemplatesWorkspaceUiState = applyTemplatesWorkspaceUiState;
         _showTemplateEditorAsync = showTemplateEditorAsync;
+        _showTemplateBuilderAsync = showTemplateBuilderAsync;
+        _createTemplateBuilderDraftAsync = createTemplateBuilderDraftAsync;
         _setTemplateEditorStatus = setTemplateEditorStatus;
         _pickTemplateFileForOpenAsync = pickTemplateFileForOpenAsync;
         _pickTemplateFileForSaveAsync = pickTemplateFileForSaveAsync;
@@ -67,6 +77,10 @@ internal sealed class TemplatesLibraryWorkspaceHost : ITemplatesLibraryWorkspace
     public void ApplyTemplatesWorkspaceUiState() => _applyTemplatesWorkspaceUiState();
 
     public Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) => _showTemplateEditorAsync(document, statusText);
+
+    public Task ShowTemplateBuilderAsync(TemplateEditorDocument document) => _showTemplateBuilderAsync(document);
+
+    public Task CreateTemplateBuilderDraftAsync() => _createTemplateBuilderDraftAsync();
 
     public void SetTemplateEditorStatus(string statusText) => _setTemplateEditorStatus(statusText);
 
@@ -135,6 +149,8 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
         _view.ReloadRequested += TemplatesLibraryView_ReloadRequested;
         _view.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;
         _view.CreateTemplateRequested += TemplatesLibraryView_CreateTemplateRequested;
+        _view.OpenTemplateInBuilderRequested += TemplatesLibraryView_OpenTemplateInBuilderRequested;
+        _view.CreateBuilderTemplateRequested += TemplatesLibraryView_CreateBuilderTemplateRequested;
         _view.DeleteTemplateRequested += TemplatesLibraryView_DeleteTemplateRequested;
         _view.ImportTemplateRequested += TemplatesLibraryView_ImportTemplateRequested;
         _view.ExportTemplateRequested += TemplatesLibraryView_ExportTemplateRequested;
@@ -151,6 +167,10 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
     }
 
     Task ITemplatesLibraryWorkspaceControllerHost.ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) => _host.ShowTemplateEditorAsync(document, statusText);
+
+    Task ITemplatesLibraryWorkspaceControllerHost.ShowTemplateBuilderAsync(TemplateEditorDocument document) => _host.ShowTemplateBuilderAsync(document);
+
+    Task ITemplatesLibraryWorkspaceControllerHost.CreateTemplateBuilderDraftAsync() => _host.CreateTemplateBuilderDraftAsync();
 
     void ITemplatesLibraryWorkspaceControllerHost.SetTemplateEditorStatus(string statusText) => _host.SetTemplateEditorStatus(statusText);
 
@@ -197,6 +217,16 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
         await _controller.CreateTemplateAsync();
     }
 
+    private async void TemplatesLibraryView_OpenTemplateInBuilderRequested(object? sender, EventArgs e)
+    {
+        await _controller.OpenSelectedTemplateInBuilderAsync();
+    }
+
+    private async void TemplatesLibraryView_CreateBuilderTemplateRequested(object? sender, EventArgs e)
+    {
+        await _controller.CreateBuilderTemplateAsync();
+    }
+
     private async void TemplatesLibraryView_DeleteTemplateRequested(object? sender, EventArgs e)
     {
         await _controller.DeleteSelectedTemplateAsync();
@@ -223,6 +253,8 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
             CanReload: !isLoading,
             CanOpenTemplate: hasSelectedLibraryItem && !isLoading,
             CanCreateTemplate: !isLoading,
+            CanOpenTemplateInBuilder: _workspace.SelectedItem?.ExecutionEngine == TemplateExecutionEngine.V2UnifiedPlanning && !isLoading,
+            CanCreateBuilderTemplate: !isLoading,
             CanDeleteTemplate: hasSelectedLibraryItem && !isLoading,
             CanImportTemplate: !isLoading,
             CanExportTemplate: hasSelectedLibraryItem && !isLoading);

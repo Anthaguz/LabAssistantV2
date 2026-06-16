@@ -11,6 +11,7 @@ public static class ShellRouteKeys
     public const string DeployFromTemplate = "deploy.from_template";
     public const string TemplatesLibrary = "templates.library";
     public const string TemplatesEditor = "templates.editor";
+    public const string TemplatesBuilder = "templates.builder";
     public const string AssetsOverview = "assets.overview";
     public const string AssetsBaseDisks = "assets.base_disks";
     public const string AssetsSwitches = "assets.switches";
@@ -54,7 +55,8 @@ public sealed class ShellViewModel
                 isFooter: false,
                 [
                     new ShellSubview(ShellRouteKeys.TemplatesLibrary, "Library", ["Import", "Export"]),
-                    new ShellSubview(ShellRouteKeys.TemplatesEditor, "Editor", ["Save Draft", "Validate"])
+                    new ShellSubview(ShellRouteKeys.TemplatesEditor, "Editor", ["Save Draft", "Validate"]),
+                    new ShellSubview(ShellRouteKeys.TemplatesBuilder, "Builder", ["Save Draft", "Validate"])
                 ],
                 showChildRoutesInShell: false),
             new ShellCapability(

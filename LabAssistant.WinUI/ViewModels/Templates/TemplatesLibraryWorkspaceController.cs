@@ -13,6 +13,10 @@ internal interface ITemplatesLibraryWorkspaceControllerHost
 
     Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText);
 
+    Task ShowTemplateBuilderAsync(TemplateEditorDocument document);
+
+    Task CreateTemplateBuilderDraftAsync();
+
     void SetTemplateEditorStatus(string statusText);
 
     Task<string?> PickTemplateFileForOpenAsync();
@@ -154,6 +158,48 @@ internal sealed class TemplatesLibraryWorkspaceController
         }
     }
 
+    public async Task OpenSelectedTemplateInBuilderAsync()
+    {
+        if (_workspace.SelectedItem is null)
+        {
+            _workspace.SetStatus("Select a template first.");
+            _host.ApplyWorkspaceState();
+            return;
+        }
+
+        if (_workspace.SelectedItem.ExecutionEngine != TemplateExecutionEngine.V2UnifiedPlanning)
+        {
+            _workspace.SetStatus("Only V2 templates open in Builder. Use the current Editor for V1/simple/legacy templates.");
+            _host.ApplyWorkspaceState();
+            return;
+        }
+
+        var ownsLoadingState = !_host.IsTemplatesLoading;
+        if (ownsLoadingState)
+        {
+            _host.SetTemplatesLoading(true);
+        }
+
+        try
+        {
+            var document = await _templatesCapabilityService.LoadForEditorAsync(_workspace.SelectedItem.FilePath);
+            await _host.ShowTemplateBuilderAsync(document);
+        }
+        catch (Exception ex)
+        {
+            _workspace.SetStatus($"Failed to open V2 template in Builder. {ex.Message}");
+        }
+        finally
+        {
+            if (ownsLoadingState)
+            {
+                _host.SetTemplatesLoading(false);
+            }
+
+            _host.ApplyWorkspaceState();
+        }
+    }
+
     public async Task CreateTemplateAsync()
     {
         var ownsLoadingState = !_host.IsTemplatesLoading;
@@ -166,6 +212,29 @@ internal sealed class TemplatesLibraryWorkspaceController
         {
             var document = await _templatesCapabilityService.CreateDraftAsync();
             await _host.ShowTemplateEditorAsync(document, "New template draft created.");
+        }
+        finally
+        {
+            if (ownsLoadingState)
+            {
+                _host.SetTemplatesLoading(false);
+            }
+
+            _host.ApplyWorkspaceState();
+        }
+    }
+
+    public async Task CreateBuilderTemplateAsync()
+    {
+        var ownsLoadingState = !_host.IsTemplatesLoading;
+        if (ownsLoadingState)
+        {
+            _host.SetTemplatesLoading(true);
+        }
+
+        try
+        {
+            await _host.CreateTemplateBuilderDraftAsync();
         }
         finally
         {
