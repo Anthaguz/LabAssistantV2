@@ -156,13 +156,15 @@ The Templates V2 Builder is an authoring surface for producing planner-compatibl
 - Deploy From Template review and resolve
 - V2 orchestration planning
 
-The first Builder slice uses a structured resource-board workflow: Profile, Networks, Credentials, Forests & Domains, VMs, and Review. It authors schema/profile, lab networks, reusable credential slot references, forests/domains, VM membership mode, domain assignment, Active Directory Domain Controller VM role assignment, and per-VM NIC/IP/DNS/gateway intent. Deterministic suggestions may help populate those fields, but only explicit user-confirmed draft values become persisted template intent.
+The first Builder slice uses a structured step-based workflow with a left stepper and one active step at a time: General, Networks, Forests & Domains, Credentials, VMs, and Review. It is not an all-sections scroll. General authors template name, description, and deployment profile, and may show read-only schema/version metadata without renaming persisted schema fields. Deployment profile remains the Conservative/Balanced/Aggressive field. The Builder also authors lab networks, reusable credential slot references, forests/domains, VM membership mode, domain assignment, Active Directory Domain Controller VM role assignment, and per-VM NIC/IP/DNS/gateway intent. Networks, Forests & Domains, Credentials, and VMs use list plus selected-detail layouts; the VM list shows VM name only and selected VM detail is grouped into Basics, Compute, Membership, Roles, Networking, and Credentials. Deterministic suggestions may help populate those fields, but only explicit user-confirmed draft values become persisted template intent.
 
 The Builder must not use multiline pipe-delimited fields as V2 resource authoring controls. Matrix views may support review or comparison, but they are not the primary authoring UI.
 
+The Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, and Back. Save confirmation belongs in the Review step.
+
 Builder output hides backend `topologyRole` details while preserving planner compatibility. On save, ordered Active Directory Domain Controller role assignments map to the current backend fields, including each domain's derived `firstDomainControllerVmId`.
 
-Trust authoring is outside the first Builder slice. The existing trust runtime contract remains a planner/runtime capability for templates that already declare supported trust intent; existing trust declarations must be preserved when a V2 template is opened and saved by Builder. Adding first-class Builder trust authoring requires a later approved issue.
+Trust authoring is outside the first Builder slice. The existing trust runtime contract remains a planner/runtime capability for templates that already declare supported trust intent; existing trust declarations must be preserved when a V2 template is opened and saved by Builder, but they are deferred/read-only in Builder. Adding first-class Builder trust authoring requires a later approved issue.
 
 ## Directory Topology Contract
 
@@ -173,6 +175,8 @@ It may declare:
 - `forests`
 - `domains`
 - `trusts`
+
+Directory topology is optional for VM-only standalone templates. Zero domains plus standalone VMs is valid. Zero domains plus a `DomainMember` VM is invalid in this slice, and zero domains plus an Active Directory Domain Controller role VM is invalid in this slice. When domains are present, each domain must have at least one Active Directory Domain Controller role VM or save/planning validation blocks with actionable feedback.
 
 The current domain runtime executes root, child, tree, and additional independent root-forest domain creation paths. The first trust runtime slice is limited to bidirectional forest trusts between two LabAssistant-managed V2 domains/forests.
 

@@ -201,7 +201,7 @@ Domain declarations carry the durable identity and relationship fields used by t
 
 Supported `relationKind` values are `Root`, `Child`, and `Tree`.
 
-Each saved domain must have at least one VM assigned the Active Directory Domain Controller role. `firstDomainControllerVmId` is derived from the ordered Active Directory Domain Controller role assignments for that domain. PDC emulator/FSMO selection or transfer is out of scope for the Builder first slice.
+Directory topology is optional for V2 templates that contain only standalone VMs. A V2 template with zero domains and only `Standalone` VMs is valid. A V2 template with zero domains is invalid if any VM uses `DomainMember` membership mode or carries the Active Directory Domain Controller role. When domains are present, each saved domain must have at least one VM assigned the Active Directory Domain Controller role. `firstDomainControllerVmId` is derived from the ordered Active Directory Domain Controller role assignments for that domain. PDC emulator/FSMO selection or transfer is out of scope for the Builder first slice.
 
 Trust declarations persist durable intent using `trustId`, source/target domain references, trust type, and direction. The first executable trust slice is limited to bidirectional forest trusts between two LabAssistant-managed V2 domains/forests. External trusts, realm trusts, one-way directions, selective authentication details, SID-filter details, and unmanaged external domains remain unsupported and must block before runtime. The first slice uses existing per-domain domain-admin credential slots and does not add dedicated trust credential fields.
 
@@ -250,18 +250,21 @@ Reusable secret values remain a local-machine concern in the DPAPI-backed creden
 
 The Templates V2 Builder is the authoring workflow for V2 templates. It must preserve the current Templates Editor for V1/simple/legacy editing while producing V2 template output compatible with Deploy From Template review and V2 planning.
 
-The first Builder slice authors V2 intent through a structured resource-board workflow:
+The first Builder slice authors V2 intent through a structured step-based workflow with a left stepper and one active step at a time rather than an all-sections scroll:
 
-1. Profile
+1. General
 2. Networks
-3. Credentials
-4. Forests & Domains
+3. Forests & Domains
+4. Credentials
 5. VMs
 6. Review
 
+General contains template name, description, deployment profile, and read-only schema/version metadata if shown. This does not rename persisted schema/version fields. Deployment profile remains the Conservative/Balanced/Aggressive field.
+
 The first Builder slice may author:
 
-- schema/profile
+- template name and description
+- deployment profile
 - lab networks
 - credential slot references
 - forests/domains
@@ -270,9 +273,11 @@ The first Builder slice may author:
 - Active Directory Domain Controller VM role assignment
 - per-VM NIC/IP/DNS/gateway intent
 
+Networks, Forests & Domains, Credentials, and VMs use list plus selected-detail layouts. The VM list shows VM name only, and selected VM detail is grouped into Basics, Compute, Membership, Roles, Networking, and Credentials.
+
 The Builder must not use multiline pipe-delimited text fields as V2 resource authoring controls. Matrix views may support review or comparison, but they are not the primary authoring UI.
 
-Deterministic suggestions are allowed for these fields, but saved template output must reflect explicit user-confirmed draft intent. Builder save maps Active Directory Domain Controller role assignments to current backend topology fields and derives `firstDomainControllerVmId` from ordered DC assignments. Trust authoring is out of scope for the first Builder slice; existing trust declarations in opened V2 templates must be preserved on save, and future trust authoring requires a separate approved contract.
+Deterministic suggestions are allowed for these fields, but saved template output must reflect explicit user-confirmed draft intent. The Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, and Back, and Save confirmation belongs in the Review step. Builder save maps Active Directory Domain Controller role assignments to current backend topology fields and derives `firstDomainControllerVmId` from ordered DC assignments. Trust authoring is out of scope for the first Builder slice; existing trust declarations in opened V2 templates must be preserved on save as deferred/read-only intent, and future trust authoring requires a separate approved contract.
 
 ## Guest/Role Placeholder Sections
 

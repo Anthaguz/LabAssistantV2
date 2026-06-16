@@ -4623,7 +4623,7 @@ Each readiness result shall include, at minimum:
 - V2 topology complexity is not pushed into the current Templates Editor
 - selecting parent `Templates` still routes to `templates.library`
 
-### 2) Resource-board authoring order
+### 2) Step-based authoring order
 **Given**
 - the Builder opens a new or existing V2 template draft
 
@@ -4631,17 +4631,27 @@ Each readiness result shall include, at minimum:
 - the user progresses through first-slice authoring
 
 **Then**
-- the Builder presents a structured resource-board workflow ordered as:
-  - Profile
+- the Builder presents a structured step-based workflow ordered exactly as:
+  - General
   - Networks
-  - Credentials
   - Forests & Domains
+  - Credentials
   - VMs
   - Review
-- VM role and assignment choices are made with the selected profile, lab networks, credentials, and directory topology visible enough to validate the draft
-- the Builder does not require users to infer topology from per-VM rows alone
+- the Builder uses a left stepper and one active step at a time rather than an all-sections scroll
+- General contains template name, description, deployment profile, and read-only schema/version metadata if shown
+- deployment profile remains the Conservative/Balanced/Aggressive field
+- resource-heavy steps use a resource list plus selected-detail layout:
+  - Networks uses a network list plus selected network detail
+  - Forests & Domains uses a forest/domain list plus selected forest/domain detail
+  - Credentials uses a slot-reference list plus selected slot detail
+  - VMs uses a VM-name-only list plus selected VM detail
+- VM detail is grouped into Basics, Compute, Membership, Roles, Networking, and Credentials
+- VM role and assignment choices are made with lab networks, directory topology, credentials, and the selected deployment profile visible enough to validate the draft
 - the Builder does not use multiline pipe-delimited authoring fields
 - a matrix may support review or comparison, but it is not the primary authoring UI
+- the Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, and Back
+- Save confirmation is shown in the Review step
 
 ### 3) First-slice V2 fields
 **Given**
@@ -4651,7 +4661,7 @@ Each readiness result shall include, at minimum:
 - the Builder exposes first-slice authoring fields
 
 **Then**
-- the draft supports schema/profile selection
+- the draft supports General fields for template name, description, deployment profile, and read-only schema/version metadata if shown
 - the draft supports lab network authoring
 - the draft supports reusable credential slot references without exposing or storing reusable secret values
 - the draft supports forest/domain authoring
@@ -4662,7 +4672,11 @@ Each readiness result shall include, at minimum:
 - each VM can carry membership mode, domain assignment, and approved VM role intent
 - each VM can author per-NIC switch/network, IP, DNS, and gateway intent
 - unsupported or incomplete required combinations block save with actionable validation feedback
-- each saved domain must have at least one VM assigned the Active Directory Domain Controller role
+- zero domains plus standalone VMs is valid
+- zero domains plus a `DomainMember` VM is invalid in this slice
+- zero domains plus an Active Directory Domain Controller role VM is invalid in this slice
+- domains present plus each domain having at least one Active Directory Domain Controller role VM is valid
+- domains present plus any domain without an Active Directory Domain Controller role VM blocks save
 - PDC emulator/FSMO selection or transfer is out of scope
 
 ### 4) Deterministic suggestions require explicit confirmation before save
@@ -4717,14 +4731,17 @@ Each readiness result shall include, at minimum:
 **Then**
 - trust authoring UI is not required
 - the Builder first slice does not expose trust-specific fields or trust-specific credentials
-- existing trust declarations in an opened V2 template are preserved on save unless a later approved trust-authoring slice changes that contract
+- existing trust declarations in an opened V2 template are preserved on save as deferred/read-only intent unless a later approved trust-authoring slice changes that contract
 - future trust authoring requires a separate approved contract slice
 
 ## Expected UI
 - `templates.builder` or equivalent Templates-local route for V2 template authoring
 - `templates.library` remains the parent/default Templates route
 - `templates.editor` remains the V1/simple/legacy editing route
-- Builder presents the Profile, Networks, Credentials, Forests & Domains, VMs, Review resource-board workflow rather than a flat per-VM-only editor
+- Builder presents the General, Networks, Forests & Domains, Credentials, VMs, Review step-based workflow with a left stepper and one active step at a time
+- Builder presents a persistent command bar with Apply Suggestions, Validate, Save, Save As, and Back
+- Save confirmation lives in the Review step
+- Networks, Forests & Domains, Credentials, and VMs use list plus selected-detail layouts; the VM list shows VM names only
 - Builder does not rely on multiline pipe-delimited text fields for authoring V2 resources
 - a matrix is not the primary authoring UI
 - save action reflects explicit user-confirmed draft intent
@@ -4735,7 +4752,7 @@ Each readiness result shall include, at minimum:
 - Builder seam tests verify Builder state/orchestration/composition does not accumulate in `MainWindow`, shared Templates composition, or the current Editor
 - schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values, and that secrets remain in the local DPAPI-backed store
 - save/load tests verify existing trust declarations are preserved even though trust authoring is deferred
-- validation tests verify each saved domain requires at least one Active Directory Domain Controller VM role assignment and derives `firstDomainControllerVmId` from ordered DC assignments
+- validation tests verify VM-only standalone templates are valid, domain-dependent VMs require domains, each saved domain requires at least one Active Directory Domain Controller VM role assignment, and `firstDomainControllerVmId` is derived from ordered DC assignments
 - validation tests verify unconfirmed suggestions are not silently persisted and invalid required combinations block save
 - planner/review compatibility tests verify saved Builder output can feed Deploy From Template review and V2 planning
 
