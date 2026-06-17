@@ -310,6 +310,7 @@ public sealed class Issue755TemplatesV2BuilderTests
         var routeBody = ExtractMethodBody(builderSource, "private List<BuilderWorkflowRoute> BuildWorkflowRoutes()");
         var selectAdjacentBody = ExtractMethodBody(builderSource, "private void SelectAdjacentStep(int offset)");
         var selectRouteBody = ExtractMethodBody(builderSource, "private void SelectRoute(BuilderWorkflowRoute route)");
+        var selectVmRouteBody = ExtractMethodBody(builderSource, "private void SelectVmRoute(BuilderWorkflowRoute route)");
         var vmRowBody = ExtractMethodBody(builderSource, "private Grid CreateVmWorkflowNavRow()");
 
         Assert.Contains("new(BuilderWorkflowStep.General)", routeBody);
@@ -323,8 +324,14 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Review));", routeBody);
         Assert.Contains("UpdateWorkingDraftFromVisibleControls();", selectAdjacentBody);
         Assert.Contains("SelectRoute(routes[targetIndex]);", selectAdjacentBody);
-        Assert.Contains("_isVmOverviewSelected = route.Step == BuilderWorkflowStep.Vms && route.VmIndex < 0;", selectRouteBody);
-        Assert.Contains("_selectedVmDetailCategory = route.VmDetailCategory;", selectRouteBody);
+        Assert.Contains("if (route.Step == BuilderWorkflowStep.Vms)", selectRouteBody);
+        Assert.Contains("SelectVmRoute(route);", selectRouteBody);
+        Assert.DoesNotContain("RenderDraftResources();", selectVmRouteBody);
+        Assert.Contains("RenderVmOverview();", selectVmRouteBody);
+        Assert.Contains("RenderVmNavChildren();", selectVmRouteBody);
+        Assert.Contains("RenderSelectedVmDetail();", selectVmRouteBody);
+        Assert.Contains("UpdateFooterCommandState();", selectVmRouteBody);
+        Assert.Contains("_selectedVmDetailCategory = route.VmDetailCategory;", selectVmRouteBody);
         Assert.Contains("_selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected", vmRowBody);
         Assert.Equal("0", FindByName(builder, "BuilderSelectedVmDetailPanel").Attribute("Grid.Column")?.Value);
         Assert.Equal("1", FindByName(builder, "BuilderVmDetailCategoryNavPanel").Attribute("Grid.Column")?.Value);

@@ -198,16 +198,51 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void SelectRoute(BuilderWorkflowRoute route)
     {
-        _selectedStep = route.Step;
-        _isVmOverviewSelected = route.Step == BuilderWorkflowStep.Vms && route.VmIndex < 0;
-        if (route.Step == BuilderWorkflowStep.Vms && route.VmIndex >= 0)
+        if (route.Step == BuilderWorkflowStep.Vms)
         {
-            _selectedVmIndex = ClampIndex(route.VmIndex, _draft.Vms.Count);
-            _selectedVmDetailCategory = route.VmDetailCategory;
+            SelectVmRoute(route);
+            return;
         }
 
+        _selectedStep = route.Step;
+        _isVmOverviewSelected = false;
         RenderSelectedStep();
         RenderDraftResources();
+    }
+
+    private void SelectVmRoute(BuilderWorkflowRoute route)
+    {
+        var wasVmOverviewSelected = _selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected;
+        var wasVmDetailSelected = _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected;
+        var previousVmIndex = _selectedVmIndex;
+        _selectedStep = BuilderWorkflowStep.Vms;
+        if (route.VmIndex < 0)
+        {
+            _isVmOverviewSelected = true;
+            if (!wasVmOverviewSelected)
+            {
+                RenderSelectedStep();
+            }
+
+            RenderVmOverview();
+            UpdateFooterCommandState();
+            return;
+        }
+
+        _selectedVmIndex = ClampIndex(route.VmIndex, _draft.Vms.Count);
+        _isVmOverviewSelected = false;
+        _selectedVmDetailCategory = route.VmDetailCategory;
+        if (!wasVmDetailSelected)
+        {
+            RenderSelectedStep();
+        }
+        else if (previousVmIndex != _selectedVmIndex)
+        {
+            RenderVmNavChildren();
+        }
+
+        RenderSelectedVmDetail();
+        UpdateFooterCommandState();
     }
 
     private void RenderSelectedStep()
