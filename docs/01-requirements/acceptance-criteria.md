@@ -4645,7 +4645,9 @@ Each readiness result shall include, at minimum:
 - clicking `VMs` opens a compact VM overview
 - clicking a VM child opens that VM's detail editor on `Basics`
 - General contains template name, description, deployment profile, and read-only schema/version metadata if shown
-- deployment profile remains the Conservative/Balanced/Aggressive field
+- deployment profile appears as a visible horizontal Conservative/Balanced/Aggressive selector below description, not as a dropdown
+- deployment profile includes a Segoe MDL2 information tooltip that explains the user-facing speed versus host-pressure tradeoff
+- deployment profile remains the existing Conservative/Balanced/Aggressive persisted field
 - resource-heavy steps use a resource list plus selected-detail layout:
   - Networks uses a network list plus selected network detail
   - Forests & Domains uses a forest/domain list plus selected forest/domain detail
@@ -4687,6 +4689,7 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - the draft supports General fields for template name, description, deployment profile, and read-only schema/version metadata if shown
+- deployment profile is selected through visible horizontal Conservative/Balanced/Aggressive options with immediate draft update behavior
 - the draft supports lab network authoring
 - the draft supports reusable credential slot references without exposing or storing reusable secret values
 - the draft supports forest/domain authoring

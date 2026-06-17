@@ -68,31 +68,34 @@
                             BorderBrush="{StaticResource ShellBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="6">
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="2*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Spacing="6">
-                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="General" />
-                                    <TextBox x:Name="BuilderTemplateNameTextBox" Header="Template Name" PlaceholderText="Template name" />
-                                    <TextBox
-                                        x:Name="BuilderTemplateDescriptionTextBox"
-                                        Header="Description"
-                                        AcceptsReturn="True"
-                                        MinHeight="56"
-                                        MaxHeight="96"
-                                        TextWrapping="Wrap" />
+                            <StackPanel Spacing="8">
+                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="General" />
+                                <TextBox x:Name="BuilderTemplateNameTextBox" Header="Template Name" PlaceholderText="Template name" />
+                                <TextBox
+                                    x:Name="BuilderTemplateDescriptionTextBox"
+                                    Header="Description"
+                                    AcceptsReturn="True"
+                                    MinHeight="56"
+                                    MaxHeight="96"
+                                    TextWrapping="Wrap" />
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Deployment profile" />
+                                        <TextBlock
+                                            x:Name="BuilderDeploymentProfileInfoIcon"
+                                            AutomationProperties.Name="Deployment profile information"
+                                            FontFamily="Segoe MDL2 Assets"
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="&#xE946;"
+                                            ToolTipService.ToolTip="Chooses how aggressively LabAssistant should deploy this template.&#x0a;&#x0a;Conservative: takes smaller steps and waits more between operations. Best for slower hosts or when reliability matters more than speed.&#x0a;&#x0a;Balanced: recommended default pacing for most labs.&#x0a;&#x0a;Aggressive: starts more work in parallel to finish sooner. Best for powerful hosts, but can use more CPU, memory, disk, and network at once." />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Button x:Name="BuilderDeploymentProfileConservativeButton" Content="Conservative" />
+                                        <Button x:Name="BuilderDeploymentProfileBalancedButton" Content="Balanced" />
+                                        <Button x:Name="BuilderDeploymentProfileAggressiveButton" Content="Aggressive" />
+                                    </StackPanel>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="6">
-                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Deployment Profile" />
-                                    <ComboBox x:Name="BuilderDeploymentProfileComboBox">
-                                        <ComboBoxItem Content="Conservative" />
-                                        <ComboBoxItem Content="Balanced" />
-                                        <ComboBoxItem Content="Aggressive" />
-                                    </ComboBox>
-                                </StackPanel>
-                            </Grid>
+                            </StackPanel>
                         </Border>
 
                         <Border

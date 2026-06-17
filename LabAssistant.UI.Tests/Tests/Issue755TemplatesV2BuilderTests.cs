@@ -163,6 +163,34 @@ public sealed class Issue755TemplatesV2BuilderTests
     }
 
     [Fact]
+    public void TemplatesBuilderView_GeneralUsesVisibleDeploymentProfileSelector()
+    {
+        var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var builderXamlSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml")));
+
+        Assert.Null(FindByNameOrDefault(builder, "BuilderDeploymentProfileComboBox"));
+        Assert.Equal("Conservative", FindByName(builder, "BuilderDeploymentProfileConservativeButton").Attribute("Content")?.Value);
+        Assert.Equal("Balanced", FindByName(builder, "BuilderDeploymentProfileBalancedButton").Attribute("Content")?.Value);
+        Assert.Equal("Aggressive", FindByName(builder, "BuilderDeploymentProfileAggressiveButton").Attribute("Content")?.Value);
+
+        var infoIcon = FindByName(builder, "BuilderDeploymentProfileInfoIcon");
+        Assert.Equal("Segoe MDL2 Assets", infoIcon.Attribute("FontFamily")?.Value);
+        Assert.Equal("\uE946", infoIcon.Attribute("Text")?.Value);
+        Assert.Contains("Chooses how aggressively LabAssistant should deploy this template.", builderXamlSource);
+        Assert.Contains("Conservative: takes smaller steps", builderXamlSource);
+        Assert.Contains("Balanced: recommended default pacing", builderXamlSource);
+        Assert.Contains("Aggressive: starts more work in parallel", builderXamlSource);
+        Assert.Contains("AutomationProperties.Name=\"Deployment profile information\"", builderXamlSource);
+
+        Assert.Contains("ConfigureDeploymentProfileButton", builderSource);
+        Assert.Contains("BuilderDeploymentProfileButton_Click", builderSource);
+        Assert.Contains("SetSelectedProfile(profile);", builderSource);
+        Assert.Contains("NotifyDraftChanged((Button)sender);", builderSource);
+        Assert.DoesNotContain("BuilderDeploymentProfileComboBox", builderSource);
+    }
+
+    [Fact]
     public void TemplatesBuilderView_DraftEditsRefreshResourceLists_WithoutFullDetailRerender()
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
@@ -416,6 +444,26 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Equal("vm-dc01", domain.FirstDomainControllerVmId);
         Assert.Equal("DomainMember", dc.MembershipMode);
         Assert.DoesNotContain(template.VmTemplates, vm => vm.TopologyRole == "RootDomainController");
+    }
+
+    [Theory]
+    [InlineData("Conservative")]
+    [InlineData("Balanced")]
+    [InlineData("Aggressive")]
+    public void BuilderDraftMapper_PreservesDeploymentProfileValue(string deploymentProfile)
+    {
+        var draft = CreateConfirmedBuilderDraft() with { DeploymentProfile = deploymentProfile };
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft,
+            templateId: "template-v2-builder",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Empty(build.Errors);
+        var template = Assert.IsType<TemplateEditorDocument>(build.Document).Template;
+        Assert.Equal(deploymentProfile, template.DeploymentProfile);
     }
 
     [Fact]
