@@ -4662,6 +4662,8 @@ Each readiness result shall include, at minimum:
 - the Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next
 - Previous and Next are step-level controls only and move through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> Review
 - Previous is disabled on General, Next is disabled on Review, and neither control iterates through VM children
+- navigating between top-level steps, VM children, and VM detail categories does not lose draft edits
+- narrow VM/category navigation updates only the needed Builder state and does not require broad full-Builder rerendering
 - Save confirmation is shown in the Review step
 
 ### 3) First-slice V2 fields
@@ -4719,6 +4721,24 @@ Each readiness result shall include, at minimum:
 - saving requires explicit user confirmation of the resulting draft
 - the Builder does not persist hidden auto-allocation or unconfirmed inferred topology
 
+### 4a) Immediate in-memory draft updates
+**Given**
+- the user is editing a V2 Builder draft
+
+**When**
+- the user changes any first-slice field in General, Networks, Forests & Domains, Credentials, VM overview, or a VM detail category
+
+**Then**
+- the in-memory Builder draft is the active source of visible user intent during editing
+- field edits update the draft immediately, or through a short UI-safe debounce when appropriate
+- the Builder does not require a per-section or per-field Save button before the edited value becomes visible draft intent
+- invalid intermediate values remain visible and remain in draft state instead of being discarded
+- validation records errors and warnings against the current draft
+- blocking validation errors prevent final Save, export, and planning until resolved
+- navigation between top-level steps, VM children, and VM detail categories preserves the edited draft values
+- narrow VM/category navigation does not require broad full-Builder rerendering
+- final Save persists validated template JSON and still requires Review confirmation
+
 ### 5) Builder output remains deploy/planner compatible
 **Given**
 - the user saves a V2 template from Builder
@@ -4775,6 +4795,8 @@ Each readiness result shall include, at minimum:
 - Builder presents a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next
 - Previous/Next move only across top-level steps and do not iterate through VM children
 - Save confirmation lives in the Review step
+- field edits update the active in-memory Builder draft immediately or through a short UI-safe debounce, without per-section or per-field Save buttons
+- invalid intermediate values remain visible in draft state until validation and final Save/export/plan gating resolve them
 - Networks, Forests & Domains, and Credentials use list plus selected-detail layouts; VM editing happens through VM children under `VMs`, not a right-side selector list
 - Builder does not rely on multiline pipe-delimited text fields for authoring V2 resources
 - a matrix is not the primary authoring UI
@@ -4790,6 +4812,7 @@ Each readiness result shall include, at minimum:
 - save/load tests verify existing trust declarations are preserved even though trust authoring is deferred
 - validation tests verify VM-only standalone templates are valid, domain-dependent VMs require domains, each saved domain requires at least one Active Directory Domain Controller VM role assignment, and `firstDomainControllerVmId` is derived from ordered DC assignments
 - validation tests verify unconfirmed suggestions are not silently persisted and invalid required combinations block save
+- draft interaction tests verify immediate or debounced draft updates, invalid intermediate value retention, navigation edit preservation, and blocking-error gating for final Save/export/plan
 - planner/review compatibility tests verify saved Builder output can feed Deploy From Template review and V2 planning
 
 ## Open Questions / TBDs

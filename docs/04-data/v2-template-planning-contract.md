@@ -162,11 +162,13 @@ Previous and Next controls live in the Builder command area and move only across
 
 Networks, Forests & Domains, and Credentials use list plus selected-detail layouts. The `VMs` row expands to show VM child items by VM name and includes a small borderless right-aligned `+` button. Clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list. Clicking a VM child opens that VM detail on `Basics`. New VM drafts use neutral incrementing names from the existing draft set, such as `vm-1` / `VM 1`, `vm-2` / `VM 2`, and so on; after adding a VM, the Builder selects the new VM child and opens `Basics`. Selected VM detail has an internal left mini-nav: Basics, Resources, Membership, Roles, Networking, and Credentials. Resources contains RAM, CPU, and base disk/VHDX fields. Networking owns NIC list/detail; NICs do not become global left-nav children. The previous right-side VM selector list is not part of the Builder contract.
 
+During Builder editing, the in-memory Builder draft is the active source of visible user intent. Field edits update that draft immediately, or through a short UI-safe debounce when appropriate, and the Builder must not require per-section or per-field Save buttons. Invalid intermediate values remain visible and remain in draft state instead of being discarded. Validation records errors and warnings against the draft; blocking errors prevent final Save, export, and planning until resolved. Navigation between top-level steps, VM children, and VM detail categories must preserve edits, and narrow VM/category navigation should not require broad full-Builder rerendering.
+
 Deterministic suggestions may help populate those fields, but only explicit user-confirmed draft values become persisted template intent.
 
 The Builder must not use multiline pipe-delimited fields as V2 resource authoring controls. Matrix views may support review or comparison, but they are not the primary authoring UI.
 
-The Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next. Save confirmation belongs in the Review step.
+The Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next. Save confirmation belongs in the Review step, and final Save persists validated template JSON.
 
 Builder output hides backend `topologyRole` details while preserving planner compatibility. On save, ordered Active Directory Domain Controller role assignments map to the current backend fields, including each domain's derived `firstDomainControllerVmId`.
 
