@@ -33,6 +33,14 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderWorkflowStep.Review
     ];
 
+    private const string BuilderSelectedNavStateTag = "BuilderNavSelected";
+    private const string ButtonBackgroundPointerOverResource = "ButtonBackgroundPointerOver";
+    private const string ButtonBackgroundPressedResource = "ButtonBackgroundPressed";
+    private const string ButtonBorderBrushPointerOverResource = "ButtonBorderBrushPointerOver";
+    private const string ButtonBorderBrushPressedResource = "ButtonBorderBrushPressed";
+    private const string ButtonForegroundPointerOverResource = "ButtonForegroundPointerOver";
+    private const string ButtonForegroundPressedResource = "ButtonForegroundPressed";
+
     private bool _isUpdatingDraft;
     private bool _canNavigateWorkflow;
     private BuilderWorkflowStep _selectedStep = BuilderWorkflowStep.General;
@@ -171,18 +179,17 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void SelectVmChild(int index)
     {
-        UpdateWorkingDraftFromVisibleControls();
         _selectedStep = BuilderWorkflowStep.Vms;
         _selectedVmIndex = index;
         _isVmOverviewSelected = false;
         _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
         RenderSelectedStep();
-        RenderDraftResources();
+        RenderVmNavChildren();
+        RenderSelectedVmDetail();
     }
 
     private void SelectVmDetailCategory(BuilderVmDetailCategory category)
     {
-        UpdateWorkingDraftFromVisibleControls();
         _selectedVmDetailCategory = category;
         RenderSelectedVmDetail();
     }
@@ -684,17 +691,17 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void BuilderDraftControl_Changed(object sender, TextChangedEventArgs e)
     {
-        NotifyDraftChanged();
+        NotifyDraftChanged(sender);
     }
 
     private void BuilderSelectionControl_Changed(object sender, SelectionChangedEventArgs e)
     {
-        NotifyDraftChanged();
+        NotifyDraftChanged(sender);
     }
 
     private void BuilderConfirmSaveCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        NotifyDraftChanged();
+        NotifyDraftChanged(sender);
     }
 
     private void BuilderAddNetworkButton_Click(object sender, RoutedEventArgs e)
@@ -831,18 +838,59 @@ public sealed partial class TemplatesBuilderView : UserControl
         DraftChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void NotifyDraftChanged()
+    private void NotifyDraftChanged(object sender)
     {
         if (_isUpdatingDraft)
         {
             return;
         }
 
-        UpdateWorkingDraftFromVisibleControls();
+        UpdateWorkingDraftFromChangedControl(sender);
         RenderResourceLists();
         RenderVmOverview();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
         DraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void UpdateWorkingDraftFromChangedControl(object sender)
+    {
+        if (_isUpdatingDraft)
+        {
+            return;
+        }
+
+        _draft = _draft with
+        {
+            TemplateName = BuilderTemplateNameTextBox.Text,
+            TemplateDescription = BuilderTemplateDescriptionTextBox.Text,
+            DeploymentProfile = GetSelectedProfile(),
+            IsSaveConfirmed = BuilderConfirmSaveCheckBox.IsChecked == true
+        };
+
+        if (sender is not FrameworkElement element ||
+            element.Tag is not string tag)
+        {
+            return;
+        }
+
+        if (tag.StartsWith("network.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedNetwork(_draft);
+        }
+        else if (tag.StartsWith("credential.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedCredentialSlot(_draft);
+        }
+        else if (tag.StartsWith("forest.", StringComparison.Ordinal) ||
+                 tag.StartsWith("domain.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedForestOrDomain(_draft);
+        }
+        else if (tag.StartsWith("vm.", StringComparison.Ordinal) ||
+                 tag.StartsWith("nic.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedVm(_draft);
+        }
     }
 
     private void EnsureSelectedResourcesInBounds()
@@ -1076,6 +1124,38 @@ public sealed partial class TemplatesBuilderView : UserControl
         button.BorderBrush = GetBrush(isSelected ? "ShellAccentBrush" : "ShellBorderBrush");
         button.BorderThickness = new Thickness(isSelected ? 2 : 1);
         button.Foreground = GetBrush(isSelected ? "ShellAccentBrush" : "ShellTextPrimaryBrush");
+        button.Tag = isSelected ? BuilderSelectedNavStateTag : null;
+        ApplyNavHoverState(button, isSelected);
+    }
+
+    private static void ApplyNavHoverState(Button button, bool isSelected)
+    {
+        if (!isSelected)
+        {
+            ClearNavHoverState(button);
+            return;
+        }
+
+        var selectedBackground = GetBrush("ShellBackgroundBrush");
+        var selectedBorder = GetBrush("ShellAccentBrush");
+        var selectedForeground = GetBrush("ShellAccentBrush");
+
+        button.Resources[ButtonBackgroundPointerOverResource] = selectedBackground;
+        button.Resources[ButtonBackgroundPressedResource] = selectedBackground;
+        button.Resources[ButtonBorderBrushPointerOverResource] = selectedBorder;
+        button.Resources[ButtonBorderBrushPressedResource] = selectedBorder;
+        button.Resources[ButtonForegroundPointerOverResource] = selectedForeground;
+        button.Resources[ButtonForegroundPressedResource] = selectedForeground;
+    }
+
+    private static void ClearNavHoverState(Button button)
+    {
+        button.Resources.Remove(ButtonBackgroundPointerOverResource);
+        button.Resources.Remove(ButtonBackgroundPressedResource);
+        button.Resources.Remove(ButtonBorderBrushPointerOverResource);
+        button.Resources.Remove(ButtonBorderBrushPressedResource);
+        button.Resources.Remove(ButtonForegroundPointerOverResource);
+        button.Resources.Remove(ButtonForegroundPressedResource);
     }
 
     private static Brush? GetBrush(string resourceKey)
@@ -1113,7 +1193,14 @@ public sealed partial class TemplatesBuilderView : UserControl
         => int.TryParse(value, out var parsed) ? parsed : 0;
 
     private static int? ParseNullableInt(string value)
-        => int.TryParse(value, out var parsed) ? parsed : null;
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return int.TryParse(value, out var parsed) ? parsed : -1;
+    }
 
     private static IReadOnlyList<string> SplitList(string value)
         => value
