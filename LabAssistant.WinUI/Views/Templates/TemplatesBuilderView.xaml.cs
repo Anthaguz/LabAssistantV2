@@ -33,6 +33,14 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderWorkflowStep.Review
     ];
 
+    private const string BuilderSelectedNavStateTag = "BuilderNavSelected";
+    private const string ButtonBackgroundPointerOverResource = "ButtonBackgroundPointerOver";
+    private const string ButtonBackgroundPressedResource = "ButtonBackgroundPressed";
+    private const string ButtonBorderBrushPointerOverResource = "ButtonBorderBrushPointerOver";
+    private const string ButtonBorderBrushPressedResource = "ButtonBorderBrushPressed";
+    private const string ButtonForegroundPointerOverResource = "ButtonForegroundPointerOver";
+    private const string ButtonForegroundPressedResource = "ButtonForegroundPressed";
+
     private bool _isUpdatingDraft;
     private bool _canNavigateWorkflow;
     private BuilderWorkflowStep _selectedStep = BuilderWorkflowStep.General;
@@ -171,18 +179,17 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void SelectVmChild(int index)
     {
-        UpdateWorkingDraftFromVisibleControls();
         _selectedStep = BuilderWorkflowStep.Vms;
         _selectedVmIndex = index;
         _isVmOverviewSelected = false;
         _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
         RenderSelectedStep();
-        RenderDraftResources();
+        RenderVmNavChildren();
+        RenderSelectedVmDetail();
     }
 
     private void SelectVmDetailCategory(BuilderVmDetailCategory category)
     {
-        UpdateWorkingDraftFromVisibleControls();
         _selectedVmDetailCategory = category;
         RenderSelectedVmDetail();
     }
@@ -456,8 +463,8 @@ public sealed partial class TemplatesBuilderView : UserControl
                 break;
             case BuilderVmDetailCategory.Resources:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-                    CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb.ToString()),
-                    CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount.ToString()),
+                    CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb),
+                    CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount),
                     CreateTextBox("Base Disk / VHDX ID", "vm.VhdxId", vm.VhdxId)));
                 break;
             case BuilderVmDetailCategory.Membership:
@@ -513,7 +520,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             CreateTextBox("Network ID", "nic.NetworkId", nic.NetworkId),
             CreateTextBox("Switch", "nic.SwitchName", nic.SwitchName),
             CreateTextBox("IP Address", "nic.IpAddress", nic.IpAddress),
-            CreateTextBox("Prefix", "nic.PrefixLength", nic.PrefixLength?.ToString() ?? string.Empty),
+            CreateTextBox("Prefix", "nic.PrefixLength", nic.PrefixLength),
             CreateTextBox("Gateway", "nic.DefaultGateway", nic.DefaultGateway),
             CreateTextBox("DNS Servers", "nic.DnsServers", string.Join(", ", nic.DnsServers))));
         return row;
@@ -634,8 +641,8 @@ public sealed partial class TemplatesBuilderView : UserControl
             },
             BuilderVmDetailCategory.Resources when HasTextBox(BuilderSelectedVmDetailPanel, "vm.MemoryMb") => vm with
             {
-                MemoryMb = ParsePositiveInt(GetText(BuilderSelectedVmDetailPanel, "vm.MemoryMb")),
-                CpuCount = ParsePositiveInt(GetText(BuilderSelectedVmDetailPanel, "vm.CpuCount")),
+                MemoryMb = GetText(BuilderSelectedVmDetailPanel, "vm.MemoryMb"),
+                CpuCount = GetText(BuilderSelectedVmDetailPanel, "vm.CpuCount"),
                 VhdxId = GetText(BuilderSelectedVmDetailPanel, "vm.VhdxId")
             },
             BuilderVmDetailCategory.Membership when HasComboBox(BuilderSelectedVmDetailPanel, "vm.MembershipMode") => vm with
@@ -678,23 +685,23 @@ public sealed partial class TemplatesBuilderView : UserControl
             GetText(row, "nic.NetworkId"),
             GetText(row, "nic.SwitchName"),
             GetText(row, "nic.IpAddress"),
-            ParseNullableInt(GetText(row, "nic.PrefixLength")),
+            GetText(row, "nic.PrefixLength"),
             GetText(row, "nic.DefaultGateway"),
             SplitList(GetText(row, "nic.DnsServers")));
 
     private void BuilderDraftControl_Changed(object sender, TextChangedEventArgs e)
     {
-        NotifyDraftChanged();
+        NotifyDraftChanged(sender);
     }
 
     private void BuilderSelectionControl_Changed(object sender, SelectionChangedEventArgs e)
     {
-        NotifyDraftChanged();
+        NotifyDraftChanged(sender);
     }
 
     private void BuilderConfirmSaveCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        NotifyDraftChanged();
+        NotifyDraftChanged(sender);
     }
 
     private void BuilderAddNetworkButton_Click(object sender, RoutedEventArgs e)
@@ -748,8 +755,8 @@ public sealed partial class TemplatesBuilderView : UserControl
             .Append(new TemplatesBuilderVmDraft(
                 $"vm-{nextVmNumber}",
                 $"VM {nextVmNumber}",
-                4096,
-                2,
+                "4096",
+                "2",
                 string.Empty,
                 V2MembershipModeCatalog.Standalone,
                 string.Empty,
@@ -780,7 +787,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         var vms = draft.Vms.ToList();
         var vm = vms[vmIndex];
         var nics = vm.Nics.ToList();
-        nics.Add(new TemplatesBuilderNicDraft($"nic-{nics.Count + 1}", "Lab", draft.LabNetworks.FirstOrDefault().NetworkId, string.Empty, string.Empty, null, string.Empty, []));
+        nics.Add(new TemplatesBuilderNicDraft($"nic-{nics.Count + 1}", "Lab", draft.LabNetworks.FirstOrDefault().NetworkId, string.Empty, string.Empty, string.Empty, string.Empty, []));
         vms[vmIndex] = vm with { Nics = nics };
         RenderAndNotify(draft with { Vms = vms, IsSaveConfirmed = false });
     }
@@ -831,18 +838,59 @@ public sealed partial class TemplatesBuilderView : UserControl
         DraftChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void NotifyDraftChanged()
+    private void NotifyDraftChanged(object sender)
     {
         if (_isUpdatingDraft)
         {
             return;
         }
 
-        UpdateWorkingDraftFromVisibleControls();
+        UpdateWorkingDraftFromChangedControl(sender);
         RenderResourceLists();
         RenderVmOverview();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
         DraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void UpdateWorkingDraftFromChangedControl(object sender)
+    {
+        if (_isUpdatingDraft)
+        {
+            return;
+        }
+
+        _draft = _draft with
+        {
+            TemplateName = BuilderTemplateNameTextBox.Text,
+            TemplateDescription = BuilderTemplateDescriptionTextBox.Text,
+            DeploymentProfile = GetSelectedProfile(),
+            IsSaveConfirmed = BuilderConfirmSaveCheckBox.IsChecked == true
+        };
+
+        if (sender is not FrameworkElement element ||
+            element.Tag is not string tag)
+        {
+            return;
+        }
+
+        if (tag.StartsWith("network.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedNetwork(_draft);
+        }
+        else if (tag.StartsWith("credential.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedCredentialSlot(_draft);
+        }
+        else if (tag.StartsWith("forest.", StringComparison.Ordinal) ||
+                 tag.StartsWith("domain.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedForestOrDomain(_draft);
+        }
+        else if (tag.StartsWith("vm.", StringComparison.Ordinal) ||
+                 tag.StartsWith("nic.", StringComparison.Ordinal))
+        {
+            _draft = UpdateSelectedVm(_draft);
+        }
     }
 
     private void EnsureSelectedResourcesInBounds()
@@ -1076,6 +1124,38 @@ public sealed partial class TemplatesBuilderView : UserControl
         button.BorderBrush = GetBrush(isSelected ? "ShellAccentBrush" : "ShellBorderBrush");
         button.BorderThickness = new Thickness(isSelected ? 2 : 1);
         button.Foreground = GetBrush(isSelected ? "ShellAccentBrush" : "ShellTextPrimaryBrush");
+        button.Tag = isSelected ? BuilderSelectedNavStateTag : null;
+        ApplyNavHoverState(button, isSelected);
+    }
+
+    private static void ApplyNavHoverState(Button button, bool isSelected)
+    {
+        if (!isSelected)
+        {
+            ClearNavHoverState(button);
+            return;
+        }
+
+        var selectedBackground = GetBrush("ShellBackgroundBrush");
+        var selectedBorder = GetBrush("ShellAccentBrush");
+        var selectedForeground = GetBrush("ShellAccentBrush");
+
+        button.Resources[ButtonBackgroundPointerOverResource] = selectedBackground;
+        button.Resources[ButtonBackgroundPressedResource] = selectedBackground;
+        button.Resources[ButtonBorderBrushPointerOverResource] = selectedBorder;
+        button.Resources[ButtonBorderBrushPressedResource] = selectedBorder;
+        button.Resources[ButtonForegroundPointerOverResource] = selectedForeground;
+        button.Resources[ButtonForegroundPressedResource] = selectedForeground;
+    }
+
+    private static void ClearNavHoverState(Button button)
+    {
+        button.Resources.Remove(ButtonBackgroundPointerOverResource);
+        button.Resources.Remove(ButtonBackgroundPressedResource);
+        button.Resources.Remove(ButtonBorderBrushPointerOverResource);
+        button.Resources.Remove(ButtonBorderBrushPressedResource);
+        button.Resources.Remove(ButtonForegroundPointerOverResource);
+        button.Resources.Remove(ButtonForegroundPressedResource);
     }
 
     private static Brush? GetBrush(string resourceKey)
@@ -1108,12 +1188,6 @@ public sealed partial class TemplatesBuilderView : UserControl
 
         return Math.Clamp(index, 0, count - 1);
     }
-
-    private static int ParsePositiveInt(string value)
-        => int.TryParse(value, out var parsed) ? parsed : 0;
-
-    private static int? ParseNullableInt(string value)
-        => int.TryParse(value, out var parsed) ? parsed : null;
 
     private static IReadOnlyList<string> SplitList(string value)
         => value

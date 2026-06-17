@@ -52,8 +52,8 @@ internal readonly record struct TemplatesBuilderVmCredentialSlotDraft(
 internal readonly record struct TemplatesBuilderVmDraft(
     string VmId,
     string Name,
-    int MemoryMb,
-    int CpuCount,
+    string MemoryMb,
+    string CpuCount,
     string VhdxId,
     string MembershipMode,
     string DomainId,
@@ -67,7 +67,7 @@ internal readonly record struct TemplatesBuilderNicDraft(
     string NetworkId,
     string SwitchName,
     string IpAddress,
-    int? PrefixLength,
+    string PrefixLength,
     string DefaultGateway,
     IReadOnlyList<string> DnsServers);
 
