@@ -4652,19 +4652,31 @@ Each readiness result shall include, at minimum:
   - Credentials uses a slot-reference list plus selected slot detail
 - the VMs overview shows total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
 - editing a VM happens by selecting a VM child in the workflow tree, not by using a right-side VM selector list
-- selected VM detail has an internal left mini-nav: Basics, Resources, Membership, Roles, Networking, and Credentials
+- selected VM detail has an internal right mini-nav: Basics, Resources, Membership, Roles, Networking, and Credentials
 - selecting a VM opens Basics by default
 - Resources contains RAM, CPU, and base disk/VHDX fields
 - Networking owns NIC list/detail; NICs do not become global left-nav children
 - VM role and assignment choices are made with lab networks, directory topology, credentials, and the selected deployment profile visible enough to validate the draft
 - the Builder does not use multiline pipe-delimited authoring fields
 - a matrix may support review or comparison, but it is not the primary authoring UI
-- the Builder exposes a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next
-- Previous and Next are step-level controls only and move through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> Review
-- Previous is disabled on General, Next is disabled on Review, and neither control iterates through VM children
+- the Builder exposes a persistent footer command area
+- Back is a left secondary action
+- during authoring steps, the footer right side exposes Previous as a secondary action and Next as the primary action
+- on Review, the footer right side exposes Previous as a secondary action, Save As as a secondary action, and Save as the primary action
+- Apply Suggestions and manual Validate are not footer actions in this contract
+- Save and Save As are Review-only actions
+- Previous and Next compute routes through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> every VM category in draft order (Basics, Resources, Membership, Roles, Networking, Credentials) -> Review
+- Previous is disabled on General and Next is disabled on Review
+- Previous and Next do not block on validation errors before Review
+- when the draft has zero VMs, Next from VMs overview goes to Review
 - navigating between top-level steps, VM children, and VM detail categories does not lose draft edits
 - narrow VM/category navigation updates only the needed Builder state and does not require broad full-Builder rerendering
-- Save confirmation is shown in the Review step
+- top-level workflow rows are active for non-VM steps
+- the VM child is active while editing a VM
+- the selected VM category is active only in the right mini-nav
+- direct workflow-tree clicks remain supported
+- Review plus Save is the confirmation; there is no separate Review confirmation checkbox
+- Review shows a blocker when at least one VM is required before Save
 
 ### 3) First-slice V2 fields
 **Given**
@@ -4707,6 +4719,7 @@ Each readiness result shall include, at minimum:
 - the Builder selects the new VM child
 - the selected VM detail opens on `Basics`
 - adding a VM does not introduce NICs as global workflow-tree children
+- direct Add VM actions select the new VM and open `Basics`
 
 ### 4) Deterministic suggestions require explicit confirmation before save
 **Given**
@@ -4733,11 +4746,13 @@ Each readiness result shall include, at minimum:
 - field edits update the draft immediately, or through a short UI-safe debounce when appropriate
 - the Builder does not require a per-section or per-field Save button before the edited value becomes visible draft intent
 - invalid intermediate values remain visible and remain in draft state instead of being discarded
-- validation records errors and warnings against the current draft
 - blocking validation errors prevent final Save, export, and planning until resolved
+- Previous and Next do not block on validation errors before Review
 - navigation between top-level steps, VM children, and VM detail categories preserves the edited draft values
 - narrow VM/category navigation does not require broad full-Builder rerendering
-- final Save persists validated template JSON and still requires Review confirmation
+- final Save persists validated template JSON from Review
+- Save remains blocked unless the current draft builds into valid template JSON
+- Review plus Save is the confirmation; there is no separate Review confirmation checkbox
 
 ### 5) Builder output remains deploy/planner compatible
 **Given**
@@ -4790,11 +4805,14 @@ Each readiness result shall include, at minimum:
 - `VMs` expands to VM child items by VM name and includes a small borderless right-aligned `+` button
 - clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
 - clicking a VM child opens that VM detail on `Basics`
-- selected VM detail uses an internal left mini-nav for Basics, Resources, Membership, Roles, Networking, and Credentials
+- selected VM detail uses an internal right mini-nav for Basics, Resources, Membership, Roles, Networking, and Credentials
 - Resources contains RAM, CPU, and base disk/VHDX; Networking owns NIC list/detail
-- Builder presents a persistent command bar with Apply Suggestions, Validate, Save, Save As, Back, Previous, and Next
-- Previous/Next move only across top-level steps and do not iterate through VM children
-- Save confirmation lives in the Review step
+- Builder presents a persistent footer with Back on the left; Previous and Next on the right during authoring; and Previous, Save As, and Save on the right during Review
+- Apply Suggestions and manual Validate are not footer actions in this contract
+- Save and Save As are Review-only actions
+- Previous/Next move through General, Networks, Forests & Domains, Credentials, VMs overview, each VM category in draft order, and Review
+- Previous/Next do not block on validation errors before Review
+- Review plus Save is the confirmation; there is no separate Review confirmation checkbox
 - field edits update the active in-memory Builder draft immediately or through a short UI-safe debounce, without per-section or per-field Save buttons
 - invalid intermediate values remain visible in draft state until validation and final Save/export/plan gating resolve them
 - Networks, Forests & Domains, and Credentials use list plus selected-detail layouts; VM editing happens through VM children under `VMs`, not a right-side selector list
@@ -4806,11 +4824,12 @@ Each readiness result shall include, at minimum:
 - route/workspace tests verify Builder is a distinct Templates workflow-state destination and parent `Templates` still defaults to `templates.library`
 - non-regression tests verify the current Templates Editor remains available for V1/simple/legacy editing
 - Builder seam tests verify Builder state/orchestration/composition does not accumulate in `MainWindow`, shared Templates composition, or the current Editor
-- workflow navigation tests verify active top-level state, Previous/Next step-level behavior, VM child navigation, and the VM inline plus affordance
+- workflow navigation tests verify active top-level state, Previous/Next full-route behavior, VM child navigation, and the VM inline plus affordance
 - VM detail navigation tests verify Basics opens by default, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC list/detail, and NICs do not become global workflow-tree children
 - schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values, and that secrets remain in the local DPAPI-backed store
 - save/load tests verify existing trust declarations are preserved even though trust authoring is deferred
 - validation tests verify VM-only standalone templates are valid, domain-dependent VMs require domains, each saved domain requires at least one Active Directory Domain Controller VM role assignment, and `firstDomainControllerVmId` is derived from ordered DC assignments
+- navigation tests verify Previous/Next full-route computation, zero-VM Review blocker behavior, and Review-only Save/Save As availability
 - validation tests verify unconfirmed suggestions are not silently persisted and invalid required combinations block save
 - draft interaction tests verify immediate or debounced draft updates, invalid intermediate value retention, navigation edit preservation, and blocking-error gating for final Save/export/plan
 - planner/review compatibility tests verify saved Builder output can feed Deploy From Template review and V2 planning
