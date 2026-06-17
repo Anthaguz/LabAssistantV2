@@ -4604,7 +4604,7 @@ Each readiness result shall include, at minimum:
 
 # AC-050 - WinUI Templates V2 Builder Workflow Contract
 
-**Related FRs:** FR-201, FR-202, FR-203, FR-204, FR-077, FR-078, FR-191, FR-192, FR-193, FR-194, FR-195, FR-197, FR-198
+**Related FRs:** FR-201, FR-202, FR-203, FR-204, FR-205, FR-077, FR-078, FR-191, FR-192, FR-193, FR-194, FR-195, FR-197, FR-198
 
 ## Scenarios
 
@@ -4703,7 +4703,7 @@ Each readiness result shall include, at minimum:
 - domains present plus each domain having at least one Active Directory Domain Controller role VM is valid
 - domains present plus any domain without an Active Directory Domain Controller role VM blocks save
 - PDC emulator/FSMO selection or transfer is out of scope
-- domain/forest editor redesign, credential semantic redesign, Review validation redesign, runtime/schema/trust/WPF work, and completion/error badges are out of scope for this contract slice
+- domain/forest editor redesign, credential semantic redesign, Review validation redesign, runtime/schema/trust/WPF work, field badges, inline markers, section badges, and completion/error badges are out of scope for this contract slice
 
 ### 3a) VM creation and navigation affordances
 **Given**
@@ -4753,6 +4753,28 @@ Each readiness result shall include, at minimum:
 - final Save persists validated template JSON from Review
 - Save remains blocked unless the current draft builds into valid template JSON
 - Review plus Save is the confirmation; there is no separate Review confirmation checkbox
+
+### 4b) Scoped automatic Builder validation
+**Given**
+- the user is editing a V2 Builder draft
+- the draft contains current Builder-local validation state with blockers and warnings
+
+**When**
+- the user changes a first-slice field that affects only part of the draft
+
+**Then**
+- the Builder triggers validation automatically for the affected scope where practical
+- Builder-local validation remains a distinct authoring seam from final document mapper/build validation
+- changing a domain name validates that domain and dependent VM/domain references
+- changing an IP address validates IP format, subnet fit, and duplicate IPs in the relevant network/NIC scope
+- changing a VM internal/display name validates VM identity and name-related rules without requiring unrelated full-draft recomputation when narrower validation is practical
+- changing VM membership validates domain assignment and role compatibility for that VM
+- current blockers and warnings are retained in Builder-local validation state until the relevant draft changes resolve or replace them
+- Review aggregates the current Builder-local blockers and warnings for the draft
+- Save and Save As remain blocked by current validation blockers and by final template build validation
+- Save and Save As remain Review-only actions
+- manual Validate remains absent from the Builder footer
+- field badges, inline markers, section badges, and completion/error badges are not introduced in this slice
 
 ### 5) Builder output remains deploy/planner compatible
 **Given**
@@ -4815,10 +4837,12 @@ Each readiness result shall include, at minimum:
 - Review plus Save is the confirmation; there is no separate Review confirmation checkbox
 - field edits update the active in-memory Builder draft immediately or through a short UI-safe debounce, without per-section or per-field Save buttons
 - invalid intermediate values remain visible in draft state until validation and final Save/export/plan gating resolve them
+- draft edits trigger Builder-local scoped validation automatically where practical, and Review aggregates current blockers and warnings
 - Networks, Forests & Domains, and Credentials use list plus selected-detail layouts; VM editing happens through VM children under `VMs`, not a right-side selector list
 - Builder does not rely on multiline pipe-delimited text fields for authoring V2 resources
 - a matrix is not the primary authoring UI
 - save action reflects explicit user-confirmed draft intent
+- manual Validate is not a footer action, and this validation slice does not introduce field badges, inline markers, section badges, or completion/error badges
 
 ## Implementation Test Expectations
 - route/workspace tests verify Builder is a distinct Templates workflow-state destination and parent `Templates` still defaults to `templates.library`
@@ -4831,6 +4855,8 @@ Each readiness result shall include, at minimum:
 - validation tests verify VM-only standalone templates are valid, domain-dependent VMs require domains, each saved domain requires at least one Active Directory Domain Controller VM role assignment, and `firstDomainControllerVmId` is derived from ordered DC assignments
 - navigation tests verify Previous/Next full-route computation, zero-VM Review blocker behavior, and Review-only Save/Save As availability
 - validation tests verify unconfirmed suggestions are not silently persisted and invalid required combinations block save
+- Builder-local validation tests verify affected-scope refresh for domain references, IP format/subnet/duplicates, VM identity/name rules, and membership domain/role compatibility
+- Review aggregation tests verify current Builder-local blockers and warnings are summarized without requiring a manual Validate footer action
 - draft interaction tests verify immediate or debounced draft updates, invalid intermediate value retention, navigation edit preservation, and blocking-error gating for final Save/export/plan
 - planner/review compatibility tests verify saved Builder output can feed Deploy From Template review and V2 planning
 
