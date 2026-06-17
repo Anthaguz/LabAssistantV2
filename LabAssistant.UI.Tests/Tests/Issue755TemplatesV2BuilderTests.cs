@@ -245,12 +245,30 @@ public sealed class Issue755TemplatesV2BuilderTests
     public void TemplatesBuilderView_SelectedNavState_IsHoverSafe()
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var constructorBody = ExtractMethodBody(builderSource, "public TemplatesBuilderView()");
+        var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select)");
+        var registerWorkflowNavBody = ExtractMethodBody(builderSource, "private static void RegisterWorkflowStepNavButton(Button button, Action select)");
+        var selectNavButtonBody = ExtractMethodBody(builderSource, "private static void SelectNavButton(Button button, Action select)");
         var applyNavStateBody = ExtractMethodBody(builderSource, "private static void ApplyNavButtonState(Button button, bool isSelected)");
         var hoverStateBody = ExtractMethodBody(builderSource, "private static void ApplyNavHoverState(Button button, bool isSelected)");
+        var renderVmNavChildrenBody = ExtractMethodBody(builderSource, "private void RenderVmNavChildren()");
+        var renderVmDetailCategoryNavBody = ExtractMethodBody(builderSource, "private void RenderVmDetailCategoryNav()");
 
         Assert.Contains("BuilderSelectedNavStateTag", builderSource);
+        Assert.Contains("RegisterWorkflowStepNavButton(BuilderGeneralStepButton", constructorBody);
+        Assert.Contains("RegisterWorkflowStepNavButton(BuilderNetworksStepButton", constructorBody);
+        Assert.Contains("RegisterWorkflowStepNavButton(BuilderForestsDomainsStepButton", constructorBody);
+        Assert.Contains("RegisterWorkflowStepNavButton(BuilderCredentialsStepButton", constructorBody);
+        Assert.Contains("RegisterWorkflowStepNavButton(BuilderVmsStepButton", constructorBody);
+        Assert.Contains("RegisterWorkflowStepNavButton(BuilderReviewStepButton", constructorBody);
+        Assert.Contains("button.Click += (_, _) => SelectNavButton(button, select);", createResourceButtonBody);
+        Assert.Contains("button.Click += (_, _) => SelectNavButton(button, select);", registerWorkflowNavBody);
+        Assert.Contains("ApplyNavButtonState(button, true);", selectNavButtonBody);
+        Assert.Contains("select();", selectNavButtonBody);
         Assert.Contains("button.Tag = isSelected ? BuilderSelectedNavStateTag : null;", applyNavStateBody);
         Assert.Contains("ApplyNavHoverState(button, isSelected);", applyNavStateBody);
+        Assert.Contains("CreateResourceButton(", renderVmNavChildrenBody);
+        Assert.Contains("CreateResourceButton(", renderVmDetailCategoryNavBody);
         Assert.Contains("ButtonBackgroundPointerOverResource", hoverStateBody);
         Assert.Contains("ButtonBackgroundPressedResource", hoverStateBody);
         Assert.Contains("ButtonBorderBrushPointerOverResource", hoverStateBody);
@@ -259,6 +277,9 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("ButtonForegroundPressedResource", hoverStateBody);
         Assert.Contains("ShellBackgroundBrush", hoverStateBody);
         Assert.Contains("ShellAccentBrush", hoverStateBody);
+        Assert.True(
+            selectNavButtonBody.IndexOf("ApplyNavButtonState(button, true);", StringComparison.Ordinal) <
+            selectNavButtonBody.IndexOf("select();", StringComparison.Ordinal));
     }
 
     [Fact]
