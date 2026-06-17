@@ -108,11 +108,12 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
             StatusText: _workspace.StatusText,
             IsStatusVisible: _workspace.HasStatusText,
             HasActiveDraft: _workspace.HasActiveDraft,
-            Draft: _workspace.CaptureDraft()));
+            Draft: _workspace.CaptureDraft(),
+            ValidationState: _workspace.ValidationState));
         _view.UpdateActionState(new TemplatesBuilderActionState(
             CanNavigate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
-            CanSave: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
-            CanSaveAs: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
+            CanSave: _workspace.HasActiveDraft && !_host.IsTemplatesLoading && !_workspace.HasValidationBlockers,
+            CanSaveAs: _workspace.HasActiveDraft && !_host.IsTemplatesLoading && !_workspace.HasValidationBlockers,
             CanBackToLibrary: !_host.IsTemplatesLoading));
     }
 
@@ -149,9 +150,10 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
         _workspace.ApplyDraft(_view.CaptureDraft());
         _view.UpdateActionState(new TemplatesBuilderActionState(
             CanNavigate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
-            CanSave: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
-            CanSaveAs: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
+            CanSave: _workspace.HasActiveDraft && !_host.IsTemplatesLoading && !_workspace.HasValidationBlockers,
+            CanSaveAs: _workspace.HasActiveDraft && !_host.IsTemplatesLoading && !_workspace.HasValidationBlockers,
             CanBackToLibrary: !_host.IsTemplatesLoading));
+        _view.UpdateValidationState(_workspace.ValidationState);
     }
 
     private async void TemplatesBuilderView_SaveRequested(object? sender, EventArgs e)

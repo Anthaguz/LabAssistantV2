@@ -37,6 +37,10 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
 
     public IReadOnlyList<V2TrustTemplate> PreservedTrusts { get; private set; } = Array.Empty<V2TrustTemplate>();
 
+    public TemplatesBuilderValidationState ValidationState { get; private set; } = TemplatesBuilderValidationState.Empty;
+
+    public bool HasValidationBlockers => ValidationState.HasBlockers;
+
     public string ContextText { get; private set; } = "No Builder draft loaded.";
 
     public string StatusText { get; private set; } = "Create or open a V2 Builder draft.";
@@ -61,7 +65,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         CreatedWithAppVersion = "1.0.0";
         SourceFilePath = null;
         PreservedTrusts = Array.Empty<V2TrustTemplate>();
-        ApplyDraft(draft with { IsSaveConfirmed = false });
+        ApplyDraft(draft with { IsSaveConfirmed = false }, TemplatesBuilderValidationRequest.All());
         HasActiveDraft = true;
         ContextText = "Editing new V2 Builder draft.";
         SetStatus("Review the suggested topology, then save.");
@@ -76,7 +80,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         CreatedWithAppVersion = document.Template.CreatedWithAppVersion;
         SourceFilePath = document.SourceFilePath;
         PreservedTrusts = CopyTrusts(document.Template.DirectoryTopology?.Trusts);
-        ApplyDraft(TemplatesBuilderDraftMapper.FromTemplate(document.Template));
+        ApplyDraft(TemplatesBuilderDraftMapper.FromTemplate(document.Template), TemplatesBuilderValidationRequest.All());
         HasActiveDraft = true;
         ContextText = string.IsNullOrWhiteSpace(SourceFilePath)
             ? "Editing V2 Builder draft."
@@ -85,6 +89,9 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
     }
 
     public void ApplyDraft(TemplatesBuilderDraftSnapshot draft)
+        => ApplyDraft(draft, TemplatesBuilderValidationRequest.DetectChangedScopes(CaptureDraft(), draft));
+
+    public void ApplyDraft(TemplatesBuilderDraftSnapshot draft, TemplatesBuilderValidationRequest validationRequest)
     {
         var editableContentChanged =
             !string.Equals(TemplateName, draft.TemplateName, StringComparison.Ordinal) ||
@@ -107,6 +114,12 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         IsSaveConfirmed = editableContentChanged && IsSaveConfirmed
             ? false
             : draft.IsSaveConfirmed;
+        if (validationRequest.Categories.Count > 0)
+        {
+            ValidationState = MergeValidationState(
+                ValidationState,
+                TemplatesBuilderDraftValidator.Validate(CaptureDraft(), validationRequest));
+        }
     }
 
     public TemplatesBuilderDraftSnapshot CaptureDraft()
@@ -157,5 +170,25 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
                 Direction = trust.Direction
             })
             .ToList();
+    }
+
+    private static TemplatesBuilderValidationState MergeValidationState(
+        TemplatesBuilderValidationState existing,
+        TemplatesBuilderValidationState updated)
+    {
+        var refreshedCategories = updated.EvaluatedCategories;
+        var blockers = existing.Blockers
+            .Where(issue => !refreshedCategories.Contains(issue.Category))
+            .Concat(updated.Blockers)
+            .ToList();
+        var warnings = existing.Warnings
+            .Where(issue => !refreshedCategories.Contains(issue.Category))
+            .Concat(updated.Warnings)
+            .ToList();
+        var categories = existing.EvaluatedCategories
+            .Concat(updated.EvaluatedCategories)
+            .ToHashSet();
+
+        return new TemplatesBuilderValidationState(blockers, warnings, categories);
     }
 }
