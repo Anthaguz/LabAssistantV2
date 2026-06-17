@@ -170,6 +170,7 @@ public sealed class Issue755TemplatesV2BuilderTests
     public void TemplatesBuilderView_FieldEditHandlers_UpdateDraftImmediately()
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var builderModels = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderDraftModels.cs")));
         var textHandlerBody = ExtractMethodBody(builderSource, "private void BuilderDraftControl_Changed(object sender, TextChangedEventArgs e)");
         var selectionHandlerBody = ExtractMethodBody(builderSource, "private void BuilderSelectionControl_Changed(object sender, SelectionChangedEventArgs e)");
         var checkboxHandlerBody = ExtractMethodBody(builderSource, "private void BuilderConfirmSaveCheckBox_Changed(object sender, RoutedEventArgs e)");
@@ -187,6 +188,39 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("UpdateSelectedCredentialSlot(_draft)", changedControlBody);
         Assert.Contains("UpdateSelectedForestOrDomain(_draft)", changedControlBody);
         Assert.Contains("UpdateSelectedVm(_draft)", changedControlBody);
+        Assert.Contains("string MemoryMb", builderModels);
+        Assert.Contains("string CpuCount", builderModels);
+        Assert.Contains("string PrefixLength", builderModels);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_InvalidNumericDraftText_ReRendersExactlyAcrossVmNavigation()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var resourcesRenderBody = ExtractSwitchCaseBody(
+            builderSource,
+            "case BuilderVmDetailCategory.Resources:",
+            "case BuilderVmDetailCategory.Membership:");
+        var networkingRenderBody = ExtractSwitchCaseBody(
+            builderSource,
+            "case BuilderVmDetailCategory.Networking:",
+            "case BuilderVmDetailCategory.Credentials:");
+        var createNicRowBody = ExtractMethodBody(builderSource, "private StackPanel CreateNicRow(TemplatesBuilderNicDraft nic)");
+        var updateVmBody = ExtractMethodBody(builderSource, "private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)");
+        var selectVmChildBody = ExtractMethodBody(builderSource, "private void SelectVmChild(int index)");
+        var selectVmDetailCategoryBody = ExtractMethodBody(builderSource, "private void SelectVmDetailCategory(BuilderVmDetailCategory category)");
+
+        Assert.Contains("CreateTextBox(\"Memory MB\", \"vm.MemoryMb\", vm.MemoryMb)", resourcesRenderBody);
+        Assert.Contains("CreateTextBox(\"CPU Count\", \"vm.CpuCount\", vm.CpuCount)", resourcesRenderBody);
+        Assert.Contains("CreateNicRow(nic)", networkingRenderBody);
+        Assert.Contains("CreateTextBox(\"Prefix\", \"nic.PrefixLength\", nic.PrefixLength)", createNicRowBody);
+        Assert.Contains("MemoryMb = GetText(BuilderSelectedVmDetailPanel, \"vm.MemoryMb\")", updateVmBody);
+        Assert.Contains("CpuCount = GetText(BuilderSelectedVmDetailPanel, \"vm.CpuCount\")", updateVmBody);
+        Assert.Contains("GetText(row, \"nic.PrefixLength\")", builderSource);
+        Assert.DoesNotContain("ParsePositiveInt", builderSource);
+        Assert.DoesNotContain("ParseNullableInt", builderSource);
+        Assert.DoesNotContain("RenderDraftResources();", selectVmChildBody);
+        Assert.DoesNotContain("RenderDraftResources();", selectVmDetailCategoryBody);
     }
 
     [Fact]
@@ -245,8 +279,8 @@ public sealed class Issue755TemplatesV2BuilderTests
         var draft = CreateConfirmedBuilderDraft();
         var invalidResourcesVm = draft.Vms[0] with
         {
-            MemoryMb = 0,
-            CpuCount = 0
+            MemoryMb = "abc MB",
+            CpuCount = "two"
         };
 
         var invalidResourcesBuild = TemplatesBuilderDraftMapper.BuildDocument(
@@ -258,10 +292,12 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         Assert.Null(invalidResourcesBuild.Document);
         Assert.Contains(invalidResourcesBuild.Errors, error => error.Contains("memory must be a positive integer", StringComparison.Ordinal));
+        Assert.Equal("abc MB", invalidResourcesVm.MemoryMb);
+        Assert.Equal("two", invalidResourcesVm.CpuCount);
 
         var invalidNicVm = draft.Vms[0] with
         {
-            Nics = [draft.Vms[0].Nics[0] with { PrefixLength = -1 }]
+            Nics = [draft.Vms[0].Nics[0] with { PrefixLength = "prefix-ish" }]
         };
 
         var invalidNicBuild = TemplatesBuilderDraftMapper.BuildDocument(
@@ -273,6 +309,7 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         Assert.Null(invalidNicBuild.Document);
         Assert.Contains(invalidNicBuild.Errors, error => error.Contains("prefix length must be 0 through 128", StringComparison.Ordinal));
+        Assert.Equal("prefix-ish", invalidNicVm.Nics[0].PrefixLength);
     }
 
     [Fact]
@@ -723,6 +760,15 @@ public sealed class Issue755TemplatesV2BuilderTests
         }
 
         throw new InvalidOperationException($"Could not read method body for '{signature}'.");
+    }
+
+    private static string ExtractSwitchCaseBody(string source, string caseStart, string nextCaseStart)
+    {
+        var start = source.IndexOf(caseStart, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Could not find switch case '{caseStart}'.");
+        var end = source.IndexOf(nextCaseStart, start, StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find switch case boundary '{nextCaseStart}'.");
+        return source[start..end];
     }
 
     private sealed class RecordingTemplatesCapabilityService : ITemplatesCapabilityService

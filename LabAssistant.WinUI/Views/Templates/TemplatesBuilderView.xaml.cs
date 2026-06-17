@@ -463,8 +463,8 @@ public sealed partial class TemplatesBuilderView : UserControl
                 break;
             case BuilderVmDetailCategory.Resources:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-                    CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb.ToString()),
-                    CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount.ToString()),
+                    CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb),
+                    CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount),
                     CreateTextBox("Base Disk / VHDX ID", "vm.VhdxId", vm.VhdxId)));
                 break;
             case BuilderVmDetailCategory.Membership:
@@ -520,7 +520,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             CreateTextBox("Network ID", "nic.NetworkId", nic.NetworkId),
             CreateTextBox("Switch", "nic.SwitchName", nic.SwitchName),
             CreateTextBox("IP Address", "nic.IpAddress", nic.IpAddress),
-            CreateTextBox("Prefix", "nic.PrefixLength", nic.PrefixLength?.ToString() ?? string.Empty),
+            CreateTextBox("Prefix", "nic.PrefixLength", nic.PrefixLength),
             CreateTextBox("Gateway", "nic.DefaultGateway", nic.DefaultGateway),
             CreateTextBox("DNS Servers", "nic.DnsServers", string.Join(", ", nic.DnsServers))));
         return row;
@@ -641,8 +641,8 @@ public sealed partial class TemplatesBuilderView : UserControl
             },
             BuilderVmDetailCategory.Resources when HasTextBox(BuilderSelectedVmDetailPanel, "vm.MemoryMb") => vm with
             {
-                MemoryMb = ParsePositiveInt(GetText(BuilderSelectedVmDetailPanel, "vm.MemoryMb")),
-                CpuCount = ParsePositiveInt(GetText(BuilderSelectedVmDetailPanel, "vm.CpuCount")),
+                MemoryMb = GetText(BuilderSelectedVmDetailPanel, "vm.MemoryMb"),
+                CpuCount = GetText(BuilderSelectedVmDetailPanel, "vm.CpuCount"),
                 VhdxId = GetText(BuilderSelectedVmDetailPanel, "vm.VhdxId")
             },
             BuilderVmDetailCategory.Membership when HasComboBox(BuilderSelectedVmDetailPanel, "vm.MembershipMode") => vm with
@@ -685,7 +685,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             GetText(row, "nic.NetworkId"),
             GetText(row, "nic.SwitchName"),
             GetText(row, "nic.IpAddress"),
-            ParseNullableInt(GetText(row, "nic.PrefixLength")),
+            GetText(row, "nic.PrefixLength"),
             GetText(row, "nic.DefaultGateway"),
             SplitList(GetText(row, "nic.DnsServers")));
 
@@ -755,8 +755,8 @@ public sealed partial class TemplatesBuilderView : UserControl
             .Append(new TemplatesBuilderVmDraft(
                 $"vm-{nextVmNumber}",
                 $"VM {nextVmNumber}",
-                4096,
-                2,
+                "4096",
+                "2",
                 string.Empty,
                 V2MembershipModeCatalog.Standalone,
                 string.Empty,
@@ -787,7 +787,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         var vms = draft.Vms.ToList();
         var vm = vms[vmIndex];
         var nics = vm.Nics.ToList();
-        nics.Add(new TemplatesBuilderNicDraft($"nic-{nics.Count + 1}", "Lab", draft.LabNetworks.FirstOrDefault().NetworkId, string.Empty, string.Empty, null, string.Empty, []));
+        nics.Add(new TemplatesBuilderNicDraft($"nic-{nics.Count + 1}", "Lab", draft.LabNetworks.FirstOrDefault().NetworkId, string.Empty, string.Empty, string.Empty, string.Empty, []));
         vms[vmIndex] = vm with { Nics = nics };
         RenderAndNotify(draft with { Vms = vms, IsSaveConfirmed = false });
     }
@@ -1187,19 +1187,6 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         return Math.Clamp(index, 0, count - 1);
-    }
-
-    private static int ParsePositiveInt(string value)
-        => int.TryParse(value, out var parsed) ? parsed : 0;
-
-    private static int? ParseNullableInt(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        return int.TryParse(value, out var parsed) ? parsed : -1;
     }
 
     private static IReadOnlyList<string> SplitList(string value)

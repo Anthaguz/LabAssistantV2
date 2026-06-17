@@ -42,28 +42,28 @@ internal static class TemplatesBuilderDraftMapper
                 new TemplatesBuilderVmDraft(
                     "vm-dc01",
                     "dc01",
-                    4096,
-                    2,
+                    "4096",
+                    "2",
                     dcDisk,
                     V2MembershipModeCatalog.DomainMember,
                     "domain-contoso",
                     IsActiveDirectoryDomainController: true,
                     new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", string.Empty, "slot-dsrm", string.Empty),
                     [
-                        new TemplatesBuilderNicDraft("nic-dc", "Domain", "lab-core", string.Empty, "10.0.0.10", 24, "10.0.0.1", ["10.0.0.10"])
+                        new TemplatesBuilderNicDraft("nic-dc", "Domain", "lab-core", string.Empty, "10.0.0.10", "24", "10.0.0.1", ["10.0.0.10"])
                     ]),
                 new TemplatesBuilderVmDraft(
                     "vm-member01",
                     "member01",
-                    4096,
-                    2,
+                    "4096",
+                    "2",
                     memberDisk,
                     V2MembershipModeCatalog.DomainMember,
                     "domain-contoso",
                     IsActiveDirectoryDomainController: false,
                     new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", "slot-join", string.Empty, string.Empty),
                     [
-                        new TemplatesBuilderNicDraft("nic-member", "Domain", "lab-core", string.Empty, "10.0.0.20", 24, "10.0.0.1", ["10.0.0.10"])
+                        new TemplatesBuilderNicDraft("nic-member", "Domain", "lab-core", string.Empty, "10.0.0.20", "24", "10.0.0.1", ["10.0.0.10"])
                     ])
             ],
             IsSaveConfirmed: false);
@@ -262,13 +262,13 @@ internal static class TemplatesBuilderDraftMapper
                 continue;
             }
 
-            if (vm.MemoryMb <= 0)
+            if (!TryParsePositiveInt(vm.MemoryMb, out var memoryMb))
             {
                 errors.Add($"VM '{vm.Name}' memory must be a positive integer.");
                 continue;
             }
 
-            if (vm.CpuCount <= 0)
+            if (!TryParsePositiveInt(vm.CpuCount, out var cpuCount))
             {
                 errors.Add($"VM '{vm.Name}' CPU count must be a positive integer.");
                 continue;
@@ -304,8 +304,8 @@ internal static class TemplatesBuilderDraftMapper
             {
                 VmId = vm.VmId.Trim(),
                 Name = vm.Name.Trim(),
-                MemoryMb = vm.MemoryMb,
-                CpuCount = vm.CpuCount,
+                MemoryMb = memoryMb,
+                CpuCount = cpuCount,
                 VhdxId = Optional(vm.VhdxId),
                 TopologyRole = vm.IsActiveDirectoryDomainController ? ActiveDirectoryDomainControllerTopologyRole : null,
                 MembershipMode = membershipMode,
@@ -329,7 +329,7 @@ internal static class TemplatesBuilderDraftMapper
                 continue;
             }
 
-            if (nic.PrefixLength is < 0 or > 128)
+            if (!TryParseOptionalPrefixLength(nic.PrefixLength, out var prefixLength))
             {
                 errors.Add($"VM '{vm.Name}' NIC '{nic.NicId}' prefix length must be 0 through 128.");
                 continue;
@@ -342,7 +342,7 @@ internal static class TemplatesBuilderDraftMapper
                 NetworkId = Optional(nic.NetworkId),
                 SwitchName = Optional(nic.SwitchName),
                 IpAddress = Optional(nic.IpAddress),
-                PrefixLength = nic.PrefixLength,
+                PrefixLength = prefixLength,
                 DefaultGateway = Optional(nic.DefaultGateway),
                 DnsServers = CopyList(nic.DnsServers)
             });
@@ -402,8 +402,8 @@ internal static class TemplatesBuilderDraftMapper
             .Select(vm => new TemplatesBuilderVmDraft(
                 vm.VmId,
                 vm.Name,
-                vm.MemoryMb,
-                vm.CpuCount,
+                vm.MemoryMb.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                vm.CpuCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 vm.VhdxId ?? string.Empty,
                 ResolveMembershipMode(vm),
                 vm.DomainId ?? string.Empty,
@@ -425,7 +425,7 @@ internal static class TemplatesBuilderDraftMapper
                 nic.NetworkId ?? string.Empty,
                 nic.SwitchName ?? string.Empty,
                 nic.IpAddress ?? string.Empty,
-                nic.PrefixLength,
+                nic.PrefixLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
                 nic.DefaultGateway ?? string.Empty,
                 nic.DnsServers ?? []))
             .ToList() ?? [];
@@ -503,6 +503,27 @@ internal static class TemplatesBuilderDraftMapper
             .ToList() ?? [];
 
         return result.Count == 0 ? null : result;
+    }
+
+    private static bool TryParsePositiveInt(string value, out int result)
+        => int.TryParse(value, out result) && result > 0;
+
+    private static bool TryParseOptionalPrefixLength(string value, out int? result)
+    {
+        result = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!int.TryParse(value, out var parsed) ||
+            parsed is < 0 or > 128)
+        {
+            return false;
+        }
+
+        result = parsed;
+        return true;
     }
 
     private static string? Optional(string? value)
