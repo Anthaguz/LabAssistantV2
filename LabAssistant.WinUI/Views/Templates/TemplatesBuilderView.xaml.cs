@@ -69,12 +69,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderDeploymentProfileComboBox.SelectionChanged += BuilderSelectionControl_Changed;
         BuilderConfirmSaveCheckBox.Checked += BuilderConfirmSaveCheckBox_Changed;
         BuilderConfirmSaveCheckBox.Unchecked += BuilderConfirmSaveCheckBox_Changed;
-        BuilderGeneralStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.General);
-        BuilderNetworksStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Networks);
-        BuilderForestsDomainsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.ForestsDomains);
-        BuilderCredentialsStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Credentials);
-        BuilderVmsStepButton.Click += (_, _) => SelectVmOverview();
-        BuilderReviewStepButton.Click += (_, _) => SelectStep(BuilderWorkflowStep.Review);
+        RegisterWorkflowStepNavButton(BuilderGeneralStepButton, () => SelectStep(BuilderWorkflowStep.General));
+        RegisterWorkflowStepNavButton(BuilderNetworksStepButton, () => SelectStep(BuilderWorkflowStep.Networks));
+        RegisterWorkflowStepNavButton(BuilderForestsDomainsStepButton, () => SelectStep(BuilderWorkflowStep.ForestsDomains));
+        RegisterWorkflowStepNavButton(BuilderCredentialsStepButton, () => SelectStep(BuilderWorkflowStep.Credentials));
+        RegisterWorkflowStepNavButton(BuilderVmsStepButton, SelectVmOverview);
+        RegisterWorkflowStepNavButton(BuilderReviewStepButton, () => SelectStep(BuilderWorkflowStep.Review));
         BuilderAddNetworkButton.Click += BuilderAddNetworkButton_Click;
         BuilderAddCredentialSlotButton.Click += BuilderAddCredentialSlotButton_Click;
         BuilderAddForestButton.Click += BuilderAddForestButton_Click;
@@ -999,8 +999,19 @@ public sealed partial class TemplatesBuilderView : UserControl
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         ApplyNavButtonState(button, isSelected);
-        button.Click += (_, _) => select();
+        button.Click += (_, _) => SelectNavButton(button, select);
         return button;
+    }
+
+    private static void RegisterWorkflowStepNavButton(Button button, Action select)
+    {
+        button.Click += (_, _) => SelectNavButton(button, select);
+    }
+
+    private static void SelectNavButton(Button button, Action select)
+    {
+        ApplyNavButtonState(button, true);
+        select();
     }
 
     private static StackPanel CreateRow()
