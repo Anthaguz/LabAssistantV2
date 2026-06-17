@@ -52,32 +52,7 @@
                     BorderThickness="1"
                     CornerRadius="6">
                     <StackPanel x:Name="BuilderWorkflowTreePanel" Spacing="6">
-                        <Button x:Name="BuilderGeneralStepButton" Content="General" HorizontalAlignment="Stretch" />
-                        <Button x:Name="BuilderNetworksStepButton" Content="Networks" HorizontalAlignment="Stretch" />
-                        <Button x:Name="BuilderForestsDomainsStepButton" Content="Forests &amp; Domains" HorizontalAlignment="Stretch" />
-                        <Button x:Name="BuilderCredentialsStepButton" Content="Credentials" HorizontalAlignment="Stretch" />
-                        <Grid x:Name="BuilderVmsNavRow" ColumnSpacing="4">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Button
-                                x:Name="BuilderVmsStepButton"
-                                Grid.Column="0"
-                                Content="VMs"
-                                HorizontalAlignment="Stretch" />
-                            <Button
-                                x:Name="BuilderAddVmFromNavButton"
-                                Grid.Column="1"
-                                MinWidth="28"
-                                Padding="6,0"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                Content="+"
-                                ToolTipService.ToolTip="Add VM" />
-                        </Grid>
                         <StackPanel x:Name="BuilderVmNavChildrenPanel" Margin="14,0,0,0" Spacing="4" />
-                        <Button x:Name="BuilderReviewStepButton" Content="Review" HorizontalAlignment="Stretch" />
                     </StackPanel>
                 </Border>
 

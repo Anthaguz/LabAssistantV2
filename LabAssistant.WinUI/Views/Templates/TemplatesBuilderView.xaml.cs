@@ -33,13 +33,10 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderWorkflowStep.Review
     ];
 
-    private const string BuilderSelectedNavStateTag = "BuilderNavSelected";
     private const string ButtonBackgroundPointerOverResource = "ButtonBackgroundPointerOver";
     private const string ButtonBackgroundPressedResource = "ButtonBackgroundPressed";
     private const string ButtonBorderBrushPointerOverResource = "ButtonBorderBrushPointerOver";
     private const string ButtonBorderBrushPressedResource = "ButtonBorderBrushPressed";
-    private const string ButtonForegroundPointerOverResource = "ButtonForegroundPointerOver";
-    private const string ButtonForegroundPressedResource = "ButtonForegroundPressed";
 
     private bool _isUpdatingDraft;
     private bool _canNavigateWorkflow;
@@ -69,18 +66,11 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderDeploymentProfileComboBox.SelectionChanged += BuilderSelectionControl_Changed;
         BuilderConfirmSaveCheckBox.Checked += BuilderConfirmSaveCheckBox_Changed;
         BuilderConfirmSaveCheckBox.Unchecked += BuilderConfirmSaveCheckBox_Changed;
-        RegisterWorkflowStepNavButton(BuilderGeneralStepButton, () => SelectStep(BuilderWorkflowStep.General));
-        RegisterWorkflowStepNavButton(BuilderNetworksStepButton, () => SelectStep(BuilderWorkflowStep.Networks));
-        RegisterWorkflowStepNavButton(BuilderForestsDomainsStepButton, () => SelectStep(BuilderWorkflowStep.ForestsDomains));
-        RegisterWorkflowStepNavButton(BuilderCredentialsStepButton, () => SelectStep(BuilderWorkflowStep.Credentials));
-        RegisterWorkflowStepNavButton(BuilderVmsStepButton, SelectVmOverview);
-        RegisterWorkflowStepNavButton(BuilderReviewStepButton, () => SelectStep(BuilderWorkflowStep.Review));
         BuilderAddNetworkButton.Click += BuilderAddNetworkButton_Click;
         BuilderAddCredentialSlotButton.Click += BuilderAddCredentialSlotButton_Click;
         BuilderAddForestButton.Click += BuilderAddForestButton_Click;
         BuilderAddDomainButton.Click += BuilderAddDomainButton_Click;
         BuilderAddVmButton.Click += BuilderAddVmButton_Click;
-        BuilderAddVmFromNavButton.Click += BuilderAddVmButton_Click;
         BuilderApplySuggestionsButton.Click += BuilderApplySuggestionsButton_Click;
         BuilderValidateButton.Click += BuilderValidateButton_Click;
         BuilderSaveButton.Click += BuilderSaveButton_Click;
@@ -130,18 +120,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderAddForestButton.IsEnabled = state.CanValidate;
         BuilderAddDomainButton.IsEnabled = state.CanValidate;
         BuilderAddVmButton.IsEnabled = state.CanValidate;
-        BuilderAddVmFromNavButton.IsEnabled = state.CanValidate;
         BuilderApplySuggestionsButton.IsEnabled = state.CanApplySuggestions;
         BuilderValidateButton.IsEnabled = state.CanValidate;
         BuilderSaveButton.IsEnabled = state.CanSave;
         BuilderSaveAsButton.IsEnabled = state.CanSaveAs;
         BuilderBackToLibraryButton.IsEnabled = state.CanBackToLibrary;
-        BuilderGeneralStepButton.IsEnabled = state.CanValidate;
-        BuilderNetworksStepButton.IsEnabled = state.CanValidate;
-        BuilderForestsDomainsStepButton.IsEnabled = state.CanValidate;
-        BuilderCredentialsStepButton.IsEnabled = state.CanValidate;
-        BuilderVmsStepButton.IsEnabled = state.CanValidate;
-        BuilderReviewStepButton.IsEnabled = state.CanValidate;
+        RenderWorkflowTreeState();
         UpdateStepCommandState();
     }
 
@@ -223,12 +207,45 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderWorkflowTreeState()
     {
-        ApplyNavButtonState(BuilderGeneralStepButton, _selectedStep == BuilderWorkflowStep.General);
-        ApplyNavButtonState(BuilderNetworksStepButton, _selectedStep == BuilderWorkflowStep.Networks);
-        ApplyNavButtonState(BuilderForestsDomainsStepButton, _selectedStep == BuilderWorkflowStep.ForestsDomains);
-        ApplyNavButtonState(BuilderCredentialsStepButton, _selectedStep == BuilderWorkflowStep.Credentials);
-        ApplyNavButtonState(BuilderVmsStepButton, _selectedStep == BuilderWorkflowStep.Vms);
-        ApplyNavButtonState(BuilderReviewStepButton, _selectedStep == BuilderWorkflowStep.Review);
+        BuilderWorkflowTreePanel.Children.Clear();
+        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("General", _selectedStep == BuilderWorkflowStep.General, () => SelectStep(BuilderWorkflowStep.General), _canNavigateWorkflow));
+        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Networks", _selectedStep == BuilderWorkflowStep.Networks, () => SelectStep(BuilderWorkflowStep.Networks), _canNavigateWorkflow));
+        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Forests & Domains", _selectedStep == BuilderWorkflowStep.ForestsDomains, () => SelectStep(BuilderWorkflowStep.ForestsDomains), _canNavigateWorkflow));
+        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Credentials", _selectedStep == BuilderWorkflowStep.Credentials, () => SelectStep(BuilderWorkflowStep.Credentials), _canNavigateWorkflow));
+        BuilderWorkflowTreePanel.Children.Add(CreateVmWorkflowNavRow());
+        BuilderWorkflowTreePanel.Children.Add(BuilderVmNavChildrenPanel);
+        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Review", _selectedStep == BuilderWorkflowStep.Review, () => SelectStep(BuilderWorkflowStep.Review), _canNavigateWorkflow));
+        RenderVmNavChildren();
+    }
+
+    private Grid CreateVmWorkflowNavRow()
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 4
+        };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var vmButton = CreateResourceButton("VMs", _selectedStep == BuilderWorkflowStep.Vms, SelectVmOverview, _canNavigateWorkflow);
+        Grid.SetColumn(vmButton, 0);
+        row.Children.Add(vmButton);
+
+        var addButton = new Button
+        {
+            MinWidth = 28,
+            Padding = new Thickness(6, 0, 6, 0),
+            Background = CreateTransparentBrush(),
+            BorderThickness = new Thickness(0),
+            Content = "+",
+            IsEnabled = _canNavigateWorkflow
+        };
+        ToolTipService.SetToolTip(addButton, "Add VM");
+        addButton.Click += BuilderAddVmButton_Click;
+        Grid.SetColumn(addButton, 1);
+        row.Children.Add(addButton);
+
+        return row;
     }
 
     private void UpdateStepCommandState()
@@ -991,27 +1008,21 @@ public sealed partial class TemplatesBuilderView : UserControl
         return checkBox;
     }
 
-    private Button CreateResourceButton(string content, bool isSelected, Action select)
+    private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true)
     {
         var button = new Button
         {
-            Content = content,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            Background = CreateTransparentBrush(),
+            BorderThickness = new Thickness(0),
+            Content = CreateNavButtonContent(content, isSelected),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = isEnabled,
+            Padding = new Thickness(0)
         };
-        ApplyNavButtonState(button, isSelected);
-        button.Click += (_, _) => SelectNavButton(button, select);
+        ConfigureNavButtonChrome(button);
+        button.Click += (_, _) => select();
         return button;
-    }
-
-    private static void RegisterWorkflowStepNavButton(Button button, Action select)
-    {
-        button.Click += (_, _) => SelectNavButton(button, select);
-    }
-
-    private static void SelectNavButton(Button button, Action select)
-    {
-        ApplyNavButtonState(button, true);
-        select();
     }
 
     private static StackPanel CreateRow()
@@ -1129,45 +1140,33 @@ public sealed partial class TemplatesBuilderView : UserControl
         comboBox.SelectedIndex = comboBox.Items.Count > 0 ? 0 : -1;
     }
 
-    private static void ApplyNavButtonState(Button button, bool isSelected)
-    {
-        button.Background = GetBrush(isSelected ? "ShellBackgroundBrush" : "ShellContentBackgroundBrush");
-        button.BorderBrush = GetBrush(isSelected ? "ShellAccentBrush" : "ShellBorderBrush");
-        button.BorderThickness = new Thickness(isSelected ? 2 : 1);
-        button.Foreground = GetBrush(isSelected ? "ShellAccentBrush" : "ShellTextPrimaryBrush");
-        button.Tag = isSelected ? BuilderSelectedNavStateTag : null;
-        ApplyNavHoverState(button, isSelected);
-    }
-
-    private static void ApplyNavHoverState(Button button, bool isSelected)
-    {
-        if (!isSelected)
+    private static Border CreateNavButtonContent(string content, bool isSelected)
+        => new()
         {
-            ClearNavHoverState(button);
-            return;
-        }
+            Padding = new Thickness(8, 5, 8, 5),
+            Background = GetBrush(isSelected ? "ShellBackgroundBrush" : "ShellContentBackgroundBrush"),
+            BorderBrush = GetBrush(isSelected ? "ShellAccentBrush" : "ShellBorderBrush"),
+            BorderThickness = new Thickness(isSelected ? 2 : 1),
+            CornerRadius = new CornerRadius(4),
+            Child = new TextBlock
+            {
+                Foreground = GetBrush(isSelected ? "ShellAccentBrush" : "ShellTextPrimaryBrush"),
+                Text = content,
+                TextWrapping = TextWrapping.WrapWholeWords
+            }
+        };
 
-        var selectedBackground = GetBrush("ShellBackgroundBrush");
-        var selectedBorder = GetBrush("ShellAccentBrush");
-        var selectedForeground = GetBrush("ShellAccentBrush");
-
-        button.Resources[ButtonBackgroundPointerOverResource] = selectedBackground;
-        button.Resources[ButtonBackgroundPressedResource] = selectedBackground;
-        button.Resources[ButtonBorderBrushPointerOverResource] = selectedBorder;
-        button.Resources[ButtonBorderBrushPressedResource] = selectedBorder;
-        button.Resources[ButtonForegroundPointerOverResource] = selectedForeground;
-        button.Resources[ButtonForegroundPressedResource] = selectedForeground;
-    }
-
-    private static void ClearNavHoverState(Button button)
+    private static void ConfigureNavButtonChrome(Button button)
     {
-        button.Resources.Remove(ButtonBackgroundPointerOverResource);
-        button.Resources.Remove(ButtonBackgroundPressedResource);
-        button.Resources.Remove(ButtonBorderBrushPointerOverResource);
-        button.Resources.Remove(ButtonBorderBrushPressedResource);
-        button.Resources.Remove(ButtonForegroundPointerOverResource);
-        button.Resources.Remove(ButtonForegroundPressedResource);
+        var transparent = CreateTransparentBrush();
+        button.Resources[ButtonBackgroundPointerOverResource] = transparent;
+        button.Resources[ButtonBackgroundPressedResource] = transparent;
+        button.Resources[ButtonBorderBrushPointerOverResource] = transparent;
+        button.Resources[ButtonBorderBrushPressedResource] = transparent;
     }
+
+    private static SolidColorBrush CreateTransparentBrush()
+        => new(Microsoft.UI.Colors.Transparent);
 
     private static Brush? GetBrush(string resourceKey)
         => Application.Current.Resources[resourceKey] as Brush;

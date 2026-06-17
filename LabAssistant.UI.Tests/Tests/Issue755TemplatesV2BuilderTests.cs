@@ -64,17 +64,18 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.NotNull(FindByName(builder, "BuilderVmsSection"));
         Assert.NotNull(FindByName(builder, "BuilderReviewSection"));
         Assert.DoesNotContain(builder.Descendants().Attributes().Select(attribute => attribute.Value), value => value == "BuilderProfileSection");
-        Assert.Equal(
-            ["General", "Networks", "Forests & Domains", "Credentials", "VMs", "Review"],
-            [
-                FindByName(builder, "BuilderGeneralStepButton").Attribute("Content")?.Value ?? string.Empty,
-                FindByName(builder, "BuilderNetworksStepButton").Attribute("Content")?.Value ?? string.Empty,
-                FindByName(builder, "BuilderForestsDomainsStepButton").Attribute("Content")?.Value ?? string.Empty,
-                FindByName(builder, "BuilderCredentialsStepButton").Attribute("Content")?.Value ?? string.Empty,
-                FindByName(builder, "BuilderVmsStepButton").Attribute("Content")?.Value ?? string.Empty,
-                FindByName(builder, "BuilderReviewStepButton").Attribute("Content")?.Value ?? string.Empty
-            ]);
-        Assert.Contains("ApplyNavButtonState", builderSource);
+        Assert.Null(FindByNameOrDefault(builder, "BuilderGeneralStepButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderNetworksStepButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderForestsDomainsStepButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderCredentialsStepButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderVmsStepButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderReviewStepButton"));
+        Assert.Contains("CreateResourceButton(\"General\"", builderSource);
+        Assert.Contains("CreateResourceButton(\"Networks\"", builderSource);
+        Assert.Contains("CreateResourceButton(\"Forests & Domains\"", builderSource);
+        Assert.Contains("CreateResourceButton(\"Credentials\"", builderSource);
+        Assert.Contains("CreateResourceButton(\"VMs\"", builderSource);
+        Assert.Contains("CreateResourceButton(\"Review\"", builderSource);
         Assert.Contains("ShellAccentBrush", builderSource);
         Assert.Contains("ShellBackgroundBrush", builderSource);
         Assert.Contains("BuilderWorkflowStep.General", builderSource);
@@ -95,11 +96,10 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.NotNull(FindByName(builder, "BuilderCredentialSlotsListPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedCredentialSlotDetailPanel"));
         Assert.Null(FindByNameOrDefault(builder, "BuilderVmNameListPanel"));
-        Assert.NotNull(FindByName(builder, "BuilderVmsNavRow"));
         Assert.NotNull(FindByName(builder, "BuilderVmNavChildrenPanel"));
-        Assert.Equal("+", FindByName(builder, "BuilderAddVmFromNavButton").Attribute("Content")?.Value);
-        Assert.Equal("0", FindByName(builder, "BuilderAddVmFromNavButton").Attribute("BorderThickness")?.Value);
-        Assert.Equal("Transparent", FindByName(builder, "BuilderAddVmFromNavButton").Attribute("Background")?.Value);
+        Assert.Contains("CreateVmWorkflowNavRow", builderSource);
+        Assert.Contains("Content = \"+\"", builderSource);
+        Assert.Contains("ToolTipService.SetToolTip(addButton, \"Add VM\")", builderSource);
         Assert.NotNull(FindByName(builder, "BuilderVmOverviewPanel"));
         Assert.NotNull(FindByName(builder, "BuilderVmTotalCountTextBlock"));
         Assert.NotNull(FindByName(builder, "BuilderVmMembershipCountsTextBlock"));
@@ -244,42 +244,43 @@ public sealed class Issue755TemplatesV2BuilderTests
     [Fact]
     public void TemplatesBuilderView_SelectedNavState_IsHoverSafe()
     {
+        var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
-        var constructorBody = ExtractMethodBody(builderSource, "public TemplatesBuilderView()");
-        var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select)");
-        var registerWorkflowNavBody = ExtractMethodBody(builderSource, "private static void RegisterWorkflowStepNavButton(Button button, Action select)");
-        var selectNavButtonBody = ExtractMethodBody(builderSource, "private static void SelectNavButton(Button button, Action select)");
-        var applyNavStateBody = ExtractMethodBody(builderSource, "private static void ApplyNavButtonState(Button button, bool isSelected)");
-        var hoverStateBody = ExtractMethodBody(builderSource, "private static void ApplyNavHoverState(Button button, bool isSelected)");
+        var renderWorkflowTreeBody = ExtractMethodBody(builderSource, "private void RenderWorkflowTreeState()");
+        var createVmWorkflowNavRowBody = ExtractMethodBody(builderSource, "private Grid CreateVmWorkflowNavRow()");
+        var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true)");
+        var createNavContentBody = ExtractMethodBody(builderSource, "private static Border CreateNavButtonContent(string content, bool isSelected)");
+        var configureNavChromeBody = ExtractMethodBody(builderSource, "private static void ConfigureNavButtonChrome(Button button)");
         var renderVmNavChildrenBody = ExtractMethodBody(builderSource, "private void RenderVmNavChildren()");
         var renderVmDetailCategoryNavBody = ExtractMethodBody(builderSource, "private void RenderVmDetailCategoryNav()");
 
-        Assert.Contains("BuilderSelectedNavStateTag", builderSource);
-        Assert.Contains("RegisterWorkflowStepNavButton(BuilderGeneralStepButton", constructorBody);
-        Assert.Contains("RegisterWorkflowStepNavButton(BuilderNetworksStepButton", constructorBody);
-        Assert.Contains("RegisterWorkflowStepNavButton(BuilderForestsDomainsStepButton", constructorBody);
-        Assert.Contains("RegisterWorkflowStepNavButton(BuilderCredentialsStepButton", constructorBody);
-        Assert.Contains("RegisterWorkflowStepNavButton(BuilderVmsStepButton", constructorBody);
-        Assert.Contains("RegisterWorkflowStepNavButton(BuilderReviewStepButton", constructorBody);
-        Assert.Contains("button.Click += (_, _) => SelectNavButton(button, select);", createResourceButtonBody);
-        Assert.Contains("button.Click += (_, _) => SelectNavButton(button, select);", registerWorkflowNavBody);
-        Assert.Contains("ApplyNavButtonState(button, true);", selectNavButtonBody);
-        Assert.Contains("select();", selectNavButtonBody);
-        Assert.Contains("button.Tag = isSelected ? BuilderSelectedNavStateTag : null;", applyNavStateBody);
-        Assert.Contains("ApplyNavHoverState(button, isSelected);", applyNavStateBody);
+        Assert.Null(FindByNameOrDefault(builder, "BuilderGeneralStepButton"));
+        Assert.DoesNotContain("RegisterWorkflowStepNavButton", builderSource);
+        Assert.DoesNotContain("SelectNavButton", builderSource);
+        Assert.DoesNotContain("ApplyNavButtonState", builderSource);
+        Assert.DoesNotContain("ApplyNavHoverState", builderSource);
+        Assert.DoesNotContain("BuilderSelectedNavStateTag", builderSource);
+        Assert.Contains("CreateResourceButton(\"General\"", renderWorkflowTreeBody);
+        Assert.Contains("CreateResourceButton(\"Networks\"", renderWorkflowTreeBody);
+        Assert.Contains("CreateResourceButton(\"Forests & Domains\"", renderWorkflowTreeBody);
+        Assert.Contains("CreateResourceButton(\"Credentials\"", renderWorkflowTreeBody);
+        Assert.Contains("CreateVmWorkflowNavRow()", renderWorkflowTreeBody);
+        Assert.Contains("BuilderWorkflowTreePanel.Children.Add(BuilderVmNavChildrenPanel);", renderWorkflowTreeBody);
+        Assert.Contains("CreateResourceButton(\"Review\"", renderWorkflowTreeBody);
+        Assert.Contains("RenderVmNavChildren();", renderWorkflowTreeBody);
+        Assert.Contains("CreateResourceButton(\"VMs\"", createVmWorkflowNavRowBody);
+        Assert.Contains("Content = CreateNavButtonContent(content, isSelected)", createResourceButtonBody);
+        Assert.Contains("ConfigureNavButtonChrome(button);", createResourceButtonBody);
+        Assert.Contains("button.Click += (_, _) => select();", createResourceButtonBody);
+        Assert.Contains("BorderBrush = GetBrush(isSelected ? \"ShellAccentBrush\" : \"ShellBorderBrush\")", createNavContentBody);
+        Assert.Contains("Foreground = GetBrush(isSelected ? \"ShellAccentBrush\" : \"ShellTextPrimaryBrush\")", createNavContentBody);
         Assert.Contains("CreateResourceButton(", renderVmNavChildrenBody);
         Assert.Contains("CreateResourceButton(", renderVmDetailCategoryNavBody);
-        Assert.Contains("ButtonBackgroundPointerOverResource", hoverStateBody);
-        Assert.Contains("ButtonBackgroundPressedResource", hoverStateBody);
-        Assert.Contains("ButtonBorderBrushPointerOverResource", hoverStateBody);
-        Assert.Contains("ButtonBorderBrushPressedResource", hoverStateBody);
-        Assert.Contains("ButtonForegroundPointerOverResource", hoverStateBody);
-        Assert.Contains("ButtonForegroundPressedResource", hoverStateBody);
-        Assert.Contains("ShellBackgroundBrush", hoverStateBody);
-        Assert.Contains("ShellAccentBrush", hoverStateBody);
-        Assert.True(
-            selectNavButtonBody.IndexOf("ApplyNavButtonState(button, true);", StringComparison.Ordinal) <
-            selectNavButtonBody.IndexOf("select();", StringComparison.Ordinal));
+        Assert.Contains("ButtonBackgroundPointerOverResource", configureNavChromeBody);
+        Assert.Contains("ButtonBackgroundPressedResource", configureNavChromeBody);
+        Assert.Contains("ButtonBorderBrushPointerOverResource", configureNavChromeBody);
+        Assert.Contains("ButtonBorderBrushPressedResource", configureNavChromeBody);
+        Assert.Contains("transparent", configureNavChromeBody);
     }
 
     [Fact]
