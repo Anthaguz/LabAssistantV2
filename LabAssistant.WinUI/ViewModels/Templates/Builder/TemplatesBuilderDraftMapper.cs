@@ -114,6 +114,11 @@ internal static class TemplatesBuilderDraftMapper
             errors.Add("Template name is required.");
         }
 
+        if (draft.Vms.Count == 0)
+        {
+            errors.Add("At least one VM is required before Save.");
+        }
+
         template.LabNetworks = MapLabNetworks(draft.LabNetworks, errors);
         template.DirectoryTopology = new V2DirectoryTopologyTemplate
         {
