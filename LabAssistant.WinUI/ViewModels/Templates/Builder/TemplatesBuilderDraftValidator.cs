@@ -144,7 +144,7 @@ internal sealed class TemplatesBuilderValidationRequest
             AddChangedDomainIds(previous.Domains, current.Domains, domainIds);
         }
 
-        AddChangedVmScopes(previous.Vms, current.Vms, categories, networkIds, vmIds);
+        AddChangedVmScopes(previous.Vms, current.Vms, categories, domainIds, networkIds, vmIds);
 
         return categories.Count == 0
             ? ForCategories()
@@ -183,6 +183,7 @@ internal sealed class TemplatesBuilderValidationRequest
         IReadOnlyList<TemplatesBuilderVmDraft> previous,
         IReadOnlyList<TemplatesBuilderVmDraft> current,
         ISet<TemplatesBuilderValidationCategory> categories,
+        ISet<string> domainIds,
         ISet<string> networkIds,
         ISet<string> vmIds)
     {
@@ -204,6 +205,8 @@ internal sealed class TemplatesBuilderValidationRequest
                 categories.Add(TemplatesBuilderValidationCategory.VmIdentity);
                 categories.Add(TemplatesBuilderValidationCategory.VmMembership);
                 categories.Add(TemplatesBuilderValidationCategory.Network);
+                AddDomainId(before, domainIds);
+                AddDomainId(after, domainIds);
                 AddNicNetworkIds(before, networkIds);
                 AddNicNetworkIds(after, networkIds);
                 continue;
@@ -220,6 +223,8 @@ internal sealed class TemplatesBuilderValidationRequest
                 before.Value.IsActiveDirectoryDomainController != after.Value.IsActiveDirectoryDomainController)
             {
                 categories.Add(TemplatesBuilderValidationCategory.VmMembership);
+                AddDomainId(before, domainIds);
+                AddDomainId(after, domainIds);
             }
 
             if (!before.Value.Nics.SequenceEqual(after.Value.Nics))
@@ -236,6 +241,14 @@ internal sealed class TemplatesBuilderValidationRequest
         if (vm is { } value && !string.IsNullOrWhiteSpace(value.VmId))
         {
             vmIds.Add(value.VmId.Trim());
+        }
+    }
+
+    private static void AddDomainId(TemplatesBuilderVmDraft? vm, ISet<string> domainIds)
+    {
+        if (vm is { } value && !string.IsNullOrWhiteSpace(value.DomainId))
+        {
+            domainIds.Add(value.DomainId.Trim());
         }
     }
 
@@ -451,7 +464,7 @@ internal static class TemplatesBuilderDraftValidator
         AddDuplicateIssues(draft.Vms.Select(vm => vm.VmId), "VM id", TemplatesBuilderValidationCategory.VmIdentity, issues);
         AddDuplicateIssues(draft.Vms.Select(vm => vm.Name), "VM name", TemplatesBuilderValidationCategory.VmIdentity, issues);
 
-        foreach (var vm in draft.Vms.Where(vm => request.IncludesVm(vm.VmId)))
+        foreach (var vm in draft.Vms)
         {
             if (string.IsNullOrWhiteSpace(vm.VmId) || string.IsNullOrWhiteSpace(vm.Name))
             {
@@ -512,7 +525,10 @@ internal static class TemplatesBuilderDraftValidator
             }
         }
 
-        foreach (var domain in draft.Domains.Where(domain => !string.IsNullOrWhiteSpace(domain.DomainId) && !dcDomainIds.Contains(domain.DomainId.Trim())))
+        foreach (var domain in draft.Domains.Where(domain =>
+                     request.IncludesDomain(domain.DomainId) &&
+                     !string.IsNullOrWhiteSpace(domain.DomainId) &&
+                     !dcDomainIds.Contains(domain.DomainId.Trim())))
         {
             AddBlocker(issues, TemplatesBuilderValidationCategory.VmMembership, $"Domain '{Display(domain.DomainId)}' requires at least one VM assigned the Active Directory Domain Controller role.", Scope(domain.DomainId));
         }

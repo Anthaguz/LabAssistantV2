@@ -213,7 +213,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         {
             TemplatesBuilderValidationCategory.Domain => IsFullScope(updated.EvaluatedDomainIds) || MatchesScope(issue, updated.EvaluatedDomainIds),
             TemplatesBuilderValidationCategory.Network => IsFullScope(updated.EvaluatedNetworkIds) || MatchesScope(issue, updated.EvaluatedNetworkIds),
-            TemplatesBuilderValidationCategory.VmIdentity => IsFullScope(updated.EvaluatedVmIds) || MatchesScope(issue, updated.EvaluatedVmIds),
+            TemplatesBuilderValidationCategory.VmIdentity => true,
             TemplatesBuilderValidationCategory.VmMembership =>
                 (IsFullScope(updated.EvaluatedVmIds) && IsFullScope(updated.EvaluatedDomainIds)) ||
                 MatchesScope(issue, updated.EvaluatedVmIds) ||

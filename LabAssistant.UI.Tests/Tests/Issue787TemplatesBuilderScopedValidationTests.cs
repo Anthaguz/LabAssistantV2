@@ -138,6 +138,29 @@ public sealed class Issue787TemplatesBuilderScopedValidationTests
     }
 
     [Fact]
+    public void BuilderWorkspace_ScopedVmIdentityRefresh_RemovesResolvedDuplicateIdentityBlockers()
+    {
+        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var draft = CreateBuilderDraft();
+        var duplicateVm = draft.Vms[1] with
+        {
+            VmId = draft.Vms[0].VmId,
+            Name = draft.Vms[0].Name
+        };
+
+        workspace.LoadNewDraft(draft);
+        workspace.ApplyDraft(draft with { Vms = [draft.Vms[0], duplicateVm] });
+
+        Assert.Contains(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM id", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+        Assert.Contains(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM name", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+
+        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], draft.Vms[1]] });
+
+        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM id", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM name", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void BuilderWorkspace_ScopedNetworkRefresh_PreservesOtherNetworkBlockers()
     {
         var workspace = new TemplatesBuilderWorkspaceViewModel();
@@ -189,6 +212,44 @@ public sealed class Issue787TemplatesBuilderScopedValidationTests
 
         Assert.True(workspace.HasValidationBlockers);
         Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.ScopeKey == draft.Vms[0].VmId);
+        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
+            issue.ScopeKey == draft.Vms[1].VmId &&
+            issue.Message.Contains("unknown domain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuilderWorkspace_ScopedMembershipRefresh_ClearsSatisfiedDomainDcBlockerAndKeepsUnrelatedVmBlocker()
+    {
+        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var draft = CreateBuilderDraft();
+        var vmWithoutDcRole = draft.Vms[0] with
+        {
+            IsActiveDirectoryDomainController = false
+        };
+        var vmWithUnrelatedMembershipBlocker = draft.Vms[1] with
+        {
+            DomainId = "domain-missing"
+        };
+
+        workspace.LoadNewDraft(draft);
+        workspace.ApplyDraft(draft with { Vms = [vmWithoutDcRole, vmWithUnrelatedMembershipBlocker] });
+
+        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
+            issue.ScopeKey == "domain-contoso" &&
+            issue.Message.Contains("requires at least one VM assigned", StringComparison.Ordinal));
+        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
+            issue.ScopeKey == draft.Vms[1].VmId &&
+            issue.Message.Contains("unknown domain", StringComparison.Ordinal));
+
+        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmWithUnrelatedMembershipBlocker] });
+
+        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
+            issue.ScopeKey == "domain-contoso" &&
+            issue.Message.Contains("requires at least one VM assigned", StringComparison.Ordinal));
         Assert.Contains(workspace.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
             issue.ScopeKey == draft.Vms[1].VmId &&
