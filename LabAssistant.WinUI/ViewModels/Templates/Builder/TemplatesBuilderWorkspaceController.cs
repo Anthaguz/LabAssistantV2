@@ -96,6 +96,13 @@ internal sealed class TemplatesBuilderWorkspaceController
             return;
         }
 
+        if (_workspace.HasValidationBlockers)
+        {
+            _workspace.SetStatus("Save blocked: " + string.Join(" ", _workspace.ValidationState.Blockers.Select(issue => issue.Message)));
+            _host.ApplyWorkspaceState();
+            return;
+        }
+
         var build = BuildCurrentDocument();
         if (build.Document is null)
         {
@@ -138,6 +145,13 @@ internal sealed class TemplatesBuilderWorkspaceController
         if (!_workspace.HasActiveDraft)
         {
             _workspace.SetStatus("Create or open a V2 Builder draft first.");
+            _host.ApplyWorkspaceState();
+            return;
+        }
+
+        if (_workspace.HasValidationBlockers)
+        {
+            _workspace.SetStatus("Save As blocked: " + string.Join(" ", _workspace.ValidationState.Blockers.Select(issue => issue.Message)));
             _host.ApplyWorkspaceState();
             return;
         }

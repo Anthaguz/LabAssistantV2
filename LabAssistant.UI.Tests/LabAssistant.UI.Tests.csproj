@@ -28,6 +28,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesEditorVmDraftModels.cs" Link="WinUI\TemplatesEditorVmDraftModels.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftModels.cs" Link="WinUI\TemplatesBuilderDraftModels.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftMapper.cs" Link="WinUI\TemplatesBuilderDraftMapper.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftValidator.cs" Link="WinUI\TemplatesBuilderDraftValidator.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkspaceController.cs" Link="WinUI\TemplatesBuilderWorkspaceController.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkspaceViewModel.cs" Link="WinUI\TemplatesBuilderWorkspaceViewModel.cs" />
   </ItemGroup>

@@ -12,7 +12,8 @@ internal readonly record struct TemplatesBuilderViewState(
     string StatusText,
     bool IsStatusVisible,
     bool HasActiveDraft,
-    TemplatesBuilderDraftSnapshot Draft);
+    TemplatesBuilderDraftSnapshot Draft,
+    TemplatesBuilderValidationState ValidationState);
 
 internal readonly record struct TemplatesBuilderActionState(
     bool CanNavigate,
@@ -42,6 +43,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private BuilderWorkflowStep _selectedStep = BuilderWorkflowStep.General;
     private BuilderVmDetailCategory _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
     private TemplatesBuilderDraftSnapshot _draft = CreateEmptyDraft();
+    private TemplatesBuilderValidationState _validationState = TemplatesBuilderValidationState.Empty;
     private TemplatesBuilderActionState _actionState;
     private int _selectedNetworkIndex;
     private int _selectedCredentialSlotIndex;
@@ -97,6 +99,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             SetTextIfChanged(BuilderTemplateNameTextBox, _draft.TemplateName);
             SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
             SetSelectedProfile(_draft.DeploymentProfile);
+            _validationState = state.ValidationState;
             RenderDraftResources();
         }
         finally
@@ -117,6 +120,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderBackToLibraryButton.IsEnabled = state.CanBackToLibrary;
         RenderWorkflowTreeState();
         UpdateFooterCommandState(state);
+    }
+
+    internal void UpdateValidationState(TemplatesBuilderValidationState validationState)
+    {
+        _validationState = validationState;
+        RenderReviewValidationState();
     }
 
     private void SelectStep(BuilderWorkflowStep step)
@@ -332,8 +341,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderSelectedForestDomainDetail();
         RenderVmOverview();
         RenderSelectedVmDetail();
-        BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
-        BuilderReviewBlockerTextBlock.Visibility = _draft.Vms.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RenderReviewValidationState();
     }
 
     private void RenderVmOverview()
@@ -923,8 +931,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         UpdateWorkingDraftFromChangedControl(sender);
         RenderResourceLists();
         RenderVmOverview();
-        BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
-        BuilderReviewBlockerTextBlock.Visibility = _draft.Vms.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RenderReviewValidationState();
         DraftChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1290,6 +1297,19 @@ public sealed partial class TemplatesBuilderView : UserControl
         var dcCount = draft.Vms.Count(vm => vm.IsActiveDirectoryDomainController);
         var nicCount = draft.Vms.Sum(vm => vm.Nics.Count);
         return $"{draft.LabNetworks.Count} networks, {draft.CredentialSlots.Count} credential slot references, {draft.Forests.Count} forests, {draft.Domains.Count} domains, {draft.Vms.Count} VMs, {dcCount} Active Directory Domain Controller role assignments, {nicCount} NICs.";
+    }
+
+    private void RenderReviewValidationState()
+    {
+        BuilderReviewSummaryTextBlock.Text = $"{BuildReviewSummary(_draft)} {_validationState.BuildReviewSummary()}";
+        BuilderReviewBlockerTextBlock.Text = _validationState.HasBlockers
+            ? string.Join(Environment.NewLine, _validationState.Blockers.Select(issue => issue.Message))
+            : _validationState.Warnings.Count > 0
+                ? string.Join(Environment.NewLine, _validationState.Warnings.Select(issue => issue.Message))
+                : "Builder validation has no current blockers or warnings.";
+        BuilderReviewBlockerTextBlock.Visibility = _validationState.HasBlockers || _validationState.Warnings.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private static string FormatResourceName(string primary, string fallback)
