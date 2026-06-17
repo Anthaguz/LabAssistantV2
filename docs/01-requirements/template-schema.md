@@ -259,7 +259,7 @@ The first Builder slice authors V2 intent through a structured step-based workfl
 5. VMs
 6. Review
 
-General contains template name, description, deployment profile, and read-only schema/version metadata if shown. This does not rename persisted schema/version fields. Deployment profile remains the Conservative/Balanced/Aggressive field.
+General contains template name, description, deployment profile, and read-only schema/version metadata if shown. This does not rename persisted schema/version fields. Deployment profile remains the Conservative/Balanced/Aggressive field, but Builder presents it as a visible horizontal selector below description rather than a dropdown. The selector includes a Segoe MDL2 information tooltip explaining the practical deployment pacing and host-resource tradeoffs.
 
 Active top-level state uses existing shell resources, including `ShellAccentBrush`, selected background, and selected border treatment. Completion/error badges are deferred to a later Review/validation UX slice.
 

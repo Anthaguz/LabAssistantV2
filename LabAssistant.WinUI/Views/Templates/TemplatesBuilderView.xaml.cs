@@ -37,6 +37,9 @@ public sealed partial class TemplatesBuilderView : UserControl
     private const string ButtonBackgroundPressedResource = "ButtonBackgroundPressed";
     private const string ButtonBorderBrushPointerOverResource = "ButtonBorderBrushPointerOver";
     private const string ButtonBorderBrushPressedResource = "ButtonBorderBrushPressed";
+    private const string ConservativeDeploymentProfile = "Conservative";
+    private const string BalancedDeploymentProfile = "Balanced";
+    private const string AggressiveDeploymentProfile = "Aggressive";
 
     private bool _isUpdatingDraft;
     private bool _canNavigateWorkflow;
@@ -45,6 +48,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private TemplatesBuilderDraftSnapshot _draft = CreateEmptyDraft();
     private TemplatesBuilderValidationState _validationState = TemplatesBuilderValidationState.Empty;
     private TemplatesBuilderActionState _actionState;
+    private string _selectedDeploymentProfile = BalancedDeploymentProfile;
     private int _selectedNetworkIndex;
     private int _selectedCredentialSlotIndex;
     private int _selectedVmIndex;
@@ -60,10 +64,12 @@ public sealed partial class TemplatesBuilderView : UserControl
     public TemplatesBuilderView()
     {
         InitializeComponent();
-        BuilderDeploymentProfileComboBox.SelectedIndex = 1;
         BuilderTemplateNameTextBox.TextChanged += BuilderDraftControl_Changed;
         BuilderTemplateDescriptionTextBox.TextChanged += BuilderDraftControl_Changed;
-        BuilderDeploymentProfileComboBox.SelectionChanged += BuilderSelectionControl_Changed;
+        ConfigureDeploymentProfileButton(BuilderDeploymentProfileConservativeButton, ConservativeDeploymentProfile);
+        ConfigureDeploymentProfileButton(BuilderDeploymentProfileBalancedButton, BalancedDeploymentProfile);
+        ConfigureDeploymentProfileButton(BuilderDeploymentProfileAggressiveButton, AggressiveDeploymentProfile);
+        SetSelectedProfile(BalancedDeploymentProfile);
         BuilderAddNetworkButton.Click += BuilderAddNetworkButton_Click;
         BuilderAddCredentialSlotButton.Click += BuilderAddCredentialSlotButton_Click;
         BuilderAddForestButton.Click += BuilderAddForestButton_Click;
@@ -1002,30 +1008,58 @@ public sealed partial class TemplatesBuilderView : UserControl
     }
 
     private string GetSelectedProfile()
-    {
-        if (BuilderDeploymentProfileComboBox.SelectedItem is ComboBoxItem item &&
-            item.Content is string content)
-        {
-            return content;
-        }
-
-        return "Balanced";
-    }
+        => _selectedDeploymentProfile;
 
     private void SetSelectedProfile(string profile)
     {
-        var normalized = string.IsNullOrWhiteSpace(profile) ? "Balanced" : profile.Trim();
-        foreach (var item in BuilderDeploymentProfileComboBox.Items.OfType<ComboBoxItem>())
+        _selectedDeploymentProfile = NormalizeDeploymentProfile(profile);
+        UpdateDeploymentProfileButtonState();
+    }
+
+    private void ConfigureDeploymentProfileButton(Button button, string profile)
+    {
+        button.Tag = profile;
+        ConfigureNavButtonChrome(button);
+        button.Click += BuilderDeploymentProfileButton_Click;
+    }
+
+    private void BuilderDeploymentProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string profile })
         {
-            if (item.Content is string content &&
-                string.Equals(content, normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                BuilderDeploymentProfileComboBox.SelectedItem = item;
-                return;
-            }
+            return;
         }
 
-        BuilderDeploymentProfileComboBox.SelectedIndex = 1;
+        SetSelectedProfile(profile);
+        NotifyDraftChanged((Button)sender);
+    }
+
+    private void UpdateDeploymentProfileButtonState()
+    {
+        UpdateDeploymentProfileButton(BuilderDeploymentProfileConservativeButton, ConservativeDeploymentProfile);
+        UpdateDeploymentProfileButton(BuilderDeploymentProfileBalancedButton, BalancedDeploymentProfile);
+        UpdateDeploymentProfileButton(BuilderDeploymentProfileAggressiveButton, AggressiveDeploymentProfile);
+    }
+
+    private void UpdateDeploymentProfileButton(Button button, string profile)
+    {
+        var isSelected = string.Equals(_selectedDeploymentProfile, profile, StringComparison.OrdinalIgnoreCase);
+        button.Content = CreateNavButtonContent(profile, isSelected);
+    }
+
+    private static string NormalizeDeploymentProfile(string profile)
+    {
+        if (string.Equals(profile, ConservativeDeploymentProfile, StringComparison.OrdinalIgnoreCase))
+        {
+            return ConservativeDeploymentProfile;
+        }
+
+        if (string.Equals(profile, AggressiveDeploymentProfile, StringComparison.OrdinalIgnoreCase))
+        {
+            return AggressiveDeploymentProfile;
+        }
+
+        return BalancedDeploymentProfile;
     }
 
     private TextBox CreateTextBox(string header, string tag, string value)
