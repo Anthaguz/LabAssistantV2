@@ -59,7 +59,7 @@ internal sealed class TemplatesBuilderWorkspaceController
     {
         await EnsureReferenceDataAsync(forceRefresh: true);
         _workspace.ApplyDraft(TemplatesBuilderDraftMapper.CreateSuggestedDraft(_referenceData));
-        _workspace.SetStatus("Deterministic suggestions applied. Review and confirm before saving.");
+        _workspace.SetStatus("Deterministic suggestions applied. Review before saving.");
         _host.ApplyWorkspaceState();
     }
 
@@ -92,13 +92,6 @@ internal sealed class TemplatesBuilderWorkspaceController
         if (!_workspace.HasActiveDraft)
         {
             _workspace.SetStatus("Create or open a V2 Builder draft first.");
-            _host.ApplyWorkspaceState();
-            return;
-        }
-
-        if (!_workspace.IsSaveConfirmed)
-        {
-            _workspace.SetStatus("Confirm the visible Builder draft before saving.");
             _host.ApplyWorkspaceState();
             return;
         }
@@ -145,13 +138,6 @@ internal sealed class TemplatesBuilderWorkspaceController
         if (!_workspace.HasActiveDraft)
         {
             _workspace.SetStatus("Create or open a V2 Builder draft first.");
-            _host.ApplyWorkspaceState();
-            return;
-        }
-
-        if (!_workspace.IsSaveConfirmed)
-        {
-            _workspace.SetStatus("Confirm the visible Builder draft before saving.");
             _host.ApplyWorkspaceState();
             return;
         }

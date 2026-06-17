@@ -15,22 +15,21 @@ internal readonly record struct TemplatesBuilderViewState(
     TemplatesBuilderDraftSnapshot Draft);
 
 internal readonly record struct TemplatesBuilderActionState(
-    bool CanApplySuggestions,
-    bool CanValidate,
+    bool CanNavigate,
     bool CanSave,
     bool CanSaveAs,
     bool CanBackToLibrary);
 
 public sealed partial class TemplatesBuilderView : UserControl
 {
-    private static readonly BuilderWorkflowStep[] WorkflowStepOrder =
+    private static readonly BuilderVmDetailCategory[] VmDetailCategoryOrder =
     [
-        BuilderWorkflowStep.General,
-        BuilderWorkflowStep.Networks,
-        BuilderWorkflowStep.ForestsDomains,
-        BuilderWorkflowStep.Credentials,
-        BuilderWorkflowStep.Vms,
-        BuilderWorkflowStep.Review
+        BuilderVmDetailCategory.Basics,
+        BuilderVmDetailCategory.Resources,
+        BuilderVmDetailCategory.Membership,
+        BuilderVmDetailCategory.Roles,
+        BuilderVmDetailCategory.Networking,
+        BuilderVmDetailCategory.Credentials
     ];
 
     private const string ButtonBackgroundPointerOverResource = "ButtonBackgroundPointerOver";
@@ -43,6 +42,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private BuilderWorkflowStep _selectedStep = BuilderWorkflowStep.General;
     private BuilderVmDetailCategory _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
     private TemplatesBuilderDraftSnapshot _draft = CreateEmptyDraft();
+    private TemplatesBuilderActionState _actionState;
     private int _selectedNetworkIndex;
     private int _selectedCredentialSlotIndex;
     private int _selectedVmIndex;
@@ -51,8 +51,6 @@ public sealed partial class TemplatesBuilderView : UserControl
     private int _selectedForestDomainIndex;
 
     public event EventHandler? DraftChanged;
-    public event EventHandler? ApplySuggestionsRequested;
-    public event EventHandler? ValidateRequested;
     public event EventHandler? SaveRequested;
     public event EventHandler? SaveAsRequested;
     public event EventHandler? BackToLibraryRequested;
@@ -64,15 +62,11 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderTemplateNameTextBox.TextChanged += BuilderDraftControl_Changed;
         BuilderTemplateDescriptionTextBox.TextChanged += BuilderDraftControl_Changed;
         BuilderDeploymentProfileComboBox.SelectionChanged += BuilderSelectionControl_Changed;
-        BuilderConfirmSaveCheckBox.Checked += BuilderConfirmSaveCheckBox_Changed;
-        BuilderConfirmSaveCheckBox.Unchecked += BuilderConfirmSaveCheckBox_Changed;
         BuilderAddNetworkButton.Click += BuilderAddNetworkButton_Click;
         BuilderAddCredentialSlotButton.Click += BuilderAddCredentialSlotButton_Click;
         BuilderAddForestButton.Click += BuilderAddForestButton_Click;
         BuilderAddDomainButton.Click += BuilderAddDomainButton_Click;
         BuilderAddVmButton.Click += BuilderAddVmButton_Click;
-        BuilderApplySuggestionsButton.Click += BuilderApplySuggestionsButton_Click;
-        BuilderValidateButton.Click += BuilderValidateButton_Click;
         BuilderSaveButton.Click += BuilderSaveButton_Click;
         BuilderSaveAsButton.Click += BuilderSaveAsButton_Click;
         BuilderBackToLibraryButton.Click += BuilderBackToLibraryButton_Click;
@@ -103,7 +97,6 @@ public sealed partial class TemplatesBuilderView : UserControl
             SetTextIfChanged(BuilderTemplateNameTextBox, _draft.TemplateName);
             SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
             SetSelectedProfile(_draft.DeploymentProfile);
-            BuilderConfirmSaveCheckBox.IsChecked = _draft.IsSaveConfirmed;
             RenderDraftResources();
         }
         finally
@@ -114,33 +107,16 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     internal void UpdateActionState(TemplatesBuilderActionState state)
     {
-        _canNavigateWorkflow = state.CanValidate;
-        BuilderAddNetworkButton.IsEnabled = state.CanValidate;
-        BuilderAddCredentialSlotButton.IsEnabled = state.CanValidate;
-        BuilderAddForestButton.IsEnabled = state.CanValidate;
-        BuilderAddDomainButton.IsEnabled = state.CanValidate;
-        BuilderAddVmButton.IsEnabled = state.CanValidate;
-        BuilderApplySuggestionsButton.IsEnabled = state.CanApplySuggestions;
-        BuilderValidateButton.IsEnabled = state.CanValidate;
-        BuilderSaveButton.IsEnabled = state.CanSave;
-        BuilderSaveAsButton.IsEnabled = state.CanSaveAs;
+        _actionState = state;
+        _canNavigateWorkflow = state.CanNavigate;
+        BuilderAddNetworkButton.IsEnabled = state.CanNavigate;
+        BuilderAddCredentialSlotButton.IsEnabled = state.CanNavigate;
+        BuilderAddForestButton.IsEnabled = state.CanNavigate;
+        BuilderAddDomainButton.IsEnabled = state.CanNavigate;
+        BuilderAddVmButton.IsEnabled = state.CanNavigate;
         BuilderBackToLibraryButton.IsEnabled = state.CanBackToLibrary;
         RenderWorkflowTreeState();
-        UpdateStepCommandState();
-    }
-
-    internal void UpdateConfirmationState(bool isSaveConfirmed)
-    {
-        _isUpdatingDraft = true;
-        try
-        {
-            BuilderConfirmSaveCheckBox.IsChecked = isSaveConfirmed;
-            _draft = _draft with { IsSaveConfirmed = isSaveConfirmed };
-        }
-        finally
-        {
-            _isUpdatingDraft = false;
-        }
+        UpdateFooterCommandState(state);
     }
 
     private void SelectStep(BuilderWorkflowStep step)
@@ -180,14 +156,93 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void SelectAdjacentStep(int offset)
     {
-        var currentIndex = Array.IndexOf(WorkflowStepOrder, _selectedStep);
+        UpdateWorkingDraftFromVisibleControls();
+        var routes = BuildWorkflowRoutes();
+        var currentIndex = routes.FindIndex(route => route == GetCurrentRoute());
         var targetIndex = currentIndex + offset;
-        if (targetIndex < 0 || targetIndex >= WorkflowStepOrder.Length)
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= routes.Count)
         {
             return;
         }
 
-        SelectStep(WorkflowStepOrder[targetIndex]);
+        SelectRoute(routes[targetIndex]);
+    }
+
+    private BuilderWorkflowRoute GetCurrentRoute()
+        => _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected
+            ? new BuilderWorkflowRoute(_selectedStep, _selectedVmIndex, _selectedVmDetailCategory)
+            : new BuilderWorkflowRoute(_selectedStep);
+
+    private List<BuilderWorkflowRoute> BuildWorkflowRoutes()
+    {
+        var routes = new List<BuilderWorkflowRoute>
+        {
+            new(BuilderWorkflowStep.General),
+            new(BuilderWorkflowStep.Networks),
+            new(BuilderWorkflowStep.ForestsDomains),
+            new(BuilderWorkflowStep.Credentials),
+            new(BuilderWorkflowStep.Vms)
+        };
+
+        for (var vmIndex = 0; vmIndex < _draft.Vms.Count; vmIndex++)
+        {
+            foreach (var category in VmDetailCategoryOrder)
+            {
+                routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Vms, vmIndex, category));
+            }
+        }
+
+        routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Review));
+        return routes;
+    }
+
+    private void SelectRoute(BuilderWorkflowRoute route)
+    {
+        if (route.Step == BuilderWorkflowStep.Vms)
+        {
+            SelectVmRoute(route);
+            return;
+        }
+
+        _selectedStep = route.Step;
+        _isVmOverviewSelected = false;
+        RenderSelectedStep();
+        RenderDraftResources();
+    }
+
+    private void SelectVmRoute(BuilderWorkflowRoute route)
+    {
+        var wasVmOverviewSelected = _selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected;
+        var wasVmDetailSelected = _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected;
+        var previousVmIndex = _selectedVmIndex;
+        _selectedStep = BuilderWorkflowStep.Vms;
+        if (route.VmIndex < 0)
+        {
+            _isVmOverviewSelected = true;
+            if (!wasVmOverviewSelected)
+            {
+                RenderSelectedStep();
+            }
+
+            RenderVmOverview();
+            UpdateFooterCommandState();
+            return;
+        }
+
+        _selectedVmIndex = ClampIndex(route.VmIndex, _draft.Vms.Count);
+        _isVmOverviewSelected = false;
+        _selectedVmDetailCategory = route.VmDetailCategory;
+        if (!wasVmDetailSelected)
+        {
+            RenderSelectedStep();
+        }
+        else if (previousVmIndex != _selectedVmIndex)
+        {
+            RenderVmNavChildren();
+        }
+
+        RenderSelectedVmDetail();
+        UpdateFooterCommandState();
     }
 
     private void RenderSelectedStep()
@@ -202,7 +257,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderSelectedVmDetailHost.Visibility = _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
 
         RenderWorkflowTreeState();
-        UpdateStepCommandState();
+        UpdateFooterCommandState();
     }
 
     private void RenderWorkflowTreeState()
@@ -227,7 +282,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var vmButton = CreateResourceButton("VMs", _selectedStep == BuilderWorkflowStep.Vms, SelectVmOverview, _canNavigateWorkflow);
+        var vmButton = CreateResourceButton("VMs", _selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected, SelectVmOverview, _canNavigateWorkflow);
         Grid.SetColumn(vmButton, 0);
         row.Children.Add(vmButton);
 
@@ -248,10 +303,24 @@ public sealed partial class TemplatesBuilderView : UserControl
         return row;
     }
 
-    private void UpdateStepCommandState()
+    private void UpdateFooterCommandState()
     {
-        BuilderPreviousStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.General;
-        BuilderNextStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.Review;
+        UpdateFooterCommandState(_actionState);
+    }
+
+    private void UpdateFooterCommandState(TemplatesBuilderActionState state)
+    {
+        var routes = BuildWorkflowRoutes();
+        var currentIndex = routes.FindIndex(route => route == GetCurrentRoute());
+        var isReview = _selectedStep == BuilderWorkflowStep.Review;
+
+        BuilderPreviousStepButton.IsEnabled = _canNavigateWorkflow && currentIndex > 0;
+        BuilderNextStepButton.IsEnabled = _canNavigateWorkflow && !isReview && currentIndex >= 0 && currentIndex < routes.Count - 1;
+        BuilderNextStepButton.Visibility = isReview ? Visibility.Collapsed : Visibility.Visible;
+        BuilderSaveAsButton.IsEnabled = isReview && state.CanSaveAs;
+        BuilderSaveButton.IsEnabled = isReview && state.CanSave;
+        BuilderSaveAsButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed;
+        BuilderSaveButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RenderDraftResources()
@@ -264,6 +333,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderVmOverview();
         RenderSelectedVmDetail();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
+        BuilderReviewBlockerTextBlock.Visibility = _draft.Vms.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RenderVmOverview()
@@ -554,8 +624,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         {
             TemplateName = BuilderTemplateNameTextBox.Text,
             TemplateDescription = BuilderTemplateDescriptionTextBox.Text,
-            DeploymentProfile = GetSelectedProfile(),
-            IsSaveConfirmed = BuilderConfirmSaveCheckBox.IsChecked == true
+            DeploymentProfile = GetSelectedProfile()
         };
 
         draft = UpdateSelectedNetwork(draft);
@@ -716,7 +785,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         NotifyDraftChanged(sender);
     }
 
-    private void BuilderConfirmSaveCheckBox_Changed(object sender, RoutedEventArgs e)
+    private void BuilderCheckBox_Changed(object sender, RoutedEventArgs e)
     {
         NotifyDraftChanged(sender);
     }
@@ -809,16 +878,6 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderAndNotify(draft with { Vms = vms, IsSaveConfirmed = false });
     }
 
-    private void BuilderApplySuggestionsButton_Click(object sender, RoutedEventArgs e)
-    {
-        ApplySuggestionsRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void BuilderValidateButton_Click(object sender, RoutedEventArgs e)
-    {
-        ValidateRequested?.Invoke(this, EventArgs.Empty);
-    }
-
     private void BuilderSaveButton_Click(object sender, RoutedEventArgs e)
     {
         SaveRequested?.Invoke(this, EventArgs.Empty);
@@ -843,7 +902,6 @@ public sealed partial class TemplatesBuilderView : UserControl
             SetTextIfChanged(BuilderTemplateNameTextBox, _draft.TemplateName);
             SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
             SetSelectedProfile(_draft.DeploymentProfile);
-            BuilderConfirmSaveCheckBox.IsChecked = _draft.IsSaveConfirmed;
             RenderDraftResources();
             RenderSelectedStep();
         }
@@ -866,6 +924,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderResourceLists();
         RenderVmOverview();
         BuilderReviewSummaryTextBlock.Text = BuildReviewSummary(_draft);
+        BuilderReviewBlockerTextBlock.Visibility = _draft.Vms.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DraftChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -880,8 +939,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         {
             TemplateName = BuilderTemplateNameTextBox.Text,
             TemplateDescription = BuilderTemplateDescriptionTextBox.Text,
-            DeploymentProfile = GetSelectedProfile(),
-            IsSaveConfirmed = BuilderConfirmSaveCheckBox.IsChecked == true
+            DeploymentProfile = GetSelectedProfile()
         };
 
         if (sender is not FrameworkElement element ||
@@ -1003,8 +1061,8 @@ public sealed partial class TemplatesBuilderView : UserControl
             Tag = tag,
             IsChecked = isChecked
         };
-        checkBox.Checked += BuilderConfirmSaveCheckBox_Changed;
-        checkBox.Unchecked += BuilderConfirmSaveCheckBox_Changed;
+        checkBox.Checked += BuilderCheckBox_Changed;
+        checkBox.Unchecked += BuilderCheckBox_Changed;
         return checkBox;
     }
 
@@ -1293,4 +1351,9 @@ public sealed partial class TemplatesBuilderView : UserControl
         Networking,
         Credentials
     }
+
+    private readonly record struct BuilderWorkflowRoute(
+        BuilderWorkflowStep Step,
+        int VmIndex = -1,
+        BuilderVmDetailCategory VmDetailCategory = BuilderVmDetailCategory.Basics);
 }

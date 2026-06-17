@@ -110,8 +110,7 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
             HasActiveDraft: _workspace.HasActiveDraft,
             Draft: _workspace.CaptureDraft()));
         _view.UpdateActionState(new TemplatesBuilderActionState(
-            CanApplySuggestions: !_host.IsTemplatesLoading,
-            CanValidate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
+            CanNavigate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
             CanSave: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
             CanSaveAs: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
             CanBackToLibrary: !_host.IsTemplatesLoading));
@@ -140,8 +139,6 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
     private void WireHandlers()
     {
         _view.DraftChanged += TemplatesBuilderView_DraftChanged;
-        _view.ApplySuggestionsRequested += TemplatesBuilderView_ApplySuggestionsRequested;
-        _view.ValidateRequested += TemplatesBuilderView_ValidateRequested;
         _view.SaveRequested += TemplatesBuilderView_SaveRequested;
         _view.SaveAsRequested += TemplatesBuilderView_SaveAsRequested;
         _view.BackToLibraryRequested += TemplatesBuilderView_BackToLibraryRequested;
@@ -150,23 +147,11 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
     private void TemplatesBuilderView_DraftChanged(object? sender, EventArgs e)
     {
         _workspace.ApplyDraft(_view.CaptureDraft());
-        _view.UpdateConfirmationState(_workspace.IsSaveConfirmed);
         _view.UpdateActionState(new TemplatesBuilderActionState(
-            CanApplySuggestions: !_host.IsTemplatesLoading,
-            CanValidate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
+            CanNavigate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
             CanSave: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
             CanSaveAs: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,
             CanBackToLibrary: !_host.IsTemplatesLoading));
-    }
-
-    private async void TemplatesBuilderView_ApplySuggestionsRequested(object? sender, EventArgs e)
-    {
-        await _controller.ApplySuggestionsAsync();
-    }
-
-    private async void TemplatesBuilderView_ValidateRequested(object? sender, EventArgs e)
-    {
-        await _controller.ValidateAsync();
     }
 
     private async void TemplatesBuilderView_SaveRequested(object? sender, EventArgs e)

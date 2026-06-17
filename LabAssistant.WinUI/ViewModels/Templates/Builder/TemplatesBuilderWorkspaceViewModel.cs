@@ -64,7 +64,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
         ApplyDraft(draft with { IsSaveConfirmed = false });
         HasActiveDraft = true;
         ContextText = "Editing new V2 Builder draft.";
-        SetStatus("Review the suggested topology, confirm intent, then save.");
+        SetStatus("Review the suggested topology, then save.");
     }
 
     public void LoadDocument(TemplateEditorDocument document)

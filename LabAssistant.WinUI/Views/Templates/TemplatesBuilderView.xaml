@@ -215,11 +215,11 @@
                                     ColumnSpacing="10"
                                     Visibility="Collapsed">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="150" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" x:Name="BuilderVmDetailCategoryNavPanel" Spacing="6" />
-                                    <StackPanel Grid.Column="1" x:Name="BuilderSelectedVmDetailPanel" Spacing="8" />
+                                    <StackPanel Grid.Column="0" x:Name="BuilderSelectedVmDetailPanel" Spacing="8" />
+                                    <StackPanel Grid.Column="1" x:Name="BuilderVmDetailCategoryNavPanel" Spacing="6" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -238,9 +238,12 @@
                                     x:Name="BuilderReviewSummaryTextBlock"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     TextWrapping="Wrap" />
-                                <CheckBox
-                                    x:Name="BuilderConfirmSaveCheckBox"
-                                    Content="I confirm this visible V2 Builder draft should be persisted." />
+                                <TextBlock
+                                    x:Name="BuilderReviewBlockerTextBlock"
+                                    Foreground="{StaticResource ShellCriticalBrush}"
+                                    Text="At least one VM is required before Save."
+                                    TextWrapping="Wrap"
+                                    Visibility="Collapsed" />
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -248,15 +251,28 @@
             </Grid>
 
             <StackPanel Grid.Row="2" Spacing="6">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="BuilderApplySuggestionsButton" Content="Apply Suggestions" />
-                    <Button x:Name="BuilderValidateButton" Content="Validate" />
-                    <Button x:Name="BuilderSaveButton" Content="Save" />
-                    <Button x:Name="BuilderSaveAsButton" Content="Save As" />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <Button x:Name="BuilderBackToLibraryButton" Content="Back" />
-                    <Button x:Name="BuilderPreviousStepButton" Content="Previous" />
-                    <Button x:Name="BuilderNextStepButton" Content="Next" />
-                </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="BuilderPreviousStepButton" Content="Previous" />
+                        <Button
+                            x:Name="BuilderNextStepButton"
+                            Background="{StaticResource ShellAccentBrush}"
+                            Content="Next"
+                            Foreground="{StaticResource ShellTopBarForegroundBrush}" />
+                        <Button x:Name="BuilderSaveAsButton" Content="Save As" Visibility="Collapsed" />
+                        <Button
+                            x:Name="BuilderSaveButton"
+                            Background="{StaticResource ShellAccentBrush}"
+                            Content="Save"
+                            Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                            Visibility="Collapsed" />
+                    </StackPanel>
+                </Grid>
                 <TextBlock
                     x:Name="BuilderStatusTextBlock"
                     Foreground="{StaticResource ShellTextSecondaryBrush}"

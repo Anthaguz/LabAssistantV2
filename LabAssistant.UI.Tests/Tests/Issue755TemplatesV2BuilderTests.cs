@@ -142,16 +142,23 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.DoesNotContain("NicsText", builderModels);
         Assert.DoesNotContain("topologyRole", builder.ToString(), StringComparison.OrdinalIgnoreCase);
 
-        var confirmation = FindByName(builder, "BuilderConfirmSaveCheckBox");
-        Assert.Contains(confirmation.Ancestors(), ancestor => HasName(ancestor, "BuilderReviewSection"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderApplySuggestionsButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderValidateButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderConfirmSaveCheckBox"));
+        Assert.NotNull(FindByName(builder, "BuilderReviewBlockerTextBlock"));
         Assert.Equal("Back", FindByName(builder, "BuilderBackToLibraryButton").Attribute("Content")?.Value);
         Assert.Equal("Previous", FindByName(builder, "BuilderPreviousStepButton").Attribute("Content")?.Value);
         Assert.Equal("Next", FindByName(builder, "BuilderNextStepButton").Attribute("Content")?.Value);
+        Assert.Equal("Save As", FindByName(builder, "BuilderSaveAsButton").Attribute("Content")?.Value);
+        Assert.Equal("Save", FindByName(builder, "BuilderSaveButton").Attribute("Content")?.Value);
+        Assert.Equal("{StaticResource ShellAccentBrush}", FindByName(builder, "BuilderNextStepButton").Attribute("Background")?.Value);
+        Assert.Equal("{StaticResource ShellAccentBrush}", FindByName(builder, "BuilderSaveButton").Attribute("Background")?.Value);
         Assert.Contains("SelectAdjacentStep(-1)", builderSource);
         Assert.Contains("SelectAdjacentStep(1)", builderSource);
-        Assert.Contains("WorkflowStepOrder", builderSource);
-        Assert.Contains("BuilderPreviousStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.General", builderSource);
-        Assert.Contains("BuilderNextStepButton.IsEnabled = _canNavigateWorkflow && _selectedStep != BuilderWorkflowStep.Review", builderSource);
+        Assert.Contains("BuildWorkflowRoutes", builderSource);
+        Assert.Contains("BuilderNextStepButton.Visibility = isReview ? Visibility.Collapsed : Visibility.Visible", builderSource);
+        Assert.Contains("BuilderSaveAsButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", builderSource);
+        Assert.Contains("BuilderSaveButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", builderSource);
         Assert.Contains("_isVmOverviewSelected = step == BuilderWorkflowStep.Vms", builderSource);
     }
 
@@ -173,7 +180,7 @@ public sealed class Issue755TemplatesV2BuilderTests
         var builderModels = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderDraftModels.cs")));
         var textHandlerBody = ExtractMethodBody(builderSource, "private void BuilderDraftControl_Changed(object sender, TextChangedEventArgs e)");
         var selectionHandlerBody = ExtractMethodBody(builderSource, "private void BuilderSelectionControl_Changed(object sender, SelectionChangedEventArgs e)");
-        var checkboxHandlerBody = ExtractMethodBody(builderSource, "private void BuilderConfirmSaveCheckBox_Changed(object sender, RoutedEventArgs e)");
+        var checkboxHandlerBody = ExtractMethodBody(builderSource, "private void BuilderCheckBox_Changed(object sender, RoutedEventArgs e)");
         var notifyDraftChangedBody = ExtractMethodBody(builderSource, "private void NotifyDraftChanged(object sender)");
         var changedControlBody = ExtractMethodBody(builderSource, "private void UpdateWorkingDraftFromChangedControl(object sender)");
 
@@ -293,6 +300,61 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("_selectedStep = BuilderWorkflowStep.Vms;", addVmBody);
         Assert.Contains("_isVmOverviewSelected = false;", addVmBody);
         Assert.Contains("_selectedVmDetailCategory = BuilderVmDetailCategory.Basics;", addVmBody);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_PreviousNextRoute_IncludesEveryVmCategoryInDraftOrder()
+    {
+        var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var routeBody = ExtractMethodBody(builderSource, "private List<BuilderWorkflowRoute> BuildWorkflowRoutes()");
+        var selectAdjacentBody = ExtractMethodBody(builderSource, "private void SelectAdjacentStep(int offset)");
+        var selectRouteBody = ExtractMethodBody(builderSource, "private void SelectRoute(BuilderWorkflowRoute route)");
+        var selectVmRouteBody = ExtractMethodBody(builderSource, "private void SelectVmRoute(BuilderWorkflowRoute route)");
+        var vmRowBody = ExtractMethodBody(builderSource, "private Grid CreateVmWorkflowNavRow()");
+
+        Assert.Contains("new(BuilderWorkflowStep.General)", routeBody);
+        Assert.Contains("new(BuilderWorkflowStep.Networks)", routeBody);
+        Assert.Contains("new(BuilderWorkflowStep.ForestsDomains)", routeBody);
+        Assert.Contains("new(BuilderWorkflowStep.Credentials)", routeBody);
+        Assert.Contains("new(BuilderWorkflowStep.Vms)", routeBody);
+        Assert.Contains("for (var vmIndex = 0; vmIndex < _draft.Vms.Count; vmIndex++)", routeBody);
+        Assert.Contains("foreach (var category in VmDetailCategoryOrder)", routeBody);
+        Assert.Contains("routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Vms, vmIndex, category));", routeBody);
+        Assert.Contains("routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Review));", routeBody);
+        Assert.Contains("UpdateWorkingDraftFromVisibleControls();", selectAdjacentBody);
+        Assert.Contains("SelectRoute(routes[targetIndex]);", selectAdjacentBody);
+        Assert.Contains("if (route.Step == BuilderWorkflowStep.Vms)", selectRouteBody);
+        Assert.Contains("SelectVmRoute(route);", selectRouteBody);
+        Assert.DoesNotContain("RenderDraftResources();", selectVmRouteBody);
+        Assert.Contains("RenderVmOverview();", selectVmRouteBody);
+        Assert.Contains("RenderVmNavChildren();", selectVmRouteBody);
+        Assert.Contains("RenderSelectedVmDetail();", selectVmRouteBody);
+        Assert.Contains("UpdateFooterCommandState();", selectVmRouteBody);
+        Assert.Contains("_selectedVmDetailCategory = route.VmDetailCategory;", selectVmRouteBody);
+        Assert.Contains("_selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected", vmRowBody);
+        Assert.Equal("0", FindByName(builder, "BuilderSelectedVmDetailPanel").Attribute("Grid.Column")?.Value);
+        Assert.Equal("1", FindByName(builder, "BuilderVmDetailCategoryNavPanel").Attribute("Grid.Column")?.Value);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_FooterRemovesManualValidationAndShowsReviewOnlySaveActions()
+    {
+        var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var updateFooterBody = ExtractMethodBody(builderSource, "private void UpdateFooterCommandState(TemplatesBuilderActionState state)");
+        var compositionSource = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderWorkspaceComposition.cs")));
+
+        Assert.Null(FindByNameOrDefault(builder, "BuilderApplySuggestionsButton"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderValidateButton"));
+        Assert.DoesNotContain("ApplySuggestionsRequested", builderSource);
+        Assert.DoesNotContain("ValidateRequested", builderSource);
+        Assert.DoesNotContain("ApplySuggestionsRequested", compositionSource);
+        Assert.DoesNotContain("ValidateRequested", compositionSource);
+        Assert.Contains("BuilderSaveAsButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", updateFooterBody);
+        Assert.Contains("BuilderSaveButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", updateFooterBody);
+        Assert.Contains("BuilderSaveAsButton.IsEnabled = isReview && state.CanSaveAs;", updateFooterBody);
+        Assert.Contains("BuilderSaveButton.IsEnabled = isReview && state.CanSave;", updateFooterBody);
     }
 
     [Fact]
@@ -416,6 +478,27 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         Assert.True(plan.Success);
         Assert.False(plan.Context.DomainSemanticsRequired);
+    }
+
+    [Fact]
+    public void BuilderDraftMapper_BlocksZeroVmDraftBeforeSave()
+    {
+        var draft = CreateConfirmedBuilderDraft();
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft with
+            {
+                Forests = [],
+                Domains = [],
+                Vms = []
+            },
+            templateId: "template-v2-empty",
+            templateRevision: 1,
+            createdWithAppVersion: "1.0.0",
+            sourceFilePath: null);
+
+        Assert.Null(build.Document);
+        Assert.Contains(build.Errors, error => error.Contains("At least one VM is required before Save.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -543,7 +626,7 @@ public sealed class Issue755TemplatesV2BuilderTests
     }
 
     [Fact]
-    public async Task BuilderSave_EditsAfterConfirmation_BlockSaveUntilReconfirmed()
+    public async Task BuilderSave_UsesReviewAsConfirmationWithoutSeparateCheckboxGate()
     {
         var workspace = new TemplatesBuilderWorkspaceViewModel();
         var service = new RecordingTemplatesCapabilityService();
@@ -552,24 +635,17 @@ public sealed class Issue755TemplatesV2BuilderTests
         var draft = CreateConfirmedBuilderDraft();
 
         workspace.LoadNewDraft(draft with { IsSaveConfirmed = false });
-        workspace.ApplyDraft(draft);
         workspace.ApplyDraft(workspace.CaptureDraft() with
         {
             TemplateDescription = "Changed after confirmation.",
-            IsSaveConfirmed = true
+            IsSaveConfirmed = false
         });
 
         await controller.SaveAsync();
 
-        Assert.Equal(0, service.SaveCalls);
-        Assert.False(workspace.IsSaveConfirmed);
-        Assert.Contains("Confirm the visible Builder draft before saving.", workspace.StatusText);
-
-        workspace.ApplyDraft(workspace.CaptureDraft() with { IsSaveConfirmed = true });
-
-        await controller.SaveAsync();
-
         Assert.Equal(1, service.SaveCalls);
+        Assert.Equal("Changed after confirmation.", service.LastSavedDocument!.Template.Description);
+        Assert.DoesNotContain("Confirm the visible Builder draft before saving.", workspace.StatusText);
     }
 
     [Fact]
