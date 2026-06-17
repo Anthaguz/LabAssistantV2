@@ -118,6 +118,84 @@ public sealed class Issue787TemplatesBuilderScopedValidationTests
     }
 
     [Fact]
+    public void BuilderWorkspace_ScopedVmIdentityRefresh_PreservesOtherVmIdentityBlockers()
+    {
+        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var draft = CreateBuilderDraft();
+        var vmAInvalid = draft.Vms[0] with { Name = "bad/name" };
+        var vmBInvalid = draft.Vms[1] with { Name = "bad name" };
+
+        workspace.LoadNewDraft(draft);
+        workspace.ApplyDraft(draft with { Vms = [vmAInvalid, vmBInvalid] });
+        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
+
+        Assert.True(workspace.HasValidationBlockers);
+        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.ScopeKey == draft.Vms[0].VmId);
+        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.VmIdentity &&
+            issue.ScopeKey == draft.Vms[1].VmId &&
+            issue.Message.Contains("unsupported characters", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuilderWorkspace_ScopedNetworkRefresh_PreservesOtherNetworkBlockers()
+    {
+        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var draft = CreateBuilderDraft();
+        var branchNetwork = new TemplatesBuilderLabNetworkDraft("lab-branch", "Branch", "vSwitch-Branch", "10.1.0.0/24", string.Empty);
+        var vmAInvalid = draft.Vms[0] with
+        {
+            Nics = [draft.Vms[0].Nics[0] with { IpAddress = "not-an-ip" }]
+        };
+        var vmBInvalid = draft.Vms[1] with
+        {
+            Nics = [draft.Vms[1].Nics[0] with { NetworkId = "lab-branch", IpAddress = "10.2.0.20" }]
+        };
+
+        workspace.LoadNewDraft(draft);
+        workspace.ApplyDraft(draft with
+        {
+            LabNetworks = [draft.LabNetworks[0], branchNetwork],
+            Vms = [vmAInvalid, vmBInvalid]
+        });
+        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
+
+        Assert.True(workspace.HasValidationBlockers);
+        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.Network &&
+            issue.ScopeKey == "lab-core");
+        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.Network &&
+            issue.ScopeKey == "lab-branch" &&
+            issue.Message.Contains("must fit network", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuilderWorkspace_ScopedMembershipRefresh_PreservesOtherMembershipBlockers()
+    {
+        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var draft = CreateBuilderDraft();
+        var vmAInvalid = draft.Vms[0] with
+        {
+            MembershipMode = V2MembershipModeCatalog.Standalone,
+            DomainId = "domain-contoso",
+            IsActiveDirectoryDomainController = false
+        };
+        var vmBInvalid = draft.Vms[1] with { DomainId = "domain-missing" };
+
+        workspace.LoadNewDraft(draft);
+        workspace.ApplyDraft(draft with { Vms = [vmAInvalid, vmBInvalid] });
+        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
+
+        Assert.True(workspace.HasValidationBlockers);
+        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.ScopeKey == draft.Vms[0].VmId);
+        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+            issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
+            issue.ScopeKey == draft.Vms[1].VmId &&
+            issue.Message.Contains("unknown domain", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void TemplatesBuilderView_ReviewAggregatesValidationStateWithoutManualValidateAction()
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));

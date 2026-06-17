@@ -28,16 +28,25 @@ internal sealed class TemplatesBuilderValidationState
     public static TemplatesBuilderValidationState Empty { get; } = new(
         [],
         [],
-        new HashSet<TemplatesBuilderValidationCategory>());
+        new HashSet<TemplatesBuilderValidationCategory>(),
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase));
 
     public TemplatesBuilderValidationState(
         IReadOnlyList<TemplatesBuilderValidationIssue> blockers,
         IReadOnlyList<TemplatesBuilderValidationIssue> warnings,
-        IReadOnlySet<TemplatesBuilderValidationCategory> evaluatedCategories)
+        IReadOnlySet<TemplatesBuilderValidationCategory> evaluatedCategories,
+        IReadOnlySet<string> evaluatedDomainIds,
+        IReadOnlySet<string> evaluatedNetworkIds,
+        IReadOnlySet<string> evaluatedVmIds)
     {
         Blockers = blockers;
         Warnings = warnings;
         EvaluatedCategories = evaluatedCategories;
+        EvaluatedDomainIds = evaluatedDomainIds;
+        EvaluatedNetworkIds = evaluatedNetworkIds;
+        EvaluatedVmIds = evaluatedVmIds;
     }
 
     public IReadOnlyList<TemplatesBuilderValidationIssue> Blockers { get; }
@@ -45,6 +54,12 @@ internal sealed class TemplatesBuilderValidationState
     public IReadOnlyList<TemplatesBuilderValidationIssue> Warnings { get; }
 
     public IReadOnlySet<TemplatesBuilderValidationCategory> EvaluatedCategories { get; }
+
+    public IReadOnlySet<string> EvaluatedDomainIds { get; }
+
+    public IReadOnlySet<string> EvaluatedNetworkIds { get; }
+
+    public IReadOnlySet<string> EvaluatedVmIds { get; }
 
     public bool HasBlockers => Blockers.Count > 0;
 
@@ -270,7 +285,10 @@ internal static class TemplatesBuilderDraftValidator
         return new TemplatesBuilderValidationState(
             issues.Where(issue => issue.Severity == TemplatesBuilderValidationSeverity.Blocker).ToList(),
             issues.Where(issue => issue.Severity == TemplatesBuilderValidationSeverity.Warning).ToList(),
-            request.Categories.ToHashSet());
+            request.Categories.ToHashSet(),
+            request.DomainIds.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            request.NetworkIds.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            request.VmIds.ToHashSet(StringComparer.OrdinalIgnoreCase));
     }
 
     private static void ValidateDomains(
@@ -344,7 +362,7 @@ internal static class TemplatesBuilderDraftValidator
             foreach (var nic in vm.Nics.Where(nic => request.IncludesNetwork(nic.NetworkId)))
             {
                 var networkKey = string.IsNullOrWhiteSpace(nic.NetworkId) ? "(unassigned)" : nic.NetworkId.Trim();
-                var scopeKey = $"{vm.VmId}:{nic.NicId}";
+                var scopeKey = networkKey;
 
                 if (!string.IsNullOrWhiteSpace(nic.IpAddress) && !TryParseIpv4(nic.IpAddress, out var address))
                 {
