@@ -5,7 +5,6 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
 internal static class TemplatesBuilderDraftMapper
 {
-    private const string ActiveDirectoryDomainControllerTopologyRole = "FirstDomainController";
     private const string DefaultCreatedWithAppVersion = "1.0.0";
 
     public static TemplatesBuilderDraftSnapshot CreateSuggestedDraft(TemplatesBuilderReferenceData referenceData)
@@ -312,7 +311,7 @@ internal static class TemplatesBuilderDraftMapper
                 MemoryMb = memoryMb,
                 CpuCount = cpuCount,
                 VhdxId = Optional(vm.VhdxId),
-                TopologyRole = vm.IsActiveDirectoryDomainController ? ActiveDirectoryDomainControllerTopologyRole : null,
+                TopologyRole = vm.IsActiveDirectoryDomainController ? TemplatesBuilderRoleProjectionCatalog.ActiveDirectoryDomainControllerTopologyRole : null,
                 MembershipMode = membershipMode,
                 DomainId = V2MembershipModeCatalog.IsDomainMember(membershipMode) ? vm.DomainId.Trim() : null,
                 CredentialSlots = CreateCredentialSlots(vm.CredentialSlots),
@@ -478,8 +477,7 @@ internal static class TemplatesBuilderDraftMapper
     }
 
     private static bool IsActiveDirectoryDomainController(string? topologyRole)
-        => string.Equals(topologyRole, ActiveDirectoryDomainControllerTopologyRole, StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(topologyRole, "RootDomainController", StringComparison.OrdinalIgnoreCase);
+        => TemplatesBuilderRoleProjectionCatalog.IsActiveDirectoryDomainControllerTopologyRole(topologyRole);
 
     private static List<V2TrustTemplate>? CopyTrusts(IReadOnlyList<V2TrustTemplate>? trusts)
     {
