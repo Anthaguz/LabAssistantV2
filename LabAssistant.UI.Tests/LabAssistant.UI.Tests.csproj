@@ -27,8 +27,11 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\DeployContextBuilder.cs" Link="WinUI\DeployContextBuilder.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesEditorVmDraftModels.cs" Link="WinUI\TemplatesEditorVmDraftModels.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftModels.cs" Link="WinUI\TemplatesBuilderDraftModels.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderFieldKeys.cs" Link="WinUI\TemplatesBuilderFieldKeys.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftMapper.cs" Link="WinUI\TemplatesBuilderDraftMapper.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftValidator.cs" Link="WinUI\TemplatesBuilderDraftValidator.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleProjectionCatalog.cs" Link="WinUI\TemplatesBuilderRoleProjectionCatalog.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderSectionProjections.cs" Link="WinUI\TemplatesBuilderSectionProjections.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkflowNavigation.cs" Link="WinUI\TemplatesBuilderWorkflowNavigation.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkspaceController.cs" Link="WinUI\TemplatesBuilderWorkspaceController.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkspaceViewModel.cs" Link="WinUI\TemplatesBuilderWorkspaceViewModel.cs" />
