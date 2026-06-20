@@ -7,7 +7,7 @@ using Xunit;
 
 namespace LabAssistant.UI.Tests.Tests;
 
-public sealed class Issue787TemplatesBuilderScopedValidationTests
+public sealed class TemplatesBuilderDraftValidationTests
 {
     [Fact]
     public void BuilderValidation_DomainChange_ValidatesDomainAndDependentMembershipReferencesOnly()
@@ -290,6 +290,34 @@ public sealed class Issue787TemplatesBuilderScopedValidationTests
         Assert.Equal(0, host.SavePickerCalls);
         Assert.Contains("blocked", workspace.StatusText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("unsupported characters", workspace.StatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BuilderSaveAndSaveAs_AreBlockedWhenFinalBuildFails()
+    {
+        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var service = new RecordingTemplatesCapabilityService();
+        var host = new RecordingBuilderHost();
+        var controller = new TemplatesBuilderWorkspaceController(service, workspace, host);
+        var draft = CreateBuilderDraft() with { TemplateName = string.Empty };
+
+        workspace.LoadNewDraft(draft);
+
+        Assert.False(workspace.HasValidationBlockers, string.Join(" | ", workspace.ValidationState.Blockers.Select(issue => issue.Message)));
+
+        await controller.SaveAsync();
+
+        Assert.Equal(0, service.SaveCalls);
+        Assert.Equal(0, host.SavePickerCalls);
+        Assert.Contains("Save blocked", workspace.StatusText, StringComparison.Ordinal);
+        Assert.Contains("Template name is required.", workspace.StatusText, StringComparison.Ordinal);
+
+        await controller.SaveAsAsync();
+
+        Assert.Equal(0, service.SaveCalls);
+        Assert.Equal(0, host.SavePickerCalls);
+        Assert.Contains("Save As blocked", workspace.StatusText, StringComparison.Ordinal);
+        Assert.Contains("Template name is required.", workspace.StatusText, StringComparison.Ordinal);
     }
 
     private static TemplatesBuilderDraftSnapshot CreateBuilderDraft()
