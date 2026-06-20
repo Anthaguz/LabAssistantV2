@@ -49,12 +49,14 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
 
     public void SetReferenceData(TemplatesBuilderReferenceData referenceData)
     {
-        var switchText = referenceData.AvailableVmSwitches.Count == 0
+        var availableSwitches = CopyList(referenceData.AvailableVmSwitches);
+        var vhdxCatalogOptions = CopyList(referenceData.VhdxCatalogOptions);
+        var switchText = availableSwitches.Count == 0
             ? "switches: none loaded"
-            : $"switches: {string.Join(", ", referenceData.AvailableVmSwitches)}";
-        var diskText = referenceData.VhdxCatalogOptions.Count == 0
+            : $"switches: {string.Join(", ", availableSwitches)}";
+        var diskText = vhdxCatalogOptions.Count == 0
             ? "catalog disks: none loaded"
-            : $"catalog disks: {string.Join(", ", referenceData.VhdxCatalogOptions.Select(option => option.Id))}";
+            : $"catalog disks: {string.Join(", ", vhdxCatalogOptions.Select(option => option.Id))}";
         ReferenceText = $"{switchText}; {diskText}";
     }
 
@@ -93,24 +95,29 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
 
     public void ApplyDraft(TemplatesBuilderDraftSnapshot draft, TemplatesBuilderValidationRequest validationRequest)
     {
+        var labNetworks = CopyList(draft.LabNetworks);
+        var credentialSlots = CopyList(draft.CredentialSlots);
+        var forests = CopyList(draft.Forests);
+        var domains = CopyList(draft.Domains);
+        var vms = CopyList(draft.Vms);
         var editableContentChanged =
-            !string.Equals(TemplateName, draft.TemplateName, StringComparison.Ordinal) ||
-            !string.Equals(TemplateDescription, draft.TemplateDescription, StringComparison.Ordinal) ||
-            !string.Equals(DeploymentProfile, draft.DeploymentProfile, StringComparison.Ordinal) ||
-            !LabNetworks.SequenceEqual(draft.LabNetworks) ||
-            !CredentialSlots.SequenceEqual(draft.CredentialSlots) ||
-            !Forests.SequenceEqual(draft.Forests) ||
-            !Domains.SequenceEqual(draft.Domains) ||
-            !Vms.SequenceEqual(draft.Vms);
+            !string.Equals(TemplateName, draft.TemplateName ?? string.Empty, StringComparison.Ordinal) ||
+            !string.Equals(TemplateDescription, draft.TemplateDescription ?? string.Empty, StringComparison.Ordinal) ||
+            !string.Equals(DeploymentProfile, draft.DeploymentProfile ?? string.Empty, StringComparison.Ordinal) ||
+            !LabNetworks.SequenceEqual(labNetworks) ||
+            !CredentialSlots.SequenceEqual(credentialSlots) ||
+            !Forests.SequenceEqual(forests) ||
+            !Domains.SequenceEqual(domains) ||
+            !Vms.SequenceEqual(vms);
 
-        TemplateName = draft.TemplateName;
-        TemplateDescription = draft.TemplateDescription;
-        DeploymentProfile = draft.DeploymentProfile;
-        LabNetworks = draft.LabNetworks.ToList();
-        CredentialSlots = draft.CredentialSlots.ToList();
-        Forests = draft.Forests.ToList();
-        Domains = draft.Domains.ToList();
-        Vms = draft.Vms.ToList();
+        TemplateName = draft.TemplateName ?? string.Empty;
+        TemplateDescription = draft.TemplateDescription ?? string.Empty;
+        DeploymentProfile = draft.DeploymentProfile ?? string.Empty;
+        LabNetworks = labNetworks;
+        CredentialSlots = credentialSlots;
+        Forests = forests;
+        Domains = domains;
+        Vms = vms;
         IsSaveConfirmed = editableContentChanged && IsSaveConfirmed
             ? false
             : draft.IsSaveConfirmed;
@@ -171,6 +178,9 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
             })
             .ToList();
     }
+
+    private static IReadOnlyList<T> CopyList<T>(IEnumerable<T>? values)
+        => values is null ? Array.Empty<T>() : values.ToList();
 
     private static TemplatesBuilderValidationState MergeValidationState(
         TemplatesBuilderValidationState existing,

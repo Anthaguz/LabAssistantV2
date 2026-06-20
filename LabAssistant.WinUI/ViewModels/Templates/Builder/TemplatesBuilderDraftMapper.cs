@@ -9,9 +9,11 @@ internal static class TemplatesBuilderDraftMapper
 
     public static TemplatesBuilderDraftSnapshot CreateSuggestedDraft(TemplatesBuilderReferenceData referenceData)
     {
-        var switchName = referenceData.AvailableVmSwitches.FirstOrDefault() ?? "vSwitch-Core";
-        var dcDisk = referenceData.VhdxCatalogOptions.FirstOrDefault()?.Id ?? string.Empty;
-        var memberDisk = referenceData.VhdxCatalogOptions.Skip(1).FirstOrDefault()?.Id ?? dcDisk;
+        var availableSwitches = referenceData.AvailableVmSwitches ?? Array.Empty<string>();
+        var vhdxCatalogOptions = referenceData.VhdxCatalogOptions ?? Array.Empty<TemplateVhdxCatalogOption>();
+        var switchName = availableSwitches.FirstOrDefault() ?? "vSwitch-Core";
+        var dcDisk = vhdxCatalogOptions.FirstOrDefault()?.Id ?? string.Empty;
+        var memberDisk = vhdxCatalogOptions.Skip(1).FirstOrDefault()?.Id ?? dcDisk;
 
         return new TemplatesBuilderDraftSnapshot(
             TemplateName: "V2 Topology Template",
@@ -325,7 +327,7 @@ internal static class TemplatesBuilderDraftMapper
     private static List<VmNetworkInterfaceTemplate> MapNics(TemplatesBuilderVmDraft vm, List<string> errors)
     {
         var nics = new List<VmNetworkInterfaceTemplate>();
-        foreach (var nic in vm.Nics)
+        foreach (var nic in vm.Nics ?? Array.Empty<TemplatesBuilderNicDraft>())
         {
             if (string.IsNullOrWhiteSpace(nic.NicId))
             {
