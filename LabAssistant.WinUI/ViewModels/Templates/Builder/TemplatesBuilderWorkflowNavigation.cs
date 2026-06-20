@@ -60,11 +60,15 @@ internal readonly record struct BuilderWorkflowNavigationRow(
     bool IsSelected,
     bool IsEnabled);
 
+internal readonly record struct BuilderWorkflowVmNavigationRow(
+    BuilderWorkflowNavigationRow VmRow,
+    IReadOnlyList<BuilderWorkflowNavigationRow> CategoryRows);
+
 internal readonly record struct BuilderWorkflowProjection(
     BuilderWorkflowRoute CurrentRoute,
     IReadOnlyList<BuilderWorkflowNavigationRow> StepRows,
     BuilderWorkflowNavigationRow VmOverviewRow,
-    IReadOnlyList<BuilderWorkflowNavigationRow> VmRows,
+    IReadOnlyList<BuilderWorkflowVmNavigationRow> VmRows,
     BuilderWorkflowStep ActiveStep,
     int SelectedVmIndex,
     BuilderVmDetailCategory SelectedVmDetailCategory,
@@ -252,16 +256,39 @@ internal sealed class TemplatesBuilderWorkflowNavigation
         return new BuilderWorkflowNavigationRow(route, "VMs", CurrentRoute == route, canNavigate);
     }
 
-    private IReadOnlyList<BuilderWorkflowNavigationRow> CreateVmRows(TemplatesBuilderDraftSnapshot draft, bool canNavigate)
+    private IReadOnlyList<BuilderWorkflowVmNavigationRow> CreateVmRows(TemplatesBuilderDraftSnapshot draft, bool canNavigate)
     {
-        var rows = new List<BuilderWorkflowNavigationRow>(draft.Vms.Count);
+        var rows = new List<BuilderWorkflowVmNavigationRow>(draft.Vms.Count);
         for (var index = 0; index < draft.Vms.Count; index++)
         {
             var vm = draft.Vms[index];
-            rows.Add(new BuilderWorkflowNavigationRow(
+            var vmRow = new BuilderWorkflowNavigationRow(
                 BuilderWorkflowRoute.ForVmCategory(index, BuilderVmDetailCategory.Basics),
                 FormatResourceName(vm.Name, vm.VmId),
                 CurrentRoute.IsVmDetail && CurrentRoute.VmIndex == index,
+                canNavigate);
+            rows.Add(new BuilderWorkflowVmNavigationRow(
+                vmRow,
+                CreateVmCategoryRows(index, canNavigate)));
+        }
+
+        return rows;
+    }
+
+    private IReadOnlyList<BuilderWorkflowNavigationRow> CreateVmCategoryRows(int vmIndex, bool canNavigate)
+    {
+        var rows = new List<BuilderWorkflowNavigationRow>(VmDetailCategoryOrder.Length);
+        foreach (var category in VmDetailCategoryOrder)
+        {
+            var route = BuilderWorkflowRoute.ForVmCategory(vmIndex, category);
+            var isSelected = CurrentRoute == route ||
+                CurrentRoute.Kind == BuilderWorkflowRouteKind.VmRole &&
+                CurrentRoute.VmIndex == vmIndex &&
+                category == BuilderVmDetailCategory.Roles;
+            rows.Add(new BuilderWorkflowNavigationRow(
+                route,
+                GetVmDetailCategoryLabel(category),
+                isSelected,
                 canNavigate));
         }
 
@@ -305,4 +332,16 @@ internal sealed class TemplatesBuilderWorkflowNavigation
 
         return string.IsNullOrWhiteSpace(fallback) ? "(unnamed)" : fallback.Trim();
     }
+
+    private static string GetVmDetailCategoryLabel(BuilderVmDetailCategory category)
+        => category switch
+        {
+            BuilderVmDetailCategory.Basics => "Basics",
+            BuilderVmDetailCategory.Resources => "Resources",
+            BuilderVmDetailCategory.Membership => "Membership",
+            BuilderVmDetailCategory.Roles => "Roles",
+            BuilderVmDetailCategory.Networking => "Networking",
+            BuilderVmDetailCategory.Credentials => "Credentials",
+            _ => category.ToString()
+        };
 }

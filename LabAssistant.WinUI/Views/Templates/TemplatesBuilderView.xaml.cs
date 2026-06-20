@@ -148,6 +148,16 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void SelectVmDetailCategory(BuilderVmDetailCategory category)
     {
         _workflowNavigation.SelectVmDetailCategory(category, _draft);
+        RenderSelectedStep();
+        RenderVmNavChildren();
+        RenderSelectedVmDetail();
+    }
+
+    private void SelectVmDetailCategory(int vmIndex, BuilderVmDetailCategory category)
+    {
+        _workflowNavigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(vmIndex, category), _draft);
+        RenderSelectedStep();
+        RenderVmNavChildren();
         RenderSelectedVmDetail();
     }
 
@@ -368,14 +378,31 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
         BuilderVmNavChildrenPanel.Children.Clear();
-        foreach (var row in projection.VmRows)
+        foreach (var group in projection.VmRows)
         {
+            var row = group.VmRow;
             var button = CreateResourceButton(
                 row.Label,
                 row.IsSelected,
                 () => SelectVmChild(row.Route.VmIndex),
                 row.IsEnabled);
             BuilderVmNavChildrenPanel.Children.Add(button);
+
+            var categoryPanel = new StackPanel
+            {
+                Margin = new Thickness(14, 0, 0, 0),
+                Spacing = 4
+            };
+            foreach (var categoryRow in group.CategoryRows)
+            {
+                categoryPanel.Children.Add(CreateResourceButton(
+                    categoryRow.Label,
+                    categoryRow.IsSelected,
+                    () => SelectVmDetailCategory(categoryRow.Route.VmIndex, categoryRow.Route.VmDetailCategory),
+                    categoryRow.IsEnabled));
+            }
+
+            BuilderVmNavChildrenPanel.Children.Add(categoryPanel);
         }
     }
 
@@ -449,7 +476,6 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
         BuilderSelectedVmDetailPanel.Children.Clear();
-        BuilderVmDetailCategoryNavPanel.Children.Clear();
         if (_draft.Vms.Count == 0)
         {
             BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText("No VM selected."));
@@ -457,7 +483,6 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         var vm = _draft.Vms[projection.SelectedVmIndex];
-        RenderVmDetailCategoryNav();
         BuilderSelectedVmDetailPanel.Children.Add(CreateRowTitle($"Selected VM Detail: {FormatResourceName(vm.Name, vm.VmId)}"));
         BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead(GetVmDetailCategoryLabel(projection.SelectedVmDetailCategory)));
 
@@ -502,19 +527,6 @@ public sealed partial class TemplatesBuilderView : UserControl
                     CreateTextBox("DSRM Slot", "vm.Dsrm", vm.CredentialSlots.Dsrm),
                     CreateTextBox("Parent Domain Admin Slot", "vm.ParentDomainAdmin", vm.CredentialSlots.ParentDomainAdmin)));
                 break;
-        }
-    }
-
-    private void RenderVmDetailCategoryNav()
-    {
-        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
-        foreach (var category in Enum.GetValues<BuilderVmDetailCategory>())
-        {
-            var selectedCategory = category;
-            BuilderVmDetailCategoryNavPanel.Children.Add(CreateResourceButton(
-                GetVmDetailCategoryLabel(selectedCategory),
-                selectedCategory == projection.SelectedVmDetailCategory,
-                () => SelectVmDetailCategory(selectedCategory)));
         }
     }
 
