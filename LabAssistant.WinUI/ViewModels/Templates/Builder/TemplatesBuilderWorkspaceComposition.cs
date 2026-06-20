@@ -109,6 +109,7 @@ internal sealed class TemplatesBuilderWorkspaceComposition : ITemplatesBuilderWo
             IsStatusVisible: _workspace.HasStatusText,
             HasActiveDraft: _workspace.HasActiveDraft,
             Draft: _workspace.CaptureDraft(),
+            AvailableSwitchInventory: _workspace.AvailableSwitchInventory,
             ValidationState: _workspace.ValidationState));
         _view.UpdateActionState(new TemplatesBuilderActionState(
             CanNavigate: _workspace.HasActiveDraft && !_host.IsTemplatesLoading,

@@ -14,6 +14,7 @@ internal readonly record struct TemplatesBuilderViewState(
     bool IsStatusVisible,
     bool HasActiveDraft,
     TemplatesBuilderDraftSnapshot Draft,
+    IReadOnlyList<V2AvailableSwitchInfo> AvailableSwitchInventory,
     TemplatesBuilderValidationState ValidationState);
 
 internal readonly record struct TemplatesBuilderActionState(
@@ -36,6 +37,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private bool _canNavigateWorkflow;
     private readonly TemplatesBuilderWorkflowNavigation _workflowNavigation = new();
     private TemplatesBuilderDraftSnapshot _draft = CreateEmptyDraft();
+    private IReadOnlyList<V2AvailableSwitchInfo> _availableSwitchInventory = Array.Empty<V2AvailableSwitchInfo>();
     private TemplatesBuilderValidationState _validationState = TemplatesBuilderValidationState.Empty;
     private TemplatesBuilderActionState _actionState;
     private string _selectedDeploymentProfile = BalancedDeploymentProfile;
@@ -94,6 +96,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             SetTextIfChanged(BuilderTemplateNameTextBox, _draft.TemplateName);
             SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
             SetSelectedProfile(_draft.DeploymentProfile);
+            _availableSwitchInventory = state.AvailableSwitchInventory ?? Array.Empty<V2AvailableSwitchInfo>();
             _validationState = state.ValidationState;
             RenderDraftResources(refreshNavigator: false);
             RenderSelectedStep();
@@ -512,14 +515,33 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         var network = _draft.LabNetworks[_selectedNetworkIndex];
-        BuilderSelectedNetworkDetailPanel.Children.Add(CreateRowTitle("Selected Network Detail"));
-        BuilderSelectedNetworkDetailPanel.Children.Add(CreateFieldGrid(
-            CreateTextBox("Network ID", TemplatesBuilderFieldKeys.NetworkId, network.NetworkId),
+        var switchIntent = TemplatesBuilderNetworkSwitchIntent.Project(network, _availableSwitchInventory);
+        var fields = new List<FrameworkElement>
+        {
             CreateTextBox("Name", TemplatesBuilderFieldKeys.NetworkName, network.Name),
-            CreateTextBox("Switch", TemplatesBuilderFieldKeys.NetworkSwitchName, network.SwitchName),
-            CreateComboBox("Switch Type", TemplatesBuilderFieldKeys.NetworkSwitchType, network.SwitchType, string.Empty, V2SwitchTypeCatalog.External, V2SwitchTypeCatalog.Internal, V2SwitchTypeCatalog.Private),
-            CreateTextBox("Subnet", TemplatesBuilderFieldKeys.NetworkSubnet, network.Subnet),
-            CreateTextBox("Notes", TemplatesBuilderFieldKeys.NetworkNotes, network.Notes)));
+            CreateSwitchPickerComboBox(switchIntent)
+        };
+        if (switchIntent.IsExistingSwitchSelected)
+        {
+            fields.Add(CreateReadOnlyTextBox("Switch Type", switchIntent.SwitchType));
+        }
+        else
+        {
+            fields.Add(CreateTextBox("New Switch Name", TemplatesBuilderFieldKeys.NetworkSwitchName, switchIntent.SwitchName));
+            fields.Add(CreateComboBox(
+                "Switch Type",
+                TemplatesBuilderFieldKeys.NetworkSwitchType,
+                switchIntent.SwitchType,
+                false,
+                new[] { V2SwitchTypeCatalog.External, V2SwitchTypeCatalog.Internal, V2SwitchTypeCatalog.Private }));
+        }
+
+        fields.Add(CreateTextBox("Subnet", TemplatesBuilderFieldKeys.NetworkSubnet, network.Subnet));
+        fields.Add(CreateTextBox("Notes", TemplatesBuilderFieldKeys.NetworkNotes, network.Notes));
+        fields.Add(CreateReadOnlyTextBox("Network ID (advanced)", network.NetworkId));
+
+        BuilderSelectedNetworkDetailPanel.Children.Add(CreateRowTitle("Selected Network Detail"));
+        BuilderSelectedNetworkDetailPanel.Children.Add(CreateFieldGrid(fields.ToArray()));
     }
 
     private void RenderSelectedCredentialSlotDetail()
@@ -709,19 +731,40 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         if (_selectedNetworkIndex < 0 ||
             _selectedNetworkIndex >= draft.LabNetworks.Count ||
-            !HasTextBox(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkId))
+            !HasTextBox(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkName))
         {
             return draft;
         }
 
         var networks = draft.LabNetworks.ToList();
+        var current = networks[_selectedNetworkIndex];
         networks[_selectedNetworkIndex] = new TemplatesBuilderLabNetworkDraft(
-            GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkId),
+            current.NetworkId,
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkName),
-            GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchName),
-            GetComboValue(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchType),
+            HasTextBox(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchName)
+                ? GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchName)
+                : current.SwitchName,
+            HasComboBox(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchType)
+                ? GetComboValue(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchType)
+                : current.SwitchType,
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSubnet),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkNotes));
+        return draft with { LabNetworks = networks };
+    }
+
+    private TemplatesBuilderDraftSnapshot ApplySelectedNetworkSwitchOption(TemplatesBuilderDraftSnapshot draft)
+    {
+        if (_selectedNetworkIndex < 0 ||
+            _selectedNetworkIndex >= draft.LabNetworks.Count ||
+            !TryGetSelectedSwitchPickerOption(BuilderSelectedNetworkDetailPanel, out var selectedOption))
+        {
+            return draft;
+        }
+
+        var networks = draft.LabNetworks.ToList();
+        networks[_selectedNetworkIndex] = TemplatesBuilderNetworkSwitchIntent.ApplySelectedOption(
+            networks[_selectedNetworkIndex],
+            selectedOption);
         return draft with { LabNetworks = networks };
     }
 
@@ -1008,8 +1051,16 @@ public sealed partial class TemplatesBuilderView : UserControl
             return;
         }
 
+        var shouldRefreshNetworkDetail =
+            sender is FrameworkElement { Tag: BuilderDraftFieldKey fieldKey } &&
+            Equals(fieldKey, TemplatesBuilderFieldKeys.NetworkSwitchSelection);
         UpdateWorkingDraftFromChangedControl(sender);
         RenderResourceLists();
+        if (shouldRefreshNetworkDetail)
+        {
+            RenderSelectedNetworkDetail();
+        }
+
         RenderVmOverview();
         RenderReviewValidationState();
         DraftChanged?.Invoke(this, EventArgs.Empty);
@@ -1037,7 +1088,9 @@ public sealed partial class TemplatesBuilderView : UserControl
         switch (fieldKey.Scope)
         {
             case BuilderDraftFieldScope.Network:
-                _draft = UpdateSelectedNetwork(_draft);
+                _draft = Equals(fieldKey, TemplatesBuilderFieldKeys.NetworkSwitchSelection)
+                    ? ApplySelectedNetworkSwitchOption(_draft)
+                    : UpdateSelectedNetwork(_draft);
                 break;
             case BuilderDraftFieldScope.CredentialSlot:
                 _draft = UpdateSelectedCredentialSlot(_draft);
@@ -1142,7 +1195,24 @@ public sealed partial class TemplatesBuilderView : UserControl
         return textBox;
     }
 
+    private static TextBox CreateReadOnlyTextBox(string header, string value)
+        => new()
+        {
+            Header = header,
+            Text = value,
+            IsReadOnly = true,
+            MinWidth = 150
+        };
+
     private ComboBox CreateComboBox(string header, BuilderDraftFieldKey fieldKey, string value, params string[] options)
+        => CreateComboBox(header, fieldKey, value, true, options);
+
+    private ComboBox CreateComboBox(
+        string header,
+        BuilderDraftFieldKey fieldKey,
+        string value,
+        bool selectFirstWhenMissing,
+        IEnumerable<string> options)
     {
         var comboBox = new ComboBox
         {
@@ -1156,7 +1226,39 @@ public sealed partial class TemplatesBuilderView : UserControl
             comboBox.Items.Add(new ComboBoxItem { Content = option });
         }
 
-        SetComboBoxValue(comboBox, value);
+        SetComboBoxValue(comboBox, value, selectFirstWhenMissing);
+        comboBox.SelectionChanged += BuilderSelectionControl_Changed;
+        return comboBox;
+    }
+
+    private ComboBox CreateSwitchPickerComboBox(TemplatesBuilderNetworkSwitchIntentProjection switchIntent)
+    {
+        var comboBox = new ComboBox
+        {
+            Header = "Switch",
+            Tag = TemplatesBuilderFieldKeys.NetworkSwitchSelection,
+            MinWidth = 150
+        };
+
+        foreach (var option in switchIntent.Options)
+        {
+            comboBox.Items.Add(new ComboBoxItem
+            {
+                Content = option.Label,
+                Tag = option
+            });
+        }
+
+        foreach (var item in comboBox.Items.OfType<ComboBoxItem>())
+        {
+            if (item.Tag is TemplatesBuilderSwitchPickerOption option &&
+                string.Equals(option.OptionKey, switchIntent.SelectedOption.OptionKey, StringComparison.Ordinal))
+            {
+                comboBox.SelectedItem = item;
+                break;
+            }
+        }
+
         comboBox.SelectionChanged += BuilderSelectionControl_Changed;
         return comboBox;
     }
@@ -1286,6 +1388,22 @@ public sealed partial class TemplatesBuilderView : UserControl
         return string.Empty;
     }
 
+    private static bool TryGetSelectedSwitchPickerOption(
+        DependencyObject root,
+        out TemplatesBuilderSwitchPickerOption selectedOption)
+    {
+        var comboBox = FindDescendants<ComboBox>(root)
+            .FirstOrDefault(item => Equals(item.Tag, TemplatesBuilderFieldKeys.NetworkSwitchSelection));
+        if (comboBox?.SelectedItem is ComboBoxItem { Tag: TemplatesBuilderSwitchPickerOption option })
+        {
+            selectedOption = option;
+            return true;
+        }
+
+        selectedOption = default;
+        return false;
+    }
+
     private static string FormatResourceName(string primary, string fallback)
     {
         if (!string.IsNullOrWhiteSpace(primary))
@@ -1299,7 +1417,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private static bool GetCheckBoxValue(DependencyObject root, BuilderDraftFieldKey fieldKey)
         => FindDescendants<CheckBox>(root).FirstOrDefault(item => Equals(item.Tag, fieldKey))?.IsChecked == true;
 
-    private static void SetComboBoxValue(ComboBox comboBox, string value)
+    private static void SetComboBoxValue(ComboBox comboBox, string value, bool selectFirstWhenMissing = true)
     {
         var normalized = value.Trim();
         foreach (var item in comboBox.Items.OfType<ComboBoxItem>())
@@ -1312,7 +1430,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             }
         }
 
-        comboBox.SelectedIndex = comboBox.Items.Count > 0 ? 0 : -1;
+        comboBox.SelectedIndex = selectFirstWhenMissing && comboBox.Items.Count > 0 ? 0 : -1;
     }
 
     private void SetNavigatorBackTarget(string targetLabel, bool canNavigateBack)

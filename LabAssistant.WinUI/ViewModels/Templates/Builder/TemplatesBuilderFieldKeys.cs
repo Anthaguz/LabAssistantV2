@@ -18,6 +18,7 @@ internal static class TemplatesBuilderFieldKeys
 {
     public static readonly BuilderDraftFieldKey NetworkId = new(BuilderDraftFieldScope.Network, nameof(TemplatesBuilderLabNetworkDraft.NetworkId));
     public static readonly BuilderDraftFieldKey NetworkName = new(BuilderDraftFieldScope.Network, nameof(TemplatesBuilderLabNetworkDraft.Name));
+    public static readonly BuilderDraftFieldKey NetworkSwitchSelection = new(BuilderDraftFieldScope.Network, "SwitchSelection");
     public static readonly BuilderDraftFieldKey NetworkSwitchName = new(BuilderDraftFieldScope.Network, nameof(TemplatesBuilderLabNetworkDraft.SwitchName));
     public static readonly BuilderDraftFieldKey NetworkSwitchType = new(BuilderDraftFieldScope.Network, nameof(TemplatesBuilderLabNetworkDraft.SwitchType));
     public static readonly BuilderDraftFieldKey NetworkSubnet = new(BuilderDraftFieldScope.Network, nameof(TemplatesBuilderLabNetworkDraft.Subnet));

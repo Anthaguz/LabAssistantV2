@@ -1108,6 +1108,157 @@ public sealed class TemplatesBuilderWorkflowContractTests
     }
 
     [Fact]
+    public void NetworkSwitchIntentProjection_SelectsExistingInventorySwitchAndLocksType()
+    {
+        var network = new TemplatesBuilderLabNetworkDraft(
+            "lab-core",
+            "Core",
+            "vSwitch-Core",
+            string.Empty,
+            "10.0.0.0/24",
+            "Core network documentation.");
+        var inventory = new[]
+        {
+            new V2AvailableSwitchInfo { Name = "vSwitch-Core", SwitchType = V2SwitchTypeCatalog.Internal },
+            new V2AvailableSwitchInfo { Name = "vSwitch-Wan", SwitchType = V2SwitchTypeCatalog.External }
+        };
+
+        var projection = TemplatesBuilderNetworkSwitchIntent.Project(network, inventory);
+
+        Assert.True(projection.IsExistingSwitchSelected);
+        Assert.False(projection.IsCreateNewSelected);
+        Assert.False(projection.IsSwitchNameEditable);
+        Assert.False(projection.IsSwitchTypeEditable);
+        Assert.Equal("vSwitch-Core", projection.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.Internal, projection.SwitchType);
+        Assert.Contains(projection.Options, option => option.IsCreateNew && option.Label == "Create new switch");
+    }
+
+    [Fact]
+    public void NetworkSwitchIntentProjection_AppliesExistingInventorySelectionToDraft()
+    {
+        var network = new TemplatesBuilderLabNetworkDraft(
+            "lab-core",
+            "Core",
+            string.Empty,
+            string.Empty,
+            "10.0.0.0/24",
+            string.Empty);
+        var projection = TemplatesBuilderNetworkSwitchIntent.Project(
+            network,
+            [new V2AvailableSwitchInfo { Name = "vSwitch-Core", SwitchType = V2SwitchTypeCatalog.Private }]);
+        var existingOption = Assert.Single(projection.Options, option => option.IsExisting);
+
+        var updated = TemplatesBuilderNetworkSwitchIntent.ApplySelectedOption(network, existingOption);
+
+        Assert.Equal("lab-core", updated.NetworkId);
+        Assert.Equal("Core", updated.Name);
+        Assert.Equal("vSwitch-Core", updated.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.Private, updated.SwitchType);
+    }
+
+    [Fact]
+    public void NetworkSwitchIntentProjection_CreateNewSwitchKeepsManualIntentEditable()
+    {
+        var network = new TemplatesBuilderLabNetworkDraft(
+            "lab-core",
+            "Core",
+            "vSwitch-New",
+            V2SwitchTypeCatalog.External,
+            "10.0.0.0/24",
+            "Documentation only.");
+
+        var projection = TemplatesBuilderNetworkSwitchIntent.Project(
+            network,
+            [new V2AvailableSwitchInfo { Name = "vSwitch-Core", SwitchType = V2SwitchTypeCatalog.Internal }]);
+
+        Assert.True(projection.IsCreateNewSelected);
+        Assert.False(projection.IsExistingSwitchSelected);
+        Assert.True(projection.IsSwitchNameEditable);
+        Assert.True(projection.IsSwitchTypeEditable);
+        Assert.Equal("vSwitch-New", projection.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.External, projection.SwitchType);
+    }
+
+    [Fact]
+    public void BuilderDraftMapper_RoundTripsLegacyNetworkIdentityAndSwitchIntentWithoutDataLoss()
+    {
+        var template = new LabTemplate
+        {
+            Id = "template-network-roundtrip",
+            Name = "Network Roundtrip",
+            SchemaVersion = TemplateSchemaVersionCatalog.V2SchemaVersion,
+            TemplateRevision = 1,
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = LabTemplate.SupportedTemplateType,
+            ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning,
+            LabNetworks =
+            [
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-core",
+                    Name = "Core",
+                    SwitchName = "vSwitch-Core",
+                    SwitchType = V2SwitchTypeCatalog.Internal,
+                    Subnet = "10.0.0.0/24",
+                    Notes = "Documentation only."
+                },
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-legacy",
+                    Name = "Legacy",
+                    SwitchName = "Legacy Switch",
+                    Subnet = "10.1.0.0/24",
+                    Notes = "Imported switch-name-only reference."
+                }
+            ],
+            DirectoryTopology = new V2DirectoryTopologyTemplate(),
+            VmTemplates =
+            {
+                new VmTemplate
+                {
+                    VmId = "vm-standalone",
+                    Name = "standalone",
+                    MemoryMb = 2048,
+                    CpuCount = 2,
+                    MembershipMode = V2MembershipModeCatalog.Standalone,
+                    Nics =
+                    [
+                        new VmNetworkInterfaceTemplate
+                        {
+                            NicId = "nic-core",
+                            NetworkId = "lab-core"
+                        }
+                    ]
+                }
+            }
+        };
+
+        var draft = TemplatesBuilderDraftMapper.FromTemplate(template);
+        var build = TemplatesBuilderDraftMapper.BuildDocument(
+            draft,
+            template.Id,
+            template.TemplateRevision,
+            template.CreatedWithAppVersion,
+            sourceFilePath: null);
+
+        Assert.Empty(build.Errors);
+        var networks = Assert.IsType<TemplateEditorDocument>(build.Document).Template.LabNetworks!;
+        var typedNetwork = Assert.Single(networks, network => network.NetworkId == "lab-core");
+        Assert.Equal("Core", typedNetwork.Name);
+        Assert.Equal("vSwitch-Core", typedNetwork.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.Internal, typedNetwork.SwitchType);
+        Assert.Equal("10.0.0.0/24", typedNetwork.Subnet);
+        Assert.Equal("Documentation only.", typedNetwork.Notes);
+
+        var legacyNetwork = Assert.Single(networks, network => network.NetworkId == "lab-legacy");
+        Assert.Equal("Legacy", legacyNetwork.Name);
+        Assert.Equal("Legacy Switch", legacyNetwork.SwitchName);
+        Assert.Null(legacyNetwork.SwitchType);
+        Assert.Equal("Imported switch-name-only reference.", legacyNetwork.Notes);
+    }
+
+    [Fact]
     public async Task BuilderDraftMapper_ProducesPlannerCompatibleV2Template()
     {
         var referenceData = new TemplatesBuilderReferenceData(

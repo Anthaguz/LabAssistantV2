@@ -37,6 +37,8 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
 
     public IReadOnlyList<V2TrustTemplate> PreservedTrusts { get; private set; } = Array.Empty<V2TrustTemplate>();
 
+    public IReadOnlyList<V2AvailableSwitchInfo> AvailableSwitchInventory { get; private set; } = Array.Empty<V2AvailableSwitchInfo>();
+
     public TemplatesBuilderValidationState ValidationState { get; private set; } = TemplatesBuilderValidationState.Empty;
 
     public bool HasValidationBlockers => ValidationState.HasBlockers;
@@ -50,6 +52,7 @@ internal sealed class TemplatesBuilderWorkspaceViewModel
     public void SetReferenceData(TemplatesBuilderReferenceData referenceData)
     {
         var availableSwitches = CopyList(referenceData.AvailableVmSwitches);
+        AvailableSwitchInventory = CopyList(referenceData.AvailableSwitchInventory);
         var vhdxCatalogOptions = CopyList(referenceData.VhdxCatalogOptions);
         var switchText = availableSwitches.Count == 0
             ? "switches: none loaded"

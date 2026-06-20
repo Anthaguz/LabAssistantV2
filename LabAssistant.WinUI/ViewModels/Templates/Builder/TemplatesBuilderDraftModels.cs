@@ -1,11 +1,32 @@
 using LabAssistant.Business.Templates;
+using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.ViewModels.Templates;
 
 namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
 internal readonly record struct TemplatesBuilderReferenceData(
     IReadOnlyList<string> AvailableVmSwitches,
-    IReadOnlyList<TemplateVhdxCatalogOption> VhdxCatalogOptions);
+    IReadOnlyList<TemplateVhdxCatalogOption> VhdxCatalogOptions,
+    IReadOnlyList<V2AvailableSwitchInfo> AvailableSwitchInventory)
+{
+    public TemplatesBuilderReferenceData(
+        IReadOnlyList<string> availableVmSwitches,
+        IReadOnlyList<TemplateVhdxCatalogOption> vhdxCatalogOptions)
+        : this(
+            availableVmSwitches,
+            vhdxCatalogOptions,
+            BuildUnknownSwitchInventory(availableVmSwitches))
+    {
+    }
+
+    private static IReadOnlyList<V2AvailableSwitchInfo> BuildUnknownSwitchInventory(IReadOnlyList<string>? switchNames)
+        => switchNames?
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Select(name => new V2AvailableSwitchInfo { Name = name.Trim(), SwitchType = "Unknown" })
+            .ToList() ?? [];
+}
 
 internal readonly record struct TemplatesBuilderDraftSnapshot(
     string TemplateName,
