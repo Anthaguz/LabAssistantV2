@@ -130,12 +130,17 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.Contains("projection.RootRows", builderSource);
         Assert.Contains("projection.VmRows", builderSource);
         Assert.Contains("projection.SelectedVmSectionRows", builderSource);
+        Assert.Contains("projection.SelectedVmNicRows", builderSource);
         Assert.Contains("SelectVmChild(row.Route.VmIndex)", builderSource);
         Assert.Contains("SelectVmDetailCategory(row.Route.VmDetailCategory)", builderSource);
+        Assert.Contains("RenderNicListNavigator", builderSource);
         Assert.Contains("BuilderNavigatorBackButton_Click", builderSource);
         Assert.Contains("FindNextVmNumber", builderSource);
         Assert.Contains("$\"vm-{nextVmNumber}\"", builderSource);
         Assert.Contains("$\"VM {nextVmNumber}\"", builderSource);
+        Assert.Contains("Content = CreateNavButtonContent(\"+ Add NIC\", isSelected: false)", builderSource);
+        Assert.Contains("ToolTipService.SetToolTip(addButton, \"Add NIC\")", builderSource);
+        Assert.Contains("AutomationProperties.SetName(addButton, \"Add NIC\")", builderSource);
         Assert.Contains("SelectVmNic", builderSource);
         Assert.Contains("RenderNicOverview", builderSource);
         Assert.Contains("RenderSelectedNicDetail", builderSource);
@@ -316,7 +321,9 @@ public sealed class TemplatesBuilderWorkflowContractTests
         var renderRootBody = ExtractMethodBody(builderSource, "private void RenderRootNavigator(BuilderWorkflowProjection projection)");
         var renderVmListBody = ExtractMethodBody(builderSource, "private void RenderVmListNavigator(BuilderWorkflowProjection projection)");
         var renderVmSectionBody = ExtractMethodBody(builderSource, "private void RenderVmSectionNavigator(BuilderWorkflowProjection projection)");
+        var renderNicListBody = ExtractMethodBody(builderSource, "private void RenderNicListNavigator(BuilderWorkflowProjection projection)");
         var createNavigatorAddVmBody = ExtractMethodBody(builderSource, "private Button CreateNavigatorAddVmButton()");
+        var createNavigatorAddNicBody = ExtractMethodBody(builderSource, "private Button CreateNavigatorAddNicButton(int vmIndex)");
         var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true, bool isNested = false)");
         var createNavContentBody = ExtractMethodBody(builderSource, "private static Border CreateNavButtonContent(string content, bool isSelected, bool isNested = false)");
         var configureNavChromeBody = ExtractMethodBody(builderSource, "private static void ConfigureNavButtonChrome(Button button)");
@@ -331,13 +338,20 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.Contains("case BuilderNavigatorDepth.Root:", renderNavigatorBody);
         Assert.Contains("case BuilderNavigatorDepth.VmList:", renderNavigatorBody);
         Assert.Contains("case BuilderNavigatorDepth.VmSections:", renderNavigatorBody);
+        Assert.Contains("case BuilderNavigatorDepth.NicList:", renderNavigatorBody);
         Assert.Contains("projection.RootRows", renderRootBody);
         Assert.Contains("projection.VmRows", renderVmListBody);
         Assert.Contains("CreateNavigatorAddVmButton()", renderVmListBody);
         Assert.Contains("projection.SelectedVmSectionRows", renderVmSectionBody);
+        Assert.Contains("CreateNavigatorAddNicButton(projection.SelectedVmIndex)", renderNicListBody);
+        Assert.Contains("projection.SelectedVmNicRows", renderNicListBody);
         Assert.Contains("SelectVmChild(row.Route.VmIndex)", renderVmListBody);
         Assert.Contains("SelectVmDetailCategory(row.Route.VmDetailCategory)", renderVmSectionBody);
+        Assert.Contains("SelectVmNic(row.Route)", renderNicListBody);
         Assert.Contains("Content = CreateNavButtonContent(\"+ Add VM\", isSelected: false)", createNavigatorAddVmBody);
+        Assert.Contains("Content = CreateNavButtonContent(\"+ Add NIC\", isSelected: false)", createNavigatorAddNicBody);
+        Assert.Contains("ToolTipService.SetToolTip(addButton, \"Add NIC\")", createNavigatorAddNicBody);
+        Assert.Contains("AutomationProperties.SetName(addButton, \"Add NIC\")", createNavigatorAddNicBody);
         Assert.Contains("Content = CreateNavButtonContent(content, isSelected, isNested)", createResourceButtonBody);
         Assert.Contains("ConfigureNavButtonChrome(button);", createResourceButtonBody);
         Assert.Contains("ToolTipService.SetToolTip(button, content);", createResourceButtonBody);
@@ -400,7 +414,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
     }
 
     [Fact]
-    public void TemplatesBuilderView_AddNic_SelectsNewNicDetail()
+    public void TemplatesBuilderView_AddNic_SelectsNewNicDetailAndKeepsNicListDepth()
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
         var addNicBody = ExtractMethodBody(builderSource, "private void BuilderAddNicButton_Click(object sender, RoutedEventArgs e)");
@@ -426,27 +440,34 @@ public sealed class TemplatesBuilderWorkflowContractTests
 
         Assert.Contains("_workflowNavigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(vmIndex, nics.Count - 1), updatedDraft);", addNicBody);
         Assert.Equal(BuilderWorkflowRoute.ForVmNic(0, 1), projection.CurrentRoute);
+        Assert.Equal(BuilderNavigatorDepth.NicList, projection.NavigatorDepth);
         Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
         Assert.True(projection.IsNicDetailSelected);
         Assert.Equal(1, projection.SelectedNicIndex);
+        Assert.Equal([false, true], projection.SelectedVmNicRows.Select(row => row.IsSelected).ToArray());
     }
 
     [Fact]
-    public void TemplatesBuilderView_NetworkingUsesOverviewAndSingleNicDetailInsteadOfStackedEditor()
+    public void TemplatesBuilderView_NetworkingUsesLeftPanelNicListAndSingleNicDetail()
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
         var networkingRenderBody = ExtractSwitchCaseBody(
             builderSource,
             "case BuilderVmDetailCategory.Networking:",
             "case BuilderVmDetailCategory.Credentials:");
+        var renderNicListBody = ExtractMethodBody(builderSource, "private void RenderNicListNavigator(BuilderWorkflowProjection projection)");
         var renderNicOverviewBody = ExtractMethodBody(builderSource, "private void RenderNicOverview(TemplatesBuilderVmDetailProjection detail)");
         var renderSelectedNicDetailBody = ExtractMethodBody(builderSource, "private void RenderSelectedNicDetail(TemplatesBuilderVmDetailProjection detail)");
 
         Assert.Contains("detail.Value.IsNicDetailSelected", networkingRenderBody);
         Assert.Contains("RenderSelectedNicDetail(detail.Value)", networkingRenderBody);
         Assert.Contains("RenderNicOverview(detail.Value)", networkingRenderBody);
-        Assert.Contains("CreateNicOverviewRow(nic)", renderNicOverviewBody);
-        Assert.Contains("SelectVmNic(projection.Route)", renderNicOverviewBody + builderSource);
+        Assert.Contains("CreateNavigatorAddNicButton(projection.SelectedVmIndex)", renderNicListBody);
+        Assert.Contains("projection.SelectedVmNicRows", renderNicListBody);
+        Assert.Contains("SelectVmNic(row.Route)", renderNicListBody);
+        Assert.DoesNotContain("SelectVmNic", renderNicOverviewBody);
+        Assert.DoesNotContain("CreateResourceButton", renderNicOverviewBody);
+        Assert.DoesNotContain("CreateNicOverviewRow", builderSource);
         Assert.Contains("CreateTextBox(\"Network ID\", TemplatesBuilderFieldKeys.NicNetworkId, nic.NetworkId)", renderSelectedNicDetailBody);
         Assert.Contains("CreateTextBox(\"Switch Override\", TemplatesBuilderFieldKeys.NicSwitchName, nic.SwitchName)", renderSelectedNicDetailBody);
         Assert.DoesNotContain("VmNicsPanel", builderSource);
@@ -529,8 +550,11 @@ public sealed class TemplatesBuilderWorkflowContractTests
         var navigation = new TemplatesBuilderWorkflowNavigation();
 
         navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
+        var projection = navigation.Project(draft, canNavigate: true);
         var footer = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
 
+        Assert.Equal(BuilderNavigatorDepth.NicList, projection.NavigatorDepth);
+        Assert.Empty(projection.SelectedVmNicRows);
         Assert.True(footer.CanGoNext);
         Assert.Equal("vm-alpha Credentials", footer.NextTargetLabel);
     }
@@ -542,15 +566,21 @@ public sealed class TemplatesBuilderWorkflowContractTests
         var navigation = new TemplatesBuilderWorkflowNavigation();
 
         navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
+        var overviewProjection = navigation.Project(draft, canNavigate: true);
         var overviewFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
         navigation.SelectAdjacent(1, draft);
+        var firstNicProjection = navigation.Project(draft, canNavigate: true);
         var firstNicFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
         navigation.SelectAdjacent(1, draft);
+        var secondNicProjection = navigation.Project(draft, canNavigate: true);
         var secondNicFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
 
+        Assert.Equal(BuilderNavigatorDepth.NicList, overviewProjection.NavigatorDepth);
         Assert.Equal("vm-alpha Networking - nic-a", overviewFooter.NextTargetLabel);
+        Assert.Equal(BuilderNavigatorDepth.NicList, firstNicProjection.NavigatorDepth);
         Assert.Equal("vm-alpha Networking", firstNicFooter.PreviousTargetLabel);
         Assert.Equal("vm-alpha Networking - nic-b", firstNicFooter.NextTargetLabel);
+        Assert.Equal(BuilderNavigatorDepth.NicList, secondNicProjection.NavigatorDepth);
         Assert.Equal("vm-alpha Networking - nic-a", secondNicFooter.PreviousTargetLabel);
         Assert.Equal("vm-alpha Credentials", secondNicFooter.NextTargetLabel);
     }
@@ -593,7 +623,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
     }
 
     [Fact]
-    public void TemplatesBuilderWorkflowNavigation_ProjectsSelectedStateAndDrillInRows()
+    public void TemplatesBuilderWorkflowNavigation_ProjectsSelectedStateAndVmSectionRows()
     {
         var draft = CreateDraftWithVms("vm-alpha", "vm-beta");
         var navigation = new TemplatesBuilderWorkflowNavigation();
@@ -605,7 +635,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
             ["General", "Networks", "Forests & Domains", "Credentials", "VMs", "Review"],
             rootProjection.RootRows.Select(row => row.Label).ToArray());
 
-        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking), draft);
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Resources), draft);
         var projection = navigation.Project(draft, canNavigate: true);
         var selectedVmRow = Assert.Single(projection.VmRows, row => row.IsSelected);
         var selectedCategoryRow = Assert.Single(projection.SelectedVmSectionRows, row => row.IsSelected);
@@ -617,32 +647,53 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.True(projection.CanNavigateBack);
         Assert.False(projection.IsVmOverviewSelected);
         Assert.Equal(1, projection.SelectedVmIndex);
-        Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
+        Assert.Equal(BuilderVmDetailCategory.Resources, projection.SelectedVmDetailCategory);
         Assert.True(projection.IsVmDetailSelected);
         Assert.Equal("vm-beta", selectedVmRow.Label);
         Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics), selectedVmRow.Route);
-        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking), selectedCategoryRow.Route);
+        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Resources), selectedCategoryRow.Route);
         Assert.Equal(
             ["Basics", "Resources", "Membership", "Roles", "Networking", "Credentials"],
             projection.SelectedVmSectionRows.Select(row => row.Label).ToArray());
     }
 
     [Fact]
-    public void TemplatesBuilderWorkflowNavigation_ProjectsNicDetailWithinNetworkingSection()
+    public void TemplatesBuilderWorkflowNavigation_NetworkingRouteUsesNicListNavigatorDepth()
+    {
+        var draft = CreateDraftWithVmNics(("dc01", ["domain-nic", "backup-nic"]));
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
+        var projection = navigation.Project(draft, canNavigate: true);
+        var detail = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(draft, projection);
+
+        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), projection.CurrentRoute);
+        Assert.Equal(BuilderNavigatorDepth.NicList, projection.NavigatorDepth);
+        Assert.Equal("Networking", projection.NavigatorTitle);
+        Assert.Equal("Back to dc01", projection.NavigatorBackTargetLabel);
+        Assert.Equal(["domain-nic", "backup-nic"], projection.SelectedVmNicRows.Select(row => row.Label).ToArray());
+        Assert.All(projection.SelectedVmNicRows, row => Assert.False(row.IsSelected));
+        Assert.NotNull(detail);
+        Assert.False(detail.Value.IsNicDetailSelected);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_ProjectsNicDetailWithinNicListNavigator()
     {
         var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a", "nic-b"]));
         var navigation = new TemplatesBuilderWorkflowNavigation();
 
         navigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(0, 1), draft);
         var projection = navigation.Project(draft, canNavigate: true);
-        var selectedCategoryRow = Assert.Single(projection.SelectedVmSectionRows, row => row.IsSelected);
+        var selectedNicRow = Assert.Single(projection.SelectedVmNicRows, row => row.IsSelected);
         var detail = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(draft, projection);
 
         Assert.Equal(BuilderWorkflowRouteKind.VmNic, projection.CurrentRoute.Kind);
+        Assert.Equal(BuilderNavigatorDepth.NicList, projection.NavigatorDepth);
         Assert.True(projection.IsNicDetailSelected);
         Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
         Assert.Equal(1, projection.SelectedNicIndex);
-        Assert.Equal(BuilderVmDetailCategory.Networking, selectedCategoryRow.Route.VmDetailCategory);
+        Assert.Equal(BuilderWorkflowRoute.ForVmNic(0, 1), selectedNicRow.Route);
         Assert.NotNull(detail);
         Assert.True(detail.Value.IsNicDetailSelected);
         Assert.Equal(1, detail.Value.SelectedNicIndex);
@@ -650,16 +701,14 @@ public sealed class TemplatesBuilderWorkflowContractTests
     }
 
     [Fact]
-    public void TemplatesBuilderWorkflowNavigation_NicOverviewRowRouteDrillsIntoSelectedNicDetail()
+    public void TemplatesBuilderWorkflowNavigation_NicListRowRouteDrillsIntoSelectedNicDetail()
     {
         var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a", "nic-b"]), ("vm-beta", ["nic-c"]));
         var navigation = new TemplatesBuilderWorkflowNavigation();
 
         navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
-        var overview = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(
-            draft,
-            navigation.Project(draft, canNavigate: true));
-        var nicRow = Assert.Single(overview!.Value.Nics, row => row.Draft.NicId == "nic-b");
+        var overviewProjection = navigation.Project(draft, canNavigate: true);
+        var nicRow = Assert.Single(overviewProjection.SelectedVmNicRows, row => row.Label == "nic-b");
 
         Assert.Equal(BuilderWorkflowRoute.ForVmNic(0, 1), nicRow.Route);
         Assert.True(navigation.SelectRoute(nicRow.Route, draft));
@@ -683,6 +732,21 @@ public sealed class TemplatesBuilderWorkflowContractTests
         var selectedRoute = BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking);
 
         navigation.SelectRoute(selectedRoute, draft);
+        var nicListProjection = navigation.Project(draft, canNavigate: true);
+
+        Assert.Equal(selectedRoute, nicListProjection.CurrentRoute);
+        Assert.Equal(BuilderNavigatorDepth.NicList, nicListProjection.NavigatorDepth);
+        Assert.Equal("Back to vm-beta", nicListProjection.NavigatorBackTargetLabel);
+        Assert.True(nicListProjection.CanNavigateBack);
+
+        Assert.True(navigation.MoveNavigatorBack());
+        var vmSectionsProjection = navigation.Project(draft, canNavigate: true);
+
+        Assert.Equal(selectedRoute, vmSectionsProjection.CurrentRoute);
+        Assert.Equal(BuilderNavigatorDepth.VmSections, vmSectionsProjection.NavigatorDepth);
+        Assert.Equal("Back to VMs", vmSectionsProjection.NavigatorBackTargetLabel);
+        Assert.True(vmSectionsProjection.CanNavigateBack);
+
         Assert.True(navigation.MoveNavigatorBack());
         var vmListProjection = navigation.Project(draft, canNavigate: true);
 
@@ -730,6 +794,8 @@ public sealed class TemplatesBuilderWorkflowContractTests
         var projection = navigation.Project(draftWithoutNic, canNavigate: true);
 
         Assert.Equal(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), projection.CurrentRoute);
+        Assert.Equal(BuilderNavigatorDepth.NicList, projection.NavigatorDepth);
+        Assert.Empty(projection.SelectedVmNicRows);
         Assert.False(projection.IsNicDetailSelected);
         Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
     }
