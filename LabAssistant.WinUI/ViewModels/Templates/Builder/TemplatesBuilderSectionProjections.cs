@@ -5,9 +5,7 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 internal enum TemplatesBuilderResourceKind
 {
     Network,
-    CredentialSlot,
-    Forest,
-    Domain
+    CredentialSlot
 }
 
 internal enum BuilderForestDomainResourceKind
@@ -65,25 +63,6 @@ internal static class TemplatesBuilderSectionProjections
                 FormatResourceName(slot.Label, slot.SlotKey),
                 index == selectedIndex))
             .ToList();
-
-    public static IReadOnlyList<TemplatesBuilderResourceRowProjection> ProjectForestDomainRows(
-        TemplatesBuilderDraftSnapshot draft,
-        BuilderForestDomainResourceKind selectedKind,
-        int selectedIndex)
-    {
-        var rows = new List<TemplatesBuilderResourceRowProjection>(draft.Forests.Count + draft.Domains.Count);
-        rows.AddRange(draft.Forests.Select((forest, index) => new TemplatesBuilderResourceRowProjection(
-            TemplatesBuilderResourceKind.Forest,
-            index,
-            $"Forest: {FormatResourceName(forest.ForestId, forest.RootDomainId)}",
-            selectedKind == BuilderForestDomainResourceKind.Forest && index == selectedIndex)));
-        rows.AddRange(draft.Domains.Select((domain, index) => new TemplatesBuilderResourceRowProjection(
-            TemplatesBuilderResourceKind.Domain,
-            index,
-            $"Domain: {FormatResourceName(domain.DnsName, domain.DomainId)}",
-            selectedKind == BuilderForestDomainResourceKind.Domain && index == selectedIndex)));
-        return rows;
-    }
 
     public static TemplatesBuilderVmOverviewProjection ProjectVmOverview(TemplatesBuilderDraftSnapshot draft)
     {

@@ -392,23 +392,102 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderForestDomainList()
     {
-        BuilderForestDomainResourcesListPanel.Children.Clear();
-        foreach (var row in TemplatesBuilderSectionProjections.ProjectForestDomainRows(_draft, _selectedForestDomainKind, _selectedForestDomainIndex))
+        BuilderDirectoryTopologyCanvasPanel.Children.Clear();
+        var projection = TemplatesBuilderDirectoryTopologyProjector.Project(_draft, _selectedForestDomainKind, _selectedForestDomainIndex);
+        if (projection.Forests.Count == 0)
         {
-            BuilderForestDomainResourcesListPanel.Children.Add(CreateResourceButton(
-                row.Label,
-                row.IsSelected,
+            BuilderDirectoryTopologyCanvasPanel.Children.Add(CreateEmptyDetailText("No forests in this draft."));
+            return;
+        }
+
+        foreach (var forest in projection.Forests)
+        {
+            BuilderDirectoryTopologyCanvasPanel.Children.Add(CreateForestTopologyContainer(forest));
+        }
+    }
+
+    private Border CreateForestTopologyContainer(TemplatesBuilderForestTopologyProjection forest)
+    {
+        var container = new Border
+        {
+            Padding = new Thickness(8),
+            Background = GetBrush("ShellBackgroundBrush"),
+            BorderBrush = forest.IsSelected ? GetBrush("ShellAccentBrush") : GetBrush("ShellBorderBrush"),
+            BorderThickness = new Thickness(forest.IsSelected ? 2 : 1),
+            CornerRadius = new CornerRadius(4)
+        };
+        var panel = new StackPanel { Spacing = 6 };
+        if (forest.CanSelect)
+        {
+            panel.Children.Add(CreateResourceButton(
+                forest.Label,
+                forest.IsSelected,
                 () =>
                 {
                     UpdateWorkingDraftFromVisibleControls();
-                    _selectedForestDomainKind = row.Kind == TemplatesBuilderResourceKind.Forest
-                        ? BuilderForestDomainResourceKind.Forest
-                        : BuilderForestDomainResourceKind.Domain;
-                    _selectedForestDomainIndex = row.Index;
+                    _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
+                    _selectedForestDomainIndex = forest.ForestIndex;
                     RenderForestDomainList();
                     RenderSelectedForestDomainDetail();
                 }));
         }
+        else
+        {
+            panel.Children.Add(CreateSubhead(forest.Label));
+        }
+
+        if (forest.RootNodes.Count == 0)
+        {
+            panel.Children.Add(CreateEmptyDetailText("No domains in this forest."));
+        }
+        else
+        {
+            foreach (var root in forest.RootNodes)
+            {
+                AddDomainTopologyNode(panel, root);
+            }
+        }
+
+        container.Child = panel;
+        return container;
+    }
+
+    private void AddDomainTopologyNode(StackPanel panel, TemplatesBuilderDomainTopologyNodeProjection node)
+    {
+        panel.Children.Add(CreateTopologyDomainButton(
+            node,
+            () =>
+            {
+                UpdateWorkingDraftFromVisibleControls();
+                _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
+                _selectedForestDomainIndex = node.DomainIndex;
+                RenderForestDomainList();
+                RenderSelectedForestDomainDetail();
+            }));
+
+        foreach (var child in node.Children)
+        {
+            AddDomainTopologyNode(panel, child);
+        }
+    }
+
+    private Button CreateTopologyDomainButton(TemplatesBuilderDomainTopologyNodeProjection node, Action select)
+    {
+        var label = $"{FormatTopologyNodePrefix(node)} {node.Label}";
+        var button = new Button
+        {
+            Background = CreateTransparentBrush(),
+            BorderThickness = new Thickness(0),
+            Content = CreateTopologyNodeContent(label, node),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(0)
+        };
+        ConfigureNavButtonChrome(button);
+        ToolTipService.SetToolTip(button, $"{node.RelationLabel}: {node.Label}");
+        AutomationProperties.SetName(button, $"{node.RelationLabel}: {node.Label}");
+        button.Click += (_, _) => select();
+        return button;
     }
 
     private void RenderSelectedNetworkDetail()
@@ -1209,6 +1288,58 @@ public sealed partial class TemplatesBuilderView : UserControl
                 TextWrapping = TextWrapping.NoWrap
             }
         };
+
+    private static Border CreateTopologyNodeContent(string content, TemplatesBuilderDomainTopologyNodeProjection node)
+        => new()
+        {
+            Margin = new Thickness(Math.Min(node.Depth, 4) * 14, 0, 0, 0),
+            Padding = new Thickness(8, 5, 8, 5),
+            Background = GetBrush(node.IsSelected ? "ShellBackgroundBrush" : "ShellContentBackgroundBrush"),
+            BorderBrush = GetBrush(node.IsSelected || node.IsRootDomain ? "ShellAccentBrush" : "ShellBorderBrush"),
+            BorderThickness = new Thickness(node.IsSelected ? 2 : node.IsRootDomain ? 1.5 : 1),
+            CornerRadius = new CornerRadius(4),
+            Child = new StackPanel
+            {
+                Spacing = 2,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        FontWeight = node.IsSelected || node.IsRootDomain
+                            ? Microsoft.UI.Text.FontWeights.SemiBold
+                            : Microsoft.UI.Text.FontWeights.Normal,
+                        Foreground = GetBrush(node.IsSelected || node.IsRootDomain ? "ShellAccentBrush" : "ShellTextPrimaryBrush"),
+                        MaxLines = 1,
+                        Text = content,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        TextWrapping = TextWrapping.NoWrap
+                    },
+                    new TextBlock
+                    {
+                        Foreground = GetBrush(node.HasMissingParent ? "ShellCriticalBrush" : "ShellTextSecondaryBrush"),
+                        MaxLines = 1,
+                        Text = node.HasMissingParent ? "Missing parent reference" : node.RelationLabel,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        TextWrapping = TextWrapping.NoWrap
+                    }
+                }
+            }
+        };
+
+    private static string FormatTopologyNodePrefix(TemplatesBuilderDomainTopologyNodeProjection node)
+    {
+        if (node.IsRootDomain)
+        {
+            return "[Root]";
+        }
+
+        if (node.IsTreeRoot)
+        {
+            return "[Tree]";
+        }
+
+        return node.Depth > 0 ? "[Child]" : "[Domain]";
+    }
 
     private static void ConfigureNavButtonChrome(Button button)
     {
