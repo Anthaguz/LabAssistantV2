@@ -55,6 +55,7 @@ public sealed class Issue755TemplatesV2BuilderTests
         var builderModels = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderDraftModels.cs")));
 
         Assert.NotNull(FindByName(builder, "BuilderLeftStepper"));
+        Assert.NotNull(FindByName(builder, "BuilderWorkflowTreeScrollViewer"));
         Assert.NotNull(FindByName(builder, "BuilderWorkflowTreePanel"));
         Assert.NotNull(FindByName(builder, "BuilderActiveStepPanel"));
         Assert.NotNull(FindByName(builder, "BuilderGeneralSection"));
@@ -176,14 +177,23 @@ public sealed class Issue755TemplatesV2BuilderTests
     }
 
     [Fact]
-    public void TemplatesBuilderView_DraftEditsRefreshResourceLists_WithoutFullDetailRerender()
+    public void TemplatesBuilderView_DraftEditsRefreshResourceLists_WithoutFullTreeOrDetailRerender()
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
         var notifyDraftChangedBody = ExtractMethodBody(builderSource, "private void NotifyDraftChanged(object sender)");
+        var updateActionStateBody = ExtractMethodBody(builderSource, "internal void UpdateActionState(TemplatesBuilderActionState state)");
+        var updateWorkflowTreeActionStateBody = ExtractMethodBody(builderSource, "private void UpdateWorkflowTreeActionState()");
+        var renderResourceListsBody = ExtractMethodBody(builderSource, "private void RenderResourceLists(bool refreshWorkflowTreeChildren = true)");
 
         Assert.Contains("RenderResourceLists();", notifyDraftChangedBody);
         Assert.DoesNotContain("RenderDraftResources();", notifyDraftChangedBody);
-        Assert.Contains("RenderSelectedVmDetail();", ExtractMethodBody(builderSource, "private void RenderDraftResources()"));
+        Assert.DoesNotContain("RenderWorkflowTreeState", notifyDraftChangedBody);
+        Assert.DoesNotContain("RenderWorkflowTreeState();", updateActionStateBody);
+        Assert.Contains("UpdateWorkflowTreeActionState();", updateActionStateBody);
+        Assert.Contains("FindDescendants<Button>(BuilderWorkflowTreePanel)", updateWorkflowTreeActionStateBody);
+        Assert.DoesNotContain("BuilderWorkflowTreePanel.Children.Clear();", updateActionStateBody);
+        Assert.Contains("if (refreshWorkflowTreeChildren)", renderResourceListsBody);
+        Assert.Contains("RenderSelectedVmDetail();", ExtractMethodBody(builderSource, "private void RenderDraftResources(bool refreshWorkflowTreeChildren = true)"));
     }
 
     [Fact]
@@ -252,13 +262,16 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         Assert.DoesNotContain("UpdateWorkingDraftFromVisibleControls();", selectVmChildBody);
         Assert.DoesNotContain("RenderDraftResources();", selectVmChildBody);
+        Assert.DoesNotContain("RenderVmNavChildren();", selectVmChildBody);
         Assert.Contains("_workflowNavigation.SelectVmChild(index, _draft);", selectVmChildBody);
-        Assert.Contains("RenderVmNavChildren();", selectVmChildBody);
+        Assert.Contains("RenderSelectedStep();", selectVmChildBody);
         Assert.Contains("RenderSelectedVmDetail();", selectVmChildBody);
 
         Assert.DoesNotContain("UpdateWorkingDraftFromVisibleControls();", selectVmDetailCategoryBody);
         Assert.DoesNotContain("RenderDraftResources();", selectVmDetailCategoryBody);
+        Assert.DoesNotContain("RenderVmNavChildren();", selectVmDetailCategoryBody);
         Assert.Contains("_workflowNavigation.SelectVmDetailCategory(category, _draft);", selectVmDetailCategoryBody);
+        Assert.Contains("RenderSelectedStep();", selectVmDetailCategoryBody);
         Assert.Contains("RenderSelectedVmDetail();", selectVmDetailCategoryBody);
     }
 
@@ -267,12 +280,12 @@ public sealed class Issue755TemplatesV2BuilderTests
     {
         var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
-        var renderWorkflowTreeBody = ExtractMethodBody(builderSource, "private void RenderWorkflowTreeState()");
+        var renderWorkflowTreeBody = ExtractMethodBody(builderSource, "private void RenderWorkflowTreeState(BuilderWorkflowProjection projection)");
         var createVmWorkflowNavRowBody = ExtractMethodBody(builderSource, "private Grid CreateVmWorkflowNavRow(BuilderWorkflowNavigationRow vmOverviewRow)");
-        var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true)");
-        var createNavContentBody = ExtractMethodBody(builderSource, "private static Border CreateNavButtonContent(string content, bool isSelected)");
+        var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true, bool isNested = false)");
+        var createNavContentBody = ExtractMethodBody(builderSource, "private static Border CreateNavButtonContent(string content, bool isSelected, bool isNested = false)");
         var configureNavChromeBody = ExtractMethodBody(builderSource, "private static void ConfigureNavButtonChrome(Button button)");
-        var renderVmNavChildrenBody = ExtractMethodBody(builderSource, "private void RenderVmNavChildren()");
+        var renderVmNavChildrenBody = ExtractMethodBody(builderSource, "private void RenderVmNavChildren(BuilderWorkflowProjection projection)");
 
         Assert.Null(FindByNameOrDefault(builder, "BuilderGeneralStepButton"));
         Assert.DoesNotContain("RegisterWorkflowStepNavButton", builderSource);
@@ -285,16 +298,21 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("CreateVmWorkflowNavRow(projection.VmOverviewRow)", renderWorkflowTreeBody);
         Assert.Contains("BuilderWorkflowTreePanel.Children.Add(BuilderVmNavChildrenPanel);", renderWorkflowTreeBody);
         Assert.Contains("var reviewRow = projection.StepRows.Last();", renderWorkflowTreeBody);
-        Assert.Contains("RenderVmNavChildren();", renderWorkflowTreeBody);
+        Assert.Contains("RenderVmNavChildren(projection);", renderWorkflowTreeBody);
         Assert.Contains("CreateResourceButton(vmOverviewRow.Label, vmOverviewRow.IsSelected, SelectVmOverview, vmOverviewRow.IsEnabled)", createVmWorkflowNavRowBody);
-        Assert.Contains("Content = CreateNavButtonContent(content, isSelected)", createResourceButtonBody);
+        Assert.Contains("Content = CreateNavButtonContent(content, isSelected, isNested)", createResourceButtonBody);
         Assert.Contains("ConfigureNavButtonChrome(button);", createResourceButtonBody);
+        Assert.Contains("ToolTipService.SetToolTip(button, content);", createResourceButtonBody);
         Assert.Contains("button.Click += (_, _) => select();", createResourceButtonBody);
         Assert.Contains("BorderBrush = GetBrush(isSelected ? \"ShellAccentBrush\" : \"ShellBorderBrush\")", createNavContentBody);
+        Assert.Contains("FontWeight = isSelected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal", createNavContentBody);
         Assert.Contains("Foreground = GetBrush(isSelected ? \"ShellAccentBrush\" : \"ShellTextPrimaryBrush\")", createNavContentBody);
+        Assert.Contains("TextTrimming = TextTrimming.CharacterEllipsis", createNavContentBody);
+        Assert.Contains("TextWrapping = TextWrapping.NoWrap", createNavContentBody);
         Assert.Contains("CreateResourceButton(", renderVmNavChildrenBody);
         Assert.Contains("group.CategoryRows", renderVmNavChildrenBody);
         Assert.Contains("categoryRow.Label", renderVmNavChildrenBody);
+        Assert.Contains("isNested: true", renderVmNavChildrenBody);
         Assert.Contains("SelectVmDetailCategory(categoryRow.Route.VmIndex, categoryRow.Route.VmDetailCategory)", renderVmNavChildrenBody);
         Assert.DoesNotContain("RenderVmDetailCategoryNav", builderSource);
         Assert.Contains("ButtonBackgroundPointerOverResource", configureNavChromeBody);
@@ -302,6 +320,28 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("ButtonBorderBrushPointerOverResource", configureNavChromeBody);
         Assert.Contains("ButtonBorderBrushPressedResource", configureNavChromeBody);
         Assert.Contains("transparent", configureNavChromeBody);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_NestedWorkflowTreeAndFooter_HandleDenseOrNarrowLayouts()
+    {
+        var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
+        var builderXamlSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml")));
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var createNavContentBody = ExtractMethodBody(builderSource, "private static Border CreateNavButtonContent(string content, bool isSelected, bool isNested = false)");
+        var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true, bool isNested = false)");
+
+        Assert.Equal("520", FindByName(builder, "BuilderWorkflowTreeScrollViewer").Attribute("MaxHeight")?.Value);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", builderXamlSource);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", builderXamlSource);
+        Assert.NotNull(FindByName(builder, "BuilderFooterCommandGrid"));
+        Assert.NotNull(FindByName(builder, "BuilderFooterCommandScrollViewer"));
+        Assert.NotNull(FindByName(builder, "BuilderFooterCommandPanel"));
+        Assert.Contains("x:Name=\"BuilderFooterCommandScrollViewer\"", builderXamlSource);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Auto\"", builderXamlSource);
+        Assert.Contains("TextTrimming = TextTrimming.CharacterEllipsis", createNavContentBody);
+        Assert.Contains("MaxLines = 1", createNavContentBody);
+        Assert.Contains("ToolTipService.SetToolTip(button, content);", createResourceButtonBody);
     }
 
     [Fact]

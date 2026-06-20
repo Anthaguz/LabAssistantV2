@@ -51,9 +51,15 @@
                     BorderBrush="{StaticResource ShellBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
-                    <StackPanel x:Name="BuilderWorkflowTreePanel" Spacing="6">
-                        <StackPanel x:Name="BuilderVmNavChildrenPanel" Margin="14,0,0,0" Spacing="4" />
-                    </StackPanel>
+                    <ScrollViewer
+                        x:Name="BuilderWorkflowTreeScrollViewer"
+                        MaxHeight="520"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="BuilderWorkflowTreePanel" Spacing="6">
+                            <StackPanel x:Name="BuilderVmNavChildrenPanel" Margin="14,0,0,0" Spacing="4" />
+                        </StackPanel>
+                    </ScrollViewer>
                 </Border>
 
                 <ScrollViewer
@@ -249,27 +255,40 @@
             </Grid>
 
             <StackPanel Grid.Row="2" Spacing="6">
-                <Grid ColumnSpacing="8">
+                <Grid
+                    x:Name="BuilderFooterCommandGrid"
+                    ColumnSpacing="8"
+                    RowSpacing="8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Button x:Name="BuilderBackToLibraryButton" Content="Back" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="BuilderPreviousStepButton" Content="Previous" />
-                        <Button
-                            x:Name="BuilderNextStepButton"
-                            Background="{StaticResource ShellAccentBrush}"
-                            Content="Next"
-                            Foreground="{StaticResource ShellTopBarForegroundBrush}" />
-                        <Button x:Name="BuilderSaveAsButton" Content="Save As" Visibility="Collapsed" />
-                        <Button
-                            x:Name="BuilderSaveButton"
-                            Background="{StaticResource ShellAccentBrush}"
-                            Content="Save"
-                            Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                            Visibility="Collapsed" />
-                    </StackPanel>
+                    <ScrollViewer
+                        x:Name="BuilderFooterCommandScrollViewer"
+                        Grid.Column="1"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Disabled">
+                        <StackPanel
+                            x:Name="BuilderFooterCommandPanel"
+                            HorizontalAlignment="Right"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Button x:Name="BuilderPreviousStepButton" Content="Previous" />
+                            <Button
+                                x:Name="BuilderNextStepButton"
+                                Background="{StaticResource ShellAccentBrush}"
+                                Content="Next"
+                                Foreground="{StaticResource ShellTopBarForegroundBrush}" />
+                            <Button x:Name="BuilderSaveAsButton" Content="Save As" Visibility="Collapsed" />
+                            <Button
+                                x:Name="BuilderSaveButton"
+                                Background="{StaticResource ShellAccentBrush}"
+                                Content="Save"
+                                Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
                 <TextBlock
                     x:Name="BuilderStatusTextBlock"

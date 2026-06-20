@@ -93,7 +93,8 @@ public sealed partial class TemplatesBuilderView : UserControl
             SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
             SetSelectedProfile(_draft.DeploymentProfile);
             _validationState = state.ValidationState;
-            RenderDraftResources();
+            RenderDraftResources(refreshWorkflowTreeChildren: false);
+            RenderSelectedStep();
         }
         finally
         {
@@ -103,6 +104,7 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     internal void UpdateActionState(TemplatesBuilderActionState state)
     {
+        var canNavigateChanged = _canNavigateWorkflow != state.CanNavigate;
         _actionState = state;
         _canNavigateWorkflow = state.CanNavigate;
         BuilderAddNetworkButton.IsEnabled = state.CanNavigate;
@@ -111,7 +113,11 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderAddDomainButton.IsEnabled = state.CanNavigate;
         BuilderAddVmButton.IsEnabled = state.CanNavigate;
         BuilderBackToLibraryButton.IsEnabled = state.CanBackToLibrary;
-        RenderWorkflowTreeState();
+        if (canNavigateChanged)
+        {
+            UpdateWorkflowTreeActionState();
+        }
+
         UpdateFooterCommandState(state);
     }
 
@@ -126,7 +132,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         UpdateWorkingDraftFromVisibleControls();
         _workflowNavigation.SelectStep(step, _draft);
         RenderSelectedStep();
-        RenderDraftResources();
+        RenderDraftResources(refreshWorkflowTreeChildren: false);
     }
 
     private void SelectVmOverview()
@@ -134,14 +140,13 @@ public sealed partial class TemplatesBuilderView : UserControl
         UpdateWorkingDraftFromVisibleControls();
         _workflowNavigation.SelectVmOverview(_draft);
         RenderSelectedStep();
-        RenderDraftResources();
+        RenderDraftResources(refreshWorkflowTreeChildren: false);
     }
 
     private void SelectVmChild(int index)
     {
         _workflowNavigation.SelectVmChild(index, _draft);
         RenderSelectedStep();
-        RenderVmNavChildren();
         RenderSelectedVmDetail();
     }
 
@@ -149,7 +154,6 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         _workflowNavigation.SelectVmDetailCategory(category, _draft);
         RenderSelectedStep();
-        RenderVmNavChildren();
         RenderSelectedVmDetail();
     }
 
@@ -157,7 +161,6 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         _workflowNavigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(vmIndex, category), _draft);
         RenderSelectedStep();
-        RenderVmNavChildren();
         RenderSelectedVmDetail();
     }
 
@@ -170,7 +173,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         RenderSelectedStep();
-        RenderDraftResources();
+        RenderDraftResources(refreshWorkflowTreeChildren: false);
     }
 
     private void RenderSelectedStep()
@@ -185,13 +188,17 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderVmOverviewPanel.Visibility = projection.ActiveStep == BuilderWorkflowStep.Vms && projection.IsVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
         BuilderSelectedVmDetailHost.Visibility = projection.ActiveStep == BuilderWorkflowStep.Vms && !projection.IsVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
 
-        RenderWorkflowTreeState();
+        RenderWorkflowTreeState(projection);
         UpdateFooterCommandState();
     }
 
     private void RenderWorkflowTreeState()
     {
-        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
+        RenderWorkflowTreeState(_workflowNavigation.Project(_draft, _canNavigateWorkflow));
+    }
+
+    private void RenderWorkflowTreeState(BuilderWorkflowProjection projection)
+    {
         BuilderWorkflowTreePanel.Children.Clear();
         foreach (var row in projection.StepRows.Take(4))
         {
@@ -202,7 +209,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderWorkflowTreePanel.Children.Add(BuilderVmNavChildrenPanel);
         var reviewRow = projection.StepRows.Last();
         BuilderWorkflowTreePanel.Children.Add(CreateResourceButton(reviewRow.Label, reviewRow.IsSelected, () => SelectStep(reviewRow.Route.Step), reviewRow.IsEnabled));
-        RenderVmNavChildren();
+        RenderVmNavChildren(projection);
     }
 
     private Grid CreateVmWorkflowNavRow(BuilderWorkflowNavigationRow vmOverviewRow)
@@ -253,10 +260,18 @@ public sealed partial class TemplatesBuilderView : UserControl
         BuilderSaveButton.Visibility = projection.IsReview ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void RenderDraftResources()
+    private void UpdateWorkflowTreeActionState()
+    {
+        foreach (var button in FindDescendants<Button>(BuilderWorkflowTreePanel))
+        {
+            button.IsEnabled = _canNavigateWorkflow;
+        }
+    }
+
+    private void RenderDraftResources(bool refreshWorkflowTreeChildren = true)
     {
         EnsureSelectedResourcesInBounds();
-        RenderResourceLists();
+        RenderResourceLists(refreshWorkflowTreeChildren);
         RenderSelectedNetworkDetail();
         RenderSelectedCredentialSlotDetail();
         RenderSelectedForestDomainDetail();
@@ -288,12 +303,15 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
     }
 
-    private void RenderResourceLists()
+    private void RenderResourceLists(bool refreshWorkflowTreeChildren = true)
     {
         RenderNetworkList();
         RenderCredentialSlotList();
         RenderForestDomainList();
-        RenderVmNavChildren();
+        if (refreshWorkflowTreeChildren)
+        {
+            RenderVmNavChildren();
+        }
     }
 
     private void RenderNetworkList()
@@ -376,7 +394,11 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderVmNavChildren()
     {
-        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
+        RenderVmNavChildren(_workflowNavigation.Project(_draft, _canNavigateWorkflow));
+    }
+
+    private void RenderVmNavChildren(BuilderWorkflowProjection projection)
+    {
         BuilderVmNavChildrenPanel.Children.Clear();
         foreach (var group in projection.VmRows)
         {
@@ -385,7 +407,8 @@ public sealed partial class TemplatesBuilderView : UserControl
                 row.Label,
                 row.IsSelected,
                 () => SelectVmChild(row.Route.VmIndex),
-                row.IsEnabled);
+                row.IsEnabled,
+                isNested: true);
             BuilderVmNavChildrenPanel.Children.Add(button);
 
             var categoryPanel = new StackPanel
@@ -399,7 +422,8 @@ public sealed partial class TemplatesBuilderView : UserControl
                     categoryRow.Label,
                     categoryRow.IsSelected,
                     () => SelectVmDetailCategory(categoryRow.Route.VmIndex, categoryRow.Route.VmDetailCategory),
-                    categoryRow.IsEnabled));
+                    categoryRow.IsEnabled,
+                    isNested: true));
             }
 
             BuilderVmNavChildrenPanel.Children.Add(categoryPanel);
@@ -834,7 +858,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             SetTextIfChanged(BuilderTemplateNameTextBox, _draft.TemplateName);
             SetTextIfChanged(BuilderTemplateDescriptionTextBox, _draft.TemplateDescription);
             SetSelectedProfile(_draft.DeploymentProfile);
-            RenderDraftResources();
+            RenderDraftResources(refreshWorkflowTreeChildren: false);
             RenderSelectedStep();
         }
         finally
@@ -1020,19 +1044,20 @@ public sealed partial class TemplatesBuilderView : UserControl
         return checkBox;
     }
 
-    private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true)
+    private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true, bool isNested = false)
     {
         var button = new Button
         {
             Background = CreateTransparentBrush(),
             BorderThickness = new Thickness(0),
-            Content = CreateNavButtonContent(content, isSelected),
+            Content = CreateNavButtonContent(content, isSelected, isNested),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             IsEnabled = isEnabled,
             Padding = new Thickness(0)
         };
         ConfigureNavButtonChrome(button);
+        ToolTipService.SetToolTip(button, content);
         button.Click += (_, _) => select();
         return button;
     }
@@ -1152,19 +1177,22 @@ public sealed partial class TemplatesBuilderView : UserControl
         comboBox.SelectedIndex = comboBox.Items.Count > 0 ? 0 : -1;
     }
 
-    private static Border CreateNavButtonContent(string content, bool isSelected)
+    private static Border CreateNavButtonContent(string content, bool isSelected, bool isNested = false)
         => new()
         {
-            Padding = new Thickness(8, 5, 8, 5),
+            Padding = isNested ? new Thickness(7, 4, 7, 4) : new Thickness(8, 5, 8, 5),
             Background = GetBrush(isSelected ? "ShellBackgroundBrush" : "ShellContentBackgroundBrush"),
             BorderBrush = GetBrush(isSelected ? "ShellAccentBrush" : "ShellBorderBrush"),
             BorderThickness = new Thickness(isSelected ? 2 : 1),
             CornerRadius = new CornerRadius(4),
             Child = new TextBlock
             {
+                FontWeight = isSelected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal,
                 Foreground = GetBrush(isSelected ? "ShellAccentBrush" : "ShellTextPrimaryBrush"),
+                MaxLines = 1,
                 Text = content,
-                TextWrapping = TextWrapping.WrapWholeWords
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.NoWrap
             }
         };
 
