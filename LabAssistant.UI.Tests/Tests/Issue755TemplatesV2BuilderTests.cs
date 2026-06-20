@@ -3,7 +3,10 @@ using System.Text.Json;
 using LabAssistant.Business.Planning;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
+using LabAssistant.Models.Configuration;
+using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.ViewModels.Templates.Builder;
@@ -877,6 +880,95 @@ public sealed class Issue755TemplatesV2BuilderTests
     }
 
     [Fact]
+    public async Task BuilderSavedTemplate_FeedsDeployV2ReviewProjection()
+    {
+        var savedDocument = await CreateSavedBuilderDocumentAsync();
+        var template = savedDocument.Template;
+
+        Assert.Equal(TemplateSchemaVersionCatalog.V2SchemaVersion, template.SchemaVersion);
+        Assert.Equal(TemplateExecutionEngine.V2UnifiedPlanning, template.ExecutionEngine);
+        Assert.NotNull(template.LabNetworks);
+        Assert.Equal("vSwitch-Core", Assert.Single(template.LabNetworks!).SwitchName);
+        Assert.Equal(2, template.VmTemplates.Count);
+        var templateDomain = Assert.Single(template.DirectoryTopology!.Domains!);
+        Assert.Equal("domain-contoso", templateDomain.DomainId);
+        Assert.Equal("vm-dc01", templateDomain.FirstDomainControllerVmId);
+        Assert.Contains(template.VmTemplates, vm => string.Equals(vm.CredentialSlots?.DomainJoin, "slot-join", StringComparison.Ordinal));
+
+        var workspace = new DeployV2ReviewWorkspaceViewModel();
+        var host = new RecordingV2ReviewHost(savedDocument);
+        var controller = new DeployV2ReviewWorkspaceController(
+            workspace,
+            new DeployV2ReviewProjectionService(),
+            host);
+
+        await controller.RefreshPlanAsync(template);
+
+        Assert.Equal(1, host.EnsureReferenceDataCalls);
+        Assert.Equal(1, host.BuildPlanCalls);
+        Assert.True(workspace.IsVisible);
+        Assert.False(workspace.IsPlanning);
+        Assert.True(workspace.CanStartDeploy);
+        Assert.False(workspace.HasBlockingItems);
+        Assert.Empty(workspace.BlockerRows);
+        Assert.Empty(workspace.CredentialSlotRows);
+        Assert.Equal(["slot-admin", "slot-dsrm", "slot-join", "slot-local"], host.LastResolvedCredentialSlotKeys);
+        Assert.Equal(4, workspace.ResolvedCredentialSlotValues.Count);
+
+        Assert.NotNull(workspace.PlanSummary);
+        Assert.Equal("V2 Topology Template", workspace.PlanSummary!.TemplateName);
+        Assert.Equal("V2 Unified Planning", workspace.PlanSummary.ExecutionEngine);
+        Assert.Equal("Balanced", workspace.PlanSummary.DeploymentProfile);
+        Assert.Equal(2, workspace.PlanSummary.VmCount);
+        Assert.Equal("Domain-aware", workspace.PlanSummary.DomainSummary);
+        Assert.Equal("Startable", workspace.PlanSummary.StartabilitySummary);
+        Assert.Equal(0, workspace.PlanSummary.UnresolvedRequirementCount);
+        Assert.NotEmpty(workspace.WaveRows);
+        Assert.Contains(workspace.DiagnosticRows, row =>
+            string.Equals(row.Title, "Nodes", StringComparison.Ordinal) &&
+            string.Equals(row.Detail, $"{workspace.PlanSummary.NodeCount} node(s)", StringComparison.Ordinal));
+
+        Assert.NotNull(workspace.CurrentPlan);
+        var reviewPlan = workspace.CurrentPlan!;
+        Assert.True(reviewPlan.Success);
+        Assert.Equal(TemplateExecutionEngine.V2UnifiedPlanning, reviewPlan.Context.ExecutionEngine);
+        Assert.True(reviewPlan.Context.DomainSemanticsRequired);
+        Assert.Equal(2, reviewPlan.Context.Vms.Count);
+        var reviewDomain = Assert.Single(reviewPlan.Context.Domains);
+        Assert.Equal("domain-contoso", reviewDomain.DomainId);
+        Assert.Equal("vm-dc01", reviewDomain.FirstDomainControllerVmId);
+
+        var dcVm = Assert.Single(reviewPlan.Context.Vms, vm => string.Equals(vm.VmId, "vm-dc01", StringComparison.Ordinal));
+        Assert.Equal("slot-local", dcVm.EffectiveBootstrapCredentialSlot);
+        Assert.Equal("slot-admin", dcVm.EffectiveDomainAdminCredentialSlot);
+        Assert.Equal("slot-dsrm", dcVm.EffectiveDsrmCredentialSlot);
+        var dcNic = Assert.Single(dcVm.Nics);
+        Assert.Equal("lab-core", dcNic.NetworkId);
+        Assert.Equal("vSwitch-Core", dcNic.EffectiveSwitchName);
+        Assert.Equal("10.0.0.10", dcNic.IpAddress);
+
+        var memberVm = Assert.Single(reviewPlan.Context.Vms, vm => string.Equals(vm.VmId, "vm-member01", StringComparison.Ordinal));
+        Assert.Equal("slot-local", memberVm.EffectiveBootstrapCredentialSlot);
+        Assert.Equal("slot-admin", memberVm.EffectiveDomainAdminCredentialSlot);
+        Assert.Equal("slot-join", memberVm.EffectiveDomainJoinCredentialSlot);
+        Assert.True(memberVm.RequiresDomainJoin);
+
+        var nodeKinds = reviewPlan.Nodes.Select(node => node.Kind).ToArray();
+        Assert.Contains(V2PlanNodeKind.PromoteFirstDomainController, nodeKinds);
+        Assert.Contains(V2PlanNodeKind.JoinDomain, nodeKinds);
+        Assert.Contains(V2PlanNodeKind.ConfigureBaseRemoteAccess, nodeKinds);
+
+        var runtimeResult = await controller.StartDeployAsync(template);
+        Assert.True(runtimeResult.Success);
+        Assert.Same(reviewPlan, host.LastDeployPlan);
+        Assert.NotNull(host.LastBaseRemoteAccessOptions);
+        Assert.True(host.LastBaseRemoteAccessOptions!.EnableRemoteDesktop);
+        Assert.True(host.LastBaseRemoteAccessOptions.SetPrivateNetworkProfile);
+        Assert.True(host.LastBaseRemoteAccessOptions.DisableFirewall);
+        Assert.True(host.LastBaseRemoteAccessOptions.DisableRdpNla);
+    }
+
+    [Fact]
     public async Task BuilderSave_UsesReviewAsConfirmationWithoutSeparateCheckboxGate()
     {
         var workspace = new TemplatesBuilderWorkspaceViewModel();
@@ -939,6 +1031,21 @@ public sealed class Issue755TemplatesV2BuilderTests
             ]);
 
         return TemplatesBuilderDraftMapper.CreateSuggestedDraft(referenceData) with { IsSaveConfirmed = true };
+    }
+
+    private static async Task<TemplateEditorDocument> CreateSavedBuilderDocumentAsync()
+    {
+        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var service = new RecordingTemplatesCapabilityService();
+        var host = new RecordingBuilderHost();
+        var controller = new TemplatesBuilderWorkspaceController(service, workspace, host);
+
+        workspace.LoadNewDraft(CreateConfirmedBuilderDraft());
+        await controller.SaveAsync();
+
+        Assert.Equal(1, service.SaveCalls);
+        Assert.NotNull(service.LastSavedDocument);
+        return service.LastSavedDocument!;
     }
 
     private static TemplatesBuilderDraftSnapshot CreateDraftWithVms(params string[] vmIds)
@@ -1219,6 +1326,114 @@ public sealed class Issue755TemplatesV2BuilderTests
         }
 
         public void NavigateToLibrary()
+        {
+        }
+    }
+
+    private sealed class RecordingV2ReviewHost : IDeployFromTemplateV2ReviewHost
+    {
+        private readonly Dictionary<string, V2RuntimeCredential> _credentialValues = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["slot-local"] = new V2RuntimeCredential { Username = "local-admin", Password = "local-password" },
+            ["slot-admin"] = new V2RuntimeCredential { Username = "CONTOSO\\Administrator", Password = "domain-password" },
+            ["slot-join"] = new V2RuntimeCredential { Username = "CONTOSO\\Joiner", Password = "join-password" },
+            ["slot-dsrm"] = new V2RuntimeCredential { Username = "DSRM", Password = "dsrm-password" }
+        };
+
+        public RecordingV2ReviewHost(TemplateEditorDocument activeTemplateDocument)
+        {
+            ActiveTemplateDocument = activeTemplateDocument;
+        }
+
+        public TemplateEditorDocument? ActiveTemplateDocument { get; }
+
+        public int EnsureReferenceDataCalls { get; private set; }
+
+        public int BuildPlanCalls { get; private set; }
+
+        public IReadOnlyList<string> LastResolvedCredentialSlotKeys { get; private set; } = Array.Empty<string>();
+
+        public V2PlanBuildResult? LastDeployPlan { get; private set; }
+
+        public V2BaseRemoteAccessOptions? LastBaseRemoteAccessOptions { get; private set; }
+
+        public Task EnsureReferenceDataAsync(bool forceRefresh)
+        {
+            EnsureReferenceDataCalls++;
+            Assert.False(forceRefresh);
+            return Task.CompletedTask;
+        }
+
+        public IReadOnlyList<LocalCredentialSlotDefinition> LoadLocalCredentialSlotDefinitions()
+            => _credentialValues
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => new LocalCredentialSlotDefinition
+                {
+                    SlotKey = pair.Key,
+                    Username = pair.Value.Username
+                })
+                .ToList();
+
+        public bool TryGetLocalCredentialSlotValue(string slotKey, out V2RuntimeCredential credential)
+        {
+            if (_credentialValues.TryGetValue(slotKey, out var value))
+            {
+                credential = value;
+                return true;
+            }
+
+            credential = new V2RuntimeCredential();
+            return false;
+        }
+
+        public void UpsertLocalCredentialSlot(string slotKey, string username, string password)
+        {
+            _credentialValues[slotKey] = new V2RuntimeCredential { Username = username, Password = password };
+        }
+
+        public async Task<V2PlanBuildResult> BuildV2PlanAsync(
+            LabTemplate template,
+            IReadOnlyCollection<string> resolvedCredentialSlotKeys)
+        {
+            BuildPlanCalls++;
+            LastResolvedCredentialSlotKeys = resolvedCredentialSlotKeys
+                .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var planner = new V2PlanningCapabilityService();
+            return await planner.BuildPlanAsync(new V2PlanBuildRequest
+            {
+                Template = template,
+                CatalogItems =
+                [
+                    CreateCatalogItem("disk-dc", @"C:\base\disk-dc.vhdx", "sig-dc"),
+                    CreateCatalogItem("disk-member", @"C:\base\disk-member.vhdx", "sig-member")
+                ],
+                AvailableSwitchNames = ["vSwitch-Core"],
+                AvailableSwitches = [new V2AvailableSwitchInfo { Name = "vSwitch-Core", SwitchType = "Internal" }],
+                ResolvedCredentialSlotKeys = resolvedCredentialSlotKeys,
+                DefaultDeploymentProfile = "Balanced"
+            });
+        }
+
+        public Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
+            LabTemplate template,
+            V2PlanBuildResult plan,
+            IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
+            V2BaseRemoteAccessOptions baseRemoteAccessOptions,
+            MultiVmDeploymentContext deploymentContext)
+        {
+            LastDeployPlan = plan;
+            LastBaseRemoteAccessOptions = baseRemoteAccessOptions;
+            return Task.FromResult(new V2RuntimeExecutionResult
+            {
+                Success = true,
+                DeploymentContext = deploymentContext,
+                ExecutedNodeIds = plan.Nodes.Select(node => node.NodeId).ToList()
+            });
+        }
+
+        public void ApplyWorkspaceState()
         {
         }
     }
