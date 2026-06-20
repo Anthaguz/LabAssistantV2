@@ -213,17 +213,12 @@
                                     <StackPanel x:Name="BuilderVmOverviewListPanel" Spacing="6" />
                                 </StackPanel>
 
-                                <Grid
+                                <StackPanel
                                     x:Name="BuilderSelectedVmDetailHost"
-                                    ColumnSpacing="10"
+                                    Spacing="8"
                                     Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="150" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" x:Name="BuilderSelectedVmDetailPanel" Spacing="8" />
-                                    <StackPanel Grid.Column="1" x:Name="BuilderVmDetailCategoryNavPanel" Spacing="6" />
-                                </Grid>
+                                    <StackPanel x:Name="BuilderSelectedVmDetailPanel" Spacing="8" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 

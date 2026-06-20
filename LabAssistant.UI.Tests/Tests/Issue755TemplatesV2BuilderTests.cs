@@ -94,7 +94,7 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.NotNull(FindByName(builder, "BuilderVmAdDcCountTextBlock"));
         Assert.NotNull(FindByName(builder, "BuilderVmOverviewListPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedVmDetailHost"));
-        Assert.NotNull(FindByName(builder, "BuilderVmDetailCategoryNavPanel"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderVmDetailCategoryNavPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedVmDetailPanel"));
         Assert.Contains("Basics", builderSource);
         Assert.Contains("Resources", builderSource);
@@ -113,10 +113,14 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("BuilderVmDetailCategory.Credentials", builderSource);
         Assert.Contains("BuilderVmNavChildrenPanel.Children.Add", builderSource);
         Assert.Contains("SelectVmChild(row.Route.VmIndex)", builderSource);
+        Assert.Contains("group.CategoryRows", builderSource);
+        Assert.Contains("SelectVmDetailCategory(categoryRow.Route.VmIndex, categoryRow.Route.VmDetailCategory)", builderSource);
         Assert.Contains("FindNextVmNumber", builderSource);
         Assert.Contains("$\"vm-{nextVmNumber}\"", builderSource);
         Assert.Contains("$\"VM {nextVmNumber}\"", builderSource);
         Assert.Contains("ReadNics(BuilderSelectedVmDetailPanel)", builderSource);
+        Assert.DoesNotContain("RenderVmDetailCategoryNav", builderSource);
+        Assert.DoesNotContain("BuilderVmDetailCategoryNavPanel", builderSource);
         Assert.DoesNotContain("BuilderVmNameListPanel", builderSource);
         Assert.DoesNotContain("BuilderLabNetworksTextBox", builderSource);
         Assert.DoesNotContain("BuilderDomainsTextBox", builderSource);
@@ -269,7 +273,6 @@ public sealed class Issue755TemplatesV2BuilderTests
         var createNavContentBody = ExtractMethodBody(builderSource, "private static Border CreateNavButtonContent(string content, bool isSelected)");
         var configureNavChromeBody = ExtractMethodBody(builderSource, "private static void ConfigureNavButtonChrome(Button button)");
         var renderVmNavChildrenBody = ExtractMethodBody(builderSource, "private void RenderVmNavChildren()");
-        var renderVmDetailCategoryNavBody = ExtractMethodBody(builderSource, "private void RenderVmDetailCategoryNav()");
 
         Assert.Null(FindByNameOrDefault(builder, "BuilderGeneralStepButton"));
         Assert.DoesNotContain("RegisterWorkflowStepNavButton", builderSource);
@@ -290,7 +293,10 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("BorderBrush = GetBrush(isSelected ? \"ShellAccentBrush\" : \"ShellBorderBrush\")", createNavContentBody);
         Assert.Contains("Foreground = GetBrush(isSelected ? \"ShellAccentBrush\" : \"ShellTextPrimaryBrush\")", createNavContentBody);
         Assert.Contains("CreateResourceButton(", renderVmNavChildrenBody);
-        Assert.Contains("CreateResourceButton(", renderVmDetailCategoryNavBody);
+        Assert.Contains("group.CategoryRows", renderVmNavChildrenBody);
+        Assert.Contains("categoryRow.Label", renderVmNavChildrenBody);
+        Assert.Contains("SelectVmDetailCategory(categoryRow.Route.VmIndex, categoryRow.Route.VmDetailCategory)", renderVmNavChildrenBody);
+        Assert.DoesNotContain("RenderVmDetailCategoryNav", builderSource);
         Assert.Contains("ButtonBackgroundPointerOverResource", configureNavChromeBody);
         Assert.Contains("ButtonBackgroundPressedResource", configureNavChromeBody);
         Assert.Contains("ButtonBorderBrushPointerOverResource", configureNavChromeBody);
@@ -347,27 +353,32 @@ public sealed class Issue755TemplatesV2BuilderTests
                 BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Review)
             ],
             routes);
-        Assert.Equal("0", FindByName(builder, "BuilderSelectedVmDetailPanel").Attribute("Grid.Column")?.Value);
-        Assert.Equal("1", FindByName(builder, "BuilderVmDetailCategoryNavPanel").Attribute("Grid.Column")?.Value);
+        Assert.Null(FindByName(builder, "BuilderSelectedVmDetailPanel").Attribute("Grid.Column"));
+        Assert.Null(FindByNameOrDefault(builder, "BuilderVmDetailCategoryNavPanel"));
     }
 
     [Fact]
-    public void TemplatesBuilderWorkflowNavigation_ProjectsSelectedStateAndVmRows()
+    public void TemplatesBuilderWorkflowNavigation_ProjectsSelectedStateAndNestedVmCategoryRows()
     {
         var draft = CreateDraftWithVms("vm-alpha", "vm-beta");
         var navigation = new TemplatesBuilderWorkflowNavigation();
 
         navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking), draft);
         var projection = navigation.Project(draft, canNavigate: true);
-        var selectedVmRow = Assert.Single(projection.VmRows, row => row.IsSelected);
+        var selectedVmGroup = Assert.Single(projection.VmRows, row => row.VmRow.IsSelected);
+        var selectedCategoryRow = Assert.Single(selectedVmGroup.CategoryRows, row => row.IsSelected);
 
         Assert.Equal(BuilderWorkflowStep.Vms, projection.ActiveStep);
         Assert.False(projection.IsVmOverviewSelected);
         Assert.Equal(1, projection.SelectedVmIndex);
         Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
         Assert.True(projection.IsVmDetailSelected);
-        Assert.Equal("vm-beta", selectedVmRow.Label);
-        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics), selectedVmRow.Route);
+        Assert.Equal("vm-beta", selectedVmGroup.VmRow.Label);
+        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics), selectedVmGroup.VmRow.Route);
+        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking), selectedCategoryRow.Route);
+        Assert.Equal(
+            ["Basics", "Resources", "Membership", "Roles", "Networking", "Credentials"],
+            selectedVmGroup.CategoryRows.Select(row => row.Label).ToArray());
     }
 
     [Fact]
@@ -401,7 +412,25 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Equal(BuilderVmDetailCategory.Roles, projection.SelectedVmDetailCategory);
         Assert.True(projection.IsVmDetailSelected);
         Assert.Equal("ad-domain-controller", projection.CurrentRoute.RoleKey);
-        Assert.True(Assert.Single(projection.VmRows).IsSelected);
+        var vmGroup = Assert.Single(projection.VmRows);
+        Assert.True(vmGroup.VmRow.IsSelected);
+        Assert.True(Assert.Single(vmGroup.CategoryRows, row => row.Route.VmDetailCategory == BuilderVmDetailCategory.Roles).IsSelected);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_KeepsFutureRoleConfigUiOutOfFirstSlice()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var rolesRenderBody = ExtractSwitchCaseBody(
+            builderSource,
+            "case BuilderVmDetailCategory.Roles:",
+            "case BuilderVmDetailCategory.Networking:");
+
+        Assert.Contains("Active Directory Domain Controller", rolesRenderBody);
+        Assert.DoesNotContain("Root CA", rolesRenderBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SQL", rolesRenderBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Web", rolesRenderBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Operations", rolesRenderBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
