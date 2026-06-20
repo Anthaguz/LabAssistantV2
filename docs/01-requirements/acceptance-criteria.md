@@ -4642,8 +4642,10 @@ Each readiness result shall include, at minimum:
 - active top-level state is explicit and uses existing shell resources, including `ShellAccentBrush`, selected background, and selected border treatment
 - completion/error badges are deferred to a later Review/validation UX slice
 - the `VMs` row expands to show VM child items by VM name
+- each VM child expands to nested category rows ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
 - clicking `VMs` opens a compact VM overview
 - clicking a VM child opens that VM's detail editor on `Basics`
+- clicking a VM category opens that category under `VMs > VM name > category`
 - General contains template name, description, deployment profile, and read-only schema/version metadata if shown
 - deployment profile appears as a visible horizontal Conservative/Balanced/Aggressive selector below description, not as a dropdown
 - deployment profile includes a Segoe MDL2 information tooltip that explains the user-facing speed versus host-pressure tradeoff
@@ -4654,7 +4656,7 @@ Each readiness result shall include, at minimum:
   - Credentials uses a slot-reference list plus selected slot detail
 - the VMs overview shows total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
 - editing a VM happens by selecting a VM child in the workflow tree, not by using a right-side VM selector list
-- selected VM detail has an internal right mini-nav: Basics, Resources, Membership, Roles, Networking, and Credentials
+- VM detail categories appear as nested left-tree rows under `VMs > VM name`: Basics, Resources, Membership, Roles, Networking, and Credentials
 - selecting a VM opens Basics by default
 - Resources contains RAM, CPU, and base disk/VHDX fields
 - Networking owns NIC list/detail; NICs do not become global left-nav children
@@ -4674,8 +4676,9 @@ Each readiness result shall include, at minimum:
 - navigating between top-level steps, VM children, and VM detail categories does not lose draft edits
 - narrow VM/category navigation updates only the needed Builder state and does not require broad full-Builder rerendering
 - top-level workflow rows are active for non-VM steps
-- the VM child is active while editing a VM
-- the selected VM category is active only in the right mini-nav
+- `VMs` is active for the VM overview
+- the VM name is active when any category for that VM is selected
+- the selected VM category is active under that VM node
 - direct workflow-tree clicks remain supported
 - Review plus Save is the confirmation; there is no separate Review confirmation checkbox
 - Review shows a blocker when at least one VM is required before Save
@@ -4697,6 +4700,8 @@ Each readiness result shall include, at minimum:
 - Domain Controller is modeled as a VM role, not as a membership mode
 - the first executable Builder-authored VM role is Active Directory Domain Controller
 - Root CA, SQL, Web, and Operations are future role extension points and are not authorable in this slice
+- future role-specific configuration belongs under `VMs > VM name > Roles > Role name`
+- this slice does not add empty Root CA, SQL, Web, or Operations configuration UI
 - each VM can carry membership mode, domain assignment, and approved VM role intent
 - each VM can author per-NIC switch/network, IP, DNS, and gateway intent
 - unsupported or incomplete required combinations block save with actionable validation feedback
@@ -4828,9 +4833,10 @@ Each readiness result shall include, at minimum:
 - Builder presents the General, Networks, Forests & Domains, Credentials, VMs, Review active workflow tree with one active top-level step at a time
 - active top-level workflow state uses `ShellAccentBrush`, selected background, and selected border treatment
 - `VMs` expands to VM child items by VM name and includes a small borderless right-aligned `+` button
+- each VM child expands to nested category rows ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
 - clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
 - clicking a VM child opens that VM detail on `Basics`
-- selected VM detail uses an internal right mini-nav for Basics, Resources, Membership, Roles, Networking, and Credentials
+- VM detail categories appear as nested left-tree rows under `VMs > VM name`: Basics, Resources, Membership, Roles, Networking, and Credentials
 - Resources contains RAM, CPU, and base disk/VHDX; Networking owns NIC list/detail
 - Builder presents a persistent footer with Back on the left; Previous and Next on the right during authoring; and Previous, Save As, and Save on the right during Review
 - Apply Suggestions and manual Validate are not footer actions in this contract
@@ -4851,8 +4857,8 @@ Each readiness result shall include, at minimum:
 - route/workspace tests verify Builder is a distinct Templates workflow-state destination and parent `Templates` still defaults to `templates.library`
 - non-regression tests verify the current Templates Editor remains available for V1/simple/legacy editing
 - Builder seam tests verify Builder state/orchestration/composition does not accumulate in `MainWindow`, shared Templates composition, or the current Editor
-- workflow navigation tests verify active top-level state, Previous/Next full-route behavior, VM child navigation, and the VM inline plus affordance
-- VM detail navigation tests verify Basics opens by default, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC list/detail, and NICs do not become global workflow-tree children
+- workflow navigation tests verify active top-level state, VM overview active state, VM name/category active state, Previous/Next full-route behavior, VM child navigation, nested VM category navigation, and the VM inline plus affordance
+- VM detail navigation tests verify Basics opens by default, category routes live under `VMs > VM name`, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC list/detail, and NICs do not become global workflow-tree children
 - schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values, and that secrets remain in the local DPAPI-backed store
 - save/load tests verify existing trust declarations are preserved even though trust authoring is deferred
 - validation tests verify VM-only standalone templates are valid, domain-dependent VMs require domains, each saved domain requires at least one Active Directory Domain Controller VM role assignment, and `firstDomainControllerVmId` is derived from ordered DC assignments
@@ -4862,6 +4868,13 @@ Each readiness result shall include, at minimum:
 - Review aggregation tests verify current Builder-local blockers and warnings are summarized without requiring a manual Validate footer action
 - draft interaction tests verify immediate or debounced draft updates, invalid intermediate value retention, navigation edit preservation, and blocking-error gating for final Save/export/plan
 - planner/review compatibility tests verify saved Builder output can feed Deploy From Template review and V2 planning
+
+## Umbrella Program Quality Gate
+- no unresolved blocking review findings remain on the V2 Builder hardening program PR set
+- automated validation required by the implementation slices is passing
+- UX/visual audit is complete and any blocking findings are resolved or converted into approved follow-up issues
+- performance/rendering audit is complete and any blocking findings are resolved or converted into approved follow-up issues
+- architecture expansion audit is complete and any blocking findings are resolved or converted into approved follow-up issues
 
 ## Open Questions / TBDs
 - none for the first V2 Builder contract slice; trust authoring is intentionally deferred to a later approved issue
