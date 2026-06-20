@@ -4681,6 +4681,7 @@ Each readiness result shall include, at minimum:
 - the root left panel remains first-level workflow navigation only
 - selecting `VMs` drills or swipes the left navigator into a VM list panel
 - selecting a VM drills or swipes the left navigator into that VM's section list ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
+- selecting `Networking` for a VM drills or swipes the left navigator into that VM's NIC list panel
 - clicking `VMs` opens a compact VM overview
 - clicking a VM opens that VM's detail editor on `Basics`
 - clicking a VM section opens that section under `VMs > VM name > section`
@@ -4736,11 +4737,14 @@ Each readiness result shall include, at minimum:
 - the root left panel remains first-level workflow navigation only
 - selecting `VMs` drills or swipes the left navigator into the VM list panel
 - selecting a VM drills or swipes the left navigator into that VM's section list: Basics, Resources, Membership, Roles, Networking, Credentials
+- selecting `Networking` drills or swipes the left navigator into the selected VM's NIC list panel
+- the NIC list panel includes Add NIC and one row per NIC
+- selecting a NIC from the NIC list panel opens only that NIC detail in the main content area
 - future role-specific configuration belongs under the selected VM's Roles section as role child routes
 - no empty role-specific configuration UI is required before a role configuration slice is approved
 - the drilled-in navigator uses a compact header with a chevron/back icon for one-level-up navigator movement
 - the Builder does not introduce a global breadcrumb bar for this navigator hierarchy
-- the visible chevron/back control may be icon-only, but accessibility labels and tooltips describe the exact target, such as `Back to VMs` or `Back to Builder`
+- the visible chevron/back control may be icon-only, but accessibility labels and tooltips describe the exact target, such as `Back to VMs`, `Back to Builder`, `Back to VM sections`, or `Back to <VM name>`
 - navigator chevron/back movement never leaves the Builder, discards draft progress, cancels deployment work, or routes back to the Templates library
 - leaving the Builder or returning to the Templates library remains a separate explicit command and preserves existing unsaved-change protections
 - footer Previous/Next move through the linear Builder route sequence rather than through the current drill-in hierarchy
@@ -4842,14 +4846,16 @@ Each readiness result shall include, at minimum:
 ### 3d) VM Networking NIC drill-in
 **Given**
 - the user is editing a selected VM's Networking section
+- the left navigator is showing that VM's NIC list panel
 
 **When**
 - the Builder displays NIC authoring
 
 **Then**
-- Networking first shows a NIC overview/list plus Add NIC
-- selecting a NIC opens a selected NIC detail view that shows only that NIC's fields
-- Add NIC creates a new NIC draft, selects it, and opens that NIC detail
+- the NIC list panel includes Add NIC and one row per NIC
+- Networking first shows a NIC overview in the main content area while the NIC list remains in the left navigator
+- selecting a NIC in the left navigator opens a selected NIC detail view that shows only that NIC's fields in the main content area
+- Add NIC creates a new NIC draft, selects it, opens that NIC detail, and leaves the left navigator at the NIC list depth
 - footer Previous/Next route through Networking overview, then each NIC detail in deterministic draft order, then Credentials
 - when the selected VM has zero NICs, Next from Networking overview goes to Credentials
 - NIC details remain within the selected VM's Networking route and do not become global workflow children
@@ -4964,12 +4970,14 @@ Each readiness result shall include, at minimum:
 - root left navigation remains first-level workflow navigation only
 - selecting `VMs` drills or swipes the left navigator into a VM list panel
 - selecting a VM drills or swipes the left navigator into that VM's section list ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
+- selecting a VM's Networking section drills or swipes the left navigator into that VM's NIC list panel with Add NIC and one row per NIC
 - drilled-in navigator panels use a compact header with an exact-target chevron/back label or tooltip instead of a global breadcrumb bar
 - clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
 - clicking a VM opens that VM detail on `Basics`
 - VM detail sections appear in the selected VM's drilled-in navigator panel: Basics, Resources, Membership, Roles, Networking, and Credentials
 - Resources contains RAM, CPU, and base disk/VHDX
 - Networking owns a NIC overview/list plus selected NIC detail
+- NIC selection happens from the selected VM's left-panel NIC list, and selected NIC detail shows only that NIC's configuration in the main content area
 - footer Previous/Next visit Networking overview, each NIC detail in draft order, and then Credentials
 - Networks shows lab network switch name and optional switch type; switch creation happens later during Deploy Review/runtime, not during Builder save
 - Forests & Domains presents a constrained topology canvas with forest containers, highlighted root domains, child branches, tree-domain roots, selectable nodes, and stable edge-ready node ids

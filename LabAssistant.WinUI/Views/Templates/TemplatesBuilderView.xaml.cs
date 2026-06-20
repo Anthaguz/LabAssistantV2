@@ -232,6 +232,9 @@ public sealed partial class TemplatesBuilderView : UserControl
             case BuilderNavigatorDepth.VmSections:
                 RenderVmSectionNavigator(projection);
                 break;
+            case BuilderNavigatorDepth.NicList:
+                RenderNicListNavigator(projection);
+                break;
         }
     }
 
@@ -279,6 +282,26 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
     }
 
+    private void RenderNicListNavigator(BuilderWorkflowProjection projection)
+    {
+        BuilderNavigatorPanel.Children.Add(CreateNavigatorAddNicButton(projection.SelectedVmIndex));
+
+        if (projection.SelectedVmNicRows.Count == 0)
+        {
+            BuilderNavigatorPanel.Children.Add(CreateEmptyDetailText("No NICs in this VM."));
+            return;
+        }
+
+        foreach (var row in projection.SelectedVmNicRows)
+        {
+            BuilderNavigatorPanel.Children.Add(CreateResourceButton(
+                row.Label,
+                row.IsSelected,
+                () => SelectVmNic(row.Route),
+                row.IsEnabled));
+        }
+    }
+
     private Button CreateNavigatorAddVmButton()
     {
         var addButton = new Button
@@ -294,6 +317,25 @@ public sealed partial class TemplatesBuilderView : UserControl
         ToolTipService.SetToolTip(addButton, "Add VM");
         AutomationProperties.SetName(addButton, "Add VM");
         addButton.Click += BuilderAddVmButton_Click;
+        return addButton;
+    }
+
+    private Button CreateNavigatorAddNicButton(int vmIndex)
+    {
+        var addButton = new Button
+        {
+            Background = CreateTransparentBrush(),
+            BorderThickness = new Thickness(0),
+            Content = CreateNavButtonContent("+ Add NIC", isSelected: false),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = _canNavigateWorkflow,
+            Tag = vmIndex
+        };
+        ConfigureNavButtonChrome(addButton);
+        ToolTipService.SetToolTip(addButton, "Add NIC");
+        AutomationProperties.SetName(addButton, "Add NIC");
+        addButton.Click += BuilderAddNicButton_Click;
         return addButton;
     }
 
@@ -653,23 +695,13 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderNicOverview(TemplatesBuilderVmDetailProjection detail)
     {
-        var addNicButton = new Button { Content = "Add NIC", Tag = detail.VmIndex };
-        addNicButton.Click += BuilderAddNicButton_Click;
-        BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
-
         if (detail.Nics.Count == 0)
         {
             BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText("No NICs in this VM."));
             return;
         }
 
-        var nicsPanel = new StackPanel { Spacing = 6 };
-        foreach (var nic in detail.Nics)
-        {
-            nicsPanel.Children.Add(CreateNicOverviewRow(nic));
-        }
-
-        BuilderSelectedVmDetailPanel.Children.Add(nicsPanel);
+        BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText($"{detail.Nics.Count} NICs in this VM."));
     }
 
     private void RenderSelectedNicDetail(TemplatesBuilderVmDetailProjection detail)
@@ -692,18 +724,6 @@ public sealed partial class TemplatesBuilderView : UserControl
             CreateTextBox("Prefix", TemplatesBuilderFieldKeys.NicPrefixLength, nic.PrefixLength),
             CreateTextBox("Gateway", TemplatesBuilderFieldKeys.NicDefaultGateway, nic.DefaultGateway),
             CreateTextBox("DNS Servers", TemplatesBuilderFieldKeys.NicDnsServers, string.Join(", ", nic.DnsServers))));
-    }
-
-    private Button CreateNicOverviewRow(TemplatesBuilderNicRowProjection projection)
-    {
-        var nic = projection.Draft;
-        var secondary = string.IsNullOrWhiteSpace(nic.NetworkId)
-            ? "No network reference"
-            : $"Network: {nic.NetworkId}";
-        return CreateResourceButton(
-            $"{projection.Label} - {secondary}",
-            projection.IsSelected,
-            () => SelectVmNic(projection.Route));
     }
 
     private void UpdateWorkingDraftFromVisibleControls()

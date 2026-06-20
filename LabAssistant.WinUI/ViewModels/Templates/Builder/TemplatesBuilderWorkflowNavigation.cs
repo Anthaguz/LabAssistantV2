@@ -33,7 +33,8 @@ internal enum BuilderNavigatorDepth
 {
     Root,
     VmList,
-    VmSections
+    VmSections,
+    NicList
 }
 
 internal readonly record struct BuilderWorkflowRoute(
@@ -79,6 +80,7 @@ internal readonly record struct BuilderWorkflowProjection(
     IReadOnlyList<BuilderWorkflowNavigationRow> RootRows,
     IReadOnlyList<BuilderWorkflowNavigationRow> VmRows,
     IReadOnlyList<BuilderWorkflowNavigationRow> SelectedVmSectionRows,
+    IReadOnlyList<BuilderWorkflowNavigationRow> SelectedVmNicRows,
     BuilderNavigatorDepth NavigatorDepth,
     string NavigatorTitle,
     string NavigatorBackTargetLabel,
@@ -133,9 +135,12 @@ internal sealed class TemplatesBuilderWorkflowNavigation
             _navigatorDepth == BuilderNavigatorDepth.VmSections
                 ? CreateSelectedVmSectionRows(draft, selectedVmIndex, canNavigate)
                 : [],
+            _navigatorDepth == BuilderNavigatorDepth.NicList
+                ? CreateSelectedVmNicRows(draft, selectedVmIndex, canNavigate)
+                : [],
             _navigatorDepth,
             CreateNavigatorTitle(draft, selectedVmIndex),
-            CreateNavigatorBackTargetLabel(),
+            CreateNavigatorBackTargetLabel(draft, selectedVmIndex),
             _navigatorDepth != BuilderNavigatorDepth.Root,
             CurrentRoute.Step,
             selectedVmIndex,
@@ -231,6 +236,12 @@ internal sealed class TemplatesBuilderWorkflowNavigation
 
     public bool MoveNavigatorBack()
     {
+        if (_navigatorDepth == BuilderNavigatorDepth.NicList)
+        {
+            _navigatorDepth = BuilderNavigatorDepth.VmSections;
+            return true;
+        }
+
         if (_navigatorDepth == BuilderNavigatorDepth.VmSections)
         {
             _navigatorDepth = BuilderNavigatorDepth.VmList;
@@ -294,9 +305,16 @@ internal sealed class TemplatesBuilderWorkflowNavigation
         }
 
         if (vmCount == 0 &&
-            _navigatorDepth == BuilderNavigatorDepth.VmSections)
+            _navigatorDepth is BuilderNavigatorDepth.VmSections or BuilderNavigatorDepth.NicList)
         {
             _navigatorDepth = BuilderNavigatorDepth.VmList;
+            return;
+        }
+
+        if (_navigatorDepth == BuilderNavigatorDepth.NicList &&
+            (!CurrentRoute.IsVmDetail || CurrentRoute.VmDetailCategory != BuilderVmDetailCategory.Networking))
+        {
+            _navigatorDepth = BuilderNavigatorDepth.VmSections;
         }
     }
 
@@ -390,20 +408,45 @@ internal sealed class TemplatesBuilderWorkflowNavigation
         return rows;
     }
 
+    private IReadOnlyList<BuilderWorkflowNavigationRow> CreateSelectedVmNicRows(
+        TemplatesBuilderDraftSnapshot draft,
+        int selectedVmIndex,
+        bool canNavigate)
+    {
+        if (draft.Vms.Count == 0 ||
+            selectedVmIndex < 0 ||
+            selectedVmIndex >= draft.Vms.Count)
+        {
+            return [];
+        }
+
+        var nics = draft.Vms[selectedVmIndex].Nics ?? Array.Empty<TemplatesBuilderNicDraft>();
+        return nics
+            .Select((nic, index) => new BuilderWorkflowNavigationRow(
+                BuilderWorkflowRoute.ForVmNic(selectedVmIndex, index),
+                FormatResourceName(nic.Name, nic.NicId),
+                index == GetSelectedNicIndex(draft, selectedVmIndex),
+                canNavigate))
+            .ToList();
+    }
+
     private string CreateNavigatorTitle(TemplatesBuilderDraftSnapshot draft, int selectedVmIndex)
         => _navigatorDepth switch
         {
             BuilderNavigatorDepth.VmList => "VMs",
             BuilderNavigatorDepth.VmSections when selectedVmIndex >= 0 && selectedVmIndex < draft.Vms.Count => FormatResourceName(draft.Vms[selectedVmIndex].Name, draft.Vms[selectedVmIndex].VmId),
             BuilderNavigatorDepth.VmSections => "VM Sections",
+            BuilderNavigatorDepth.NicList => "Networking",
             _ => "Builder"
         };
 
-    private string CreateNavigatorBackTargetLabel()
+    private string CreateNavigatorBackTargetLabel(TemplatesBuilderDraftSnapshot draft, int selectedVmIndex)
         => _navigatorDepth switch
         {
             BuilderNavigatorDepth.VmList => "Back to Builder",
             BuilderNavigatorDepth.VmSections => "Back to VMs",
+            BuilderNavigatorDepth.NicList when selectedVmIndex >= 0 && selectedVmIndex < draft.Vms.Count => $"Back to {FormatResourceName(draft.Vms[selectedVmIndex].Name, draft.Vms[selectedVmIndex].VmId)}",
+            BuilderNavigatorDepth.NicList => "Back to VM sections",
             _ => string.Empty
         };
 
@@ -414,8 +457,23 @@ internal sealed class TemplatesBuilderWorkflowNavigation
             return BuilderNavigatorDepth.Root;
         }
 
-        return route.IsVmDetail ? BuilderNavigatorDepth.VmSections : BuilderNavigatorDepth.VmList;
+        if (!route.IsVmDetail)
+        {
+            return BuilderNavigatorDepth.VmList;
+        }
+
+        return route.VmDetailCategory == BuilderVmDetailCategory.Networking
+            ? BuilderNavigatorDepth.NicList
+            : BuilderNavigatorDepth.VmSections;
     }
+
+    private int GetSelectedNicIndex(TemplatesBuilderDraftSnapshot draft, int selectedVmIndex)
+        => CurrentRoute.Kind == BuilderWorkflowRouteKind.VmNic &&
+            CurrentRoute.VmIndex == selectedVmIndex &&
+            CurrentRoute.NicIndex >= 0 &&
+            CurrentRoute.NicIndex < (draft.Vms[selectedVmIndex].Nics?.Count ?? 0)
+                ? CurrentRoute.NicIndex
+                : -1;
 
     private static int ClampIndex(int index, int count)
     {
