@@ -157,6 +157,19 @@ public static class LabTemplateValidator
             {
                 result.Errors.Add($"Duplicate V2 lab network id: {network.NetworkId}.");
             }
+
+            if (!string.IsNullOrWhiteSpace(network.SwitchType))
+            {
+                if (string.IsNullOrWhiteSpace(network.SwitchName))
+                {
+                    result.Errors.Add($"V2 lab network '{network.NetworkId}' switchType requires switchName.");
+                }
+
+                if (!V2SwitchTypeCatalog.IsSupported(network.SwitchType))
+                {
+                    result.Errors.Add($"V2 lab network '{network.NetworkId}' switchType must be External, Internal, or Private.");
+                }
+            }
         }
     }
 

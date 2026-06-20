@@ -40,7 +40,10 @@ internal interface IDeployFromTemplateCompositionHost
 
     Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
 
-    Task<V2PlanBuildResult> BuildV2PlanAsync(LabTemplate template, IReadOnlyCollection<string> resolvedCredentialSlotKeys);
+    Task<V2PlanBuildResult> BuildV2PlanAsync(
+        LabTemplate template,
+        IReadOnlyCollection<string> resolvedCredentialSlotKeys,
+        IReadOnlyDictionary<string, string> externalSwitchAdapterMappings);
 
     void RefreshSharedUiState();
 

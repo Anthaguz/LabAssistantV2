@@ -26,6 +26,11 @@ public class MultiVmDeploymentContext
     public List<V2TrustRuntimeContext> V2TrustContexts { get; } = new();
 
     /// <summary>
+    /// Runtime state for V2 network switches that may be created and later cleaned up by this deployment.
+    /// </summary>
+    public List<V2NetworkSwitchRuntimeContext> V2NetworkSwitchContexts { get; } = new();
+
+    /// <summary>
     /// Indicates whether any VM blocking failure should cancel the remaining deployment work.
     /// </summary>
     public bool StopAllOnAnyVmFailure { get; set; }
@@ -164,6 +169,42 @@ public sealed class V2TrustRuntimeContext
 
     /// <summary>
     /// Indicates that cleanup could not fully remove the trust objects.
+    /// </summary>
+    public bool CleanupResidual { get; set; }
+}
+
+/// <summary>
+/// Tracks runtime and cleanup state for one V2 network switch requirement.
+/// </summary>
+public sealed class V2NetworkSwitchRuntimeContext
+{
+    /// <summary>
+    /// Resolved switch name from the V2 plan.
+    /// </summary>
+    public string SwitchName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Resolved switch type from the V2 plan.
+    /// </summary>
+    public string SwitchType { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Indicates that the switch was created by this deployment and is eligible for cleanup on failure/cancellation.
+    /// </summary>
+    public bool CreatedByDeployment { get; set; }
+
+    /// <summary>
+    /// Indicates that switch reconciliation completed successfully.
+    /// </summary>
+    public bool Ready { get; set; }
+
+    /// <summary>
+    /// Indicates that cleanup was attempted for this switch.
+    /// </summary>
+    public bool CleanupAttempted { get; set; }
+
+    /// <summary>
+    /// Indicates that cleanup could not fully remove the created switch.
     /// </summary>
     public bool CleanupResidual { get; set; }
 }

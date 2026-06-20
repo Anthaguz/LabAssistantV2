@@ -426,6 +426,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             CreateTextBox("Network ID", TemplatesBuilderFieldKeys.NetworkId, network.NetworkId),
             CreateTextBox("Name", TemplatesBuilderFieldKeys.NetworkName, network.Name),
             CreateTextBox("Switch", TemplatesBuilderFieldKeys.NetworkSwitchName, network.SwitchName),
+            CreateComboBox("Switch Type", TemplatesBuilderFieldKeys.NetworkSwitchType, network.SwitchType, string.Empty, V2SwitchTypeCatalog.External, V2SwitchTypeCatalog.Internal, V2SwitchTypeCatalog.Private),
             CreateTextBox("Subnet", TemplatesBuilderFieldKeys.NetworkSubnet, network.Subnet),
             CreateTextBox("Notes", TemplatesBuilderFieldKeys.NetworkNotes, network.Notes)));
     }
@@ -592,6 +593,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkId),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkName),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchName),
+            GetComboValue(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchType),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSubnet),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkNotes));
         return draft with { LabNetworks = networks };
@@ -739,7 +741,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         var draft = CaptureDraft();
         var networks = draft.LabNetworks
-            .Append(new TemplatesBuilderLabNetworkDraft($"lab-network-{draft.LabNetworks.Count + 1}", "Network", string.Empty, string.Empty, string.Empty))
+            .Append(new TemplatesBuilderLabNetworkDraft($"lab-network-{draft.LabNetworks.Count + 1}", "Network", string.Empty, string.Empty, string.Empty, string.Empty))
             .ToList();
         _selectedNetworkIndex = networks.Count - 1;
         RenderAndNotify(draft with { LabNetworks = networks, IsSaveConfirmed = false });

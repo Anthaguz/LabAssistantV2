@@ -40,6 +40,9 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
     public IReadOnlyDictionary<string, V2RuntimeCredential> ResolvedCredentialSlotValues { get; private set; } =
         new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase);
 
+    public IReadOnlyDictionary<string, string> ExternalSwitchAdapterMappings { get; private set; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     public void Hide()
     {
         IsVisible = false;
@@ -50,6 +53,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         HasBlockingItems = false;
         CanStartDeploy = false;
         ResolvedCredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase);
+        ExternalSwitchAdapterMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         SelectedCredentialSlotKey = string.Empty;
         SelectedCredentialSlotPurpose = "Select a slot below to create or update its local value.";
         SelectedCredentialSlotUsername = string.Empty;
@@ -119,6 +123,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         CanStartDeploy = false;
         StatusText = message;
         ResolvedCredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase);
+        ExternalSwitchAdapterMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         SelectedCredentialSlotKey = string.Empty;
         SelectedCredentialSlotPurpose = "Planning failed. Fix the template or environment, then retry.";
         SelectedCredentialSlotUsername = string.Empty;
@@ -133,6 +138,24 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
             DisableFirewall = disableFirewall,
             DisableRdpNla = disableRdpNla
         };
+    }
+
+    public void SetExternalSwitchAdapterMapping(string switchName, string adapterName)
+    {
+        var mappings = new Dictionary<string, string>(ExternalSwitchAdapterMappings, StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(switchName) || string.IsNullOrWhiteSpace(adapterName))
+        {
+            if (!string.IsNullOrWhiteSpace(switchName))
+            {
+                mappings.Remove(switchName.Trim());
+            }
+        }
+        else
+        {
+            mappings[switchName.Trim()] = adapterName.Trim();
+        }
+
+        ExternalSwitchAdapterMappings = mappings;
     }
 
     public V2BaseRemoteAccessOptions CreateBaseRemoteAccessOptions()

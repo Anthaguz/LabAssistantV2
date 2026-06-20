@@ -195,6 +195,126 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ReusesExistingTypedNetworkSwitchWithoutCreatingOrDeletingIt()
+    {
+        var operations = new ConcurrentQueue<string>();
+        var request = await CreateSwitchRuntimeRequestAsync(
+            [
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-core",
+                    Name = "Core",
+                    SwitchName = "vSwitch-Core",
+                    SwitchType = V2SwitchTypeCatalog.Internal
+                }
+            ],
+            [new VmNetworkInterfaceTemplate { NicId = "nic-core", NetworkId = "lab-core" }],
+            [CreateSwitch("vSwitch-Core", V2SwitchTypeCatalog.Internal)]);
+        var hyperV = new FakeHyperVService { SharedOperations = operations };
+        var machineAdmin = new FakeHyperVMachineAdminService(operations)
+        {
+            Switches =
+            [
+                new HyperVVirtualSwitchInfo { Name = "vSwitch-Core", SwitchType = V2SwitchTypeCatalog.Internal }
+            ]
+        };
+        var service = CreateService(hyperV, new FakeGuestCommandExecutor(), machineAdminService: machineAdmin);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("switch:vswitch-core:EnsureNetworkSwitch", result.ExecutedNodeIds);
+        Assert.Empty(machineAdmin.CreatedSwitches);
+        Assert.Empty(machineAdmin.DeletedSwitches);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CreatesMissingInternalSwitchBeforeProvisioningVm()
+    {
+        var operations = new ConcurrentQueue<string>();
+        var request = await CreateSwitchRuntimeRequestAsync(
+            [
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-core",
+                    Name = "Core",
+                    SwitchName = "vSwitch-NewCore",
+                    SwitchType = V2SwitchTypeCatalog.Internal
+                }
+            ],
+            [new VmNetworkInterfaceTemplate { NicId = "nic-core", NetworkId = "lab-core" }],
+            []);
+        var hyperV = new FakeHyperVService { SharedOperations = operations };
+        var machineAdmin = new FakeHyperVMachineAdminService(operations);
+        var service = CreateService(hyperV, new FakeGuestCommandExecutor(), machineAdminService: machineAdmin);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains(machineAdmin.CreatedSwitches, request =>
+            request.Name == "vSwitch-NewCore" &&
+            request.SwitchType == V2SwitchTypeCatalog.Internal);
+        var orderedOperations = operations.ToList();
+        Assert.True(
+            orderedOperations.IndexOf("CreateSwitch:vSwitch-NewCore") <
+            orderedOperations.IndexOf("CreateVm:networked01"));
+        Assert.Empty(machineAdmin.DeletedSwitches);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FailedDeploymentDeletesOnlySwitchesCreatedByThisRun()
+    {
+        var operations = new ConcurrentQueue<string>();
+        var request = await CreateSwitchRuntimeRequestAsync(
+            [
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-existing",
+                    Name = "Existing",
+                    SwitchName = "vSwitch-Existing",
+                    SwitchType = V2SwitchTypeCatalog.Internal
+                },
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-created",
+                    Name = "Created",
+                    SwitchName = "vSwitch-Created",
+                    SwitchType = V2SwitchTypeCatalog.Private
+                }
+            ],
+            [
+                new VmNetworkInterfaceTemplate { NicId = "nic-existing", NetworkId = "lab-existing" },
+                new VmNetworkInterfaceTemplate { NicId = "nic-created", NetworkId = "lab-created" }
+            ],
+            [CreateSwitch("vSwitch-Existing", V2SwitchTypeCatalog.Internal)]);
+        var hyperV = new FakeHyperVService
+        {
+            SharedOperations = operations,
+            CreateVmResult = false
+        };
+        var machineAdmin = new FakeHyperVMachineAdminService(operations)
+        {
+            Switches =
+            [
+                new HyperVVirtualSwitchInfo { Name = "vSwitch-Existing", SwitchType = V2SwitchTypeCatalog.Internal }
+            ]
+        };
+        var service = CreateService(hyperV, new FakeGuestCommandExecutor(), machineAdminService: machineAdmin);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains(machineAdmin.CreatedSwitches, request => request.Name == "vSwitch-Created");
+        Assert.Contains("vSwitch-Created", machineAdmin.DeletedSwitches);
+        Assert.DoesNotContain("vSwitch-Existing", machineAdmin.DeletedSwitches);
+        Assert.Contains(result.DeploymentContext.V2NetworkSwitchContexts, context =>
+            context.SwitchName == "vSwitch-Created" &&
+            context.CreatedByDeployment &&
+            context.CleanupAttempted &&
+            !context.CleanupResidual);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_CancellationDuringGuestReadiness_EndsCancelled()
     {
         var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: false);
@@ -381,14 +501,16 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     private static IV2RuntimeCapabilityService CreateService(
         FakeHyperVService hyperVService,
         FakeGuestCommandExecutor guestCommandExecutor,
-        IStructuredLogger? logger = null)
+        IStructuredLogger? logger = null,
+        IHyperVMachineAdminService? machineAdminService = null)
     {
         return new V2RuntimeCapabilityService(
             () => new FakeSession(),
             _ => hyperVService,
             guestCommandExecutor,
             new FakeCleanupOrchestrator(),
-            logger);
+            logger,
+            machineAdminService);
     }
 
     private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestAsync(
@@ -440,6 +562,62 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 ["slot-join"] = new() { Username = @"LAB\JoinUser", Password = "Password123!" },
                 ["slot-admin"] = new() { Username = "Administrator@contoso.com", Password = "Password123!" },
                 ["slot-dsrm"] = new() { Username = "DSRM", Password = "Password123!" }
+            },
+            GuestTransportMaxRetries = 1,
+            GuestTransportRetryDelay = TimeSpan.FromMilliseconds(10)
+        };
+    }
+
+    private async Task<V2RuntimeExecutionRequest> CreateSwitchRuntimeRequestAsync(
+        IReadOnlyList<LabNetworkTemplate> networks,
+        IReadOnlyList<VmNetworkInterfaceTemplate> nics,
+        IReadOnlyList<V2AvailableSwitchInfo> availableSwitches)
+    {
+        var template = new LabTemplate
+        {
+            Id = "template-switch-runtime",
+            Name = "Switch Runtime",
+            SchemaVersion = "2.0.0",
+            ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning,
+            DeploymentProfile = "Balanced",
+            LabNetworks = networks.ToList(),
+            VmTemplates =
+            [
+                new VmTemplate
+                {
+                    VmId = "vm-networked01",
+                    Name = "networked01",
+                    MemoryMb = 2048,
+                    CpuCount = 2,
+                    VhdxId = "disk-networked",
+                    MembershipMode = V2MembershipModeCatalog.Standalone,
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = "slot-local"
+                    },
+                    Nics = nics.ToList()
+                }
+            ]
+        };
+        var catalogItems = new[] { CreateCatalogItem("disk-networked", "slot-local") };
+        var plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = template,
+            CatalogItems = catalogItems,
+            AvailableSwitches = availableSwitches,
+            ResolvedCredentialSlotKeys = ["slot-local"],
+            DefaultDeploymentProfile = "Balanced"
+        });
+        Assert.True(plan.Success, string.Join(Environment.NewLine, plan.Issues.Select(issue => issue.Message)));
+
+        return new V2RuntimeExecutionRequest
+        {
+            Template = template,
+            Plan = plan,
+            Settings = CreateSettings(),
+            CredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["slot-local"] = new() { Username = "Administrator", Password = "Password123!" }
             },
             GuestTransportMaxRetries = 1,
             GuestTransportRetryDelay = TimeSpan.FromMilliseconds(10)
@@ -727,29 +905,33 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     {
         public ConcurrentQueue<string> Operations { get; } = new();
 
+        public ConcurrentQueue<string>? SharedOperations { get; init; }
+
+        public bool CreateVmResult { get; init; } = true;
+
         public Func<string, Task>? OnCreateVmAsync { get; set; }
 
         public Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount)
         {
-            Operations.Enqueue($"CreateVm:{vmName}");
-            return InvokeAsync(OnCreateVmAsync, vmName);
+            RecordOperation($"CreateVm:{vmName}");
+            return InvokeAsync(OnCreateVmAsync, vmName, CreateVmResult);
         }
 
         public Task<bool> EnableGuestServicesAsync(string vmName)
         {
-            Operations.Enqueue($"EnableGuestServices:{vmName}");
+            RecordOperation($"EnableGuestServices:{vmName}");
             return Task.FromResult(true);
         }
 
         public Task<bool> StartVmAsync(string vmName)
         {
-            Operations.Enqueue($"StartVm:{vmName}");
+            RecordOperation($"StartVm:{vmName}");
             return Task.FromResult(true);
         }
 
         public Task<bool> StopVmAsync(string vmName)
         {
-            Operations.Enqueue($"StopVm:{vmName}");
+            RecordOperation($"StopVm:{vmName}");
             return Task.FromResult(true);
         }
 
@@ -759,13 +941,13 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         public Task<bool> RemoveVmAsync(string vmName)
         {
-            Operations.Enqueue($"RemoveVm:{vmName}");
+            RecordOperation($"RemoveVm:{vmName}");
             return Task.FromResult(true);
         }
 
         public Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath)
         {
-            Operations.Enqueue($"CreateVhd:{Path.GetFileNameWithoutExtension(vhdPath)}");
+            RecordOperation($"CreateVhd:{Path.GetFileNameWithoutExtension(vhdPath)}");
             return Task.FromResult(true);
         }
 
@@ -773,7 +955,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         public Task<bool> DisableVmCheckpointsAsync(string vmName)
         {
-            Operations.Enqueue($"DisableCheckpoints:{vmName}");
+            RecordOperation($"DisableCheckpoints:{vmName}");
             return Task.FromResult(true);
         }
 
@@ -799,19 +981,113 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         public Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName)
         {
-            Operations.Enqueue($"AddSwitch:{vmName}:{switchName}");
+            RecordOperation($"AddSwitch:{vmName}:{switchName}");
             return Task.FromResult(true);
         }
 
-        private static async Task<bool> InvokeAsync(Func<string, Task>? callback, string vmName)
+        private void RecordOperation(string operation)
+        {
+            Operations.Enqueue(operation);
+            SharedOperations?.Enqueue(operation);
+        }
+
+        private static async Task<bool> InvokeAsync(Func<string, Task>? callback, string vmName, bool result)
         {
             if (callback != null)
             {
                 await callback(vmName);
             }
 
-            return true;
+            return result;
         }
+    }
+
+    private sealed class FakeHyperVMachineAdminService : IHyperVMachineAdminService
+    {
+        private readonly ConcurrentQueue<string> _sharedOperations;
+
+        public FakeHyperVMachineAdminService(ConcurrentQueue<string> sharedOperations)
+        {
+            _sharedOperations = sharedOperations;
+        }
+
+        public List<HyperVVirtualSwitchInfo> Switches { get; set; } = [];
+
+        public List<HyperVVirtualSwitchCreateRequest> CreatedSwitches { get; } = [];
+
+        public List<string> DeletedSwitches { get; } = [];
+
+        public Task<IReadOnlyList<HyperVHostMachineVmInfo>> ListHostVmsAsync() =>
+            Task.FromResult<IReadOnlyList<HyperVHostMachineVmInfo>>(Array.Empty<HyperVHostMachineVmInfo>());
+
+        public Task<HyperVMachineEditSnapshot?> GetVmEditSnapshotAsync(string vmName) =>
+            Task.FromResult<HyperVMachineEditSnapshot?>(null);
+
+        public Task<IReadOnlyList<string>> GetVirtualSwitchNamesAsync() =>
+            Task.FromResult<IReadOnlyList<string>>(Switches.Select(item => item.Name).ToArray());
+
+        public Task<IReadOnlyList<HyperVVirtualSwitchInfo>> ListVirtualSwitchesAsync()
+        {
+            _sharedOperations.Enqueue("ListSwitches");
+            return Task.FromResult<IReadOnlyList<HyperVVirtualSwitchInfo>>(Switches.ToArray());
+        }
+
+        public Task<IReadOnlyList<string>> GetAttachedVmNamesForSwitchAsync(string switchName) =>
+            Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        public Task<HyperVMachineActionResult> CreateVirtualSwitchAsync(HyperVVirtualSwitchCreateRequest request)
+        {
+            _sharedOperations.Enqueue($"CreateSwitch:{request.Name}");
+            CreatedSwitches.Add(request);
+            Switches.Add(new HyperVVirtualSwitchInfo
+            {
+                Name = request.Name,
+                SwitchType = request.SwitchType,
+                AdapterName = request.AdapterName
+            });
+            return Task.FromResult(new HyperVMachineActionResult { Success = true });
+        }
+
+        public Task<HyperVMachineActionResult> RenameVirtualSwitchAsync(string currentName, string newName) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<HyperVMachineActionResult> DeleteVirtualSwitchAsync(string switchName)
+        {
+            _sharedOperations.Enqueue($"DeleteSwitch:{switchName}");
+            DeletedSwitches.Add(switchName);
+            Switches.RemoveAll(item => string.Equals(item.Name, switchName, StringComparison.OrdinalIgnoreCase));
+            return Task.FromResult(new HyperVMachineActionResult { Success = true });
+        }
+
+        public Task<HyperVMachineActionResult> StartVmAsync(string vmName) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<HyperVMachineActionResult> StopVmAsync(string vmName) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<HyperVMachineActionResult> RestartVmAsync(string vmName) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<IReadOnlyList<string>> GetVmIpAddressesAsync(string vmName) =>
+            Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<IReadOnlyList<HyperVMachineDiskClassificationResult>> ClassifyVmDisksAsync(
+            string vmName,
+            IReadOnlyCollection<string> knownBaseDiskPaths,
+            string? differencingDiskBasePath) =>
+            Task.FromResult<IReadOnlyList<HyperVMachineDiskClassificationResult>>(Array.Empty<HyperVMachineDiskClassificationResult>());
+
+        public Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<HyperVMachineActionResult> DeleteVmAsync(string vmName, bool includeStorage) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
     }
 
     private sealed class FakeCleanupOrchestrator : IVmCleanupOrchestrator
