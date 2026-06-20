@@ -4620,6 +4620,7 @@ Each readiness result shall include, at minimum:
 - navigation resolves to `templates.builder` or an equivalent Templates-local Builder route
 - the Builder remains inside the long-lived Templates workspace
 - the current `templates.editor` remains available for V1/simple/legacy template editing
+- V1/simple/legacy templates are not routed into V2-only Builder authoring requirements
 - V2 topology complexity is not pushed into the current Templates Editor
 - selecting parent `Templates` still routes to `templates.library`
 
@@ -4631,21 +4632,22 @@ Each readiness result shall include, at minimum:
 - the user progresses through first-slice authoring
 
 **Then**
-- the Builder presents an active workflow tree ordered exactly as:
+- the Builder presents an active workflow navigator ordered exactly as:
   - General
   - Networks
   - Forests & Domains
   - Credentials
   - VMs
   - Review
-- the Builder uses the left workflow tree and one active top-level step at a time rather than an all-sections scroll
+- the Builder uses the left workflow navigator and one active top-level step at a time rather than an all-sections scroll
 - active top-level state is explicit and uses existing shell resources, including `ShellAccentBrush`, selected background, and selected border treatment
 - completion/error badges are deferred to a later Review/validation UX slice
-- the `VMs` row expands to show VM child items by VM name
-- each VM child expands to nested category rows ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
+- the root left panel remains first-level workflow navigation only
+- selecting `VMs` drills or swipes the left navigator into a VM list panel
+- selecting a VM drills or swipes the left navigator into that VM's section list ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
 - clicking `VMs` opens a compact VM overview
-- clicking a VM child opens that VM's detail editor on `Basics`
-- clicking a VM category opens that category under `VMs > VM name > category`
+- clicking a VM opens that VM's detail editor on `Basics`
+- clicking a VM section opens that section under `VMs > VM name > section`
 - General contains template name, description, deployment profile, and read-only schema/version metadata if shown
 - deployment profile appears as a visible horizontal Conservative/Balanced/Aggressive selector below description, not as a dropdown
 - deployment profile includes a Segoe MDL2 information tooltip that explains the user-facing speed versus host-pressure tradeoff
@@ -4655,8 +4657,8 @@ Each readiness result shall include, at minimum:
   - Forests & Domains uses a forest/domain list plus selected forest/domain detail
   - Credentials uses a slot-reference list plus selected slot detail
 - the VMs overview shows total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
-- editing a VM happens by selecting a VM child in the workflow tree, not by using a right-side VM selector list
-- VM detail categories appear as nested left-tree rows under `VMs > VM name`: Basics, Resources, Membership, Roles, Networking, and Credentials
+- editing a VM happens by selecting a VM in the drilled-in VM list panel, not by using a right-side VM selector list
+- VM detail sections appear in the selected VM's drilled-in navigator panel: Basics, Resources, Membership, Roles, Networking, and Credentials
 - selecting a VM opens Basics by default
 - Resources contains RAM, CPU, and base disk/VHDX fields
 - Networking owns NIC list/detail; NICs do not become global left-nav children
@@ -4664,24 +4666,49 @@ Each readiness result shall include, at minimum:
 - the Builder does not use multiline pipe-delimited authoring fields
 - a matrix may support review or comparison, but it is not the primary authoring UI
 - the Builder exposes a persistent footer command area
-- Back is a left secondary action
+- the Builder exit/library-return command may remain a left secondary footer action when present, but it is separate from navigator chevron/back movement
 - during authoring steps, the footer right side exposes Previous as a secondary action and Next as the primary action
 - on Review, the footer right side exposes Previous as a secondary action, Save As as a secondary action, and Save as the primary action
 - Apply Suggestions and manual Validate are not footer actions in this contract
 - Save and Save As are Review-only actions
-- Previous and Next compute routes through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> every VM category in draft order (Basics, Resources, Membership, Roles, Networking, Credentials) -> Review
+- Previous and Next compute routes through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> every VM section in draft order (Basics, Resources, Membership, Roles, Networking, Credentials) -> Review
+- Previous and Next move through the linear Builder route sequence, not the current navigator hierarchy
+- Previous and Next should expose the destination where practical
 - Previous is disabled on General and Next is disabled on Review
 - Previous and Next do not block on validation errors before Review
 - when the draft has zero VMs, Next from VMs overview goes to Review
-- navigating between top-level steps, VM children, and VM detail categories does not lose draft edits
-- narrow VM/category navigation updates only the needed Builder state and does not require broad full-Builder rerendering
+- navigating between top-level steps, VM list, and VM detail sections does not lose draft edits
+- narrow VM/section navigation updates only the needed Builder state and does not require broad full-Builder rerendering
 - top-level workflow rows are active for non-VM steps
 - `VMs` is active for the VM overview
-- the VM name is active when any category for that VM is selected
-- the selected VM category is active under that VM node
-- direct workflow-tree clicks remain supported
+- the VM remains active while any section for that VM is selected
+- the selected VM section is active within that VM's section list
+- direct navigator clicks remain supported
 - Review plus Save is the confirmation; there is no separate Review confirmation checkbox
 - Review shows a blocker when at least one VM is required before Save
+
+### 2a) Drill-in navigator and safe route semantics
+**Given**
+- the user is authoring a V2 template in the Builder
+- the left navigator is at the root, VM list, or selected-VM section level
+
+**When**
+- the user drills into `VMs`, drills into a VM, uses the navigator chevron/back control, or uses footer Previous/Next
+
+**Then**
+- the root left panel remains first-level workflow navigation only
+- selecting `VMs` drills or swipes the left navigator into the VM list panel
+- selecting a VM drills or swipes the left navigator into that VM's section list: Basics, Resources, Membership, Roles, Networking, Credentials
+- future role-specific configuration belongs under the selected VM's Roles section as role child routes
+- no empty role-specific configuration UI is required before a role configuration slice is approved
+- the drilled-in navigator uses a compact header with a chevron/back icon for one-level-up navigator movement
+- the Builder does not introduce a global breadcrumb bar for this navigator hierarchy
+- the visible chevron/back control may be icon-only, but accessibility labels and tooltips describe the exact target, such as `Back to VMs` or `Back to Builder`
+- navigator chevron/back movement never leaves the Builder, discards draft progress, cancels deployment work, or routes back to the Templates library
+- leaving the Builder or returning to the Templates library remains a separate explicit command and preserves existing unsaved-change protections
+- footer Previous/Next move through the linear Builder route sequence rather than through the current drill-in hierarchy
+- footer Previous/Next expose their destination where practical
+- scrollable Builder content reserves layout for scrollbars and does not overlap footer actions, action buttons, or command surfaces
 
 ### 3) First-slice V2 fields
 **Given**
@@ -4716,17 +4743,17 @@ Each readiness result shall include, at minimum:
 ### 3a) VM creation and navigation affordances
 **Given**
 - the Builder draft already contains zero or more VM drafts
-- the user is in the Builder workflow tree or VM overview
+- the user is in the Builder VM list navigator panel or VM overview
 
 **When**
-- the user uses the small borderless right-aligned `+` button on the `VMs` nav row or Add VM in the VM overview
+- the user uses the VM list panel's compact Add VM affordance or Add VM in the VM overview
 
 **Then**
 - the Builder creates a VM with neutral incrementing internal/display names based on the existing draft set, such as `vm-1` / `VM 1`, `vm-2` / `VM 2`, and so on
-- the new VM appears as a child item under `VMs`
-- the Builder selects the new VM child
+- the new VM appears in the VM list panel
+- the Builder selects the new VM
 - the selected VM detail opens on `Basics`
-- adding a VM does not introduce NICs as global workflow-tree children
+- adding a VM does not introduce NICs as global left-navigator children
 - direct Add VM actions select the new VM and open `Basics`
 
 ### 4) Deterministic suggestions require explicit confirmation before save
@@ -4756,8 +4783,8 @@ Each readiness result shall include, at minimum:
 - invalid intermediate values remain visible and remain in draft state instead of being discarded
 - blocking validation errors prevent final Save, export, and planning until resolved
 - Previous and Next do not block on validation errors before Review
-- navigation between top-level steps, VM children, and VM detail categories preserves the edited draft values
-- narrow VM/category navigation does not require broad full-Builder rerendering
+- navigation between top-level steps, VM list, and VM detail sections preserves the edited draft values
+- narrow VM/section navigation does not require broad full-Builder rerendering
 - final Save persists validated template JSON from Review
 - Save remains blocked unless the current draft builds into valid template JSON
 - Review plus Save is the confirmation; there is no separate Review confirmation checkbox
@@ -4830,24 +4857,29 @@ Each readiness result shall include, at minimum:
 - `templates.builder` or equivalent Templates-local route for V2 template authoring
 - `templates.library` remains the parent/default Templates route
 - `templates.editor` remains the V1/simple/legacy editing route
-- Builder presents the General, Networks, Forests & Domains, Credentials, VMs, Review active workflow tree with one active top-level step at a time
+- Builder presents the General, Networks, Forests & Domains, Credentials, VMs, Review active workflow navigator with one active top-level step at a time
 - active top-level workflow state uses `ShellAccentBrush`, selected background, and selected border treatment
-- `VMs` expands to VM child items by VM name and includes a small borderless right-aligned `+` button
-- each VM child expands to nested category rows ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
+- root left navigation remains first-level workflow navigation only
+- selecting `VMs` drills or swipes the left navigator into a VM list panel
+- selecting a VM drills or swipes the left navigator into that VM's section list ordered as Basics, Resources, Membership, Roles, Networking, and Credentials
+- drilled-in navigator panels use a compact header with an exact-target chevron/back label or tooltip instead of a global breadcrumb bar
 - clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
-- clicking a VM child opens that VM detail on `Basics`
-- VM detail categories appear as nested left-tree rows under `VMs > VM name`: Basics, Resources, Membership, Roles, Networking, and Credentials
+- clicking a VM opens that VM detail on `Basics`
+- VM detail sections appear in the selected VM's drilled-in navigator panel: Basics, Resources, Membership, Roles, Networking, and Credentials
 - Resources contains RAM, CPU, and base disk/VHDX; Networking owns NIC list/detail
-- Builder presents a persistent footer with Back on the left; Previous and Next on the right during authoring; and Previous, Save As, and Save on the right during Review
+- Builder presents a persistent footer with the separate Builder exit/library-return action on the left when present; Previous and Next on the right during authoring; and Previous, Save As, and Save on the right during Review
+- navigator chevron/back movement never exits the Builder or routes to the Templates library
 - Apply Suggestions and manual Validate are not footer actions in this contract
 - Save and Save As are Review-only actions
-- Previous/Next move through General, Networks, Forests & Domains, Credentials, VMs overview, each VM category in draft order, and Review
+- Previous/Next move through General, Networks, Forests & Domains, Credentials, VMs overview, each VM section in draft order, and Review
+- Previous/Next follow the linear Builder route sequence rather than navigator hierarchy and expose the destination where practical
 - Previous/Next do not block on validation errors before Review
+- scrollable Builder content reserves layout for scrollbars and does not overlap footer actions, action buttons, or command surfaces
 - Review plus Save is the confirmation; there is no separate Review confirmation checkbox
 - field edits update the active in-memory Builder draft immediately or through a short UI-safe debounce, without per-section or per-field Save buttons
 - invalid intermediate values remain visible in draft state until validation and final Save/export/plan gating resolve them
 - draft edits trigger Builder-local scoped validation automatically where practical, and Review aggregates current blockers and warnings
-- Networks, Forests & Domains, and Credentials use list plus selected-detail layouts; VM editing happens through VM children under `VMs`, not a right-side selector list
+- Networks, Forests & Domains, and Credentials use list plus selected-detail layouts; VM editing happens through the drilled-in VM list panel, not a right-side selector list
 - Builder does not rely on multiline pipe-delimited text fields for authoring V2 resources
 - a matrix is not the primary authoring UI
 - save action reflects explicit user-confirmed draft intent
@@ -4857,12 +4889,16 @@ Each readiness result shall include, at minimum:
 - route/workspace tests verify Builder is a distinct Templates workflow-state destination and parent `Templates` still defaults to `templates.library`
 - non-regression tests verify the current Templates Editor remains available for V1/simple/legacy editing
 - Builder seam tests verify Builder state/orchestration/composition does not accumulate in `MainWindow`, shared Templates composition, or the current Editor
-- workflow navigation tests verify active top-level state, VM overview active state, VM name/category active state, Previous/Next full-route behavior, VM child navigation, nested VM category navigation, and the VM inline plus affordance
-- VM detail navigation tests verify Basics opens by default, category routes live under `VMs > VM name`, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC list/detail, and NICs do not become global workflow-tree children
+- Builder authoring/navigation smoke coverage does not require Hyper-V; Hyper-V validation belongs to runtime/deployment integration coverage
+- new Builder tests use behavior or surface names rather than issue-numbered class names; existing issue-numbered tests may be renamed in a later targeted test slice
+- workflow navigation tests verify active top-level state, VM overview active state, selected VM/section active state, Previous/Next full-route behavior, VM list drill-in navigation, selected-VM section drill-in navigation, and the VM add affordance
+- navigator safety tests verify chevron/back exact-target labels or tooltips and confirm one-level-up movement never exits Builder, discards draft progress, cancels deployment work, or routes to the Templates library
+- VM detail navigation tests verify Basics opens by default, section routes live under `VMs > VM name`, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC list/detail, and NICs do not become global left-navigator children
+- layout tests verify scrollable Builder content reserves layout for scrollbars and does not overlap footer actions, action buttons, or command surfaces
 - schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values, and that secrets remain in the local DPAPI-backed store
 - save/load tests verify existing trust declarations are preserved even though trust authoring is deferred
 - validation tests verify VM-only standalone templates are valid, domain-dependent VMs require domains, each saved domain requires at least one Active Directory Domain Controller VM role assignment, and `firstDomainControllerVmId` is derived from ordered DC assignments
-- navigation tests verify Previous/Next full-route computation, zero-VM Review blocker behavior, and Review-only Save/Save As availability
+- navigation tests verify Previous/Next full-route computation, destination exposure where practical, zero-VM Review blocker behavior, and Review-only Save/Save As availability
 - validation tests verify unconfirmed suggestions are not silently persisted and invalid required combinations block save
 - Builder-local validation tests verify affected-scope refresh for domain references, IP format/subnet/duplicates, VM identity/name rules, and membership domain/role compatibility
 - Review aggregation tests verify current Builder-local blockers and warnings are summarized without requiring a manual Validate footer action

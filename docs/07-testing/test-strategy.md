@@ -43,6 +43,8 @@
 
 ## Validation Expectations
 - PRs should include automated tests for new decision logic and workflow changes.
+- Builder authoring/navigation smoke tests should exercise route semantics, draft preservation, accessible navigator targets, and layout safety without requiring Hyper-V.
+- New Builder tests should use behavior or surface names instead of issue-numbered class names; renaming existing issue-numbered tests can happen in a later targeted test slice.
 - Manual Hyper-V validation remains required for runtime behaviors that cannot be proven with mocks (especially deployment, cleanup, and host-specific failures).
 - Build/test commands are documented in `AGENTS.md`; local machine/CI are the source of truth when sandboxed environments are unreliable.
 
