@@ -400,6 +400,7 @@ internal sealed class DeployFromTemplateWorkspaceViewModel
     {
         return kind switch
         {
+            V2PlanNodeKind.EnsureNetworkSwitch => DeploymentStepKeys.V2EnsureNetworkSwitch,
             V2PlanNodeKind.ProvisionVm => DeploymentStepKeys.V2ProvisionVm,
             V2PlanNodeKind.EnableGuestServices => DeploymentStepKeys.V2EnableGuestServices,
             V2PlanNodeKind.StartVm => DeploymentStepKeys.V2StartVm,

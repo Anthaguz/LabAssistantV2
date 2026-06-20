@@ -282,7 +282,9 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     Task<V2PlanBuildResult> IDeployFromTemplateV2ReviewHost.BuildV2PlanAsync(
         LabTemplate template,
-        IReadOnlyCollection<string> resolvedCredentialSlotKeys) => _host.BuildV2PlanAsync(template, resolvedCredentialSlotKeys);
+        IReadOnlyCollection<string> resolvedCredentialSlotKeys,
+        IReadOnlyDictionary<string, string> externalSwitchAdapterMappings) =>
+        _host.BuildV2PlanAsync(template, resolvedCredentialSlotKeys, externalSwitchAdapterMappings);
 
     Task<V2RuntimeExecutionResult> IDeployFromTemplateV2ReviewHost.ExecuteV2DeployAsync(
         LabTemplate template,

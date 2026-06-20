@@ -937,7 +937,9 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.Equal(TemplateSchemaVersionCatalog.V2SchemaVersion, template.SchemaVersion);
         Assert.Equal(TemplateExecutionEngine.V2UnifiedPlanning, template.ExecutionEngine);
         Assert.NotNull(template.LabNetworks);
-        Assert.Equal("vSwitch-Core", Assert.Single(template.LabNetworks!).SwitchName);
+        var savedNetwork = Assert.Single(template.LabNetworks!);
+        Assert.Equal("vSwitch-Core", savedNetwork.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.Internal, savedNetwork.SwitchType);
         Assert.Equal(2, template.VmTemplates.Count);
         var templateDomain = Assert.Single(template.DirectoryTopology!.Domains!);
         Assert.Equal("domain-contoso", templateDomain.DomainId);
@@ -1018,6 +1020,38 @@ public sealed class TemplatesBuilderWorkflowContractTests
     }
 
     [Fact]
+    public async Task DeployV2Review_ExternalSwitchAdapterMapping_IsPerRunPlannerState()
+    {
+        var savedDocument = await CreateSavedBuilderDocumentAsync();
+        var template = savedDocument.Template;
+        var network = Assert.Single(template.LabNetworks!);
+        network.SwitchName = "vSwitch-Wan";
+        network.SwitchType = V2SwitchTypeCatalog.External;
+
+        var workspace = new DeployV2ReviewWorkspaceViewModel();
+        var host = new RecordingV2ReviewHost(savedDocument);
+        var controller = new DeployV2ReviewWorkspaceController(
+            workspace,
+            new DeployV2ReviewProjectionService(),
+            host);
+
+        await controller.RefreshPlanAsync(template);
+
+        Assert.False(workspace.CanStartDeploy);
+        Assert.Contains(workspace.BlockerRows, row => row.Message.Contains("adapter mapping", StringComparison.OrdinalIgnoreCase));
+
+        controller.SetExternalSwitchAdapterMapping("vSwitch-Wan", "Ethernet 2");
+        await controller.RefreshPlanAsync(template);
+
+        Assert.True(workspace.CanStartDeploy);
+        Assert.Equal("Ethernet 2", host.LastExternalSwitchAdapterMappings["vSwitch-Wan"]);
+        var switchRequirement = Assert.Single(workspace.CurrentPlan!.Context.NetworkSwitchRequirements);
+        Assert.Equal("Ethernet 2", switchRequirement.ExternalAdapterName);
+        Assert.DoesNotContain(template.LabNetworks!, item =>
+            string.Equals(item.Notes, "Ethernet 2", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task BuilderSave_UsesReviewAsConfirmationWithoutSeparateCheckboxGate()
     {
         var workspace = new TemplatesBuilderWorkspaceViewModel();
@@ -1079,7 +1113,12 @@ public sealed class TemplatesBuilderWorkflowContractTests
                 new TemplateVhdxCatalogOption("disk-member", @"C:\base\disk-member.vhdx", "Windows Server", "2022", 2, "sig-member")
             ]);
 
-        return TemplatesBuilderDraftMapper.CreateSuggestedDraft(referenceData) with { IsSaveConfirmed = true };
+        var draft = TemplatesBuilderDraftMapper.CreateSuggestedDraft(referenceData);
+        var typedNetworks = draft.LabNetworks
+            .Select(network => network with { SwitchType = V2SwitchTypeCatalog.Internal })
+            .ToList();
+
+        return draft with { LabNetworks = typedNetworks, IsSaveConfirmed = true };
     }
 
     private static async Task<TemplateEditorDocument> CreateSavedBuilderDocumentAsync()
@@ -1402,6 +1441,9 @@ public sealed class TemplatesBuilderWorkflowContractTests
 
         public IReadOnlyList<string> LastResolvedCredentialSlotKeys { get; private set; } = Array.Empty<string>();
 
+        public IReadOnlyDictionary<string, string> LastExternalSwitchAdapterMappings { get; private set; } =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         public V2PlanBuildResult? LastDeployPlan { get; private set; }
 
         public V2BaseRemoteAccessOptions? LastBaseRemoteAccessOptions { get; private set; }
@@ -1442,12 +1484,14 @@ public sealed class TemplatesBuilderWorkflowContractTests
 
         public async Task<V2PlanBuildResult> BuildV2PlanAsync(
             LabTemplate template,
-            IReadOnlyCollection<string> resolvedCredentialSlotKeys)
+            IReadOnlyCollection<string> resolvedCredentialSlotKeys,
+            IReadOnlyDictionary<string, string> externalSwitchAdapterMappings)
         {
             BuildPlanCalls++;
             LastResolvedCredentialSlotKeys = resolvedCredentialSlotKeys
                 .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            LastExternalSwitchAdapterMappings = new Dictionary<string, string>(externalSwitchAdapterMappings, StringComparer.OrdinalIgnoreCase);
 
             var planner = new V2PlanningCapabilityService();
             return await planner.BuildPlanAsync(new V2PlanBuildRequest
@@ -1461,6 +1505,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
                 AvailableSwitchNames = ["vSwitch-Core"],
                 AvailableSwitches = [new V2AvailableSwitchInfo { Name = "vSwitch-Core", SwitchType = "Internal" }],
                 ResolvedCredentialSlotKeys = resolvedCredentialSlotKeys,
+                ExternalSwitchAdapterMappings = externalSwitchAdapterMappings,
                 DefaultDeploymentProfile = "Balanced"
             });
         }

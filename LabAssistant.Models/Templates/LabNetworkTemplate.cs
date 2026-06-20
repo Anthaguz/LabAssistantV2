@@ -13,6 +13,9 @@ public class LabNetworkTemplate
 
     public string? SwitchName { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SwitchType { get; set; }
+
     public string? Subnet { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -14,6 +14,9 @@ public sealed class V2PlanBuildRequest
 
     public IReadOnlyCollection<string> ResolvedCredentialSlotKeys { get; set; } = Array.Empty<string>();
 
+    public IReadOnlyDictionary<string, string> ExternalSwitchAdapterMappings { get; set; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     public string? DefaultDeploymentProfile { get; set; }
 }
 
@@ -59,7 +62,24 @@ public sealed class V2ResolvedPlanningContext
 
     public IReadOnlyList<V2ResolvedTrustPlanningContext> Trusts { get; init; } = Array.Empty<V2ResolvedTrustPlanningContext>();
 
+    public IReadOnlyList<V2ResolvedNetworkSwitchRequirement> NetworkSwitchRequirements { get; init; } = Array.Empty<V2ResolvedNetworkSwitchRequirement>();
+
     public IReadOnlyList<V2ResolvedVmPlanningContext> Vms { get; init; } = Array.Empty<V2ResolvedVmPlanningContext>();
+}
+
+public sealed class V2ResolvedNetworkSwitchRequirement
+{
+    public string NodeId { get; init; } = string.Empty;
+
+    public string SwitchName { get; init; } = string.Empty;
+
+    public string SwitchType { get; init; } = string.Empty;
+
+    public string? ExternalAdapterName { get; init; }
+
+    public IReadOnlyList<string> NetworkIds { get; init; } = Array.Empty<string>();
+
+    public IReadOnlyList<string> AffectedVmIds { get; init; } = Array.Empty<string>();
 }
 
 public sealed class V2ResolvedForestPlanningContext
@@ -224,7 +244,8 @@ public enum V2PlanNodeKind
     ApplyCapabilityRole = 22,
     PrepareForestTrustDns = 23,
     CreateForestTrust = 24,
-    ValidateForestTrust = 25
+    ValidateForestTrust = 25,
+    EnsureNetworkSwitch = 26
 }
 
 public sealed class V2PlanNode
@@ -247,6 +268,8 @@ public sealed class V2PlanNode
 
     public string? TrustId { get; init; }
 
+    public string? SwitchName { get; init; }
+
     public int WaveHint { get; set; }
 }
 
@@ -267,7 +290,8 @@ public enum V2PlanDependencyReasonCode
     DomainRequired = 3,
     RoleOrdering = 4,
     ProfileWavePolicy = 5,
-    TrustRequired = 6
+    TrustRequired = 6,
+    SwitchRequired = 7
 }
 
 public sealed class V2PlanDependency
@@ -322,7 +346,8 @@ public enum V2UnresolvedRequirementKind
     CatalogReference = 2,
     LabNetwork = 3,
     SwitchReference = 4,
-    RouterRequirement = 5
+    RouterRequirement = 5,
+    ExternalSwitchAdapterMapping = 6
 }
 
 public sealed class V2UnresolvedRequirement
