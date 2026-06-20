@@ -1,12 +1,12 @@
 # V2 Health, Trust Runtime, And Builder Issue Briefs
 
-**Purpose:** Preserve the approved next-issue chain for V2 health reconciliation, trust runtime, and the Templates V2 Builder so future agents can create narrow issues without re-expanding the scope into a broad implementation grab bag.
+**Purpose:** Preserve the approved historical issue chain for V2 health reconciliation, trust runtime, and the Templates V2 Builder so future agents can understand the sequencing without treating this file as current implementation authority.
 
-## Current Health Summary
+## Historical Status
 
-The V2 backend direction is broadly healthy. The current runtime executes root domains, child domains, tree domains, additional independent root forests, replica promotion, per-domain DNS stabilization, domain joins, router runtime, deploy-time review, and deploy-time base remote access. The main confirmed gap is explicit trust runtime.
+This file is historical planning and traceability context for the chain that led through #750, #751, #753, #754, #755, #789, and the #791 health review. It is not a current V2 runtime or Builder authority source.
 
-The important correction is process and traceability, not a runtime rollback. Some docs and issue metadata still describe earlier boundaries, especially around child/tree/additional-forest execution. Those should be reconciled before new runtime or UI implementation starts.
+As of the #791 health review, PR #758 has landed the first executable bidirectional managed-forest trust runtime path. The old issue briefs below intentionally preserve the pre-#758 planning sequence, but statements that trusts were missing, non-executable, or deferred describe the chain's state at that earlier point rather than the current merged runtime.
 
 ## PM Issue Brief - Mismatch: docs vs code - V2 extended topology execution boundary
 
@@ -26,14 +26,14 @@ PM-only; docs and GitHub metadata reconciliation only. No runtime or UI code edi
 - Status target: create a docs-only reconciliation issue and close it only after current docs match backend reality.
 
 ### Goal
-Bring the V2 current-authority docs and active epic notes into alignment with merged code: child domains, tree domains, and additional independent root forests are executable; trusts remain non-executable.
+Historical #750 goal: bring the V2 current-authority docs and active epic notes into alignment with merged code at that point in the chain, when child domains, tree domains, and additional independent root forests were executable and trusts had not yet landed.
 
 ### Why this issue exists
 The backend moved faster than the durable docs. Leaving the old boundary in place would cause future agents to plan from stale assumptions and could duplicate already-completed topology work.
 
 ### In Scope
 - Update current authority/support docs that still say child/tree/additional forests are deferred or non-executable.
-- Note that trusts remain known-but-non-executable until the trust-runtime slice.
+- Note that trusts were known-but-not-yet-executable until the subsequent trust-runtime slice.
 - Prepare labels and status notes for recently completed V2 issues and PRs where metadata is missing.
 - Recommend whether epics `#716`, `#720`, `#721`, and `#722` should remain open or receive progress comments.
 - Retire stale TBDs around child/tree/extra-forest schema fields, first review-surface visuals, and base remote-access return-to-runtime wording.
@@ -67,7 +67,7 @@ Use a dedicated docs branch from updated `origin/master`. Do not include local-o
 
 ### Definition of Done
 - Current V2 docs accurately describe executable topology state.
-- Trusts are still clearly deferred as runtime behavior.
+- The then-current trust runtime gap was carried into the follow-up trust contract/runtime slice.
 - Completed V2 work has a clear traceability note or metadata recommendation.
 
 ## PM Issue Brief - Contract: Define first V2 forest-trust runtime slice
