@@ -53,10 +53,12 @@ internal sealed class TemplatesCapabilityRuntime
     private readonly TemplatesBuilderWorkspaceComposition _builderComposition;
     private readonly ITemplatesWorkspaceShellBridge _shellBridge;
     private readonly Func<Task<IReadOnlyList<string>>> _loadAvailableVmSwitchesAsync;
+    private readonly Func<Task<IReadOnlyList<V2AvailableSwitchInfo>>> _loadAvailableVmSwitchInfoAsync;
     private readonly Func<Task<IReadOnlyList<TemplateVhdxCatalogOption>>> _loadVhdxCatalogOptionsAsync;
     private readonly Action _refreshDeployTemplatesLoadingState;
     private readonly List<TemplateVhdxCatalogOption> _templateVhdxCatalogOptions = [];
     private IReadOnlyList<string> _templateAvailableSwitches = Array.Empty<string>();
+    private IReadOnlyList<V2AvailableSwitchInfo> _templateAvailableSwitchInfo = Array.Empty<V2AvailableSwitchInfo>();
     private bool _isLoading;
 
     public TemplatesCapabilityRuntime(
@@ -66,6 +68,7 @@ internal sealed class TemplatesCapabilityRuntime
         TemplatesBuilderWorkspaceComposition builderComposition,
         ITemplatesWorkspaceShellBridge shellBridge,
         Func<Task<IReadOnlyList<string>>> loadAvailableVmSwitchesAsync,
+        Func<Task<IReadOnlyList<V2AvailableSwitchInfo>>> loadAvailableVmSwitchInfoAsync,
         Func<Task<IReadOnlyList<TemplateVhdxCatalogOption>>> loadVhdxCatalogOptionsAsync,
         Action refreshDeployTemplatesLoadingState)
     {
@@ -75,6 +78,7 @@ internal sealed class TemplatesCapabilityRuntime
         _builderComposition = builderComposition;
         _shellBridge = shellBridge;
         _loadAvailableVmSwitchesAsync = loadAvailableVmSwitchesAsync;
+        _loadAvailableVmSwitchInfoAsync = loadAvailableVmSwitchInfoAsync;
         _loadVhdxCatalogOptionsAsync = loadVhdxCatalogOptionsAsync;
         _refreshDeployTemplatesLoadingState = refreshDeployTemplatesLoadingState;
     }
@@ -145,7 +149,7 @@ internal sealed class TemplatesCapabilityRuntime
     public async Task<TemplatesBuilderReferenceData> LoadBuilderReferenceDataAsync(bool forceRefresh)
     {
         await EnsureEditorReferenceDataAsync(forceRefresh);
-        return new TemplatesBuilderReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions);
+        return new TemplatesBuilderReferenceData(_templateAvailableSwitches, _templateVhdxCatalogOptions, _templateAvailableSwitchInfo);
     }
 
     public void ApplyShellState()
@@ -170,9 +174,40 @@ internal sealed class TemplatesCapabilityRuntime
             return;
         }
 
-        _templateAvailableSwitches = await _loadAvailableVmSwitchesAsync();
+        _templateAvailableSwitchInfo = NormalizeSwitchInfo(await _loadAvailableVmSwitchInfoAsync());
+        if (_templateAvailableSwitchInfo.Count > 0)
+        {
+            _templateAvailableSwitches = _templateAvailableSwitchInfo.Select(item => item.Name).ToList();
+        }
+        else
+        {
+            _templateAvailableSwitches = await _loadAvailableVmSwitchesAsync();
+            _templateAvailableSwitchInfo = _templateAvailableSwitches
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .Select(name => new V2AvailableSwitchInfo { Name = name.Trim(), SwitchType = "Unknown" })
+                .ToList();
+        }
+
         ApplyEditorReferenceData();
     }
+
+    private static IReadOnlyList<V2AvailableSwitchInfo> NormalizeSwitchInfo(IReadOnlyList<V2AvailableSwitchInfo>? switches)
+        => switches?
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var item = group.First();
+                return new V2AvailableSwitchInfo
+                {
+                    Name = item.Name.Trim(),
+                    SwitchType = string.IsNullOrWhiteSpace(item.SwitchType) ? "Unknown" : item.SwitchType.Trim()
+                };
+            })
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
 
     private async Task EnsureVhdxCatalogOptionsAsync(bool forceRefresh)
     {

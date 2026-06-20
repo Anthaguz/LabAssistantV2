@@ -4689,7 +4689,7 @@ Each readiness result shall include, at minimum:
 - deployment profile includes a Segoe MDL2 information tooltip that explains the user-facing speed versus host-pressure tradeoff
 - deployment profile remains the existing Conservative/Balanced/Aggressive persisted field
 - resource-heavy steps use a resource list plus selected-detail layout:
-  - Networks uses a network list plus selected network detail, including switch name, optional switch type, subnet, and notes
+  - Networks uses a network list plus selected network detail, including lab network label/name, switch intent, subnet, notes, and advanced/read-only network id when exposed
   - Forests & Domains uses a constrained topology canvas with selectable forest/domain nodes and selected node detail
   - Credentials uses a slot-reference list plus selected slot detail
 - the VMs overview shows total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
@@ -4802,9 +4802,17 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - the step remains named `Networks`
-- each network can author a stable network id, display name, switch name, optional switch type, subnet, and notes
+- each network uses the lab network label/name as the main user-facing name
+- each network preserves a stable `networkId` for NIC references, but `networkId` is hidden or shown only as an advanced/read-only identifier rather than as a primary authoring field
+- the switch field is presented as a picker populated from known host switch inventory when that inventory is available
+- the switch picker includes a clear `Create new switch` option
+- selecting an existing host switch populates the network's switch name and switch type from inventory
+- switch type is not user-editable while an existing host switch is selected
+- choosing `Create new switch` allows entering a switch name and selecting switch type
 - supported switch type values are `External`, `Internal`, and `Private`
 - switch type is optional for existing or imported templates
+- existing templates with `networkId`, `name`, `switchName`, and optional `switchType` load and save without losing those values
+- notes remain documentation-only and do not drive deploy-time switch creation or reconciliation behavior
 - network rows show enough switch name/type context for the user to understand deploy-time switch intent
 - Builder save persists the network's switch intent as template data but does not create, rename, or delete Hyper-V switches
 - a network with switch name plus switch type represents switch ensure intent for deploy-time reconciliation

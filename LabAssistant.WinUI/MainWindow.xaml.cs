@@ -232,6 +232,32 @@ public sealed partial class MainWindow : Window
             }
         }
 
+        async Task<IReadOnlyList<V2AvailableSwitchInfo>> loadAvailableVmSwitchInfoAsync()
+        {
+            try
+            {
+                var result = await _assetsSwitchesCapabilityService.LoadAsync();
+                return result.Items
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+                    .GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .Select(group =>
+                    {
+                        var item = group.First();
+                        return new V2AvailableSwitchInfo
+                        {
+                            Name = item.Name.Trim(),
+                            SwitchType = string.IsNullOrWhiteSpace(item.SwitchType) ? "Unknown" : item.SwitchType.Trim()
+                        };
+                    })
+                    .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            catch (Exception)
+            {
+                return Array.Empty<V2AvailableSwitchInfo>();
+            }
+        }
+
         async Task<IReadOnlyList<TemplateVhdxCatalogOption>> loadVhdxCatalogOptionsAsync()
         {
             var result = await _templatesCapabilityService.LoadVhdxCatalogOptionsAsync();
@@ -253,6 +279,7 @@ public sealed partial class MainWindow : Window
             builderComposition,
             shellBridge,
             loadAvailableVmSwitchesAsync,
+            loadAvailableVmSwitchInfoAsync,
             loadVhdxCatalogOptionsAsync,
             () => _deployCapabilityRuntime?.RefreshTemplatesLoadingState());
         return runtime;
