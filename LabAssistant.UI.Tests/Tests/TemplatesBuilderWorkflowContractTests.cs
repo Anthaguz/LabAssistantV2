@@ -14,7 +14,7 @@ using Xunit;
 
 namespace LabAssistant.UI.Tests.Tests;
 
-public sealed class Issue755TemplatesV2BuilderTests
+public sealed class TemplatesBuilderWorkflowContractTests
 {
     [Fact]
     public void ShellViewModel_ResolvesTemplatesBuilder_AsDistinctWorkflowRoute()
