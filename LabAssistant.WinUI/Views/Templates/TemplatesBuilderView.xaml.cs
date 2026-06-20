@@ -166,6 +166,18 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderSelectedVmDetail();
     }
 
+    private void SelectVmNic(int nicIndex)
+    {
+        UpdateWorkingDraftFromVisibleControls();
+        if (!_workflowNavigation.SelectVmNic(nicIndex, _draft))
+        {
+            return;
+        }
+
+        RenderSelectedStep();
+        RenderSelectedVmDetail();
+    }
+
     private void SelectAdjacentStep(int offset)
     {
         UpdateWorkingDraftFromVisibleControls();
@@ -392,23 +404,102 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderForestDomainList()
     {
-        BuilderForestDomainResourcesListPanel.Children.Clear();
-        foreach (var row in TemplatesBuilderSectionProjections.ProjectForestDomainRows(_draft, _selectedForestDomainKind, _selectedForestDomainIndex))
+        BuilderDirectoryTopologyCanvasPanel.Children.Clear();
+        var projection = TemplatesBuilderDirectoryTopologyProjector.Project(_draft, _selectedForestDomainKind, _selectedForestDomainIndex);
+        if (projection.Forests.Count == 0)
         {
-            BuilderForestDomainResourcesListPanel.Children.Add(CreateResourceButton(
-                row.Label,
-                row.IsSelected,
+            BuilderDirectoryTopologyCanvasPanel.Children.Add(CreateEmptyDetailText("No forests in this draft."));
+            return;
+        }
+
+        foreach (var forest in projection.Forests)
+        {
+            BuilderDirectoryTopologyCanvasPanel.Children.Add(CreateForestTopologyContainer(forest));
+        }
+    }
+
+    private Border CreateForestTopologyContainer(TemplatesBuilderForestTopologyProjection forest)
+    {
+        var container = new Border
+        {
+            Padding = new Thickness(8),
+            Background = GetBrush("ShellBackgroundBrush"),
+            BorderBrush = forest.IsSelected ? GetBrush("ShellAccentBrush") : GetBrush("ShellBorderBrush"),
+            BorderThickness = new Thickness(forest.IsSelected ? 2 : 1),
+            CornerRadius = new CornerRadius(4)
+        };
+        var panel = new StackPanel { Spacing = 6 };
+        if (forest.CanSelect)
+        {
+            panel.Children.Add(CreateResourceButton(
+                forest.Label,
+                forest.IsSelected,
                 () =>
                 {
                     UpdateWorkingDraftFromVisibleControls();
-                    _selectedForestDomainKind = row.Kind == TemplatesBuilderResourceKind.Forest
-                        ? BuilderForestDomainResourceKind.Forest
-                        : BuilderForestDomainResourceKind.Domain;
-                    _selectedForestDomainIndex = row.Index;
+                    _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
+                    _selectedForestDomainIndex = forest.ForestIndex;
                     RenderForestDomainList();
                     RenderSelectedForestDomainDetail();
                 }));
         }
+        else
+        {
+            panel.Children.Add(CreateSubhead(forest.Label));
+        }
+
+        if (forest.RootNodes.Count == 0)
+        {
+            panel.Children.Add(CreateEmptyDetailText("No domains in this forest."));
+        }
+        else
+        {
+            foreach (var root in forest.RootNodes)
+            {
+                AddDomainTopologyNode(panel, root);
+            }
+        }
+
+        container.Child = panel;
+        return container;
+    }
+
+    private void AddDomainTopologyNode(StackPanel panel, TemplatesBuilderDomainTopologyNodeProjection node)
+    {
+        panel.Children.Add(CreateTopologyDomainButton(
+            node,
+            () =>
+            {
+                UpdateWorkingDraftFromVisibleControls();
+                _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
+                _selectedForestDomainIndex = node.DomainIndex;
+                RenderForestDomainList();
+                RenderSelectedForestDomainDetail();
+            }));
+
+        foreach (var child in node.Children)
+        {
+            AddDomainTopologyNode(panel, child);
+        }
+    }
+
+    private Button CreateTopologyDomainButton(TemplatesBuilderDomainTopologyNodeProjection node, Action select)
+    {
+        var label = $"{FormatTopologyNodePrefix(node)} {node.Label}";
+        var button = new Button
+        {
+            Background = CreateTransparentBrush(),
+            BorderThickness = new Thickness(0),
+            Content = CreateTopologyNodeContent(label, node),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(0)
+        };
+        ConfigureNavButtonChrome(button);
+        ToolTipService.SetToolTip(button, $"{node.RelationLabel}: {node.Label}");
+        AutomationProperties.SetName(button, $"{node.RelationLabel}: {node.Label}");
+        button.Click += (_, _) => select();
+        return button;
     }
 
     private void RenderSelectedNetworkDetail()
@@ -426,6 +517,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             CreateTextBox("Network ID", TemplatesBuilderFieldKeys.NetworkId, network.NetworkId),
             CreateTextBox("Name", TemplatesBuilderFieldKeys.NetworkName, network.Name),
             CreateTextBox("Switch", TemplatesBuilderFieldKeys.NetworkSwitchName, network.SwitchName),
+            CreateComboBox("Switch Type", TemplatesBuilderFieldKeys.NetworkSwitchType, network.SwitchType, string.Empty, V2SwitchTypeCatalog.External, V2SwitchTypeCatalog.Internal, V2SwitchTypeCatalog.Private),
             CreateTextBox("Subnet", TemplatesBuilderFieldKeys.NetworkSubnet, network.Subnet),
             CreateTextBox("Notes", TemplatesBuilderFieldKeys.NetworkNotes, network.Notes)));
     }
@@ -518,16 +610,13 @@ public sealed partial class TemplatesBuilderView : UserControl
 
                 break;
             case BuilderVmDetailCategory.Networking:
-                var addNicButton = new Button { Content = "Add NIC", Tag = detail.Value.VmIndex };
-                addNicButton.Click += BuilderAddNicButton_Click;
-                BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
-                var nicsPanel = new StackPanel { Spacing = 6, Tag = TemplatesBuilderFieldKeys.VmNicsPanel };
-                foreach (var nic in detail.Value.Nics)
+                if (detail.Value.IsNicDetailSelected)
                 {
-                    nicsPanel.Children.Add(CreateNicRow(nic));
+                    RenderSelectedNicDetail(detail.Value);
+                    break;
                 }
 
-                BuilderSelectedVmDetailPanel.Children.Add(nicsPanel);
+                RenderNicOverview(detail.Value);
                 break;
             case BuilderVmDetailCategory.Credentials:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
@@ -540,21 +629,59 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
     }
 
-    private StackPanel CreateNicRow(TemplatesBuilderNicRowProjection projection)
+    private void RenderNicOverview(TemplatesBuilderVmDetailProjection detail)
     {
-        var nic = projection.Draft;
-        var row = CreateRow();
-        row.Tag = TemplatesBuilderFieldKeys.NicRow;
-        row.Children.Add(CreateFieldGrid(
+        var addNicButton = new Button { Content = "Add NIC", Tag = detail.VmIndex };
+        addNicButton.Click += BuilderAddNicButton_Click;
+        BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
+
+        if (detail.Nics.Count == 0)
+        {
+            BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText("No NICs in this VM."));
+            return;
+        }
+
+        var nicsPanel = new StackPanel { Spacing = 6 };
+        foreach (var nic in detail.Nics)
+        {
+            nicsPanel.Children.Add(CreateNicOverviewRow(nic));
+        }
+
+        BuilderSelectedVmDetailPanel.Children.Add(nicsPanel);
+    }
+
+    private void RenderSelectedNicDetail(TemplatesBuilderVmDetailProjection detail)
+    {
+        if (detail.SelectedNicIndex < 0 ||
+            detail.SelectedNicIndex >= detail.Nics.Count)
+        {
+            BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText("No NIC selected."));
+            return;
+        }
+
+        var nic = detail.Nics[detail.SelectedNicIndex].Draft;
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead($"NIC: {FormatResourceName(nic.Name, nic.NicId)}"));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
             CreateTextBox("NIC ID", TemplatesBuilderFieldKeys.NicId, nic.NicId),
             CreateTextBox("Name", TemplatesBuilderFieldKeys.NicName, nic.Name),
             CreateTextBox("Network ID", TemplatesBuilderFieldKeys.NicNetworkId, nic.NetworkId),
-            CreateTextBox("Switch", TemplatesBuilderFieldKeys.NicSwitchName, nic.SwitchName),
+            CreateTextBox("Switch Override", TemplatesBuilderFieldKeys.NicSwitchName, nic.SwitchName),
             CreateTextBox("IP Address", TemplatesBuilderFieldKeys.NicIpAddress, nic.IpAddress),
             CreateTextBox("Prefix", TemplatesBuilderFieldKeys.NicPrefixLength, nic.PrefixLength),
             CreateTextBox("Gateway", TemplatesBuilderFieldKeys.NicDefaultGateway, nic.DefaultGateway),
             CreateTextBox("DNS Servers", TemplatesBuilderFieldKeys.NicDnsServers, string.Join(", ", nic.DnsServers))));
-        return row;
+    }
+
+    private Button CreateNicOverviewRow(TemplatesBuilderNicRowProjection projection)
+    {
+        var nic = projection.Draft;
+        var secondary = string.IsNullOrWhiteSpace(nic.NetworkId)
+            ? "No network reference"
+            : $"Network: {nic.NetworkId}";
+        return CreateResourceButton(
+            $"{projection.Label} - {secondary}",
+            projection.IsSelected,
+            () => SelectVmNic(projection.Index));
     }
 
     private void UpdateWorkingDraftFromVisibleControls()
@@ -592,6 +719,7 @@ public sealed partial class TemplatesBuilderView : UserControl
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkId),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkName),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchName),
+            GetComboValue(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchType),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSubnet),
             GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkNotes));
         return draft with { LabNetworks = networks };
@@ -685,9 +813,10 @@ public sealed partial class TemplatesBuilderView : UserControl
             {
                 IsActiveDirectoryDomainController = GetCheckBoxValue(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmIsActiveDirectoryDomainController)
             },
-            BuilderVmDetailCategory.Networking when HasNicsPanel(BuilderSelectedVmDetailPanel) => vm with
+            BuilderVmDetailCategory.Networking when projection.IsNicDetailSelected &&
+                HasTextBox(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicId) => vm with
             {
-                Nics = ReadNics(BuilderSelectedVmDetailPanel)
+                Nics = UpdateSelectedNic(vm.Nics, projection.SelectedNicIndex)
             },
             BuilderVmDetailCategory.Credentials when HasTextBox(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmLocalBootstrap) => vm with
             {
@@ -703,22 +832,26 @@ public sealed partial class TemplatesBuilderView : UserControl
         return draft with { Vms = vms };
     }
 
-    private List<TemplatesBuilderNicDraft> ReadNics(DependencyObject root)
+    private IReadOnlyList<TemplatesBuilderNicDraft> UpdateSelectedNic(IReadOnlyList<TemplatesBuilderNicDraft> existingNics, int selectedNicIndex)
     {
-        var nicsPanel = FindDescendants<StackPanel>(root).FirstOrDefault(panel => Equals(panel.Tag, TemplatesBuilderFieldKeys.VmNicsPanel));
-        return nicsPanel?.Children.OfType<StackPanel>().Select(ReadNic).ToList() ?? [];
-    }
+        existingNics ??= [];
+        if (selectedNicIndex < 0 || selectedNicIndex >= existingNics.Count)
+        {
+            return existingNics;
+        }
 
-    private TemplatesBuilderNicDraft ReadNic(StackPanel row)
-        => new(
-            GetText(row, TemplatesBuilderFieldKeys.NicId),
-            GetText(row, TemplatesBuilderFieldKeys.NicName),
-            GetText(row, TemplatesBuilderFieldKeys.NicNetworkId),
-            GetText(row, TemplatesBuilderFieldKeys.NicSwitchName),
-            GetText(row, TemplatesBuilderFieldKeys.NicIpAddress),
-            GetText(row, TemplatesBuilderFieldKeys.NicPrefixLength),
-            GetText(row, TemplatesBuilderFieldKeys.NicDefaultGateway),
-            SplitList(GetText(row, TemplatesBuilderFieldKeys.NicDnsServers)));
+        var nics = existingNics.ToList();
+        nics[selectedNicIndex] = new TemplatesBuilderNicDraft(
+            GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicId),
+            GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicName),
+            GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicNetworkId),
+            GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicSwitchName),
+            GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicIpAddress),
+            GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicPrefixLength),
+            GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicDefaultGateway),
+            SplitList(GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicDnsServers)));
+        return nics;
+    }
 
     private void BuilderDraftControl_Changed(object sender, TextChangedEventArgs e)
     {
@@ -739,7 +872,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         var draft = CaptureDraft();
         var networks = draft.LabNetworks
-            .Append(new TemplatesBuilderLabNetworkDraft($"lab-network-{draft.LabNetworks.Count + 1}", "Network", string.Empty, string.Empty, string.Empty))
+            .Append(new TemplatesBuilderLabNetworkDraft($"lab-network-{draft.LabNetworks.Count + 1}", "Network", string.Empty, string.Empty, string.Empty, string.Empty))
             .ToList();
         _selectedNetworkIndex = networks.Count - 1;
         RenderAndNotify(draft with { LabNetworks = networks, IsSaveConfirmed = false });
@@ -815,10 +948,12 @@ public sealed partial class TemplatesBuilderView : UserControl
 
         var vms = draft.Vms.ToList();
         var vm = vms[vmIndex];
-        var nics = vm.Nics.ToList();
+        var nics = (vm.Nics ?? Array.Empty<TemplatesBuilderNicDraft>()).ToList();
         nics.Add(new TemplatesBuilderNicDraft($"nic-{nics.Count + 1}", "Lab", draft.LabNetworks.FirstOrDefault().NetworkId, string.Empty, string.Empty, string.Empty, string.Empty, []));
         vms[vmIndex] = vm with { Nics = nics };
-        RenderAndNotify(draft with { Vms = vms, IsSaveConfirmed = false });
+        var updatedDraft = draft with { Vms = vms, IsSaveConfirmed = false };
+        _workflowNavigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(vmIndex, nics.Count - 1), updatedDraft);
+        RenderAndNotify(updatedDraft);
     }
 
     private void BuilderSaveButton_Click(object sender, RoutedEventArgs e)
@@ -1140,9 +1275,6 @@ public sealed partial class TemplatesBuilderView : UserControl
     private static bool HasCheckBox(DependencyObject root, BuilderDraftFieldKey fieldKey)
         => FindDescendants<CheckBox>(root).Any(checkBox => Equals(checkBox.Tag, fieldKey));
 
-    private static bool HasNicsPanel(DependencyObject root)
-        => FindDescendants<StackPanel>(root).Any(panel => Equals(panel.Tag, TemplatesBuilderFieldKeys.VmNicsPanel));
-
     private static string GetComboValue(DependencyObject root, BuilderDraftFieldKey fieldKey)
     {
         var comboBox = FindDescendants<ComboBox>(root).FirstOrDefault(item => Equals(item.Tag, fieldKey));
@@ -1152,6 +1284,16 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         return string.Empty;
+    }
+
+    private static string FormatResourceName(string primary, string fallback)
+    {
+        if (!string.IsNullOrWhiteSpace(primary))
+        {
+            return primary.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(fallback) ? "(unnamed)" : fallback.Trim();
     }
 
     private static bool GetCheckBoxValue(DependencyObject root, BuilderDraftFieldKey fieldKey)
@@ -1207,6 +1349,58 @@ public sealed partial class TemplatesBuilderView : UserControl
                 TextWrapping = TextWrapping.NoWrap
             }
         };
+
+    private static Border CreateTopologyNodeContent(string content, TemplatesBuilderDomainTopologyNodeProjection node)
+        => new()
+        {
+            Margin = new Thickness(Math.Min(node.Depth, 4) * 14, 0, 0, 0),
+            Padding = new Thickness(8, 5, 8, 5),
+            Background = GetBrush(node.IsSelected ? "ShellBackgroundBrush" : "ShellContentBackgroundBrush"),
+            BorderBrush = GetBrush(node.IsSelected || node.IsRootDomain ? "ShellAccentBrush" : "ShellBorderBrush"),
+            BorderThickness = new Thickness(node.IsSelected ? 2 : node.IsRootDomain ? 1.5 : 1),
+            CornerRadius = new CornerRadius(4),
+            Child = new StackPanel
+            {
+                Spacing = 2,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        FontWeight = node.IsSelected || node.IsRootDomain
+                            ? Microsoft.UI.Text.FontWeights.SemiBold
+                            : Microsoft.UI.Text.FontWeights.Normal,
+                        Foreground = GetBrush(node.IsSelected || node.IsRootDomain ? "ShellAccentBrush" : "ShellTextPrimaryBrush"),
+                        MaxLines = 1,
+                        Text = content,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        TextWrapping = TextWrapping.NoWrap
+                    },
+                    new TextBlock
+                    {
+                        Foreground = GetBrush(node.HasMissingParent ? "ShellCriticalBrush" : "ShellTextSecondaryBrush"),
+                        MaxLines = 1,
+                        Text = node.HasMissingParent ? "Missing parent reference" : node.RelationLabel,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        TextWrapping = TextWrapping.NoWrap
+                    }
+                }
+            }
+        };
+
+    private static string FormatTopologyNodePrefix(TemplatesBuilderDomainTopologyNodeProjection node)
+    {
+        if (node.IsRootDomain)
+        {
+            return "[Root]";
+        }
+
+        if (node.IsTreeRoot)
+        {
+            return "[Tree]";
+        }
+
+        return node.Depth > 0 ? "[Child]" : "[Domain]";
+    }
 
     private static void ConfigureNavButtonChrome(Button button)
     {

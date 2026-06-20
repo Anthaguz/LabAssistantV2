@@ -165,7 +165,7 @@ public sealed class TemplatesBuilderDraftValidationTests
     {
         var workspace = new TemplatesBuilderWorkspaceViewModel();
         var draft = CreateBuilderDraft();
-        var branchNetwork = new TemplatesBuilderLabNetworkDraft("lab-branch", "Branch", "vSwitch-Branch", "10.1.0.0/24", string.Empty);
+        var branchNetwork = new TemplatesBuilderLabNetworkDraft("lab-branch", "Branch", "vSwitch-Branch", string.Empty, "10.1.0.0/24", string.Empty);
         var vmAInvalid = draft.Vms[0] with
         {
             Nics = [draft.Vms[0].Nics[0] with { IpAddress = "not-an-ip" }]

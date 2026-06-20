@@ -130,6 +130,124 @@ public sealed class V2PlanningCapabilityServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanAsync_MissingInternalNetworkSwitch_AddsEnsureNodeBeforeVmProvision()
+    {
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        var network = Assert.Single(request.Template.LabNetworks!, item => item.NetworkId == "lab-core");
+        network.SwitchName = "vSwitch-NewCore";
+        network.SwitchType = V2SwitchTypeCatalog.Internal;
+        request.AvailableSwitchNames = [];
+        request.AvailableSwitches = [];
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        var requirement = Assert.Single(result.Context.NetworkSwitchRequirements);
+        Assert.Equal("vSwitch-NewCore", requirement.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.Internal, requirement.SwitchType);
+
+        var ensureNode = Assert.Single(result.Nodes, node => node.Kind == V2PlanNodeKind.EnsureNetworkSwitch);
+        var provisionNodes = result.Nodes.Where(node => node.Kind == V2PlanNodeKind.ProvisionVm).ToList();
+        Assert.All(provisionNodes, provisionNode =>
+            Assert.Contains(result.Dependencies, dep =>
+                dep.FromNodeId == ensureNode.NodeId &&
+                dep.ToNodeId == provisionNode.NodeId &&
+                dep.ReasonCode == V2PlanDependencyReasonCode.SwitchRequired));
+        Assert.All(provisionNodes, provisionNode => Assert.True(ensureNode.WaveHint < provisionNode.WaveHint));
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_ExistingSwitchWithDifferentType_BlocksTypedNetworkReuse()
+    {
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        var network = Assert.Single(request.Template.LabNetworks!, item => item.NetworkId == "lab-core");
+        network.SwitchType = V2SwitchTypeCatalog.Private;
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Code == "switch-type-mismatch");
+        Assert.Contains(result.UnresolvedRequirements, requirement =>
+            requirement.Kind == V2UnresolvedRequirementKind.SwitchReference &&
+            requirement.Key == "vSwitch-Core");
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_ConflictingDeclaredSwitchTypesForSameName_BlocksTemplateSwitchIntent()
+    {
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        var coreNetwork = Assert.Single(request.Template.LabNetworks!, item => item.NetworkId == "lab-core");
+        coreNetwork.SwitchName = "vSwitch-Shared";
+        coreNetwork.SwitchType = V2SwitchTypeCatalog.Internal;
+        request.Template.LabNetworks =
+        [
+            coreNetwork,
+            new LabNetworkTemplate
+            {
+                NetworkId = "lab-isolated",
+                Name = "Isolated",
+                SwitchName = "vSwitch-Shared",
+                SwitchType = V2SwitchTypeCatalog.Private
+            }
+        ];
+        var memberVm = Assert.Single(request.Template.VmTemplates!, vm => vm.VmId == "vm-member01");
+        var memberNic = Assert.Single(memberVm.Nics!);
+        memberNic.NetworkId = "lab-isolated";
+        request.AvailableSwitchNames = [];
+        request.AvailableSwitches = [];
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Code == "switch-type-mismatch");
+        Assert.Equal(
+            result.Nodes.Select(node => node.NodeId).Distinct(StringComparer.Ordinal).Count(),
+            result.Nodes.Count);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_MissingExternalNetworkSwitch_RequiresDeployReviewAdapterMapping()
+    {
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        var network = Assert.Single(request.Template.LabNetworks!, item => item.NetworkId == "lab-core");
+        network.SwitchName = "vSwitch-Wan";
+        network.SwitchType = V2SwitchTypeCatalog.External;
+        request.AvailableSwitchNames = [];
+        request.AvailableSwitches = [];
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Code == "external-switch-adapter-required");
+        Assert.Contains(result.UnresolvedRequirements, requirement =>
+            requirement.Kind == V2UnresolvedRequirementKind.ExternalSwitchAdapterMapping &&
+            requirement.Key == "vSwitch-Wan");
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_ExternalAdapterMapping_ResolvesMissingExternalSwitchRequirement()
+    {
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        var network = Assert.Single(request.Template.LabNetworks!, item => item.NetworkId == "lab-core");
+        network.SwitchName = "vSwitch-Wan";
+        network.SwitchType = V2SwitchTypeCatalog.External;
+        request.AvailableSwitchNames = [];
+        request.AvailableSwitches = [];
+        request.ExternalSwitchAdapterMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["vSwitch-Wan"] = "Ethernet 2"
+        };
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        var requirement = Assert.Single(result.Context.NetworkSwitchRequirements);
+        Assert.Equal("vSwitch-Wan", requirement.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.External, requirement.SwitchType);
+        Assert.Equal("Ethernet 2", requirement.ExternalAdapterName);
+    }
+
+    [Fact]
     public async Task BuildPlanAsync_RootAndMemberPlan_PreservesDomainReadyOrdering()
     {
         var result = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]));

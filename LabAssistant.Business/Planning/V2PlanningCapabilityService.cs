@@ -91,6 +91,14 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         {
             availableSwitches.TryAdd(switchName, null);
         }
+        var externalSwitchAdapterMappings = request.ExternalSwitchAdapterMappings
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+            .GroupBy(pair => pair.Key.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Value.Trim(),
+                StringComparer.OrdinalIgnoreCase);
+        var switchRequirements = new Dictionary<string, NetworkSwitchRequirementBuilder>(StringComparer.OrdinalIgnoreCase);
         var resolvedSlots = new HashSet<string>(
             request.ResolvedCredentialSlotKeys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => key.Trim()),
             StringComparer.OrdinalIgnoreCase);
@@ -100,7 +108,16 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             .ToList();
 
         var states = sortedVms
-            .Select(vm => ResolveVmState(vm, request.CatalogItems, labNetworks, availableSwitches, resolvedSlots, issues, unresolved))
+            .Select(vm => ResolveVmState(
+                vm,
+                request.CatalogItems,
+                labNetworks,
+                availableSwitches,
+                externalSwitchAdapterMappings,
+                switchRequirements,
+                resolvedSlots,
+                issues,
+                unresolved))
             .ToList();
 
         var hasRootDc = states.Any(state => state.TopologyRoleIs("FirstDomainController"));
@@ -142,6 +159,11 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         }
 
         var resolvedTrusts = ResolveTrusts(topologyResolution, states, resolvedSlots, issues, unresolved);
+        var resolvedSwitchRequirements = switchRequirements.Values
+            .Select(builder => builder.Build())
+            .OrderBy(requirement => requirement.SwitchName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(requirement => requirement.SwitchType, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var routerRequired = DetermineRouterRequirement(states, domainRequired);
         if (routerRequired && !states.Any(state => state.IsRouterCapable))
         {
@@ -171,12 +193,15 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             Forests = topologyResolution.Forests,
             Domains = topologyResolution.Domains,
             Trusts = resolvedTrusts,
+            NetworkSwitchRequirements = resolvedSwitchRequirements,
             Vms = states.Select(state => state.ToContext()).ToArray()
         };
 
+        EmitSwitchNodes(resolvedSwitchRequirements, nodes);
         EmitNodes(states, routerRequired, nodes);
         EmitTrustNodes(resolvedTrusts, nodes);
         EmitDependencies(states, routerRequired, dependencies);
+        EmitSwitchDependencies(resolvedSwitchRequirements, nodes, states, dependencies);
         EmitTrustDependencies(resolvedTrusts, nodes, states, dependencies);
         ApplyWaveHints(nodes, dependencies, resolvedProfile, states);
         var waves = BuildWaves(nodes);
@@ -212,6 +237,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         IReadOnlyList<VhdxCatalogItem> catalogItems,
         IReadOnlyDictionary<string, LabNetworkTemplate> labNetworks,
         IReadOnlyDictionary<string, string?> availableSwitches,
+        IReadOnlyDictionary<string, string> externalSwitchAdapterMappings,
+        IDictionary<string, NetworkSwitchRequirementBuilder> switchRequirements,
         ISet<string> resolvedSlots,
         List<V2PlanIssue> issues,
         List<V2UnresolvedRequirement> unresolved)
@@ -302,7 +329,14 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             });
         }
 
-        var resolvedNics = ResolveNics(vm, labNetworks, availableSwitches, issues, unresolved);
+        var resolvedNics = ResolveNics(
+            vm,
+            labNetworks,
+            availableSwitches,
+            externalSwitchAdapterMappings,
+            switchRequirements,
+            issues,
+            unresolved);
         var requiresGuestWork = DetermineGuestWorkRequirement(topologyRole, membershipMode, knownCapabilities, resolvedNics, vm);
         var bootstrapSlot = Normalize(vm.CredentialSlots?.LocalBootstrap) ?? Normalize(bootstrapProfile?.LocalCredentialSlotRef);
         var domainAdminSlot = Normalize(vm.CredentialSlots?.DomainAdmin);
@@ -547,6 +581,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         VmTemplate vm,
         IReadOnlyDictionary<string, LabNetworkTemplate> labNetworks,
         IReadOnlyDictionary<string, string?> availableSwitches,
+        IReadOnlyDictionary<string, string> externalSwitchAdapterMappings,
+        IDictionary<string, NetworkSwitchRequirementBuilder> switchRequirements,
         List<V2PlanIssue> issues,
         List<V2UnresolvedRequirement> unresolved)
     {
@@ -580,27 +616,23 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                     });
                 }
 
-                var effectiveSwitch = Normalize(nic.SwitchName) ?? Normalize(network?.SwitchName);
-                string? effectiveSwitchType = null;
-                if (!string.IsNullOrWhiteSpace(effectiveSwitch) && !availableSwitches.TryGetValue(effectiveSwitch, out effectiveSwitchType))
-                {
-                    unresolved.Add(new V2UnresolvedRequirement
-                    {
-                        Kind = V2UnresolvedRequirementKind.SwitchReference,
-                        Key = effectiveSwitch,
-                        AffectedVmIds = [vm.VmId],
-                        Description = $"VM '{vmName}' requires switch '{effectiveSwitch}' on NIC '{nic.NicId}', but it is not available on the current host."
-                    });
-                    issues.Add(new V2PlanIssue
-                    {
-                        Severity = V2PlanIssueSeverity.Blocking,
-                        Code = "switch-reference-missing",
-                        VmId = vm.VmId,
-                        VmName = vmName,
-                        Message = $"VM '{vmName}' requires unavailable switch '{effectiveSwitch}'.",
-                        SuggestedAction = "Create the switch on this host or update the template NIC mapping."
-                    });
-                }
+                var nicSwitchOverride = Normalize(nic.SwitchName);
+                var effectiveSwitch = nicSwitchOverride ?? Normalize(network?.SwitchName);
+                var declaredNetworkSwitchType = nicSwitchOverride is null
+                    ? NormalizeSupportedSwitchType(network?.SwitchType)
+                    : null;
+                var effectiveSwitchType = ResolveEffectiveSwitch(
+                    vm,
+                    vmName,
+                    nic.NicId,
+                    networkId,
+                    effectiveSwitch,
+                    declaredNetworkSwitchType,
+                    availableSwitches,
+                    externalSwitchAdapterMappings,
+                    switchRequirements,
+                    issues,
+                    unresolved);
 
                 result.Add(new V2ResolvedVmNetworkInterface
                 {
@@ -666,6 +698,217 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         }
 
         return result;
+    }
+
+    private static string? ResolveEffectiveSwitch(
+        VmTemplate vm,
+        string vmName,
+        string nicId,
+        string? networkId,
+        string? effectiveSwitch,
+        string? declaredNetworkSwitchType,
+        IReadOnlyDictionary<string, string?> availableSwitches,
+        IReadOnlyDictionary<string, string> externalSwitchAdapterMappings,
+        IDictionary<string, NetworkSwitchRequirementBuilder> switchRequirements,
+        List<V2PlanIssue> issues,
+        List<V2UnresolvedRequirement> unresolved)
+    {
+        if (string.IsNullOrWhiteSpace(effectiveSwitch))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(declaredNetworkSwitchType))
+        {
+            if (availableSwitches.TryGetValue(effectiveSwitch, out var legacyAvailableSwitchType))
+            {
+                return NormalizeSupportedSwitchType(legacyAvailableSwitchType) ?? NormalizeSwitchType(legacyAvailableSwitchType);
+            }
+
+            unresolved.Add(new V2UnresolvedRequirement
+            {
+                Kind = V2UnresolvedRequirementKind.SwitchReference,
+                Key = effectiveSwitch,
+                AffectedVmIds = [vm.VmId],
+                Description = $"VM '{vmName}' requires switch '{effectiveSwitch}' on NIC '{nicId}', but it is not available on the current host."
+            });
+            issues.Add(new V2PlanIssue
+            {
+                Severity = V2PlanIssueSeverity.Blocking,
+                Code = "switch-reference-missing",
+                VmId = vm.VmId,
+                VmName = vmName,
+                Message = $"VM '{vmName}' requires unavailable switch '{effectiveSwitch}'.",
+                SuggestedAction = "Create the switch on this host or define a lab network switchType when the deployment should create it."
+            });
+            return null;
+        }
+
+        if (availableSwitches.TryGetValue(effectiveSwitch, out var availableSwitchType))
+        {
+            var normalizedAvailableType = NormalizeSupportedSwitchType(availableSwitchType);
+            if (!string.Equals(normalizedAvailableType, declaredNetworkSwitchType, StringComparison.OrdinalIgnoreCase))
+            {
+                AddSwitchTypeMismatchIssue(
+                    vm,
+                    vmName,
+                    nicId,
+                    effectiveSwitch,
+                    declaredNetworkSwitchType,
+                    availableSwitchType,
+                    issues,
+                    unresolved);
+                return normalizedAvailableType ?? NormalizeSwitchType(availableSwitchType);
+            }
+
+            AddSwitchRequirement(
+                switchRequirements,
+                networkId,
+                vm,
+                vmName,
+                nicId,
+                effectiveSwitch,
+                declaredNetworkSwitchType,
+                externalAdapterName: null,
+                issues,
+                unresolved);
+            return declaredNetworkSwitchType;
+        }
+
+        if (SwitchTypeIs(declaredNetworkSwitchType, V2SwitchTypeCatalog.External))
+        {
+            if (!externalSwitchAdapterMappings.TryGetValue(effectiveSwitch, out var adapterName))
+            {
+                unresolved.Add(new V2UnresolvedRequirement
+                {
+                    Kind = V2UnresolvedRequirementKind.ExternalSwitchAdapterMapping,
+                    Key = effectiveSwitch,
+                    AffectedVmIds = [vm.VmId],
+                    Description = $"External switch '{effectiveSwitch}' for VM '{vmName}' requires a deploy-review adapter mapping before it can be created."
+                });
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "external-switch-adapter-required",
+                    VmId = vm.VmId,
+                    VmName = vmName,
+                    Message = $"VM '{vmName}' requires missing External switch '{effectiveSwitch}', but no deploy-review adapter mapping was provided.",
+                    SuggestedAction = "Map the External switch to a host adapter for this deployment run or pre-create a matching External switch."
+                });
+                return declaredNetworkSwitchType;
+            }
+
+            AddSwitchRequirement(
+                switchRequirements,
+                networkId,
+                vm,
+                vmName,
+                nicId,
+                effectiveSwitch,
+                declaredNetworkSwitchType,
+                adapterName,
+                issues,
+                unresolved);
+            return declaredNetworkSwitchType;
+        }
+
+        AddSwitchRequirement(
+            switchRequirements,
+            networkId,
+            vm,
+            vmName,
+            nicId,
+            effectiveSwitch,
+            declaredNetworkSwitchType,
+            externalAdapterName: null,
+            issues,
+            unresolved);
+        return declaredNetworkSwitchType;
+    }
+
+    private static void AddSwitchTypeMismatchIssue(
+        VmTemplate vm,
+        string vmName,
+        string nicId,
+        string switchName,
+        string expectedType,
+        string? actualType,
+        List<V2PlanIssue> issues,
+        List<V2UnresolvedRequirement> unresolved)
+    {
+        unresolved.Add(new V2UnresolvedRequirement
+        {
+            Kind = V2UnresolvedRequirementKind.SwitchReference,
+            Key = switchName,
+            AffectedVmIds = [vm.VmId],
+            Description = $"VM '{vmName}' requires switch '{switchName}' as {expectedType}, but the current host reports type '{NormalizeSwitchType(actualType) ?? "Unknown"}'."
+        });
+        issues.Add(new V2PlanIssue
+        {
+            Severity = V2PlanIssueSeverity.Blocking,
+            Code = "switch-type-mismatch",
+            VmId = vm.VmId,
+            VmName = vmName,
+            Message = $"VM '{vmName}' requires switch '{switchName}' as {expectedType}, but the host switch type is '{NormalizeSwitchType(actualType) ?? "Unknown"}'.",
+            SuggestedAction = "Use a switch with the same name and type, rename one of the switches, or update the lab network switchType."
+        });
+    }
+
+    private static void AddSwitchRequirement(
+        IDictionary<string, NetworkSwitchRequirementBuilder> switchRequirements,
+        string? networkId,
+        VmTemplate vm,
+        string vmName,
+        string nicId,
+        string switchName,
+        string switchType,
+        string? externalAdapterName,
+        List<V2PlanIssue> issues,
+        List<V2UnresolvedRequirement> unresolved)
+    {
+        var key = switchName.Trim();
+        if (!switchRequirements.TryGetValue(key, out var builder))
+        {
+            builder = new NetworkSwitchRequirementBuilder(switchName, switchType, externalAdapterName);
+            switchRequirements[key] = builder;
+        }
+        else if (!string.Equals(builder.SwitchType, switchType, StringComparison.OrdinalIgnoreCase))
+        {
+            AddDeclaredSwitchTypeConflictIssue(vm, vmName, nicId, switchName, switchType, builder.SwitchType, issues, unresolved);
+            return;
+        }
+
+        builder.AddNetwork(networkId);
+        builder.AddVm(vm.VmId);
+        builder.SetExternalAdapterName(externalAdapterName);
+    }
+
+    private static void AddDeclaredSwitchTypeConflictIssue(
+        VmTemplate vm,
+        string vmName,
+        string nicId,
+        string switchName,
+        string expectedType,
+        string declaredType,
+        List<V2PlanIssue> issues,
+        List<V2UnresolvedRequirement> unresolved)
+    {
+        unresolved.Add(new V2UnresolvedRequirement
+        {
+            Kind = V2UnresolvedRequirementKind.SwitchReference,
+            Key = switchName,
+            AffectedVmIds = [vm.VmId],
+            Description = $"VM '{vmName}' requires switch '{switchName}' as {expectedType} on NIC '{nicId}', but another lab network declares it as {declaredType}."
+        });
+        issues.Add(new V2PlanIssue
+        {
+            Severity = V2PlanIssueSeverity.Blocking,
+            Code = "switch-type-mismatch",
+            VmId = vm.VmId,
+            VmName = vmName,
+            Message = $"Switch '{switchName}' is declared with conflicting V2 switch types: {declaredType} and {expectedType}.",
+            SuggestedAction = "Use one switch type per switch name, or assign different switch names to the lab networks."
+        });
     }
 
     private static bool DetermineGuestWorkRequirement(
@@ -746,6 +989,23 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         }
 
         return routerRequired;
+    }
+
+    private static void EmitSwitchNodes(
+        IReadOnlyList<V2ResolvedNetworkSwitchRequirement> switchRequirements,
+        List<V2PlanNode> nodes)
+    {
+        foreach (var requirement in switchRequirements)
+        {
+            nodes.Add(new V2PlanNode
+            {
+                NodeId = requirement.NodeId,
+                Kind = V2PlanNodeKind.EnsureNetworkSwitch,
+                DisplayName = $"Ensure switch {requirement.SwitchName}",
+                WorkloadClass = V2WorkloadClass.HeavyHost,
+                SwitchName = requirement.SwitchName
+            });
+        }
     }
 
     private static void EmitNodes(IReadOnlyList<ResolvedVmState> states, bool routerRequired, List<V2PlanNode> nodes)
@@ -1022,6 +1282,43 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         }
     }
 
+    private static void EmitSwitchDependencies(
+        IReadOnlyList<V2ResolvedNetworkSwitchRequirement> switchRequirements,
+        IReadOnlyList<V2PlanNode> nodes,
+        IReadOnlyList<ResolvedVmState> states,
+        List<V2PlanDependency> dependencies)
+    {
+        if (switchRequirements.Count == 0)
+        {
+            return;
+        }
+
+        var nodeById = nodes.ToDictionary(node => node.NodeId, StringComparer.Ordinal);
+        var stateByVmId = states.ToDictionary(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase);
+        foreach (var requirement in switchRequirements)
+        {
+            if (!nodeById.TryGetValue(requirement.NodeId, out var switchNode))
+            {
+                continue;
+            }
+
+            foreach (var vmId in requirement.AffectedVmIds)
+            {
+                if (!stateByVmId.TryGetValue(vmId, out var state))
+                {
+                    continue;
+                }
+
+                AddDependencyIfPresent(
+                    switchNode,
+                    state.TryGetNode(V2PlanNodeKind.ProvisionVm),
+                    V2PlanDependencyReasonCode.SwitchRequired,
+                    $"VM '{state.Vm.Name}' waits for switch '{requirement.SwitchName}' to be available.",
+                    dependencies);
+            }
+        }
+    }
+
     private static void AddDependencyIfPresent(
         V2PlanNode? from,
         V2PlanNode? to,
@@ -1085,6 +1382,12 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         }
 
         var node = nodes[nodeId];
+        if (node.Kind == V2PlanNodeKind.EnsureNetworkSwitch)
+        {
+            cache[nodeId] = 0;
+            return 0;
+        }
+
         var state = stateByVmId[node.VmId];
         var baseWave = GetBaseWave(profile, state, node);
         if (!dependencyMap.TryGetValue(nodeId, out var incoming) || incoming.Length == 0)
@@ -1110,6 +1413,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
         return node.Kind switch
         {
+            V2PlanNodeKind.EnsureNetworkSwitch => 0,
             V2PlanNodeKind.ProvisionVm => 10 + roleOffset,
             V2PlanNodeKind.EnableGuestServices => 20 + roleOffset,
             V2PlanNodeKind.StartVm => 30 + roleOffset,
@@ -1396,8 +1700,23 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
     private static string? NormalizeSwitchType(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static string? NormalizeSupportedSwitchType(string? value)
+        => V2SwitchTypeCatalog.TryNormalize(value, out var switchType) ? switchType : null;
+
     private static bool SwitchTypeIs(string? switchType, string expectedType)
         => string.Equals(switchType, expectedType, StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildSwitchNodeId(string switchName)
+    {
+        var builder = new System.Text.StringBuilder();
+        foreach (var ch in switchName.Trim())
+        {
+            builder.Append(char.IsLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '-');
+        }
+
+        var normalized = builder.ToString().Trim('-');
+        return $"switch:{(normalized.Length == 0 ? "unnamed" : normalized)}:EnsureNetworkSwitch";
+    }
 
     private static IReadOnlyList<ResolvedVmState> GetRouterValidationTargets(IReadOnlyList<ResolvedVmState> states)
     {
@@ -1615,5 +1934,58 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 Nics = ResolvedNics.ToArray()
             };
         }
+    }
+
+    private sealed class NetworkSwitchRequirementBuilder
+    {
+        private readonly HashSet<string> _networkIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _affectedVmIds = new(StringComparer.OrdinalIgnoreCase);
+
+        public NetworkSwitchRequirementBuilder(string switchName, string switchType, string? externalAdapterName)
+        {
+            SwitchName = switchName.Trim();
+            SwitchType = switchType.Trim();
+            ExternalAdapterName = Normalize(externalAdapterName);
+        }
+
+        public string SwitchName { get; }
+
+        public string SwitchType { get; }
+
+        public string? ExternalAdapterName { get; private set; }
+
+        public void AddNetwork(string? networkId)
+        {
+            var normalized = Normalize(networkId);
+            if (normalized is not null)
+            {
+                _networkIds.Add(normalized);
+            }
+        }
+
+        public void AddVm(string vmId)
+        {
+            var normalized = Normalize(vmId);
+            if (normalized is not null)
+            {
+                _affectedVmIds.Add(normalized);
+            }
+        }
+
+        public void SetExternalAdapterName(string? externalAdapterName)
+        {
+            ExternalAdapterName ??= Normalize(externalAdapterName);
+        }
+
+        public V2ResolvedNetworkSwitchRequirement Build()
+            => new()
+            {
+                NodeId = BuildSwitchNodeId(SwitchName),
+                SwitchName = SwitchName,
+                SwitchType = SwitchType,
+                ExternalAdapterName = ExternalAdapterName,
+                NetworkIds = _networkIds.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
+                AffectedVmIds = _affectedVmIds.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray()
+            };
     }
 }

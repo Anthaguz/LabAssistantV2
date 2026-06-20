@@ -30,7 +30,10 @@ internal sealed class DeployV2ReviewWorkspaceController
             await _host.EnsureReferenceDataAsync(forceRefresh: false);
             var slotDefinitions = _host.LoadLocalCredentialSlotDefinitions();
             var slotValues = BuildResolvedSlotDictionary(slotDefinitions);
-            var plan = await _host.BuildV2PlanAsync(template, slotValues.Keys.ToList());
+            var plan = await _host.BuildV2PlanAsync(
+                template,
+                slotValues.Keys.ToList(),
+                _workspace.ExternalSwitchAdapterMappings);
             var projection = _projectionService.Build(template, plan, slotDefinitions, slotValues);
 
             _workspace.ApplyProjection(
@@ -54,6 +57,12 @@ internal sealed class DeployV2ReviewWorkspaceController
     public void SelectCredentialSlot(string? slotKey)
     {
         _workspace.SelectCredentialSlot(slotKey);
+        _host.ApplyWorkspaceState();
+    }
+
+    public void SetExternalSwitchAdapterMapping(string switchName, string adapterName)
+    {
+        _workspace.SetExternalSwitchAdapterMapping(switchName, adapterName);
         _host.ApplyWorkspaceState();
     }
 
@@ -116,7 +125,10 @@ internal interface IDeployFromTemplateV2ReviewHost
 
     void UpsertLocalCredentialSlot(string slotKey, string username, string password);
 
-    Task<V2PlanBuildResult> BuildV2PlanAsync(LabTemplate template, IReadOnlyCollection<string> resolvedCredentialSlotKeys);
+    Task<V2PlanBuildResult> BuildV2PlanAsync(
+        LabTemplate template,
+        IReadOnlyCollection<string> resolvedCredentialSlotKeys,
+        IReadOnlyDictionary<string, string> externalSwitchAdapterMappings);
 
     Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
         LabTemplate template,

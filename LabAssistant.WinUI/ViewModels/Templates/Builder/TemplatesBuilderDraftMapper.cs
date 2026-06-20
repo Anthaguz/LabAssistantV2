@@ -21,7 +21,7 @@ internal static class TemplatesBuilderDraftMapper
             DeploymentProfile: "Balanced",
             LabNetworks:
             [
-                new TemplatesBuilderLabNetworkDraft("lab-core", "Core", switchName, "10.0.0.0/24", "Core lab network")
+                new TemplatesBuilderLabNetworkDraft("lab-core", "Core", switchName, string.Empty, "10.0.0.0/24", "Core lab network")
             ],
             CredentialSlots:
             [
@@ -160,6 +160,7 @@ internal static class TemplatesBuilderDraftMapper
                 NetworkId = network.NetworkId.Trim(),
                 Name = network.Name.Trim(),
                 SwitchName = Optional(network.SwitchName),
+                SwitchType = Optional(network.SwitchType),
                 Subnet = Optional(network.Subnet),
                 Notes = Optional(network.Notes)
             });
@@ -383,6 +384,7 @@ internal static class TemplatesBuilderDraftMapper
                 network.NetworkId,
                 network.Name,
                 network.SwitchName ?? string.Empty,
+                network.SwitchType ?? string.Empty,
                 network.Subnet ?? string.Empty,
                 network.Notes ?? string.Empty))
             .ToList() ?? [];

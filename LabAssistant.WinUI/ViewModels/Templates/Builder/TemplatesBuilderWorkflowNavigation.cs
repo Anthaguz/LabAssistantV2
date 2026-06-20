@@ -25,7 +25,8 @@ internal enum BuilderWorkflowRouteKind
     Step,
     VmOverview,
     VmCategory,
-    VmRole
+    VmRole,
+    VmNic
 }
 
 internal enum BuilderNavigatorDepth
@@ -40,7 +41,8 @@ internal readonly record struct BuilderWorkflowRoute(
     BuilderWorkflowStep Step,
     int VmIndex = -1,
     BuilderVmDetailCategory VmDetailCategory = BuilderVmDetailCategory.Basics,
-    string RoleKey = "")
+    string RoleKey = "",
+    int NicIndex = -1)
 {
     public static BuilderWorkflowRoute ForStep(BuilderWorkflowStep step)
         => step == BuilderWorkflowStep.Vms
@@ -56,9 +58,14 @@ internal readonly record struct BuilderWorkflowRoute(
     public static BuilderWorkflowRoute ForVmRole(int vmIndex, string roleKey)
         => new(BuilderWorkflowRouteKind.VmRole, BuilderWorkflowStep.Vms, vmIndex, BuilderVmDetailCategory.Roles, roleKey);
 
+    public static BuilderWorkflowRoute ForVmNic(int vmIndex, int nicIndex)
+        => new(BuilderWorkflowRouteKind.VmNic, BuilderWorkflowStep.Vms, vmIndex, BuilderVmDetailCategory.Networking, NicIndex: nicIndex);
+
     public bool IsReview => Step == BuilderWorkflowStep.Review;
 
-    public bool IsVmDetail => Kind is BuilderWorkflowRouteKind.VmCategory or BuilderWorkflowRouteKind.VmRole;
+    public bool IsVmDetail => Kind is BuilderWorkflowRouteKind.VmCategory or BuilderWorkflowRouteKind.VmRole or BuilderWorkflowRouteKind.VmNic;
+
+    public bool IsNicDetail => Kind == BuilderWorkflowRouteKind.VmNic;
 }
 
 internal readonly record struct BuilderWorkflowNavigationRow(
@@ -79,7 +86,9 @@ internal readonly record struct BuilderWorkflowProjection(
     BuilderWorkflowStep ActiveStep,
     int SelectedVmIndex,
     BuilderVmDetailCategory SelectedVmDetailCategory,
+    int SelectedNicIndex,
     bool IsVmDetailSelected,
+    bool IsNicDetailSelected,
     bool IsVmOverviewSelected);
 
 internal readonly record struct BuilderWorkflowFooterProjection(
@@ -109,12 +118,13 @@ internal sealed class TemplatesBuilderWorkflowNavigation
 
     public BuilderWorkflowProjection Project(TemplatesBuilderDraftSnapshot draft, bool canNavigate)
     {
-        EnsureCurrentRouteInBounds(draft.Vms.Count);
+        EnsureCurrentRouteInBounds(draft);
         EnsureNavigatorDepthInBounds(draft.Vms.Count);
         var selectedVmIndex = CurrentRoute.IsVmDetail ? CurrentRoute.VmIndex : 0;
         var selectedVmDetailCategory = CurrentRoute.IsVmDetail
             ? CurrentRoute.VmDetailCategory
             : BuilderVmDetailCategory.Basics;
+        var selectedNicIndex = CurrentRoute.IsNicDetail ? CurrentRoute.NicIndex : -1;
 
         return new BuilderWorkflowProjection(
             CurrentRoute,
@@ -130,7 +140,9 @@ internal sealed class TemplatesBuilderWorkflowNavigation
             CurrentRoute.Step,
             selectedVmIndex,
             selectedVmDetailCategory,
+            selectedNicIndex,
             CurrentRoute.IsVmDetail,
+            CurrentRoute.IsNicDetail,
             CurrentRoute.Kind == BuilderWorkflowRouteKind.VmOverview);
     }
 
@@ -140,7 +152,7 @@ internal sealed class TemplatesBuilderWorkflowNavigation
         bool canSave,
         bool canSaveAs)
     {
-        EnsureCurrentRouteInBounds(draft.Vms.Count);
+        EnsureCurrentRouteInBounds(draft);
         var routes = BuildRoutes(draft);
         var currentIndex = FindRouteIndex(routes, CurrentRoute);
         var isReview = CurrentRoute.IsReview;
@@ -176,9 +188,19 @@ internal sealed class TemplatesBuilderWorkflowNavigation
         return SelectRoute(BuilderWorkflowRoute.ForVmCategory(CurrentRoute.VmIndex, category), draft);
     }
 
+    public bool SelectVmNic(int nicIndex, TemplatesBuilderDraftSnapshot draft)
+    {
+        if (!CurrentRoute.IsVmDetail)
+        {
+            return false;
+        }
+
+        return SelectRoute(BuilderWorkflowRoute.ForVmNic(CurrentRoute.VmIndex, nicIndex), draft);
+    }
+
     public bool SelectAdjacent(int offset, TemplatesBuilderDraftSnapshot draft)
     {
-        EnsureCurrentRouteInBounds(draft.Vms.Count);
+        EnsureCurrentRouteInBounds(draft);
         var routes = BuildRoutes(draft);
         var currentIndex = FindRouteIndex(routes, CurrentRoute);
         var targetIndex = currentIndex + offset;
@@ -194,7 +216,7 @@ internal sealed class TemplatesBuilderWorkflowNavigation
 
     public bool SelectRoute(BuilderWorkflowRoute route, TemplatesBuilderDraftSnapshot draft)
     {
-        var selectedRoute = NormalizeRoute(route, draft.Vms.Count);
+        var selectedRoute = NormalizeRoute(route, draft);
         var targetDepth = GetDefaultNavigatorDepth(selectedRoute);
         if (selectedRoute == CurrentRoute &&
             targetDepth == _navigatorDepth)
@@ -225,7 +247,13 @@ internal sealed class TemplatesBuilderWorkflowNavigation
     }
 
     public void EnsureCurrentRouteInBounds(TemplatesBuilderDraftSnapshot draft)
-        => EnsureCurrentRouteInBounds(draft.Vms.Count);
+    {
+        var normalizedRoute = NormalizeRoute(CurrentRoute, draft);
+        if (normalizedRoute != CurrentRoute)
+        {
+            CurrentRoute = normalizedRoute;
+        }
+    }
 
     public static IReadOnlyList<BuilderWorkflowRoute> BuildRoutes(TemplatesBuilderDraftSnapshot draft)
     {
@@ -243,20 +271,18 @@ internal sealed class TemplatesBuilderWorkflowNavigation
             foreach (var category in VmDetailCategoryOrder)
             {
                 routes.Add(BuilderWorkflowRoute.ForVmCategory(vmIndex, category));
+                if (category == BuilderVmDetailCategory.Networking)
+                {
+                    for (var nicIndex = 0; nicIndex < (draft.Vms[vmIndex].Nics?.Count ?? 0); nicIndex++)
+                    {
+                        routes.Add(BuilderWorkflowRoute.ForVmNic(vmIndex, nicIndex));
+                    }
+                }
             }
         }
 
         routes.Add(BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Review));
         return routes;
-    }
-
-    private void EnsureCurrentRouteInBounds(int vmCount)
-    {
-        var normalizedRoute = NormalizeRoute(CurrentRoute, vmCount);
-        if (normalizedRoute != CurrentRoute)
-        {
-            CurrentRoute = normalizedRoute;
-        }
     }
 
     private void EnsureNavigatorDepthInBounds(int vmCount)
@@ -287,9 +313,12 @@ internal sealed class TemplatesBuilderWorkflowNavigation
         }
 
         var vmIndex = ClampIndex(route.VmIndex, vmCount);
-        return route.Kind == BuilderWorkflowRouteKind.VmRole
-            ? BuilderWorkflowRoute.ForVmRole(vmIndex, route.RoleKey)
-            : BuilderWorkflowRoute.ForVmCategory(vmIndex, route.VmDetailCategory);
+        return route.Kind switch
+        {
+            BuilderWorkflowRouteKind.VmRole => BuilderWorkflowRoute.ForVmRole(vmIndex, route.RoleKey),
+            BuilderWorkflowRouteKind.VmNic => BuilderWorkflowRoute.ForVmNic(vmIndex, Math.Max(0, route.NicIndex)),
+            _ => BuilderWorkflowRoute.ForVmCategory(vmIndex, route.VmDetailCategory)
+        };
     }
 
     private IReadOnlyList<BuilderWorkflowNavigationRow> CreateRootRows(bool canNavigate)
@@ -347,7 +376,10 @@ internal sealed class TemplatesBuilderWorkflowNavigation
             var isSelected = CurrentRoute == route ||
                 CurrentRoute.Kind == BuilderWorkflowRouteKind.VmRole &&
                 CurrentRoute.VmIndex == selectedVmIndex &&
-                category == BuilderVmDetailCategory.Roles;
+                category == BuilderVmDetailCategory.Roles ||
+                CurrentRoute.Kind == BuilderWorkflowRouteKind.VmNic &&
+                CurrentRoute.VmIndex == selectedVmIndex &&
+                category == BuilderVmDetailCategory.Networking;
             rows.Add(new BuilderWorkflowNavigationRow(
                 route,
                 GetVmDetailCategoryLabel(category),
@@ -441,7 +473,40 @@ internal sealed class TemplatesBuilderWorkflowNavigation
         var vmName = route.VmIndex >= 0 && route.VmIndex < draft.Vms.Count
             ? FormatResourceName(draft.Vms[route.VmIndex].Name, draft.Vms[route.VmIndex].VmId)
             : "VM";
+        if (route.Kind == BuilderWorkflowRouteKind.VmNic &&
+            route.VmIndex >= 0 &&
+            route.VmIndex < draft.Vms.Count)
+        {
+            return $"{vmName} {FormatNicRouteLabel(draft.Vms[route.VmIndex], route.NicIndex)}";
+        }
+
         return $"{vmName} {GetVmDetailCategoryLabel(route.VmDetailCategory)}";
+    }
+
+    private static BuilderWorkflowRoute NormalizeRoute(BuilderWorkflowRoute route, TemplatesBuilderDraftSnapshot draft)
+    {
+        var normalizedRoute = NormalizeRoute(route, draft.Vms.Count);
+        if (normalizedRoute.Kind != BuilderWorkflowRouteKind.VmNic ||
+            normalizedRoute.VmIndex < 0 ||
+            normalizedRoute.VmIndex >= draft.Vms.Count)
+        {
+            return normalizedRoute;
+        }
+
+        var nicCount = draft.Vms[normalizedRoute.VmIndex].Nics?.Count ?? 0;
+        return nicCount == 0
+            ? BuilderWorkflowRoute.ForVmCategory(normalizedRoute.VmIndex, BuilderVmDetailCategory.Networking)
+            : BuilderWorkflowRoute.ForVmNic(normalizedRoute.VmIndex, ClampIndex(normalizedRoute.NicIndex, nicCount));
+    }
+
+    private static string FormatNicRouteLabel(TemplatesBuilderVmDraft vm, int nicIndex)
+    {
+        if (vm.Nics is null || nicIndex < 0 || nicIndex >= vm.Nics.Count)
+        {
+            return "Networking";
+        }
+
+        return $"Networking - {FormatResourceName(vm.Nics[nicIndex].Name, vm.Nics[nicIndex].NicId)}";
     }
 
     private static string GetVmDetailCategoryLabel(BuilderVmDetailCategory category)

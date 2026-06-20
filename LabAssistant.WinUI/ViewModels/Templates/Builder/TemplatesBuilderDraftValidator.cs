@@ -393,6 +393,23 @@ internal static class TemplatesBuilderDraftValidator
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var seenIpsByNetwork = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
+        foreach (var network in networks.Where(network => request.IncludesNetwork(network.NetworkId)))
+        {
+            var scopeKey = Scope(network.NetworkId);
+            if (!string.IsNullOrWhiteSpace(network.SwitchType))
+            {
+                if (string.IsNullOrWhiteSpace(network.SwitchName))
+                {
+                    AddBlocker(issues, TemplatesBuilderValidationCategory.Network, $"Network '{Display(network.NetworkId)}' switch type requires a switch name.", scopeKey);
+                }
+
+                if (!V2SwitchTypeCatalog.IsSupported(network.SwitchType))
+                {
+                    AddBlocker(issues, TemplatesBuilderValidationCategory.Network, $"Network '{Display(network.NetworkId)}' switch type must be External, Internal, or Private.", scopeKey);
+                }
+            }
+        }
+
         foreach (var vm in vms)
         {
             if (vm.Nics is null)

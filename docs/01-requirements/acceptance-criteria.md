@@ -4460,11 +4460,47 @@ Each readiness result shall include, at minimum:
 - `LightWaitValidation` remains broadly overlap-safe
 - workload classes inform overlap posture but do not override explicit dependencies
 
+### 13) Network switch reconciliation - declared switches are ensured before VM creation
+**Given**
+- a V2 template declares one or more lab networks with `switchName`
+- a lab network may also declare optional `switchType` as `External`, `Internal`, or `Private`
+- the target host may have no matching switches, matching switches, or same-name switches with different types
+
+**When**
+- the V2 review-and-resolve flow and runtime prepare the deployment
+
+**Then**
+- legacy `switchName`-only lab networks remain valid template intent but cannot auto-create a missing switch
+- a network-backed switch can be created only when both `switchName` and `switchType` are declared
+- an existing switch is reused only when its name and type match the template declaration
+- an existing same-name switch with a different type blocks deployment with actionable guidance
+- missing `Internal` and `Private` switches are represented as deploy-time ensure work before any VM creation or NIC attachment that depends on them
+- missing `External` switches require a deploy-review adapter mapping for the current host before runtime can create them
+- host-specific External adapter mappings are not persisted into the shared template
+- per-NIC switch overrides may still resolve an effective switch, but they do not create missing switches unless backed by a lab network with complete switch name and type intent
+
+### 14) Network switch cleanup - created switches are cleaned up, reused switches are preserved
+**Given**
+- a V2 deployment created one or more missing virtual switches from template network intent
+- the operation later fails or is cancelled before successful completion
+
+**When**
+- runtime cleanup runs
+
+**Then**
+- cleanup attempts to delete only switches created by the current deployment operation
+- reused pre-existing switches are never deleted by deployment cleanup
+- switch cleanup occurs after VM cleanup has detached or removed deployment-created VM dependencies
+- residual switch cleanup failures are logged and reported with `operationId`, switch name, switch type, result, and error details
+- switch ensure/reuse/create/block/cleanup events are emitted as structured logs and do not include secrets
+
 ## Expected UI
 - a V2 review-and-resolve surface that can show:
   - orchestration graph or scheduling waves
   - unresolved credential slots
   - unresolved bootstrap assumptions
+  - unresolved or blocked network switch requirements
+  - host-specific External switch adapter mappings for the current deployment run
   - dependency blockers
   - selected deployment profile
 - blocking messages for unresolved V2 requirements before runtime start
@@ -4653,15 +4689,15 @@ Each readiness result shall include, at minimum:
 - deployment profile includes a Segoe MDL2 information tooltip that explains the user-facing speed versus host-pressure tradeoff
 - deployment profile remains the existing Conservative/Balanced/Aggressive persisted field
 - resource-heavy steps use a resource list plus selected-detail layout:
-  - Networks uses a network list plus selected network detail
-  - Forests & Domains uses a forest/domain list plus selected forest/domain detail
+  - Networks uses a network list plus selected network detail, including switch name, optional switch type, subnet, and notes
+  - Forests & Domains uses a constrained topology canvas with selectable forest/domain nodes and selected node detail
   - Credentials uses a slot-reference list plus selected slot detail
 - the VMs overview shows total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
 - editing a VM happens by selecting a VM in the drilled-in VM list panel, not by using a right-side VM selector list
 - VM detail sections appear in the selected VM's drilled-in navigator panel: Basics, Resources, Membership, Roles, Networking, and Credentials
 - selecting a VM opens Basics by default
 - Resources contains RAM, CPU, and base disk/VHDX fields
-- Networking owns NIC list/detail; NICs do not become global left-nav children
+- Networking owns a NIC overview/list plus selected NIC detail; NICs do not become global workflow children outside the selected VM's Networking route
 - VM role and assignment choices are made with lab networks, directory topology, credentials, and the selected deployment profile visible enough to validate the draft
 - the Builder does not use multiline pipe-delimited authoring fields
 - a matrix may support review or comparison, but it is not the primary authoring UI
@@ -4671,14 +4707,15 @@ Each readiness result shall include, at minimum:
 - on Review, the footer right side exposes Previous as a secondary action, Save As as a secondary action, and Save as the primary action
 - Apply Suggestions and manual Validate are not footer actions in this contract
 - Save and Save As are Review-only actions
-- Previous and Next compute routes through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> every VM section in draft order (Basics, Resources, Membership, Roles, Networking, Credentials) -> Review
+- Previous and Next compute routes through General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> each VM's Basics -> Resources -> Membership -> Roles -> Networking overview -> NIC details in draft order -> Credentials -> Review
 - Previous and Next move through the linear Builder route sequence, not the current navigator hierarchy
 - Previous and Next should expose the destination where practical
 - Previous is disabled on General and Next is disabled on Review
 - Previous and Next do not block on validation errors before Review
 - when the draft has zero VMs, Next from VMs overview goes to Review
-- navigating between top-level steps, VM list, and VM detail sections does not lose draft edits
-- narrow VM/section navigation updates only the needed Builder state and does not require broad full-Builder rerendering
+- when a selected VM has zero NICs, Next from Networking overview goes to Credentials
+- navigating between top-level steps, VM list, VM detail sections, and NIC details does not lose draft edits
+- narrow VM/section/NIC navigation updates only the needed Builder state and does not require broad full-Builder rerendering
 - top-level workflow rows are active for non-VM steps
 - `VMs` is active for the VM overview
 - the VM remains active while any section for that VM is selected
@@ -4720,7 +4757,7 @@ Each readiness result shall include, at minimum:
 **Then**
 - the draft supports General fields for template name, description, deployment profile, and read-only schema/version metadata if shown
 - deployment profile is selected through visible horizontal Conservative/Balanced/Aggressive options with immediate draft update behavior
-- the draft supports lab network authoring
+- the draft supports lab network authoring with network id, display name, switch name, optional switch type, subnet, and notes
 - the draft supports reusable credential slot references without exposing or storing reusable secret values
 - the draft supports forest/domain authoring
 - membership mode choices are limited to `DomainMember` and `Standalone`
@@ -4730,7 +4767,7 @@ Each readiness result shall include, at minimum:
 - future role-specific configuration belongs under `VMs > VM name > Roles > Role name`
 - this slice does not add empty Root CA, SQL, Web, or Operations configuration UI
 - each VM can carry membership mode, domain assignment, and approved VM role intent
-- each VM can author per-NIC switch/network, IP, DNS, and gateway intent
+- each VM can author per-NIC network reference, advanced/reference-only switch override, IP, DNS, and gateway intent
 - unsupported or incomplete required combinations block save with actionable validation feedback
 - zero domains plus standalone VMs is valid
 - zero domains plus a `DomainMember` VM is invalid in this slice
@@ -4738,7 +4775,7 @@ Each readiness result shall include, at minimum:
 - domains present plus each domain having at least one Active Directory Domain Controller role VM is valid
 - domains present plus any domain without an Active Directory Domain Controller role VM blocks save
 - PDC emulator/FSMO selection or transfer is out of scope
-- domain/forest editor redesign, credential semantic redesign, Review validation redesign, runtime/schema/trust/WPF work, field badges, inline markers, section badges, and completion/error badges are out of scope for this contract slice
+- credential semantic redesign, Review validation redesign, runtime implementation, trust authoring, WPF work, field badges, inline markers, section badges, and completion/error badges are out of scope for this contract slice
 
 ### 3a) VM creation and navigation affordances
 **Given**
@@ -4753,8 +4790,63 @@ Each readiness result shall include, at minimum:
 - the new VM appears in the VM list panel
 - the Builder selects the new VM
 - the selected VM detail opens on `Basics`
-- adding a VM does not introduce NICs as global left-navigator children
+- adding a VM does not introduce NICs as top-level or cross-VM workflow children
 - direct Add VM actions select the new VM and open `Basics`
+
+### 3b) Networks author switch intent without owning host mutation
+**Given**
+- the user edits the Builder Networks step
+
+**When**
+- the Builder exposes lab network fields
+
+**Then**
+- the step remains named `Networks`
+- each network can author a stable network id, display name, switch name, optional switch type, subnet, and notes
+- supported switch type values are `External`, `Internal`, and `Private`
+- switch type is optional for existing or imported templates
+- network rows show enough switch name/type context for the user to understand deploy-time switch intent
+- Builder save persists the network's switch intent as template data but does not create, rename, or delete Hyper-V switches
+- a network with switch name plus switch type represents switch ensure intent for deploy-time reconciliation
+- a network with switch name but no switch type remains valid legacy/reference intent but cannot auto-create a missing switch
+- NICs primarily reference Networks when they need portable switch creation/defaulting behavior
+- a per-NIC switch override remains an advanced/reference-only escape hatch and does not by itself create missing switches
+
+### 3c) Forests & Domains topology canvas
+**Given**
+- the user edits the Forests & Domains step
+- the draft may contain multiple forests, root domains, child domains, and tree domains
+
+**When**
+- the Builder renders directory topology authoring
+
+**Then**
+- the Builder uses a constrained topology canvas rather than a flat forest/domain list
+- each forest appears as a separate visual container
+- each forest's root domain is highlighted as the forest root
+- child domains appear as branches under their parent domain
+- tree domains appear as separate tree roots inside the same forest and can have child branches of their own
+- selecting a forest or domain node shows only that node's editable details in the selected-detail area
+- node and connector projection uses stable ids based on draft identity so future/read-only trust edges can be layered without reworking the topology model
+- the canvas is not a freeform drag/drop graph editor in this slice
+- invalid or incomplete intermediate forest/domain values remain visible and editable
+
+### 3d) VM Networking NIC drill-in
+**Given**
+- the user is editing a selected VM's Networking section
+
+**When**
+- the Builder displays NIC authoring
+
+**Then**
+- Networking first shows a NIC overview/list plus Add NIC
+- selecting a NIC opens a selected NIC detail view that shows only that NIC's fields
+- Add NIC creates a new NIC draft, selects it, and opens that NIC detail
+- footer Previous/Next route through Networking overview, then each NIC detail in deterministic draft order, then Credentials
+- when the selected VM has zero NICs, Next from Networking overview goes to Credentials
+- NIC details remain within the selected VM's Networking route and do not become global workflow children
+- navigating between NIC details preserves invalid intermediate NIC values
+- long NIC names, nested navigation, and scrollable content must reserve layout for scrollbars and must not overlap action buttons, footer actions, or command surfaces
 
 ### 4) Deterministic suggestions require explicit confirmation before save
 **Given**
@@ -4774,7 +4866,7 @@ Each readiness result shall include, at minimum:
 - the user is editing a V2 Builder draft
 
 **When**
-- the user changes any first-slice field in General, Networks, Forests & Domains, Credentials, VM overview, or a VM detail category
+- the user changes any first-slice field in General, Networks, Forests & Domains, Credentials, VM overview, a VM detail category, or a NIC detail
 
 **Then**
 - the in-memory Builder draft is the active source of visible user intent during editing
@@ -4850,6 +4942,8 @@ Each readiness result shall include, at minimum:
 **Then**
 - trust authoring UI is not required
 - the Builder first slice does not expose trust-specific fields or trust-specific credentials
+- the Forests & Domains topology canvas may use stable node and edge-ready projection ids for future/read-only trust rendering
+- the canvas must not create, edit, delete, or validate trust declarations as a first-class authoring workflow in this slice
 - existing trust declarations in an opened V2 template are preserved on save as deferred/read-only intent unless a later approved trust-authoring slice changes that contract
 - future trust authoring requires a separate approved contract slice
 
@@ -4866,12 +4960,16 @@ Each readiness result shall include, at minimum:
 - clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list
 - clicking a VM opens that VM detail on `Basics`
 - VM detail sections appear in the selected VM's drilled-in navigator panel: Basics, Resources, Membership, Roles, Networking, and Credentials
-- Resources contains RAM, CPU, and base disk/VHDX; Networking owns NIC list/detail
+- Resources contains RAM, CPU, and base disk/VHDX
+- Networking owns a NIC overview/list plus selected NIC detail
+- footer Previous/Next visit Networking overview, each NIC detail in draft order, and then Credentials
+- Networks shows lab network switch name and optional switch type; switch creation happens later during Deploy Review/runtime, not during Builder save
+- Forests & Domains presents a constrained topology canvas with forest containers, highlighted root domains, child branches, tree-domain roots, selectable nodes, and stable edge-ready node ids
 - Builder presents a persistent footer with the separate Builder exit/library-return action on the left when present; Previous and Next on the right during authoring; and Previous, Save As, and Save on the right during Review
 - navigator chevron/back movement never exits the Builder or routes to the Templates library
 - Apply Suggestions and manual Validate are not footer actions in this contract
 - Save and Save As are Review-only actions
-- Previous/Next move through General, Networks, Forests & Domains, Credentials, VMs overview, each VM section in draft order, and Review
+- Previous/Next move through General, Networks, Forests & Domains, Credentials, VMs overview, each VM's Basics, Resources, Membership, Roles, Networking overview, each NIC detail in draft order, Credentials, and Review
 - Previous/Next follow the linear Builder route sequence rather than navigator hierarchy and expose the destination where practical
 - Previous/Next do not block on validation errors before Review
 - scrollable Builder content reserves layout for scrollbars and does not overlap footer actions, action buttons, or command surfaces
@@ -4879,7 +4977,7 @@ Each readiness result shall include, at minimum:
 - field edits update the active in-memory Builder draft immediately or through a short UI-safe debounce, without per-section or per-field Save buttons
 - invalid intermediate values remain visible in draft state until validation and final Save/export/plan gating resolve them
 - draft edits trigger Builder-local scoped validation automatically where practical, and Review aggregates current blockers and warnings
-- Networks, Forests & Domains, and Credentials use list plus selected-detail layouts; VM editing happens through the drilled-in VM list panel, not a right-side selector list
+- Networks and Credentials use list plus selected-detail layouts; Forests & Domains uses the constrained topology canvas plus selected-detail layout; VM editing happens through the drilled-in VM list panel, not a right-side selector list
 - Builder does not rely on multiline pipe-delimited text fields for authoring V2 resources
 - a matrix is not the primary authoring UI
 - save action reflects explicit user-confirmed draft intent
@@ -4893,7 +4991,11 @@ Each readiness result shall include, at minimum:
 - new Builder tests use behavior or surface names rather than issue-numbered class names; existing issue-numbered tests may be renamed in a later targeted test slice
 - workflow navigation tests verify active top-level state, VM overview active state, selected VM/section active state, Previous/Next full-route behavior, VM list drill-in navigation, selected-VM section drill-in navigation, and the VM add affordance
 - navigator safety tests verify chevron/back exact-target labels or tooltips and confirm one-level-up movement never exits Builder, discards draft progress, cancels deployment work, or routes to the Templates library
-- VM detail navigation tests verify Basics opens by default, section routes live under `VMs > VM name`, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC list/detail, and NICs do not become global left-navigator children
+- VM detail navigation tests verify Basics opens by default, section routes live under `VMs > VM name`, Resources owns RAM/CPU/base disk/VHDX, Networking owns NIC overview/detail routing, and NICs do not become global workflow children
+- Networks tests verify switch type persistence, switch name/type display, legacy switch-name-only validity, and that Builder save does not create Hyper-V switches
+- topology canvas projection tests verify separate forest containers, highlighted root domains, child branches, tree-domain roots, selectable node ids, missing-reference resilience, and edge-ready projection ids without trust authoring
+- NIC drill-in tests verify Networking overview, Add NIC selection, deterministic NIC detail route order, zero-NIC routing to Credentials, invalid NIC draft preservation, and footer Previous/Next targets
+- deploy/review/runtime tests verify exact name+type switch reuse, same-name/different-type blocking, missing Internal/Private switch creation before VM creation, missing External adapter mapping resolution, created-switch tracking, and created-only cleanup on failure/cancel
 - layout tests verify scrollable Builder content reserves layout for scrollbars and does not overlap footer actions, action buttons, or command surfaces
 - schema/persistence tests verify first-slice V2 fields save and reload without embedding reusable secret values, and that secrets remain in the local DPAPI-backed store
 - save/load tests verify existing trust declarations are preserved even though trust authoring is deferred

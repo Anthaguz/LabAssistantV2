@@ -22,6 +22,7 @@ internal readonly record struct TemplatesBuilderLabNetworkDraft(
     string NetworkId,
     string Name,
     string SwitchName,
+    string SwitchType,
     string Subnet,
     string Notes);
 

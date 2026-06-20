@@ -93,7 +93,10 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
 
     public Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode) => _runReadinessAsync(context, mode);
 
-    public Task<V2PlanBuildResult> BuildV2PlanAsync(LabTemplate template, IReadOnlyCollection<string> resolvedCredentialSlotKeys)
+    public Task<V2PlanBuildResult> BuildV2PlanAsync(
+        LabTemplate template,
+        IReadOnlyCollection<string> resolvedCredentialSlotKeys,
+        IReadOnlyDictionary<string, string> externalSwitchAdapterMappings)
     {
         return _v2PlanningCapabilityService.BuildPlanAsync(new V2PlanBuildRequest
         {
@@ -102,6 +105,7 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
             AvailableSwitchNames = _referenceDataService.AvailableSwitches,
             AvailableSwitches = _referenceDataService.AvailableSwitchInfo,
             ResolvedCredentialSlotKeys = resolvedCredentialSlotKeys,
+            ExternalSwitchAdapterMappings = externalSwitchAdapterMappings,
             DefaultDeploymentProfile = "Balanced"
         });
     }

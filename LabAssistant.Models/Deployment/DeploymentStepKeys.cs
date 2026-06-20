@@ -18,6 +18,7 @@ public static class DeploymentStepKeys
     public const string ConfigureNetworkInformation = "ConfigureNetworkInformation";
 
     public const string V2ProvisionVm = "v2.provision";
+    public const string V2EnsureNetworkSwitch = "v2.ensureNetworkSwitch";
     public const string V2EnableGuestServices = "v2.enableGuestServices";
     public const string V2StartVm = "v2.start";
     public const string V2GuestTransportReady = "v2.guestTransportReady";

@@ -5,9 +5,7 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 internal enum TemplatesBuilderResourceKind
 {
     Network,
-    CredentialSlot,
-    Forest,
-    Domain
+    CredentialSlot
 }
 
 internal enum BuilderForestDomainResourceKind
@@ -31,7 +29,9 @@ internal readonly record struct TemplatesBuilderVmOverviewProjection(
 
 internal readonly record struct TemplatesBuilderNicRowProjection(
     int Index,
-    TemplatesBuilderNicDraft Draft);
+    TemplatesBuilderNicDraft Draft,
+    string Label,
+    bool IsSelected);
 
 internal readonly record struct TemplatesBuilderVmDetailProjection(
     int VmIndex,
@@ -40,7 +40,9 @@ internal readonly record struct TemplatesBuilderVmDetailProjection(
     string CategoryLabel,
     TemplatesBuilderVmDraft Vm,
     IReadOnlyList<TemplatesBuilderVmRoleProjection> Roles,
-    IReadOnlyList<TemplatesBuilderNicRowProjection> Nics);
+    IReadOnlyList<TemplatesBuilderNicRowProjection> Nics,
+    int SelectedNicIndex,
+    bool IsNicDetailSelected);
 
 internal static class TemplatesBuilderSectionProjections
 {
@@ -65,25 +67,6 @@ internal static class TemplatesBuilderSectionProjections
                 FormatResourceName(slot.Label, slot.SlotKey),
                 index == selectedIndex))
             .ToList();
-
-    public static IReadOnlyList<TemplatesBuilderResourceRowProjection> ProjectForestDomainRows(
-        TemplatesBuilderDraftSnapshot draft,
-        BuilderForestDomainResourceKind selectedKind,
-        int selectedIndex)
-    {
-        var rows = new List<TemplatesBuilderResourceRowProjection>(draft.Forests.Count + draft.Domains.Count);
-        rows.AddRange(draft.Forests.Select((forest, index) => new TemplatesBuilderResourceRowProjection(
-            TemplatesBuilderResourceKind.Forest,
-            index,
-            $"Forest: {FormatResourceName(forest.ForestId, forest.RootDomainId)}",
-            selectedKind == BuilderForestDomainResourceKind.Forest && index == selectedIndex)));
-        rows.AddRange(draft.Domains.Select((domain, index) => new TemplatesBuilderResourceRowProjection(
-            TemplatesBuilderResourceKind.Domain,
-            index,
-            $"Domain: {FormatResourceName(domain.DnsName, domain.DomainId)}",
-            selectedKind == BuilderForestDomainResourceKind.Domain && index == selectedIndex)));
-        return rows;
-    }
 
     public static TemplatesBuilderVmOverviewProjection ProjectVmOverview(TemplatesBuilderDraftSnapshot draft)
     {
@@ -123,7 +106,13 @@ internal static class TemplatesBuilderSectionProjections
             GetVmDetailCategoryLabel(workflowProjection.SelectedVmDetailCategory),
             vm,
             TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm),
-            vm.Nics.Select((nic, index) => new TemplatesBuilderNicRowProjection(index, nic)).ToList());
+            (vm.Nics ?? Array.Empty<TemplatesBuilderNicDraft>()).Select((nic, index) => new TemplatesBuilderNicRowProjection(
+                index,
+                nic,
+                FormatResourceName(nic.Name, nic.NicId),
+                workflowProjection.IsNicDetailSelected && workflowProjection.SelectedNicIndex == index)).ToList(),
+            workflowProjection.SelectedNicIndex,
+            workflowProjection.IsNicDetailSelected);
     }
 
     private static string FormatResourceName(string primary, string fallback)

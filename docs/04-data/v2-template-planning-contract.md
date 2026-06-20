@@ -16,10 +16,13 @@ Each V2 template may declare one or more lab networks that provide:
 - stable network id
 - display name
 - Hyper-V switch association
+- optional Hyper-V switch type (`External`, `Internal`, or `Private`)
 - subnet metadata
 - notes or intent metadata
 
 Lab networks provide shared validation context. They do not remove the need for explicit per-NIC guest addressing by default.
+
+`switchName` plus `switchType` is the portable switch ensure intent for deploy-time reconciliation. A lab network that declares only `switchName` remains valid reference intent for existing/imported templates, but it is not enough information to auto-create a missing switch on a new host. Host-specific External adapter mapping is resolved during Deploy From Template review for the current deployment run and must not be persisted into the shared template.
 
 ### VM NICs
 Each V2 VM may declare a NIC collection.
@@ -29,12 +32,14 @@ Each NIC may include:
 - nic id or key
 - display name
 - attached lab network id
-- fallback Hyper-V switch name
+- fallback Hyper-V switch name as an advanced/reference-only override
 - guest IP address
 - prefix length
 - default gateway
 - DNS servers
 - optional flags such as "requires router path"
+
+Per-NIC switch overrides can resolve an effective switch when explicit NIC-level attachment is needed, but they do not create missing switches unless backed by a lab network with complete switch name and type intent.
 
 ### Backend topology roles
 Backend topology roles shape orchestration order and dependency semantics:
@@ -129,6 +134,22 @@ Root domains, child domains, tree domains, and multiple independent root forests
 
 Base remote-access guest hardening is now a deploy-time V2 review/runtime option and remains deferred only at the template-authoring/schema level.
 
+## Network Switch Reconciliation Contract
+
+V2 planning must resolve network-backed switch requirements before runtime VM creation:
+
+- a declared `switchName` plus `switchType` can produce deploy-time switch ensure work
+- an existing switch is reusable only when both name and type match
+- an existing same-name switch with a different type is a blocking review/planning issue
+- missing `Internal` and `Private` switches can be created automatically before dependent VM creation or NIC attachment
+- missing `External` switches require current-host adapter mapping during Deploy Review before runtime can create them
+- host-specific External adapter selections are deploy-run resolution state, not shared template data
+- legacy `switchName`-only network intent remains valid but cannot auto-create missing switches
+- runtime cleanup deletes only switches created by the current deployment operation after VM cleanup has detached or removed dependent VMs
+- reused pre-existing switches are never deleted by deployment cleanup
+
+Switch ensure, reuse, blocking, creation, and cleanup must emit structured logs with `operationId`, switch name, switch type, result, and failure details where applicable.
+
 ## Bootstrap Profile References
 
 Each VM may reference bootstrap expectations derived from its VHDX catalog entry.
@@ -156,13 +177,13 @@ The Templates V2 Builder is an authoring surface for producing planner-compatibl
 - Deploy From Template review and resolve
 - V2 orchestration planning
 
-The first Builder slice uses a structured step-based workflow with a left active workflow tree and one active top-level step at a time: General, Networks, Forests & Domains, Credentials, VMs, and Review. It is not an all-sections scroll. Active top-level state uses existing shell resources, including `ShellAccentBrush`, selected background, and selected border treatment; completion/error badges are deferred to a later Review/validation UX slice. General authors template name, description, and deployment profile, and may show read-only schema/version metadata without renaming persisted schema fields. Deployment profile remains the Conservative/Balanced/Aggressive field, but Builder presents it as a visible horizontal selector below description rather than a dropdown and provides a Segoe MDL2 information tooltip that explains the practical pacing/resource-pressure tradeoff. The Builder also authors lab networks, reusable credential slot references, forests/domains, VM membership mode, domain assignment, Active Directory Domain Controller VM role assignment, and per-VM NIC/IP/DNS/gateway intent.
+The first Builder slice uses a structured step-based workflow with a left active workflow tree and one active top-level step at a time: General, Networks, Forests & Domains, Credentials, VMs, and Review. It is not an all-sections scroll. Active top-level state uses existing shell resources, including `ShellAccentBrush`, selected background, and selected border treatment; completion/error badges are deferred to a later Review/validation UX slice. General authors template name, description, and deployment profile, and may show read-only schema/version metadata without renaming persisted schema fields. Deployment profile remains the Conservative/Balanced/Aggressive field, but Builder presents it as a visible horizontal selector below description rather than a dropdown and provides a Segoe MDL2 information tooltip that explains the practical pacing/resource-pressure tradeoff. The Builder also authors lab networks with switch name and optional switch type, reusable credential slot references, forests/domains, VM membership mode, domain assignment, Active Directory Domain Controller VM role assignment, and per-VM NIC/IP/DNS/gateway intent.
 
-Previous and Next controls live in the Builder footer and compute routes in this order: General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> every VM category in draft order (Basics, Resources, Membership, Roles, Networking, Credentials) -> Review. Previous is disabled on General, Next is disabled on Review, and Previous/Next do not block on validation errors before Review. When the draft has zero VMs, Next from VMs overview goes to Review, and Review shows a blocker that at least one VM is required before Save.
+Previous and Next controls live in the Builder footer and compute routes in this order: General -> Networks -> Forests & Domains -> Credentials -> VMs overview -> each VM's Basics -> Resources -> Membership -> Roles -> Networking overview -> NIC details in draft order -> Credentials -> Review. Previous is disabled on General, Next is disabled on Review, and Previous/Next do not block on validation errors before Review. When the draft has zero VMs, Next from VMs overview goes to Review, and Review shows a blocker that at least one VM is required before Save. When a selected VM has zero NICs, Next from Networking overview goes to Credentials.
 
-Networks, Forests & Domains, and Credentials use list plus selected-detail layouts. The `VMs` row expands to show VM child items by VM name and includes a small borderless right-aligned `+` button. Each VM child expands to nested category rows ordered as Basics, Resources, Membership, Roles, Networking, and Credentials. Clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list. Clicking a VM child opens that VM detail on `Basics`; clicking a VM category opens that category under `VMs > VM name > category`. Top-level workflow rows are active for non-VM steps, `VMs` is active for the VM overview, the VM name is active when any category for that VM is selected, and the selected VM category is active under that VM node. Direct workflow-tree clicks remain supported. New VM drafts use neutral incrementing names from the existing draft set, such as `vm-1` / `VM 1`, `vm-2` / `VM 2`, and so on; after adding a VM, the Builder selects the new VM child and opens `Basics`. VM detail categories appear as nested left-tree rows under `VMs > VM name`: Basics, Resources, Membership, Roles, Networking, and Credentials. Resources contains RAM, CPU, and base disk/VHDX fields. Networking owns NIC list/detail; NICs do not become global left-nav children. The previous right-side VM selector list is not part of the Builder contract.
+Networks and Credentials use list plus selected-detail layouts. Forests & Domains uses a constrained topology canvas plus selected-detail layout: separate forest containers, highlighted root domain nodes, child-domain branches under parents, tree-domain roots as separate trees inside the same forest, selectable forest/domain nodes, and stable edge-ready node identifiers for future/read-only trust edges. The canvas is not a freeform drag/drop graph editor in this slice. The `VMs` row expands to show VM child items by VM name and includes a small borderless right-aligned `+` button. Each VM child expands to nested category rows ordered as Basics, Resources, Membership, Roles, Networking, and Credentials. Clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list. Clicking a VM child opens that VM detail on `Basics`; clicking a VM category opens that category under `VMs > VM name > category`. Top-level workflow rows are active for non-VM steps, `VMs` is active for the VM overview, the VM name is active when any category for that VM is selected, and the selected VM category is active under that VM node. Direct workflow-tree clicks remain supported. New VM drafts use neutral incrementing names from the existing draft set, such as `vm-1` / `VM 1`, `vm-2` / `VM 2`, and so on; after adding a VM, the Builder selects the new VM child and opens `Basics`. VM detail categories appear as nested left-tree rows under `VMs > VM name`: Basics, Resources, Membership, Roles, Networking, and Credentials. Resources contains RAM, CPU, and base disk/VHDX fields. Networking owns a NIC overview/list and selected NIC detail; NIC details remain inside the selected VM's Networking route and do not become global workflow children. Add NIC selects the newly created NIC detail. The previous right-side VM selector list is not part of the Builder contract.
 
-During Builder editing, the in-memory Builder draft is the active source of visible user intent. Field edits update that draft immediately, or through a short UI-safe debounce when appropriate, and the Builder must not require per-section or per-field Save buttons. Invalid intermediate values remain visible and remain in draft state instead of being discarded. Blocking errors prevent final Save, export, and planning until resolved, but do not block Previous/Next before Review. Navigation between top-level steps, VM children, and VM detail categories must preserve edits, and narrow VM/category navigation should not require broad full-Builder rerendering.
+During Builder editing, the in-memory Builder draft is the active source of visible user intent. Field edits update that draft immediately, or through a short UI-safe debounce when appropriate, and the Builder must not require per-section or per-field Save buttons. Invalid intermediate values remain visible and remain in draft state instead of being discarded. Blocking errors prevent final Save, export, and planning until resolved, but do not block Previous/Next before Review. Navigation between top-level steps, VM children, VM detail categories, and NIC details must preserve edits, and narrow VM/category/NIC navigation should not require broad full-Builder rerendering.
 
 Builder-local validation is a draft authoring seam and does not create a separate planning dialect or persisted validation payload. Draft edits trigger automatic validation for affected scopes where practical: domain name edits validate the edited domain and dependent references; IP edits validate IP format, subnet fit, and duplicate IPs; VM identity/name edits validate identity and name rules; membership edits validate domain assignment and role compatibility for that VM. Review aggregates current Builder-local blockers and warnings, but final Save/Save As still requires the draft to pass final document mapper/build validation and produce planner-compatible V2 JSON.
 
@@ -174,7 +195,7 @@ The Builder exposes a persistent footer: Back is a left secondary action; author
 
 Builder output hides backend `topologyRole` details while preserving planner compatibility. On save, ordered Active Directory Domain Controller role assignments map to the current backend fields, including each domain's derived `firstDomainControllerVmId`.
 
-Domain/forest editor redesign, credential semantic redesign, Review validation redesign, runtime/schema/trust/WPF work, field badges, inline markers, section badges, and completion/error badges are outside this contract slice. Trust authoring is outside the first Builder slice. The existing trust runtime contract remains a planner/runtime capability for templates that already declare supported trust intent; existing trust declarations must be preserved when a V2 template is opened and saved by Builder, but they are deferred/read-only in Builder. Adding first-class Builder trust authoring requires a later approved issue.
+Credential semantic redesign, Review validation redesign, runtime implementation, trust authoring, WPF work, field badges, inline markers, section badges, and completion/error badges are outside this contract slice. The Forests & Domains topology canvas may remain edge-ready for future/read-only trust rendering, but trust authoring is outside this Builder slice. The existing trust runtime contract remains a planner/runtime capability for templates that already declare supported trust intent; existing trust declarations must be preserved when a V2 template is opened and saved by Builder, but they are deferred/read-only in Builder. Adding first-class Builder trust authoring requires a later approved issue.
 
 ## Directory Topology Contract
 
