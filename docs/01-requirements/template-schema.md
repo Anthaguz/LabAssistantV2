@@ -164,6 +164,7 @@ Rule:
 - Active Directory Domain Controller is a VM role, not a membership mode
 - Builder maps ordered Active Directory Domain Controller role assignments to current backend topology fields on save
 - Root CA, SQL, Web, and Operations are future Builder role extension points and are not authorable in the first Builder slice
+- Future role-specific configuration belongs under `VMs > VM name > Roles > Role name`; this slice must not add empty Root CA, SQL, Web, or Operations configuration UI
 - future topology/capability combinations require an approved contract before they become authorable
 
 ### V2 membership mode
@@ -277,11 +278,11 @@ The first Builder slice may author:
 - Active Directory Domain Controller VM role assignment
 - per-VM NIC/IP/DNS/gateway intent
 
-Networks, Forests & Domains, and Credentials use list plus selected-detail layouts. The `VMs` row expands to show VM child items by VM name. Clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list. Clicking a VM child opens that VM detail on `Basics`. Top-level workflow rows are active for non-VM steps, the VM child is active while editing a VM, and the selected VM category is active only in the right mini-nav. Direct workflow-tree clicks remain supported.
+Networks, Forests & Domains, and Credentials use list plus selected-detail layouts. The `VMs` row expands to show VM child items by VM name, and each VM child expands to nested category rows ordered as Basics, Resources, Membership, Roles, Networking, and Credentials. Clicking `VMs` opens a compact VM overview with total VM count, standalone/domain-member counts, AD DC role count, Add VM, and a simple VM summary list. Clicking a VM child opens that VM detail on `Basics`; clicking a VM category opens that category under `VMs > VM name > category`. Top-level workflow rows are active for non-VM steps, `VMs` is active for the VM overview, the VM name is active when any category for that VM is selected, and the selected VM category is active under that VM node. Direct workflow-tree clicks remain supported.
 
 The `VMs` nav row includes a small borderless right-aligned `+` button. The VM overview also includes Add VM. New VM drafts use neutral incrementing names from the existing draft set, such as `vm-1` / `VM 1`, `vm-2` / `VM 2`, and so on. After adding a VM, the Builder selects the new VM child and opens `Basics`.
 
-Selected VM detail has an internal right mini-nav: Basics, Resources, Membership, Roles, Networking, and Credentials. Resources contains RAM, CPU, and base disk/VHDX fields. Networking owns NIC list/detail; NICs do not become global left-nav children. The previous right-side VM selector list is not part of the Builder contract.
+VM detail categories appear as nested left-tree rows under `VMs > VM name`: Basics, Resources, Membership, Roles, Networking, and Credentials. Resources contains RAM, CPU, and base disk/VHDX fields. Networking owns NIC list/detail; NICs do not become global left-nav children. The previous right-side VM selector list is not part of the Builder contract.
 
 During editing, the in-memory Builder draft is the active source of visible user intent. Field edits update that draft immediately, or through a short UI-safe debounce when appropriate, and the Builder must not require per-section or per-field Save buttons. Invalid intermediate values remain visible and remain in draft state instead of being discarded. Blocking errors prevent final Save, export, and planning until resolved, but do not block Previous/Next before Review. Navigation between top-level steps, VM children, and VM detail categories must preserve edits, and narrow VM/category navigation should not require broad full-Builder rerendering.
 
