@@ -627,7 +627,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)
     {
         var projection = _workflowNavigation.Project(draft, _canNavigateWorkflow);
-        if (projection.IsVmOverviewSelected)
+        if (!projection.IsVmDetailSelected)
         {
             return draft;
         }

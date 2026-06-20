@@ -68,6 +68,7 @@ internal readonly record struct BuilderWorkflowProjection(
     BuilderWorkflowStep ActiveStep,
     int SelectedVmIndex,
     BuilderVmDetailCategory SelectedVmDetailCategory,
+    bool IsVmDetailSelected,
     bool IsVmOverviewSelected);
 
 internal readonly record struct BuilderWorkflowFooterProjection(
@@ -107,6 +108,7 @@ internal sealed class TemplatesBuilderWorkflowNavigation
             CurrentRoute.Step,
             selectedVmIndex,
             selectedVmDetailCategory,
+            CurrentRoute.IsVmDetail,
             CurrentRoute.Kind == BuilderWorkflowRouteKind.VmOverview);
     }
 

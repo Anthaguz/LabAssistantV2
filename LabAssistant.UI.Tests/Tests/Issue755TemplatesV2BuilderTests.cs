@@ -365,8 +365,27 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.False(projection.IsVmOverviewSelected);
         Assert.Equal(1, projection.SelectedVmIndex);
         Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
+        Assert.True(projection.IsVmDetailSelected);
         Assert.Equal("vm-beta", selectedVmRow.Label);
         Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics), selectedVmRow.Route);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_NonVmRoutesDoNotCaptureHiddenVmDetail()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var updateVmBody = ExtractMethodBody(builderSource, "private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)");
+        var draft = CreateDraftWithVms("vm-alpha", "vm-beta");
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking), draft);
+        navigation.SelectStep(BuilderWorkflowStep.General, draft);
+        var projection = navigation.Project(draft, canNavigate: true);
+
+        Assert.Equal(BuilderWorkflowStep.General, projection.ActiveStep);
+        Assert.False(projection.IsVmOverviewSelected);
+        Assert.False(projection.IsVmDetailSelected);
+        Assert.Contains("if (!projection.IsVmDetailSelected)", updateVmBody);
     }
 
     [Fact]
@@ -380,6 +399,7 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         Assert.Equal(BuilderWorkflowRouteKind.VmRole, projection.CurrentRoute.Kind);
         Assert.Equal(BuilderVmDetailCategory.Roles, projection.SelectedVmDetailCategory);
+        Assert.True(projection.IsVmDetailSelected);
         Assert.Equal("ad-domain-controller", projection.CurrentRoute.RoleKey);
         Assert.True(Assert.Single(projection.VmRows).IsSelected);
     }
