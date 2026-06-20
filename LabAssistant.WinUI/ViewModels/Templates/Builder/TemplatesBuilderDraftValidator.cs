@@ -115,11 +115,17 @@ internal sealed class TemplatesBuilderValidationRequest
 
     public bool Includes(TemplatesBuilderValidationCategory category) => Categories.Contains(category);
 
-    public bool IncludesDomain(string domainId) => DomainIds.Count == 0 || DomainIds.Contains(domainId);
+    public bool IncludesDomain(string? domainId)
+        => DomainIds.Count == 0 ||
+           (!string.IsNullOrWhiteSpace(domainId) && DomainIds.Contains(domainId));
 
-    public bool IncludesNetwork(string networkId) => NetworkIds.Count == 0 || NetworkIds.Contains(networkId);
+    public bool IncludesNetwork(string? networkId)
+        => NetworkIds.Count == 0 ||
+           (!string.IsNullOrWhiteSpace(networkId) && NetworkIds.Contains(networkId));
 
-    public bool IncludesVm(string vmId) => VmIds.Count == 0 || VmIds.Contains(vmId);
+    public bool IncludesVm(string? vmId)
+        => VmIds.Count == 0 ||
+           (!string.IsNullOrWhiteSpace(vmId) && VmIds.Contains(vmId));
 
     public static TemplatesBuilderValidationRequest DetectChangedScopes(
         TemplatesBuilderDraftSnapshot previous,
@@ -130,21 +136,30 @@ internal sealed class TemplatesBuilderValidationRequest
         var networkIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var vmIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        if (!previous.LabNetworks.SequenceEqual(current.LabNetworks))
+        var previousNetworks = OrEmpty(previous.LabNetworks);
+        var currentNetworks = OrEmpty(current.LabNetworks);
+        var previousForests = OrEmpty(previous.Forests);
+        var currentForests = OrEmpty(current.Forests);
+        var previousDomains = OrEmpty(previous.Domains);
+        var currentDomains = OrEmpty(current.Domains);
+        var previousVms = OrEmpty(previous.Vms);
+        var currentVms = OrEmpty(current.Vms);
+
+        if (!previousNetworks.SequenceEqual(currentNetworks))
         {
             categories.Add(TemplatesBuilderValidationCategory.Network);
-            AddChangedNetworkIds(previous.LabNetworks, current.LabNetworks, networkIds);
+            AddChangedNetworkIds(previousNetworks, currentNetworks, networkIds);
         }
 
-        if (!previous.Forests.SequenceEqual(current.Forests) ||
-            !previous.Domains.SequenceEqual(current.Domains))
+        if (!previousForests.SequenceEqual(currentForests) ||
+            !previousDomains.SequenceEqual(currentDomains))
         {
             categories.Add(TemplatesBuilderValidationCategory.Domain);
             categories.Add(TemplatesBuilderValidationCategory.VmMembership);
-            AddChangedDomainIds(previous.Domains, current.Domains, domainIds);
+            AddChangedDomainIds(previousDomains, currentDomains, domainIds);
         }
 
-        AddChangedVmScopes(previous.Vms, current.Vms, categories, domainIds, networkIds, vmIds);
+        AddChangedVmScopes(previousVms, currentVms, categories, domainIds, networkIds, vmIds);
 
         return categories.Count == 0
             ? ForCategories()
@@ -259,11 +274,14 @@ internal sealed class TemplatesBuilderValidationRequest
             return;
         }
 
-        foreach (var networkId in vm.Value.Nics.Select(nic => nic.NetworkId).Where(id => !string.IsNullOrWhiteSpace(id)))
+        foreach (var networkId in OrEmpty(vm.Value.Nics).Select(nic => nic.NetworkId).Where(id => !string.IsNullOrWhiteSpace(id)))
         {
             networkIds.Add(networkId.Trim());
         }
     }
+
+    private static IReadOnlyList<T> OrEmpty<T>(IReadOnlyList<T>? values)
+        => values ?? Array.Empty<T>();
 }
 
 internal static class TemplatesBuilderDraftValidator
@@ -309,19 +327,21 @@ internal static class TemplatesBuilderDraftValidator
         TemplatesBuilderValidationRequest request,
         ICollection<TemplatesBuilderValidationIssue> issues)
     {
-        AddDuplicateIssues(draft.Domains.Select(domain => domain.DomainId), "Domain id", TemplatesBuilderValidationCategory.Domain, issues);
-        AddDuplicateIssues(draft.Domains.Select(domain => domain.DnsName), "Domain DNS name", TemplatesBuilderValidationCategory.Domain, issues);
+        var domains = OrEmpty(draft.Domains);
+        var forests = OrEmpty(draft.Forests);
+        AddDuplicateIssues(domains.Select(domain => domain.DomainId), "Domain id", TemplatesBuilderValidationCategory.Domain, issues);
+        AddDuplicateIssues(domains.Select(domain => domain.DnsName), "Domain DNS name", TemplatesBuilderValidationCategory.Domain, issues);
 
-        var domainIds = draft.Domains
+        var domainIds = domains
             .Where(domain => !string.IsNullOrWhiteSpace(domain.DomainId))
             .Select(domain => domain.DomainId.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var forestIds = draft.Forests
+        var forestIds = forests
             .Where(forest => !string.IsNullOrWhiteSpace(forest.ForestId))
             .Select(forest => forest.ForestId.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var domain in draft.Domains.Where(domain => request.IncludesDomain(domain.DomainId)))
+        foreach (var domain in domains.Where(domain => request.IncludesDomain(domain.DomainId)))
         {
             var scopeKey = Scope(domain.DomainId);
             if (string.IsNullOrWhiteSpace(domain.DomainId) ||
@@ -353,7 +373,7 @@ internal static class TemplatesBuilderDraftValidator
             }
         }
 
-        foreach (var forest in draft.Forests.Where(forest => !string.IsNullOrWhiteSpace(forest.RootDomainId) && !domainIds.Contains(forest.RootDomainId.Trim())))
+        foreach (var forest in forests.Where(forest => !string.IsNullOrWhiteSpace(forest.RootDomainId) && !domainIds.Contains(forest.RootDomainId.Trim())))
         {
             AddBlocker(issues, TemplatesBuilderValidationCategory.Domain, $"Forest '{Display(forest.ForestId)}' references unknown root domain '{forest.RootDomainId}'.", Scope(forest.ForestId));
         }
@@ -364,14 +384,23 @@ internal static class TemplatesBuilderDraftValidator
         TemplatesBuilderValidationRequest request,
         ICollection<TemplatesBuilderValidationIssue> issues)
     {
-        var networksById = draft.LabNetworks
+        var networks = OrEmpty(draft.LabNetworks);
+        var vms = OrEmpty(draft.Vms);
+        AddDuplicateIssues(networks.Select(network => network.NetworkId), "Network id", TemplatesBuilderValidationCategory.Network, issues);
+        var networksById = networks
             .Where(network => !string.IsNullOrWhiteSpace(network.NetworkId))
             .GroupBy(network => network.NetworkId.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var seenIpsByNetwork = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var vm in draft.Vms)
+        foreach (var vm in vms)
         {
+            if (vm.Nics is null)
+            {
+                AddBlocker(issues, TemplatesBuilderValidationCategory.Network, $"VM '{Display(vm.Name)}' networking data could not be loaded.", Scope(vm.VmId));
+                continue;
+            }
+
             foreach (var nic in vm.Nics.Where(nic => request.IncludesNetwork(nic.NetworkId)))
             {
                 var networkKey = string.IsNullOrWhiteSpace(nic.NetworkId) ? "(unassigned)" : nic.NetworkId.Trim();
@@ -455,16 +484,17 @@ internal static class TemplatesBuilderDraftValidator
         TemplatesBuilderValidationRequest request,
         ICollection<TemplatesBuilderValidationIssue> issues)
     {
-        if (draft.Vms.Count == 0)
+        var vms = OrEmpty(draft.Vms);
+        if (vms.Count == 0)
         {
             AddBlocker(issues, TemplatesBuilderValidationCategory.VmIdentity, "At least one VM is required before Save.", null);
             return;
         }
 
-        AddDuplicateIssues(draft.Vms.Select(vm => vm.VmId), "VM id", TemplatesBuilderValidationCategory.VmIdentity, issues);
-        AddDuplicateIssues(draft.Vms.Select(vm => vm.Name), "VM name", TemplatesBuilderValidationCategory.VmIdentity, issues);
+        AddDuplicateIssues(vms.Select(vm => vm.VmId), "VM id", TemplatesBuilderValidationCategory.VmIdentity, issues);
+        AddDuplicateIssues(vms.Select(vm => vm.Name), "VM name", TemplatesBuilderValidationCategory.VmIdentity, issues);
 
-        foreach (var vm in draft.Vms)
+        foreach (var vm in vms)
         {
             if (string.IsNullOrWhiteSpace(vm.VmId) || string.IsNullOrWhiteSpace(vm.Name))
             {
@@ -483,16 +513,18 @@ internal static class TemplatesBuilderDraftValidator
         TemplatesBuilderValidationRequest request,
         ICollection<TemplatesBuilderValidationIssue> issues)
     {
-        var domainIds = draft.Domains
+        var domains = OrEmpty(draft.Domains);
+        var vms = OrEmpty(draft.Vms);
+        var domainIds = domains
             .Where(domain => !string.IsNullOrWhiteSpace(domain.DomainId))
             .Select(domain => domain.DomainId.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var dcDomainIds = draft.Vms
+        var dcDomainIds = vms
             .Where(vm => vm.IsActiveDirectoryDomainController && !string.IsNullOrWhiteSpace(vm.DomainId))
             .Select(vm => vm.DomainId.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var vm in draft.Vms.Where(vm => request.IncludesVm(vm.VmId)))
+        foreach (var vm in vms.Where(vm => request.IncludesVm(vm.VmId)))
         {
             var membershipMode = V2MembershipModeCatalog.Normalize(vm.MembershipMode);
             var scopeKey = Scope(vm.VmId);
@@ -525,7 +557,7 @@ internal static class TemplatesBuilderDraftValidator
             }
         }
 
-        foreach (var domain in draft.Domains.Where(domain =>
+        foreach (var domain in domains.Where(domain =>
                      request.IncludesDomain(domain.DomainId) &&
                      !string.IsNullOrWhiteSpace(domain.DomainId) &&
                      !dcDomainIds.Contains(domain.DomainId.Trim())))
@@ -648,4 +680,7 @@ internal static class TemplatesBuilderDraftValidator
 
     private static string? Scope(string value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static IReadOnlyList<T> OrEmpty<T>(IReadOnlyList<T>? values)
+        => values ?? Array.Empty<T>();
 }
