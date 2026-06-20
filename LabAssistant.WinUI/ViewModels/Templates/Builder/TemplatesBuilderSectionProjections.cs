@@ -29,6 +29,7 @@ internal readonly record struct TemplatesBuilderVmOverviewProjection(
 
 internal readonly record struct TemplatesBuilderNicRowProjection(
     int Index,
+    BuilderWorkflowRoute Route,
     TemplatesBuilderNicDraft Draft,
     string Label,
     bool IsSelected);
@@ -108,6 +109,7 @@ internal static class TemplatesBuilderSectionProjections
             TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm),
             (vm.Nics ?? Array.Empty<TemplatesBuilderNicDraft>()).Select((nic, index) => new TemplatesBuilderNicRowProjection(
                 index,
+                BuilderWorkflowRoute.ForVmNic(workflowProjection.SelectedVmIndex, index),
                 nic,
                 FormatResourceName(nic.Name, nic.NicId),
                 workflowProjection.IsNicDetailSelected && workflowProjection.SelectedNicIndex == index)).ToList(),

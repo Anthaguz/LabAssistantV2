@@ -166,10 +166,10 @@ public sealed partial class TemplatesBuilderView : UserControl
         RenderSelectedVmDetail();
     }
 
-    private void SelectVmNic(int nicIndex)
+    private void SelectVmNic(BuilderWorkflowRoute route)
     {
         UpdateWorkingDraftFromVisibleControls();
-        if (!_workflowNavigation.SelectVmNic(nicIndex, _draft))
+        if (!_workflowNavigation.SelectRoute(route, _draft))
         {
             return;
         }
@@ -681,7 +681,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         return CreateResourceButton(
             $"{projection.Label} - {secondary}",
             projection.IsSelected,
-            () => SelectVmNic(projection.Index));
+            () => SelectVmNic(projection.Route));
     }
 
     private void UpdateWorkingDraftFromVisibleControls()

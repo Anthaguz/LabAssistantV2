@@ -446,7 +446,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.Contains("RenderSelectedNicDetail(detail.Value)", networkingRenderBody);
         Assert.Contains("RenderNicOverview(detail.Value)", networkingRenderBody);
         Assert.Contains("CreateNicOverviewRow(nic)", renderNicOverviewBody);
-        Assert.Contains("SelectVmNic(projection.Index)", renderNicOverviewBody + builderSource);
+        Assert.Contains("SelectVmNic(projection.Route)", renderNicOverviewBody + builderSource);
         Assert.Contains("CreateTextBox(\"Network ID\", TemplatesBuilderFieldKeys.NicNetworkId, nic.NetworkId)", renderSelectedNicDetailBody);
         Assert.Contains("CreateTextBox(\"Switch Override\", TemplatesBuilderFieldKeys.NicSwitchName, nic.SwitchName)", renderSelectedNicDetailBody);
         Assert.DoesNotContain("VmNicsPanel", builderSource);
@@ -647,6 +647,32 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.True(detail.Value.IsNicDetailSelected);
         Assert.Equal(1, detail.Value.SelectedNicIndex);
         Assert.True(detail.Value.Nics[1].IsSelected);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_NicOverviewRowRouteDrillsIntoSelectedNicDetail()
+    {
+        var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a", "nic-b"]), ("vm-beta", ["nic-c"]));
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
+        var overview = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(
+            draft,
+            navigation.Project(draft, canNavigate: true));
+        var nicRow = Assert.Single(overview!.Value.Nics, row => row.Draft.NicId == "nic-b");
+
+        Assert.Equal(BuilderWorkflowRoute.ForVmNic(0, 1), nicRow.Route);
+        Assert.True(navigation.SelectRoute(nicRow.Route, draft));
+
+        var projection = navigation.Project(draft, canNavigate: true);
+        var detail = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(draft, projection);
+
+        Assert.Equal(BuilderWorkflowRoute.ForVmNic(0, 1), projection.CurrentRoute);
+        Assert.NotNull(detail);
+        Assert.True(detail.Value.IsNicDetailSelected);
+        Assert.Equal(1, detail.Value.SelectedNicIndex);
+        Assert.Equal("nic-b", detail.Value.Nics[detail.Value.SelectedNicIndex].Draft.NicId);
+        Assert.Equal([false, true], detail.Value.Nics.Select(row => row.IsSelected).ToArray());
     }
 
     [Fact]
