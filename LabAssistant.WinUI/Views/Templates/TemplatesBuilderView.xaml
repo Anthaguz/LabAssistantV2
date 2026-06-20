@@ -44,29 +44,55 @@
                 </Grid.ColumnDefinitions>
 
                 <Border
-                    x:Name="BuilderLeftStepper"
+                    x:Name="BuilderLeftNavigator"
                     Grid.Column="0"
                     Padding="8"
                     Background="{StaticResource ShellContentBackgroundBrush}"
                     BorderBrush="{StaticResource ShellBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
-                    <ScrollViewer
-                        x:Name="BuilderWorkflowTreeScrollViewer"
-                        MaxHeight="520"
-                        HorizontalScrollBarVisibility="Disabled"
-                        VerticalScrollBarVisibility="Auto">
-                        <StackPanel x:Name="BuilderWorkflowTreePanel" Spacing="6">
-                            <StackPanel x:Name="BuilderVmNavChildrenPanel" Margin="14,0,0,0" Spacing="4" />
-                        </StackPanel>
-                    </ScrollViewer>
+                    <StackPanel Spacing="8">
+                        <Grid
+                            x:Name="BuilderNavigatorHeaderGrid"
+                            ColumnSpacing="6"
+                            Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                x:Name="BuilderNavigatorBackButton"
+                                AutomationProperties.Name="Back to Builder"
+                                Content="&#xE72B;"
+                                FontFamily="Segoe MDL2 Assets"
+                                MinWidth="28"
+                                Padding="6,2,6,2"
+                                ToolTipService.ToolTip="Back to Builder" />
+                            <TextBlock
+                                x:Name="BuilderNavigatorTitleTextBlock"
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Builder"
+                                TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                        <ScrollViewer
+                            x:Name="BuilderNavigatorScrollViewer"
+                            MaxHeight="520"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="BuilderNavigatorPanel" Spacing="6" />
+                        </ScrollViewer>
+                    </StackPanel>
                 </Border>
 
                 <ScrollViewer
                     x:Name="BuilderActiveStepScrollViewer"
                     Grid.Column="1"
+                    HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto">
-                    <Grid x:Name="BuilderActiveStepPanel" Margin="0,0,10,0">
+                    <Grid x:Name="BuilderActiveStepPanel" Margin="0,0,12,0">
                         <Border
                             x:Name="BuilderGeneralSection"
                             Padding="8"
@@ -264,31 +290,26 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Button x:Name="BuilderBackToLibraryButton" Content="Back" />
-                    <ScrollViewer
-                        x:Name="BuilderFooterCommandScrollViewer"
+                    <StackPanel
+                        x:Name="BuilderFooterCommandPanel"
                         Grid.Column="1"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Disabled">
-                        <StackPanel
-                            x:Name="BuilderFooterCommandPanel"
-                            HorizontalAlignment="Right"
-                            Orientation="Horizontal"
-                            Spacing="8">
-                            <Button x:Name="BuilderPreviousStepButton" Content="Previous" />
-                            <Button
-                                x:Name="BuilderNextStepButton"
-                                Background="{StaticResource ShellAccentBrush}"
-                                Content="Next"
-                                Foreground="{StaticResource ShellTopBarForegroundBrush}" />
-                            <Button x:Name="BuilderSaveAsButton" Content="Save As" Visibility="Collapsed" />
-                            <Button
-                                x:Name="BuilderSaveButton"
-                                Background="{StaticResource ShellAccentBrush}"
-                                Content="Save"
-                                Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                                Visibility="Collapsed" />
-                        </StackPanel>
-                    </ScrollViewer>
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Button x:Name="BuilderPreviousStepButton" Content="Previous" />
+                        <Button
+                            x:Name="BuilderNextStepButton"
+                            Background="{StaticResource ShellAccentBrush}"
+                            Content="Next"
+                            Foreground="{StaticResource ShellTopBarForegroundBrush}" />
+                        <Button x:Name="BuilderSaveAsButton" Content="Save As" Visibility="Collapsed" />
+                        <Button
+                            x:Name="BuilderSaveButton"
+                            Background="{StaticResource ShellAccentBrush}"
+                            Content="Save"
+                            Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                            Visibility="Collapsed" />
+                    </StackPanel>
                 </Grid>
                 <TextBlock
                     x:Name="BuilderStatusTextBlock"
