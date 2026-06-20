@@ -265,7 +265,7 @@ Authority rules:
 
 ## 7) Workflow for Agents (Do This Every Time)
 
-### Before coding
+### Before issue work
 1) Read `AGENTS.md`
 2) Identify the driving requirement:
    - User story ID + Acceptance Criteria section
@@ -275,16 +275,18 @@ Authority rules:
 4) Write or update missing AC if needed (PM Agent) **before implementation**
 5) Confirm the issue fits the context budget rules in section 7.1 before proceeding
 
-### During coding
+For docs-only governance, workflow, classification, handoff, or repository-process issues, the driving requirement may be the active issue brief plus `AGENTS.md`. SRS/Acceptance Criteria confirmation is required when the issue defines or changes product behavior; it is not required for pure process documentation that does not change runtime behavior.
+
+### During issue work
 - Keep PRs small and focused
 - Prefer additive changes over massive refactors unless explicitly required
 - Do not reformat unrelated files
 
-### After coding
-- Ensure AC scenarios are satisfied (happy path + failures + cleanup behavior)
-- Add/update tests
-- Update docs if behavior/architecture changed
-- Ensure logs are emitted at key steps with operationId (canonical structured field)
+### After issue work
+- Ensure AC scenarios are satisfied when product behavior changed (happy path + failures + cleanup behavior)
+- Add/update tests when runtime behavior, decision logic, or test contracts changed
+- Update docs if behavior, architecture, or durable workflow rules changed
+- Ensure logs are emitted at key steps with operationId (canonical structured field) when runtime workflows changed
 - Prepare the final handoff using the handoff rules in section 7.6
 
 ### 7.1 Context Budget & Issue Sizing Rules
@@ -330,6 +332,13 @@ Authority rules:
 - Do not pull milestone-coded docs into the active authority set for a normal implementation slice.
 - If historical milestone context is genuinely needed, cite it as history and restate the surviving rule in the current authority docs or issue brief before relying on it.
 
+#### Program orchestration and specialist subagent rules
+- For approved larger goals, use one parent/orchestrator as the program owner. The parent/orchestrator owns architecture direction, issue order, branch hygiene, subagent lifecycle, and the final quality gate.
+- Specialist agents may perform audits or narrow implementation slices. They should receive compact issue briefs, small authority sets, and explicit write boundaries.
+- Implementation subagents must have narrow, preferably disjoint write ownership. If two implementation subagents need the same files or capability seam, the orchestrator must sequence the work or split the scope before edits overlap.
+- Specialist agents must not become nested implementation orchestrators by default. A nested orchestrator, additional umbrella owner, or second layer of implementation coordination requires explicit approval in the active issue or orchestration brief.
+- Specialist subagent threads or sessions should be closed, archived, or otherwise retired when their assigned slice is handed off, blocked, or no longer needed.
+
 ### 7.2 Project-Specific AGENTS.md Files
 - A project-specific `AGENTS.md` is worth adding only when a project has rules that genuinely differ from the repo default.
 - Good reasons:
@@ -365,16 +374,24 @@ Authority rules:
   - `milestone-<code>/issue-<number>-<short-slug>`
   - If no milestone code exists, use:
     - `issue-<number>-<short-slug>`
-- Issue branches must be created from the current `origin/master` state, not from a potentially stale local `master`.
-- Before starting issue work, agents must fetch `origin/master` and confirm the branch base reflects the current remote baseline.
+- By default, ordinary issue branches must be created from the current `origin/master` state, not from a potentially stale local `master`.
+- Before starting ordinary issue work, agents must fetch `origin/master` and confirm the branch base reflects the current remote baseline.
 - If the issue depends on earlier merged work, agents must verify that required docs/code are present on `origin/master` before editing.
 - Local scratch or support files are not part of issue scope unless the user explicitly asks to include them.
 - `HANDOFF.md` is local-only workflow state and must be ignored for issue branching, commits, and PR scope unless the user explicitly says otherwise.
 - Unrelated tracked or untracked worktree state must not be pulled into an issue branch or commit just because it exists locally.
-- If issue work starts on the wrong branch, agents must move the issue-specific changes onto a fresh dedicated branch from updated `origin/master` before committing or opening a PR.
-- PRs should contain only issue-scoped changes plus any unavoidable prerequisite baseline sync required to make the branch coherent against current `origin/master`.
+- If ordinary issue work starts on the wrong branch, agents must move the issue-specific changes onto a fresh dedicated branch from updated `origin/master` before committing or opening a PR.
+- Ordinary issue PRs should contain only issue-scoped changes plus any unavoidable prerequisite baseline sync required to make the branch coherent against current `origin/master`.
 - If an issue depends on an earlier issue that is already merged, agents must check whether that earlier issue is still open and close it before finishing the current slice, or explicitly note that it was already closed.
 - If validation uses `--no-build` and the result appears stale, inconsistent with the current source, or likely to be using an older assembly/test host, agents must rebuild and rerun until the validation result is trustworthy before handoff.
+
+#### Umbrella integration branch model
+- Use an umbrella integration branch only for an explicitly approved larger goal that needs coordinated sub-issues before landing on `master`.
+- The parent/orchestrator owns the umbrella branch and should create it from the current `origin/master` baseline, for example `goal/v2-builder-hardening`.
+- Sub-issue branches for that goal should branch from the current umbrella integration branch and open PRs back into the umbrella branch, not directly into `master`.
+- The final umbrella PR targets `master` only after the parent/orchestrator completes the integration quality gate and confirms the combined branch is ready.
+- If an issue is not part of an approved umbrella branch program, the default ordinary issue-from-`origin/master` workflow still applies.
+- When a sub-issue depends on prior umbrella work, agents must verify that the required commits are present on the umbrella branch before editing.
 
 ### 7.6 Handoff Rules
 
