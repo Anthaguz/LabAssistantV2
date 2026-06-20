@@ -29,7 +29,9 @@ internal readonly record struct TemplatesBuilderVmOverviewProjection(
 
 internal readonly record struct TemplatesBuilderNicRowProjection(
     int Index,
-    TemplatesBuilderNicDraft Draft);
+    TemplatesBuilderNicDraft Draft,
+    string Label,
+    bool IsSelected);
 
 internal readonly record struct TemplatesBuilderVmDetailProjection(
     int VmIndex,
@@ -38,7 +40,9 @@ internal readonly record struct TemplatesBuilderVmDetailProjection(
     string CategoryLabel,
     TemplatesBuilderVmDraft Vm,
     IReadOnlyList<TemplatesBuilderVmRoleProjection> Roles,
-    IReadOnlyList<TemplatesBuilderNicRowProjection> Nics);
+    IReadOnlyList<TemplatesBuilderNicRowProjection> Nics,
+    int SelectedNicIndex,
+    bool IsNicDetailSelected);
 
 internal static class TemplatesBuilderSectionProjections
 {
@@ -102,7 +106,13 @@ internal static class TemplatesBuilderSectionProjections
             GetVmDetailCategoryLabel(workflowProjection.SelectedVmDetailCategory),
             vm,
             TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm),
-            vm.Nics.Select((nic, index) => new TemplatesBuilderNicRowProjection(index, nic)).ToList());
+            (vm.Nics ?? Array.Empty<TemplatesBuilderNicDraft>()).Select((nic, index) => new TemplatesBuilderNicRowProjection(
+                index,
+                nic,
+                FormatResourceName(nic.Name, nic.NicId),
+                workflowProjection.IsNicDetailSelected && workflowProjection.SelectedNicIndex == index)).ToList(),
+            workflowProjection.SelectedNicIndex,
+            workflowProjection.IsNicDetailSelected);
     }
 
     private static string FormatResourceName(string primary, string fallback)
