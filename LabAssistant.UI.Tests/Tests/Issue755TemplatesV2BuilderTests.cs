@@ -70,20 +70,8 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Null(FindByNameOrDefault(builder, "BuilderCredentialsStepButton"));
         Assert.Null(FindByNameOrDefault(builder, "BuilderVmsStepButton"));
         Assert.Null(FindByNameOrDefault(builder, "BuilderReviewStepButton"));
-        Assert.Contains("CreateResourceButton(\"General\"", builderSource);
-        Assert.Contains("CreateResourceButton(\"Networks\"", builderSource);
-        Assert.Contains("CreateResourceButton(\"Forests & Domains\"", builderSource);
-        Assert.Contains("CreateResourceButton(\"Credentials\"", builderSource);
-        Assert.Contains("CreateResourceButton(\"VMs\"", builderSource);
-        Assert.Contains("CreateResourceButton(\"Review\"", builderSource);
         Assert.Contains("ShellAccentBrush", builderSource);
         Assert.Contains("ShellBackgroundBrush", builderSource);
-        Assert.Contains("BuilderWorkflowStep.General", builderSource);
-        Assert.Contains("BuilderWorkflowStep.Networks", builderSource);
-        Assert.Contains("BuilderWorkflowStep.ForestsDomains", builderSource);
-        Assert.Contains("BuilderWorkflowStep.Credentials", builderSource);
-        Assert.Contains("BuilderWorkflowStep.Vms", builderSource);
-        Assert.Contains("BuilderWorkflowStep.Review", builderSource);
         Assert.DoesNotContain("BuilderProfileSection", builderSource);
         Assert.DoesNotContain("BuilderNetworksPanel", builder.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("BuilderDomainsPanel", builder.ToString(), StringComparison.Ordinal);
@@ -124,12 +112,10 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Contains("BuilderVmDetailCategory.Networking", builderSource);
         Assert.Contains("BuilderVmDetailCategory.Credentials", builderSource);
         Assert.Contains("BuilderVmNavChildrenPanel.Children.Add", builderSource);
-        Assert.Contains("SelectVmChild(index)", builderSource);
-        Assert.Contains("_selectedVmDetailCategory = BuilderVmDetailCategory.Basics", builderSource);
+        Assert.Contains("SelectVmChild(row.Route.VmIndex)", builderSource);
         Assert.Contains("FindNextVmNumber", builderSource);
         Assert.Contains("$\"vm-{nextVmNumber}\"", builderSource);
         Assert.Contains("$\"VM {nextVmNumber}\"", builderSource);
-        Assert.Contains("_isVmOverviewSelected = false", builderSource);
         Assert.Contains("ReadNics(BuilderSelectedVmDetailPanel)", builderSource);
         Assert.DoesNotContain("BuilderVmNameListPanel", builderSource);
         Assert.DoesNotContain("BuilderLabNetworksTextBox", builderSource);
@@ -155,11 +141,6 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.Equal("{StaticResource ShellAccentBrush}", FindByName(builder, "BuilderSaveButton").Attribute("Background")?.Value);
         Assert.Contains("SelectAdjacentStep(-1)", builderSource);
         Assert.Contains("SelectAdjacentStep(1)", builderSource);
-        Assert.Contains("BuildWorkflowRoutes", builderSource);
-        Assert.Contains("BuilderNextStepButton.Visibility = isReview ? Visibility.Collapsed : Visibility.Visible", builderSource);
-        Assert.Contains("BuilderSaveAsButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", builderSource);
-        Assert.Contains("BuilderSaveButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", builderSource);
-        Assert.Contains("_isVmOverviewSelected = step == BuilderWorkflowStep.Vms", builderSource);
     }
 
     [Fact]
@@ -267,12 +248,13 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         Assert.DoesNotContain("UpdateWorkingDraftFromVisibleControls();", selectVmChildBody);
         Assert.DoesNotContain("RenderDraftResources();", selectVmChildBody);
-        Assert.Contains("_selectedVmDetailCategory = BuilderVmDetailCategory.Basics;", selectVmChildBody);
+        Assert.Contains("_workflowNavigation.SelectVmChild(index, _draft);", selectVmChildBody);
         Assert.Contains("RenderVmNavChildren();", selectVmChildBody);
         Assert.Contains("RenderSelectedVmDetail();", selectVmChildBody);
 
         Assert.DoesNotContain("UpdateWorkingDraftFromVisibleControls();", selectVmDetailCategoryBody);
         Assert.DoesNotContain("RenderDraftResources();", selectVmDetailCategoryBody);
+        Assert.Contains("_workflowNavigation.SelectVmDetailCategory(category, _draft);", selectVmDetailCategoryBody);
         Assert.Contains("RenderSelectedVmDetail();", selectVmDetailCategoryBody);
     }
 
@@ -282,7 +264,7 @@ public sealed class Issue755TemplatesV2BuilderTests
         var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
         var renderWorkflowTreeBody = ExtractMethodBody(builderSource, "private void RenderWorkflowTreeState()");
-        var createVmWorkflowNavRowBody = ExtractMethodBody(builderSource, "private Grid CreateVmWorkflowNavRow()");
+        var createVmWorkflowNavRowBody = ExtractMethodBody(builderSource, "private Grid CreateVmWorkflowNavRow(BuilderWorkflowNavigationRow vmOverviewRow)");
         var createResourceButtonBody = ExtractMethodBody(builderSource, "private Button CreateResourceButton(string content, bool isSelected, Action select, bool isEnabled = true)");
         var createNavContentBody = ExtractMethodBody(builderSource, "private static Border CreateNavButtonContent(string content, bool isSelected)");
         var configureNavChromeBody = ExtractMethodBody(builderSource, "private static void ConfigureNavButtonChrome(Button button)");
@@ -295,15 +277,13 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.DoesNotContain("ApplyNavButtonState", builderSource);
         Assert.DoesNotContain("ApplyNavHoverState", builderSource);
         Assert.DoesNotContain("BuilderSelectedNavStateTag", builderSource);
-        Assert.Contains("CreateResourceButton(\"General\"", renderWorkflowTreeBody);
-        Assert.Contains("CreateResourceButton(\"Networks\"", renderWorkflowTreeBody);
-        Assert.Contains("CreateResourceButton(\"Forests & Domains\"", renderWorkflowTreeBody);
-        Assert.Contains("CreateResourceButton(\"Credentials\"", renderWorkflowTreeBody);
-        Assert.Contains("CreateVmWorkflowNavRow()", renderWorkflowTreeBody);
+        Assert.Contains("projection.StepRows.Take(4)", renderWorkflowTreeBody);
+        Assert.Contains("CreateResourceButton(row.Label, row.IsSelected, () => SelectStep(row.Route.Step), row.IsEnabled)", renderWorkflowTreeBody);
+        Assert.Contains("CreateVmWorkflowNavRow(projection.VmOverviewRow)", renderWorkflowTreeBody);
         Assert.Contains("BuilderWorkflowTreePanel.Children.Add(BuilderVmNavChildrenPanel);", renderWorkflowTreeBody);
-        Assert.Contains("CreateResourceButton(\"Review\"", renderWorkflowTreeBody);
+        Assert.Contains("var reviewRow = projection.StepRows.Last();", renderWorkflowTreeBody);
         Assert.Contains("RenderVmNavChildren();", renderWorkflowTreeBody);
-        Assert.Contains("CreateResourceButton(\"VMs\"", createVmWorkflowNavRowBody);
+        Assert.Contains("CreateResourceButton(vmOverviewRow.Label, vmOverviewRow.IsSelected, SelectVmOverview, vmOverviewRow.IsEnabled)", createVmWorkflowNavRowBody);
         Assert.Contains("Content = CreateNavButtonContent(content, isSelected)", createResourceButtonBody);
         Assert.Contains("ConfigureNavButtonChrome(button);", createResourceButtonBody);
         Assert.Contains("button.Click += (_, _) => select();", createResourceButtonBody);
@@ -323,46 +303,105 @@ public sealed class Issue755TemplatesV2BuilderTests
     {
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
         var addVmBody = ExtractMethodBody(builderSource, "private void BuilderAddVmButton_Click(object sender, RoutedEventArgs e)");
+        var draft = CreateDraftWithVms("vm-1", "vm-2");
+        var navigation = new TemplatesBuilderWorkflowNavigation();
 
-        Assert.Contains("_selectedVmIndex = vms.Count - 1;", addVmBody);
-        Assert.Contains("_selectedStep = BuilderWorkflowStep.Vms;", addVmBody);
-        Assert.Contains("_isVmOverviewSelected = false;", addVmBody);
-        Assert.Contains("_selectedVmDetailCategory = BuilderVmDetailCategory.Basics;", addVmBody);
+        navigation.SelectVmChild(draft.Vms.Count - 1, draft);
+        var projection = navigation.Project(draft, canNavigate: true);
+
+        Assert.Contains("_workflowNavigation.SelectVmChild(vms.Count - 1, updatedDraft);", addVmBody);
+        Assert.Equal(BuilderWorkflowStep.Vms, projection.ActiveStep);
+        Assert.False(projection.IsVmOverviewSelected);
+        Assert.Equal(1, projection.SelectedVmIndex);
+        Assert.Equal(BuilderVmDetailCategory.Basics, projection.SelectedVmDetailCategory);
+        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics), projection.CurrentRoute);
     }
 
     [Fact]
     public void TemplatesBuilderView_PreviousNextRoute_IncludesEveryVmCategoryInDraftOrder()
     {
         var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
-        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
-        var routeBody = ExtractMethodBody(builderSource, "private List<BuilderWorkflowRoute> BuildWorkflowRoutes()");
-        var selectAdjacentBody = ExtractMethodBody(builderSource, "private void SelectAdjacentStep(int offset)");
-        var selectRouteBody = ExtractMethodBody(builderSource, "private void SelectRoute(BuilderWorkflowRoute route)");
-        var selectVmRouteBody = ExtractMethodBody(builderSource, "private void SelectVmRoute(BuilderWorkflowRoute route)");
-        var vmRowBody = ExtractMethodBody(builderSource, "private Grid CreateVmWorkflowNavRow()");
+        var draft = CreateDraftWithVms("vm-alpha", "vm-beta");
 
-        Assert.Contains("new(BuilderWorkflowStep.General)", routeBody);
-        Assert.Contains("new(BuilderWorkflowStep.Networks)", routeBody);
-        Assert.Contains("new(BuilderWorkflowStep.ForestsDomains)", routeBody);
-        Assert.Contains("new(BuilderWorkflowStep.Credentials)", routeBody);
-        Assert.Contains("new(BuilderWorkflowStep.Vms)", routeBody);
-        Assert.Contains("for (var vmIndex = 0; vmIndex < _draft.Vms.Count; vmIndex++)", routeBody);
-        Assert.Contains("foreach (var category in VmDetailCategoryOrder)", routeBody);
-        Assert.Contains("routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Vms, vmIndex, category));", routeBody);
-        Assert.Contains("routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Review));", routeBody);
-        Assert.Contains("UpdateWorkingDraftFromVisibleControls();", selectAdjacentBody);
-        Assert.Contains("SelectRoute(routes[targetIndex]);", selectAdjacentBody);
-        Assert.Contains("if (route.Step == BuilderWorkflowStep.Vms)", selectRouteBody);
-        Assert.Contains("SelectVmRoute(route);", selectRouteBody);
-        Assert.DoesNotContain("RenderDraftResources();", selectVmRouteBody);
-        Assert.Contains("RenderVmOverview();", selectVmRouteBody);
-        Assert.Contains("RenderVmNavChildren();", selectVmRouteBody);
-        Assert.Contains("RenderSelectedVmDetail();", selectVmRouteBody);
-        Assert.Contains("UpdateFooterCommandState();", selectVmRouteBody);
-        Assert.Contains("_selectedVmDetailCategory = route.VmDetailCategory;", selectVmRouteBody);
-        Assert.Contains("_selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected", vmRowBody);
+        var routes = TemplatesBuilderWorkflowNavigation.BuildRoutes(draft);
+
+        Assert.Equal(
+            [
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.General),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Networks),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.ForestsDomains),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Credentials),
+                BuilderWorkflowRoute.VmOverview(),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Basics),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Resources),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Membership),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Roles),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Credentials),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Resources),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Membership),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Roles),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Credentials),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Review)
+            ],
+            routes);
         Assert.Equal("0", FindByName(builder, "BuilderSelectedVmDetailPanel").Attribute("Grid.Column")?.Value);
         Assert.Equal("1", FindByName(builder, "BuilderVmDetailCategoryNavPanel").Attribute("Grid.Column")?.Value);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_ProjectsSelectedStateAndVmRows()
+    {
+        var draft = CreateDraftWithVms("vm-alpha", "vm-beta");
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking), draft);
+        var projection = navigation.Project(draft, canNavigate: true);
+        var selectedVmRow = Assert.Single(projection.VmRows, row => row.IsSelected);
+
+        Assert.Equal(BuilderWorkflowStep.Vms, projection.ActiveStep);
+        Assert.False(projection.IsVmOverviewSelected);
+        Assert.Equal(1, projection.SelectedVmIndex);
+        Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
+        Assert.True(projection.IsVmDetailSelected);
+        Assert.Equal("vm-beta", selectedVmRow.Label);
+        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics), selectedVmRow.Route);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_NonVmRoutesDoNotCaptureHiddenVmDetail()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var updateVmBody = ExtractMethodBody(builderSource, "private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)");
+        var draft = CreateDraftWithVms("vm-alpha", "vm-beta");
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking), draft);
+        navigation.SelectStep(BuilderWorkflowStep.General, draft);
+        var projection = navigation.Project(draft, canNavigate: true);
+
+        Assert.Equal(BuilderWorkflowStep.General, projection.ActiveStep);
+        Assert.False(projection.IsVmOverviewSelected);
+        Assert.False(projection.IsVmDetailSelected);
+        Assert.Contains("if (!projection.IsVmDetailSelected)", updateVmBody);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_ModelsFutureRoleChildRouteWithoutVmRowDrift()
+    {
+        var draft = CreateDraftWithVms("vm-alpha");
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmRole(0, "ad-domain-controller"), draft);
+        var projection = navigation.Project(draft, canNavigate: true);
+
+        Assert.Equal(BuilderWorkflowRouteKind.VmRole, projection.CurrentRoute.Kind);
+        Assert.Equal(BuilderVmDetailCategory.Roles, projection.SelectedVmDetailCategory);
+        Assert.True(projection.IsVmDetailSelected);
+        Assert.Equal("ad-domain-controller", projection.CurrentRoute.RoleKey);
+        Assert.True(Assert.Single(projection.VmRows).IsSelected);
     }
 
     [Fact]
@@ -372,6 +411,8 @@ public sealed class Issue755TemplatesV2BuilderTests
         var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
         var updateFooterBody = ExtractMethodBody(builderSource, "private void UpdateFooterCommandState(TemplatesBuilderActionState state)");
         var compositionSource = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderWorkspaceComposition.cs")));
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+        var draft = CreateDraftWithVms("vm-alpha");
 
         Assert.Null(FindByNameOrDefault(builder, "BuilderApplySuggestionsButton"));
         Assert.Null(FindByNameOrDefault(builder, "BuilderValidateButton"));
@@ -379,10 +420,22 @@ public sealed class Issue755TemplatesV2BuilderTests
         Assert.DoesNotContain("ValidateRequested", builderSource);
         Assert.DoesNotContain("ApplySuggestionsRequested", compositionSource);
         Assert.DoesNotContain("ValidateRequested", compositionSource);
-        Assert.Contains("BuilderSaveAsButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", updateFooterBody);
-        Assert.Contains("BuilderSaveButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed", updateFooterBody);
-        Assert.Contains("BuilderSaveAsButton.IsEnabled = isReview && state.CanSaveAs;", updateFooterBody);
-        Assert.Contains("BuilderSaveButton.IsEnabled = isReview && state.CanSave;", updateFooterBody);
+        Assert.Contains("ProjectFooter(_draft, _canNavigateWorkflow, state.CanSave, state.CanSaveAs)", updateFooterBody);
+
+        var firstFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
+        Assert.False(firstFooter.IsReview);
+        Assert.False(firstFooter.CanGoPrevious);
+        Assert.True(firstFooter.CanGoNext);
+        Assert.False(firstFooter.CanSave);
+        Assert.False(firstFooter.CanSaveAs);
+
+        navigation.SelectStep(BuilderWorkflowStep.Review, draft);
+        var reviewFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
+        Assert.True(reviewFooter.IsReview);
+        Assert.True(reviewFooter.CanGoPrevious);
+        Assert.False(reviewFooter.CanGoNext);
+        Assert.True(reviewFooter.CanSave);
+        Assert.True(reviewFooter.CanSaveAs);
     }
 
     [Fact]
@@ -737,6 +790,30 @@ public sealed class Issue755TemplatesV2BuilderTests
 
         return TemplatesBuilderDraftMapper.CreateSuggestedDraft(referenceData) with { IsSaveConfirmed = true };
     }
+
+    private static TemplatesBuilderDraftSnapshot CreateDraftWithVms(params string[] vmIds)
+        => new(
+            "Builder draft",
+            "Draft for navigation tests.",
+            "Balanced",
+            [],
+            [],
+            [],
+            [],
+            vmIds
+                .Select(vmId => new TemplatesBuilderVmDraft(
+                    vmId,
+                    vmId,
+                    "4096",
+                    "2",
+                    string.Empty,
+                    V2MembershipModeCatalog.Standalone,
+                    string.Empty,
+                    false,
+                    new TemplatesBuilderVmCredentialSlotDraft(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty),
+                    []))
+                .ToList(),
+            false);
 
     private static LabTemplate CreateTemplateWithTrust()
     {
