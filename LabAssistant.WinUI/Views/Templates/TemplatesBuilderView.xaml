@@ -173,7 +173,12 @@
                                         <ColumnDefinition Width="240" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" x:Name="BuilderForestDomainResourcesListPanel" Spacing="6" />
+                                    <ScrollViewer
+                                        Grid.Column="0"
+                                        HorizontalScrollBarVisibility="Disabled"
+                                        VerticalScrollBarVisibility="Auto">
+                                        <StackPanel x:Name="BuilderDirectoryTopologyCanvasPanel" Spacing="8" />
+                                    </ScrollViewer>
                                     <StackPanel Grid.Column="1" x:Name="BuilderSelectedForestDomainDetailPanel" Spacing="8" />
                                 </Grid>
                             </StackPanel>

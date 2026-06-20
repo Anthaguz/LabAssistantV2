@@ -88,7 +88,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.DoesNotContain("BuilderVmsPanel", builderSource, StringComparison.Ordinal);
         Assert.NotNull(FindByName(builder, "BuilderNetworksListPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedNetworkDetailPanel"));
-        Assert.NotNull(FindByName(builder, "BuilderForestDomainResourcesListPanel"));
+        Assert.NotNull(FindByName(builder, "BuilderDirectoryTopologyCanvasPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedForestDomainDetailPanel"));
         Assert.NotNull(FindByName(builder, "BuilderCredentialSlotsListPanel"));
         Assert.NotNull(FindByName(builder, "BuilderSelectedCredentialSlotDetailPanel"));
@@ -98,7 +98,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.Contains("RenderVmSectionNavigator", builderSource);
         Assert.Contains("TemplatesBuilderSectionProjections.ProjectNetworkRows", builderSource);
         Assert.Contains("TemplatesBuilderSectionProjections.ProjectCredentialSlotRows", builderSource);
-        Assert.Contains("TemplatesBuilderSectionProjections.ProjectForestDomainRows", builderSource);
+        Assert.Contains("TemplatesBuilderDirectoryTopologyProjector.Project", builderSource);
         Assert.Contains("TemplatesBuilderSectionProjections.ProjectVmOverview", builderSource);
         Assert.Contains("TemplatesBuilderSectionProjections.ProjectSelectedVmDetail", builderSource);
         Assert.Contains("Content = CreateNavButtonContent(\"+ Add VM\", isSelected: false)", builderSource);
@@ -534,7 +534,7 @@ public sealed class TemplatesBuilderWorkflowContractTests
 
         var networkRow = Assert.Single(TemplatesBuilderSectionProjections.ProjectNetworkRows(draft, selectedIndex: 0));
         var credentialRows = TemplatesBuilderSectionProjections.ProjectCredentialSlotRows(draft, selectedIndex: 1);
-        var forestDomainRows = TemplatesBuilderSectionProjections.ProjectForestDomainRows(draft, BuilderForestDomainResourceKind.Domain, selectedIndex: 0);
+        var topology = TemplatesBuilderDirectoryTopologyProjector.Project(draft, BuilderForestDomainResourceKind.Domain, selectedIndex: 0);
         var overview = TemplatesBuilderSectionProjections.ProjectVmOverview(draft);
 
         navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
@@ -546,9 +546,11 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.True(networkRow.IsSelected);
         Assert.Equal(4, credentialRows.Count);
         Assert.Equal(TemplatesBuilderResourceKind.CredentialSlot, credentialRows[1].Kind);
-        Assert.Equal(TemplatesBuilderResourceKind.Forest, forestDomainRows[0].Kind);
-        Assert.Equal(TemplatesBuilderResourceKind.Domain, forestDomainRows[1].Kind);
-        Assert.True(forestDomainRows[1].IsSelected);
+        var forest = Assert.Single(topology.Forests);
+        Assert.Equal("forest:forest-contoso", forest.NodeId);
+        var rootDomain = Assert.Single(forest.RootNodes);
+        Assert.Equal("domain:domain-contoso", rootDomain.NodeId);
+        Assert.True(rootDomain.IsSelected);
         Assert.Equal(2, overview.TotalVmCount);
         Assert.Equal(2, overview.DomainMemberVmCount);
         Assert.Equal(1, overview.ActiveDirectoryDomainControllerCount);
