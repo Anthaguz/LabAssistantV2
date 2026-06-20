@@ -136,7 +136,9 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.Contains("FindNextVmNumber", builderSource);
         Assert.Contains("$\"vm-{nextVmNumber}\"", builderSource);
         Assert.Contains("$\"VM {nextVmNumber}\"", builderSource);
-        Assert.Contains("ReadNics(BuilderSelectedVmDetailPanel)", builderSource);
+        Assert.Contains("SelectVmNic", builderSource);
+        Assert.Contains("RenderNicOverview", builderSource);
+        Assert.Contains("RenderSelectedNicDetail", builderSource);
         Assert.DoesNotContain("RenderVmDetailCategoryNav", builderSource);
         Assert.DoesNotContain("BuilderVmDetailCategoryNavPanel", builderSource);
         Assert.DoesNotContain("BuilderVmNameListPanel", builderSource);
@@ -266,18 +268,19 @@ public sealed class TemplatesBuilderWorkflowContractTests
             builderSource,
             "case BuilderVmDetailCategory.Networking:",
             "case BuilderVmDetailCategory.Credentials:");
-        var createNicRowBody = ExtractMethodBody(builderSource, "private StackPanel CreateNicRow(TemplatesBuilderNicRowProjection projection)");
+        var renderSelectedNicDetailBody = ExtractMethodBody(builderSource, "private void RenderSelectedNicDetail(TemplatesBuilderVmDetailProjection detail)");
         var updateVmBody = ExtractMethodBody(builderSource, "private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)");
         var selectVmChildBody = ExtractMethodBody(builderSource, "private void SelectVmChild(int index)");
         var selectVmDetailCategoryBody = ExtractMethodBody(builderSource, "private void SelectVmDetailCategory(BuilderVmDetailCategory category)");
 
         Assert.Contains("CreateTextBox(\"Memory MB\", TemplatesBuilderFieldKeys.VmMemoryMb, vm.MemoryMb)", resourcesRenderBody);
         Assert.Contains("CreateTextBox(\"CPU Count\", TemplatesBuilderFieldKeys.VmCpuCount, vm.CpuCount)", resourcesRenderBody);
-        Assert.Contains("CreateNicRow(nic)", networkingRenderBody);
-        Assert.Contains("CreateTextBox(\"Prefix\", TemplatesBuilderFieldKeys.NicPrefixLength, nic.PrefixLength)", createNicRowBody);
+        Assert.Contains("RenderNicOverview(detail.Value)", networkingRenderBody);
+        Assert.Contains("RenderSelectedNicDetail(detail.Value)", networkingRenderBody);
+        Assert.Contains("CreateTextBox(\"Prefix\", TemplatesBuilderFieldKeys.NicPrefixLength, nic.PrefixLength)", renderSelectedNicDetailBody);
         Assert.Contains("MemoryMb = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmMemoryMb)", updateVmBody);
         Assert.Contains("CpuCount = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmCpuCount)", updateVmBody);
-        Assert.Contains("GetText(row, TemplatesBuilderFieldKeys.NicPrefixLength)", builderSource);
+        Assert.Contains("GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.NicPrefixLength)", builderSource);
         Assert.DoesNotContain("ParsePositiveInt", builderSource);
         Assert.DoesNotContain("ParseNullableInt", builderSource);
         Assert.DoesNotContain("RenderDraftResources();", selectVmChildBody);
@@ -397,6 +400,61 @@ public sealed class TemplatesBuilderWorkflowContractTests
     }
 
     [Fact]
+    public void TemplatesBuilderView_AddNic_SelectsNewNicDetail()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var addNicBody = ExtractMethodBody(builderSource, "private void BuilderAddNicButton_Click(object sender, RoutedEventArgs e)");
+        var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a"]));
+        var updatedDraft = draft with
+        {
+            Vms =
+            [
+                draft.Vms[0] with
+                {
+                    Nics =
+                    [
+                        draft.Vms[0].Nics[0],
+                        new TemplatesBuilderNicDraft("nic-b", "nic-b", "lab-core", string.Empty, string.Empty, string.Empty, string.Empty, [])
+                    ]
+                }
+            ]
+        };
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(0, updatedDraft.Vms[0].Nics.Count - 1), updatedDraft);
+        var projection = navigation.Project(updatedDraft, canNavigate: true);
+
+        Assert.Contains("_workflowNavigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(vmIndex, nics.Count - 1), updatedDraft);", addNicBody);
+        Assert.Equal(BuilderWorkflowRoute.ForVmNic(0, 1), projection.CurrentRoute);
+        Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
+        Assert.True(projection.IsNicDetailSelected);
+        Assert.Equal(1, projection.SelectedNicIndex);
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_NetworkingUsesOverviewAndSingleNicDetailInsteadOfStackedEditor()
+    {
+        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
+        var networkingRenderBody = ExtractSwitchCaseBody(
+            builderSource,
+            "case BuilderVmDetailCategory.Networking:",
+            "case BuilderVmDetailCategory.Credentials:");
+        var renderNicOverviewBody = ExtractMethodBody(builderSource, "private void RenderNicOverview(TemplatesBuilderVmDetailProjection detail)");
+        var renderSelectedNicDetailBody = ExtractMethodBody(builderSource, "private void RenderSelectedNicDetail(TemplatesBuilderVmDetailProjection detail)");
+
+        Assert.Contains("detail.Value.IsNicDetailSelected", networkingRenderBody);
+        Assert.Contains("RenderSelectedNicDetail(detail.Value)", networkingRenderBody);
+        Assert.Contains("RenderNicOverview(detail.Value)", networkingRenderBody);
+        Assert.Contains("CreateNicOverviewRow(nic)", renderNicOverviewBody);
+        Assert.Contains("SelectVmNic(projection.Index)", renderNicOverviewBody + builderSource);
+        Assert.Contains("CreateTextBox(\"Network ID\", TemplatesBuilderFieldKeys.NicNetworkId, nic.NetworkId)", renderSelectedNicDetailBody);
+        Assert.Contains("CreateTextBox(\"Switch Override\", TemplatesBuilderFieldKeys.NicSwitchName, nic.SwitchName)", renderSelectedNicDetailBody);
+        Assert.DoesNotContain("VmNicsPanel", builderSource);
+        Assert.DoesNotContain("ReadNics", builderSource);
+        Assert.DoesNotContain("CreateNicRow", builderSource);
+    }
+
+    [Fact]
     public void TemplatesBuilderView_PreviousNextRoute_IncludesEveryVmCategoryInDraftOrder()
     {
         var builder = LoadXaml(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml"));
@@ -428,6 +486,110 @@ public sealed class TemplatesBuilderWorkflowContractTests
             routes);
         Assert.Null(FindByName(builder, "BuilderSelectedVmDetailPanel").Attribute("Grid.Column"));
         Assert.Null(FindByNameOrDefault(builder, "BuilderVmDetailCategoryNavPanel"));
+    }
+
+    [Fact]
+    public void TemplatesBuilderView_PreviousNextRoute_IncludesNicDetailsAfterNetworkingOverview()
+    {
+        var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a", "nic-b"]), ("vm-beta", ["nic-c"]));
+
+        var routes = TemplatesBuilderWorkflowNavigation.BuildRoutes(draft);
+
+        Assert.Equal(
+            [
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.General),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Networks),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.ForestsDomains),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Credentials),
+                BuilderWorkflowRoute.VmOverview(),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Basics),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Resources),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Membership),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Roles),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking),
+                BuilderWorkflowRoute.ForVmNic(0, 0),
+                BuilderWorkflowRoute.ForVmNic(0, 1),
+                BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Credentials),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Basics),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Resources),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Membership),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Roles),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Networking),
+                BuilderWorkflowRoute.ForVmNic(1, 0),
+                BuilderWorkflowRoute.ForVmCategory(1, BuilderVmDetailCategory.Credentials),
+                BuilderWorkflowRoute.ForStep(BuilderWorkflowStep.Review)
+            ],
+            routes);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_NetworkingOverviewRoutesToCredentialsWhenVmHasZeroNics()
+    {
+        var draft = CreateDraftWithVms("vm-alpha");
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
+        var footer = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
+
+        Assert.True(footer.CanGoNext);
+        Assert.Equal("vm-alpha Credentials", footer.NextTargetLabel);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_NicDetailFooterTargetsFollowDraftOrder()
+    {
+        var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a", "nic-b"]));
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), draft);
+        var overviewFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
+        navigation.SelectAdjacent(1, draft);
+        var firstNicFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
+        navigation.SelectAdjacent(1, draft);
+        var secondNicFooter = navigation.ProjectFooter(draft, canNavigate: true, canSave: true, canSaveAs: true);
+
+        Assert.Equal("vm-alpha Networking - nic-a", overviewFooter.NextTargetLabel);
+        Assert.Equal("vm-alpha Networking", firstNicFooter.PreviousTargetLabel);
+        Assert.Equal("vm-alpha Networking - nic-b", firstNicFooter.NextTargetLabel);
+        Assert.Equal("vm-alpha Networking - nic-a", secondNicFooter.PreviousTargetLabel);
+        Assert.Equal("vm-alpha Credentials", secondNicFooter.NextTargetLabel);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_NicDetailRoutesPreserveInvalidDraftValues()
+    {
+        var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a", "nic-b"]));
+        var invalidNicDraft = draft with
+        {
+            Vms =
+            [
+                draft.Vms[0] with
+                {
+                    Nics =
+                    [
+                        draft.Vms[0].Nics[0] with
+                        {
+                            IpAddress = "999.1.1.1",
+                            PrefixLength = "prefix-ish"
+                        },
+                        draft.Vms[0].Nics[1]
+                    ]
+                }
+            ]
+        };
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(0, 0), invalidNicDraft);
+        navigation.SelectAdjacent(1, invalidNicDraft);
+        navigation.SelectAdjacent(-1, invalidNicDraft);
+        var detail = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(
+            invalidNicDraft,
+            navigation.Project(invalidNicDraft, canNavigate: true));
+
+        Assert.NotNull(detail);
+        Assert.True(detail.Value.IsNicDetailSelected);
+        Assert.Equal("999.1.1.1", detail.Value.Nics[0].Draft.IpAddress);
+        Assert.Equal("prefix-ish", detail.Value.Nics[0].Draft.PrefixLength);
     }
 
     [Fact]
@@ -463,6 +625,28 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.Equal(
             ["Basics", "Resources", "Membership", "Roles", "Networking", "Credentials"],
             projection.SelectedVmSectionRows.Select(row => row.Label).ToArray());
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_ProjectsNicDetailWithinNetworkingSection()
+    {
+        var draft = CreateDraftWithVmNics(("vm-alpha", ["nic-a", "nic-b"]));
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(0, 1), draft);
+        var projection = navigation.Project(draft, canNavigate: true);
+        var selectedCategoryRow = Assert.Single(projection.SelectedVmSectionRows, row => row.IsSelected);
+        var detail = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(draft, projection);
+
+        Assert.Equal(BuilderWorkflowRouteKind.VmNic, projection.CurrentRoute.Kind);
+        Assert.True(projection.IsNicDetailSelected);
+        Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
+        Assert.Equal(1, projection.SelectedNicIndex);
+        Assert.Equal(BuilderVmDetailCategory.Networking, selectedCategoryRow.Route.VmDetailCategory);
+        Assert.NotNull(detail);
+        Assert.True(detail.Value.IsNicDetailSelected);
+        Assert.Equal(1, detail.Value.SelectedNicIndex);
+        Assert.True(detail.Value.Nics[1].IsSelected);
     }
 
     [Fact]
@@ -506,6 +690,22 @@ public sealed class TemplatesBuilderWorkflowContractTests
         Assert.False(projection.IsVmOverviewSelected);
         Assert.False(projection.IsVmDetailSelected);
         Assert.Contains("if (!projection.IsVmDetailSelected)", updateVmBody);
+    }
+
+    [Fact]
+    public void TemplatesBuilderWorkflowNavigation_NormalizesRemovedNicDetailBackToNetworkingOverview()
+    {
+        var draftWithNic = CreateDraftWithVmNics(("vm-alpha", ["nic-a"]));
+        var draftWithoutNic = CreateDraftWithVms("vm-alpha");
+        var navigation = new TemplatesBuilderWorkflowNavigation();
+
+        navigation.SelectRoute(BuilderWorkflowRoute.ForVmNic(0, 0), draftWithNic);
+        navigation.EnsureCurrentRouteInBounds(draftWithoutNic);
+        var projection = navigation.Project(draftWithoutNic, canNavigate: true);
+
+        Assert.Equal(BuilderWorkflowRoute.ForVmCategory(0, BuilderVmDetailCategory.Networking), projection.CurrentRoute);
+        Assert.False(projection.IsNicDetailSelected);
+        Assert.Equal(BuilderVmDetailCategory.Networking, projection.SelectedVmDetailCategory);
     }
 
     [Fact]
@@ -1159,6 +1359,40 @@ public sealed class TemplatesBuilderWorkflowContractTests
                     false,
                     new TemplatesBuilderVmCredentialSlotDraft(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty),
                     []))
+                .ToList(),
+            false);
+
+    private static TemplatesBuilderDraftSnapshot CreateDraftWithVmNics(params (string VmId, string[] NicIds)[] vmDefinitions)
+        => new(
+            "Builder draft",
+            "Draft for NIC navigation tests.",
+            "Balanced",
+            [new TemplatesBuilderLabNetworkDraft("lab-core", "Core", "vSwitch-Core", V2SwitchTypeCatalog.Internal, "10.0.0.0/24", string.Empty)],
+            [],
+            [],
+            [],
+            vmDefinitions
+                .Select(vm => new TemplatesBuilderVmDraft(
+                    vm.VmId,
+                    vm.VmId,
+                    "4096",
+                    "2",
+                    string.Empty,
+                    V2MembershipModeCatalog.Standalone,
+                    string.Empty,
+                    false,
+                    new TemplatesBuilderVmCredentialSlotDraft(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty),
+                    vm.NicIds
+                        .Select(nicId => new TemplatesBuilderNicDraft(
+                            nicId,
+                            nicId,
+                            "lab-core",
+                            string.Empty,
+                            string.Empty,
+                            "24",
+                            string.Empty,
+                            []))
+                        .ToList()))
                 .ToList(),
             false);
 
