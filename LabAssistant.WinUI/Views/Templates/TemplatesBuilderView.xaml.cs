@@ -282,24 +282,21 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderVmOverview()
     {
-        BuilderVmTotalCountTextBlock.Text = _draft.Vms.Count.ToString();
-        var standaloneCount = _draft.Vms.Count(vm => string.Equals(vm.MembershipMode, V2MembershipModeCatalog.Standalone, StringComparison.OrdinalIgnoreCase));
-        var domainMemberCount = _draft.Vms.Count(vm => string.Equals(vm.MembershipMode, V2MembershipModeCatalog.DomainMember, StringComparison.OrdinalIgnoreCase));
-        BuilderVmMembershipCountsTextBlock.Text = $"Standalone {standaloneCount} / Domain {domainMemberCount}";
-        BuilderVmAdDcCountTextBlock.Text = _draft.Vms.Count(vm => vm.IsActiveDirectoryDomainController).ToString();
+        var projection = TemplatesBuilderSectionProjections.ProjectVmOverview(_draft);
+        BuilderVmTotalCountTextBlock.Text = projection.TotalVmCount.ToString();
+        BuilderVmMembershipCountsTextBlock.Text = $"Standalone {projection.StandaloneVmCount} / Domain {projection.DomainMemberVmCount}";
+        BuilderVmAdDcCountTextBlock.Text = projection.ActiveDirectoryDomainControllerCount.ToString();
 
         BuilderVmOverviewListPanel.Children.Clear();
-        if (_draft.Vms.Count == 0)
+        if (projection.TotalVmCount == 0)
         {
             BuilderVmOverviewListPanel.Children.Add(CreateEmptyDetailText("No VMs in this draft."));
             return;
         }
 
-        foreach (var vm in _draft.Vms)
+        foreach (var row in projection.SummaryRows)
         {
-            var role = vm.IsActiveDirectoryDomainController ? ", AD DC" : string.Empty;
-            BuilderVmOverviewListPanel.Children.Add(CreateEmptyDetailText(
-                $"{FormatResourceName(vm.Name, vm.VmId)} - {FormatResourceName(vm.MembershipMode, V2MembershipModeCatalog.Standalone)}, {vm.Nics.Count} NICs{role}"));
+            BuilderVmOverviewListPanel.Children.Add(CreateEmptyDetailText(row));
         }
     }
 
@@ -317,17 +314,15 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void RenderNetworkList()
     {
         BuilderNetworksListPanel.Children.Clear();
-        for (var i = 0; i < _draft.LabNetworks.Count; i++)
+        foreach (var row in TemplatesBuilderSectionProjections.ProjectNetworkRows(_draft, _selectedNetworkIndex))
         {
-            var index = i;
-            var network = _draft.LabNetworks[i];
             BuilderNetworksListPanel.Children.Add(CreateResourceButton(
-                FormatResourceName(network.Name, network.NetworkId),
-                index == _selectedNetworkIndex,
+                row.Label,
+                row.IsSelected,
                 () =>
                 {
                     UpdateWorkingDraftFromVisibleControls();
-                    _selectedNetworkIndex = index;
+                    _selectedNetworkIndex = row.Index;
                     RenderNetworkList();
                     RenderSelectedNetworkDetail();
                 }));
@@ -337,17 +332,15 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void RenderCredentialSlotList()
     {
         BuilderCredentialSlotsListPanel.Children.Clear();
-        for (var i = 0; i < _draft.CredentialSlots.Count; i++)
+        foreach (var row in TemplatesBuilderSectionProjections.ProjectCredentialSlotRows(_draft, _selectedCredentialSlotIndex))
         {
-            var index = i;
-            var slot = _draft.CredentialSlots[i];
             BuilderCredentialSlotsListPanel.Children.Add(CreateResourceButton(
-                FormatResourceName(slot.Label, slot.SlotKey),
-                index == _selectedCredentialSlotIndex,
+                row.Label,
+                row.IsSelected,
                 () =>
                 {
                     UpdateWorkingDraftFromVisibleControls();
-                    _selectedCredentialSlotIndex = index;
+                    _selectedCredentialSlotIndex = row.Index;
                     RenderCredentialSlotList();
                     RenderSelectedCredentialSlotDetail();
                 }));
@@ -357,35 +350,18 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void RenderForestDomainList()
     {
         BuilderForestDomainResourcesListPanel.Children.Clear();
-        for (var i = 0; i < _draft.Forests.Count; i++)
+        foreach (var row in TemplatesBuilderSectionProjections.ProjectForestDomainRows(_draft, _selectedForestDomainKind, _selectedForestDomainIndex))
         {
-            var index = i;
-            var forest = _draft.Forests[i];
             BuilderForestDomainResourcesListPanel.Children.Add(CreateResourceButton(
-                $"Forest: {FormatResourceName(forest.ForestId, forest.RootDomainId)}",
-                _selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && index == _selectedForestDomainIndex,
+                row.Label,
+                row.IsSelected,
                 () =>
                 {
                     UpdateWorkingDraftFromVisibleControls();
-                    _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
-                    _selectedForestDomainIndex = index;
-                    RenderForestDomainList();
-                    RenderSelectedForestDomainDetail();
-                }));
-        }
-
-        for (var i = 0; i < _draft.Domains.Count; i++)
-        {
-            var index = i;
-            var domain = _draft.Domains[i];
-            BuilderForestDomainResourcesListPanel.Children.Add(CreateResourceButton(
-                $"Domain: {FormatResourceName(domain.DnsName, domain.DomainId)}",
-                _selectedForestDomainKind == BuilderForestDomainResourceKind.Domain && index == _selectedForestDomainIndex,
-                () =>
-                {
-                    UpdateWorkingDraftFromVisibleControls();
-                    _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
-                    _selectedForestDomainIndex = index;
+                    _selectedForestDomainKind = row.Kind == TemplatesBuilderResourceKind.Forest
+                        ? BuilderForestDomainResourceKind.Forest
+                        : BuilderForestDomainResourceKind.Domain;
+                    _selectedForestDomainIndex = row.Index;
                     RenderForestDomainList();
                     RenderSelectedForestDomainDetail();
                 }));
@@ -442,11 +418,11 @@ public sealed partial class TemplatesBuilderView : UserControl
         var network = _draft.LabNetworks[_selectedNetworkIndex];
         BuilderSelectedNetworkDetailPanel.Children.Add(CreateRowTitle("Selected Network Detail"));
         BuilderSelectedNetworkDetailPanel.Children.Add(CreateFieldGrid(
-            CreateTextBox("Network ID", "network.NetworkId", network.NetworkId),
-            CreateTextBox("Name", "network.Name", network.Name),
-            CreateTextBox("Switch", "network.SwitchName", network.SwitchName),
-            CreateTextBox("Subnet", "network.Subnet", network.Subnet),
-            CreateTextBox("Notes", "network.Notes", network.Notes)));
+            CreateTextBox("Network ID", TemplatesBuilderFieldKeys.NetworkId, network.NetworkId),
+            CreateTextBox("Name", TemplatesBuilderFieldKeys.NetworkName, network.Name),
+            CreateTextBox("Switch", TemplatesBuilderFieldKeys.NetworkSwitchName, network.SwitchName),
+            CreateTextBox("Subnet", TemplatesBuilderFieldKeys.NetworkSubnet, network.Subnet),
+            CreateTextBox("Notes", TemplatesBuilderFieldKeys.NetworkNotes, network.Notes)));
     }
 
     private void RenderSelectedCredentialSlotDetail()
@@ -461,9 +437,9 @@ public sealed partial class TemplatesBuilderView : UserControl
         var slot = _draft.CredentialSlots[_selectedCredentialSlotIndex];
         BuilderSelectedCredentialSlotDetailPanel.Children.Add(CreateRowTitle("Selected Slot Detail"));
         BuilderSelectedCredentialSlotDetailPanel.Children.Add(CreateFieldGrid(
-            CreateTextBox("Slot Key", "credential.SlotKey", slot.SlotKey),
-            CreateTextBox("Label", "credential.Label", slot.Label),
-            CreateTextBox("Scope", "credential.ScopeHint", slot.ScopeHint)));
+            CreateTextBox("Slot Key", TemplatesBuilderFieldKeys.CredentialSlotKey, slot.SlotKey),
+            CreateTextBox("Label", TemplatesBuilderFieldKeys.CredentialSlotLabel, slot.Label),
+            CreateTextBox("Scope", TemplatesBuilderFieldKeys.CredentialSlotScopeHint, slot.ScopeHint)));
     }
 
     private void RenderSelectedForestDomainDetail()
@@ -474,8 +450,8 @@ public sealed partial class TemplatesBuilderView : UserControl
             var forest = _draft.Forests[_selectedForestDomainIndex];
             BuilderSelectedForestDomainDetailPanel.Children.Add(CreateRowTitle("Selected Forest Detail"));
             BuilderSelectedForestDomainDetailPanel.Children.Add(CreateFieldGrid(
-                CreateTextBox("Forest ID", "forest.ForestId", forest.ForestId),
-                CreateTextBox("Root Domain ID", "forest.RootDomainId", forest.RootDomainId)));
+                CreateTextBox("Forest ID", TemplatesBuilderFieldKeys.ForestId, forest.ForestId),
+                CreateTextBox("Root Domain ID", TemplatesBuilderFieldKeys.ForestRootDomainId, forest.RootDomainId)));
             return;
         }
 
@@ -484,12 +460,12 @@ public sealed partial class TemplatesBuilderView : UserControl
             var domain = _draft.Domains[_selectedForestDomainIndex];
             BuilderSelectedForestDomainDetailPanel.Children.Add(CreateRowTitle("Selected Domain Detail"));
             BuilderSelectedForestDomainDetailPanel.Children.Add(CreateFieldGrid(
-                CreateTextBox("Domain ID", "domain.DomainId", domain.DomainId),
-                CreateTextBox("DNS Name", "domain.DnsName", domain.DnsName),
-                CreateTextBox("NetBIOS", "domain.NetBiosName", domain.NetBiosName),
-                CreateTextBox("Forest ID", "domain.ForestId", domain.ForestId),
-                CreateComboBox("Relation", "domain.RelationKind", domain.RelationKind, nameof(V2DomainRelationKind.Root), nameof(V2DomainRelationKind.Child), nameof(V2DomainRelationKind.Tree)),
-                CreateTextBox("Parent Domain ID", "domain.ParentDomainId", domain.ParentDomainId)));
+                CreateTextBox("Domain ID", TemplatesBuilderFieldKeys.DomainId, domain.DomainId),
+                CreateTextBox("DNS Name", TemplatesBuilderFieldKeys.DomainDnsName, domain.DnsName),
+                CreateTextBox("NetBIOS", TemplatesBuilderFieldKeys.DomainNetBiosName, domain.NetBiosName),
+                CreateTextBox("Forest ID", TemplatesBuilderFieldKeys.DomainForestId, domain.ForestId),
+                CreateComboBox("Relation", TemplatesBuilderFieldKeys.DomainRelationKind, domain.RelationKind, nameof(V2DomainRelationKind.Root), nameof(V2DomainRelationKind.Child), nameof(V2DomainRelationKind.Tree)),
+                CreateTextBox("Parent Domain ID", TemplatesBuilderFieldKeys.DomainParentDomainId, domain.ParentDomainId)));
             return;
         }
 
@@ -500,43 +476,48 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
         BuilderSelectedVmDetailPanel.Children.Clear();
-        if (_draft.Vms.Count == 0)
+        var detail = TemplatesBuilderSectionProjections.ProjectSelectedVmDetail(_draft, projection);
+        if (detail is null)
         {
             BuilderSelectedVmDetailPanel.Children.Add(CreateEmptyDetailText("No VM selected."));
             return;
         }
 
-        var vm = _draft.Vms[projection.SelectedVmIndex];
-        BuilderSelectedVmDetailPanel.Children.Add(CreateRowTitle($"Selected VM Detail: {FormatResourceName(vm.Name, vm.VmId)}"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead(GetVmDetailCategoryLabel(projection.SelectedVmDetailCategory)));
+        var vm = detail.Value.Vm;
+        BuilderSelectedVmDetailPanel.Children.Add(CreateRowTitle(detail.Value.Title));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead(detail.Value.CategoryLabel));
 
-        switch (projection.SelectedVmDetailCategory)
+        switch (detail.Value.Category)
         {
             case BuilderVmDetailCategory.Basics:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-                    CreateTextBox("VM ID", "vm.VmId", vm.VmId),
-                    CreateTextBox("Name", "vm.Name", vm.Name)));
+                    CreateTextBox("VM ID", TemplatesBuilderFieldKeys.VmId, vm.VmId),
+                    CreateTextBox("Name", TemplatesBuilderFieldKeys.VmName, vm.Name)));
                 break;
             case BuilderVmDetailCategory.Resources:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-                    CreateTextBox("Memory MB", "vm.MemoryMb", vm.MemoryMb),
-                    CreateTextBox("CPU Count", "vm.CpuCount", vm.CpuCount),
-                    CreateTextBox("Base Disk / VHDX ID", "vm.VhdxId", vm.VhdxId)));
+                    CreateTextBox("Memory MB", TemplatesBuilderFieldKeys.VmMemoryMb, vm.MemoryMb),
+                    CreateTextBox("CPU Count", TemplatesBuilderFieldKeys.VmCpuCount, vm.CpuCount),
+                    CreateTextBox("Base Disk / VHDX ID", TemplatesBuilderFieldKeys.VmVhdxId, vm.VhdxId)));
                 break;
             case BuilderVmDetailCategory.Membership:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-                    CreateComboBox("Membership", "vm.MembershipMode", vm.MembershipMode, V2MembershipModeCatalog.DomainMember, V2MembershipModeCatalog.Standalone),
-                    CreateTextBox("Domain ID", "vm.DomainId", vm.DomainId)));
+                    CreateComboBox("Membership", TemplatesBuilderFieldKeys.VmMembershipMode, vm.MembershipMode, V2MembershipModeCatalog.DomainMember, V2MembershipModeCatalog.Standalone),
+                    CreateTextBox("Domain ID", TemplatesBuilderFieldKeys.VmDomainId, vm.DomainId)));
                 break;
             case BuilderVmDetailCategory.Roles:
-                BuilderSelectedVmDetailPanel.Children.Add(CreateCheckBox("Active Directory Domain Controller", "vm.IsActiveDirectoryDomainController", vm.IsActiveDirectoryDomainController));
+                foreach (var role in detail.Value.Roles.Where(role => role.IsAuthorable))
+                {
+                    BuilderSelectedVmDetailPanel.Children.Add(CreateCheckBox(role.DisplayName, TemplatesBuilderFieldKeys.VmIsActiveDirectoryDomainController, role.IsAssigned));
+                }
+
                 break;
             case BuilderVmDetailCategory.Networking:
-                var addNicButton = new Button { Content = "Add NIC", Tag = projection.SelectedVmIndex };
+                var addNicButton = new Button { Content = "Add NIC", Tag = detail.Value.VmIndex };
                 addNicButton.Click += BuilderAddNicButton_Click;
                 BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
-                var nicsPanel = new StackPanel { Spacing = 6, Tag = "vm.NicsPanel" };
-                foreach (var nic in vm.Nics)
+                var nicsPanel = new StackPanel { Spacing = 6, Tag = TemplatesBuilderFieldKeys.VmNicsPanel };
+                foreach (var nic in detail.Value.Nics)
                 {
                     nicsPanel.Children.Add(CreateNicRow(nic));
                 }
@@ -545,28 +526,29 @@ public sealed partial class TemplatesBuilderView : UserControl
                 break;
             case BuilderVmDetailCategory.Credentials:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
-                    CreateTextBox("Local Bootstrap Slot", "vm.LocalBootstrap", vm.CredentialSlots.LocalBootstrap),
-                    CreateTextBox("Domain Admin Slot", "vm.DomainAdmin", vm.CredentialSlots.DomainAdmin),
-                    CreateTextBox("Domain Join Slot", "vm.DomainJoin", vm.CredentialSlots.DomainJoin),
-                    CreateTextBox("DSRM Slot", "vm.Dsrm", vm.CredentialSlots.Dsrm),
-                    CreateTextBox("Parent Domain Admin Slot", "vm.ParentDomainAdmin", vm.CredentialSlots.ParentDomainAdmin)));
+                    CreateTextBox("Local Bootstrap Slot", TemplatesBuilderFieldKeys.VmLocalBootstrap, vm.CredentialSlots.LocalBootstrap),
+                    CreateTextBox("Domain Admin Slot", TemplatesBuilderFieldKeys.VmDomainAdmin, vm.CredentialSlots.DomainAdmin),
+                    CreateTextBox("Domain Join Slot", TemplatesBuilderFieldKeys.VmDomainJoin, vm.CredentialSlots.DomainJoin),
+                    CreateTextBox("DSRM Slot", TemplatesBuilderFieldKeys.VmDsrm, vm.CredentialSlots.Dsrm),
+                    CreateTextBox("Parent Domain Admin Slot", TemplatesBuilderFieldKeys.VmParentDomainAdmin, vm.CredentialSlots.ParentDomainAdmin)));
                 break;
         }
     }
 
-    private StackPanel CreateNicRow(TemplatesBuilderNicDraft nic)
+    private StackPanel CreateNicRow(TemplatesBuilderNicRowProjection projection)
     {
+        var nic = projection.Draft;
         var row = CreateRow();
-        row.Tag = "nic.Row";
+        row.Tag = TemplatesBuilderFieldKeys.NicRow;
         row.Children.Add(CreateFieldGrid(
-            CreateTextBox("NIC ID", "nic.NicId", nic.NicId),
-            CreateTextBox("Name", "nic.Name", nic.Name),
-            CreateTextBox("Network ID", "nic.NetworkId", nic.NetworkId),
-            CreateTextBox("Switch", "nic.SwitchName", nic.SwitchName),
-            CreateTextBox("IP Address", "nic.IpAddress", nic.IpAddress),
-            CreateTextBox("Prefix", "nic.PrefixLength", nic.PrefixLength),
-            CreateTextBox("Gateway", "nic.DefaultGateway", nic.DefaultGateway),
-            CreateTextBox("DNS Servers", "nic.DnsServers", string.Join(", ", nic.DnsServers))));
+            CreateTextBox("NIC ID", TemplatesBuilderFieldKeys.NicId, nic.NicId),
+            CreateTextBox("Name", TemplatesBuilderFieldKeys.NicName, nic.Name),
+            CreateTextBox("Network ID", TemplatesBuilderFieldKeys.NicNetworkId, nic.NetworkId),
+            CreateTextBox("Switch", TemplatesBuilderFieldKeys.NicSwitchName, nic.SwitchName),
+            CreateTextBox("IP Address", TemplatesBuilderFieldKeys.NicIpAddress, nic.IpAddress),
+            CreateTextBox("Prefix", TemplatesBuilderFieldKeys.NicPrefixLength, nic.PrefixLength),
+            CreateTextBox("Gateway", TemplatesBuilderFieldKeys.NicDefaultGateway, nic.DefaultGateway),
+            CreateTextBox("DNS Servers", TemplatesBuilderFieldKeys.NicDnsServers, string.Join(", ", nic.DnsServers))));
         return row;
     }
 
@@ -595,18 +577,18 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         if (_selectedNetworkIndex < 0 ||
             _selectedNetworkIndex >= draft.LabNetworks.Count ||
-            FindDescendants<TextBox>(BuilderSelectedNetworkDetailPanel).All(textBox => !string.Equals(textBox.Tag as string, "network.NetworkId", StringComparison.Ordinal)))
+            !HasTextBox(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkId))
         {
             return draft;
         }
 
         var networks = draft.LabNetworks.ToList();
         networks[_selectedNetworkIndex] = new TemplatesBuilderLabNetworkDraft(
-            GetText(BuilderSelectedNetworkDetailPanel, "network.NetworkId"),
-            GetText(BuilderSelectedNetworkDetailPanel, "network.Name"),
-            GetText(BuilderSelectedNetworkDetailPanel, "network.SwitchName"),
-            GetText(BuilderSelectedNetworkDetailPanel, "network.Subnet"),
-            GetText(BuilderSelectedNetworkDetailPanel, "network.Notes"));
+            GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkId),
+            GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkName),
+            GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSwitchName),
+            GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkSubnet),
+            GetText(BuilderSelectedNetworkDetailPanel, TemplatesBuilderFieldKeys.NetworkNotes));
         return draft with { LabNetworks = networks };
     }
 
@@ -614,16 +596,16 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         if (_selectedCredentialSlotIndex < 0 ||
             _selectedCredentialSlotIndex >= draft.CredentialSlots.Count ||
-            FindDescendants<TextBox>(BuilderSelectedCredentialSlotDetailPanel).All(textBox => !string.Equals(textBox.Tag as string, "credential.SlotKey", StringComparison.Ordinal)))
+            !HasTextBox(BuilderSelectedCredentialSlotDetailPanel, TemplatesBuilderFieldKeys.CredentialSlotKey))
         {
             return draft;
         }
 
         var slots = draft.CredentialSlots.ToList();
         slots[_selectedCredentialSlotIndex] = new TemplatesBuilderCredentialSlotDraft(
-            GetText(BuilderSelectedCredentialSlotDetailPanel, "credential.SlotKey"),
-            GetText(BuilderSelectedCredentialSlotDetailPanel, "credential.Label"),
-            GetText(BuilderSelectedCredentialSlotDetailPanel, "credential.ScopeHint"));
+            GetText(BuilderSelectedCredentialSlotDetailPanel, TemplatesBuilderFieldKeys.CredentialSlotKey),
+            GetText(BuilderSelectedCredentialSlotDetailPanel, TemplatesBuilderFieldKeys.CredentialSlotLabel),
+            GetText(BuilderSelectedCredentialSlotDetailPanel, TemplatesBuilderFieldKeys.CredentialSlotScopeHint));
         return draft with { CredentialSlots = slots };
     }
 
@@ -632,28 +614,28 @@ public sealed partial class TemplatesBuilderView : UserControl
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest &&
             _selectedForestDomainIndex >= 0 &&
             _selectedForestDomainIndex < draft.Forests.Count &&
-            FindDescendants<TextBox>(BuilderSelectedForestDomainDetailPanel).Any(textBox => string.Equals(textBox.Tag as string, "forest.ForestId", StringComparison.Ordinal)))
+            HasTextBox(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.ForestId))
         {
             var forests = draft.Forests.ToList();
             forests[_selectedForestDomainIndex] = new TemplatesBuilderForestDraft(
-                GetText(BuilderSelectedForestDomainDetailPanel, "forest.ForestId"),
-                GetText(BuilderSelectedForestDomainDetailPanel, "forest.RootDomainId"));
+                GetText(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.ForestId),
+                GetText(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.ForestRootDomainId));
             return draft with { Forests = forests };
         }
 
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain &&
             _selectedForestDomainIndex >= 0 &&
             _selectedForestDomainIndex < draft.Domains.Count &&
-            FindDescendants<TextBox>(BuilderSelectedForestDomainDetailPanel).Any(textBox => string.Equals(textBox.Tag as string, "domain.DomainId", StringComparison.Ordinal)))
+            HasTextBox(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.DomainId))
         {
             var domains = draft.Domains.ToList();
             domains[_selectedForestDomainIndex] = new TemplatesBuilderDomainDraft(
-                GetText(BuilderSelectedForestDomainDetailPanel, "domain.DomainId"),
-                GetText(BuilderSelectedForestDomainDetailPanel, "domain.DnsName"),
-                GetText(BuilderSelectedForestDomainDetailPanel, "domain.NetBiosName"),
-                GetText(BuilderSelectedForestDomainDetailPanel, "domain.ForestId"),
-                GetComboValue(BuilderSelectedForestDomainDetailPanel, "domain.RelationKind"),
-                GetText(BuilderSelectedForestDomainDetailPanel, "domain.ParentDomainId"));
+                GetText(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.DomainId),
+                GetText(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.DomainDnsName),
+                GetText(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.DomainNetBiosName),
+                GetText(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.DomainForestId),
+                GetComboValue(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.DomainRelationKind),
+                GetText(BuilderSelectedForestDomainDetailPanel, TemplatesBuilderFieldKeys.DomainParentDomainId));
             return draft with { Domains = domains };
         }
 
@@ -678,38 +660,38 @@ public sealed partial class TemplatesBuilderView : UserControl
         var vm = vms[projection.SelectedVmIndex];
         vms[projection.SelectedVmIndex] = projection.SelectedVmDetailCategory switch
         {
-            BuilderVmDetailCategory.Basics when HasTextBox(BuilderSelectedVmDetailPanel, "vm.VmId") => vm with
+            BuilderVmDetailCategory.Basics when HasTextBox(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmId) => vm with
             {
-                VmId = GetText(BuilderSelectedVmDetailPanel, "vm.VmId"),
-                Name = GetText(BuilderSelectedVmDetailPanel, "vm.Name")
+                VmId = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmId),
+                Name = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmName)
             },
-            BuilderVmDetailCategory.Resources when HasTextBox(BuilderSelectedVmDetailPanel, "vm.MemoryMb") => vm with
+            BuilderVmDetailCategory.Resources when HasTextBox(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmMemoryMb) => vm with
             {
-                MemoryMb = GetText(BuilderSelectedVmDetailPanel, "vm.MemoryMb"),
-                CpuCount = GetText(BuilderSelectedVmDetailPanel, "vm.CpuCount"),
-                VhdxId = GetText(BuilderSelectedVmDetailPanel, "vm.VhdxId")
+                MemoryMb = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmMemoryMb),
+                CpuCount = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmCpuCount),
+                VhdxId = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmVhdxId)
             },
-            BuilderVmDetailCategory.Membership when HasComboBox(BuilderSelectedVmDetailPanel, "vm.MembershipMode") => vm with
+            BuilderVmDetailCategory.Membership when HasComboBox(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmMembershipMode) => vm with
             {
-                MembershipMode = GetComboValue(BuilderSelectedVmDetailPanel, "vm.MembershipMode"),
-                DomainId = GetText(BuilderSelectedVmDetailPanel, "vm.DomainId")
+                MembershipMode = GetComboValue(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmMembershipMode),
+                DomainId = GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmDomainId)
             },
-            BuilderVmDetailCategory.Roles when HasCheckBox(BuilderSelectedVmDetailPanel, "vm.IsActiveDirectoryDomainController") => vm with
+            BuilderVmDetailCategory.Roles when HasCheckBox(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmIsActiveDirectoryDomainController) => vm with
             {
-                IsActiveDirectoryDomainController = GetCheckBoxValue(BuilderSelectedVmDetailPanel, "vm.IsActiveDirectoryDomainController")
+                IsActiveDirectoryDomainController = GetCheckBoxValue(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmIsActiveDirectoryDomainController)
             },
             BuilderVmDetailCategory.Networking when HasNicsPanel(BuilderSelectedVmDetailPanel) => vm with
             {
                 Nics = ReadNics(BuilderSelectedVmDetailPanel)
             },
-            BuilderVmDetailCategory.Credentials when HasTextBox(BuilderSelectedVmDetailPanel, "vm.LocalBootstrap") => vm with
+            BuilderVmDetailCategory.Credentials when HasTextBox(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmLocalBootstrap) => vm with
             {
                 CredentialSlots = new TemplatesBuilderVmCredentialSlotDraft(
-                    GetText(BuilderSelectedVmDetailPanel, "vm.LocalBootstrap"),
-                    GetText(BuilderSelectedVmDetailPanel, "vm.DomainAdmin"),
-                    GetText(BuilderSelectedVmDetailPanel, "vm.DomainJoin"),
-                    GetText(BuilderSelectedVmDetailPanel, "vm.Dsrm"),
-                    GetText(BuilderSelectedVmDetailPanel, "vm.ParentDomainAdmin"))
+                    GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmLocalBootstrap),
+                    GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmDomainAdmin),
+                    GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmDomainJoin),
+                    GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmDsrm),
+                    GetText(BuilderSelectedVmDetailPanel, TemplatesBuilderFieldKeys.VmParentDomainAdmin))
             },
             _ => vm
         };
@@ -718,20 +700,20 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private List<TemplatesBuilderNicDraft> ReadNics(DependencyObject root)
     {
-        var nicsPanel = FindDescendants<StackPanel>(root).FirstOrDefault(panel => string.Equals(panel.Tag as string, "vm.NicsPanel", StringComparison.Ordinal));
+        var nicsPanel = FindDescendants<StackPanel>(root).FirstOrDefault(panel => Equals(panel.Tag, TemplatesBuilderFieldKeys.VmNicsPanel));
         return nicsPanel?.Children.OfType<StackPanel>().Select(ReadNic).ToList() ?? [];
     }
 
     private TemplatesBuilderNicDraft ReadNic(StackPanel row)
         => new(
-            GetText(row, "nic.NicId"),
-            GetText(row, "nic.Name"),
-            GetText(row, "nic.NetworkId"),
-            GetText(row, "nic.SwitchName"),
-            GetText(row, "nic.IpAddress"),
-            GetText(row, "nic.PrefixLength"),
-            GetText(row, "nic.DefaultGateway"),
-            SplitList(GetText(row, "nic.DnsServers")));
+            GetText(row, TemplatesBuilderFieldKeys.NicId),
+            GetText(row, TemplatesBuilderFieldKeys.NicName),
+            GetText(row, TemplatesBuilderFieldKeys.NicNetworkId),
+            GetText(row, TemplatesBuilderFieldKeys.NicSwitchName),
+            GetText(row, TemplatesBuilderFieldKeys.NicIpAddress),
+            GetText(row, TemplatesBuilderFieldKeys.NicPrefixLength),
+            GetText(row, TemplatesBuilderFieldKeys.NicDefaultGateway),
+            SplitList(GetText(row, TemplatesBuilderFieldKeys.NicDnsServers)));
 
     private void BuilderDraftControl_Changed(object sender, TextChangedEventArgs e)
     {
@@ -897,29 +879,27 @@ public sealed partial class TemplatesBuilderView : UserControl
             DeploymentProfile = GetSelectedProfile()
         };
 
-        if (sender is not FrameworkElement element ||
-            element.Tag is not string tag)
+        if (sender is not FrameworkElement { Tag: BuilderDraftFieldKey fieldKey })
         {
             return;
         }
 
-        if (tag.StartsWith("network.", StringComparison.Ordinal))
+        switch (fieldKey.Scope)
         {
-            _draft = UpdateSelectedNetwork(_draft);
-        }
-        else if (tag.StartsWith("credential.", StringComparison.Ordinal))
-        {
-            _draft = UpdateSelectedCredentialSlot(_draft);
-        }
-        else if (tag.StartsWith("forest.", StringComparison.Ordinal) ||
-                 tag.StartsWith("domain.", StringComparison.Ordinal))
-        {
-            _draft = UpdateSelectedForestOrDomain(_draft);
-        }
-        else if (tag.StartsWith("vm.", StringComparison.Ordinal) ||
-                 tag.StartsWith("nic.", StringComparison.Ordinal))
-        {
-            _draft = UpdateSelectedVm(_draft);
+            case BuilderDraftFieldScope.Network:
+                _draft = UpdateSelectedNetwork(_draft);
+                break;
+            case BuilderDraftFieldScope.CredentialSlot:
+                _draft = UpdateSelectedCredentialSlot(_draft);
+                break;
+            case BuilderDraftFieldScope.Forest:
+            case BuilderDraftFieldScope.Domain:
+                _draft = UpdateSelectedForestOrDomain(_draft);
+                break;
+            case BuilderDraftFieldScope.Vm:
+            case BuilderDraftFieldScope.Nic:
+                _draft = UpdateSelectedVm(_draft);
+                break;
         }
     }
 
@@ -999,12 +979,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         return BalancedDeploymentProfile;
     }
 
-    private TextBox CreateTextBox(string header, string tag, string value)
+    private TextBox CreateTextBox(string header, BuilderDraftFieldKey fieldKey, string value)
     {
         var textBox = new TextBox
         {
             Header = header,
-            Tag = tag,
+            Tag = fieldKey,
             Text = value,
             MinWidth = 150
         };
@@ -1012,12 +992,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         return textBox;
     }
 
-    private ComboBox CreateComboBox(string header, string tag, string value, params string[] options)
+    private ComboBox CreateComboBox(string header, BuilderDraftFieldKey fieldKey, string value, params string[] options)
     {
         var comboBox = new ComboBox
         {
             Header = header,
-            Tag = tag,
+            Tag = fieldKey,
             MinWidth = 150
         };
 
@@ -1031,12 +1011,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         return comboBox;
     }
 
-    private CheckBox CreateCheckBox(string content, string tag, bool isChecked)
+    private CheckBox CreateCheckBox(string content, BuilderDraftFieldKey fieldKey, bool isChecked)
     {
         var checkBox = new CheckBox
         {
             Content = content,
-            Tag = tag,
+            Tag = fieldKey,
             IsChecked = isChecked
         };
         checkBox.Checked += BuilderCheckBox_Changed;
@@ -1132,24 +1112,24 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
     }
 
-    private static string GetText(DependencyObject root, string tag)
-        => FindDescendants<TextBox>(root).FirstOrDefault(textBox => string.Equals(textBox.Tag as string, tag, StringComparison.Ordinal))?.Text ?? string.Empty;
+    private static string GetText(DependencyObject root, BuilderDraftFieldKey fieldKey)
+        => FindDescendants<TextBox>(root).FirstOrDefault(textBox => Equals(textBox.Tag, fieldKey))?.Text ?? string.Empty;
 
-    private static bool HasTextBox(DependencyObject root, string tag)
-        => FindDescendants<TextBox>(root).Any(textBox => string.Equals(textBox.Tag as string, tag, StringComparison.Ordinal));
+    private static bool HasTextBox(DependencyObject root, BuilderDraftFieldKey fieldKey)
+        => FindDescendants<TextBox>(root).Any(textBox => Equals(textBox.Tag, fieldKey));
 
-    private static bool HasComboBox(DependencyObject root, string tag)
-        => FindDescendants<ComboBox>(root).Any(comboBox => string.Equals(comboBox.Tag as string, tag, StringComparison.Ordinal));
+    private static bool HasComboBox(DependencyObject root, BuilderDraftFieldKey fieldKey)
+        => FindDescendants<ComboBox>(root).Any(comboBox => Equals(comboBox.Tag, fieldKey));
 
-    private static bool HasCheckBox(DependencyObject root, string tag)
-        => FindDescendants<CheckBox>(root).Any(checkBox => string.Equals(checkBox.Tag as string, tag, StringComparison.Ordinal));
+    private static bool HasCheckBox(DependencyObject root, BuilderDraftFieldKey fieldKey)
+        => FindDescendants<CheckBox>(root).Any(checkBox => Equals(checkBox.Tag, fieldKey));
 
     private static bool HasNicsPanel(DependencyObject root)
-        => FindDescendants<StackPanel>(root).Any(panel => string.Equals(panel.Tag as string, "vm.NicsPanel", StringComparison.Ordinal));
+        => FindDescendants<StackPanel>(root).Any(panel => Equals(panel.Tag, TemplatesBuilderFieldKeys.VmNicsPanel));
 
-    private static string GetComboValue(DependencyObject root, string tag)
+    private static string GetComboValue(DependencyObject root, BuilderDraftFieldKey fieldKey)
     {
-        var comboBox = FindDescendants<ComboBox>(root).FirstOrDefault(item => string.Equals(item.Tag as string, tag, StringComparison.Ordinal));
+        var comboBox = FindDescendants<ComboBox>(root).FirstOrDefault(item => Equals(item.Tag, fieldKey));
         if (comboBox?.SelectedItem is ComboBoxItem { Content: string content })
         {
             return content;
@@ -1158,8 +1138,8 @@ public sealed partial class TemplatesBuilderView : UserControl
         return string.Empty;
     }
 
-    private static bool GetCheckBoxValue(DependencyObject root, string tag)
-        => FindDescendants<CheckBox>(root).FirstOrDefault(item => string.Equals(item.Tag as string, tag, StringComparison.Ordinal))?.IsChecked == true;
+    private static bool GetCheckBoxValue(DependencyObject root, BuilderDraftFieldKey fieldKey)
+        => FindDescendants<CheckBox>(root).FirstOrDefault(item => Equals(item.Tag, fieldKey))?.IsChecked == true;
 
     private static void SetComboBoxValue(ComboBox comboBox, string value)
     {
@@ -1287,28 +1267,6 @@ public sealed partial class TemplatesBuilderView : UserControl
             : Visibility.Collapsed;
     }
 
-    private static string FormatResourceName(string primary, string fallback)
-    {
-        if (!string.IsNullOrWhiteSpace(primary))
-        {
-            return primary.Trim();
-        }
-
-        return string.IsNullOrWhiteSpace(fallback) ? "(unnamed)" : fallback.Trim();
-    }
-
-    private static string GetVmDetailCategoryLabel(BuilderVmDetailCategory category)
-        => category switch
-        {
-            BuilderVmDetailCategory.Basics => "Basics",
-            BuilderVmDetailCategory.Resources => "Resources",
-            BuilderVmDetailCategory.Membership => "Membership",
-            BuilderVmDetailCategory.Roles => "Roles",
-            BuilderVmDetailCategory.Networking => "Networking",
-            BuilderVmDetailCategory.Credentials => "Credentials",
-            _ => category.ToString()
-        };
-
     private static TemplatesBuilderDraftSnapshot CreateEmptyDraft()
         => new(
             string.Empty,
@@ -1320,10 +1278,4 @@ public sealed partial class TemplatesBuilderView : UserControl
             [],
             [],
             false);
-
-    private enum BuilderForestDomainResourceKind
-    {
-        Forest,
-        Domain
-    }
 }
