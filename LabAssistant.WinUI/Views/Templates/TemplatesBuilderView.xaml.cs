@@ -23,16 +23,6 @@ internal readonly record struct TemplatesBuilderActionState(
 
 public sealed partial class TemplatesBuilderView : UserControl
 {
-    private static readonly BuilderVmDetailCategory[] VmDetailCategoryOrder =
-    [
-        BuilderVmDetailCategory.Basics,
-        BuilderVmDetailCategory.Resources,
-        BuilderVmDetailCategory.Membership,
-        BuilderVmDetailCategory.Roles,
-        BuilderVmDetailCategory.Networking,
-        BuilderVmDetailCategory.Credentials
-    ];
-
     private const string ButtonBackgroundPointerOverResource = "ButtonBackgroundPointerOver";
     private const string ButtonBackgroundPressedResource = "ButtonBackgroundPressed";
     private const string ButtonBorderBrushPointerOverResource = "ButtonBorderBrushPointerOver";
@@ -43,16 +33,13 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private bool _isUpdatingDraft;
     private bool _canNavigateWorkflow;
-    private BuilderWorkflowStep _selectedStep = BuilderWorkflowStep.General;
-    private BuilderVmDetailCategory _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
+    private readonly TemplatesBuilderWorkflowNavigation _workflowNavigation = new();
     private TemplatesBuilderDraftSnapshot _draft = CreateEmptyDraft();
     private TemplatesBuilderValidationState _validationState = TemplatesBuilderValidationState.Empty;
     private TemplatesBuilderActionState _actionState;
     private string _selectedDeploymentProfile = BalancedDeploymentProfile;
     private int _selectedNetworkIndex;
     private int _selectedCredentialSlotIndex;
-    private int _selectedVmIndex;
-    private bool _isVmOverviewSelected = true;
     private BuilderForestDomainResourceKind _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
     private int _selectedForestDomainIndex;
 
@@ -137,8 +124,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void SelectStep(BuilderWorkflowStep step)
     {
         UpdateWorkingDraftFromVisibleControls();
-        _selectedStep = step;
-        _isVmOverviewSelected = step == BuilderWorkflowStep.Vms;
+        _workflowNavigation.SelectStep(step, _draft);
         RenderSelectedStep();
         RenderDraftResources();
     }
@@ -146,18 +132,14 @@ public sealed partial class TemplatesBuilderView : UserControl
     private void SelectVmOverview()
     {
         UpdateWorkingDraftFromVisibleControls();
-        _selectedStep = BuilderWorkflowStep.Vms;
-        _isVmOverviewSelected = true;
+        _workflowNavigation.SelectVmOverview(_draft);
         RenderSelectedStep();
         RenderDraftResources();
     }
 
     private void SelectVmChild(int index)
     {
-        _selectedStep = BuilderWorkflowStep.Vms;
-        _selectedVmIndex = index;
-        _isVmOverviewSelected = false;
-        _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
+        _workflowNavigation.SelectVmChild(index, _draft);
         RenderSelectedStep();
         RenderVmNavChildren();
         RenderSelectedVmDetail();
@@ -165,111 +147,33 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void SelectVmDetailCategory(BuilderVmDetailCategory category)
     {
-        _selectedVmDetailCategory = category;
+        _workflowNavigation.SelectVmDetailCategory(category, _draft);
         RenderSelectedVmDetail();
     }
 
     private void SelectAdjacentStep(int offset)
     {
         UpdateWorkingDraftFromVisibleControls();
-        var routes = BuildWorkflowRoutes();
-        var currentIndex = routes.FindIndex(route => route == GetCurrentRoute());
-        var targetIndex = currentIndex + offset;
-        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= routes.Count)
+        if (!_workflowNavigation.SelectAdjacent(offset, _draft))
         {
             return;
         }
 
-        SelectRoute(routes[targetIndex]);
-    }
-
-    private BuilderWorkflowRoute GetCurrentRoute()
-        => _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected
-            ? new BuilderWorkflowRoute(_selectedStep, _selectedVmIndex, _selectedVmDetailCategory)
-            : new BuilderWorkflowRoute(_selectedStep);
-
-    private List<BuilderWorkflowRoute> BuildWorkflowRoutes()
-    {
-        var routes = new List<BuilderWorkflowRoute>
-        {
-            new(BuilderWorkflowStep.General),
-            new(BuilderWorkflowStep.Networks),
-            new(BuilderWorkflowStep.ForestsDomains),
-            new(BuilderWorkflowStep.Credentials),
-            new(BuilderWorkflowStep.Vms)
-        };
-
-        for (var vmIndex = 0; vmIndex < _draft.Vms.Count; vmIndex++)
-        {
-            foreach (var category in VmDetailCategoryOrder)
-            {
-                routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Vms, vmIndex, category));
-            }
-        }
-
-        routes.Add(new BuilderWorkflowRoute(BuilderWorkflowStep.Review));
-        return routes;
-    }
-
-    private void SelectRoute(BuilderWorkflowRoute route)
-    {
-        if (route.Step == BuilderWorkflowStep.Vms)
-        {
-            SelectVmRoute(route);
-            return;
-        }
-
-        _selectedStep = route.Step;
-        _isVmOverviewSelected = false;
         RenderSelectedStep();
         RenderDraftResources();
     }
 
-    private void SelectVmRoute(BuilderWorkflowRoute route)
-    {
-        var wasVmOverviewSelected = _selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected;
-        var wasVmDetailSelected = _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected;
-        var previousVmIndex = _selectedVmIndex;
-        _selectedStep = BuilderWorkflowStep.Vms;
-        if (route.VmIndex < 0)
-        {
-            _isVmOverviewSelected = true;
-            if (!wasVmOverviewSelected)
-            {
-                RenderSelectedStep();
-            }
-
-            RenderVmOverview();
-            UpdateFooterCommandState();
-            return;
-        }
-
-        _selectedVmIndex = ClampIndex(route.VmIndex, _draft.Vms.Count);
-        _isVmOverviewSelected = false;
-        _selectedVmDetailCategory = route.VmDetailCategory;
-        if (!wasVmDetailSelected)
-        {
-            RenderSelectedStep();
-        }
-        else if (previousVmIndex != _selectedVmIndex)
-        {
-            RenderVmNavChildren();
-        }
-
-        RenderSelectedVmDetail();
-        UpdateFooterCommandState();
-    }
-
     private void RenderSelectedStep()
     {
-        BuilderGeneralSection.Visibility = _selectedStep == BuilderWorkflowStep.General ? Visibility.Visible : Visibility.Collapsed;
-        BuilderNetworksSection.Visibility = _selectedStep == BuilderWorkflowStep.Networks ? Visibility.Visible : Visibility.Collapsed;
-        BuilderForestsDomainsSection.Visibility = _selectedStep == BuilderWorkflowStep.ForestsDomains ? Visibility.Visible : Visibility.Collapsed;
-        BuilderCredentialsSection.Visibility = _selectedStep == BuilderWorkflowStep.Credentials ? Visibility.Visible : Visibility.Collapsed;
-        BuilderVmsSection.Visibility = _selectedStep == BuilderWorkflowStep.Vms ? Visibility.Visible : Visibility.Collapsed;
-        BuilderReviewSection.Visibility = _selectedStep == BuilderWorkflowStep.Review ? Visibility.Visible : Visibility.Collapsed;
-        BuilderVmOverviewPanel.Visibility = _selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
-        BuilderSelectedVmDetailHost.Visibility = _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
+        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
+        BuilderGeneralSection.Visibility = projection.ActiveStep == BuilderWorkflowStep.General ? Visibility.Visible : Visibility.Collapsed;
+        BuilderNetworksSection.Visibility = projection.ActiveStep == BuilderWorkflowStep.Networks ? Visibility.Visible : Visibility.Collapsed;
+        BuilderForestsDomainsSection.Visibility = projection.ActiveStep == BuilderWorkflowStep.ForestsDomains ? Visibility.Visible : Visibility.Collapsed;
+        BuilderCredentialsSection.Visibility = projection.ActiveStep == BuilderWorkflowStep.Credentials ? Visibility.Visible : Visibility.Collapsed;
+        BuilderVmsSection.Visibility = projection.ActiveStep == BuilderWorkflowStep.Vms ? Visibility.Visible : Visibility.Collapsed;
+        BuilderReviewSection.Visibility = projection.ActiveStep == BuilderWorkflowStep.Review ? Visibility.Visible : Visibility.Collapsed;
+        BuilderVmOverviewPanel.Visibility = projection.ActiveStep == BuilderWorkflowStep.Vms && projection.IsVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
+        BuilderSelectedVmDetailHost.Visibility = projection.ActiveStep == BuilderWorkflowStep.Vms && !projection.IsVmOverviewSelected ? Visibility.Visible : Visibility.Collapsed;
 
         RenderWorkflowTreeState();
         UpdateFooterCommandState();
@@ -277,18 +181,21 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderWorkflowTreeState()
     {
+        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
         BuilderWorkflowTreePanel.Children.Clear();
-        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("General", _selectedStep == BuilderWorkflowStep.General, () => SelectStep(BuilderWorkflowStep.General), _canNavigateWorkflow));
-        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Networks", _selectedStep == BuilderWorkflowStep.Networks, () => SelectStep(BuilderWorkflowStep.Networks), _canNavigateWorkflow));
-        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Forests & Domains", _selectedStep == BuilderWorkflowStep.ForestsDomains, () => SelectStep(BuilderWorkflowStep.ForestsDomains), _canNavigateWorkflow));
-        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Credentials", _selectedStep == BuilderWorkflowStep.Credentials, () => SelectStep(BuilderWorkflowStep.Credentials), _canNavigateWorkflow));
-        BuilderWorkflowTreePanel.Children.Add(CreateVmWorkflowNavRow());
+        foreach (var row in projection.StepRows.Take(4))
+        {
+            BuilderWorkflowTreePanel.Children.Add(CreateResourceButton(row.Label, row.IsSelected, () => SelectStep(row.Route.Step), row.IsEnabled));
+        }
+
+        BuilderWorkflowTreePanel.Children.Add(CreateVmWorkflowNavRow(projection.VmOverviewRow));
         BuilderWorkflowTreePanel.Children.Add(BuilderVmNavChildrenPanel);
-        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton("Review", _selectedStep == BuilderWorkflowStep.Review, () => SelectStep(BuilderWorkflowStep.Review), _canNavigateWorkflow));
+        var reviewRow = projection.StepRows.Last();
+        BuilderWorkflowTreePanel.Children.Add(CreateResourceButton(reviewRow.Label, reviewRow.IsSelected, () => SelectStep(reviewRow.Route.Step), reviewRow.IsEnabled));
         RenderVmNavChildren();
     }
 
-    private Grid CreateVmWorkflowNavRow()
+    private Grid CreateVmWorkflowNavRow(BuilderWorkflowNavigationRow vmOverviewRow)
     {
         var row = new Grid
         {
@@ -297,7 +204,7 @@ public sealed partial class TemplatesBuilderView : UserControl
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var vmButton = CreateResourceButton("VMs", _selectedStep == BuilderWorkflowStep.Vms && _isVmOverviewSelected, SelectVmOverview, _canNavigateWorkflow);
+        var vmButton = CreateResourceButton(vmOverviewRow.Label, vmOverviewRow.IsSelected, SelectVmOverview, vmOverviewRow.IsEnabled);
         Grid.SetColumn(vmButton, 0);
         row.Children.Add(vmButton);
 
@@ -325,17 +232,15 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void UpdateFooterCommandState(TemplatesBuilderActionState state)
     {
-        var routes = BuildWorkflowRoutes();
-        var currentIndex = routes.FindIndex(route => route == GetCurrentRoute());
-        var isReview = _selectedStep == BuilderWorkflowStep.Review;
+        var projection = _workflowNavigation.ProjectFooter(_draft, _canNavigateWorkflow, state.CanSave, state.CanSaveAs);
 
-        BuilderPreviousStepButton.IsEnabled = _canNavigateWorkflow && currentIndex > 0;
-        BuilderNextStepButton.IsEnabled = _canNavigateWorkflow && !isReview && currentIndex >= 0 && currentIndex < routes.Count - 1;
-        BuilderNextStepButton.Visibility = isReview ? Visibility.Collapsed : Visibility.Visible;
-        BuilderSaveAsButton.IsEnabled = isReview && state.CanSaveAs;
-        BuilderSaveButton.IsEnabled = isReview && state.CanSave;
-        BuilderSaveAsButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed;
-        BuilderSaveButton.Visibility = isReview ? Visibility.Visible : Visibility.Collapsed;
+        BuilderPreviousStepButton.IsEnabled = projection.CanGoPrevious;
+        BuilderNextStepButton.IsEnabled = projection.CanGoNext;
+        BuilderNextStepButton.Visibility = projection.IsReview ? Visibility.Collapsed : Visibility.Visible;
+        BuilderSaveAsButton.IsEnabled = projection.CanSaveAs;
+        BuilderSaveButton.IsEnabled = projection.CanSave;
+        BuilderSaveAsButton.Visibility = projection.IsReview ? Visibility.Visible : Visibility.Collapsed;
+        BuilderSaveButton.Visibility = projection.IsReview ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RenderDraftResources()
@@ -461,15 +366,15 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderVmNavChildren()
     {
+        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
         BuilderVmNavChildrenPanel.Children.Clear();
-        for (var i = 0; i < _draft.Vms.Count; i++)
+        foreach (var row in projection.VmRows)
         {
-            var index = i;
-            var vm = _draft.Vms[i];
             var button = CreateResourceButton(
-                FormatResourceName(vm.Name, vm.VmId),
-                _selectedStep == BuilderWorkflowStep.Vms && !_isVmOverviewSelected && index == _selectedVmIndex,
-                () => SelectVmChild(index));
+                row.Label,
+                row.IsSelected,
+                () => SelectVmChild(row.Route.VmIndex),
+                row.IsEnabled);
             BuilderVmNavChildrenPanel.Children.Add(button);
         }
     }
@@ -542,6 +447,7 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderSelectedVmDetail()
     {
+        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
         BuilderSelectedVmDetailPanel.Children.Clear();
         BuilderVmDetailCategoryNavPanel.Children.Clear();
         if (_draft.Vms.Count == 0)
@@ -550,12 +456,12 @@ public sealed partial class TemplatesBuilderView : UserControl
             return;
         }
 
-        var vm = _draft.Vms[_selectedVmIndex];
+        var vm = _draft.Vms[projection.SelectedVmIndex];
         RenderVmDetailCategoryNav();
         BuilderSelectedVmDetailPanel.Children.Add(CreateRowTitle($"Selected VM Detail: {FormatResourceName(vm.Name, vm.VmId)}"));
-        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead(GetVmDetailCategoryLabel(_selectedVmDetailCategory)));
+        BuilderSelectedVmDetailPanel.Children.Add(CreateSubhead(GetVmDetailCategoryLabel(projection.SelectedVmDetailCategory)));
 
-        switch (_selectedVmDetailCategory)
+        switch (projection.SelectedVmDetailCategory)
         {
             case BuilderVmDetailCategory.Basics:
                 BuilderSelectedVmDetailPanel.Children.Add(CreateFieldGrid(
@@ -577,7 +483,7 @@ public sealed partial class TemplatesBuilderView : UserControl
                 BuilderSelectedVmDetailPanel.Children.Add(CreateCheckBox("Active Directory Domain Controller", "vm.IsActiveDirectoryDomainController", vm.IsActiveDirectoryDomainController));
                 break;
             case BuilderVmDetailCategory.Networking:
-                var addNicButton = new Button { Content = "Add NIC", Tag = _selectedVmIndex };
+                var addNicButton = new Button { Content = "Add NIC", Tag = projection.SelectedVmIndex };
                 addNicButton.Click += BuilderAddNicButton_Click;
                 BuilderSelectedVmDetailPanel.Children.Add(addNicButton);
                 var nicsPanel = new StackPanel { Spacing = 6, Tag = "vm.NicsPanel" };
@@ -601,12 +507,13 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private void RenderVmDetailCategoryNav()
     {
+        var projection = _workflowNavigation.Project(_draft, _canNavigateWorkflow);
         foreach (var category in Enum.GetValues<BuilderVmDetailCategory>())
         {
             var selectedCategory = category;
             BuilderVmDetailCategoryNavPanel.Children.Add(CreateResourceButton(
                 GetVmDetailCategoryLabel(selectedCategory),
-                selectedCategory == _selectedVmDetailCategory,
+                selectedCategory == projection.SelectedVmDetailCategory,
                 () => SelectVmDetailCategory(selectedCategory)));
         }
     }
@@ -719,20 +626,21 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     private TemplatesBuilderDraftSnapshot UpdateSelectedVm(TemplatesBuilderDraftSnapshot draft)
     {
-        if (_isVmOverviewSelected)
+        var projection = _workflowNavigation.Project(draft, _canNavigateWorkflow);
+        if (projection.IsVmOverviewSelected)
         {
             return draft;
         }
 
-        if (_selectedVmIndex < 0 ||
-            _selectedVmIndex >= draft.Vms.Count)
+        if (projection.SelectedVmIndex < 0 ||
+            projection.SelectedVmIndex >= draft.Vms.Count)
         {
             return draft;
         }
 
         var vms = draft.Vms.ToList();
-        var vm = vms[_selectedVmIndex];
-        vms[_selectedVmIndex] = _selectedVmDetailCategory switch
+        var vm = vms[projection.SelectedVmIndex];
+        vms[projection.SelectedVmIndex] = projection.SelectedVmDetailCategory switch
         {
             BuilderVmDetailCategory.Basics when HasTextBox(BuilderSelectedVmDetailPanel, "vm.VmId") => vm with
             {
@@ -864,11 +772,9 @@ public sealed partial class TemplatesBuilderView : UserControl
                 new TemplatesBuilderVmCredentialSlotDraft(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty),
                 []))
             .ToList();
-        _selectedVmIndex = vms.Count - 1;
-        _selectedStep = BuilderWorkflowStep.Vms;
-        _isVmOverviewSelected = false;
-        _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
-        RenderAndNotify(draft with { Vms = vms, IsSaveConfirmed = false });
+        var updatedDraft = draft with { Vms = vms, IsSaveConfirmed = false };
+        _workflowNavigation.SelectVmChild(vms.Count - 1, updatedDraft);
+        RenderAndNotify(updatedDraft);
     }
 
     private void BuilderAddNicButton_Click(object sender, RoutedEventArgs e)
@@ -985,12 +891,7 @@ public sealed partial class TemplatesBuilderView : UserControl
     {
         _selectedNetworkIndex = ClampIndex(_selectedNetworkIndex, _draft.LabNetworks.Count);
         _selectedCredentialSlotIndex = ClampIndex(_selectedCredentialSlotIndex, _draft.CredentialSlots.Count);
-        _selectedVmIndex = ClampIndex(_selectedVmIndex, _draft.Vms.Count);
-        if (_draft.Vms.Count == 0)
-        {
-            _isVmOverviewSelected = true;
-            _selectedVmDetailCategory = BuilderVmDetailCategory.Basics;
-        }
+        _workflowNavigation.EnsureCurrentRouteInBounds(_draft);
 
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count == 0 && _draft.Domains.Count > 0)
         {
@@ -1380,34 +1281,9 @@ public sealed partial class TemplatesBuilderView : UserControl
             [],
             false);
 
-    private enum BuilderWorkflowStep
-    {
-        General,
-        Networks,
-        ForestsDomains,
-        Credentials,
-        Vms,
-        Review
-    }
-
     private enum BuilderForestDomainResourceKind
     {
         Forest,
         Domain
     }
-
-    private enum BuilderVmDetailCategory
-    {
-        Basics,
-        Resources,
-        Membership,
-        Roles,
-        Networking,
-        Credentials
-    }
-
-    private readonly record struct BuilderWorkflowRoute(
-        BuilderWorkflowStep Step,
-        int VmIndex = -1,
-        BuilderVmDetailCategory VmDetailCategory = BuilderVmDetailCategory.Basics);
 }
