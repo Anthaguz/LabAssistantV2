@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business.Assets;
@@ -99,19 +100,20 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
 
     public Visibility DetailsVisibility => HasDetails ? Visibility.Visible : Visibility.Collapsed;
 
-    public override async Task InitializeAsync(object? parameter = null)
+    public override async Task InitializeAsync(object? parameter = null, CancellationToken cancellationToken = default)
     {
         if (IsInitialized)
         {
             return;
         }
 
-        await EnsureInventoryAsync(forceRefresh: false);
+        await EnsureInventoryAsync(forceRefresh: false, cancellationToken);
         IsInitialized = true;
     }
 
-    public override Task CleanupAsync()
+    public override async Task CleanupAsync()
     {
+        await base.CleanupAsync();
         _hasLoaded = false;
         _isSaving = false;
         _isRemoving = false;
@@ -128,10 +130,14 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
         SelectedDiskValidationText = "Validation has not been evaluated.";
         ReferenceWarningText = "No removal assessment has been performed.";
         IsInitialized = false;
-        return Task.CompletedTask;
     }
 
-    public async Task EnsureInventoryAsync(bool forceRefresh)
+    public Task EnsureInventoryAsync(bool forceRefresh)
+    {
+        return EnsureInventoryAsync(forceRefresh, LifecycleToken);
+    }
+
+    private async Task EnsureInventoryAsync(bool forceRefresh, CancellationToken cancellationToken)
     {
         if (IsLoading || (!forceRefresh && (_hasLoaded || _isDraftActive)))
         {
@@ -139,13 +145,13 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
             return;
         }
 
-        await LoadInventoryAsync(forceRefresh);
+        await LoadInventoryAsync(forceRefresh, cancellationToken);
     }
 
     [RelayCommand]
     private async Task RefreshAsync()
     {
-        await LoadInventoryAsync(forceRefresh: true);
+        await LoadInventoryAsync(forceRefresh: true, LifecycleToken);
     }
 
     [RelayCommand]
@@ -188,7 +194,8 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
         NotifyStateChanged();
         try
         {
-            var assessment = await _capabilityService.AssessRemoveAsync(SelectedDisk.Id);
+            var cancellationToken = LifecycleToken;
+            var assessment = await _capabilityService.AssessRemoveAsync(SelectedDisk.Id, cancellationToken);
             SelectedDisk.ReferenceSummary = assessment.ReferenceSignalSummary;
             ReferenceWarningText = string.Join(Environment.NewLine, assessment.WarningReasons.DefaultIfEmpty(assessment.ReferenceSignalSummary));
 
@@ -205,7 +212,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
                 return;
             }
 
-            var result = await _capabilityService.RemoveAsync(SelectedDisk.Id);
+            var result = await _capabilityService.RemoveAsync(SelectedDisk.Id, cancellationToken);
             StatusMessage = result.UserMessage;
             if (!result.Success)
             {
@@ -215,7 +222,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
 
             _isDraftActive = false;
             SetError(null);
-            await LoadInventoryAsync(forceRefresh: true);
+            await LoadInventoryAsync(forceRefresh: true, cancellationToken);
         }
         finally
         {
@@ -235,7 +242,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
             return;
         }
 
-        var validation = await _capabilityService.ValidateAsync(draft);
+        var validation = await _capabilityService.ValidateAsync(draft, LifecycleToken);
         ApplyValidation(validation);
         StatusMessage = string.Equals(validation.Severity, "Pass", StringComparison.OrdinalIgnoreCase)
             ? "Validation passed. The base disk is ready to use."
@@ -246,7 +253,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
     [RelayCommand]
     private Task SaveMetadataAsync()
     {
-        return SaveMetadataCoreAsync();
+        return SaveMetadataCoreAsync(LifecycleToken);
     }
 
     [RelayCommand]
@@ -307,7 +314,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
 
     partial void OnNotesChanged(string value) => HandleEditorChanged();
 
-    private async Task LoadInventoryAsync(bool forceRefresh)
+    private async Task LoadInventoryAsync(bool forceRefresh, CancellationToken cancellationToken = default)
     {
         if (IsLoading)
         {
@@ -319,7 +326,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
         try
         {
             var previousSelectionId = SelectedDisk?.Id;
-            var result = await _capabilityService.LoadAsync(forceRefresh);
+            var result = await _capabilityService.LoadAsync(forceRefresh, cancellationToken);
             _hasLoaded = true;
 
             BaseDisks.Clear();
@@ -348,6 +355,10 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
                 ? $"Loaded {BaseDisks.Count} base disk(s) with {result.Errors.Count} issue(s). Review the error panel and refresh after correcting the catalog."
                 : $"Loaded {BaseDisks.Count} base disk(s).";
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            StatusMessage = forceRefresh ? "Base disk refresh canceled." : "Base disk load canceled.";
+        }
         catch (Exception ex)
         {
             SetError(ex.Message);
@@ -359,7 +370,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
         }
     }
 
-    private async Task SaveMetadataCoreAsync()
+    private async Task SaveMetadataCoreAsync(CancellationToken cancellationToken = default)
     {
         var draft = CaptureDraft();
         if (draft is null)
@@ -374,7 +385,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
         NotifyStateChanged();
         try
         {
-            var result = await _capabilityService.SaveAsync(draft);
+            var result = await _capabilityService.SaveAsync(draft, cancellationToken);
             StatusMessage = result.UserMessage;
             if (!result.Success)
             {
@@ -384,7 +395,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
 
             _isDraftActive = false;
             SetError(null);
-            await LoadInventoryAsync(forceRefresh: true);
+            await LoadInventoryAsync(forceRefresh: true, cancellationToken);
             if (result.Item is not null)
             {
                 var savedItem = BaseDisks.FirstOrDefault(row => string.Equals(row.Id, result.Item.Id, StringComparison.OrdinalIgnoreCase));
@@ -400,7 +411,7 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
                 Generation = draft.Generation,
                 Notes = draft.Notes,
                 IsNew = false
-            });
+            }, cancellationToken);
             ApplyValidation(validation);
         }
         finally

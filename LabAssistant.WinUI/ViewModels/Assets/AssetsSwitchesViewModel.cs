@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business.Assets;
@@ -101,19 +102,20 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
 
     public Visibility DeleteConstraintVisibility => string.IsNullOrWhiteSpace(DeleteConstraintText) ? Visibility.Collapsed : Visibility.Visible;
 
-    public override async Task InitializeAsync(object? parameter = null)
+    public override async Task InitializeAsync(object? parameter = null, CancellationToken cancellationToken = default)
     {
         if (IsInitialized)
         {
             return;
         }
 
-        await EnsureInventoryAsync(forceRefresh: false);
+        await EnsureInventoryAsync(forceRefresh: false, cancellationToken);
         IsInitialized = true;
     }
 
-    public override Task CleanupAsync()
+    public override async Task CleanupAsync()
     {
+        await base.CleanupAsync();
         _hasLoaded = false;
         _isSaving = false;
         _isDeleting = false;
@@ -130,10 +132,14 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         SetError(null);
         StatusMessage = "Select a virtual switch or click New Switch to begin.";
         IsInitialized = false;
-        return Task.CompletedTask;
     }
 
-    public async Task EnsureInventoryAsync(bool forceRefresh)
+    public Task EnsureInventoryAsync(bool forceRefresh)
+    {
+        return EnsureInventoryAsync(forceRefresh, LifecycleToken);
+    }
+
+    private async Task EnsureInventoryAsync(bool forceRefresh, CancellationToken cancellationToken)
     {
         if (IsLoading || (!forceRefresh && (_hasLoaded || _isDraftActive)))
         {
@@ -141,13 +147,13 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
             return;
         }
 
-        await LoadInventoryAsync(forceRefresh);
+        await LoadInventoryAsync(forceRefresh, cancellationToken);
     }
 
     [RelayCommand]
     private async Task RefreshAsync()
     {
-        await LoadInventoryAsync(forceRefresh: true);
+        await LoadInventoryAsync(forceRefresh: true, LifecycleToken);
     }
 
     [RelayCommand]
@@ -161,7 +167,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         DeleteConstraintText = string.Empty;
         SetAttachedVmState(Array.Empty<string>(), "Attached VMs are shown for existing switches.");
         StatusMessage = "Preparing a new virtual switch draft. Complete the fields and apply when the validation state is ready.";
-        await RefreshValidationAsync();
+        await RefreshValidationAsync(LifecycleToken);
     }
 
     [RelayCommand]
@@ -178,7 +184,8 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         NotifyStateChanged();
         try
         {
-            var assessment = await _capabilityService.AssessDeleteAsync(SelectedSwitch.Name, GetKnownInventorySnapshot());
+            var cancellationToken = LifecycleToken;
+            var assessment = await _capabilityService.AssessDeleteAsync(SelectedSwitch.Name, GetKnownInventorySnapshot(), cancellationToken);
             ApplyDeleteAssessment(assessment);
             if (!assessment.CanDelete)
             {
@@ -193,7 +200,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
                 return;
             }
 
-            var result = await _capabilityService.DeleteAsync(SelectedSwitch.Name, assessment);
+            var result = await _capabilityService.DeleteAsync(SelectedSwitch.Name, assessment, cancellationToken);
             StatusMessage = result.UserMessage;
             if (!result.Success)
             {
@@ -203,7 +210,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
 
             _isDraftActive = false;
             SetError(null);
-            await LoadInventoryAsync(forceRefresh: true);
+            await LoadInventoryAsync(forceRefresh: true, cancellationToken);
         }
         finally
         {
@@ -215,12 +222,12 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
     [RelayCommand]
     private Task SaveChangesAsync()
     {
-        return SaveChangesCoreAsync();
+        return SaveChangesCoreAsync(LifecycleToken);
     }
 
     partial void OnSelectedSwitchChanged(SwitchListItem? value)
     {
-        _ = HandleSelectionChangedAsync(value);
+        _ = HandleSelectionChangedAsync(value, LifecycleToken);
     }
 
     partial void OnIsEmptyChanged(bool value) => NotifyStateChanged();
@@ -239,7 +246,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
 
     partial void OnAdapterNameChanged(string value) => HandleEditorChanged();
 
-    private async Task LoadInventoryAsync(bool forceRefresh)
+    private async Task LoadInventoryAsync(bool forceRefresh, CancellationToken cancellationToken = default)
     {
         if (IsLoading)
         {
@@ -251,7 +258,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         try
         {
             var previousSelectionName = SelectedSwitch?.Name;
-            var result = await _capabilityService.LoadAsync(forceRefresh);
+            var result = await _capabilityService.LoadAsync(forceRefresh, cancellationToken);
             _hasLoaded = true;
 
             Switches.Clear();
@@ -281,6 +288,10 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
                 ? $"Loaded {Switches.Count} switch(es) with {result.Errors.Count} issue(s). Review the error panel and refresh after correcting the host state."
                 : $"Loaded {Switches.Count} switch(es).";
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            StatusMessage = forceRefresh ? "Virtual switch refresh canceled." : "Virtual switch load canceled.";
+        }
         catch (Exception ex)
         {
             SetError(ex.Message);
@@ -292,29 +303,36 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         }
     }
 
-    private async Task HandleSelectionChangedAsync(SwitchListItem? selectedSwitch)
+    private async Task HandleSelectionChangedAsync(SwitchListItem? selectedSwitch, CancellationToken cancellationToken = default)
     {
-        if (selectedSwitch is not null)
+        try
         {
-            _isDraftActive = false;
-            SetError(null);
-            SetEditorFields(selectedSwitch.Name, selectedSwitch.Type, selectedSwitch.AdapterName ?? string.Empty);
-            SelectedSwitchValidationText = selectedSwitch.Status;
-            DeleteConstraintText = string.Empty;
-            SetAttachedVmState(Array.Empty<string>(), "Loading attached VMs...");
-            await LoadAttachedVmNamesAsync(selectedSwitch.Name);
-            await RefreshValidationAsync();
-            StatusMessage = "Selected virtual switch details are ready.";
+            if (selectedSwitch is not null)
+            {
+                _isDraftActive = false;
+                SetError(null);
+                SetEditorFields(selectedSwitch.Name, selectedSwitch.Type, selectedSwitch.AdapterName ?? string.Empty);
+                SelectedSwitchValidationText = selectedSwitch.Status;
+                DeleteConstraintText = string.Empty;
+                SetAttachedVmState(Array.Empty<string>(), "Loading attached VMs...");
+                await LoadAttachedVmNamesAsync(selectedSwitch.Name, cancellationToken);
+                await RefreshValidationAsync(cancellationToken);
+                StatusMessage = "Selected virtual switch details are ready.";
+            }
+            else if (!_isDraftActive)
+            {
+                ClearEditor();
+            }
         }
-        else if (!_isDraftActive)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            ClearEditor();
+            return;
         }
 
         NotifyStateChanged();
     }
 
-    private async Task SaveChangesCoreAsync()
+    private async Task SaveChangesCoreAsync(CancellationToken cancellationToken = default)
     {
         var draft = CaptureDraft(SelectedSwitch is null);
         _isSaving = true;
@@ -322,7 +340,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         NotifyStateChanged();
         try
         {
-            var result = await _capabilityService.SaveAsync(draft);
+            var result = await _capabilityService.SaveAsync(draft, cancellationToken);
             StatusMessage = result.UserMessage;
             if (!result.Success)
             {
@@ -332,7 +350,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
 
             _isDraftActive = false;
             SetError(null);
-            await LoadInventoryAsync(forceRefresh: true);
+            await LoadInventoryAsync(forceRefresh: true, cancellationToken);
             if (result.Item is not null)
             {
                 var selected = Switches.FirstOrDefault(row => string.Equals(row.Name, result.Item.Name, StringComparison.OrdinalIgnoreCase));
@@ -346,11 +364,11 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         }
     }
 
-    private async Task RefreshValidationAsync()
+    private async Task RefreshValidationAsync(CancellationToken cancellationToken = default)
     {
         var requestVersion = ++_validationRequestVersion;
         var draft = CaptureDraft(SelectedSwitch is null);
-        var validation = await _capabilityService.ValidateAsync(draft, GetKnownInventorySnapshot());
+        var validation = await _capabilityService.ValidateAsync(draft, GetKnownInventorySnapshot(), cancellationToken);
         if (requestVersion != _validationRequestVersion)
         {
             return;
@@ -364,10 +382,10 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadAttachedVmNamesAsync(string switchName)
+    private async Task LoadAttachedVmNamesAsync(string switchName, CancellationToken cancellationToken = default)
     {
         var requestVersion = ++_attachedVmRequestVersion;
-        var vmNames = await _capabilityService.GetAttachedVmNamesAsync(switchName);
+        var vmNames = await _capabilityService.GetAttachedVmNamesAsync(switchName, cancellationToken);
         if (requestVersion != _attachedVmRequestVersion || SelectedSwitch is null || !string.Equals(SelectedSwitch.Name, switchName, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -414,7 +432,7 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
         }
 
         DeleteConstraintText = string.Empty;
-        _ = RefreshValidationAsync();
+        _ = RefreshValidationAsync(LifecycleToken);
         NotifyStateChanged();
     }
 

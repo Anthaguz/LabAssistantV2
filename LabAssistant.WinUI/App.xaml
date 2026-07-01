@@ -7,8 +7,11 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <controls:XamlControlsResources />
-                <ResourceDictionary Source="ms-appx:///Styles/HighContrast.xaml" />
-            </ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Styles/Tokens/SpacingTokens.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/Tokens/TypographyTokens.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/Tokens/ElevationTokens.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/HighContrast.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">

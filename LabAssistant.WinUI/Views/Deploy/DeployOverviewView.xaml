@@ -29,12 +29,12 @@
             </Grid.ColumnDefinitions>
 
             <Border
-                Padding="12"
+                Padding="{StaticResource CardPadding}"
                 Background="{StaticResource ShellBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="6">
-                <StackPanel Spacing="8">
+                CornerRadius="{StaticResource CardCornerRadius}">
+                <StackPanel Spacing="{StaticResource SpacingS}">
                     <TextBlock
                         Foreground="{StaticResource ShellTextPrimaryBrush}"
                         FontWeight="SemiBold"
@@ -56,12 +56,12 @@
 
             <Border
                 Grid.Column="1"
-                Padding="12"
+                Padding="{StaticResource CardPadding}"
                 Background="{StaticResource ShellBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="6">
-                <StackPanel Spacing="8">
+                CornerRadius="{StaticResource CardCornerRadius}">
+                <StackPanel Spacing="{StaticResource SpacingS}">
                     <TextBlock
                         Foreground="{StaticResource ShellTextPrimaryBrush}"
                         FontWeight="SemiBold"

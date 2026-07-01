@@ -3,21 +3,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="HighContrast">
-            <Color x:Key="ShellBackgroundColor">{ThemeResource SystemColorWindowColor}</Color>
-            <Color x:Key="ShellTopBarBackgroundColor">{ThemeResource SystemColorWindowColor}</Color>
-            <Color x:Key="ShellTopBarForegroundColor">{ThemeResource SystemColorWindowTextColor}</Color>
-            <Color x:Key="ShellRailBackgroundColor">{ThemeResource SystemColorWindowColor}</Color>
-            <Color x:Key="ShellDrawerBackgroundColor">{ThemeResource SystemColorWindowColor}</Color>
-            <Color x:Key="ShellContentBackgroundColor">{ThemeResource SystemColorWindowColor}</Color>
-            <Color x:Key="ShellInsightsBackgroundColor">{ThemeResource SystemColorWindowColor}</Color>
-            <Color x:Key="ShellBorderColor">{ThemeResource SystemColorWindowTextColor}</Color>
-            <Color x:Key="ShellTextPrimaryColor">{ThemeResource SystemColorWindowTextColor}</Color>
-            <Color x:Key="ShellTextSecondaryColor">{ThemeResource SystemColorGrayTextColor}</Color>
-            <Color x:Key="ShellAccentColor">{ThemeResource SystemColorHotlightColor}</Color>
-            <Color x:Key="ShellWarnColor">{ThemeResource SystemColorHighlightColor}</Color>
-            <Color x:Key="ShellScrimColor">{ThemeResource SystemColorWindowTextColor}</Color>
-            <Color x:Key="ShellCriticalColor">{ThemeResource SystemColorHighlightColor}</Color>
-
             <SolidColorBrush x:Key="ShellBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="ShellTopBarBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="ShellTopBarForegroundBrush" Color="{ThemeResource SystemColorWindowTextColor}" />

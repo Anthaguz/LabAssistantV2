@@ -1,6 +1,5 @@
 using LabAssistant.WinUI.ViewModels;
 using Microsoft.UI.Dispatching;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Shell;
@@ -13,16 +12,7 @@ internal sealed class ShellNavigationCoordinator
     private readonly TextBlock _currentRouteTextBlock;
     private readonly TextBlock _contentTitleTextBlock;
     private readonly TextBlock _contentDescriptionTextBlock;
-    private readonly FrameworkElement _machinesOverviewPanel;
-    private readonly FrameworkElement _assetsLocalNavigationPanel;
-    private readonly FrameworkElement _assetsOverviewPanel;
-    private readonly FrameworkElement _assetsBaseDisksPanel;
-    private readonly FrameworkElement _assetsSwitchesPanel;
-    private readonly FrameworkElement _settingsMachinesPanel;
-    private readonly FrameworkElement _nonMachinesPlaceholderTextBlock;
-    private readonly Action _applyRightPanelState;
-    private readonly Action _applyTemplatesUiState;
-    private readonly Action _applyCapabilityShellState;
+    private readonly ShellPanelVisibilityManager _panelVisibilityManager;
     private readonly Func<Task> _loadMachinesDeletionPolicyAsync;
     private readonly Action _discardMachineEditDraft;
     private readonly Action<string> _resetRightPanelForCapabilitySwitch;
@@ -41,16 +31,7 @@ internal sealed class ShellNavigationCoordinator
         TextBlock currentRouteTextBlock,
         TextBlock contentTitleTextBlock,
         TextBlock contentDescriptionTextBlock,
-        FrameworkElement machinesOverviewPanel,
-        FrameworkElement assetsLocalNavigationPanel,
-        FrameworkElement assetsOverviewPanel,
-        FrameworkElement assetsBaseDisksPanel,
-        FrameworkElement assetsSwitchesPanel,
-        FrameworkElement settingsMachinesPanel,
-        FrameworkElement nonMachinesPlaceholderTextBlock,
-        Action applyRightPanelState,
-        Action applyTemplatesUiState,
-        Action applyCapabilityShellState,
+        ShellPanelVisibilityManager panelVisibilityManager,
         Func<Task> loadMachinesDeletionPolicyAsync,
         Action discardMachineEditDraft,
         Action<string> resetRightPanelForCapabilitySwitch,
@@ -62,16 +43,7 @@ internal sealed class ShellNavigationCoordinator
         _currentRouteTextBlock = currentRouteTextBlock;
         _contentTitleTextBlock = contentTitleTextBlock;
         _contentDescriptionTextBlock = contentDescriptionTextBlock;
-        _machinesOverviewPanel = machinesOverviewPanel;
-        _assetsLocalNavigationPanel = assetsLocalNavigationPanel;
-        _assetsOverviewPanel = assetsOverviewPanel;
-        _assetsBaseDisksPanel = assetsBaseDisksPanel;
-        _assetsSwitchesPanel = assetsSwitchesPanel;
-        _settingsMachinesPanel = settingsMachinesPanel;
-        _nonMachinesPlaceholderTextBlock = nonMachinesPlaceholderTextBlock;
-        _applyRightPanelState = applyRightPanelState;
-        _applyTemplatesUiState = applyTemplatesUiState;
-        _applyCapabilityShellState = applyCapabilityShellState;
+        _panelVisibilityManager = panelVisibilityManager;
         _loadMachinesDeletionPolicyAsync = loadMachinesDeletionPolicyAsync;
         _discardMachineEditDraft = discardMachineEditDraft;
         _resetRightPanelForCapabilitySwitch = resetRightPanelForCapabilitySwitch;
@@ -158,7 +130,7 @@ internal sealed class ShellNavigationCoordinator
 
         if (IsMachinesOverviewActive)
         {
-            _ = _ensureMachinesInventoryAsync();
+            _ = SafeFireAndForgetAsync(_ensureMachinesInventoryAsync);
         }
     }
 
@@ -167,21 +139,12 @@ internal sealed class ShellNavigationCoordinator
         _currentRouteTextBlock.Text = $"{_activeCapability.DisplayName} / {_activeSubview.DisplayName}";
         _contentTitleTextBlock.Text = _activeCapability.DisplayName;
         _contentDescriptionTextBlock.Text = GetContentDescription();
-        _applyRightPanelState();
-        _machinesOverviewPanel.Visibility = IsMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        _assetsLocalNavigationPanel.Visibility = IsAssetsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
-        _assetsOverviewPanel.Visibility = IsAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
-        _assetsBaseDisksPanel.Visibility = IsAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;
-        _assetsSwitchesPanel.Visibility = IsAssetsSwitchesActive ? Visibility.Visible : Visibility.Collapsed;
-        _applyTemplatesUiState();
-        _settingsMachinesPanel.Visibility = IsSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
-        _nonMachinesPlaceholderTextBlock.Visibility = IsKnownCapabilityActive() ? Visibility.Collapsed : Visibility.Visible;
+        _panelVisibilityManager.ApplyVisibility(_activeCapability, _activeSubview);
         QueueNavigationSelectionUpdate();
-        _applyCapabilityShellState();
 
         if (IsSettingsMachinesActive)
         {
-            _ = _loadMachinesDeletionPolicyAsync();
+            _ = SafeFireAndForgetAsync(_loadMachinesDeletionPolicyAsync);
         }
     }
 
@@ -258,13 +221,15 @@ internal sealed class ShellNavigationCoordinator
         return $"Use {_activeCapability.DisplayName} to continue to {_activeSubview.DisplayName}.";
     }
 
-    private bool IsKnownCapabilityActive()
+    private async Task SafeFireAndForgetAsync(Func<Task> operation)
     {
-        return IsMachinesOverviewActive ||
-            IsDeployCapabilityActive ||
-            IsAssetsCapabilityActive ||
-            IsTemplatesCapabilityActive ||
-            IsSettingsMachinesActive ||
-            IsDiagnosticsCapabilityActive;
+        try
+        {
+            await operation();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ShellNavigationCoordinator] Background operation failed: {ex.Message}");
+        }
     }
 }

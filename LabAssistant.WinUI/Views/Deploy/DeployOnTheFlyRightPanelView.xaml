@@ -6,7 +6,7 @@
     x:Name="Root"
     x:DefaultBindMode="OneWay">
     <Grid
-        RowSpacing="8"
+        RowSpacing="{StaticResource SpacingS}"
         AutomationProperties.LandmarkType="Main"
         XYFocusKeyboardNavigation="Enabled">
         <Grid.RowDefinitions>
@@ -20,10 +20,10 @@
             Background="{StaticResource ShellContentBackgroundBrush}"
             BorderBrush="{StaticResource ShellBorderBrush}"
             BorderThickness="1"
-            CornerRadius="6"
+            CornerRadius="{StaticResource CardCornerRadius}"
             AutomationProperties.LandmarkType="Custom"
             AutomationProperties.LocalizedLandmarkType="Deployment status summary">
-            <StackPanel Spacing="8">
+            <StackPanel Spacing="{StaticResource SpacingS}">
                 <TextBlock
                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                     Text="Quick Deploy progress and VM step details."
@@ -48,7 +48,7 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="1" RowSpacing="8" XYFocusKeyboardNavigation="Enabled">
+        <Grid Grid.Row="1" RowSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -60,11 +60,11 @@
                 Background="{StaticResource ShellBackgroundBrush}"
                 BorderBrush="{StaticResource ShellBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="6"
+                CornerRadius="{StaticResource CardCornerRadius}"
                 AutomationProperties.LandmarkType="Custom"
                 AutomationProperties.LocalizedLandmarkType="Loading status"
                 Visibility="{x:Bind ViewModel.LoadingVisibility}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                     <ProgressRing
                         Width="16"
                         Height="16"
@@ -85,7 +85,7 @@
                     Background="{StaticResource ShellBackgroundBrush}"
                     BorderBrush="{StaticResource ShellBorderBrush}"
                     BorderThickness="1"
-                    CornerRadius="6"
+                    CornerRadius="{StaticResource CardCornerRadius}"
                     AutomationProperties.LandmarkType="Custom"
                     AutomationProperties.LocalizedLandmarkType="Empty state"
                     Visibility="{x:Bind ViewModel.EmptyStateVisibility}">
@@ -118,7 +118,7 @@
                                 Background="{StaticResource ShellBackgroundBrush}"
                                 BorderBrush="{StaticResource ShellBorderBrush}"
                                 BorderThickness="1"
-                                CornerRadius="6">
+                                CornerRadius="{StaticResource CardCornerRadius}">
                                 <Grid RowSpacing="6">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />

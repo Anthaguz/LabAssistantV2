@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business.Machines;
@@ -171,7 +172,7 @@ public partial class MachinesViewModel : ViewModelBase
 
     public DateTimeOffset LastOnDemandRdpRefreshUtc { get; private set; } = DateTimeOffset.MinValue;
 
-    public override async Task InitializeAsync(object? parameter = null)
+    public override async Task InitializeAsync(object? parameter = null, CancellationToken cancellationToken = default)
     {
         if (IsInitialized)
         {
@@ -179,12 +180,13 @@ public partial class MachinesViewModel : ViewModelBase
         }
 
         EnsurePropertyChangedSubscription();
-        await EnsureInventoryAsync(forceRefresh: true);
+        await EnsureInventoryAsync(forceRefresh: true, cancellationToken);
         IsInitialized = true;
     }
 
-    public override Task CleanupAsync()
+    public override async Task CleanupAsync()
     {
+        await base.CleanupAsync();
         _shellBridge = null;
         _isMachineEditLoading = false;
         _isRdpRefreshRunning = false;
@@ -192,7 +194,6 @@ public partial class MachinesViewModel : ViewModelBase
         ClearWorkspaceState(DefaultStatusMessage);
         ReleasePropertyChangedSubscription();
         IsInitialized = false;
-        return Task.CompletedTask;
     }
 
     internal void AttachShellBridge(IMachinesCapabilityShellBridge shellBridge)
@@ -220,10 +221,20 @@ public partial class MachinesViewModel : ViewModelBase
 
     public Task EnsureInventoryAsync(bool forceRefresh)
     {
-        return RefreshInventoryCoreAsync(forceRefresh);
+        return EnsureInventoryAsync(forceRefresh, LifecycleToken);
     }
 
-    public async Task RefreshRdpReadinessAsync(bool selectedOnly)
+    private Task EnsureInventoryAsync(bool forceRefresh, CancellationToken cancellationToken)
+    {
+        return RefreshInventoryCoreAsync(forceRefresh, cancellationToken);
+    }
+
+    public Task RefreshRdpReadinessAsync(bool selectedOnly)
+    {
+        return RefreshRdpReadinessAsync(selectedOnly, LifecycleToken);
+    }
+
+    private async Task RefreshRdpReadinessAsync(bool selectedOnly, CancellationToken cancellationToken)
     {
         if (!HasInventory || _isRdpRefreshRunning)
         {
@@ -241,10 +252,12 @@ public partial class MachinesViewModel : ViewModelBase
 
         _isRdpRefreshRunning = true;
         LastRdpReadinessRefreshUtc = DateTimeOffset.UtcNow;
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(LifecycleToken, cancellationToken);
         try
         {
             foreach (var vm in candidates)
             {
+                linkedCts.Token.ThrowIfCancellationRequested();
                 SetRdpReadiness(vm, new MachineRdpReadinessResult
                 {
                     State = MachineRdpReadinessState.Checking,
@@ -255,9 +268,13 @@ public partial class MachinesViewModel : ViewModelBase
 
             foreach (var vm in candidates)
             {
-                var readiness = await _machinesService.EvaluateRdpReadinessAsync(vm, CancellationToken.None);
+                var readiness = await _machinesService.EvaluateRdpReadinessAsync(vm, linkedCts.Token);
                 SetRdpReadiness(vm, readiness);
             }
+        }
+        catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
+        {
+            return;
         }
         finally
         {
@@ -269,7 +286,7 @@ public partial class MachinesViewModel : ViewModelBase
     [RelayCommand]
     private Task RefreshAsync()
     {
-        return EnsureInventoryAsync(forceRefresh: true);
+        return EnsureInventoryAsync(forceRefresh: true, LifecycleToken);
     }
 
     [RelayCommand]
@@ -277,7 +294,7 @@ public partial class MachinesViewModel : ViewModelBase
     {
         return RunSelectedMachineOperationAsync(
             "Starting VM...",
-            vm => _machinesService.StartVmAsync(vm),
+            (vm, _) => _machinesService.StartVmAsync(vm),
             refreshInventory: true);
     }
 
@@ -286,7 +303,7 @@ public partial class MachinesViewModel : ViewModelBase
     {
         return RunSelectedMachineOperationAsync(
             "Stopping VM...",
-            vm => _machinesService.StopVmAsync(vm),
+            (vm, _) => _machinesService.StopVmAsync(vm),
             refreshInventory: true);
     }
 
@@ -295,7 +312,7 @@ public partial class MachinesViewModel : ViewModelBase
     {
         return RunSelectedMachineOperationAsync(
             "Restarting VM...",
-            vm => _machinesService.RestartVmAsync(vm),
+            (vm, _) => _machinesService.RestartVmAsync(vm),
             refreshInventory: true);
     }
 
@@ -304,7 +321,7 @@ public partial class MachinesViewModel : ViewModelBase
     {
         return RunSelectedMachineOperationAsync(
             "Opening Hyper-V Console...",
-            vm => _machinesService.OpenConsoleAsync(vm),
+            (vm, _) => _machinesService.OpenConsoleAsync(vm),
             refreshInventory: false);
     }
 
@@ -324,7 +341,7 @@ public partial class MachinesViewModel : ViewModelBase
             if (DateTimeOffset.UtcNow - LastOnDemandRdpRefreshUtc >= TimeSpan.FromSeconds(2))
             {
                 LastOnDemandRdpRefreshUtc = DateTimeOffset.UtcNow;
-                await RefreshRdpReadinessAsync(selectedOnly: true);
+                await RefreshRdpReadinessAsync(selectedOnly: true, LifecycleToken);
             }
 
             return;
@@ -332,7 +349,7 @@ public partial class MachinesViewModel : ViewModelBase
 
         await RunSelectedMachineOperationAsync(
             "Opening RDP...",
-            selectedVm => _machinesService.OpenRdpAsync(selectedVm, _selectedRdpReadiness.TargetIpv4!),
+            (selectedVm, _) => _machinesService.OpenRdpAsync(selectedVm, _selectedRdpReadiness.TargetIpv4!),
             refreshInventory: false);
     }
 
@@ -386,7 +403,7 @@ public partial class MachinesViewModel : ViewModelBase
 
         await RunSelectedMachineOperationAsync(
             "Deleting VM...",
-            selectedVm => _machinesService.DeleteVmAsync(selectedVm, selectedScope.Value),
+            (selectedVm, _) => _machinesService.DeleteVmAsync(selectedVm, selectedScope.Value),
             refreshInventory: true,
             clearSelectionOnSuccess: true);
     }
@@ -414,7 +431,7 @@ public partial class MachinesViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteWithLoadingAsync(async () =>
+        await ExecuteWithLoadingAsync(async (ct) =>
         {
             StatusMessage = "Applying machine changes...";
             var result = await _machinesService.ApplyEditsAsync(vm, _editDraft);
@@ -424,9 +441,9 @@ public partial class MachinesViewModel : ViewModelBase
                 return;
             }
 
-            await RefreshInventoryCoreAsync(forceRefresh: true);
-            await LoadSelectedMachineStateAsync(SelectedMachine, ++_selectionRevision);
-        });
+            await RefreshInventoryCoreAsync(forceRefresh: true, ct);
+            await LoadSelectedMachineStateAsync(SelectedMachine, ++_selectionRevision, ct);
+        }, LifecycleToken);
 
         if (!string.IsNullOrWhiteSpace(ErrorMessage))
         {
@@ -442,7 +459,7 @@ public partial class MachinesViewModel : ViewModelBase
         }
 
         ApplySelectionState(value, updateNoSelectionStatus: true);
-        _ = LoadSelectedMachineStateAsync(value, ++_selectionRevision);
+        _ = LoadSelectedMachineStateAsync(value, ++_selectionRevision, LifecycleToken);
     }
 
     partial void OnCpuCountChanged(string value) => RefreshDraftFromEditors();
@@ -521,7 +538,7 @@ public partial class MachinesViewModel : ViewModelBase
         _isPropertyChangedHooked = false;
     }
 
-    private async Task RefreshInventoryCoreAsync(bool forceRefresh)
+    private async Task RefreshInventoryCoreAsync(bool forceRefresh, CancellationToken cancellationToken = default)
     {
         if (!forceRefresh && HasInventory)
         {
@@ -529,7 +546,7 @@ public partial class MachinesViewModel : ViewModelBase
         }
 
         var selectedVmKey = SelectedMachine is null ? null : GetVmKey(SelectedMachine);
-        await ExecuteWithLoadingAsync(async () =>
+        await ExecuteWithLoadingAsync(async (ct) =>
         {
             StatusMessage = "Loading host VM inventory...";
             var inventory = await _machinesService.LoadInventoryAsync();
@@ -560,8 +577,8 @@ public partial class MachinesViewModel : ViewModelBase
                 ? $"Loaded {Machines.Count} VM(s)."
                 : "No Hyper-V VMs found on this host.";
 
-            await LoadSelectedMachineStateAsync(nextSelection, ++_selectionRevision);
-        });
+            await LoadSelectedMachineStateAsync(nextSelection, ++_selectionRevision, ct);
+        }, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(ErrorMessage))
         {
@@ -571,7 +588,7 @@ public partial class MachinesViewModel : ViewModelBase
 
     private async Task RunSelectedMachineOperationAsync(
         string pendingMessage,
-        Func<MachineInventoryItem, Task<MachineOperationResult>> operation,
+        Func<MachineInventoryItem, CancellationToken, Task<MachineOperationResult>> operation,
         bool refreshInventory,
         bool clearSelectionOnSuccess = false)
     {
@@ -581,10 +598,10 @@ public partial class MachinesViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteWithLoadingAsync(async () =>
+        await ExecuteWithLoadingAsync(async (ct) =>
         {
             StatusMessage = pendingMessage;
-            var result = await operation(vm);
+            var result = await operation(vm, ct);
             StatusMessage = $"{result.UserMessage} (operationId: {result.OperationId})";
             if (!result.Success)
             {
@@ -599,13 +616,13 @@ public partial class MachinesViewModel : ViewModelBase
 
             if (refreshInventory)
             {
-                await RefreshInventoryCoreAsync(forceRefresh: true);
+                await RefreshInventoryCoreAsync(forceRefresh: true, ct);
                 if (SelectedMachine is not null)
                 {
-                    await RefreshRdpReadinessAsync(selectedOnly: true);
+                    await RefreshRdpReadinessAsync(selectedOnly: true, ct);
                 }
             }
-        });
+        }, LifecycleToken);
 
         if (!string.IsNullOrWhiteSpace(ErrorMessage))
         {
@@ -613,7 +630,7 @@ public partial class MachinesViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadSelectedMachineStateAsync(MachineListItem? selectedMachine, int revision)
+    private async Task LoadSelectedMachineStateAsync(MachineListItem? selectedMachine, int revision, CancellationToken cancellationToken = default)
     {
         if (selectedMachine is null || !TryGetInventoryItem(selectedMachine, out var vm))
         {
@@ -627,8 +644,11 @@ public partial class MachinesViewModel : ViewModelBase
         RaiseComputedStateChanged();
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var snapshot = await _machinesService.LoadEditSnapshotAsync(vm);
+            cancellationToken.ThrowIfCancellationRequested();
             var availableSwitches = await _machinesService.LoadVirtualSwitchesAsync();
+            cancellationToken.ThrowIfCancellationRequested();
             if (revision != _selectionRevision || !IsCurrentSelection(selectedMachine))
             {
                 return;
@@ -645,6 +665,10 @@ public partial class MachinesViewModel : ViewModelBase
             }
 
             ApplySnapshotToEditors(snapshot, availableSwitches);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
         }
         catch (Exception ex)
         {

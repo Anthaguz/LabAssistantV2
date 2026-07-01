@@ -20,7 +20,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 
     private PowerShellSessionPoolHealthMonitor? _healthMonitor;
     private int _availableCount;
-    private bool _disposed;
+    private int _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PowerShellSessionPool"/> class.
@@ -280,12 +280,10 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
     /// <returns>A value task that completes when disposal finishes.</returns>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
         {
             return;
         }
-
-        _disposed = true;
 
         if (_healthMonitor is not null)
         {
@@ -342,7 +340,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_disposed || _sessions.Count >= _options.MaxPoolSize)
+            if (_disposed == 1 || _sessions.Count >= _options.MaxPoolSize)
             {
                 return null;
             }
@@ -404,7 +402,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
             return;
         }
 
-        if (_disposed)
+        if (_disposed == 1)
         {
             RetireSession(session);
             return;
@@ -431,7 +429,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 
     private bool TryEnqueueAvailable(IPersistentPowerShellSession session)
     {
-        if (_disposed || !_availableSessions.Writer.TryWrite(session))
+        if (_disposed == 1 || !_availableSessions.Writer.TryWrite(session))
         {
             return false;
         }
@@ -517,7 +515,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
     }
 
     private void Log(

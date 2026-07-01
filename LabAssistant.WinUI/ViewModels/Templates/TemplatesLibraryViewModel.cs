@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.WinUI.Infrastructure;
@@ -60,20 +61,21 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
     public string SelectedTemplateLastModified => SelectedTemplate?.LastModifiedDisplay ?? "Last modified unavailable";
     public string RenameHintText => SelectedTemplate is null ? "Select a template to rename it." : "Rename the template display name and persist the change to the current file.";
 
-    public override Task InitializeAsync(object? parameter = null)
+    public override async Task InitializeAsync(object? parameter = null, CancellationToken cancellationToken = default)
     {
         if (IsInitialized)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         EnsurePropertyChangedSubscription();
         IsInitialized = true;
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
-    public override Task CleanupAsync()
+    public override async Task CleanupAsync()
     {
+        await base.CleanupAsync();
         Templates.Clear();
         SelectedTemplate = null;
         RenameTemplateName = string.Empty;
@@ -96,7 +98,6 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
         ReleasePropertyChangedSubscription();
         RefreshComputedState();
         IsInitialized = false;
-        return Task.CompletedTask;
     }
 
     [RelayCommand] private void ApplySearch() => ApplySearchRequested?.Invoke();

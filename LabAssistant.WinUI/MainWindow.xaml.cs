@@ -86,13 +86,7 @@ public sealed partial class MainWindow : Window
             () => IsDeployFromTemplateActive,
             () => _deployCapabilityRuntime,
             () => RootLayout.ActualWidth);
-        _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
-            _shellViewModel,
-            DispatcherQueue,
-            GlobalNavigationView,
-            CurrentRouteTextBlock,
-            ContentTitleTextBlock,
-            ContentDescriptionTextBlock,
+        var panelVisibilityManager = new ShellPanelVisibilityManager(
             MachinesOverviewViewHost,
             AssetsLocalNavigationPanel,
             AssetsOverviewViewHost,
@@ -102,7 +96,15 @@ public sealed partial class MainWindow : Window
             NonMachinesPlaceholderTextBlock,
             ApplyRightPanelState,
             () => templatesCapabilityRuntime?.ApplyUiState(),
-            ApplyCapabilityShellState,
+            ApplyCapabilityShellState);
+        _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
+            _shellViewModel,
+            DispatcherQueue,
+            GlobalNavigationView,
+            CurrentRouteTextBlock,
+            ContentTitleTextBlock,
+            ContentDescriptionTextBlock,
+            panelVisibilityManager,
             LoadMachinesDeletionPolicyAsync,
             () => machinesCapabilityRuntime?.DiscardEditDraft(),
             ResetRightPanelForCapabilitySwitch,
@@ -134,11 +136,18 @@ public sealed partial class MainWindow : Window
         RootLayout.Loaded += async (_, _) =>
         {
             RootLayout.Focus(FocusState.Programmatic);
-            await _machinesCapabilityRuntime.EnsureInventoryAsync(forceRefresh: true);
-            await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);
-            await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
-            await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
-            await LoadMachinesDeletionPolicyAsync();
+            try
+            {
+                await _machinesCapabilityRuntime.EnsureInventoryAsync(forceRefresh: true);
+                await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);
+                await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
+                await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
+                await LoadMachinesDeletionPolicyAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Loaded initialization failed: {ex}");
+            }
         };
 
         ApplyState();
