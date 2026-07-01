@@ -5,7 +5,7 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 internal sealed class DeployOverviewWorkspaceComposition
 {
     private readonly DeployOverviewView _view;
-    private readonly DeployOverviewWorkspaceViewModel _workspace = new();
+    private readonly DeployOverviewViewModel _workspace;
     private readonly IDeployOverviewWorkspaceHost _host;
     private readonly IDeployOverviewWorkspaceShellBridge _shellBridge;
 
@@ -15,10 +15,11 @@ internal sealed class DeployOverviewWorkspaceComposition
         IDeployOverviewWorkspaceShellBridge shellBridge)
     {
         _view = view;
+        _workspace = view.ViewModel;
         _host = host;
         _shellBridge = shellBridge;
         WireHandlers();
-        ApplyWorkspaceState();
+        RefreshSummary();
     }
 
     public void RefreshUiState()
@@ -29,7 +30,6 @@ internal sealed class DeployOverviewWorkspaceComposition
         }
 
         RefreshSummary();
-        ApplyWorkspaceState();
     }
 
     public void ApplyShellState()
@@ -40,13 +40,12 @@ internal sealed class DeployOverviewWorkspaceComposition
         }
 
         RefreshSummary();
-        ApplyWorkspaceState();
     }
 
     private void WireHandlers()
     {
-        _view.OpenQuickDeployRequested += OpenQuickDeployRequested;
-        _view.OpenFromTemplateRequested += OpenFromTemplateRequested;
+        _workspace.OpenQuickDeployRequested += OpenQuickDeployRequested;
+        _workspace.OpenFromTemplateRequested += OpenFromTemplateRequested;
     }
 
     private void RefreshSummary()
@@ -55,11 +54,6 @@ internal sealed class DeployOverviewWorkspaceComposition
             _host.QuickDeployDraftCount,
             _host.IsLoadingTemplates,
             _host.AvailableTemplateCount);
-    }
-
-    private void ApplyWorkspaceState()
-    {
-        _view.UpdateSummary(_workspace.QuickDeploySummaryText, _workspace.FromTemplateSummaryText);
     }
 
     private void OpenQuickDeployRequested(object? sender, EventArgs e)

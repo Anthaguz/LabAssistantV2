@@ -2,7 +2,7 @@ using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.Models.Deploy;
 
-internal sealed record DeployVmResultRow(
+public sealed record DeployVmResultRow(
     string VmName,
     string Status,
     string Summary,

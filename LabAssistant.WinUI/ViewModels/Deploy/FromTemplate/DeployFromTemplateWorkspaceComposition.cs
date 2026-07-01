@@ -45,9 +45,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _view.SetV2CredentialSlotsItemsSource(_v2ReviewWorkspace.CredentialSlotRows);
         _view.SetV2WavesItemsSource(_v2ReviewWorkspace.WaveRows);
         _view.SetV2DiagnosticsItemsSource(_v2ReviewWorkspace.DiagnosticRows);
-        _rightPanelView.SetIssueRowsItemsSource(_workspace.IssueRows);
-        _rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);
-        _rightPanelView.ResetPanelState();
+        _rightPanelView.ViewModel.Reset();
         WireHandlers();
         UpdateUi();
     }
@@ -88,7 +86,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
     public void ResetPanelState()
     {
-        _rightPanelView.ResetPanelState();
+        _rightPanelView.ViewModel.Reset();
     }
 
     public Task EvaluateReadinessAsync(DeploymentPreflightMode mode)
@@ -630,6 +628,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
             _workspace.SetReadinessSummary("Select a template to evaluate readiness and run deploy.");
             _workspace.ClearGroupedIssueState();
             _workspace.RefreshResultRows(_compatibilityIssues, _readinessReport);
+            UpdateCredentialsPanelState();
             ApplyWorkspaceState();
             _host.RefreshResultsPanelState();
             return;
@@ -642,6 +641,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
                 .Select(row => new DeployIssueRow(row.Scope, row.Severity, row.Message))
                 .ToList());
             _workspace.RefreshResultRows([], null);
+            UpdateCredentialsPanelState();
             ApplyWorkspaceState();
             _host.RefreshResultsPanelState();
             return;
@@ -659,6 +659,7 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
 
         _workspace.RefreshResultRows(_compatibilityIssues, _readinessReport);
         UpdateIssueRows();
+        UpdateCredentialsPanelState();
         ApplyWorkspaceState();
         _host.RefreshResultsPanelState();
     }
@@ -711,6 +712,42 @@ internal sealed class DeployFromTemplateWorkspaceComposition : IDeployFromTempla
         _view.ApplyV2ReviewState(_v2ReviewWorkspace.IsVisible, _v2ReviewWorkspace.StatusText, _v2ReviewWorkspace.PlanSummary);
         _view.ApplyV2CredentialEditorState(_v2ReviewWorkspace.SelectedCredentialSlotPurpose, _v2ReviewWorkspace.SelectedCredentialSlotUsername);
         _view.ApplyV2BaseRemoteAccessState(_v2ReviewWorkspace.BaseRemoteAccess);
+    }
+
+    private void UpdateCredentialsPanelState()
+    {
+        if (_workspace.ActiveTemplateDocument is null)
+        {
+            _rightPanelView.ViewModel.Reset();
+            return;
+        }
+
+        if (!IsActiveTemplateV2())
+        {
+            _rightPanelView.ViewModel.Reset("Credential slots are only used for V2 templates.");
+            return;
+        }
+
+        if (_v2ReviewWorkspace.IsPlanning)
+        {
+            _rightPanelView.ViewModel.ShowLoading(_v2ReviewWorkspace.StatusText);
+            return;
+        }
+
+        var credentialSlots = _v2ReviewWorkspace.CredentialSlotRows
+            .Select(row => new CredentialSlotItem(
+                row.SlotKey,
+                row.PurposeSummary,
+                row.AffectedVmSummary,
+                row.ExistingUsername,
+                row.HasStoredValue))
+            .ToList();
+        var allSlotsResolved = _v2ReviewWorkspace.CurrentPlan is not null && credentialSlots.Count == 0;
+        var statusMessage = allSlotsResolved
+            ? "No unresolved credential slots remain."
+            : _v2ReviewWorkspace.StatusText;
+
+        _rightPanelView.ViewModel.UpdateSlots(credentialSlots, allSlotsResolved, statusMessage);
     }
 
     private bool IsActiveTemplateV2()

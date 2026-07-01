@@ -1,5 +1,8 @@
 using LabAssistant.Business;
 using LabAssistant.WinUI.Diagnostics;
+using LabAssistant.WinUI.ViewModels.Assets;
+using LabAssistant.WinUI.ViewModels.Machines;
+using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Services.Logging;
 using InfrastructureServices = LabAssistant.Services.ServiceCollectionExtensions;
@@ -70,6 +73,13 @@ public partial class App : Application
             InfrastructureServices.AddInfrastructureServices(serviceCollection);
             serviceCollection.AddBusinessServices();
             serviceCollection.AddPersistenceServices();
+            serviceCollection.AddSingleton<AssetsOverviewViewModel>();
+            serviceCollection.AddSingleton<AssetsBaseDisksViewModel>();
+            serviceCollection.AddSingleton<AssetsSwitchesViewModel>();
+            serviceCollection.AddSingleton<MachinesViewModel>();
+            serviceCollection.AddSingleton<TemplatesLibraryViewModel>();
+            serviceCollection.AddSingleton<TemplatesEditorViewModel>();
+            serviceCollection.AddSingleton<TemplatesBuilderViewModel>();
             StartupCrashLogger.MarkPhase("OnLaunched", "after service registration");
 
             Services = serviceCollection.BuildServiceProvider();

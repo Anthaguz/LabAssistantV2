@@ -68,8 +68,7 @@ internal sealed class AssetsOverviewWorkspaceHost : IAssetsOverviewWorkspaceHost
 
 internal sealed class AssetsOverviewWorkspaceComposition
 {
-    private readonly AssetsOverviewView _view;
-    private readonly AssetsOverviewWorkspaceViewModel _workspace = new();
+    private readonly AssetsOverviewViewModel _viewModel;
     private readonly IAssetsOverviewWorkspaceHost _host;
     private readonly IAssetsOverviewWorkspaceShellBridge _shellBridge;
 
@@ -78,11 +77,11 @@ internal sealed class AssetsOverviewWorkspaceComposition
         IAssetsOverviewWorkspaceHost host,
         IAssetsOverviewWorkspaceShellBridge shellBridge)
     {
-        _view = view;
+        _viewModel = view.ViewModel;
         _host = host;
         _shellBridge = shellBridge;
-        WireHandlers();
-        ApplyWorkspaceState();
+        _viewModel.ConfigureNavigation(_shellBridge.NavigateToRoute);
+        RefreshSummary();
     }
 
     public void ApplyShellState()
@@ -93,36 +92,14 @@ internal sealed class AssetsOverviewWorkspaceComposition
         }
 
         RefreshSummary();
-        ApplyWorkspaceState();
-    }
-
-    private void WireHandlers()
-    {
-        _view.OpenBaseDisksRequested += OpenBaseDisksRequested;
-        _view.OpenSwitchesRequested += OpenSwitchesRequested;
-    }
-
-    private void OpenBaseDisksRequested(object? sender, object e)
-    {
-        _shellBridge.NavigateToRoute(ShellRouteKeys.AssetsBaseDisks);
-    }
-
-    private void OpenSwitchesRequested(object? sender, object e)
-    {
-        _shellBridge.NavigateToRoute(ShellRouteKeys.AssetsSwitches);
     }
 
     private void RefreshSummary()
     {
-        _workspace.RefreshSummary(
+        _viewModel.RefreshSummary(
             _host.IsAssetsBaseDisksLoading,
             _host.IsAssetsSwitchesLoading,
             _host.AssetsBaseDiskCount,
             _host.AssetsSwitchCount);
-    }
-
-    private void ApplyWorkspaceState()
-    {
-        _view.UpdateSummary(_workspace.BaseDisksSummaryText, _workspace.SwitchesSummaryText);
     }
 }

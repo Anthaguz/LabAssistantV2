@@ -1,5 +1,6 @@
 <UserControl
     x:Class="LabAssistant.WinUI.Views.Assets.AssetsOverviewView"
+    x:Name="AssetsOverviewViewRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid RowSpacing="12">
@@ -8,10 +9,17 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TextBlock
-            Foreground="{StaticResource ShellTextSecondaryBrush}"
-            Text="Use Assets to inspect shared disk and switch inventory without leaving the capability workspace."
-            TextWrapping="Wrap" />
+        <StackPanel Spacing="8">
+            <TextBlock
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="{x:Bind ViewModel.CatalogStatus, Mode=OneWay}"
+                TextWrapping="Wrap" />
+            <ProgressRing
+                Width="24"
+                Height="24"
+                IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+        </StackPanel>
 
         <Grid
             Grid.Row="1"
@@ -33,14 +41,12 @@
                         FontWeight="SemiBold"
                         Text="Base Disks" />
                     <TextBlock
-                        x:Name="AssetsOverviewBaseDisksSummaryTextBlock"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Open Base Disks to inspect imported VHDX inventory."
+                        Text="{x:Bind ViewModel.BaseDisksSummaryText, Mode=OneWay}"
                         TextWrapping="Wrap" />
                     <Button
-                        x:Name="AssetsOverviewOpenBaseDisksButton"
                         HorizontalAlignment="Left"
-                        Click="AssetsOverviewOpenBaseDisksButton_Click"
+                        Command="{x:Bind ViewModel.OpenBaseDisksCommand}"
                         Content="Open Base Disks" />
                 </StackPanel>
             </Border>
@@ -58,14 +64,12 @@
                         FontWeight="SemiBold"
                         Text="Switches" />
                     <TextBlock
-                        x:Name="AssetsOverviewSwitchesSummaryTextBlock"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Open Switches to inspect host virtual switch inventory."
+                        Text="{x:Bind ViewModel.SwitchesSummaryText, Mode=OneWay}"
                         TextWrapping="Wrap" />
                     <Button
-                        x:Name="AssetsOverviewOpenSwitchesButton"
                         HorizontalAlignment="Left"
-                        Click="AssetsOverviewOpenSwitchesButton_Click"
+                        Command="{x:Bind ViewModel.OpenSwitchesCommand}"
                         Content="Open Switches" />
                 </StackPanel>
             </Border>
