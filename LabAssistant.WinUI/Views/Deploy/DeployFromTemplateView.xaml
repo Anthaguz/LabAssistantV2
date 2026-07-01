@@ -197,6 +197,11 @@
                                         x:Name="DeployV2BlockersListView"
                                         MaxHeight="180"
                                         SelectionMode="None">
+                                        <ListView.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <ItemsStackPanel />
+                                            </ItemsPanelTemplate>
+                                        </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding}" TextWrapping="Wrap" />
@@ -221,6 +226,11 @@
                                         x:Name="DeployV2CredentialSlotsListView"
                                         MaxHeight="180"
                                         SelectionMode="Single">
+                                        <ListView.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <ItemsStackPanel />
+                                            </ItemsPanelTemplate>
+                                        </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Margin="0,0,0,8" Spacing="2">
@@ -275,6 +285,11 @@
                                         x:Name="DeployV2WavesListView"
                                         MaxHeight="180"
                                         SelectionMode="None">
+                                        <ListView.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <ItemsStackPanel />
+                                            </ItemsPanelTemplate>
+                                        </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Margin="0,0,0,8" Spacing="2">
@@ -299,6 +314,11 @@
                                         x:Name="DeployV2DiagnosticsListView"
                                         MaxHeight="180"
                                         SelectionMode="None">
+                                        <ListView.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <ItemsStackPanel />
+                                            </ItemsPanelTemplate>
+                                        </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Margin="0,0,0,8" Spacing="2">
@@ -363,6 +383,11 @@
                             <ListView
                                 x:Name="DeploySharedIssuesListView"
                                 MaxHeight="160">
+                                <ListView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <ItemsStackPanel />
+                                    </ItemsPanelTemplate>
+                                </ListView.ItemsPanel>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock

@@ -7,6 +7,7 @@ using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
 using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.IO;
 
 namespace LabAssistant.Services;
@@ -15,7 +16,14 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
+        services.AddSingleton(new SessionPoolOptions
+        {
+            WarmupCount = 2,
+            MaxPoolSize = 4,
+            IdleRecycleTimeout = TimeSpan.FromMinutes(5)
+        });
         services.AddSingleton<ISessionResolver, SessionResolver>();
+        services.AddSingleton<IPowerShellSessionPool, PowerShellSessionPool>();
         services.AddTransient<IPersistentPowerShellSession, PersistentPowerShellSession>();
         services.AddSingleton<IPowerShellExecutor, PowerShellExecutor>();
         services.AddSingleton<IHyperVQueryExecutor, HyperVQueryExecutor>();

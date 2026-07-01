@@ -1,136 +1,165 @@
-<UserControl
-    x:Class="LabAssistant.WinUI.Views.Deploy.DeployOnTheFlyRightPanelView"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Deploy"
-    x:Name="Root"
-    x:DefaultBindMode="OneWay">
-    <Grid RowSpacing="8">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <Border
-            Grid.Row="0"
-            Padding="8"
-            Background="{StaticResource ShellContentBackgroundBrush}"
-            BorderBrush="{StaticResource ShellBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="6">
-            <StackPanel Spacing="8">
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="Quick Deploy progress and VM step details."
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    Foreground="{StaticResource ShellTextPrimaryBrush}"
-                    FontWeight="SemiBold"
-                    Text="{x:Bind ViewModel.OverallStatusText}" />
-                <ProgressBar
-                    Height="8"
-                    Minimum="0"
-                    Maximum="100"
-                    Value="{x:Bind ViewModel.ProgressPercentValue}" />
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="{x:Bind ViewModel.ProgressSummaryText}"
-                    TextWrapping="Wrap" />
-            </StackPanel>
-        </Border>
-
-        <Grid Grid.Row="1" RowSpacing="8">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <Border
-                Grid.Row="0"
-                Padding="10"
-                Background="{StaticResource ShellBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6"
-                Visibility="{x:Bind ViewModel.LoadingVisibility}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <ProgressRing Width="16" Height="16" IsActive="True" />
-                    <TextBlock
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="{x:Bind ViewModel.ProgressSummaryText}" />
-                </StackPanel>
-            </Border>
-
-            <Grid Grid.Row="1">
-                <Border
-                    Padding="10"
-                    Background="{StaticResource ShellBackgroundBrush}"
-                    BorderBrush="{StaticResource ShellBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Visibility="{x:Bind ViewModel.EmptyStateVisibility}">
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="{x:Bind ViewModel.EmptyStateMessage}"
-                        TextWrapping="Wrap" />
-                </Border>
-
-                <ListView ItemsSource="{x:Bind ViewModel.VmProgressItems}" SelectionMode="None" Visibility="{x:Bind ViewModel.VmProgressVisibility}">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Padding" Value="0" />
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="viewModels:DeployVmProgressItem">
-                            <Border
-                                Margin="0,0,0,8"
-                                Padding="10,8"
-                                Background="{StaticResource ShellBackgroundBrush}"
-                                BorderBrush="{StaticResource ShellBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6">
-                                <Grid RowSpacing="6">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <Grid ColumnSpacing="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock
-                                            Grid.Column="0"
-                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                            FontWeight="SemiBold"
-                                            Text="{x:Bind VmName}" />
-                                        <TextBlock
-                                            Grid.Column="1"
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="{x:Bind Status}" />
-                                    </Grid>
-                                    <ProgressBar
-                                        Grid.Row="1"
-                                        Height="6"
-                                        Minimum="0"
-                                        Maximum="100"
-                                        Value="{x:Bind ProgressPercent}" />
-                                    <TextBlock
-                                        Grid.Row="2"
-                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="{x:Bind DisplaySummary}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{x:Bind SummaryVisibility}" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-            </Grid>
-        </Grid>
-    </Grid>
-</UserControl>
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Deploy.DeployOnTheFlyRightPanelView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Deploy"
+    x:Name="Root"
+    x:DefaultBindMode="OneWay">
+    <Grid
+        RowSpacing="8"
+        AutomationProperties.LandmarkType="Main"
+        XYFocusKeyboardNavigation="Enabled">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border
+            Grid.Row="0"
+            Padding="8"
+            Background="{StaticResource ShellContentBackgroundBrush}"
+            BorderBrush="{StaticResource ShellBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            AutomationProperties.LandmarkType="Custom"
+            AutomationProperties.LocalizedLandmarkType="Deployment status summary">
+            <StackPanel Spacing="8">
+                <TextBlock
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="Quick Deploy progress and VM step details."
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                    FontWeight="SemiBold"
+                    AutomationProperties.LiveSetting="Polite"
+                    Text="{x:Bind ViewModel.OverallStatusText}" />
+                <ProgressBar
+                    Height="8"
+                    Minimum="0"
+                    Maximum="100"
+                    AutomationProperties.Name="Overall deployment progress"
+                    AutomationProperties.HelpText="Shows total Quick Deploy completion percentage."
+                    Value="{x:Bind ViewModel.ProgressPercentValue}" />
+                <TextBlock
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    AutomationProperties.LiveSetting="Polite"
+                    Text="{x:Bind ViewModel.ProgressSummaryText}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1" RowSpacing="8" XYFocusKeyboardNavigation="Enabled">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border
+                Grid.Row="0"
+                Padding="10"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                AutomationProperties.LandmarkType="Custom"
+                AutomationProperties.LocalizedLandmarkType="Loading status"
+                Visibility="{x:Bind ViewModel.LoadingVisibility}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ProgressRing
+                        Width="16"
+                        Height="16"
+                        AutomationProperties.Name="Loading deployment progress details"
+                        AutomationProperties.HelpText="Indicates that deploy progress details are loading."
+                        IsActive="True" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        AutomationProperties.LiveSetting="Polite"
+                        Text="{x:Bind ViewModel.ProgressSummaryText}" />
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="1" XYFocusKeyboardNavigation="Enabled">
+                <Border
+                    Padding="10"
+                    Background="{StaticResource ShellBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    AutomationProperties.LandmarkType="Custom"
+                    AutomationProperties.LocalizedLandmarkType="Empty state"
+                    Visibility="{x:Bind ViewModel.EmptyStateVisibility}">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        AutomationProperties.LiveSetting="Polite"
+                        Text="{x:Bind ViewModel.EmptyStateMessage}"
+                        TextWrapping="Wrap" />
+                </Border>
+
+                <ListView
+                    ItemsSource="{x:Bind ViewModel.VmProgressItems}"
+                    SelectionMode="None"
+                    TabIndex="0"
+                    AutomationProperties.Name="Virtual machine deployment progress list"
+                    AutomationProperties.HelpText="Shows the current Quick Deploy progress for each virtual machine."
+                    Visibility="{x:Bind ViewModel.VmProgressVisibility}"
+                    XYFocusKeyboardNavigation="Enabled">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:DeployVmProgressItem">
+                            <Border
+                                Margin="0,0,0,8"
+                                Padding="10,8"
+                                Background="{StaticResource ShellBackgroundBrush}"
+                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                                <Grid RowSpacing="6">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            Grid.Column="0"
+                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind VmName}" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            Text="{x:Bind Status}" />
+                                    </Grid>
+                                    <ProgressBar
+                                        Grid.Row="1"
+                                        Height="6"
+                                        Minimum="0"
+                                        Maximum="100"
+                                        AutomationProperties.Name="Virtual machine progress"
+                                        AutomationProperties.HelpText="Shows the completion percentage for the current virtual machine."
+                                        Value="{x:Bind ProgressPercent}" />
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="{x:Bind DisplaySummary}"
+                                        TextWrapping="Wrap"
+                                        Visibility="{x:Bind SummaryVisibility}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

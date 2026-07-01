@@ -1,63 +1,64 @@
-<Application
-    x:Class="LabAssistant.WinUI.App"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:Microsoft.UI.Xaml.Controls">
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <controls:XamlControlsResources />
-            </ResourceDictionary.MergedDictionaries>
-
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Light">
-                    <Color x:Key="ShellBackgroundColor">#FFF3F4F6</Color>
-                    <Color x:Key="ShellTopBarBackgroundColor">#FF0F172A</Color>
-                    <Color x:Key="ShellTopBarForegroundColor">#FFF8FAFC</Color>
-                    <Color x:Key="ShellRailBackgroundColor">#FF111827</Color>
-                    <Color x:Key="ShellDrawerBackgroundColor">#FF1F2937</Color>
-                    <Color x:Key="ShellContentBackgroundColor">#FFFFFFFF</Color>
-                    <Color x:Key="ShellInsightsBackgroundColor">#FFFFFFFF</Color>
-                    <Color x:Key="ShellBorderColor">#FFE5E7EB</Color>
-                    <Color x:Key="ShellTextPrimaryColor">#FF111827</Color>
-                    <Color x:Key="ShellTextSecondaryColor">#FF4B5563</Color>
-                    <Color x:Key="ShellAccentColor">#FF2563EB</Color>
-                    <Color x:Key="ShellWarnColor">#FFB45309</Color>
-                    <Color x:Key="ShellScrimColor">#66000000</Color>
-                    <Color x:Key="ShellCriticalColor">#FFB91C1C</Color>
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Dark">
-                    <Color x:Key="ShellBackgroundColor">#FF0B1220</Color>
-                    <Color x:Key="ShellTopBarBackgroundColor">#FF020617</Color>
-                    <Color x:Key="ShellTopBarForegroundColor">#FFE2E8F0</Color>
-                    <Color x:Key="ShellRailBackgroundColor">#FF030712</Color>
-                    <Color x:Key="ShellDrawerBackgroundColor">#FF111827</Color>
-                    <Color x:Key="ShellContentBackgroundColor">#FF111827</Color>
-                    <Color x:Key="ShellInsightsBackgroundColor">#FF111827</Color>
-                    <Color x:Key="ShellBorderColor">#FF334155</Color>
-                    <Color x:Key="ShellTextPrimaryColor">#FFF8FAFC</Color>
-                    <Color x:Key="ShellTextSecondaryColor">#FFCBD5E1</Color>
-                    <Color x:Key="ShellAccentColor">#FF60A5FA</Color>
-                    <Color x:Key="ShellWarnColor">#FFFBBF24</Color>
-                    <Color x:Key="ShellScrimColor">#99000000</Color>
-                    <Color x:Key="ShellCriticalColor">#FFF87171</Color>
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-
-            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="{ThemeResource ShellBackgroundColor}" />
-            <SolidColorBrush x:Key="ShellTopBarBackgroundBrush" Color="{ThemeResource ShellTopBarBackgroundColor}" />
-            <SolidColorBrush x:Key="ShellTopBarForegroundBrush" Color="{ThemeResource ShellTopBarForegroundColor}" />
-            <SolidColorBrush x:Key="ShellRailBackgroundBrush" Color="{ThemeResource ShellRailBackgroundColor}" />
-            <SolidColorBrush x:Key="ShellDrawerBackgroundBrush" Color="{ThemeResource ShellDrawerBackgroundColor}" />
-            <SolidColorBrush x:Key="ShellContentBackgroundBrush" Color="{ThemeResource ShellContentBackgroundColor}" />
-            <SolidColorBrush x:Key="ShellInsightsBackgroundBrush" Color="{ThemeResource ShellInsightsBackgroundColor}" />
-            <SolidColorBrush x:Key="ShellBorderBrush" Color="{ThemeResource ShellBorderColor}" />
-            <SolidColorBrush x:Key="ShellTextPrimaryBrush" Color="{ThemeResource ShellTextPrimaryColor}" />
-            <SolidColorBrush x:Key="ShellTextSecondaryBrush" Color="{ThemeResource ShellTextSecondaryColor}" />
-            <SolidColorBrush x:Key="ShellAccentBrush" Color="{ThemeResource ShellAccentColor}" />
-            <SolidColorBrush x:Key="ShellWarnBrush" Color="{ThemeResource ShellWarnColor}" />
-            <SolidColorBrush x:Key="ShellScrimBrush" Color="{ThemeResource ShellScrimColor}" />
-            <SolidColorBrush x:Key="ShellCriticalBrush" Color="{ThemeResource ShellCriticalColor}" />
-        </ResourceDictionary>
-    </Application.Resources>
-</Application>
+<Application
+    x:Class="LabAssistant.WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <controls:XamlControlsResources />
+                <ResourceDictionary Source="ms-appx:///Styles/HighContrast.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <Color x:Key="ShellBackgroundColor">#FFF3F4F6</Color>
+                    <Color x:Key="ShellTopBarBackgroundColor">#FF0F172A</Color>
+                    <Color x:Key="ShellTopBarForegroundColor">#FFF8FAFC</Color>
+                    <Color x:Key="ShellRailBackgroundColor">#FF111827</Color>
+                    <Color x:Key="ShellDrawerBackgroundColor">#FF1F2937</Color>
+                    <Color x:Key="ShellContentBackgroundColor">#FFFFFFFF</Color>
+                    <Color x:Key="ShellInsightsBackgroundColor">#FFFFFFFF</Color>
+                    <Color x:Key="ShellBorderColor">#FFE5E7EB</Color>
+                    <Color x:Key="ShellTextPrimaryColor">#FF111827</Color>
+                    <Color x:Key="ShellTextSecondaryColor">#FF4B5563</Color>
+                    <Color x:Key="ShellAccentColor">#FF2563EB</Color>
+                    <Color x:Key="ShellWarnColor">#FFB45309</Color>
+                    <Color x:Key="ShellScrimColor">#66000000</Color>
+                    <Color x:Key="ShellCriticalColor">#FFB91C1C</Color>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <Color x:Key="ShellBackgroundColor">#FF0B1220</Color>
+                    <Color x:Key="ShellTopBarBackgroundColor">#FF020617</Color>
+                    <Color x:Key="ShellTopBarForegroundColor">#FFE2E8F0</Color>
+                    <Color x:Key="ShellRailBackgroundColor">#FF030712</Color>
+                    <Color x:Key="ShellDrawerBackgroundColor">#FF111827</Color>
+                    <Color x:Key="ShellContentBackgroundColor">#FF111827</Color>
+                    <Color x:Key="ShellInsightsBackgroundColor">#FF111827</Color>
+                    <Color x:Key="ShellBorderColor">#FF334155</Color>
+                    <Color x:Key="ShellTextPrimaryColor">#FFF8FAFC</Color>
+                    <Color x:Key="ShellTextSecondaryColor">#FFCBD5E1</Color>
+                    <Color x:Key="ShellAccentColor">#FF60A5FA</Color>
+                    <Color x:Key="ShellWarnColor">#FFFBBF24</Color>
+                    <Color x:Key="ShellScrimColor">#99000000</Color>
+                    <Color x:Key="ShellCriticalColor">#FFF87171</Color>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <SolidColorBrush x:Key="ShellBackgroundBrush" Color="{ThemeResource ShellBackgroundColor}" />
+            <SolidColorBrush x:Key="ShellTopBarBackgroundBrush" Color="{ThemeResource ShellTopBarBackgroundColor}" />
+            <SolidColorBrush x:Key="ShellTopBarForegroundBrush" Color="{ThemeResource ShellTopBarForegroundColor}" />
+            <SolidColorBrush x:Key="ShellRailBackgroundBrush" Color="{ThemeResource ShellRailBackgroundColor}" />
+            <SolidColorBrush x:Key="ShellDrawerBackgroundBrush" Color="{ThemeResource ShellDrawerBackgroundColor}" />
+            <SolidColorBrush x:Key="ShellContentBackgroundBrush" Color="{ThemeResource ShellContentBackgroundColor}" />
+            <SolidColorBrush x:Key="ShellInsightsBackgroundBrush" Color="{ThemeResource ShellInsightsBackgroundColor}" />
+            <SolidColorBrush x:Key="ShellBorderBrush" Color="{ThemeResource ShellBorderColor}" />
+            <SolidColorBrush x:Key="ShellTextPrimaryBrush" Color="{ThemeResource ShellTextPrimaryColor}" />
+            <SolidColorBrush x:Key="ShellTextSecondaryBrush" Color="{ThemeResource ShellTextSecondaryColor}" />
+            <SolidColorBrush x:Key="ShellAccentBrush" Color="{ThemeResource ShellAccentColor}" />
+            <SolidColorBrush x:Key="ShellWarnBrush" Color="{ThemeResource ShellWarnColor}" />
+            <SolidColorBrush x:Key="ShellScrimBrush" Color="{ThemeResource ShellScrimColor}" />
+            <SolidColorBrush x:Key="ShellCriticalBrush" Color="{ThemeResource ShellCriticalColor}" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -69,12 +69,13 @@ public partial class MachinesViewModel : ViewModelBase
     private bool _suppressSelectionChanged;
     private bool _isMachineEditLoading;
     private bool _isRdpRefreshRunning;
+    private bool _isPropertyChangedHooked;
     private int _selectionRevision;
 
     public MachinesViewModel(IMachinesCapabilityService machinesService)
     {
         _machinesService = machinesService;
-        PropertyChanged += OnViewModelPropertyChanged;
+        EnsurePropertyChangedSubscription();
     }
 
     [ObservableProperty]
@@ -177,13 +178,19 @@ public partial class MachinesViewModel : ViewModelBase
             return;
         }
 
+        EnsurePropertyChangedSubscription();
         await EnsureInventoryAsync(forceRefresh: true);
         IsInitialized = true;
     }
 
     public override Task CleanupAsync()
     {
+        _shellBridge = null;
+        _isMachineEditLoading = false;
+        _isRdpRefreshRunning = false;
+        _selectionRevision++;
         ClearWorkspaceState(DefaultStatusMessage);
+        ReleasePropertyChangedSubscription();
         IsInitialized = false;
         return Task.CompletedTask;
     }
@@ -490,6 +497,28 @@ public partial class MachinesViewModel : ViewModelBase
         {
             RaiseComputedStateChanged();
         }
+    }
+
+    private void EnsurePropertyChangedSubscription()
+    {
+        if (_isPropertyChangedHooked)
+        {
+            return;
+        }
+
+        PropertyChanged += OnViewModelPropertyChanged;
+        _isPropertyChangedHooked = true;
+    }
+
+    private void ReleasePropertyChangedSubscription()
+    {
+        if (!_isPropertyChangedHooked)
+        {
+            return;
+        }
+
+        PropertyChanged -= OnViewModelPropertyChanged;
+        _isPropertyChangedHooked = false;
     }
 
     private async Task RefreshInventoryCoreAsync(bool forceRefresh)

@@ -99,6 +99,38 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
 
     public Visibility DetailsVisibility => HasDetails ? Visibility.Visible : Visibility.Collapsed;
 
+    public override async Task InitializeAsync(object? parameter = null)
+    {
+        if (IsInitialized)
+        {
+            return;
+        }
+
+        await EnsureInventoryAsync(forceRefresh: false);
+        IsInitialized = true;
+    }
+
+    public override Task CleanupAsync()
+    {
+        _hasLoaded = false;
+        _isSaving = false;
+        _isRemoving = false;
+        _isDraftActive = false;
+        _isUpdatingEditor = false;
+        IsLoading = false;
+        BaseDisks.Clear();
+        SetSelectedDisk(null);
+        ClearEditorFields();
+        IsEmpty = true;
+        SetError(null);
+        StatusMessage = "Select a base disk or import a VHDX to begin.";
+        SelectedDiskSummaryText = "Select a base disk or import a VHDX to begin.";
+        SelectedDiskValidationText = "Validation has not been evaluated.";
+        ReferenceWarningText = "No removal assessment has been performed.";
+        IsInitialized = false;
+        return Task.CompletedTask;
+    }
+
     public async Task EnsureInventoryAsync(bool forceRefresh)
     {
         if (IsLoading || (!forceRefresh && (_hasLoaded || _isDraftActive)))

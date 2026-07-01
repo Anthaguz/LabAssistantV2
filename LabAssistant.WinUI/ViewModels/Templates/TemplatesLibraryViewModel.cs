@@ -8,16 +8,12 @@ namespace LabAssistant.WinUI.ViewModels.Templates;
 
 public partial class TemplatesLibraryViewModel : ViewModelBase
 {
+    private bool _isPropertyChangedHooked;
+
     public TemplatesLibraryViewModel()
     {
         StatusMessage = "Select a template to view details.";
-        PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName is nameof(IsLoading) or nameof(ErrorMessage))
-            {
-                RefreshComputedState();
-            }
-        };
+        EnsurePropertyChangedSubscription();
     }
 
     public Action? ApplySearchRequested { get; set; }
@@ -64,6 +60,45 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
     public string SelectedTemplateLastModified => SelectedTemplate?.LastModifiedDisplay ?? "Last modified unavailable";
     public string RenameHintText => SelectedTemplate is null ? "Select a template to rename it." : "Rename the template display name and persist the change to the current file.";
 
+    public override Task InitializeAsync(object? parameter = null)
+    {
+        if (IsInitialized)
+        {
+            return Task.CompletedTask;
+        }
+
+        EnsurePropertyChangedSubscription();
+        IsInitialized = true;
+        return Task.CompletedTask;
+    }
+
+    public override Task CleanupAsync()
+    {
+        Templates.Clear();
+        SelectedTemplate = null;
+        RenameTemplateName = string.Empty;
+        SearchText = string.Empty;
+        IsEmpty = true;
+        IsLoading = false;
+        ErrorMessage = null;
+        StatusMessage = "Select a template to view details.";
+        ApplySearchRequested = null;
+        ClearSearchRequested = null;
+        LoadRequested = null;
+        CreateRequested = null;
+        CreateBuilderRequested = null;
+        RenameRequested = null;
+        DeleteRequested = null;
+        OpenInBuilderRequested = null;
+        OpenInEditorRequested = null;
+        ImportRequested = null;
+        ExportRequested = null;
+        ReleasePropertyChangedSubscription();
+        RefreshComputedState();
+        IsInitialized = false;
+        return Task.CompletedTask;
+    }
+
     [RelayCommand] private void ApplySearch() => ApplySearchRequested?.Invoke();
     [RelayCommand] private void ClearSearch() { SearchText = string.Empty; ClearSearchRequested?.Invoke(); }
     [RelayCommand] private void Load() => LoadRequested?.Invoke();
@@ -100,4 +135,34 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
     }
 
     partial void OnIsEmptyChanged(bool value) => RefreshComputedState();
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(IsLoading) or nameof(ErrorMessage))
+        {
+            RefreshComputedState();
+        }
+    }
+
+    private void EnsurePropertyChangedSubscription()
+    {
+        if (_isPropertyChangedHooked)
+        {
+            return;
+        }
+
+        PropertyChanged += OnViewModelPropertyChanged;
+        _isPropertyChangedHooked = true;
+    }
+
+    private void ReleasePropertyChangedSubscription()
+    {
+        if (!_isPropertyChangedHooked)
+        {
+            return;
+        }
+
+        PropertyChanged -= OnViewModelPropertyChanged;
+        _isPropertyChangedHooked = false;
+    }
 }

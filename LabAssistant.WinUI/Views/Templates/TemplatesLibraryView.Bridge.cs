@@ -32,6 +32,7 @@ public sealed partial class TemplatesLibraryView : UserControl
 {
     private bool _isUpdatingSearchText;
     private bool _isUpdatingSelection;
+    private bool _isBridgeAttached;
 
     public event EventHandler? SearchTextChanged;
     public event EventHandler? SelectedTemplateChanged;
@@ -49,6 +50,16 @@ public sealed partial class TemplatesLibraryView : UserControl
 
     partial void InitializeBridge()
     {
+        AttachBridge();
+    }
+
+    private void AttachBridge()
+    {
+        if (_isBridgeAttached)
+        {
+            return;
+        }
+
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         ViewModel.ApplySearchRequested = () => ApplySearchRequested?.Invoke(this, EventArgs.Empty);
         ViewModel.ClearSearchRequested = () => ClearSearchRequested?.Invoke(this, EventArgs.Empty);
@@ -61,6 +72,18 @@ public sealed partial class TemplatesLibraryView : UserControl
         ViewModel.OpenInEditorRequested = () => OpenTemplateRequested?.Invoke(this, EventArgs.Empty);
         ViewModel.ImportRequested = () => ImportTemplateRequested?.Invoke(this, EventArgs.Empty);
         ViewModel.ExportRequested = () => ExportTemplateRequested?.Invoke(this, EventArgs.Empty);
+        _isBridgeAttached = true;
+    }
+
+    private void DetachBridge()
+    {
+        if (!_isBridgeAttached)
+        {
+            return;
+        }
+
+        ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        _isBridgeAttached = false;
     }
 
     public void SetInventorySource(object? itemsSource)

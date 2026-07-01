@@ -101,6 +101,38 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
 
     public Visibility DeleteConstraintVisibility => string.IsNullOrWhiteSpace(DeleteConstraintText) ? Visibility.Collapsed : Visibility.Visible;
 
+    public override async Task InitializeAsync(object? parameter = null)
+    {
+        if (IsInitialized)
+        {
+            return;
+        }
+
+        await EnsureInventoryAsync(forceRefresh: false);
+        IsInitialized = true;
+    }
+
+    public override Task CleanupAsync()
+    {
+        _hasLoaded = false;
+        _isSaving = false;
+        _isDeleting = false;
+        _isDraftActive = false;
+        _isUpdatingEditor = false;
+        _validationRequestVersion++;
+        _attachedVmRequestVersion++;
+        IsLoading = false;
+        Switches.Clear();
+        AttachedVmNames.Clear();
+        SetSelectedSwitch(null);
+        ClearEditor();
+        IsEmpty = true;
+        SetError(null);
+        StatusMessage = "Select a virtual switch or click New Switch to begin.";
+        IsInitialized = false;
+        return Task.CompletedTask;
+    }
+
     public async Task EnsureInventoryAsync(bool forceRefresh)
     {
         if (IsLoading || (!forceRefresh && (_hasLoaded || _isDraftActive)))

@@ -1,121 +1,145 @@
-<UserControl
-    x:Class="LabAssistant.WinUI.Views.Deploy.DeployFromTemplateRightPanelView"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Deploy"
-    x:Name="Root"
-    x:DefaultBindMode="OneWay">
-    <Grid RowSpacing="8">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <Border
-            Grid.Row="0"
-            Padding="8"
-            Background="{StaticResource ShellContentBackgroundBrush}"
-            BorderBrush="{StaticResource ShellBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="6">
-            <StackPanel Spacing="6">
-                <TextBlock
-                    Foreground="{StaticResource ShellTextPrimaryBrush}"
-                    FontWeight="SemiBold"
-                    Text="Credential slots" />
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="Credential slots from the active V2 deployment plan appear here for review."
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="{x:Bind ViewModel.StatusMessageText}"
-                    TextWrapping="Wrap" />
-            </StackPanel>
-        </Border>
-
-        <Grid Grid.Row="1">
-            <Border
-                Padding="10"
-                Background="{StaticResource ShellBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6"
-                Visibility="{x:Bind ViewModel.LoadingVisibility}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <ProgressRing Width="16" Height="16" IsActive="True" />
-                    <TextBlock
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="{x:Bind ViewModel.StatusMessageText}" />
-                </StackPanel>
-            </Border>
-
-            <Border
-                Padding="10"
-                Background="{StaticResource ShellBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6"
-                Visibility="{x:Bind ViewModel.EmptyStateVisibility}">
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="{x:Bind ViewModel.EmptyStateMessage}"
-                    TextWrapping="Wrap" />
-            </Border>
-
-            <ListView ItemsSource="{x:Bind ViewModel.CredentialSlotItems}" SelectionMode="None" Visibility="{x:Bind ViewModel.CredentialSlotsVisibility}">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:CredentialSlotItem">
-                        <Border
-                            Margin="0,0,0,8"
-                            Padding="10,8"
-                            Background="{StaticResource ShellBackgroundBrush}"
-                            BorderBrush="{StaticResource ShellBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                            <StackPanel Spacing="6">
-                                <Grid ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                        FontWeight="SemiBold"
-                                        Text="{x:Bind SlotKey}" />
-                                    <Border
-                                        Grid.Column="1"
-                                        Padding="8,3"
-                                        Background="{StaticResource ShellContentBackgroundBrush}"
-                                        BorderBrush="{StaticResource ShellBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="999">
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            FontSize="12"
-                                            FontWeight="SemiBold"
-                                            Text="{x:Bind StoredValueStatus}" />
-                                    </Border>
-                                </Grid>
-                                <TextBlock
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="{x:Bind PurposeSummary}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="{x:Bind AffectedVmSummary}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="{x:Bind StoredValueSummary}"
-                                    TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </Grid>
-    </Grid>
-</UserControl>
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Deploy.DeployFromTemplateRightPanelView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Deploy"
+    x:Name="Root"
+    x:DefaultBindMode="OneWay">
+    <Grid
+        RowSpacing="8"
+        AutomationProperties.LandmarkType="Main"
+        XYFocusKeyboardNavigation="Enabled">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border
+            Grid.Row="0"
+            Padding="8"
+            Background="{StaticResource ShellContentBackgroundBrush}"
+            BorderBrush="{StaticResource ShellBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            AutomationProperties.LandmarkType="Custom"
+            AutomationProperties.LocalizedLandmarkType="Template deployment status">
+            <StackPanel Spacing="6">
+                <TextBlock
+                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                    FontWeight="SemiBold"
+                    Text="Credential slots" />
+                <TextBlock
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="Credential slots from the active V2 deployment plan appear here for review."
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    AutomationProperties.LiveSetting="Polite"
+                    Text="{x:Bind ViewModel.StatusMessageText}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1" XYFocusKeyboardNavigation="Enabled">
+            <Border
+                Padding="10"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                AutomationProperties.LandmarkType="Custom"
+                AutomationProperties.LocalizedLandmarkType="Loading status"
+                Visibility="{x:Bind ViewModel.LoadingVisibility}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ProgressRing
+                        Width="16"
+                        Height="16"
+                        AutomationProperties.Name="Loading credential slots"
+                        AutomationProperties.HelpText="Indicates that credential slots are loading for the selected deployment plan."
+                        IsActive="True" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        AutomationProperties.LiveSetting="Polite"
+                        Text="{x:Bind ViewModel.StatusMessageText}" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="10"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                AutomationProperties.LandmarkType="Custom"
+                AutomationProperties.LocalizedLandmarkType="Empty state"
+                Visibility="{x:Bind ViewModel.EmptyStateVisibility}">
+                <TextBlock
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    AutomationProperties.LiveSetting="Polite"
+                    Text="{x:Bind ViewModel.EmptyStateMessage}"
+                    TextWrapping="Wrap" />
+            </Border>
+
+            <ListView
+                ItemsSource="{x:Bind ViewModel.CredentialSlotItems}"
+                SelectionMode="None"
+                TabIndex="0"
+                AutomationProperties.Name="Credential slot list"
+                AutomationProperties.HelpText="Shows credential slots required by the active deployment template."
+                Visibility="{x:Bind ViewModel.CredentialSlotsVisibility}"
+                XYFocusKeyboardNavigation="Enabled">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:CredentialSlotItem">
+                        <Border
+                            Margin="0,0,0,8"
+                            Padding="10,8"
+                            Background="{StaticResource ShellBackgroundBrush}"
+                            BorderBrush="{StaticResource ShellBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                        FontWeight="SemiBold"
+                                        Text="{x:Bind SlotKey}" />
+                                    <Border
+                                        Grid.Column="1"
+                                        Padding="8,3"
+                                        Background="{StaticResource ShellContentBackgroundBrush}"
+                                        BorderBrush="{StaticResource ShellBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="999">
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind StoredValueStatus}" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="{x:Bind PurposeSummary}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="{x:Bind AffectedVmSummary}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                    Text="{x:Bind StoredValueSummary}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+    </Grid>
+</UserControl>

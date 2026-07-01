@@ -1,117 +1,142 @@
-<UserControl
-    x:Class="LabAssistant.WinUI.Views.Templates.TemplatesLibraryView"
-    x:Name="TemplatesLibraryViewRoot"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Templates">
-    <Grid RowSpacing="12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <StackPanel Spacing="6">
-            <TextBlock
-                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                FontSize="16"
-                FontWeight="SemiBold"
-                Text="Template Library" />
-            <TextBlock
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="Browse saved templates, open them in the editor or builder, and maintain the library from one place."
-                TextWrapping="Wrap" />
-            <TextBlock
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                TextWrapping="Wrap" />
-            <ProgressRing
-                Width="24"
-                Height="24"
-                IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
-                Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
-            <TextBlock
-                Foreground="{StaticResource ShellCriticalBrush}"
-                Text="{x:Bind ViewModel.ErrorStateText, Mode=OneWay}"
-                TextWrapping="Wrap"
-                Visibility="{x:Bind ViewModel.ErrorVisibility, Mode=OneWay}" />
-            <TextBlock
-                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                Text="{x:Bind ViewModel.EmptyStateText, Mode=OneWay}"
-                TextWrapping="Wrap"
-                Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}" />
-        </StackPanel>
-
-        <Grid Grid.Row="1" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBox Grid.Column="0" PlaceholderText="Search by name, id, or description" Text="{x:Bind ViewModel.SearchText, Mode=TwoWay}" />
-            <Button Grid.Column="1" Command="{x:Bind ViewModel.ApplySearchCommand}" Content="Apply" IsEnabled="{x:Bind ViewModel.CanApplySearch, Mode=OneWay}" />
-            <Button Grid.Column="2" Command="{x:Bind ViewModel.ClearSearchCommand}" Content="Clear" IsEnabled="{x:Bind ViewModel.CanClearSearch, Mode=OneWay}" />
-            <Button Grid.Column="3" Command="{x:Bind ViewModel.LoadCommand}" Content="Reload" IsEnabled="{x:Bind ViewModel.CanLoad, Mode=OneWay}" />
-        </Grid>
-
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
-            <Button Command="{x:Bind ViewModel.OpenInEditorCommand}" Content="Open in Editor" IsEnabled="{x:Bind ViewModel.CanOpenInEditor, Mode=OneWay}" />
-            <Button Command="{x:Bind ViewModel.CreateCommand}" Content="Create New" IsEnabled="{x:Bind ViewModel.CanCreate, Mode=OneWay}" />
-            <Button Command="{x:Bind ViewModel.OpenInBuilderCommand}" Content="Open in Builder" IsEnabled="{x:Bind ViewModel.CanOpenInBuilder, Mode=OneWay}" />
-            <Button Command="{x:Bind ViewModel.CreateBuilderCommand}" Content="Create V2 Builder" IsEnabled="{x:Bind ViewModel.CanCreateBuilder, Mode=OneWay}" />
-            <Button Command="{x:Bind ViewModel.RenameCommand}" Content="Rename" IsEnabled="{x:Bind ViewModel.CanRename, Mode=OneWay}" />
-            <Button Command="{x:Bind ViewModel.DeleteCommand}" Content="Delete" IsEnabled="{x:Bind ViewModel.CanDelete, Mode=OneWay}" />
-        </StackPanel>
-
-        <Grid Grid.Row="3" ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="3*" />
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
-                <ListView ItemsSource="{x:Bind ViewModel.Templates, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedTemplate, Mode=TwoWay}" SelectionMode="Single">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Padding" Value="0" />
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="viewModels:TemplateListItem">
-                            <Grid Padding="12,10" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="0,0,0,1">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontSize="14" FontWeight="SemiBold" Text="{x:Bind Name, Mode=OneWay}" />
-                                <TextBlock Grid.Row="1" Foreground="{StaticResource ShellTextSecondaryBrush}" MaxLines="2" Text="{x:Bind DescriptionOrFallback, Mode=OneWay}" TextTrimming="WordEllipsis" TextWrapping="Wrap" />
-                                <TextBlock Grid.Row="2" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind SlotCountDisplay, Mode=OneWay}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-            </Border>
-
-            <Border Grid.Column="1" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6">
-                <Grid>
-                    <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.SelectedTemplateVisibility, Mode=OneWay}">
-                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" Text="{x:Bind ViewModel.SelectedTemplateTitle, Mode=OneWay}" />
-                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateDescription, Mode=OneWay}" TextWrapping="Wrap" />
-                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateMetadata, Mode=OneWay}" TextWrapping="Wrap" />
-                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateLastModified, Mode=OneWay}" TextWrapping="Wrap" />
-                        <StackPanel Spacing="4">
-                            <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Rename template" />
-                            <TextBox PlaceholderText="Template name" Text="{x:Bind ViewModel.RenameTemplateName, Mode=TwoWay}" />
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.RenameHintText, Mode=OneWay}" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </StackPanel>
-                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Select a template to review its details, rename it, or open it in the editor or builder." TextWrapping="Wrap" Visibility="{x:Bind ViewModel.NoSelectionVisibility, Mode=OneWay}" />
-                </Grid>
-            </Border>
-        </Grid>
-    </Grid>
-</UserControl>
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Templates.TemplatesLibraryView"
+    x:Name="TemplatesLibraryViewRoot"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Templates">
+    <Grid
+        RowSpacing="12"
+        AutomationProperties.LandmarkType="Main"
+        XYFocusKeyboardNavigation="Enabled">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel
+            Spacing="6"
+            AutomationProperties.LandmarkType="Custom"
+            AutomationProperties.LocalizedLandmarkType="Template library status">
+            <TextBlock
+                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Text="Template Library" />
+            <TextBlock
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="Browse saved templates, open them in the editor or builder, and maintain the library from one place."
+                TextWrapping="Wrap" />
+            <TextBlock
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                AutomationProperties.LiveSetting="Polite"
+                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                TextWrapping="Wrap" />
+            <ProgressRing
+                Width="24"
+                Height="24"
+                AutomationProperties.Name="Loading template library"
+                AutomationProperties.HelpText="Indicates whether the template library is loading."
+                IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+            <TextBlock
+                Foreground="{StaticResource ShellCriticalBrush}"
+                AutomationProperties.LiveSetting="Assertive"
+                Text="{x:Bind ViewModel.ErrorStateText, Mode=OneWay}"
+                TextWrapping="Wrap"
+                Visibility="{x:Bind ViewModel.ErrorVisibility, Mode=OneWay}" />
+            <TextBlock
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                AutomationProperties.LiveSetting="Polite"
+                Text="{x:Bind ViewModel.EmptyStateText, Mode=OneWay}"
+                TextWrapping="Wrap"
+                Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}" />
+        </StackPanel>
+
+        <Grid
+            Grid.Row="1"
+            ColumnSpacing="8"
+            AutomationProperties.LandmarkType="Form"
+            XYFocusKeyboardNavigation="Enabled">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox
+                Grid.Column="0"
+                TabIndex="0"
+                AutomationProperties.Name="Template search"
+                AutomationProperties.HelpText="Search templates by name, identifier, or description."
+                PlaceholderText="Search by name, id, or description"
+                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay}" />
+            <Button Grid.Column="1" TabIndex="1" AccessKey="A" AutomationProperties.Name="Apply search" AutomationProperties.HelpText="Apply the template search filter." Command="{x:Bind ViewModel.ApplySearchCommand}" Content="Apply" IsEnabled="{x:Bind ViewModel.CanApplySearch, Mode=OneWay}" />
+            <Button Grid.Column="2" TabIndex="2" AccessKey="C" AutomationProperties.Name="Clear search" AutomationProperties.HelpText="Clear the template search filter." Command="{x:Bind ViewModel.ClearSearchCommand}" Content="Clear" IsEnabled="{x:Bind ViewModel.CanClearSearch, Mode=OneWay}" />
+            <Button Grid.Column="3" TabIndex="3" AccessKey="R" AutomationProperties.Name="Reload template library" AutomationProperties.HelpText="Reload the template library." Command="{x:Bind ViewModel.LoadCommand}" Content="Reload" IsEnabled="{x:Bind ViewModel.CanLoad, Mode=OneWay}" />
+        </Grid>
+
+        <StackPanel
+            Grid.Row="2"
+            Orientation="Horizontal"
+            Spacing="8"
+            AutomationProperties.LandmarkType="Navigation">
+            <Button TabIndex="4" AccessKey="E" AutomationProperties.Name="Open template in editor" AutomationProperties.HelpText="Open the selected template in the editor." Command="{x:Bind ViewModel.OpenInEditorCommand}" Content="Open in Editor" IsEnabled="{x:Bind ViewModel.CanOpenInEditor, Mode=OneWay}" />
+            <Button TabIndex="5" AccessKey="N" AutomationProperties.Name="Create new template" AutomationProperties.HelpText="Create a new template in the library." Command="{x:Bind ViewModel.CreateCommand}" Content="Create New" IsEnabled="{x:Bind ViewModel.CanCreate, Mode=OneWay}" />
+            <Button TabIndex="6" AccessKey="B" AutomationProperties.Name="Open template in builder" AutomationProperties.HelpText="Open the selected template in the builder." Command="{x:Bind ViewModel.OpenInBuilderCommand}" Content="Open in Builder" IsEnabled="{x:Bind ViewModel.CanOpenInBuilder, Mode=OneWay}" />
+            <Button TabIndex="7" AccessKey="V" AutomationProperties.Name="Create V2 builder" AutomationProperties.HelpText="Create a new V2 builder from the library." Command="{x:Bind ViewModel.CreateBuilderCommand}" Content="Create V2 Builder" IsEnabled="{x:Bind ViewModel.CanCreateBuilder, Mode=OneWay}" />
+            <Button TabIndex="8" AccessKey="M" AutomationProperties.Name="Rename selected template" AutomationProperties.HelpText="Rename the selected template." Command="{x:Bind ViewModel.RenameCommand}" Content="Rename" IsEnabled="{x:Bind ViewModel.CanRename, Mode=OneWay}" />
+            <Button TabIndex="9" AccessKey="D" AutomationProperties.Name="Delete selected template" AutomationProperties.HelpText="Delete the selected template from the library." Command="{x:Bind ViewModel.DeleteCommand}" Content="Delete" IsEnabled="{x:Bind ViewModel.CanDelete, Mode=OneWay}" />
+        </StackPanel>
+
+        <Grid Grid.Row="3" ColumnSpacing="12" XYFocusKeyboardNavigation="Enabled">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="3*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6" AutomationProperties.LandmarkType="Navigation">
+                <ListView TabIndex="10" AutomationProperties.Name="Templates list" AutomationProperties.HelpText="Browse and select a saved template." ItemsSource="{x:Bind ViewModel.Templates, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedTemplate, Mode=TwoWay}" SelectionMode="Single" XYFocusKeyboardNavigation="Enabled">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:TemplateListItem">
+                            <Grid Padding="12,10" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="0,0,0,1">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontSize="14" FontWeight="SemiBold" Text="{x:Bind Name, Mode=OneWay}" />
+                                <TextBlock Grid.Row="1" Foreground="{StaticResource ShellTextSecondaryBrush}" MaxLines="2" Text="{x:Bind DescriptionOrFallback, Mode=OneWay}" TextTrimming="WordEllipsis" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="2" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind SlotCountDisplay, Mode=OneWay}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Border>
+
+            <Border Grid.Column="1" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6" AutomationProperties.LandmarkType="Form">
+                <Grid>
+                    <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.SelectedTemplateVisibility, Mode=OneWay}">
+                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" Text="{x:Bind ViewModel.SelectedTemplateTitle, Mode=OneWay}" />
+                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateDescription, Mode=OneWay}" TextWrapping="Wrap" />
+                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateMetadata, Mode=OneWay}" TextWrapping="Wrap" />
+                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateLastModified, Mode=OneWay}" TextWrapping="Wrap" />
+                        <StackPanel Spacing="4">
+                            <TextBlock x:Name="RenameTemplateLabel" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Rename template" />
+                            <TextBox TabIndex="11" AutomationProperties.Name="Template name" AutomationProperties.HelpText="Enter a new name for the selected template." AutomationProperties.LabeledBy="{Binding ElementName=RenameTemplateLabel}" PlaceholderText="Template name" Text="{x:Bind ViewModel.RenameTemplateName, Mode=TwoWay}" />
+                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.RenameHintText, Mode=OneWay}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="Select a template to review its details, rename it, or open it in the editor or builder." TextWrapping="Wrap" Visibility="{x:Bind ViewModel.NoSelectionVisibility, Mode=OneWay}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
