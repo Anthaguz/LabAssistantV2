@@ -17,7 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LabAssistant\LabAssistant.csproj" />
+    <ProjectReference Include="..\LabAssistant.Business\LabAssistant.Business.csproj" />
+    <ProjectReference Include="..\LabAssistant.Models\LabAssistant.Models.csproj" />
+    <ProjectReference Include="..\LabAssistant.Services\LabAssistant.Services.csproj" />
   </ItemGroup>
 
   <ItemGroup>
