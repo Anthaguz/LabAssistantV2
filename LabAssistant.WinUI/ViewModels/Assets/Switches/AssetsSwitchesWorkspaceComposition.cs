@@ -24,9 +24,7 @@ internal sealed class AssetsSwitchesCompositionHost : IAssetsSwitchesComposition
 
 internal sealed class AssetsSwitchesWorkspaceComposition : IAssetsSwitchesWorkspaceHost
 {
-    private readonly AssetsSwitchesView _view;
-    private readonly AssetsSwitchesWorkspaceViewModel _workspace = new();
-    private readonly AssetsSwitchesWorkspaceController _controller;
+    private readonly AssetsSwitchesViewModel _viewModel;
     private readonly IAssetsSwitchesCompositionHost _host;
 
     public AssetsSwitchesWorkspaceComposition(
@@ -34,125 +32,62 @@ internal sealed class AssetsSwitchesWorkspaceComposition : IAssetsSwitchesWorksp
         AssetsSwitchesView view,
         IAssetsSwitchesCompositionHost host)
     {
-        _view = view;
+        _viewModel = view.ViewModel;
         _host = host;
-        _controller = new AssetsSwitchesWorkspaceController(capabilityService, _workspace, this);
-        _view.SetInventorySource(_workspace.Inventory);
-        _view.SetAttachedVmSource(_workspace.AttachedVmNames);
-        WireHandlers();
-        _controller.ApplyWorkspaceState();
+        _viewModel.ConfirmDeleteAsync = (item, assessment) =>
+            _host.ShowDeleteConfirmationDialogAsync(
+                new AssetsSwitchListRow(new AssetsSwitchRecord
+                {
+                    Name = item.Name,
+                    SwitchType = item.Type,
+                    AdapterName = item.AdapterName
+                }),
+                assessment);
     }
 
-    public bool IsLoading => _workspace.IsLoading;
+    public bool IsLoading => _viewModel.IsLoading;
 
-    public int InventoryCount => _workspace.Inventory.Count;
+    public int InventoryCount => _viewModel.Switches.Count;
 
-    public Task EnsureInventoryAsync(bool forceRefresh) => _controller.EnsureInventoryAsync(forceRefresh);
+    public Task EnsureInventoryAsync(bool forceRefresh) => _viewModel.EnsureInventoryAsync(forceRefresh);
 
     public void ApplyShellState()
     {
-        _ = _controller.EnsureInventoryAsync(forceRefresh: false);
-        _controller.ApplyWorkspaceState();
+        _ = _viewModel.EnsureInventoryAsync(forceRefresh: false);
     }
 
     AssetsSwitchDraft? IAssetsSwitchesWorkspaceHost.CaptureDraft(bool isNewOverride) => CaptureDraft(isNewOverride);
 
-    string IAssetsSwitchesWorkspaceHost.GetSelectedSwitchType() => _view.GetSelectedSwitchType();
+    string IAssetsSwitchesWorkspaceHost.GetSelectedSwitchType() => _viewModel.SelectedType;
 
-    void IAssetsSwitchesWorkspaceHost.ApplyEditorDraft(AssetsSwitchDraft draft) => _view.ApplyEditorDraft(draft);
+    void IAssetsSwitchesWorkspaceHost.ApplyEditorDraft(AssetsSwitchDraft draft)
+    {
+    }
 
-    void IAssetsSwitchesWorkspaceHost.ClearEditorFields() => _view.ClearEditor();
+    void IAssetsSwitchesWorkspaceHost.ClearEditorFields()
+    {
+    }
 
-    void IAssetsSwitchesWorkspaceHost.SetSelectedRow(AssetsSwitchListRow? row) => _view.SetSelectedSwitch(row);
+    void IAssetsSwitchesWorkspaceHost.SetSelectedRow(AssetsSwitchListRow? row)
+    {
+    }
 
     void IAssetsSwitchesWorkspaceHost.ApplyWorkspaceState(AssetsSwitchesWorkspaceViewModel workspace, bool canValidateOrApply, bool isExternalSwitchTypeSelected)
-        => ApplyWorkspaceState(workspace, canValidateOrApply, isExternalSwitchTypeSelected);
+    {
+    }
 
     Task<bool> IAssetsSwitchesWorkspaceHost.ShowDeleteConfirmationDialogAsync(AssetsSwitchListRow row, AssetsSwitchDeleteAssessment assessment)
         => _host.ShowDeleteConfirmationDialogAsync(row, assessment);
 
-    private void WireHandlers()
-    {
-        _view.SelectedSwitchChanged += AssetsSwitchesListView_SelectionChanged;
-        _view.RefreshRequested += AssetsSwitchesRefreshRequested;
-        _view.CreateRequested += AssetsSwitchesCreateRequested;
-        _view.ApplyRequested += AssetsSwitchesApplyRequested;
-        _view.DeleteRequested += AssetsSwitchesDeleteRequested;
-        _view.EditorChanged += AssetsSwitchesEditorChanged;
-    }
-
     private AssetsSwitchDraft CaptureDraft(bool isNewOverride)
     {
-        var formValues = _view.CaptureFormValues();
         return new AssetsSwitchDraft
         {
             IsNew = isNewOverride,
-            OriginalName = isNewOverride ? null : _workspace.SelectedRow?.Name,
-            Name = formValues.NameText.Trim(),
-            SwitchType = formValues.SelectedSwitchType,
-            AdapterName = formValues.AdapterNameText
+            OriginalName = isNewOverride ? null : _viewModel.SelectedSwitch?.Name,
+            Name = _viewModel.SwitchName.Trim(),
+            SwitchType = _viewModel.SelectedType,
+            AdapterName = _viewModel.AdapterName
         };
-    }
-
-    private void ApplyWorkspaceState(AssetsSwitchesWorkspaceViewModel workspace, bool canValidateOrApply, bool isExternalSwitchTypeSelected)
-    {
-        _view.UpdateWorkspaceState(BuildViewState(workspace, canValidateOrApply, isExternalSwitchTypeSelected));
-    }
-
-    private static AssetsSwitchesViewState BuildViewState(
-        AssetsSwitchesWorkspaceViewModel workspace,
-        bool canValidateOrApply,
-        bool isExternalSwitchTypeSelected)
-    {
-        var isEditingExisting = workspace.SelectedRow is not null && workspace.PendingDraft is null;
-        return new AssetsSwitchesViewState(
-            CanRefresh: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting,
-            CanCreate: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting,
-            CanApply: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting && canValidateOrApply,
-            CanDelete: !workspace.IsLoading && !workspace.IsSaving && !workspace.IsDeleting && workspace.SelectedRow is not null,
-            CanEditSwitchType: !isEditingExisting && !workspace.IsSaving && !workspace.IsDeleting,
-            CanEditAdapter: !isEditingExisting && !workspace.IsSaving && !workspace.IsDeleting && isExternalSwitchTypeSelected,
-            IsLoadingVisible: workspace.IsLoading,
-            IsEmptyVisible: !workspace.IsLoading && workspace.Inventory.Count == 0 && !workspace.HasErrorState,
-            IsErrorVisible: workspace.HasErrorState,
-            StatusText: workspace.StatusText,
-            SelectedSwitchValidationText: workspace.SelectedSwitchValidationText,
-            DeleteConstraintText: workspace.DeleteConstraintText,
-            AttachedVmHintText: workspace.AttachedVmHintText,
-            ErrorStateText: workspace.ErrorStateText,
-            LoadingStateText: workspace.IsLoading
-                ? "Loading current Hyper-V virtual switches. Current details remain visible until refresh completes."
-                : "Virtual switch inventory is idle.",
-            EmptyStateText: "No virtual switches were found on this host. Click Create to prepare a new switch.");
-    }
-
-    private async void AssetsSwitchesListView_SelectionChanged(object? sender, EventArgs e)
-    {
-        await _controller.HandleSelectionChangedAsync(_view.SelectedSwitch);
-    }
-
-    private async void AssetsSwitchesRefreshRequested(object? sender, EventArgs e)
-    {
-        await _controller.EnsureInventoryAsync(forceRefresh: true);
-    }
-
-    private async void AssetsSwitchesCreateRequested(object? sender, EventArgs e)
-    {
-        await _controller.BeginCreateAsync();
-    }
-
-    private async void AssetsSwitchesApplyRequested(object? sender, EventArgs e)
-    {
-        await _controller.SaveDraftAsync();
-    }
-
-    private async void AssetsSwitchesDeleteRequested(object? sender, EventArgs e)
-    {
-        await _controller.DeleteSelectedAsync();
-    }
-
-    private async void AssetsSwitchesEditorChanged(object? sender, EventArgs e)
-    {
-        await _controller.HandleEditorChangedAsync();
     }
 }

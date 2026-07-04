@@ -2592,17 +2592,17 @@ Each readiness result shall include, at minimum:
 
 ## Scenarios
 
-### 1) Machines gains a capability-local composition owner beyond the initial state/controller seams
+### 1) Machines moves state ownership into a capability-local MVVM surface
 **Given**
-- Machines already has `MachinesWorkspaceViewModel` and `MachinesWorkspaceController`
+- Machines previously relied on imperative view code-behind plus transitional runtime/controller seams
 
 **When**
-- the post-AM33 cleanup target is defined
+- the Machines overview is modernized
 
 **Then**
-- a Machines-local workspace composition owner is explicitly required as the long-term target
-- that target is defined as the home for Machines-specific view/controller/state composition
-- `MainWindow` is no longer treated as the intended long-term Machines composition hub
+- a capability-local `MachinesViewModel` becomes the state and command owner for the Machines surface
+- `MachinesOverviewView` uses compiled `x:Bind` instead of imperative control mutation for inventory, detail, and edit state
+- any remaining runtime/controller seams are treated as transitional adapters rather than long-term state owners
 
 ### 2) MainWindow host-bridge responsibilities are explicitly marked for reduction
 **Given**
@@ -2614,10 +2614,10 @@ Each readiness result shall include, at minimum:
 **Then**
 - Machines-specific host-bridge responsibilities are explicitly identified as temporary
 - follow-up issues are expected to reduce `MainWindow` responsibility for:
-  - Machines-specific view refresh
+  - Machines-specific view refresh orchestration
   - selection synchronization
   - edit-control coordination
-  - controller-host bridging
+  - controller-host bridging beyond narrow shell-only dialog or polling seams
 
 ### 3) Machines cleanup preserves all approved user-visible behavior
 **Given**

@@ -247,6 +247,55 @@ internal sealed class TemplatesLibraryWorkspaceController
         }
     }
 
+    public async Task RenameSelectedTemplateAsync(string? newTemplateName)
+    {
+        if (_workspace.SelectedItem is null)
+        {
+            _workspace.SetStatus("Select a template first.");
+            _host.ApplyWorkspaceState();
+            return;
+        }
+
+        var trimmedName = newTemplateName?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(trimmedName))
+        {
+            _workspace.SetStatus("Enter a new template name first.");
+            _host.ApplyWorkspaceState();
+            return;
+        }
+
+        var ownsLoadingState = !_host.IsTemplatesLoading;
+        if (ownsLoadingState)
+        {
+            _host.SetTemplatesLoading(true);
+        }
+
+        try
+        {
+            var document = await _templatesCapabilityService.LoadForEditorAsync(_workspace.SelectedItem.FilePath);
+            document.Template.Name = trimmedName;
+            var result = await _templatesCapabilityService.SaveAsync(document, _workspace.SelectedItem.FilePath);
+            _workspace.SetStatus(result.UserMessage);
+            if (result.Success)
+            {
+                await EnsureLibraryAsync(forceRefresh: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _workspace.SetFailure($"Failed to rename template. {ex.Message}");
+        }
+        finally
+        {
+            if (ownsLoadingState)
+            {
+                _host.SetTemplatesLoading(false);
+            }
+
+            _host.ApplyWorkspaceState();
+        }
+    }
+
     public async Task DeleteSelectedTemplateAsync()
     {
         if (_workspace.SelectedItem is null)

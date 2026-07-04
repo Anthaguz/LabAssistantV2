@@ -1,74 +1,85 @@
-<UserControl
-    x:Class="LabAssistant.WinUI.Views.Deploy.DeployOverviewView"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid RowSpacing="12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <TextBlock
-            Foreground="{StaticResource ShellTextSecondaryBrush}"
-            Text="Choose a deploy workflow, then continue in the dedicated child surface without leaving the Deploy capability."
-            TextWrapping="Wrap" />
-
-        <Grid
-            Grid.Row="1"
-            ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <Border
-                Padding="12"
-                Background="{StaticResource ShellBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <StackPanel Spacing="8">
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Quick Deploy" />
-                    <TextBlock
-                        x:Name="DeployOverviewQuickDeploySummaryTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Open Quick Deploy to configure VM entries and run deployment."
-                        TextWrapping="Wrap" />
-                    <Button
-                        x:Name="DeployOverviewOpenQuickDeployButton"
-                        HorizontalAlignment="Left"
-                        Click="DeployOverviewOpenQuickDeployButton_Click"
-                        Content="Open Quick Deploy" />
-                </StackPanel>
-            </Border>
-
-            <Border
-                Grid.Column="1"
-                Padding="12"
-                Background="{StaticResource ShellBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-                <StackPanel Spacing="8">
-                    <TextBlock
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="From Template" />
-                    <TextBlock
-                        x:Name="DeployOverviewFromTemplateSummaryTextBlock"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="Open From Template to review a template and resolve readiness blockers before deploy."
-                        TextWrapping="Wrap" />
-                    <Button
-                        x:Name="DeployOverviewOpenFromTemplateButton"
-                        HorizontalAlignment="Left"
-                        Click="DeployOverviewOpenFromTemplateButton_Click"
-                        Content="Open From Template" />
-                </StackPanel>
-            </Border>
-        </Grid>
-    </Grid>
-</UserControl>
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Deploy.DeployOverviewView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Name="Root"
+    x:DefaultBindMode="OneWay">
+    <Grid
+        RowSpacing="12"
+        AutomationProperties.LandmarkType="Main"
+        XYFocusKeyboardNavigation="Enabled">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Foreground="{StaticResource ShellTextSecondaryBrush}"
+            Text="Choose a deploy workflow, then continue in the dedicated child surface without leaving the Deploy capability."
+            TextWrapping="Wrap" />
+
+        <Grid
+            Grid.Row="1"
+            ColumnSpacing="12"
+            AutomationProperties.LandmarkType="Navigation"
+            XYFocusKeyboardNavigation="Enabled">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Padding="{StaticResource CardPadding}"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CardCornerRadius}">
+                <StackPanel Spacing="{StaticResource SpacingS}">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="Quick Deploy" />
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="{x:Bind ViewModel.QuickDeploySummaryText}"
+                        TextWrapping="Wrap" />
+                    <Button
+                        HorizontalAlignment="Left"
+                        TabIndex="0"
+                        AccessKey="Q"
+                        AutomationProperties.Name="Open Quick Deploy"
+                        AutomationProperties.HelpText="Open the Quick Deploy workflow in the deploy workspace."
+                        Command="{x:Bind ViewModel.OpenQuickDeployAction}"
+                        Content="Open Quick Deploy" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Padding="{StaticResource CardPadding}"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CardCornerRadius}">
+                <StackPanel Spacing="{StaticResource SpacingS}">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                        FontWeight="SemiBold"
+                        Text="From Template" />
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="{x:Bind ViewModel.FromTemplateSummaryText}"
+                        TextWrapping="Wrap" />
+                    <Button
+                        HorizontalAlignment="Left"
+                        TabIndex="1"
+                        AccessKey="T"
+                        AutomationProperties.Name="Open From Template"
+                        AutomationProperties.HelpText="Open the template-based deploy workflow in the deploy workspace."
+                        Command="{x:Bind ViewModel.OpenFromTemplateAction}"
+                        Content="Open From Template" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

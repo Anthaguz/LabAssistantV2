@@ -149,6 +149,7 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
         _view.ReloadRequested += TemplatesLibraryView_ReloadRequested;
         _view.OpenTemplateRequested += TemplatesLibraryView_OpenTemplateRequested;
         _view.CreateTemplateRequested += TemplatesLibraryView_CreateTemplateRequested;
+        _view.RenameTemplateRequested += TemplatesLibraryView_RenameTemplateRequested;
         _view.OpenTemplateInBuilderRequested += TemplatesLibraryView_OpenTemplateInBuilderRequested;
         _view.CreateBuilderTemplateRequested += TemplatesLibraryView_CreateBuilderTemplateRequested;
         _view.DeleteTemplateRequested += TemplatesLibraryView_DeleteTemplateRequested;
@@ -217,6 +218,11 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
         await _controller.CreateTemplateAsync();
     }
 
+    private async void TemplatesLibraryView_RenameTemplateRequested(object? sender, EventArgs e)
+    {
+        await _controller.RenameSelectedTemplateAsync(_view.CaptureInteractionState().RenameTemplateName);
+    }
+
     private async void TemplatesLibraryView_OpenTemplateInBuilderRequested(object? sender, EventArgs e)
     {
         await _controller.OpenSelectedTemplateInBuilderAsync();
@@ -250,13 +256,17 @@ internal sealed class TemplatesLibraryWorkspaceComposition : ITemplatesLibraryWo
             SelectedTemplate: _workspace.SelectedItem,
             CanApplySearch: !isLoading,
             CanClearSearch: !isLoading,
-            CanReload: !isLoading,
+            CanLoad: !isLoading,
             CanOpenTemplate: hasSelectedLibraryItem && !isLoading,
             CanCreateTemplate: !isLoading,
+            CanRenameTemplate: hasSelectedLibraryItem && !isLoading,
             CanOpenTemplateInBuilder: _workspace.SelectedItem?.ExecutionEngine == TemplateExecutionEngine.V2UnifiedPlanning && !isLoading,
             CanCreateBuilderTemplate: !isLoading,
             CanDeleteTemplate: hasSelectedLibraryItem && !isLoading,
             CanImportTemplate: !isLoading,
-            CanExportTemplate: hasSelectedLibraryItem && !isLoading);
+            CanExportTemplate: hasSelectedLibraryItem && !isLoading,
+            IsLoading: isLoading,
+            IsEmpty: _workspace.Items.Count == 0,
+            HasError: _workspace.HasErrorState);
     }
 }

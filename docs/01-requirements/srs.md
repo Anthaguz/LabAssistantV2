@@ -570,7 +570,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-128:** WinUI `Machines` shall be reworked toward a capability-local workspace composition object so the shell no longer remains the practical final destination for Machines-specific UI composition after the initial extraction slices.
-  - **Acceptance details:** Machines follow-up cleanup must preserve the existing `MachinesWorkspaceViewModel` and `MachinesWorkspaceController` seams while introducing a capability-local composition owner that becomes the long-term home for Machines-specific view/controller/state coordination.
+  - **Acceptance details:** Machines follow-up cleanup must move view-owned state, edit draft tracking, and command orchestration into a capability-local `MachinesViewModel` that uses compiled `x:Bind`; transitional runtime/controller seams may remain only as thin adapters while `MainWindow` retains shell lifetime and polling concerns.
   - **Priority:** P1
 
 - **FR-129:** WinUI `Machines` host-bridge responsibilities currently implemented by `MainWindow` shall be treated as transitional only and reduced behind the capability-local workspace composition boundary.

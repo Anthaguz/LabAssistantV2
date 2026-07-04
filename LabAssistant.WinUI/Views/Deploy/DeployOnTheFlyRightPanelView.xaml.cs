@@ -1,16 +1,11 @@
+using LabAssistant.WinUI.ViewModels.Deploy;
 using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Views.Deploy;
 
 public sealed partial class DeployOnTheFlyRightPanelView : UserControl
 {
-    public DeployOnTheFlyRightPanelView()
-    {
-        InitializeComponent();
-    }
+    public DeployProgressViewModel ViewModel { get; } = new();
 
-    public void SetResultRowsItemsSource(object? itemsSource)
-    {
-        DeployOnTheFlyVmResultsListView.ItemsSource = itemsSource;
-    }
+    public DeployOnTheFlyRightPanelView() => InitializeComponent();
 }

@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.Models.Deploy;
 
-internal sealed record DeployTimelineStepRow(
+public sealed record DeployTimelineStepRow(
     string Label,
     DeployTimelineStepState State)
 {

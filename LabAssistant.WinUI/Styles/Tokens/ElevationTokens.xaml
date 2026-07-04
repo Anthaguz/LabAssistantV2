@@ -1,0 +1,19 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Level 0: No shadow (flat) -->
+    <Thickness x:Key="ElevationLevel0BorderThickness">0</Thickness>
+    <SolidColorBrush x:Key="ElevationLevel0BorderBrush" Color="{ThemeResource ShellBorderColor}" Opacity="0" />
+
+    <!-- Level 1: Subtle shadow (cards) — use border only in WinUI -->
+    <Thickness x:Key="ElevationLevel1BorderThickness">1</Thickness>
+    <SolidColorBrush x:Key="ElevationLevel1BorderBrush" Color="{ThemeResource ShellBorderColor}" Opacity="1" />
+
+    <!-- Level 2: Medium shadow (dropdown/flyout) -->
+    <Thickness x:Key="ElevationLevel2BorderThickness">1</Thickness>
+    <SolidColorBrush x:Key="ElevationLevel2BorderBrush" Color="{ThemeResource ShellTextSecondaryColor}" Opacity="0.45" />
+
+    <!-- Level 3: High shadow (dialog) -->
+    <Thickness x:Key="ElevationLevel3BorderThickness">1</Thickness>
+    <SolidColorBrush x:Key="ElevationLevel3BorderBrush" Color="{ThemeResource ShellTextSecondaryColor}" Opacity="0.7" />
+</ResourceDictionary>

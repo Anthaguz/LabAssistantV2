@@ -31,7 +31,7 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
         _workspace = workspace;
 
         _view.SetVmEntriesSource(_workspace.VmEntryRows);
-        _rightPanelView.SetResultRowsItemsSource(_workspace.ResultRows);
+        _rightPanelView.ViewModel.Reset();
         SetVisibility(isActive: false);
     }
 
@@ -51,6 +51,7 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
 
         RefreshResultRows();
         RefreshIssueRows();
+        UpdateRightPanelState();
         UpdateVmEntryRows();
         UpdateEditorPanel();
 
@@ -101,6 +102,7 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     public void RefreshResultRows()
     {
         _workspace.RefreshResultRows();
+        UpdateRightPanelState();
     }
 
     /// <summary>
@@ -117,6 +119,7 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
     public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)
     {
         _workspace.ApplyOutcomeSummary(summary);
+        UpdateRightPanelState();
     }
 
     /// <summary>
@@ -246,6 +249,15 @@ internal sealed class DeployOnTheFlyWorkspaceComposition
                 : _workspace.ResultRows.Count > 0
                     ? $"{_workspace.ResultRows.Count} VM result row(s) are available for review."
                     : "Use the side panel during or after deploy for progress, timeline, and results.");
+    }
+
+    private void UpdateRightPanelState()
+    {
+        _rightPanelView.ViewModel.UpdateState(
+            _workspace.LifecycleState,
+            _workspace.ProgressPercent,
+            _workspace.ProgressSummary,
+            _workspace.ResultRows.ToList());
     }
 
     private DeployOnTheFlyEditorViewState BuildEditorViewState()

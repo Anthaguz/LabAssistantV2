@@ -157,6 +157,7 @@ The following surfaces remain explicit anchor examples for the shell/layout rule
 - machines workspace remains a bounded master/detail surface rather than an unbounded page
 - list/details editing regions keep explicit scroll ownership
 - compact behavior may prioritize list-first focus while preserving access to machine actions
+- the Machines overview surface should bind through a capability-local `MachinesViewModel` with compiled `x:Bind`, leaving code-behind limited to view construction and lifetime hooks
 
 ### Templates
 - template library/editor surfaces remain inside bounded capability layout
