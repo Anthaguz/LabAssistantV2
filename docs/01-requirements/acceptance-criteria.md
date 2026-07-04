@@ -829,22 +829,21 @@ Each readiness result shall include, at minimum:
 
 ---
 
-# AC-007 â€” WinUI Parallel Shell Foundation (Milestone AA)
+# AC-007 â€” WinUI Shell Foundation (Milestone AA)
 
 **Related FRs:** FR-067, FR-068, FR-069, FR-070, FR-071, FR-072
 
 ## Scenarios
 
-### 1) Parallel UI Projects â€” Build and Launch
+### 1) WinUI UI Project â€” Build and Launch
 **Given**
-- The solution includes WPF and WinUI UI projects
+- The solution includes the WinUI UI project
 
 **When**
-- User/developer builds and launches each UI project independently
+- User/developer builds and launches the WinUI UI project
 
 **Then**
-- Both UIs launch successfully
-- WPF remains launchable as the legacy baseline/maintenance surface
+- The WinUI UI launches successfully
 - WinUI shell startup is functional without requiring feature-parity migration
 
 ### 2) Shell Navigation â€” Icon Rail + Hamburger Drawer
@@ -924,7 +923,7 @@ Each readiness result shall include, at minimum:
 - Machines actions continue emitting operation-scoped structured events per AC-006/FR-066
 
 ## Definition of Done
-- [ ] Parallel WPF + WinUI projects are present and launchable
+- [ ] WinUI project is present and launchable as the sole UI
 - [ ] Icon-rail + hamburger drawer behavior matches contract, including compact-width drawer fallback plus scrim and dismiss interactions
 - [ ] WinUI defaults to Machines and does not persist last selected capability
 - [ ] Right panel infrastructure is collapsed by default and capability-local trigger ownership remains explicit
