@@ -100,17 +100,17 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
         IsInitialized = false;
     }
 
-    [RelayCommand] private void ApplySearch() => ApplySearchRequested?.Invoke();
-    [RelayCommand] private void ClearSearch() { SearchText = string.Empty; ClearSearchRequested?.Invoke(); }
-    [RelayCommand] private void Load() => LoadRequested?.Invoke();
-    [RelayCommand] private void Create() => CreateRequested?.Invoke();
-    [RelayCommand] private void CreateBuilder() => CreateBuilderRequested?.Invoke();
-    [RelayCommand] private void Rename() => RenameRequested?.Invoke();
-    [RelayCommand] private void Delete() => DeleteRequested?.Invoke();
-    [RelayCommand] private void OpenInBuilder() => OpenInBuilderRequested?.Invoke();
-    [RelayCommand] private void OpenInEditor() => OpenInEditorRequested?.Invoke();
-    [RelayCommand] private void Import() => ImportRequested?.Invoke();
-    [RelayCommand] private void Export() => ExportRequested?.Invoke();
+    [RelayCommand] private void ApplySearch() => InvokeBridgeCallback(ApplySearchRequested);
+    [RelayCommand] private void ClearSearch() { SearchText = string.Empty; InvokeBridgeCallback(ClearSearchRequested); }
+    [RelayCommand] private void Load() => InvokeBridgeCallback(LoadRequested);
+    [RelayCommand] private void Create() => InvokeBridgeCallback(CreateRequested);
+    [RelayCommand] private void CreateBuilder() => InvokeBridgeCallback(CreateBuilderRequested);
+    [RelayCommand] private void Rename() => InvokeBridgeCallback(RenameRequested);
+    [RelayCommand] private void Delete() => InvokeBridgeCallback(DeleteRequested);
+    [RelayCommand] private void OpenInBuilder() => InvokeBridgeCallback(OpenInBuilderRequested);
+    [RelayCommand] private void OpenInEditor() => InvokeBridgeCallback(OpenInEditorRequested);
+    [RelayCommand] private void Import() => InvokeBridgeCallback(ImportRequested);
+    [RelayCommand] private void Export() => InvokeBridgeCallback(ExportRequested);
 
     public void RefreshComputedState()
     {

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -167,6 +168,28 @@ public abstract partial class ViewModelBase : ObservableObject, IAsyncDisposable
         ErrorMessage = message;
 
         Debug.WriteLine($"[{GetType().Name}] Operation failed: {ex}");
+    }
+
+    /// <summary>
+    /// Invokes a bridge callback that forwards a command to the view or composition layer.
+    /// When the callback is not wired, the missing handler is surfaced as a diagnostic instead
+    /// of being silently dropped, so wiring gaps are detectable during development rather than
+    /// presenting as a dead control at runtime. Returns whether a handler ran so callers and
+    /// tests can distinguish a real invocation from an unwired no-op.
+    /// </summary>
+    /// <param name="callback">The bridge callback to invoke; may be <c>null</c> when unwired.</param>
+    /// <param name="commandName">The invoking command name, supplied automatically by the compiler.</param>
+    /// <returns><c>true</c> if a handler was invoked; otherwise <c>false</c>.</returns>
+    protected bool InvokeBridgeCallback(Action? callback, [CallerMemberName] string? commandName = null)
+    {
+        if (callback is null)
+        {
+            Debug.WriteLine($"[{GetType().Name}] Bridge command '{commandName}' was invoked but no handler is wired; the action had no effect.");
+            return false;
+        }
+
+        callback();
+        return true;
     }
 
     /// <summary>

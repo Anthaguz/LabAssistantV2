@@ -69,13 +69,13 @@ public partial class TemplatesEditorViewModel : ViewModelBase
     public string SelectedSlotHeading => SelectedSlot is null ? "No VM slot selected" : $"Editing {SelectedSlot.Name}";
     public string SelectedSlotSummary => SelectedSlot?.Description ?? "Select a VM slot to edit its configuration.";
 
-    [RelayCommand] private void Save() => SaveRequested?.Invoke();
-    [RelayCommand] private void SaveAs() => SaveAsRequested?.Invoke();
-    [RelayCommand] private void Cancel() => CancelRequested?.Invoke();
-    [RelayCommand] private void AddSlot() => AddSlotRequested?.Invoke();
-    [RelayCommand] private void RemoveSlot() => RemoveSlotRequested?.Invoke();
-    [RelayCommand] private void ApplySlotChanges() => ApplySlotChangesRequested?.Invoke();
-    [RelayCommand] private void Validate() => ValidateRequested?.Invoke();
+    [RelayCommand] private void Save() => InvokeBridgeCallback(SaveRequested);
+    [RelayCommand] private void SaveAs() => InvokeBridgeCallback(SaveAsRequested);
+    [RelayCommand] private void Cancel() => InvokeBridgeCallback(CancelRequested);
+    [RelayCommand] private void AddSlot() => InvokeBridgeCallback(AddSlotRequested);
+    [RelayCommand] private void RemoveSlot() => InvokeBridgeCallback(RemoveSlotRequested);
+    [RelayCommand] private void ApplySlotChanges() => InvokeBridgeCallback(ApplySlotChangesRequested);
+    [RelayCommand] private void Validate() => InvokeBridgeCallback(ValidateRequested);
 
     public void RefreshComputedState()
     {
