@@ -88,7 +88,7 @@ Milestone D delivered a complete VHDX catalog + template mapping workflow:
   - Logs
 
 ## Architecture Notes (Project Boundaries)
-- UI: `LabAssistant` (WPF)
+- UI: `LabAssistant.WinUI`
 - Business: `LabAssistant.Business`
 - Services: `LabAssistant.Services`
 - Data: `LabAssistant.Data`
@@ -99,8 +99,8 @@ Milestone D delivered a complete VHDX catalog + template mapping workflow:
   - Services and Data depend only on Models.
 
 ## UI Models vs. Domain Models
-- **Domain models live in `LabAssistant.Models`** and must be UI-agnostic (shared across WPF/WinUI/CLI).
-- **UI-only models live in `LabAssistant`** (e.g., under `ViewModels` or `UiModels`) and are safe to replace if the UI changes.
+- **Domain models live in `LabAssistant.Models`** and must be UI-agnostic (shared across WinUI/CLI).
+- **UI-only models live in `LabAssistant.WinUI`** (e.g., under `ViewModels` or `UiModels`) and are safe to replace if the UI changes.
 - If a type exists only to shape UI state (grouping, selection, formatting), keep it in the UI project.
 
 ## What Is Complete vs. What Is Next

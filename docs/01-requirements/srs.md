@@ -302,10 +302,9 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** Destructive operations (delete with or without disks) must log explicit action intent and result.
   - **Priority:** P1
 
-- **FR-067:** The product shall support a parallel UI execution model during WinUI migration:
-  - `LabAssistant` (WPF) remains available as a legacy baseline/maintenance surface
-  - `LabAssistant.WinUI` is introduced as a separate application project
-  - **Acceptance details:** both UI projects build in solution and are independently launchable.
+- **FR-067:** `LabAssistant.WinUI` shall be the sole UI application project.
+  - The prior parallel WPF + WinUI migration model is retired; the legacy `LabAssistant` (WPF) project has been removed.
+  - **Acceptance details:** the solution builds with WinUI as the only UI project and it is independently launchable.
   - **Priority:** P1
 
 - **FR-068:** WinUI shell navigation shall use icon-rail + hamburger drawer interaction:

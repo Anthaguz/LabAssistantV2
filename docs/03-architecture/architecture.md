@@ -13,9 +13,6 @@ Current document authority for WinUI shell, lane, and shared seam rules is defin
   - Primary desktop UI and current shell composition root.
   - Owns navigation, views, viewmodels, and user interaction state for the supported product surface.
   - Binds to business/data/service abstractions and displays progress, summaries, and errors.
-- **Legacy UI (`LabAssistant`)**
-  - WPF application kept only for legacy maintenance, migration cleanup, or explicit removal work.
-  - It is not the current authority for WinUI behavior, ownership, or workflow design.
 - **Business (`LabAssistant.Business`)**
   - Orchestrates workflows (deployment pipeline, cleanup/cancellation coordination, outcome summaries).
   - Owns validation and workflow decision logic that should be unit-testable.
