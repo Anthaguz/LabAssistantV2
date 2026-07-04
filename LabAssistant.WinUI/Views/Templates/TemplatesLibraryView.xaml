@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Templates">
     <Grid
-        RowSpacing="12"
+        RowSpacing="{StaticResource SpacingM}"
         AutomationProperties.LandmarkType="Main"
         XYFocusKeyboardNavigation="Enabled">
         <Grid.RowDefinitions>
@@ -56,7 +56,7 @@
 
         <Grid
             Grid.Row="1"
-            ColumnSpacing="8"
+            ColumnSpacing="{StaticResource SpacingS}"
             AutomationProperties.LandmarkType="Form"
             XYFocusKeyboardNavigation="Enabled">
             <Grid.ColumnDefinitions>
@@ -80,7 +80,7 @@
         <StackPanel
             Grid.Row="2"
             Orientation="Horizontal"
-            Spacing="8"
+            Spacing="{StaticResource SpacingS}"
             AutomationProperties.LandmarkType="Navigation">
             <Button TabIndex="4" AccessKey="E" AutomationProperties.Name="Open template in editor" AutomationProperties.HelpText="Open the selected template in the editor." Command="{x:Bind ViewModel.OpenInEditorCommand}" Content="Open in Editor" IsEnabled="{x:Bind ViewModel.CanOpenInEditor, Mode=OneWay}" />
             <Button TabIndex="5" AccessKey="N" AutomationProperties.Name="Create new template" AutomationProperties.HelpText="Create a new template in the library." Command="{x:Bind ViewModel.CreateCommand}" Content="Create New" IsEnabled="{x:Bind ViewModel.CanCreate, Mode=OneWay}" />
@@ -90,13 +90,13 @@
             <Button TabIndex="9" AccessKey="D" AutomationProperties.Name="Delete selected template" AutomationProperties.HelpText="Delete the selected template from the library." Command="{x:Bind ViewModel.DeleteCommand}" Content="Delete" IsEnabled="{x:Bind ViewModel.CanDelete, Mode=OneWay}" />
         </StackPanel>
 
-        <Grid Grid.Row="3" ColumnSpacing="12" XYFocusKeyboardNavigation="Enabled">
+        <Grid Grid.Row="3" ColumnSpacing="{StaticResource SpacingM}" XYFocusKeyboardNavigation="Enabled">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" />
                 <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6" AutomationProperties.LandmarkType="Navigation">
+            <Border Grid.Column="0" Padding="{StaticResource CardPadding}" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CardCornerRadius}" AutomationProperties.LandmarkType="Navigation">
                 <ListView TabIndex="10" AutomationProperties.Name="Templates list" AutomationProperties.HelpText="Browse and select a saved template." ItemsSource="{x:Bind ViewModel.Templates, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedTemplate, Mode=TwoWay}" SelectionMode="Single" XYFocusKeyboardNavigation="Enabled">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
@@ -121,14 +121,14 @@
                 </ListView>
             </Border>
 
-            <Border Grid.Column="1" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6" AutomationProperties.LandmarkType="Form">
+            <Border Grid.Column="1" Padding="{StaticResource CardPadding}" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CardCornerRadius}" AutomationProperties.LandmarkType="Form">
                 <Grid>
-                    <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.SelectedTemplateVisibility, Mode=OneWay}">
+                    <StackPanel Spacing="{StaticResource SpacingS}" Visibility="{x:Bind ViewModel.SelectedTemplateVisibility, Mode=OneWay}">
                         <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" Text="{x:Bind ViewModel.SelectedTemplateTitle, Mode=OneWay}" />
                         <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateDescription, Mode=OneWay}" TextWrapping="Wrap" />
                         <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateMetadata, Mode=OneWay}" TextWrapping="Wrap" />
                         <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateLastModified, Mode=OneWay}" TextWrapping="Wrap" />
-                        <StackPanel Spacing="4">
+                        <StackPanel Spacing="{StaticResource SpacingXS}">
                             <TextBlock x:Name="RenameTemplateLabel" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Rename template" />
                             <TextBox TabIndex="11" AutomationProperties.Name="Template name" AutomationProperties.HelpText="Enter a new name for the selected template." AutomationProperties.LabeledBy="{Binding ElementName=RenameTemplateLabel}" PlaceholderText="Template name" Text="{x:Bind ViewModel.RenameTemplateName, Mode=TwoWay}" />
                             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.RenameHintText, Mode=OneWay}" TextWrapping="Wrap" />

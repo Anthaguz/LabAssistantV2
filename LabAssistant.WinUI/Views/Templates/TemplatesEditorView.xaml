@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Templates">
     <Grid
-        RowSpacing="12"
+        RowSpacing="{StaticResource SpacingM}"
         AutomationProperties.LandmarkType="Main"
         XYFocusKeyboardNavigation="Enabled">
         <Grid.RowDefinitions>
@@ -29,8 +29,8 @@
             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" TextWrapping="Wrap" Visibility="{x:Bind ViewModel.StatusVisibility, Mode=OneWay}" />
         </StackPanel>
 
-        <Border Grid.Row="1" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6" AutomationProperties.LandmarkType="Form">
-            <Grid ColumnSpacing="12" XYFocusKeyboardNavigation="Enabled">
+        <Border Grid.Row="1" Padding="{StaticResource CardPadding}" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CardCornerRadius}" AutomationProperties.LandmarkType="Form">
+            <Grid ColumnSpacing="{StaticResource SpacingM}" XYFocusKeyboardNavigation="Enabled">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="2*" />
                     <ColumnDefinition Width="3*" />
@@ -46,14 +46,14 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" ColumnSpacing="12" XYFocusKeyboardNavigation="Enabled">
+        <Grid Grid.Row="2" ColumnSpacing="{StaticResource SpacingM}" XYFocusKeyboardNavigation="Enabled">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" />
                 <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6" AutomationProperties.LandmarkType="Navigation">
-                <Grid RowSpacing="8" XYFocusKeyboardNavigation="Enabled">
+            <Border Grid.Column="0" Padding="{StaticResource CardPadding}" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CardCornerRadius}" AutomationProperties.LandmarkType="Navigation">
+                <Grid RowSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -63,64 +63,64 @@
                     <ListView Grid.Row="1" TabIndex="2" AutomationProperties.Name="Template virtual machine slots" AutomationProperties.HelpText="Browse and select a virtual machine slot to edit." ItemsSource="{x:Bind ViewModel.Slots, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedSlot, Mode=TwoWay}" SelectionMode="Single" XYFocusKeyboardNavigation="Enabled">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="viewModels:TemplateSlotItem">
-                                <StackPanel Padding="8" Spacing="4">
+                                <StackPanel Padding="8" Spacing="{StaticResource SpacingXS}">
                                     <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="{x:Bind Name, Mode=OneWay}" />
                                     <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind Description, Mode=OneWay}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                         <Button TabIndex="3" AccessKey="A" AutomationProperties.Name="Add slot" AutomationProperties.HelpText="Add a new virtual machine slot to the template." Command="{x:Bind ViewModel.AddSlotCommand}" Content="Add Slot" IsEnabled="{x:Bind ViewModel.CanAddSlot, Mode=OneWay}" />
                         <Button TabIndex="4" AccessKey="R" AutomationProperties.Name="Remove slot" AutomationProperties.HelpText="Remove the selected virtual machine slot from the template." Command="{x:Bind ViewModel.RemoveSlotCommand}" Content="Remove Slot" IsEnabled="{x:Bind ViewModel.CanRemoveSlot, Mode=OneWay}" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Padding="12" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="6" AutomationProperties.LandmarkType="Form">
+            <Border Grid.Column="1" Padding="{StaticResource CardPadding}" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CardCornerRadius}" AutomationProperties.LandmarkType="Form">
                 <Grid>
                     <ScrollViewer Visibility="{x:Bind ViewModel.SelectedSlotVisibility, Mode=OneWay}">
-                        <StackPanel Margin="0,0,10,0" Spacing="8">
+                        <StackPanel Margin="0,0,10,0" Spacing="{StaticResource SpacingS}">
                             <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" Text="{x:Bind ViewModel.SelectedSlotHeading, Mode=OneWay}" />
                             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedSlotSummary, Mode=OneWay}" TextWrapping="Wrap" />
                             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SlotIdText, Mode=OneWay}" />
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotNameLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Name" />
                                 <TextBox Grid.Column="1" TabIndex="5" AutomationProperties.Name="Slot name" AutomationProperties.HelpText="Edit the selected slot name." AutomationProperties.LabeledBy="{Binding ElementName=SlotNameLabel}" Text="{x:Bind ViewModel.SlotName, Mode=TwoWay}" />
                             </Grid>
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotMemoryLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Memory (MB)" />
                                 <TextBox Grid.Column="1" TabIndex="6" AutomationProperties.Name="Slot memory in megabytes" AutomationProperties.HelpText="Edit the memory assigned to the selected slot." AutomationProperties.LabeledBy="{Binding ElementName=SlotMemoryLabel}" Text="{x:Bind ViewModel.SlotMemoryText, Mode=TwoWay}" />
                             </Grid>
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotCpuLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="CPU count" />
                                 <TextBox Grid.Column="1" TabIndex="7" AutomationProperties.Name="Slot CPU count" AutomationProperties.HelpText="Edit the processor count for the selected slot." AutomationProperties.LabeledBy="{Binding ElementName=SlotCpuLabel}" Text="{x:Bind ViewModel.SlotCpuText, Mode=TwoWay}" />
                             </Grid>
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotSwitchesLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Switches" />
                                 <TextBox Grid.Column="1" TabIndex="8" AutomationProperties.Name="Slot switches" AutomationProperties.HelpText="Enter comma-separated switch names for the selected slot." AutomationProperties.LabeledBy="{Binding ElementName=SlotSwitchesLabel}" PlaceholderText="Comma-separated switch names" Text="{x:Bind ViewModel.SlotSwitchesText, Mode=TwoWay}" />
                             </Grid>
                             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SwitchGuidanceText, Mode=OneWay}" TextWrapping="Wrap" />
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotBaseDiskIdLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Base disk id" />
                                 <TextBox Grid.Column="1" TabIndex="9" AutomationProperties.Name="Base disk identifier" AutomationProperties.HelpText="Edit the base disk identifier for the selected slot." AutomationProperties.LabeledBy="{Binding ElementName=SlotBaseDiskIdLabel}" Text="{x:Bind ViewModel.SlotBaseDiskId, Mode=TwoWay}" />
                             </Grid>
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotBaseDiskPathLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Base disk path" />
                                 <TextBox Grid.Column="1" TabIndex="10" AutomationProperties.Name="Base disk path" AutomationProperties.HelpText="Edit the base disk path for the selected slot." AutomationProperties.LabeledBy="{Binding ElementName=SlotBaseDiskPathLabel}" Text="{x:Bind ViewModel.SlotBaseDiskPath, Mode=TwoWay}" />
                             </Grid>
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotGenerationLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Generation" />
                                 <TextBox Grid.Column="1" TabIndex="11" AutomationProperties.Name="Slot generation" AutomationProperties.HelpText="Edit the Hyper-V generation for the selected slot." AutomationProperties.LabeledBy="{Binding ElementName=SlotGenerationLabel}" Text="{x:Bind ViewModel.SlotGenerationText, Mode=TwoWay}" />
                             </Grid>
-                            <Grid ColumnSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="SlotVhdxSignatureLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="VHDX signature" />
                                 <TextBox Grid.Column="1" TabIndex="12" AutomationProperties.Name="VHDX signature" AutomationProperties.HelpText="Edit the VHDX signature for the selected slot." AutomationProperties.LabeledBy="{Binding ElementName=SlotVhdxSignatureLabel}" Text="{x:Bind ViewModel.SlotVhdxSignature, Mode=TwoWay}" />
@@ -134,7 +134,7 @@
             </Border>
         </Grid>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" AutomationProperties.LandmarkType="Navigation">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="{StaticResource SpacingS}" AutomationProperties.LandmarkType="Navigation">
             <Button TabIndex="14" AccessKey="S" AutomationProperties.Name="Save template" AutomationProperties.HelpText="Save the template changes." Command="{x:Bind ViewModel.SaveCommand}" Content="Save" IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" />
             <Button TabIndex="15" AccessKey="V" AutomationProperties.Name="Validate template" AutomationProperties.HelpText="Validate the current template." Command="{x:Bind ViewModel.ValidateCommand}" Content="Validate" IsEnabled="{x:Bind ViewModel.CanValidate, Mode=OneWay}" />
             <Button TabIndex="16" AccessKey="C" AutomationProperties.Name="Cancel template editing" AutomationProperties.HelpText="Cancel template editing and return to the previous workspace state." Command="{x:Bind ViewModel.CancelCommand}" Content="Cancel" IsEnabled="{x:Bind ViewModel.CanCancel, Mode=OneWay}" />
