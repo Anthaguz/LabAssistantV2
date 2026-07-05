@@ -87,6 +87,7 @@ public partial class App : Application
             serviceCollection.AddTransient<DiagnosticsOverviewViewModel>();
             serviceCollection.AddTransient<DiagnosticsLogsViewModel>();
             serviceCollection.AddTransient<SettingsMachinesViewModel>();
+            serviceCollection.AddSingleton<ITemplateEditorHandoff, TemplateEditorHandoff>();
             StartupCrashLogger.MarkPhase("OnLaunched", "after service registration");
 
             Services = serviceCollection.BuildServiceProvider();

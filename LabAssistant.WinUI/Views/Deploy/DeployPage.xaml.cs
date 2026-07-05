@@ -142,15 +142,14 @@ public sealed partial class DeployPage : Page, ICapabilityPage
             hyperVMachineAdminService);
         var resolveSuggestionsService = new DeployResolveSuggestionsService();
 
+        var templateEditorHandoff = services.GetRequiredService<ViewModels.Templates.ITemplateEditorHandoff>();
         _templatesShellAdapter = new DeployTemplatesShellAdapter(
             _templateItems,
             () => _isTemplatesLoading,
             () => _templateItems.ToList(),
             forceRefresh => ReloadTemplatesAsync(forceRefresh),
             filePath => _templatesCapabilityService!.LoadForEditorAsync(filePath),
-            (document, statusText) => _shellHost is not null
-                ? _shellHost.ShowTemplateInEditorAsync(document, statusText)
-                : Task.CompletedTask);
+            (document, statusText) => templateEditorHandoff.ShowInEditorAsync(document, statusText));
 
         var templateEditorLauncher = new DeployTemplateEditorLauncher(_templatesShellAdapter);
 

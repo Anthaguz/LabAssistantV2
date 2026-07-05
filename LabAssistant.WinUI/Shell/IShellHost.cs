@@ -1,4 +1,3 @@
-using LabAssistant.Business.Templates;
 using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.Shell;
@@ -39,12 +38,4 @@ internal interface IShellHost
     /// reaching back into the shell window directly.
     /// </summary>
     ShellDialogService Dialogs { get; }
-
-    /// <summary>
-    /// Cross-capability handoff: opens <paramref name="document"/> in the Templates editor and
-    /// navigates to it. Deploy's "edit template" affordance uses this so it can hand a resolved
-    /// template document to the Templates capability without owning Templates composition. The
-    /// shell backs it with the live Templates runtime.
-    /// </summary>
-    System.Threading.Tasks.Task ShowTemplateInEditorAsync(TemplateEditorDocument document, string statusText);
 }

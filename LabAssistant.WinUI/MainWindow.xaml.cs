@@ -92,10 +92,11 @@ public sealed partial class MainWindow : Window
             _navigationCoordinator,
             () => RootLayout.XamlRoot,
             _dialogService,
-            _shellPanelStateManager,
-            (document, statusText) => _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText)));
+            _shellPanelStateManager));
 
         _templatesCapabilityRuntime = templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
+        App.Services.GetRequiredService<ViewModels.Templates.ITemplateEditorHandoff>()
+            .SetHandler((document, statusText) => _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText));
 
         ConfigureShellIcons();
         _navigationCoordinator.ConfigureNavigationView();
