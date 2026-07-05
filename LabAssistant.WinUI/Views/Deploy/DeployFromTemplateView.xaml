@@ -1,7 +1,14 @@
 <UserControl
     x:Class="LabAssistant.WinUI.Views.Deploy.DeployFromTemplateView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:LabAssistant.WinUI.Converters"
+    xmlns:deployModels="using:LabAssistant.WinUI.Models.Deploy"
+    x:Name="Root"
+    x:DefaultBindMode="OneWay">
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
     <Border
         Padding="{StaticResource CardPadding}"
         Background="{StaticResource ShellBackgroundBrush}"
@@ -23,27 +30,29 @@
                 <ComboBox
                     x:Name="DeployTemplateSelectorComboBox"
                     Grid.Column="0"
-                    PlaceholderText="Select a template" />
+                    DisplayMemberPath="Name"
+                    IsEnabled="{x:Bind ViewModel.IsTemplateSelectorEnabled, Mode=OneWay}"
+                    ItemsSource="{x:Bind ViewModel.TemplateItems}"
+                    PlaceholderText="Select a template"
+                    SelectedItem="{x:Bind ViewModel.SelectedTemplateLibraryItem, Mode=TwoWay}" />
                 <Button
-                    x:Name="DeployReloadTemplatesButton"
                     Grid.Column="1"
                     MinWidth="86"
+                    Command="{x:Bind ViewModel.ReloadTemplatesCommand}"
                     Content="Reload"
                     ToolTipService.ToolTip="Reload templates" />
                 <Button
-                    x:Name="DeployEvaluateReadinessButton"
                     Grid.Column="2"
-                    Content="Review Readiness" />
+                    Command="{x:Bind ViewModel.EvaluateReadinessCommand}"
+                    Content="{x:Bind ViewModel.EvaluateButtonText, Mode=OneWay}" />
             </Grid>
 
             <ScrollViewer
-                x:Name="DeployFromTemplateWorkspaceScrollViewer"
                 Grid.Row="1"
                 VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="10">
                     <Border
-                        x:Name="DeployReadinessSummaryPanel"
                         Padding="10"
                         Background="{StaticResource ShellContentBackgroundBrush}"
                         BorderBrush="{StaticResource ShellBorderBrush}"
@@ -62,77 +71,70 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock
-                                x:Name="DeployOverallStateTextBlock"
                                 Grid.Column="0"
                                 VerticalAlignment="Center"
                                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                                 FontWeight="SemiBold"
-                                Text="Idle" />
+                                Text="{x:Bind ViewModel.LifecycleState, Mode=OneWay}" />
                             <ProgressBar
-                                x:Name="DeployProgressBar"
                                 Grid.Column="1"
                                 Height="12"
                                 Minimum="0"
                                 Maximum="100"
-                                Value="0"
+                                Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}"
                                 VerticalAlignment="Center" />
                             <TextBlock
-                                x:Name="DeployProgressSummaryTextBlock"
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="No deployment started."
+                                Text="{x:Bind ViewModel.ProgressSummary, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                             <StackPanel
                                 Grid.Column="3"
                                 HorizontalAlignment="Right"
                                 Spacing="{StaticResource SpacingXS}">
                                 <Button
-                                    x:Name="DeployOpenResultsPanelButton"
-                                    Content="Open Progress / Results" />
+                                    Command="{x:Bind ViewModel.ToggleResultsPanelCommand}"
+                                    Content="{x:Bind ViewModel.ResultsPanelButtonText, Mode=OneWay}"
+                                    IsEnabled="{x:Bind ViewModel.CanToggleResultsPanel, Mode=OneWay}" />
                                 <TextBlock
-                                    x:Name="DeployResultsPanelSummaryTextBlock"
                                     HorizontalAlignment="Right"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     FontSize="12"
-                                    Text="Use the side panel during or after deploy for progress and results." />
+                                    Text="{x:Bind ViewModel.ResultsPanelSummaryText, Mode=OneWay}" />
                             </StackPanel>
                             <TextBlock
-                                x:Name="DeployGlobalIssuesBadgeTextBlock"
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                Grid.ColumnSpan="4"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{x:Bind ViewModel.ReadinessSummaryText, Mode=OneWay}" />
+                            <TextBlock
                                 Grid.Row="2"
                                 Grid.Column="0"
                                 Grid.ColumnSpan="4"
                                 Foreground="{StaticResource ShellWarnBrush}"
                                 FontWeight="SemiBold"
-                                Text="Issues: 0"
+                                Text="{x:Bind ViewModel.GlobalIssuesBadgeText, Mode=OneWay}"
                                 Visibility="Collapsed" />
-                            <TextBlock
-                                x:Name="DeployReadinessSummaryTextBlock"
-                                Grid.Row="1"
-                                Grid.Column="0"
-                                Grid.ColumnSpan="4"
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Readiness summary" />
                         </Grid>
                     </Border>
 
                     <Border
-                        x:Name="DeployV2ReviewPanel"
                         Padding="10"
                         Background="{StaticResource ShellContentBackgroundBrush}"
                         BorderBrush="{StaticResource ShellBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="{StaticResource CardCornerRadius}"
-                        Visibility="Collapsed">
+                        Visibility="{x:Bind ViewModel.V2Review.IsVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel Spacing="10">
                             <TextBlock
                                 Foreground="{StaticResource ShellTextPrimaryBrush}"
                                 FontWeight="SemiBold"
                                 Text="V2 Review and Resolve" />
                             <TextBlock
-                                x:Name="DeployV2StatusTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="V2 planning has not run yet."
+                                Text="{x:Bind ViewModel.V2Review.StatusText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
 
                             <Border
@@ -146,7 +148,9 @@
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"
                                         FontWeight="SemiBold"
                                         Text="Plan Summary" />
-                                    <TextBlock x:Name="DeployV2PlanSummaryTextBlock" TextWrapping="Wrap" />
+                                    <TextBlock
+                                        Text="{x:Bind ViewModel.V2Review.PlanSummaryText, Mode=OneWay}"
+                                        TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
 
@@ -166,19 +170,19 @@
                                         Text="Legacy script defaults are enabled for this V2 deploy unless you change them here."
                                         TextWrapping="Wrap" />
                                     <CheckBox
-                                        x:Name="DeployV2EnableRemoteDesktopCheckBox"
                                         Content="Enable Remote Desktop"
+                                        IsChecked="True"
                                         IsEnabled="False" />
                                     <CheckBox
-                                        x:Name="DeployV2SetPrivateNetworkProfileCheckBox"
                                         Content="Set network profile to Private"
+                                        IsChecked="True"
                                         IsEnabled="False" />
                                     <CheckBox
-                                        x:Name="DeployV2DisableFirewallCheckBox"
-                                        Content="Disable Windows Firewall" />
+                                        Content="Disable Windows Firewall"
+                                        IsChecked="{x:Bind ViewModel.V2DisableFirewall, Mode=TwoWay}" />
                                     <CheckBox
-                                        x:Name="DeployV2DisableRdpNlaCheckBox"
-                                        Content="Disable RDP NLA" />
+                                        Content="Disable RDP NLA"
+                                        IsChecked="{x:Bind ViewModel.V2DisableRdpNla, Mode=TwoWay}" />
                                 </StackPanel>
                             </Border>
 
@@ -194,8 +198,8 @@
                                         FontWeight="SemiBold"
                                         Text="Blocking Items" />
                                     <ListView
-                                        x:Name="DeployV2BlockersListView"
                                         MaxHeight="180"
+                                        ItemsSource="{x:Bind ViewModel.V2Review.BlockerRows, Mode=OneWay}"
                                         SelectionMode="None">
                                         <ListView.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -203,8 +207,20 @@
                                             </ItemsPanelTemplate>
                                         </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                            <DataTemplate x:DataType="deployModels:DeployV2BlockerRow">
+                                                <StackPanel Margin="0,0,0,8" Spacing="2">
+                                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind Message}" TextWrapping="Wrap" />
+                                                    <TextBlock
+                                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                        FontSize="12"
+                                                        Text="{x:Bind Severity}"
+                                                        TextWrapping="Wrap" />
+                                                    <TextBlock
+                                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                        FontSize="12"
+                                                        Text="{x:Bind Scope}"
+                                                        TextWrapping="Wrap" />
+                                                </StackPanel>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
                                     </ListView>
@@ -225,6 +241,8 @@
                                     <ListView
                                         x:Name="DeployV2CredentialSlotsListView"
                                         MaxHeight="180"
+                                        ItemsSource="{x:Bind ViewModel.V2Review.CredentialSlotRows, Mode=OneWay}"
+                                        SelectionChanged="OnDeployV2CredentialSlotSelectionChanged"
                                         SelectionMode="Single">
                                         <ListView.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -232,19 +250,18 @@
                                             </ItemsPanelTemplate>
                                         </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
-                                            <DataTemplate>
+                                            <DataTemplate x:DataType="deployModels:DeployV2CredentialSlotRow">
                                                 <StackPanel Margin="0,0,0,8" Spacing="2">
-                                                    <TextBlock FontWeight="SemiBold" Text="{Binding SlotKey}" />
-                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{Binding PurposeSummary}" TextWrapping="Wrap" />
-                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{Binding AffectedVmSummary}" TextWrapping="Wrap" />
+                                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind SlotKey}" />
+                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind PurposeSummary}" TextWrapping="Wrap" />
+                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind AffectedVmSummary}" TextWrapping="Wrap" />
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
                                     </ListView>
                                     <TextBlock
-                                        x:Name="DeployV2CredentialSlotEditorTextBlock"
                                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="Select a slot below to create or update its local value."
+                                        Text="{x:Bind ViewModel.V2CredentialSlotEditorText, Mode=OneWay}"
                                         TextWrapping="Wrap" />
                                     <Grid ColumnSpacing="{StaticResource SpacingS}">
                                         <Grid.ColumnDefinitions>
@@ -253,18 +270,18 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBox
-                                            x:Name="DeployV2CredentialSlotUsernameTextBox"
                                             Grid.Column="0"
                                             Header="Username"
-                                            PlaceholderText="User name" />
+                                            PlaceholderText="User name"
+                                            Text="{x:Bind ViewModel.V2CredentialSlotUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <PasswordBox
                                             x:Name="DeployV2CredentialSlotPasswordBox"
                                             Grid.Column="1"
                                             Header="Password" />
                                         <Button
-                                            x:Name="DeployV2SaveCredentialSlotButton"
                                             Grid.Column="2"
                                             VerticalAlignment="Bottom"
+                                            Click="OnDeployV2SaveCredentialSlotRequested"
                                             Content="Save Slot" />
                                     </Grid>
                                 </StackPanel>
@@ -282,8 +299,8 @@
                                         FontWeight="SemiBold"
                                         Text="Execution Waves" />
                                     <ListView
-                                        x:Name="DeployV2WavesListView"
                                         MaxHeight="180"
+                                        ItemsSource="{x:Bind ViewModel.V2Review.WaveRows, Mode=OneWay}"
                                         SelectionMode="None">
                                         <ListView.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -291,10 +308,10 @@
                                             </ItemsPanelTemplate>
                                         </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
-                                            <DataTemplate>
+                                            <DataTemplate x:DataType="deployModels:DeployV2WaveRow">
                                                 <StackPanel Margin="0,0,0,8" Spacing="2">
-                                                    <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" />
-                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{Binding Summary}" TextWrapping="Wrap" />
+                                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind DisplayName}" />
+                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind Summary}" TextWrapping="Wrap" />
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
@@ -311,8 +328,8 @@
                                     BorderThickness="1"
                                     CornerRadius="{StaticResource CardCornerRadius}">
                                     <ListView
-                                        x:Name="DeployV2DiagnosticsListView"
                                         MaxHeight="180"
+                                        ItemsSource="{x:Bind ViewModel.V2Review.DiagnosticRows, Mode=OneWay}"
                                         SelectionMode="None">
                                         <ListView.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -320,10 +337,10 @@
                                             </ItemsPanelTemplate>
                                         </ListView.ItemsPanel>
                                         <ListView.ItemTemplate>
-                                            <DataTemplate>
+                                            <DataTemplate x:DataType="deployModels:DeployV2DiagnosticRow">
                                                 <StackPanel Margin="0,0,0,8" Spacing="2">
-                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
-                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{Binding Detail}" TextWrapping="Wrap" />
+                                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind Title}" />
+                                                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind Detail}" TextWrapping="Wrap" />
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
@@ -350,16 +367,14 @@
                                 FontWeight="SemiBold"
                                 Text="Template Review" />
                             <TextBlock
-                                x:Name="DeployTemplateSummaryTextBlock"
                                 Grid.Row="1"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Select a template to review deployment summary, shared blockers, and remediation paths."
+                                Text="{x:Bind ViewModel.TemplateSummaryText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                             <TextBlock
-                                x:Name="DeployTemplateRemediationTextBlock"
                                 Grid.Row="2"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Use this surface to review readiness and choose the correct remediation path before deploy."
+                                Text="{x:Bind ViewModel.TemplateRemediationText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                         </Grid>
                     </Border>
@@ -376,41 +391,37 @@
                                 FontWeight="SemiBold"
                                 Text="Remediation and Deploy" />
                             <TextBlock
-                                x:Name="DeploySharedIssuesSummaryTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="Shared review items appear here when multiple VMs need the same remediation."
+                                Text="{x:Bind ViewModel.SharedIssuesSummaryText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                             <ListView
-                                x:Name="DeploySharedIssuesListView"
-                                MaxHeight="160">
+                                MaxHeight="160"
+                                ItemsSource="{x:Bind ViewModel.SharedIssueSummaries, Mode=OneWay}">
                                 <ListView.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <ItemsStackPanel />
                                     </ItemsPanelTemplate>
                                 </ListView.ItemsPanel>
                                 <ListView.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock
-                                            Text="{Binding}"
-                                            TextWrapping="Wrap" />
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{x:Bind}" TextWrapping="Wrap" />
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                                 <Button
-                                    x:Name="DeployResolveSuggestionsButton"
+                                    Command="{x:Bind ViewModel.ResolveSuggestionsCommand}"
                                     Content="Resolve Suggestions" />
                                 <Button
-                                    x:Name="DeployOpenTemplateEditorButton"
+                                    Command="{x:Bind ViewModel.OpenTemplateEditorCommand}"
                                     Content="Fix in Templates Editor" />
                                 <Button
-                                    x:Name="DeployStartButton"
+                                    Command="{x:Bind ViewModel.StartDeployCommand}"
                                     Content="Start Deploy" />
                             </StackPanel>
                             <TextBlock
-                                x:Name="DeployActionStatusTextBlock"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="No action selected."
+                                Text="{x:Bind ViewModel.ActionStatusText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

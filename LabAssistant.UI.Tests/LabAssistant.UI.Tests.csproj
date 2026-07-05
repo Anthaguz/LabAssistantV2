@@ -63,6 +63,16 @@
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployTimelineStepDefinition.cs" Link="WinUI\DeployTimelineStepDefinition.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployVmProgressState.cs" Link="WinUI\DeployVmProgressState.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployIssueRow.cs" Link="WinUI\DeployIssueRow.cs" />
+
+    <!-- From Template lane (runtime-independent view model, controllers, host seams, and projections). -->
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployFromTemplateViewModel.cs" Link="WinUI\DeployFromTemplateViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployFromTemplateWorkspaceController.cs" Link="WinUI\DeployFromTemplateWorkspaceController.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployFromTemplateCredentialPanelKind.cs" Link="WinUI\DeployFromTemplateCredentialPanelKind.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\CredentialSlotItem.cs" Link="WinUI\CredentialSlotItem.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployFromTemplateCredentialPanelState.cs" Link="WinUI\DeployFromTemplateCredentialPanelState.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\IDeployFromTemplateCompositionHost.cs" Link="WinUI\IDeployFromTemplateCompositionHost.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\IDeployFromTemplateWorkspaceControllerHost.cs" Link="WinUI\IDeployFromTemplateWorkspaceControllerHost.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\IDeployFromTemplateLane.cs" Link="WinUI\IDeployFromTemplateLane.cs" />
   </ItemGroup>
 
 </Project>

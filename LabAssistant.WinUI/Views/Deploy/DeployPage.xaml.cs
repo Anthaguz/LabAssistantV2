@@ -31,10 +31,10 @@ namespace LabAssistant.WinUI.Views.Deploy;
 /// delegate-bag composition that lived in <c>MainWindow</c>.
 /// </summary>
 /// <remarks>
-/// The Quick Deploy lane is full x:Bind MVVM: <see cref="DeployQuickDeployViewModel"/> owns its
-/// state, commands, and workflow (via its preserved controller) and is bound directly by the
-/// subview. The From Template lane still runs through its preserved controller/workspace layer
-/// hosted here; its MVVM rewrite lands in a follow-up.
+/// The Quick Deploy and From Template lanes are both full x:Bind MVVM: their view models
+/// (<see cref="DeployQuickDeployViewModel"/> and <see cref="DeployFromTemplateViewModel"/>) own their
+/// state, commands, and workflow (via preserved controllers) and are bound directly by the subviews.
+/// This page composes their dependency graph from DI and reconciles the shell right panel for them.
 /// </remarks>
 public sealed partial class DeployPage : Page, ICapabilityPage
 {
@@ -44,7 +44,7 @@ public sealed partial class DeployPage : Page, ICapabilityPage
     private ITemplatesCapabilityService? _templatesCapabilityService;
     private DeployTemplatesShellAdapter? _templatesShellAdapter;
     private DeployQuickDeployViewModel? _quickDeployLane;
-    private DeployFromTemplateWorkspaceComposition? _fromTemplateLane;
+    private DeployFromTemplateViewModel? _fromTemplateLane;
     private DeployQuickDeployRightPanelView? _quickDeployRightPanel;
     private DeployFromTemplateRightPanelView? _fromTemplateRightPanel;
 
@@ -95,7 +95,13 @@ public sealed partial class DeployPage : Page, ICapabilityPage
             _quickDeployLane.ResultsPanelStateChanged -= OnQuickDeployResultsPanelStateChanged;
         }
 
+        if (_fromTemplateLane is not null)
+        {
+            _fromTemplateLane.ResultsPanelStateChanged -= OnFromTemplateResultsPanelStateChanged;
+        }
+
         QuickDeployViewHost.ViewModel = null;
+        FromTemplateViewHost.ViewModel = null;
         if (_shellHost is not null)
         {
             _shellHost.RightPanel.StateChanged -= OnRightPanelStateChanged;
@@ -165,10 +171,7 @@ public sealed partial class DeployPage : Page, ICapabilityPage
         _quickDeployLane.ResultsPanelStateChanged += OnQuickDeployResultsPanelStateChanged;
         QuickDeployViewHost.ViewModel = _quickDeployLane;
 
-        _fromTemplateLane = new DeployFromTemplateWorkspaceComposition(
-            FromTemplateViewHost,
-            _fromTemplateRightPanel,
-            _templatesShellAdapter.ItemsSource,
+        _fromTemplateLane = new DeployFromTemplateViewModel(
             new DeployFromTemplateWorkspaceHost(
                 referenceDataService,
                 resolveSuggestionsService,
@@ -184,8 +187,11 @@ public sealed partial class DeployPage : Page, ICapabilityPage
                     await deploymentCoordinator.DeployAllAsync(deploymentContext);
                     return deploymentOutcomeSummaryBuilder.Build(deploymentContext);
                 },
-                AttachProgressCallbacks,
-                () => _shellHost?.RightPanel.Toggle()));
+                () => _shellHost?.RightPanel.Toggle()),
+            action => DispatcherQueue.TryEnqueue(() => action()),
+            _templatesShellAdapter.ItemsSource);
+        _fromTemplateLane.ResultsPanelStateChanged += OnFromTemplateResultsPanelStateChanged;
+        FromTemplateViewHost.ViewModel = _fromTemplateLane;
 
         RefreshOverviewSummary();
     }
@@ -319,6 +325,33 @@ public sealed partial class DeployPage : Page, ICapabilityPage
     }
 
     /// <summary>
+    /// Projects the From Template lane's credential-slot state onto the shell right panel. Progress and
+    /// results for this lane render in-tab, so the right panel only mirrors the credential-slot surface.
+    /// </summary>
+    private void OnFromTemplateResultsPanelStateChanged(object? sender, EventArgs e)
+    {
+        if (_fromTemplateLane is not null && _fromTemplateRightPanel is not null)
+        {
+            var projection = _fromTemplateLane.ProjectCredentialPanel();
+            var panelViewModel = _fromTemplateRightPanel.ViewModel;
+            switch (projection.Kind)
+            {
+                case DeployFromTemplateCredentialPanelKind.Reset:
+                    panelViewModel.Reset(projection.StatusMessage);
+                    break;
+                case DeployFromTemplateCredentialPanelKind.Loading:
+                    panelViewModel.ShowLoading(projection.StatusMessage);
+                    break;
+                case DeployFromTemplateCredentialPanelKind.Slots:
+                    panelViewModel.UpdateSlots(projection.Slots, projection.AllSlotsResolved, projection.StatusMessage);
+                    break;
+            }
+        }
+
+        UpdateRightPanelForActiveLane();
+    }
+
+    /// <summary>
     /// Shows the Quick Deploy remove-entry confirmation. Replaces the identical prompt that lived on
     /// the deleted Quick Deploy shell bridge; the lane view model now depends only on this injected
     /// confirmation seam.
@@ -379,23 +412,6 @@ public sealed partial class DeployPage : Page, ICapabilityPage
         {
             _isTemplatesLoading = false;
             RefreshOverviewSummary();
-        }
-    }
-
-    /// <summary>
-    /// Marshals per-VM deploy progress callbacks onto the UI thread. Replaces the identical wiring
-    /// that lived on the deleted shared <c>DeployCapabilityShellBridge</c>.
-    /// </summary>
-    private void AttachProgressCallbacks(
-        MultiVmDeploymentContext context,
-        Action<string, string?> onLogMessage,
-        Action<string, DeployStepStateUpdate> onStepStateUpdated)
-    {
-        foreach (var vmContext in context.VmContexts)
-        {
-            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
-            vmContext.LogCallback = message => DispatcherQueue.TryEnqueue(() => onLogMessage(vmName, message));
-            vmContext.StepStateEmitter = update => DispatcherQueue.TryEnqueue(() => onStepStateUpdated(vmName, update));
         }
     }
 }
