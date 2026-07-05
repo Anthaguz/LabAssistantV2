@@ -9,7 +9,7 @@ It tells you what the current shell looks like and what pattern to reach for fir
 
 The app is moving from a "every capability view is always instantiated and toggled by `Visibility`" shell toward on-demand capability pages hosted in a `Frame`.
 This is partial.
-As of now, `Machines`, `Diagnostics`, `Assets`, and `Settings` are migrated; the remaining capabilities (`Templates`, `Deploy`) still use the older long-lived-workspace/runtime model.
+As of now, `Machines`, `Diagnostics`, `Assets`, `Settings`, and `Deploy` are migrated; the remaining capability (`Templates`) still uses the older long-lived-workspace/runtime model.
 
 Because of that, do not assume the whole app already works the frame way, and do not assume the older capabilities are wrong.
 When you touch a capability, prefer the migrated pattern below, but treating a not-yet-migrated capability as a bug (rather than as pending work) is itself a mistake.
