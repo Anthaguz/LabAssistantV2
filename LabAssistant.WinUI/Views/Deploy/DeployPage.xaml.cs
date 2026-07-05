@@ -31,9 +31,10 @@ namespace LabAssistant.WinUI.Views.Deploy;
 /// delegate-bag composition that lived in <c>MainWindow</c>.
 /// </summary>
 /// <remarks>
-/// Interim stage: the Quick Deploy and From Template lanes still run through their preserved
-/// controller/workspace layer hosted here (no longer through <c>MainWindow</c>). The full x:Bind
-/// MVVM rewrite of those lanes and the removal of the remaining lane glue land in the follow-up.
+/// The Quick Deploy and From Template lanes are both full x:Bind MVVM: their view models
+/// (<see cref="DeployQuickDeployViewModel"/> and <see cref="DeployFromTemplateViewModel"/>) own their
+/// state, commands, and workflow (via preserved controllers) and are bound directly by the subviews.
+/// This page composes their dependency graph from DI and reconciles the shell right panel for them.
 /// </remarks>
 public sealed partial class DeployPage : Page, ICapabilityPage
 {
@@ -42,9 +43,9 @@ public sealed partial class DeployPage : Page, ICapabilityPage
     private IShellHost? _shellHost;
     private ITemplatesCapabilityService? _templatesCapabilityService;
     private DeployTemplatesShellAdapter? _templatesShellAdapter;
-    private DeployOnTheFlyWorkspaceOwner? _quickDeployLane;
-    private DeployFromTemplateWorkspaceComposition? _fromTemplateLane;
-    private DeployOnTheFlyRightPanelView? _quickDeployRightPanel;
+    private DeployQuickDeployViewModel? _quickDeployLane;
+    private DeployFromTemplateViewModel? _fromTemplateLane;
+    private DeployQuickDeployRightPanelView? _quickDeployRightPanel;
     private DeployFromTemplateRightPanelView? _fromTemplateRightPanel;
 
     private string _activeRouteKey = ShellRouteKeys.DeployOverview;
@@ -88,6 +89,19 @@ public sealed partial class DeployPage : Page, ICapabilityPage
 
         OverviewViewModel.OpenQuickDeployRequested -= OnOpenQuickDeployRequested;
         OverviewViewModel.OpenFromTemplateRequested -= OnOpenFromTemplateRequested;
+        if (_quickDeployLane is not null)
+        {
+            _quickDeployLane.SharedUiStateChanged -= OnLaneSharedUiStateChanged;
+            _quickDeployLane.ResultsPanelStateChanged -= OnQuickDeployResultsPanelStateChanged;
+        }
+
+        if (_fromTemplateLane is not null)
+        {
+            _fromTemplateLane.ResultsPanelStateChanged -= OnFromTemplateResultsPanelStateChanged;
+        }
+
+        QuickDeployViewHost.ViewModel = null;
+        FromTemplateViewHost.ViewModel = null;
         if (_shellHost is not null)
         {
             _shellHost.RightPanel.StateChanged -= OnRightPanelStateChanged;
@@ -128,41 +142,35 @@ public sealed partial class DeployPage : Page, ICapabilityPage
             hyperVMachineAdminService);
         var resolveSuggestionsService = new DeployResolveSuggestionsService();
 
+        var templateEditorHandoff = services.GetRequiredService<ViewModels.Templates.ITemplateEditorHandoff>();
         _templatesShellAdapter = new DeployTemplatesShellAdapter(
             _templateItems,
             () => _isTemplatesLoading,
             () => _templateItems.ToList(),
             forceRefresh => ReloadTemplatesAsync(forceRefresh),
             filePath => _templatesCapabilityService!.LoadForEditorAsync(filePath),
-            (document, statusText) => _shellHost is not null
-                ? _shellHost.ShowTemplateInEditorAsync(document, statusText)
-                : Task.CompletedTask);
+            (document, statusText) => templateEditorHandoff.ShowInEditorAsync(document, statusText));
 
         var templateEditorLauncher = new DeployTemplateEditorLauncher(_templatesShellAdapter);
 
-        _quickDeployRightPanel = new DeployOnTheFlyRightPanelView();
+        _quickDeployRightPanel = new DeployQuickDeployRightPanelView();
         _fromTemplateRightPanel = new DeployFromTemplateRightPanelView();
 
-        _quickDeployLane = new DeployOnTheFlyWorkspaceOwner(
-            QuickDeployViewHost,
-            _quickDeployRightPanel,
+        _quickDeployLane = new DeployQuickDeployViewModel(
             referenceDataService,
             resolveSuggestionsService,
-            templateEditorLauncher,
-            new DeployOnTheFlyWorkspaceShellBridge(
-                DispatcherQueue,
-                () => _shellHost?.XamlRoot,
-                () => _shellHost?.RightPanel.Toggle(),
-                OnLaneResultsPanelStateChanged),
+            templateEditorLauncher.ShowEditorAsync,
             deploymentPreflightService,
             deploymentCoordinator,
-            deploymentOutcomeSummaryBuilder);
+            deploymentOutcomeSummaryBuilder,
+            action => DispatcherQueue.TryEnqueue(() => action()),
+            ShowRemoveVmEntryConfirmationDialogAsync,
+            () => _shellHost?.RightPanel.Toggle());
         _quickDeployLane.SharedUiStateChanged += OnLaneSharedUiStateChanged;
+        _quickDeployLane.ResultsPanelStateChanged += OnQuickDeployResultsPanelStateChanged;
+        QuickDeployViewHost.ViewModel = _quickDeployLane;
 
-        _fromTemplateLane = new DeployFromTemplateWorkspaceComposition(
-            FromTemplateViewHost,
-            _fromTemplateRightPanel,
-            _templatesShellAdapter.ItemsSource,
+        _fromTemplateLane = new DeployFromTemplateViewModel(
             new DeployFromTemplateWorkspaceHost(
                 referenceDataService,
                 resolveSuggestionsService,
@@ -178,8 +186,11 @@ public sealed partial class DeployPage : Page, ICapabilityPage
                     await deploymentCoordinator.DeployAllAsync(deploymentContext);
                     return deploymentOutcomeSummaryBuilder.Build(deploymentContext);
                 },
-                AttachProgressCallbacks,
-                () => _shellHost?.RightPanel.Toggle()));
+                () => _shellHost?.RightPanel.Toggle()),
+            action => DispatcherQueue.TryEnqueue(() => action()),
+            _templatesShellAdapter.ItemsSource);
+        _fromTemplateLane.ResultsPanelStateChanged += OnFromTemplateResultsPanelStateChanged;
+        FromTemplateViewHost.ViewModel = _fromTemplateLane;
 
         RefreshOverviewSummary();
     }
@@ -298,6 +309,67 @@ public sealed partial class DeployPage : Page, ICapabilityPage
 
     private void OnLaneResultsPanelStateChanged() => UpdateRightPanelForActiveLane();
 
+    private void OnQuickDeployResultsPanelStateChanged(object? sender, EventArgs e)
+    {
+        if (_quickDeployLane is not null && _quickDeployRightPanel is not null)
+        {
+            _quickDeployRightPanel.ViewModel.UpdateState(
+                _quickDeployLane.LifecycleState,
+                _quickDeployLane.ProgressPercent,
+                _quickDeployLane.ProgressSummary,
+                _quickDeployLane.ResultRows.ToList());
+        }
+
+        UpdateRightPanelForActiveLane();
+    }
+
+    /// <summary>
+    /// Projects the From Template lane's credential-slot state onto the shell right panel. Progress and
+    /// results for this lane render in-tab, so the right panel only mirrors the credential-slot surface.
+    /// </summary>
+    private void OnFromTemplateResultsPanelStateChanged(object? sender, EventArgs e)
+    {
+        if (_fromTemplateLane is not null && _fromTemplateRightPanel is not null)
+        {
+            var projection = _fromTemplateLane.ProjectCredentialPanel();
+            var panelViewModel = _fromTemplateRightPanel.ViewModel;
+            switch (projection.Kind)
+            {
+                case DeployFromTemplateCredentialPanelKind.Reset:
+                    panelViewModel.Reset(projection.StatusMessage);
+                    break;
+                case DeployFromTemplateCredentialPanelKind.Loading:
+                    panelViewModel.ShowLoading(projection.StatusMessage);
+                    break;
+                case DeployFromTemplateCredentialPanelKind.Slots:
+                    panelViewModel.UpdateSlots(projection.Slots, projection.AllSlotsResolved, projection.StatusMessage);
+                    break;
+            }
+        }
+
+        UpdateRightPanelForActiveLane();
+    }
+
+    /// <summary>
+    /// Shows the Quick Deploy remove-entry confirmation. Replaces the identical prompt that lived on
+    /// the deleted Quick Deploy shell bridge; the lane view model now depends only on this injected
+    /// confirmation seam.
+    /// </summary>
+    private async Task<bool> ShowRemoveVmEntryConfirmationDialogAsync(string vmName)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = _shellHost?.XamlRoot,
+            Title = "Remove VM Entry",
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
+            Content = $"Remove '{vmName}' from quick deploy configuration?",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
+
     private void OnRightPanelStateChanged()
     {
         if (_shellHost is null)
@@ -339,23 +411,6 @@ public sealed partial class DeployPage : Page, ICapabilityPage
         {
             _isTemplatesLoading = false;
             RefreshOverviewSummary();
-        }
-    }
-
-    /// <summary>
-    /// Marshals per-VM deploy progress callbacks onto the UI thread. Replaces the identical wiring
-    /// that lived on the deleted shared <c>DeployCapabilityShellBridge</c>.
-    /// </summary>
-    private void AttachProgressCallbacks(
-        MultiVmDeploymentContext context,
-        Action<string, string?> onLogMessage,
-        Action<string, DeployStepStateUpdate> onStepStateUpdated)
-    {
-        foreach (var vmContext in context.VmContexts)
-        {
-            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
-            vmContext.LogCallback = message => DispatcherQueue.TryEnqueue(() => onLogMessage(vmName, message));
-            vmContext.StepStateEmitter = update => DispatcherQueue.TryEnqueue(() => onStepStateUpdated(vmName, update));
         }
     }
 }

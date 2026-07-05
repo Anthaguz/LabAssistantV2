@@ -1,22 +1,25 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using LabAssistant.Models.Templates;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Media;
 
 namespace LabAssistant.WinUI.Models.Deploy;
 
-public sealed class DeployOnTheFlyVmEntryRow : INotifyPropertyChanged
+/// <summary>
+/// Presentation row for a single Quick Deploy VM entry. Exposes only runtime-independent state
+/// (display text plus issue severity/flags) so the view maps severity and visibility through
+/// converters and the type stays unit-testable without the WinUI runtime.
+/// </summary>
+public sealed class DeployQuickDeployVmEntryRow : INotifyPropertyChanged
 {
     private string _displayName;
     private string _secondaryText;
     private string _issueBadgeText = string.Empty;
     private string _issueSummary = string.Empty;
-    private Visibility _issueBadgeVisibility = Visibility.Collapsed;
-    private Visibility _issueSummaryVisibility = Visibility.Collapsed;
-    private Brush? _issueBrush;
+    private string _issueSeverity = "None";
+    private bool _hasIssueBadge;
+    private bool _hasIssueSummary;
 
-    public DeployOnTheFlyVmEntryRow(VmTemplate vmEntry)
+    public DeployQuickDeployVmEntryRow(VmTemplate vmEntry)
     {
         VmEntry = vmEntry;
         _displayName = string.IsNullOrWhiteSpace(vmEntry.Name) ? "Unnamed VM" : vmEntry.Name.Trim();
@@ -49,22 +52,25 @@ public sealed class DeployOnTheFlyVmEntryRow : INotifyPropertyChanged
         set => SetProperty(ref _issueSummary, value);
     }
 
-    public Visibility IssueBadgeVisibility
+    /// <summary>
+    /// Severity token consumed by the view brush converter. One of "Critical", "Warning", or "None".
+    /// </summary>
+    public string IssueSeverity
     {
-        get => _issueBadgeVisibility;
-        set => SetProperty(ref _issueBadgeVisibility, value);
+        get => _issueSeverity;
+        set => SetProperty(ref _issueSeverity, value);
     }
 
-    public Visibility IssueSummaryVisibility
+    public bool HasIssueBadge
     {
-        get => _issueSummaryVisibility;
-        set => SetProperty(ref _issueSummaryVisibility, value);
+        get => _hasIssueBadge;
+        set => SetProperty(ref _hasIssueBadge, value);
     }
 
-    public Brush? IssueBrush
+    public bool HasIssueSummary
     {
-        get => _issueBrush;
-        set => SetProperty(ref _issueBrush, value);
+        get => _hasIssueSummary;
+        set => SetProperty(ref _hasIssueSummary, value);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

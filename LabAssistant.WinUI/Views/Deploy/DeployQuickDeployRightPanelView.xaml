@@ -1,5 +1,5 @@
 <UserControl
-    x:Class="LabAssistant.WinUI.Views.Deploy.DeployOnTheFlyRightPanelView"
+    x:Class="LabAssistant.WinUI.Views.Deploy.DeployQuickDeployRightPanelView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Deploy"

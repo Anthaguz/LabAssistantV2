@@ -10,11 +10,11 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 internal sealed class DeployFromTemplateWorkspaceController
 {
-    private readonly DeployFromTemplateWorkspaceViewModel _workspace;
+    private readonly DeployFromTemplateViewModel _workspace;
     private readonly IDeployFromTemplateWorkspaceControllerHost _host;
 
     public DeployFromTemplateWorkspaceController(
-        DeployFromTemplateWorkspaceViewModel workspace,
+        DeployFromTemplateViewModel workspace,
         IDeployFromTemplateWorkspaceControllerHost host)
     {
         _workspace = workspace;

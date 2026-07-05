@@ -77,23 +77,6 @@
                         FontFamily="Segoe MDL2 Assets"
                         Foreground="{StaticResource ShellTopBarForegroundBrush}"
                         ToolTipService.ToolTip="Toggle details panel" />
-                    <Border
-                        x:Name="IssueBadge"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        MinWidth="18"
-                        Height="18"
-                        Background="{StaticResource ShellCriticalBrush}"
-                        CornerRadius="9"
-                        Visibility="Visible">
-                        <TextBlock
-                            x:Name="IssueBadgeTextBlock"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                            FontSize="11"
-                            Text="3" />
-                    </Border>
                 </Grid>
             </Grid>
         </Border>

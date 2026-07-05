@@ -10,7 +10,7 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 /// Quick Deploy-local controller host contract.
 /// Implementations own the lane-local workflow boundary and may forward only the narrow shared Deploy or shell callbacks that still remain outside the local owner.
 /// </summary>
-internal interface IDeployOnTheFlyWorkspaceControllerHost
+internal interface IDeployQuickDeployWorkspaceControllerHost
 {
     AppSettings DeploymentSettings { get; }
 

@@ -1,11 +1,19 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
-internal sealed class DeployV2ReviewWorkspaceViewModel
+/// <summary>
+/// Observable state owner for the From Template V2 review pane. It is driven by
+/// <see cref="DeployV2ReviewWorkspaceController"/> and bound directly through x:Bind as a child of
+/// <see cref="DeployFromTemplateViewModel"/>. Mutations raise a blanket change notification so the
+/// compiled bindings re-evaluate the projected review state (status, plan summary, and the blocker,
+/// credential-slot, wave, and diagnostic collections).
+/// </summary>
+internal sealed class DeployV2ReviewWorkspaceViewModel : ObservableObject
 {
     public bool IsVisible { get; private set; }
 
@@ -14,6 +22,16 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
     public string StatusText { get; private set; } = "V2 planning has not run yet.";
 
     public DeployV2PlanSummaryRow? PlanSummary { get; private set; }
+
+    /// <summary>
+    /// Gets the human-readable plan-summary block rendered in the V2 review pane. Kept here (rather
+    /// than in the view) so the projection stays runtime-independent and unit-testable.
+    /// </summary>
+    public string PlanSummaryText => PlanSummary is null
+        ? "No V2 plan has been projected yet."
+        : $"{PlanSummary.TemplateName} | {PlanSummary.ExecutionEngine} | Profile: {PlanSummary.DeploymentProfile}\n" +
+          $"VMs: {PlanSummary.VmCount} | Nodes: {PlanSummary.NodeCount} | Unresolved: {PlanSummary.UnresolvedRequirementCount}\n" +
+          $"{PlanSummary.RouterSummary} | {PlanSummary.DomainSummary} | {PlanSummary.StartabilitySummary}";
 
     public V2PlanBuildResult? CurrentPlan { get; private set; }
 
@@ -59,6 +77,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         SelectedCredentialSlotUsername = string.Empty;
         BaseRemoteAccess = CreateDefaultBaseRemoteAccess();
         ClearRows();
+        OnPropertyChanged(string.Empty);
     }
 
     public void BeginPlanning()
@@ -66,6 +85,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         IsVisible = true;
         IsPlanning = true;
         StatusText = "Building V2 deployment plan...";
+        OnPropertyChanged(string.Empty);
     }
 
     public void ApplyProjection(
@@ -99,6 +119,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
             SelectedCredentialSlotKey = string.Empty;
             SelectedCredentialSlotPurpose = "No unresolved credential slots remain.";
             SelectedCredentialSlotUsername = string.Empty;
+            OnPropertyChanged(string.Empty);
             return;
         }
 
@@ -111,6 +132,8 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         {
             SelectCredentialSlot(SelectedCredentialSlotKey);
         }
+
+        OnPropertyChanged(string.Empty);
     }
 
     public void SetPlanningFailed(string message)
@@ -129,6 +152,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         SelectedCredentialSlotUsername = string.Empty;
         ClearRows();
         BlockerRows.Add(new DeployV2BlockerRow("Block", "Global", message));
+        OnPropertyChanged(string.Empty);
     }
 
     public void UpdateBaseRemoteAccessOptions(bool disableFirewall, bool disableRdpNla)
@@ -138,6 +162,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
             DisableFirewall = disableFirewall,
             DisableRdpNla = disableRdpNla
         };
+        OnPropertyChanged(string.Empty);
     }
 
     public void SetExternalSwitchAdapterMapping(string switchName, string adapterName)
@@ -156,6 +181,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
         }
 
         ExternalSwitchAdapterMappings = mappings;
+        OnPropertyChanged(string.Empty);
     }
 
     public V2BaseRemoteAccessOptions CreateBaseRemoteAccessOptions()
@@ -176,6 +202,7 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
             SelectedCredentialSlotKey = string.Empty;
             SelectedCredentialSlotPurpose = "Select a slot below to create or update its local value.";
             SelectedCredentialSlotUsername = string.Empty;
+            OnPropertyChanged(string.Empty);
             return;
         }
 
@@ -186,12 +213,14 @@ internal sealed class DeployV2ReviewWorkspaceViewModel
             SelectedCredentialSlotKey = string.Empty;
             SelectedCredentialSlotPurpose = "Select a slot below to create or update its local value.";
             SelectedCredentialSlotUsername = string.Empty;
+            OnPropertyChanged(string.Empty);
             return;
         }
 
         SelectedCredentialSlotKey = row.SlotKey;
         SelectedCredentialSlotPurpose = $"{row.PurposeSummary} | {row.AffectedVmSummary}";
         SelectedCredentialSlotUsername = row.ExistingUsername;
+        OnPropertyChanged(string.Empty);
     }
 
     private void ClearRows()

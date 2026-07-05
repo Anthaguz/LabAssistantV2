@@ -1,4 +1,3 @@
-using LabAssistant.Business.Templates;
 using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.Shell;
@@ -12,20 +11,17 @@ internal sealed class ShellHost : IShellHost
 {
     private readonly ShellNavigationCoordinator _coordinator;
     private readonly Func<XamlRoot?> _getXamlRoot;
-    private readonly Func<TemplateEditorDocument, string, System.Threading.Tasks.Task> _showTemplateInEditorAsync;
 
     public ShellHost(
         ShellNavigationCoordinator coordinator,
         Func<XamlRoot?> getXamlRoot,
         ShellDialogService dialogs,
-        IShellRightPanel rightPanel,
-        Func<TemplateEditorDocument, string, System.Threading.Tasks.Task> showTemplateInEditorAsync)
+        IShellRightPanel rightPanel)
     {
         _coordinator = coordinator;
         _getXamlRoot = getXamlRoot;
         Dialogs = dialogs;
         RightPanel = rightPanel;
-        _showTemplateInEditorAsync = showTemplateInEditorAsync;
     }
 
     public void NavigateToRoute(string routeKey) => _coordinator.NavigateToRoute(routeKey);
@@ -37,7 +33,4 @@ internal sealed class ShellHost : IShellHost
     public IShellRightPanel RightPanel { get; }
 
     public ShellDialogService Dialogs { get; }
-
-    public System.Threading.Tasks.Task ShowTemplateInEditorAsync(TemplateEditorDocument document, string statusText) =>
-        _showTemplateInEditorAsync(document, statusText);
 }

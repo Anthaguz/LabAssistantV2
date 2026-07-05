@@ -59,9 +59,4 @@ internal interface IDeployFromTemplateCompositionHost
         IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
         V2BaseRemoteAccessOptions baseRemoteAccessOptions,
         MultiVmDeploymentContext deploymentContext);
-
-    void AttachProgressCallbacks(
-        MultiVmDeploymentContext context,
-        Action<string, string?> onLogMessage,
-        Action<string, DeployStepStateUpdate> onStepStateUpdated);
 }

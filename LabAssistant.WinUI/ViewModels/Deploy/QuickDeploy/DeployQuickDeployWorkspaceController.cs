@@ -11,18 +11,21 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 /// Owns Quick Deploy workflow orchestration that belongs with the long-lived workspace rather than in the shell,
 /// including readiness evaluation, deploy start sequencing, and auto-evaluate debounce.
 /// </summary>
-internal sealed class DeployOnTheFlyWorkspaceController
+internal sealed class DeployQuickDeployWorkspaceController
 {
-    private readonly DeployOnTheFlyWorkspaceViewModel _workspace;
-    private readonly IDeployOnTheFlyWorkspaceControllerHost _host;
+    private readonly DeployQuickDeployViewModel _workspace;
+    private readonly IDeployQuickDeployWorkspaceControllerHost _host;
+    private readonly int _autoEvaluateDelayMs;
     private int _autoEvaluateNonce;
 
-    public DeployOnTheFlyWorkspaceController(
-        DeployOnTheFlyWorkspaceViewModel workspace,
-        IDeployOnTheFlyWorkspaceControllerHost host)
+    public DeployQuickDeployWorkspaceController(
+        DeployQuickDeployViewModel workspace,
+        IDeployQuickDeployWorkspaceControllerHost host,
+        int autoEvaluateDelayMs = 350)
     {
         _workspace = workspace;
         _host = host;
+        _autoEvaluateDelayMs = autoEvaluateDelayMs;
     }
 
     /// <summary>
@@ -177,7 +180,7 @@ internal sealed class DeployOnTheFlyWorkspaceController
 
     private async Task DebouncedAutoEvaluateAsync(int nonce)
     {
-        await Task.Delay(350);
+        await Task.Delay(_autoEvaluateDelayMs);
 
         // Only the newest scheduled pass may continue, and only while the workflow is idle enough
         // to safely reconcile the draft back into workspace state before calling the current residual readiness bridge.

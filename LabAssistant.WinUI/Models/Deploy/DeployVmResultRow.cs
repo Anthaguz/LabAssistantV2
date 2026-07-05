@@ -1,5 +1,3 @@
-using Microsoft.UI.Xaml;
-
 namespace LabAssistant.WinUI.Models.Deploy;
 
 public sealed record DeployVmResultRow(
@@ -36,11 +34,4 @@ public sealed record DeployVmResultRow(
             return normalizedSummary;
         }
     }
-
-    public Visibility SummaryVisibility =>
-        string.IsNullOrWhiteSpace(DisplaySummary) ? Visibility.Collapsed : Visibility.Visible;
-
-    public Visibility ExpanderVisibility => IsExpandable ? Visibility.Visible : Visibility.Collapsed;
-
-    public Visibility FlatCardVisibility => IsExpandable ? Visibility.Collapsed : Visibility.Visible;
 }
