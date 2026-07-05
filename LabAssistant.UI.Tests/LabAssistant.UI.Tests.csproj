@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -24,6 +25,8 @@
 
   <ItemGroup>
     <Compile Include="..\LabAssistant.WinUI\ViewModels\ShellViewModel.cs" Link="WinUI\ShellViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\Infrastructure\ViewModelBase.cs" Link="WinUI\ViewModelBase.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\DeployOverviewViewModel.cs" Link="WinUI\DeployOverviewViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\Theming\ShellIconCatalog.cs" Link="WinUI\ShellIconCatalog.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployContextTypes.cs" Link="WinUI\DeployContextTypes.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployV2ReviewModels.cs" Link="WinUI\DeployV2ReviewModels.cs" />
