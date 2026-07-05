@@ -331,6 +331,9 @@ This file is a practical baseline plan for recurring regression checks. It does 
 ## TC-020: Milestone AM Assets Extraction Closure Verification
 - **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
 - **Type:** Manual (real Windows machine / Hyper-V host where Switches flows are exercised) + automated coverage
+- **Reconciliation note (frame-based navigation, task `nav-frame-based`):** this milestone record predates frame-based navigation.
+  Assets is now an on-demand `AssetsPage` created on route entry and torn down on leave, with Overview, Base Disks, and Switches subviews bound to `AssetsOverviewViewModel`, `AssetsBaseDisksViewModel`, and `AssetsSwitchesViewModel` through `x:Bind`; the former `AssetsCapabilityRuntime`, `AssetsOverviewWorkspace*`, `AssetsBaseDisksWorkspace*`, and `AssetsSwitchesWorkspace*` seams and the long-lived-workspace/route-refresh model no longer exist.
+  The Assets behavioral contracts still hold (Overview route-entry/summary surface with its summary reflecting Base Disks and Switches load state, Base Disks import/validate/save/remove-with-confirm, Switches create/delete-with-confirm guardrails) and remain the current verification target; see TC-026.
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#407`, `#408`, `#409`, `#410`, `#411`, `#412`, `#439`, `#441`, `#453`, `#454`, `#455`, `#456`, `#457`, `#458`, `#459`, `#460`, `#461`, `#462`, `#463`, `#464`, `#465`, `#466`, `#467`, `#468`, `#469`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
@@ -391,6 +394,9 @@ This file is a practical baseline plan for recurring regression checks. It does 
 ## TC-023: Milestone AM Diagnostics Extraction Closure Verification
 - **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
 - **Type:** Manual (real Windows machine) + automated coverage
+- **Reconciliation note (frame-based navigation, task `nav-frame-based`):** this milestone record predates frame-based navigation.
+  Diagnostics is now an on-demand `DiagnosticsPage` created on route entry and torn down on leave, with subviews bound to `DiagnosticsOverviewViewModel` and `DiagnosticsLogsViewModel` through `x:Bind`; the former `DiagnosticsCapabilityRuntime`, `DiagnosticsOverviewWorkspace*`, and `DiagnosticsLogsWorkspace*` seams and the long-lived-workspace/route-refresh model no longer exist.
+  The Diagnostics behavioral contracts still hold (Overview route-entry/summary surface, Logs child troubleshooting surface, filter/selection/reload/clear/open-location, Overview summary reflecting Logs load state) and remain the current verification target; see TC-025.
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#439`, `#441`, `#528`, `#529`, `#530`, `#531`, `#532`, `#533`, `#534`, `#535`, `#536`, `#537`, `#538`, `#539`, `#540`, `#541`, `#542`, `#543`, `#544`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
@@ -420,6 +426,57 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - One-shot Machines administrative actions show isolated action-scoped command timing.
   - Deploy timing shows one workflow-session creation per VM workflow plus workflow command timing.
   - Inventory load and edit snapshot load expose measurable flow duration.
+
+## TC-025: Frame-Based Diagnostics Capability Verification
+- **Related AC:** `AC-040`, `AC-041`, `AC-042` (reconciled for frame-based navigation), `FR-113`, `FR-167`, `FR-170`, `FR-173`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related task:** `nav-frame-based` (Diagnostics reference: on-demand `DiagnosticsPage` + full `x:Bind` MVVM)
+- **Steps:**
+  1. Launch the app (startup route `machines.overview`), then select `Diagnostics` in the navigation pane.
+  2. Confirm the capability renders in the shell capability frame and the shell header shows the Diagnostics title/description (child views do not repeat them).
+  3. On the Overview subview, confirm the Logs and Support Export summary cards render, then click `Open Logs` and confirm the shell switches to the Logs subview (header, nav selection, and tab all update).
+  4. On the Logs subview, confirm structured entries load; exercise filters (operation id / level / event / text / start-date / end-date), then `Apply filters`, `Clear filters`, and `Reload`; confirm buttons disable while a load is in flight.
+  5. Select a log entry and confirm the envelope line and pretty-printed context detail populate; clear selection by reloading.
+  6. Click `Open raw JSONL` (Logs) and `Open Log Location` (Overview) and confirm the file/folder reveal behavior and that Overview support status is surfaced on the Logs status line.
+  7. Return to Overview and confirm its logs summary reflects the loaded entry count; then navigate to another capability and back and confirm Diagnostics reloads fresh.
+- **Expected:**
+  - Diagnostics is created on route entry and torn down on leave: navigating away fires the page's `OnNavigatedFrom`, and returning constructs a fresh `DiagnosticsPage` with fresh `DiagnosticsOverviewViewModel`/`DiagnosticsLogsViewModel` instances (transient), with no leftover in-flight load from the prior visit.
+  - `MainWindow` owns only shell chrome/routing/header/right-panel; the capability page owns Overview/Logs coordination; views resolve their view models from DI and never depend on `MainWindow`.
+  - Overview remains the route-entry and summary surface; Logs remains a child troubleshooting surface; the Overview logs summary reflects Logs load state.
+  - Filter, selection, reload, clear, and open-location behaviors match prior Diagnostics behavior; no regressions versus TC-023's behavioral contracts.
+
+## TC-026: Frame-Based Assets Capability Verification
+- **Related AC:** `AC-021`, `FR-113`, `FR-132`, `FR-134`, `FR-137`, `FR-140`, `FR-143` (reconciled for frame-based navigation)
+- **Type:** Manual (real Windows machine / Hyper-V host where Switches flows are exercised) + automated coverage
+- **Related task:** `nav-frame-based` (Assets migration: on-demand `AssetsPage` hosting the existing `x:Bind` MVVM subviews)
+- **Steps:**
+  1. Launch the app (startup route `machines.overview`), then select `Assets` in the navigation pane.
+  2. Confirm the capability renders in the shell capability frame and the shell header shows the Assets title/description (child views do not repeat them).
+  3. On the Overview subview, confirm the Base Disks and Switches summary cards render real inventory counts (not zero) shortly after entry, and that `Open Base Disks` / `Open Switches` switch the shell to the matching subview (header, nav selection, and tab all update).
+  4. On the Base Disks subview, import a VHDX (file picker opens), edit metadata, validate, and save; then select a base disk and remove it (confirm the remove dialog appears and removal only proceeds after confirmation).
+  5. On the Switches subview, create a switch and delete one (confirm the delete dialog appears and delete only proceeds after confirmation; blocked-delete guardrails still hold when a VM is attached).
+  6. Return to Overview and confirm its summary reflects the updated Base Disks and Switches counts.
+  7. Navigate to another capability and back and confirm Assets reloads fresh.
+- **Expected:**
+  - Assets is created on route entry and torn down on leave: navigating away fires the page's `OnNavigatedFrom`, and returning constructs a fresh `AssetsPage` with fresh (transient) Overview/Base Disks/Switches view models, with no leftover in-flight load from the prior visit.
+  - `MainWindow` owns only shell chrome/routing/header/right-panel; the capability page owns subview tab-sync, the Overview summary coordination, and the file/confirmation dialog wiring (through the shell `IShellHost.Dialogs` seam); views resolve their view models from DI and never depend on `MainWindow`.
+  - Overview remains the route-entry summary/navigation surface; its summary reflects Base Disks and Switches load state and counts.
+  - Base Disks import/validate/save/remove-with-confirm and Switches create/delete-with-confirm guardrails match prior Assets behavior; no regressions versus TC-020's behavioral contracts.
+
+## TC-027: Frame-Based Settings Capability Verification
+- **Related AC:** `AC-006` (Machines deletion policy, reconciled for frame-based navigation), `FR-113`
+- **Type:** Manual + automated coverage
+- **Related task:** `nav-frame-based` (Settings migration: on-demand `SettingsPage` hosting the `SettingsMachinesView` bound to `SettingsMachinesViewModel`)
+- **Steps:**
+  1. Launch the app and select `Settings` in the footer navigation.
+  2. Confirm the capability renders in the shell capability frame with the shell header showing the Settings title/description, and that the Machines deletion policy selector shows the currently persisted mode (status line reads `Current: <mode>`).
+  3. Change the selected policy and click `Save policy`; confirm the status line reads `Saved: <mode>` and the Save button is disabled while the save is in flight.
+  4. Navigate away to another capability and back to Settings; confirm the selector reflects the just-saved policy (persisted) and a fresh page/view model is used.
+  5. Restart the app and confirm the saved policy is still selected on entry.
+- **Expected:**
+  - Settings is created on route entry and torn down on leave; returning constructs a fresh `SettingsPage` with a fresh (transient) `SettingsMachinesViewModel` that reloads the current policy in its `Loaded` lifecycle.
+  - `MainWindow` owns only shell chrome/routing/header; the deletion-policy load/save logic lives entirely in `SettingsMachinesViewModel` (through `IMachinesCapabilityService`), not in `MainWindow` code-behind.
+  - The supported modes and persistence semantics match AC section 6 exactly; only the hosting surface changed. Settings currently exposes a single Machines subview (the interim `settings.general` placeholder was removed; broader Settings design tracked separately).
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.

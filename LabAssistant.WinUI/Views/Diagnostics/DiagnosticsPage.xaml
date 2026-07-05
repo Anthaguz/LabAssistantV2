@@ -1,0 +1,17 @@
+<Page
+    x:Class="LabAssistant.WinUI.Views.Diagnostics.DiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:diagViews="using:LabAssistant.WinUI.Views.Diagnostics">
+    <TabView
+        x:Name="SubviewTabView"
+        IsAddTabButtonVisible="False"
+        SelectionChanged="SubviewTabView_SelectionChanged">
+        <TabViewItem x:Name="OverviewTabViewItem" Header="Overview" IsClosable="False">
+            <diagViews:DiagnosticsOverviewView x:Name="OverviewViewHost" />
+        </TabViewItem>
+        <TabViewItem x:Name="LogsTabViewItem" Header="Logs" IsClosable="False">
+            <diagViews:DiagnosticsLogsView x:Name="LogsViewHost" />
+        </TabViewItem>
+    </TabView>
+</Page>

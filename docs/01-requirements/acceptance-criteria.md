@@ -731,6 +731,10 @@ Each readiness result shall include, at minimum:
   - potential base/uncertain classification is never auto-selected for storage deletion
 - Confirmation dialog still shows effective scope before destructive action
 
+> **Reconciliation note (frame-based navigation, task `nav-frame-based`).**
+> `Settings > Machines` is now served by an on-demand `SettingsPage` created on route entry and torn down on leave (footer navigation, route `settings.machines`), replacing the former inline Settings panel and its `MainWindow` code-behind. The deletion-policy selector binds to `SettingsMachinesViewModel` through `x:Bind`, which loads the current policy on entry and persists it through `IMachinesCapabilityService`. The supported modes, default-scope-follows-policy rule, safety guardrails, and confirmation behavior above are unchanged; only the hosting surface moved. The interim `settings.general` placeholder subview was removed (design tracked separately) so Settings currently exposes only the Machines subview.
+
+
 ### 6a) Delete Cleanup Completeness — VM Folder and Disk Cleanup
 **Given**
 - User confirms delete with storage scope
@@ -3580,6 +3584,11 @@ Each readiness result shall include, at minimum:
 # AC-040 - WinUI Diagnostics Shared Composition Cleanup Target (AM105)
 
 **Related FRs:** FR-167, FR-168, FR-169, FR-104, FR-105, FR-106, FR-107, FR-108, FR-109, FR-125, FR-126, FR-127
+
+> **Reconciliation note (frame-based navigation, task `nav-frame-based`).**
+> AC-040, AC-041, and AC-042 were authored against the earlier model where Diagnostics lived inside `MainWindow` as a long-lived workspace whose shared composition owner was `DiagnosticsCapabilityRuntime`.
+> The shell has since moved to frame-based capability navigation: Diagnostics is an on-demand `DiagnosticsPage` created on route entry and torn down on leave, and its subviews bind directly to `DiagnosticsOverviewViewModel` and `DiagnosticsLogsViewModel` through `x:Bind`.
+> Read every reference below to `DiagnosticsCapabilityRuntime`, a "long-lived Diagnostics workspace", or "route-activation refresh rather than per-navigation recreation" as satisfied by the capability page and its navigation lifecycle: the page is the Diagnostics-local owner, `MainWindow` stays shell-only, views never depend on `MainWindow`, and the behavioral contracts are preserved (Overview is the route-entry and summary surface, Logs is a child troubleshooting surface, and the Overview logs summary reflects Logs load state).
 
 ## Scenarios
 

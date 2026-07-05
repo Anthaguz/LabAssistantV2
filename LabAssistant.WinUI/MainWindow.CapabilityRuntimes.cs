@@ -12,93 +12,19 @@ using LabAssistant.Services.HyperV;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
-using LabAssistant.WinUI.ViewModels.Assets;
 using LabAssistant.WinUI.ViewModels.Deploy;
-using LabAssistant.WinUI.ViewModels.Diagnostics;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.ViewModels.Templates.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using LabAssistant.Services.Logging;
 using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
 
 public sealed partial class MainWindow
 {
-    private AssetsCapabilityRuntime CreateAssetsCapabilityRuntime(
-        out AssetsBaseDisksWorkspaceComposition assetsBaseDisksWorkspaceComposition,
-        out AssetsSwitchesWorkspaceComposition assetsSwitchesWorkspaceComposition)
-    {
-        var baseDisksCompositionHost = new AssetsBaseDisksCompositionHost(
-            PickBaseDiskFilePath,
-            ShowAssetsBaseDiskRemoveConfirmationDialogAsync);
-        assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(
-            _assetsBaseDisksCapabilityService,
-            AssetsBaseDisksViewHost,
-            baseDisksCompositionHost);
-
-        var switchesCompositionHost = new AssetsSwitchesCompositionHost(ShowAssetsSwitchDeleteConfirmationDialogAsync);
-        assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(
-            _assetsSwitchesCapabilityService,
-            AssetsSwitchesViewHost,
-            switchesCompositionHost);
-
-        var capabilityShellBridge = new AssetsCapabilityShellBridge(
-            () => IsAssetsCapabilityActive,
-            () => IsAssetsOverviewActive,
-            () => IsAssetsBaseDisksActive,
-            () => IsAssetsSwitchesActive,
-            NavigateToRoute);
-
-        return new AssetsCapabilityRuntime(
-            AssetsOverviewViewHost,
-            assetsBaseDisksWorkspaceComposition,
-            assetsSwitchesWorkspaceComposition,
-            AssetsSubviewTabView,
-            AssetsOverviewTabViewItem,
-            AssetsBaseDisksTabViewItem,
-            AssetsSwitchesTabViewItem,
-            new AssetsCapabilityHost(),
-            capabilityShellBridge);
-    }
-
-    private MachinesCapabilityRuntime CreateMachinesCapabilityRuntime()
-    {
-        var capabilityShellBridge = new MachinesCapabilityShellBridge(
-            () => IsMachinesOverviewActive,
-            UpdateReadinessPollingState,
-            () => RootLayout.XamlRoot);
-
-        return new MachinesCapabilityRuntime(
-            _machinesCapabilityService,
-            MachinesOverviewViewHost,
-            capabilityShellBridge);
-    }
-
-    private DiagnosticsCapabilityRuntime CreateDiagnosticsCapabilityRuntime()
-    {
-        var capabilityHost = new DiagnosticsCapabilityHost(App.Services.GetRequiredService<IStructuredLogViewerService>());
-        var capabilityShellBridge = new DiagnosticsCapabilityShellBridge(
-            () => IsDiagnosticsCapabilityActive,
-            () => IsDiagnosticsOverviewActive,
-            () => IsDiagnosticsLogsActive,
-            NavigateToRoute,
-            TryOpenStructuredLogLocation);
-
-        return new DiagnosticsCapabilityRuntime(
-            DiagnosticsLocalNavigationPanel,
-            DiagnosticsOverviewViewHost,
-            DiagnosticsLogsViewHost,
-            DiagnosticsSubviewTabView,
-            DiagnosticsOverviewTabViewItem,
-            DiagnosticsLogsTabViewItem,
-            capabilityHost,
-            capabilityShellBridge);
-    }
-
     private TemplatesCapabilityRuntime CreateTemplatesCapabilityRuntime()
     {
         var workspaceHost = TemplatesWorkspacePanel;
