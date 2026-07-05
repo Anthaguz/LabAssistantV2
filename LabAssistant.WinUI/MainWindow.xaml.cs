@@ -5,10 +5,8 @@ using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Interop;
-using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.Shell;
 using LabAssistant.WinUI.ViewModels;
-using LabAssistant.WinUI.ViewModels.Assets;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
@@ -28,7 +26,6 @@ public sealed partial class MainWindow : Window
     private readonly ShellViewModel _shellViewModel = new();
     private readonly IMachinesCapabilityService _machinesCapabilityService;
     private readonly ITemplatesCapabilityService _templatesCapabilityService;
-    private readonly IAssetsBaseDisksCapabilityService _assetsBaseDisksCapabilityService;
     private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
     private readonly ShellLayoutManager _layoutManager;
     private readonly ShellPanelStateManager _shellPanelStateManager;
@@ -36,9 +33,6 @@ public sealed partial class MainWindow : Window
     private readonly ShellThemeManager _themeManager;
     private readonly ShellDialogService _dialogService;
     private readonly ShellKeyboardHandler _keyboardHandler;
-    private readonly AssetsCapabilityRuntime _assetsCapabilityRuntime;
-    private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
-    private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
     private readonly DeployCapabilityRuntime _deployCapabilityRuntime;
 
@@ -50,7 +44,6 @@ public sealed partial class MainWindow : Window
 
         _machinesCapabilityService = App.Services.GetRequiredService<IMachinesCapabilityService>();
         _templatesCapabilityService = App.Services.GetRequiredService<ITemplatesCapabilityService>();
-        _assetsBaseDisksCapabilityService = App.Services.GetRequiredService<IAssetsBaseDisksCapabilityService>();
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
 
         ShellNavigationCoordinator? navigationCoordinator = null;
@@ -80,10 +73,6 @@ public sealed partial class MainWindow : Window
             () => _deployCapabilityRuntime,
             () => RootLayout.ActualWidth);
         var panelVisibilityManager = new ShellPanelVisibilityManager(
-            AssetsLocalNavigationPanel,
-            AssetsOverviewViewHost,
-            AssetsBaseDisksViewHost,
-            AssetsSwitchesViewHost,
             SettingsMachinesPanel,
             NonMachinesPlaceholderTextBlock,
             ApplyRightPanelState,
@@ -92,6 +81,7 @@ public sealed partial class MainWindow : Window
         var capabilityPageTypes = new Dictionary<string, Type>(StringComparer.Ordinal)
         {
             ["machines"] = typeof(Views.Machines.MachinesPage),
+            ["assets"] = typeof(Views.Assets.AssetsPage),
             ["diagnostics"] = typeof(Views.Diagnostics.DiagnosticsPage)
         };
         _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
@@ -107,13 +97,8 @@ public sealed partial class MainWindow : Window
             CapabilityFrame,
             capabilityPageTypes,
             typeof(Views.Shell.ShellBlankPage));
-        _navigationCoordinator.SetShellHost(new ShellHost(_navigationCoordinator, () => RootLayout.XamlRoot));
+        _navigationCoordinator.SetShellHost(new ShellHost(_navigationCoordinator, () => RootLayout.XamlRoot, _dialogService));
 
-        _assetsCapabilityRuntime = CreateAssetsCapabilityRuntime(
-            out var assetsBaseDisksWorkspaceComposition,
-            out var assetsSwitchesWorkspaceComposition);
-        _assetsBaseDisksWorkspaceComposition = assetsBaseDisksWorkspaceComposition;
-        _assetsSwitchesWorkspaceComposition = assetsSwitchesWorkspaceComposition;
         _templatesCapabilityRuntime = templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
 
@@ -136,7 +121,6 @@ public sealed partial class MainWindow : Window
             {
                 await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);
                 await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
-                await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
                 await LoadMachinesDeletionPolicyAsync();
             }
             catch (Exception ex)
@@ -155,10 +139,6 @@ public sealed partial class MainWindow : Window
     private bool IsTemplatesLibraryActive => _navigationCoordinator.IsTemplatesLibraryActive;
     private bool IsTemplatesEditorActive => _navigationCoordinator.IsTemplatesEditorActive;
     private bool IsTemplatesBuilderActive => _navigationCoordinator.IsTemplatesBuilderActive;
-    private bool IsAssetsOverviewActive => _navigationCoordinator.IsAssetsOverviewActive;
-    private bool IsAssetsBaseDisksActive => _navigationCoordinator.IsAssetsBaseDisksActive;
-    private bool IsAssetsSwitchesActive => _navigationCoordinator.IsAssetsSwitchesActive;
-    private bool IsAssetsCapabilityActive => _navigationCoordinator.IsAssetsCapabilityActive;
     private bool IsTemplatesCapabilityActive => _navigationCoordinator.IsTemplatesCapabilityActive;
     private bool IsSettingsMachinesActive => _navigationCoordinator.IsSettingsMachinesActive;
 
@@ -173,7 +153,6 @@ public sealed partial class MainWindow : Window
     private void ApplyCapabilityShellState()
     {
         _deployCapabilityRuntime.ApplyShellState();
-        _assetsCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
     }
 
@@ -184,22 +163,10 @@ public sealed partial class MainWindow : Window
 
     private void NavigateToRoute(string routeKey) => _navigationCoordinator.NavigateToRoute(routeKey);
 
-    private string? PickBaseDiskFilePath() => _dialogService.PickBaseDiskFilePath();
-
     private Task<string?> PickTemplateFileForOpenAsync() => _dialogService.PickTemplateFileForOpenAsync();
 
     private Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName) =>
         _dialogService.PickTemplateFileForSaveAsync(suggestedFileName);
-
-    private Task<bool> ShowAssetsBaseDiskRemoveConfirmationDialogAsync(
-        AssetsBaseDiskListRow row,
-        AssetsBaseDiskRemovalAssessment assessment) =>
-        _dialogService.ShowAssetsBaseDiskRemoveConfirmationDialogAsync(row, assessment);
-
-    private Task<bool> ShowAssetsSwitchDeleteConfirmationDialogAsync(
-        AssetsSwitchListRow row,
-        AssetsSwitchDeleteAssessment assessment) =>
-        _dialogService.ShowAssetsSwitchDeleteConfirmationDialogAsync(row, assessment);
 
     private Task<bool> ShowDeleteTemplateConfirmationDialogAsync(TemplateLibraryItem selectedTemplate) =>
         _dialogService.ShowDeleteTemplateConfirmationDialogAsync(selectedTemplate);

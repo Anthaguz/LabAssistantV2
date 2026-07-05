@@ -2,7 +2,6 @@
     x:Class="LabAssistant.WinUI.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:assetsViews="using:LabAssistant.WinUI.Views.Assets"
     xmlns:deployViews="using:LabAssistant.WinUI.Views.Deploy"
     xmlns:machineViews="using:LabAssistant.WinUI.Views.Machines"
     xmlns:templateViews="using:LabAssistant.WinUI.Views.Templates">
@@ -167,34 +166,6 @@
                                     <TabViewItem x:Name="DeployFromTemplateTabViewItem" Header="From Template" IsClosable="False">
                                         <deployViews:DeployFromTemplateView
                                             x:Name="DeployFromTemplateViewHost"
-                                            Visibility="Collapsed" />
-                                    </TabViewItem>
-                                </TabView>
-                            </Border>
-                            <Border
-                                x:Name="AssetsLocalNavigationPanel"
-                                Grid.Row="2"
-                                Padding="8"
-                                Background="{StaticResource ShellContentBackgroundBrush}"
-                                BorderBrush="{StaticResource ShellBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Visibility="Collapsed">
-                                <TabView
-                                    x:Name="AssetsSubviewTabView"
-                                    IsAddTabButtonVisible="False"
-                                    >
-                                    <TabViewItem x:Name="AssetsOverviewTabViewItem" Header="Overview" IsClosable="False">
-                                        <assetsViews:AssetsOverviewView x:Name="AssetsOverviewViewHost" />
-                                    </TabViewItem>
-                                    <TabViewItem x:Name="AssetsBaseDisksTabViewItem" Header="Base Disks" IsClosable="False">
-                                        <assetsViews:AssetsBaseDisksView
-                                            x:Name="AssetsBaseDisksViewHost"
-                                            Visibility="Collapsed" />
-                                    </TabViewItem>
-                                    <TabViewItem x:Name="AssetsSwitchesTabViewItem" Header="Switches" IsClosable="False">
-                                        <assetsViews:AssetsSwitchesView
-                                            x:Name="AssetsSwitchesViewHost"
                                             Visibility="Collapsed" />
                                     </TabViewItem>
                                 </TabView>

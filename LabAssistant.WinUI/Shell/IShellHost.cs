@@ -24,4 +24,11 @@ internal interface IShellHost
 
     /// <summary>The shell <see cref="XamlRoot"/> for shell-owned dialogs.</summary>
     XamlRoot? XamlRoot { get; }
+
+    /// <summary>
+    /// Shell-owned dialog and file-picker service. Capability pages that need native file dialogs
+    /// (which require the shell window handle) or shared confirmation dialogs use this instead of
+    /// reaching back into the shell window directly.
+    /// </summary>
+    ShellDialogService Dialogs { get; }
 }

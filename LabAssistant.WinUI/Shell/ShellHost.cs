@@ -12,10 +12,11 @@ internal sealed class ShellHost : IShellHost
     private readonly ShellNavigationCoordinator _coordinator;
     private readonly Func<XamlRoot?> _getXamlRoot;
 
-    public ShellHost(ShellNavigationCoordinator coordinator, Func<XamlRoot?> getXamlRoot)
+    public ShellHost(ShellNavigationCoordinator coordinator, Func<XamlRoot?> getXamlRoot, ShellDialogService dialogs)
     {
         _coordinator = coordinator;
         _getXamlRoot = getXamlRoot;
+        Dialogs = dialogs;
     }
 
     public void NavigateToRoute(string routeKey) => _coordinator.NavigateToRoute(routeKey);
@@ -23,4 +24,6 @@ internal sealed class ShellHost : IShellHost
     public void ReportActiveSubview(string routeKey) => _coordinator.ReportActiveSubview(routeKey);
 
     public XamlRoot? XamlRoot => _getXamlRoot();
+
+    public ShellDialogService Dialogs { get; }
 }

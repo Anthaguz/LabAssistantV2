@@ -12,7 +12,6 @@ using LabAssistant.Services.HyperV;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
-using LabAssistant.WinUI.ViewModels.Assets;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
@@ -26,43 +25,6 @@ namespace LabAssistant.WinUI;
 
 public sealed partial class MainWindow
 {
-    private AssetsCapabilityRuntime CreateAssetsCapabilityRuntime(
-        out AssetsBaseDisksWorkspaceComposition assetsBaseDisksWorkspaceComposition,
-        out AssetsSwitchesWorkspaceComposition assetsSwitchesWorkspaceComposition)
-    {
-        var baseDisksCompositionHost = new AssetsBaseDisksCompositionHost(
-            PickBaseDiskFilePath,
-            ShowAssetsBaseDiskRemoveConfirmationDialogAsync);
-        assetsBaseDisksWorkspaceComposition = new AssetsBaseDisksWorkspaceComposition(
-            _assetsBaseDisksCapabilityService,
-            AssetsBaseDisksViewHost,
-            baseDisksCompositionHost);
-
-        var switchesCompositionHost = new AssetsSwitchesCompositionHost(ShowAssetsSwitchDeleteConfirmationDialogAsync);
-        assetsSwitchesWorkspaceComposition = new AssetsSwitchesWorkspaceComposition(
-            _assetsSwitchesCapabilityService,
-            AssetsSwitchesViewHost,
-            switchesCompositionHost);
-
-        var capabilityShellBridge = new AssetsCapabilityShellBridge(
-            () => IsAssetsCapabilityActive,
-            () => IsAssetsOverviewActive,
-            () => IsAssetsBaseDisksActive,
-            () => IsAssetsSwitchesActive,
-            NavigateToRoute);
-
-        return new AssetsCapabilityRuntime(
-            AssetsOverviewViewHost,
-            assetsBaseDisksWorkspaceComposition,
-            assetsSwitchesWorkspaceComposition,
-            AssetsSubviewTabView,
-            AssetsOverviewTabViewItem,
-            AssetsBaseDisksTabViewItem,
-            AssetsSwitchesTabViewItem,
-            new AssetsCapabilityHost(),
-            capabilityShellBridge);
-    }
-
     private TemplatesCapabilityRuntime CreateTemplatesCapabilityRuntime()
     {
         var workspaceHost = TemplatesWorkspacePanel;

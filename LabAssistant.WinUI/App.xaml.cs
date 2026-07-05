@@ -75,9 +75,9 @@ public partial class App : Application
             InfrastructureServices.AddInfrastructureServices(serviceCollection);
             serviceCollection.AddBusinessServices();
             serviceCollection.AddPersistenceServices();
-            serviceCollection.AddSingleton<AssetsOverviewViewModel>();
-            serviceCollection.AddSingleton<AssetsBaseDisksViewModel>();
-            serviceCollection.AddSingleton<AssetsSwitchesViewModel>();
+            serviceCollection.AddTransient<AssetsOverviewViewModel>();
+            serviceCollection.AddTransient<AssetsBaseDisksViewModel>();
+            serviceCollection.AddTransient<AssetsSwitchesViewModel>();
             serviceCollection.AddSingleton<MachinesViewModel>();
             serviceCollection.AddSingleton<TemplatesLibraryViewModel>();
             serviceCollection.AddSingleton<TemplatesEditorViewModel>();

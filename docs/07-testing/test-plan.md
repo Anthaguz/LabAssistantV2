@@ -331,6 +331,9 @@ This file is a practical baseline plan for recurring regression checks. It does 
 ## TC-020: Milestone AM Assets Extraction Closure Verification
 - **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
 - **Type:** Manual (real Windows machine / Hyper-V host where Switches flows are exercised) + automated coverage
+- **Reconciliation note (frame-based navigation, task `nav-frame-based`):** this milestone record predates frame-based navigation.
+  Assets is now an on-demand `AssetsPage` created on route entry and torn down on leave, with Overview, Base Disks, and Switches subviews bound to `AssetsOverviewViewModel`, `AssetsBaseDisksViewModel`, and `AssetsSwitchesViewModel` through `x:Bind`; the former `AssetsCapabilityRuntime`, `AssetsOverviewWorkspace*`, `AssetsBaseDisksWorkspace*`, and `AssetsSwitchesWorkspace*` seams and the long-lived-workspace/route-refresh model no longer exist.
+  The Assets behavioral contracts still hold (Overview route-entry/summary surface with its summary reflecting Base Disks and Switches load state, Base Disks import/validate/save/remove-with-confirm, Switches create/delete-with-confirm guardrails) and remain the current verification target; see TC-026.
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#407`, `#408`, `#409`, `#410`, `#411`, `#412`, `#439`, `#441`, `#453`, `#454`, `#455`, `#456`, `#457`, `#458`, `#459`, `#460`, `#461`, `#462`, `#463`, `#464`, `#465`, `#466`, `#467`, `#468`, `#469`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
@@ -441,6 +444,24 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - `MainWindow` owns only shell chrome/routing/header/right-panel; the capability page owns Overview/Logs coordination; views resolve their view models from DI and never depend on `MainWindow`.
   - Overview remains the route-entry and summary surface; Logs remains a child troubleshooting surface; the Overview logs summary reflects Logs load state.
   - Filter, selection, reload, clear, and open-location behaviors match prior Diagnostics behavior; no regressions versus TC-023's behavioral contracts.
+
+## TC-026: Frame-Based Assets Capability Verification
+- **Related AC:** `AC-021`, `FR-113`, `FR-132`, `FR-134`, `FR-137`, `FR-140`, `FR-143` (reconciled for frame-based navigation)
+- **Type:** Manual (real Windows machine / Hyper-V host where Switches flows are exercised) + automated coverage
+- **Related task:** `nav-frame-based` (Assets migration: on-demand `AssetsPage` hosting the existing `x:Bind` MVVM subviews)
+- **Steps:**
+  1. Launch the app (startup route `machines.overview`), then select `Assets` in the navigation pane.
+  2. Confirm the capability renders in the shell capability frame and the shell header shows the Assets title/description (child views do not repeat them).
+  3. On the Overview subview, confirm the Base Disks and Switches summary cards render real inventory counts (not zero) shortly after entry, and that `Open Base Disks` / `Open Switches` switch the shell to the matching subview (header, nav selection, and tab all update).
+  4. On the Base Disks subview, import a VHDX (file picker opens), edit metadata, validate, and save; then select a base disk and remove it (confirm the remove dialog appears and removal only proceeds after confirmation).
+  5. On the Switches subview, create a switch and delete one (confirm the delete dialog appears and delete only proceeds after confirmation; blocked-delete guardrails still hold when a VM is attached).
+  6. Return to Overview and confirm its summary reflects the updated Base Disks and Switches counts.
+  7. Navigate to another capability and back and confirm Assets reloads fresh.
+- **Expected:**
+  - Assets is created on route entry and torn down on leave: navigating away fires the page's `OnNavigatedFrom`, and returning constructs a fresh `AssetsPage` with fresh (transient) Overview/Base Disks/Switches view models, with no leftover in-flight load from the prior visit.
+  - `MainWindow` owns only shell chrome/routing/header/right-panel; the capability page owns subview tab-sync, the Overview summary coordination, and the file/confirmation dialog wiring (through the shell `IShellHost.Dialogs` seam); views resolve their view models from DI and never depend on `MainWindow`.
+  - Overview remains the route-entry summary/navigation surface; its summary reflects Base Disks and Switches load state and counts.
+  - Base Disks import/validate/save/remove-with-confirm and Switches create/delete-with-confirm guardrails match prior Assets behavior; no regressions versus TC-020's behavioral contracts.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
