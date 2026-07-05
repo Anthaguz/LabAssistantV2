@@ -31,9 +31,10 @@ namespace LabAssistant.WinUI.Views.Deploy;
 /// delegate-bag composition that lived in <c>MainWindow</c>.
 /// </summary>
 /// <remarks>
-/// Interim stage: the Quick Deploy and From Template lanes still run through their preserved
-/// controller/workspace layer hosted here (no longer through <c>MainWindow</c>). The full x:Bind
-/// MVVM rewrite of those lanes and the removal of the remaining lane glue land in the follow-up.
+/// The Quick Deploy lane is full x:Bind MVVM: <see cref="DeployQuickDeployViewModel"/> owns its
+/// state, commands, and workflow (via its preserved controller) and is bound directly by the
+/// subview. The From Template lane still runs through its preserved controller/workspace layer
+/// hosted here; its MVVM rewrite lands in a follow-up.
 /// </remarks>
 public sealed partial class DeployPage : Page, ICapabilityPage
 {
@@ -42,9 +43,9 @@ public sealed partial class DeployPage : Page, ICapabilityPage
     private IShellHost? _shellHost;
     private ITemplatesCapabilityService? _templatesCapabilityService;
     private DeployTemplatesShellAdapter? _templatesShellAdapter;
-    private DeployOnTheFlyWorkspaceOwner? _quickDeployLane;
+    private DeployQuickDeployViewModel? _quickDeployLane;
     private DeployFromTemplateWorkspaceComposition? _fromTemplateLane;
-    private DeployOnTheFlyRightPanelView? _quickDeployRightPanel;
+    private DeployQuickDeployRightPanelView? _quickDeployRightPanel;
     private DeployFromTemplateRightPanelView? _fromTemplateRightPanel;
 
     private string _activeRouteKey = ShellRouteKeys.DeployOverview;
@@ -88,6 +89,13 @@ public sealed partial class DeployPage : Page, ICapabilityPage
 
         OverviewViewModel.OpenQuickDeployRequested -= OnOpenQuickDeployRequested;
         OverviewViewModel.OpenFromTemplateRequested -= OnOpenFromTemplateRequested;
+        if (_quickDeployLane is not null)
+        {
+            _quickDeployLane.SharedUiStateChanged -= OnLaneSharedUiStateChanged;
+            _quickDeployLane.ResultsPanelStateChanged -= OnQuickDeployResultsPanelStateChanged;
+        }
+
+        QuickDeployViewHost.ViewModel = null;
         if (_shellHost is not null)
         {
             _shellHost.RightPanel.StateChanged -= OnRightPanelStateChanged;
@@ -140,24 +148,22 @@ public sealed partial class DeployPage : Page, ICapabilityPage
 
         var templateEditorLauncher = new DeployTemplateEditorLauncher(_templatesShellAdapter);
 
-        _quickDeployRightPanel = new DeployOnTheFlyRightPanelView();
+        _quickDeployRightPanel = new DeployQuickDeployRightPanelView();
         _fromTemplateRightPanel = new DeployFromTemplateRightPanelView();
 
-        _quickDeployLane = new DeployOnTheFlyWorkspaceOwner(
-            QuickDeployViewHost,
-            _quickDeployRightPanel,
+        _quickDeployLane = new DeployQuickDeployViewModel(
             referenceDataService,
             resolveSuggestionsService,
-            templateEditorLauncher,
-            new DeployOnTheFlyWorkspaceShellBridge(
-                DispatcherQueue,
-                () => _shellHost?.XamlRoot,
-                () => _shellHost?.RightPanel.Toggle(),
-                OnLaneResultsPanelStateChanged),
+            templateEditorLauncher.ShowEditorAsync,
             deploymentPreflightService,
             deploymentCoordinator,
-            deploymentOutcomeSummaryBuilder);
+            deploymentOutcomeSummaryBuilder,
+            action => DispatcherQueue.TryEnqueue(() => action()),
+            ShowRemoveVmEntryConfirmationDialogAsync,
+            () => _shellHost?.RightPanel.Toggle());
         _quickDeployLane.SharedUiStateChanged += OnLaneSharedUiStateChanged;
+        _quickDeployLane.ResultsPanelStateChanged += OnQuickDeployResultsPanelStateChanged;
+        QuickDeployViewHost.ViewModel = _quickDeployLane;
 
         _fromTemplateLane = new DeployFromTemplateWorkspaceComposition(
             FromTemplateViewHost,
@@ -297,6 +303,40 @@ public sealed partial class DeployPage : Page, ICapabilityPage
     }
 
     private void OnLaneResultsPanelStateChanged() => UpdateRightPanelForActiveLane();
+
+    private void OnQuickDeployResultsPanelStateChanged(object? sender, EventArgs e)
+    {
+        if (_quickDeployLane is not null && _quickDeployRightPanel is not null)
+        {
+            _quickDeployRightPanel.ViewModel.UpdateState(
+                _quickDeployLane.LifecycleState,
+                _quickDeployLane.ProgressPercent,
+                _quickDeployLane.ProgressSummary,
+                _quickDeployLane.ResultRows.ToList());
+        }
+
+        UpdateRightPanelForActiveLane();
+    }
+
+    /// <summary>
+    /// Shows the Quick Deploy remove-entry confirmation. Replaces the identical prompt that lived on
+    /// the deleted Quick Deploy shell bridge; the lane view model now depends only on this injected
+    /// confirmation seam.
+    /// </summary>
+    private async Task<bool> ShowRemoveVmEntryConfirmationDialogAsync(string vmName)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = _shellHost?.XamlRoot,
+            Title = "Remove VM Entry",
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
+            Content = $"Remove '{vmName}' from quick deploy configuration?",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
 
     private void OnRightPanelStateChanged()
     {

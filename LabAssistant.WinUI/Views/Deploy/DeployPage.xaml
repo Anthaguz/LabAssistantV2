@@ -11,7 +11,7 @@
             <deployViews:DeployOverviewView x:Name="OverviewViewHost" />
         </TabViewItem>
         <TabViewItem x:Name="QuickDeployTabViewItem" Header="Quick Deploy" IsClosable="False">
-            <deployViews:DeployOnTheFlyView x:Name="QuickDeployViewHost" />
+            <deployViews:DeployQuickDeployView x:Name="QuickDeployViewHost" />
         </TabViewItem>
         <TabViewItem x:Name="FromTemplateTabViewItem" Header="From Template" IsClosable="False">
             <deployViews:DeployFromTemplateView x:Name="FromTemplateViewHost" />

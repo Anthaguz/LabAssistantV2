@@ -64,7 +64,7 @@ public sealed class DeployMultiSwitchBehaviorTests
 
         var vm = Assert.Single(result.MultiVmContext.VmContexts);
         Assert.Equal(["Lab-A"], vm.VirtualSwitchNames);
-        var blockingIssue = Assert.Single(result.CompatibilityIssues.Where(issue => issue.IsBlocking));
+        var blockingIssue = Assert.Single(result.CompatibilityIssues, issue => issue.IsBlocking);
         Assert.Contains("Missing-B", blockingIssue.Message);
     }
 
