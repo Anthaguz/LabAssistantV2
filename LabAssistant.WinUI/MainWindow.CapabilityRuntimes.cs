@@ -65,19 +65,6 @@ public sealed partial class MainWindow
             capabilityShellBridge);
     }
 
-    private MachinesCapabilityRuntime CreateMachinesCapabilityRuntime()
-    {
-        var capabilityShellBridge = new MachinesCapabilityShellBridge(
-            () => IsMachinesOverviewActive,
-            UpdateReadinessPollingState,
-            () => RootLayout.XamlRoot);
-
-        return new MachinesCapabilityRuntime(
-            _machinesCapabilityService,
-            MachinesOverviewViewHost,
-            capabilityShellBridge);
-    }
-
     private DiagnosticsCapabilityRuntime CreateDiagnosticsCapabilityRuntime()
     {
         var capabilityHost = new DiagnosticsCapabilityHost(App.Services.GetRequiredService<IStructuredLogViewerService>());

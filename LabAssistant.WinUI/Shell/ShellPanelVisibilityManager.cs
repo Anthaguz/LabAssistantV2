@@ -5,7 +5,6 @@ namespace LabAssistant.WinUI.Shell;
 
 internal sealed class ShellPanelVisibilityManager
 {
-    private readonly FrameworkElement _machinesOverviewPanel;
     private readonly FrameworkElement _assetsLocalNavigationPanel;
     private readonly FrameworkElement _assetsOverviewPanel;
     private readonly FrameworkElement _assetsBaseDisksPanel;
@@ -17,7 +16,6 @@ internal sealed class ShellPanelVisibilityManager
     private readonly Action _applyCapabilityShellState;
 
     public ShellPanelVisibilityManager(
-        FrameworkElement machinesOverviewPanel,
         FrameworkElement assetsLocalNavigationPanel,
         FrameworkElement assetsOverviewPanel,
         FrameworkElement assetsBaseDisksPanel,
@@ -28,7 +26,6 @@ internal sealed class ShellPanelVisibilityManager
         Action applyTemplatesUiState,
         Action applyCapabilityShellState)
     {
-        _machinesOverviewPanel = machinesOverviewPanel;
         _assetsLocalNavigationPanel = assetsLocalNavigationPanel;
         _assetsOverviewPanel = assetsOverviewPanel;
         _assetsBaseDisksPanel = assetsBaseDisksPanel;
@@ -58,7 +55,6 @@ internal sealed class ShellPanelVisibilityManager
             string.Equals(capability.Key, "diagnostics", StringComparison.Ordinal);
 
         _applyRightPanelState();
-        _machinesOverviewPanel.Visibility = isMachinesOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         _assetsLocalNavigationPanel.Visibility = isAssetsCapabilityActive ? Visibility.Visible : Visibility.Collapsed;
         _assetsOverviewPanel.Visibility = isAssetsOverviewActive ? Visibility.Visible : Visibility.Collapsed;
         _assetsBaseDisksPanel.Visibility = isAssetsBaseDisksActive ? Visibility.Visible : Visibility.Collapsed;

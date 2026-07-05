@@ -39,7 +39,6 @@ public sealed partial class MainWindow : Window
     private readonly ShellThemeManager _themeManager;
     private readonly ShellDialogService _dialogService;
     private readonly ShellKeyboardHandler _keyboardHandler;
-    private readonly MachinesCapabilityRuntime _machinesCapabilityRuntime;
     private readonly AssetsCapabilityRuntime _assetsCapabilityRuntime;
     private readonly AssetsBaseDisksWorkspaceComposition _assetsBaseDisksWorkspaceComposition;
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
@@ -48,7 +47,6 @@ public sealed partial class MainWindow : Window
     private readonly DiagnosticsCapabilityRuntime _diagnosticsCapabilityRuntime;
 
     private bool _isSavingDeletionPolicy;
-    private DispatcherQueueTimer? _rdpReadinessTimer;
 
     public MainWindow()
     {
@@ -60,7 +58,6 @@ public sealed partial class MainWindow : Window
         _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
 
         ShellNavigationCoordinator? navigationCoordinator = null;
-        MachinesCapabilityRuntime? machinesCapabilityRuntime = null;
         TemplatesCapabilityRuntime? templatesCapabilityRuntime = null;
 
         _layoutManager = new ShellLayoutManager(GlobalNavigationView);
@@ -87,7 +84,6 @@ public sealed partial class MainWindow : Window
             () => _deployCapabilityRuntime,
             () => RootLayout.ActualWidth);
         var panelVisibilityManager = new ShellPanelVisibilityManager(
-            MachinesOverviewViewHost,
             AssetsLocalNavigationPanel,
             AssetsOverviewViewHost,
             AssetsBaseDisksViewHost,
@@ -97,6 +93,10 @@ public sealed partial class MainWindow : Window
             ApplyRightPanelState,
             () => templatesCapabilityRuntime?.ApplyUiState(),
             ApplyCapabilityShellState);
+        var capabilityPageTypes = new Dictionary<string, Type>(StringComparer.Ordinal)
+        {
+            ["machines"] = typeof(Views.Machines.MachinesPage)
+        };
         _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
             _shellViewModel,
             DispatcherQueue,
@@ -106,11 +106,12 @@ public sealed partial class MainWindow : Window
             ContentDescriptionTextBlock,
             panelVisibilityManager,
             LoadMachinesDeletionPolicyAsync,
-            () => machinesCapabilityRuntime?.DiscardEditDraft(),
             ResetRightPanelForCapabilitySwitch,
-            () => machinesCapabilityRuntime?.EnsureInventoryAsync(forceRefresh: false) ?? Task.CompletedTask);
+            CapabilityFrame,
+            capabilityPageTypes,
+            typeof(Views.Shell.ShellBlankPage));
+        _navigationCoordinator.SetShellHost(new ShellHost(_navigationCoordinator, () => RootLayout.XamlRoot));
 
-        _machinesCapabilityRuntime = machinesCapabilityRuntime = CreateMachinesCapabilityRuntime();
         _assetsCapabilityRuntime = CreateAssetsCapabilityRuntime(
             out var assetsBaseDisksWorkspaceComposition,
             out var assetsSwitchesWorkspaceComposition);
@@ -132,13 +133,11 @@ public sealed partial class MainWindow : Window
         RootLayout.SizeChanged += RootLayout_SizeChanged;
         _layoutManager.CompactFallbackChanged += (_, isCompact) => _shellPanelStateManager.SetCompactFallback(isCompact);
 
-        InitializeRdpReadinessTimer();
         RootLayout.Loaded += async (_, _) =>
         {
             RootLayout.Focus(FocusState.Programmatic);
             try
             {
-                await _machinesCapabilityRuntime.EnsureInventoryAsync(forceRefresh: true);
                 await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);
                 await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
                 await _assetsBaseDisksWorkspaceComposition.EnsureInventoryAsync(forceRefresh: true);
@@ -153,7 +152,6 @@ public sealed partial class MainWindow : Window
         ApplyState();
     }
 
-    private bool IsMachinesOverviewActive => _navigationCoordinator.IsMachinesOverviewActive;
     private bool IsDeployOverviewActive => _navigationCoordinator.IsDeployOverviewActive;
     private bool IsDeployFromTemplateActive => _navigationCoordinator.IsDeployFromTemplateActive;
     private bool IsDeployOnTheFlyActive => _navigationCoordinator.IsDeployOnTheFlyActive;
@@ -181,7 +179,6 @@ public sealed partial class MainWindow : Window
 
     private void ApplyCapabilityShellState()
     {
-        _machinesCapabilityRuntime.ApplyShellState();
         _deployCapabilityRuntime.ApplyShellState();
         _assetsCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
@@ -263,40 +260,6 @@ public sealed partial class MainWindow : Window
         {
             _isSavingDeletionPolicy = false;
             SaveMachinesDeletionPolicyButton.IsEnabled = true;
-        }
-    }
-
-    private void InitializeRdpReadinessTimer()
-    {
-        _rdpReadinessTimer = DispatcherQueue.CreateTimer();
-        _rdpReadinessTimer.Interval = TimeSpan.FromMinutes(5);
-        _rdpReadinessTimer.Tick += async (_, _) => await _machinesCapabilityRuntime.RefreshRdpReadinessAsync(selectedOnly: false);
-    }
-
-    private void UpdateReadinessPollingState()
-    {
-        if (_rdpReadinessTimer is null)
-        {
-            return;
-        }
-
-        if (IsMachinesOverviewActive && _machinesCapabilityRuntime.HasInventory)
-        {
-            if (!_rdpReadinessTimer.IsRunning)
-            {
-                _rdpReadinessTimer.Start();
-                if (DateTimeOffset.UtcNow - _machinesCapabilityRuntime.LastRdpReadinessRefreshUtc >= _rdpReadinessTimer.Interval)
-                {
-                    _ = _machinesCapabilityRuntime.RefreshRdpReadinessAsync(selectedOnly: false);
-                }
-            }
-
-            return;
-        }
-
-        if (_rdpReadinessTimer.IsRunning)
-        {
-            _rdpReadinessTimer.Stop();
         }
     }
 

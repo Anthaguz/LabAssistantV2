@@ -1,42 +1,20 @@
 using LabAssistant.Business.Machines;
-using LabAssistant.WinUI.Views.Machines;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
-namespace LabAssistant.WinUI.ViewModels.Machines;
+namespace LabAssistant.WinUI.Views.Machines;
 
-internal interface IMachinesCapabilityShellBridge
+/// <summary>
+/// Builders for the Machines destructive-delete confirmation dialogs. Relocated verbatim from the
+/// former <c>MachinesCapabilityShellBridge</c> so the delete flow keeps its exact behavior while
+/// the capability page owns the shell seam.
+/// </summary>
+internal static class MachinesDeleteDialogs
 {
-    bool IsMachinesOverviewActive { get; }
-
-    void UpdateReadinessPollingState();
-
-    Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview);
-
-    Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope);
-}
-
-internal sealed class MachinesCapabilityShellBridge : IMachinesCapabilityShellBridge
-{
-    private readonly Func<bool> _isMachinesOverviewActive;
-    private readonly Action _updateReadinessPollingState;
-    private readonly Func<XamlRoot?> _getXamlRoot;
-
-    public MachinesCapabilityShellBridge(
-        Func<bool> isMachinesOverviewActive,
-        Action updateReadinessPollingState,
-        Func<XamlRoot?> getXamlRoot)
-    {
-        _isMachinesOverviewActive = isMachinesOverviewActive;
-        _updateReadinessPollingState = updateReadinessPollingState;
-        _getXamlRoot = getXamlRoot;
-    }
-
-    public bool IsMachinesOverviewActive => _isMachinesOverviewActive();
-
-    public void UpdateReadinessPollingState() => _updateReadinessPollingState();
-
-    public async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview)
+    public static async Task<MachineDeleteScope?> ShowDeleteScopeDialogAsync(
+        XamlRoot? xamlRoot,
+        MachineInventoryItem vm,
+        MachineDeletePreview preview)
     {
         var vmOnlyRadio = new RadioButton
         {
@@ -92,7 +70,7 @@ internal sealed class MachinesCapabilityShellBridge : IMachinesCapabilityShellBr
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
             IsPrimaryButtonEnabled = false,
-            XamlRoot = _getXamlRoot(),
+            XamlRoot = xamlRoot,
             Content = content
         };
 
@@ -110,7 +88,11 @@ internal sealed class MachinesCapabilityShellBridge : IMachinesCapabilityShellBr
             : MachineDeleteScope.VmRegistrationOnly;
     }
 
-    public async Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope)
+    public static async Task<bool> ShowDeleteConfirmationDialogAsync(
+        XamlRoot? xamlRoot,
+        MachineInventoryItem vm,
+        MachineDeletePreview preview,
+        MachineDeleteScope effectiveScope)
     {
         var scopeText = effectiveScope == MachineDeleteScope.VmAndStorage
             ? "VM + associated disks/files"
@@ -142,7 +124,7 @@ internal sealed class MachinesCapabilityShellBridge : IMachinesCapabilityShellBr
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
             IsPrimaryButtonEnabled = false,
-            XamlRoot = _getXamlRoot(),
+            XamlRoot = xamlRoot,
             Content = content
         };
 
@@ -152,31 +134,4 @@ internal sealed class MachinesCapabilityShellBridge : IMachinesCapabilityShellBr
         var result = await dialog.ShowAsync();
         return result == ContentDialogResult.Primary;
     }
-}
-
-internal sealed class MachinesCapabilityRuntime
-{
-    private readonly MachinesViewModel _viewModel;
-
-    public MachinesCapabilityRuntime(
-        IMachinesCapabilityService machinesCapabilityService,
-        MachinesOverviewView view,
-        IMachinesCapabilityShellBridge shellBridge)
-    {
-        ArgumentNullException.ThrowIfNull(machinesCapabilityService);
-        _viewModel = view.ViewModel;
-        _viewModel.AttachShellBridge(shellBridge);
-    }
-
-    public bool HasInventory => _viewModel.HasInventory;
-
-    public DateTimeOffset LastRdpReadinessRefreshUtc => _viewModel.LastRdpReadinessRefreshUtc;
-
-    public void ApplyShellState() => _viewModel.ApplyShellState();
-
-    public void DiscardEditDraft() => _viewModel.DiscardEditDraft();
-
-    public Task EnsureInventoryAsync(bool forceRefresh) => _viewModel.EnsureInventoryAsync(forceRefresh);
-
-    public Task RefreshRdpReadinessAsync(bool selectedOnly) => _viewModel.RefreshRdpReadinessAsync(selectedOnly);
 }

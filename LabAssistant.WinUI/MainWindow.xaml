@@ -229,10 +229,11 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <machineViews:MachinesOverviewView
-                                    x:Name="MachinesOverviewViewHost"
+                                <Frame
+                                    x:Name="CapabilityFrame"
                                     Grid.Row="0"
                                     Grid.Column="0"
+                                    IsNavigationStackEnabled="False"
                                     Visibility="Collapsed" />
                                 <Border
                                     x:Name="TemplatesWorkspacePanel"
