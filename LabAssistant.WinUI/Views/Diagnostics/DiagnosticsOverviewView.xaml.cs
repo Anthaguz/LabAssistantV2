@@ -1,36 +1,24 @@
+using LabAssistant.WinUI.ViewModels.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml;
 
 namespace LabAssistant.WinUI.Views.Diagnostics;
 
-public readonly record struct DiagnosticsOverviewViewState(
-    string LogsSummaryText,
-    string SupportSummaryText);
-
+/// <summary>
+/// Diagnostics Overview subview. Binds directly to <see cref="DiagnosticsOverviewViewModel"/> via
+/// <c>x:Bind</c>; the hosting page wires the view model's capability seam and cross-subview summary
+/// refresh. Replaces the former event-forwarding, imperative view-state code-behind.
+/// </summary>
 public sealed partial class DiagnosticsOverviewView : UserControl
 {
-    public event RoutedEventHandler? OpenLogsRequested;
-
-    public event RoutedEventHandler? OpenSupportExportRequested;
+    public DiagnosticsOverviewViewModel ViewModel { get; }
 
     public DiagnosticsOverviewView()
     {
+        ViewModel = App.Services.GetRequiredService<DiagnosticsOverviewViewModel>();
+        DataContext = ViewModel;
         InitializeComponent();
-    }
-
-    public void ApplyWorkspaceState(DiagnosticsOverviewViewState state)
-    {
-        DiagnosticsOverviewLogsSummaryTextBlock.Text = state.LogsSummaryText;
-        DiagnosticsOverviewSupportSummaryTextBlock.Text = state.SupportSummaryText;
-    }
-
-    private void DiagnosticsOverviewOpenLogsButton_Click(object sender, RoutedEventArgs e)
-    {
-        OpenLogsRequested?.Invoke(this, e);
-    }
-
-    private void DiagnosticsOverviewOpenSupportExportButton_Click(object sender, RoutedEventArgs e)
-    {
-        OpenSupportExportRequested?.Invoke(this, e);
+        Loaded += async (_, _) => await ViewModel.InitializeAsync();
+        Unloaded += async (_, _) => await ViewModel.CleanupAsync();
     }
 }

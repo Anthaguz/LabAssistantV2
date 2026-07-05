@@ -391,6 +391,9 @@ This file is a practical baseline plan for recurring regression checks. It does 
 ## TC-023: Milestone AM Diagnostics Extraction Closure Verification
 - **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
 - **Type:** Manual (real Windows machine) + automated coverage
+- **Reconciliation note (frame-based navigation, task `nav-frame-based`):** this milestone record predates frame-based navigation.
+  Diagnostics is now an on-demand `DiagnosticsPage` created on route entry and torn down on leave, with subviews bound to `DiagnosticsOverviewViewModel` and `DiagnosticsLogsViewModel` through `x:Bind`; the former `DiagnosticsCapabilityRuntime`, `DiagnosticsOverviewWorkspace*`, and `DiagnosticsLogsWorkspace*` seams and the long-lived-workspace/route-refresh model no longer exist.
+  The Diagnostics behavioral contracts still hold (Overview route-entry/summary surface, Logs child troubleshooting surface, filter/selection/reload/clear/open-location, Overview summary reflecting Logs load state) and remain the current verification target; see TC-025.
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#439`, `#441`, `#528`, `#529`, `#530`, `#531`, `#532`, `#533`, `#534`, `#535`, `#536`, `#537`, `#538`, `#539`, `#540`, `#541`, `#542`, `#543`, `#544`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
@@ -420,6 +423,24 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - One-shot Machines administrative actions show isolated action-scoped command timing.
   - Deploy timing shows one workflow-session creation per VM workflow plus workflow command timing.
   - Inventory load and edit snapshot load expose measurable flow duration.
+
+## TC-025: Frame-Based Diagnostics Capability Verification
+- **Related AC:** `AC-040`, `AC-041`, `AC-042` (reconciled for frame-based navigation), `FR-113`, `FR-167`, `FR-170`, `FR-173`
+- **Type:** Manual (real Windows machine) + automated coverage
+- **Related task:** `nav-frame-based` (Diagnostics reference: on-demand `DiagnosticsPage` + full `x:Bind` MVVM)
+- **Steps:**
+  1. Launch the app (startup route `machines.overview`), then select `Diagnostics` in the navigation pane.
+  2. Confirm the capability renders in the shell capability frame and the shell header shows the Diagnostics title/description (child views do not repeat them).
+  3. On the Overview subview, confirm the Logs and Support Export summary cards render, then click `Open Logs` and confirm the shell switches to the Logs subview (header, nav selection, and tab all update).
+  4. On the Logs subview, confirm structured entries load; exercise filters (operation id / level / event / text / start-date / end-date), then `Apply filters`, `Clear filters`, and `Reload`; confirm buttons disable while a load is in flight.
+  5. Select a log entry and confirm the envelope line and pretty-printed context detail populate; clear selection by reloading.
+  6. Click `Open raw JSONL` (Logs) and `Open Log Location` (Overview) and confirm the file/folder reveal behavior and that Overview support status is surfaced on the Logs status line.
+  7. Return to Overview and confirm its logs summary reflects the loaded entry count; then navigate to another capability and back and confirm Diagnostics reloads fresh.
+- **Expected:**
+  - Diagnostics is created on route entry and torn down on leave: navigating away fires the page's `OnNavigatedFrom`, and returning constructs a fresh `DiagnosticsPage` with fresh `DiagnosticsOverviewViewModel`/`DiagnosticsLogsViewModel` instances (transient), with no leftover in-flight load from the prior visit.
+  - `MainWindow` owns only shell chrome/routing/header/right-panel; the capability page owns Overview/Logs coordination; views resolve their view models from DI and never depend on `MainWindow`.
+  - Overview remains the route-entry and summary surface; Logs remains a child troubleshooting surface; the Overview logs summary reflects Logs load state.
+  - Filter, selection, reload, clear, and open-location behaviors match prior Diagnostics behavior; no regressions versus TC-023's behavioral contracts.
 
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.

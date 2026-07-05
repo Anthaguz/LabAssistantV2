@@ -1,17 +1,14 @@
-using System.Diagnostics;
 using LabAssistant.Business.Assets;
 using LabAssistant.Business.Machines;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
-using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Interop;
 using LabAssistant.WinUI.Models.Assets;
 using LabAssistant.WinUI.Shell;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.ViewModels.Assets;
-using LabAssistant.WinUI.ViewModels.Diagnostics;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
@@ -44,7 +41,6 @@ public sealed partial class MainWindow : Window
     private readonly AssetsSwitchesWorkspaceComposition _assetsSwitchesWorkspaceComposition;
     private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
     private readonly DeployCapabilityRuntime _deployCapabilityRuntime;
-    private readonly DiagnosticsCapabilityRuntime _diagnosticsCapabilityRuntime;
 
     private bool _isSavingDeletionPolicy;
 
@@ -95,7 +91,8 @@ public sealed partial class MainWindow : Window
             ApplyCapabilityShellState);
         var capabilityPageTypes = new Dictionary<string, Type>(StringComparer.Ordinal)
         {
-            ["machines"] = typeof(Views.Machines.MachinesPage)
+            ["machines"] = typeof(Views.Machines.MachinesPage),
+            ["diagnostics"] = typeof(Views.Diagnostics.DiagnosticsPage)
         };
         _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
             _shellViewModel,
@@ -119,7 +116,6 @@ public sealed partial class MainWindow : Window
         _assetsSwitchesWorkspaceComposition = assetsSwitchesWorkspaceComposition;
         _templatesCapabilityRuntime = templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
         _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
-        _diagnosticsCapabilityRuntime = CreateDiagnosticsCapabilityRuntime();
 
         ConfigureShellIcons();
         _navigationCoordinator.ConfigureNavigationView();
@@ -165,9 +161,6 @@ public sealed partial class MainWindow : Window
     private bool IsAssetsCapabilityActive => _navigationCoordinator.IsAssetsCapabilityActive;
     private bool IsTemplatesCapabilityActive => _navigationCoordinator.IsTemplatesCapabilityActive;
     private bool IsSettingsMachinesActive => _navigationCoordinator.IsSettingsMachinesActive;
-    private bool IsDiagnosticsOverviewActive => _navigationCoordinator.IsDiagnosticsOverviewActive;
-    private bool IsDiagnosticsLogsActive => _navigationCoordinator.IsDiagnosticsLogsActive;
-    private bool IsDiagnosticsCapabilityActive => _navigationCoordinator.IsDiagnosticsCapabilityActive;
 
     private void ApplyState()
     {
@@ -182,7 +175,6 @@ public sealed partial class MainWindow : Window
         _deployCapabilityRuntime.ApplyShellState();
         _assetsCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
-        _diagnosticsCapabilityRuntime.ApplyShellState();
     }
 
     private void ResetRightPanelForCapabilitySwitch(string incomingCapabilityKey) =>
@@ -260,37 +252,6 @@ public sealed partial class MainWindow : Window
         {
             _isSavingDeletionPolicy = false;
             SaveMachinesDeletionPolicyButton.IsEnabled = true;
-        }
-    }
-
-    private string? TryOpenStructuredLogLocation(string filePath)
-    {
-        try
-        {
-            if (File.Exists(filePath))
-            {
-                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"")
-                {
-                    UseShellExecute = true
-                });
-                return null;
-            }
-
-            var folderPath = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
-            {
-                Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folderPath}\"")
-                {
-                    UseShellExecute = true
-                });
-                return $"Active structured log file not found. Opened log folder: {folderPath}";
-            }
-
-            return $"Structured log path does not exist yet: {filePath}";
-        }
-        catch (Exception ex)
-        {
-            return $"Failed to open structured log location. {ex.Message}";
         }
     }
 

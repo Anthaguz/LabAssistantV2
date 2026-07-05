@@ -14,14 +14,12 @@ using LabAssistant.WinUI.Theming;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.ViewModels.Assets;
 using LabAssistant.WinUI.ViewModels.Deploy;
-using LabAssistant.WinUI.ViewModels.Diagnostics;
 using LabAssistant.WinUI.ViewModels.Machines;
 using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.ViewModels.Templates.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using LabAssistant.Services.Logging;
 using WinRT.Interop;
 
 namespace LabAssistant.WinUI;
@@ -62,27 +60,6 @@ public sealed partial class MainWindow
             AssetsBaseDisksTabViewItem,
             AssetsSwitchesTabViewItem,
             new AssetsCapabilityHost(),
-            capabilityShellBridge);
-    }
-
-    private DiagnosticsCapabilityRuntime CreateDiagnosticsCapabilityRuntime()
-    {
-        var capabilityHost = new DiagnosticsCapabilityHost(App.Services.GetRequiredService<IStructuredLogViewerService>());
-        var capabilityShellBridge = new DiagnosticsCapabilityShellBridge(
-            () => IsDiagnosticsCapabilityActive,
-            () => IsDiagnosticsOverviewActive,
-            () => IsDiagnosticsLogsActive,
-            NavigateToRoute,
-            TryOpenStructuredLogLocation);
-
-        return new DiagnosticsCapabilityRuntime(
-            DiagnosticsLocalNavigationPanel,
-            DiagnosticsOverviewViewHost,
-            DiagnosticsLogsViewHost,
-            DiagnosticsSubviewTabView,
-            DiagnosticsOverviewTabViewItem,
-            DiagnosticsLogsTabViewItem,
-            capabilityHost,
             capabilityShellBridge);
     }
 
