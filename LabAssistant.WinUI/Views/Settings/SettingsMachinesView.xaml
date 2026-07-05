@@ -1,0 +1,40 @@
+<UserControl
+    x:Class="LabAssistant.WinUI.Views.Settings.SettingsMachinesView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border
+        Padding="{StaticResource CardPadding}"
+        VerticalAlignment="Top"
+        Background="{StaticResource ShellBackgroundBrush}"
+        BorderBrush="{StaticResource ShellBorderBrush}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource CardCornerRadius}">
+        <StackPanel Spacing="{StaticResource SpacingS}">
+            <TextBlock
+                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Text="Machines Deletion Policy" />
+            <TextBlock
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                Text="Sets the default delete scope for Machines. Confirmation still shows effective scope before delete."
+                TextWrapping="Wrap" />
+            <ComboBox
+                Width="420"
+                AutomationProperties.Name="Machines deletion policy"
+                DisplayMemberPath="Label"
+                ItemsSource="{x:Bind ViewModel.PolicyOptions}"
+                SelectedItem="{x:Bind ViewModel.SelectedPolicy, Mode=TwoWay}" />
+            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                <Button
+                    AutomationProperties.Name="Save Machines deletion policy"
+                    Command="{x:Bind ViewModel.SaveCommand}"
+                    Content="Save policy" />
+                <TextBlock
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                    Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

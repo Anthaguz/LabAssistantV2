@@ -731,6 +731,10 @@ Each readiness result shall include, at minimum:
   - potential base/uncertain classification is never auto-selected for storage deletion
 - Confirmation dialog still shows effective scope before destructive action
 
+> **Reconciliation note (frame-based navigation, task `nav-frame-based`).**
+> `Settings > Machines` is now served by an on-demand `SettingsPage` created on route entry and torn down on leave (footer navigation, route `settings.machines`), replacing the former inline Settings panel and its `MainWindow` code-behind. The deletion-policy selector binds to `SettingsMachinesViewModel` through `x:Bind`, which loads the current policy on entry and persists it through `IMachinesCapabilityService`. The supported modes, default-scope-follows-policy rule, safety guardrails, and confirmation behavior above are unchanged; only the hosting surface moved. The interim `settings.general` placeholder subview was removed (design tracked separately) so Settings currently exposes only the Machines subview.
+
+
 ### 6a) Delete Cleanup Completeness — VM Folder and Disk Cleanup
 **Given**
 - User confirms delete with storage scope

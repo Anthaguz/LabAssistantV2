@@ -36,8 +36,6 @@ public sealed partial class MainWindow : Window
     private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
     private readonly DeployCapabilityRuntime _deployCapabilityRuntime;
 
-    private bool _isSavingDeletionPolicy;
-
     public MainWindow()
     {
         InitializeComponent();
@@ -73,7 +71,6 @@ public sealed partial class MainWindow : Window
             () => _deployCapabilityRuntime,
             () => RootLayout.ActualWidth);
         var panelVisibilityManager = new ShellPanelVisibilityManager(
-            SettingsMachinesPanel,
             NonMachinesPlaceholderTextBlock,
             ApplyRightPanelState,
             () => templatesCapabilityRuntime?.ApplyUiState(),
@@ -82,7 +79,8 @@ public sealed partial class MainWindow : Window
         {
             ["machines"] = typeof(Views.Machines.MachinesPage),
             ["assets"] = typeof(Views.Assets.AssetsPage),
-            ["diagnostics"] = typeof(Views.Diagnostics.DiagnosticsPage)
+            ["diagnostics"] = typeof(Views.Diagnostics.DiagnosticsPage),
+            ["settings"] = typeof(Views.Settings.SettingsPage)
         };
         _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
             _shellViewModel,
@@ -92,7 +90,6 @@ public sealed partial class MainWindow : Window
             ContentTitleTextBlock,
             ContentDescriptionTextBlock,
             panelVisibilityManager,
-            LoadMachinesDeletionPolicyAsync,
             ResetRightPanelForCapabilitySwitch,
             CapabilityFrame,
             capabilityPageTypes,
@@ -121,7 +118,6 @@ public sealed partial class MainWindow : Window
             {
                 await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);
                 await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
-                await LoadMachinesDeletionPolicyAsync();
             }
             catch (Exception ex)
             {
@@ -140,7 +136,6 @@ public sealed partial class MainWindow : Window
     private bool IsTemplatesEditorActive => _navigationCoordinator.IsTemplatesEditorActive;
     private bool IsTemplatesBuilderActive => _navigationCoordinator.IsTemplatesBuilderActive;
     private bool IsTemplatesCapabilityActive => _navigationCoordinator.IsTemplatesCapabilityActive;
-    private bool IsSettingsMachinesActive => _navigationCoordinator.IsSettingsMachinesActive;
 
     private void ApplyState()
     {
@@ -193,54 +188,4 @@ public sealed partial class MainWindow : Window
 
     private void RootLayout_SizeChanged(object sender, SizeChangedEventArgs e) =>
         _layoutManager.HandleRootLayoutSizeChanged(e.NewSize.Width);
-
-    private async void SaveMachinesDeletionPolicyButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (MachinesDeletionPolicyComboBox.SelectedItem is not ComboBoxItem selectedItem ||
-            selectedItem.Tag is not string modeRaw ||
-            !Enum.TryParse<MachineDeletionPolicyMode>(modeRaw, ignoreCase: true, out var mode))
-        {
-            MachinesDeletionPolicyStatusTextBlock.Text = "Select a deletion policy mode first.";
-            return;
-        }
-
-        _isSavingDeletionPolicy = true;
-        SaveMachinesDeletionPolicyButton.IsEnabled = false;
-        try
-        {
-            await _machinesCapabilityService.SetDeletionPolicyAsync(mode);
-            MachinesDeletionPolicyStatusTextBlock.Text = $"Saved: {selectedItem.Content}";
-        }
-        catch (Exception ex)
-        {
-            MachinesDeletionPolicyStatusTextBlock.Text = $"Failed to save policy. {ex.Message}";
-        }
-        finally
-        {
-            _isSavingDeletionPolicy = false;
-            SaveMachinesDeletionPolicyButton.IsEnabled = true;
-        }
-    }
-
-    private async Task LoadMachinesDeletionPolicyAsync()
-    {
-        if (!IsSettingsMachinesActive || _isSavingDeletionPolicy)
-        {
-            return;
-        }
-
-        try
-        {
-            var mode = await _machinesCapabilityService.GetDeletionPolicyAsync();
-            var item = MachinesDeletionPolicyComboBox.Items
-                .OfType<ComboBoxItem>()
-                .FirstOrDefault(candidate => string.Equals(candidate.Tag?.ToString(), mode.ToString(), StringComparison.Ordinal));
-            MachinesDeletionPolicyComboBox.SelectedItem = item;
-            MachinesDeletionPolicyStatusTextBlock.Text = $"Current: {item?.Content ?? mode.ToString()}";
-        }
-        catch (Exception ex)
-        {
-            MachinesDeletionPolicyStatusTextBlock.Text = $"Failed to load policy. {ex.Message}";
-        }
-    }
 }

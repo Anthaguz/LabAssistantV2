@@ -463,6 +463,21 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Overview remains the route-entry summary/navigation surface; its summary reflects Base Disks and Switches load state and counts.
   - Base Disks import/validate/save/remove-with-confirm and Switches create/delete-with-confirm guardrails match prior Assets behavior; no regressions versus TC-020's behavioral contracts.
 
+## TC-027: Frame-Based Settings Capability Verification
+- **Related AC:** `AC-006` (Machines deletion policy, reconciled for frame-based navigation), `FR-113`
+- **Type:** Manual + automated coverage
+- **Related task:** `nav-frame-based` (Settings migration: on-demand `SettingsPage` hosting the `SettingsMachinesView` bound to `SettingsMachinesViewModel`)
+- **Steps:**
+  1. Launch the app and select `Settings` in the footer navigation.
+  2. Confirm the capability renders in the shell capability frame with the shell header showing the Settings title/description, and that the Machines deletion policy selector shows the currently persisted mode (status line reads `Current: <mode>`).
+  3. Change the selected policy and click `Save policy`; confirm the status line reads `Saved: <mode>` and the Save button is disabled while the save is in flight.
+  4. Navigate away to another capability and back to Settings; confirm the selector reflects the just-saved policy (persisted) and a fresh page/view model is used.
+  5. Restart the app and confirm the saved policy is still selected on entry.
+- **Expected:**
+  - Settings is created on route entry and torn down on leave; returning constructs a fresh `SettingsPage` with a fresh (transient) `SettingsMachinesViewModel` that reloads the current policy in its `Loaded` lifecycle.
+  - `MainWindow` owns only shell chrome/routing/header; the deletion-policy load/save logic lives entirely in `SettingsMachinesViewModel` (through `IMachinesCapabilityService`), not in `MainWindow` code-behind.
+  - The supported modes and persistence semantics match AC section 6 exactly; only the hosting surface changed. Settings currently exposes a single Machines subview (the interim `settings.general` placeholder was removed; broader Settings design tracked separately).
+
 ## Open Questions / TBDs
 - Whether to split this file into smoke tests vs milestone regression suites as the product grows.
 - Whether to add explicit pass/fail checklists for different Windows versions once compatibility targets are finalized.

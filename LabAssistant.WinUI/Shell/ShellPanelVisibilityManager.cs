@@ -5,20 +5,17 @@ namespace LabAssistant.WinUI.Shell;
 
 internal sealed class ShellPanelVisibilityManager
 {
-    private readonly FrameworkElement _settingsMachinesPanel;
     private readonly FrameworkElement _nonMachinesPlaceholderTextBlock;
     private readonly Action _applyRightPanelState;
     private readonly Action _applyTemplatesUiState;
     private readonly Action _applyCapabilityShellState;
 
     public ShellPanelVisibilityManager(
-        FrameworkElement settingsMachinesPanel,
         FrameworkElement nonMachinesPlaceholderTextBlock,
         Action applyRightPanelState,
         Action applyTemplatesUiState,
         Action applyCapabilityShellState)
     {
-        _settingsMachinesPanel = settingsMachinesPanel;
         _nonMachinesPlaceholderTextBlock = nonMachinesPlaceholderTextBlock;
         _applyRightPanelState = applyRightPanelState;
         _applyTemplatesUiState = applyTemplatesUiState;
@@ -41,7 +38,6 @@ internal sealed class ShellPanelVisibilityManager
 
         _applyRightPanelState();
         _applyTemplatesUiState();
-        _settingsMachinesPanel.Visibility = isSettingsMachinesActive ? Visibility.Visible : Visibility.Collapsed;
         _nonMachinesPlaceholderTextBlock.Visibility = isKnownCapabilityActive ? Visibility.Collapsed : Visibility.Visible;
         _applyCapabilityShellState();
     }

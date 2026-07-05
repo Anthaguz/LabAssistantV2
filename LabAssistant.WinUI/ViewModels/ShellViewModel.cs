@@ -17,7 +17,6 @@ public static class ShellRouteKeys
     public const string AssetsSwitches = "assets.switches";
     public const string DiagnosticsOverview = "diagnostics.overview";
     public const string DiagnosticsLogs = "diagnostics.logs";
-    public const string SettingsGeneral = "settings.general";
     public const string SettingsMachines = "settings.machines";
 }
 
@@ -84,8 +83,7 @@ public sealed class ShellViewModel
                 displayName: "Settings",
                 isFooter: true,
                 [
-                    new ShellSubview(ShellRouteKeys.SettingsMachines, "Machines", ["Save Policy"]),
-                    new ShellSubview(ShellRouteKeys.SettingsGeneral, "General", ["Apply"])
+                    new ShellSubview(ShellRouteKeys.SettingsMachines, "Machines", ["Save Policy"])
                 ])
         ];
 

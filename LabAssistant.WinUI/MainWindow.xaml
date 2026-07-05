@@ -212,42 +212,6 @@
                                             Visibility="Collapsed" />
                                     </Grid>
                                 </Border>
-                                <Border
-                                    x:Name="SettingsMachinesPanel"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Padding="12"
-                                    Background="{StaticResource ShellBackgroundBrush}"
-                                    BorderBrush="{StaticResource ShellBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Visibility="Collapsed">
-                                    <StackPanel Spacing="10">
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                            FontSize="16"
-                                            FontWeight="SemiBold"
-                                            Text="Machines Deletion Policy" />
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="Sets the default delete scope for Machines. Confirmation still shows effective scope before delete."
-                                            TextWrapping="Wrap" />
-                                        <ComboBox x:Name="MachinesDeletionPolicyComboBox" Width="420">
-                                            <ComboBoxItem Tag="AskEveryTime" Content="Ask every time (default)" />
-                                            <ComboBoxItem Tag="AlwaysDeleteDisks" Content="Always delete disks" />
-                                            <ComboBoxItem Tag="AlwaysDeleteDisksForLabAssistantProvisioned" Content="Always delete disks for LabAssistant-provisioned VMs" />
-                                            <ComboBoxItem Tag="AlwaysDeleteDisksForDifferencingOnly" Content="Always delete disks for differencing disks only" />
-                                        </ComboBox>
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <Button x:Name="SaveMachinesDeletionPolicyButton" Click="SaveMachinesDeletionPolicyButton_Click" Content="Save policy" />
-                                            <TextBlock
-                                                x:Name="MachinesDeletionPolicyStatusTextBlock"
-                                                VerticalAlignment="Center"
-                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                Text="Policy not loaded." />
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
                                 <TextBlock
                                     x:Name="NonMachinesPlaceholderTextBlock"
                                     Grid.Row="0"

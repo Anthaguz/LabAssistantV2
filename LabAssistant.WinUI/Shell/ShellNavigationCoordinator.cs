@@ -14,7 +14,6 @@ internal sealed class ShellNavigationCoordinator
     private readonly TextBlock _contentTitleTextBlock;
     private readonly TextBlock _contentDescriptionTextBlock;
     private readonly ShellPanelVisibilityManager _panelVisibilityManager;
-    private readonly Func<Task> _loadMachinesDeletionPolicyAsync;
     private readonly Action<string> _resetRightPanelForCapabilitySwitch;
     private readonly Frame _capabilityFrame;
     private readonly IReadOnlyDictionary<string, Type> _capabilityPageTypes;
@@ -35,7 +34,6 @@ internal sealed class ShellNavigationCoordinator
         TextBlock contentTitleTextBlock,
         TextBlock contentDescriptionTextBlock,
         ShellPanelVisibilityManager panelVisibilityManager,
-        Func<Task> loadMachinesDeletionPolicyAsync,
         Action<string> resetRightPanelForCapabilitySwitch,
         Frame capabilityFrame,
         IReadOnlyDictionary<string, Type> capabilityPageTypes,
@@ -48,7 +46,6 @@ internal sealed class ShellNavigationCoordinator
         _contentTitleTextBlock = contentTitleTextBlock;
         _contentDescriptionTextBlock = contentDescriptionTextBlock;
         _panelVisibilityManager = panelVisibilityManager;
-        _loadMachinesDeletionPolicyAsync = loadMachinesDeletionPolicyAsync;
         _resetRightPanelForCapabilitySwitch = resetRightPanelForCapabilitySwitch;
         _capabilityFrame = capabilityFrame;
         _capabilityPageTypes = capabilityPageTypes;
@@ -146,11 +143,6 @@ internal sealed class ShellNavigationCoordinator
     {
         ApplyHeaderAndPanels();
         ApplyFrameState();
-
-        if (IsSettingsMachinesActive)
-        {
-            _ = SafeFireAndForgetAsync(_loadMachinesDeletionPolicyAsync);
-        }
     }
 
     /// <summary>
@@ -290,17 +282,5 @@ internal sealed class ShellNavigationCoordinator
         }
 
         return $"Use {_activeCapability.DisplayName} to continue to {_activeSubview.DisplayName}.";
-    }
-
-    private async Task SafeFireAndForgetAsync(Func<Task> operation)
-    {
-        try
-        {
-            await operation();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[ShellNavigationCoordinator] Background operation failed: {ex.Message}");
-        }
     }
 }
