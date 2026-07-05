@@ -1,59 +1,100 @@
-using LabAssistant.WinUI.ViewModels.Deploy;
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Shell;
 
-internal sealed class ShellPanelStateManager
+/// <summary>
+/// Shell owner of the right panel (the progress/results/details surface). It owns visibility,
+/// width, compact fallback, and the user open/close toggle, and hosts whatever content the active
+/// capability page pushes through <see cref="IShellRightPanel"/>. The manager itself is
+/// capability-agnostic: it no longer knows about Deploy. A page sets content, title, and requests
+/// auto-open; the shell decides whether the panel is actually shown.
+/// </summary>
+internal sealed class ShellPanelStateManager : IShellRightPanel
 {
     public const double ShellRightPanelExpandedWidth = 380;
-    private const string DeployCapabilityKey = "deploy";
+    private const string DefaultTitle = "Details";
 
     private readonly FrameworkElement _insightsPanel;
     private readonly ColumnDefinition _shellRightPanelColumn;
     private readonly Button _insightsToggleButton;
-    private readonly Border _issueBadge;
-    private readonly TextBlock _issueBadgeTextBlock;
     private readonly TextBlock _rightPanelTitleTextBlock;
-    private readonly Border _rightPanelEmptyStateBorder;
-    private readonly Func<string> _getActiveCapabilityKey;
-    private readonly Func<bool> _isDeployOnTheFlyActive;
-    private readonly Func<bool> _isDeployFromTemplateActive;
-    private readonly Func<DeployCapabilityRuntime?> _getDeployCapabilityRuntime;
+    private readonly ContentControl _rightPanelContentHost;
     private readonly Func<double> _getRootLayoutWidth;
 
     private bool _isShellRightPanelOpen;
     private bool _isShellRightPanelInCompactFallback;
-    private bool _isDeployRightPanelAutoOpenSuppressed;
-    private string _shellRightPanelOwnerCapabilityKey = string.Empty;
+    private bool _isAutoOpenRequested;
+    private bool _isAutoOpenSuppressed;
+    private bool _isShown;
+    // Snapshot of the last state we told listeners about, so StateChanged fires on any real
+    // transition regardless of whether the compact-fallback field was already mutated by the caller
+    // (SetCompactFallback pre-writes it before calling ApplyRightPanelState).
+    private bool _lastNotifiedShown;
+    private bool _lastNotifiedUnavailable;
+    private string _title = DefaultTitle;
 
     public ShellPanelStateManager(
         FrameworkElement insightsPanel,
         ColumnDefinition shellRightPanelColumn,
         Button insightsToggleButton,
-        Border issueBadge,
-        TextBlock issueBadgeTextBlock,
         TextBlock rightPanelTitleTextBlock,
-        Border rightPanelEmptyStateBorder,
-        Func<string> getActiveCapabilityKey,
-        Func<bool> isDeployOnTheFlyActive,
-        Func<bool> isDeployFromTemplateActive,
-        Func<DeployCapabilityRuntime?> getDeployCapabilityRuntime,
+        ContentControl rightPanelContentHost,
         Func<double> getRootLayoutWidth)
     {
         _insightsPanel = insightsPanel;
         _shellRightPanelColumn = shellRightPanelColumn;
         _insightsToggleButton = insightsToggleButton;
-        _issueBadge = issueBadge;
-        _issueBadgeTextBlock = issueBadgeTextBlock;
         _rightPanelTitleTextBlock = rightPanelTitleTextBlock;
-        _rightPanelEmptyStateBorder = rightPanelEmptyStateBorder;
-        _getActiveCapabilityKey = getActiveCapabilityKey;
-        _isDeployOnTheFlyActive = isDeployOnTheFlyActive;
-        _isDeployFromTemplateActive = isDeployFromTemplateActive;
-        _getDeployCapabilityRuntime = getDeployCapabilityRuntime;
+        _rightPanelContentHost = rightPanelContentHost;
         _getRootLayoutWidth = getRootLayoutWidth;
     }
+
+    /// <summary>True when the active page currently owns right-panel content.</summary>
+    private bool HasOwner => _rightPanelContentHost.Content is not null;
+
+    // IShellRightPanel
+
+    public void SetContent(UIElement? content)
+    {
+        if (ReferenceEquals(_rightPanelContentHost.Content, content))
+        {
+            return;
+        }
+
+        _rightPanelContentHost.Content = content;
+        if (content is null)
+        {
+            // Clearing the owner ends any run-scoped panel state so the next owner starts clean.
+            _isShellRightPanelOpen = false;
+            _isAutoOpenRequested = false;
+            _isAutoOpenSuppressed = false;
+        }
+
+        ApplyRightPanelState();
+    }
+
+    public void SetTitle(string? title)
+    {
+        _title = string.IsNullOrWhiteSpace(title) ? DefaultTitle : title!;
+        _rightPanelTitleTextBlock.Text = _title;
+    }
+
+    public void RequestAutoOpen()
+    {
+        _isAutoOpenRequested = true;
+        ApplyRightPanelState();
+    }
+
+    public void Toggle() => TogglePanel();
+
+    public bool IsShown => _isShown;
+
+    public bool IsUnavailable => _isShellRightPanelInCompactFallback;
+
+    /// <summary>Raised after <see cref="ApplyRightPanelState"/> changes panel show-state.</summary>
+    public event Action? StateChanged;
 
     public void ApplyRightPanelState()
     {
@@ -62,60 +103,43 @@ internal sealed class ShellPanelStateManager
             _isShellRightPanelInCompactFallback = _getRootLayoutWidth() < ShellLayoutManager.ShellRightPanelCompactThreshold;
         }
 
-        _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(_getActiveCapabilityKey());
         if (_isShellRightPanelInCompactFallback && _isShellRightPanelOpen)
         {
             _isShellRightPanelOpen = false;
         }
 
-        var deployCapabilityRuntime = _getDeployCapabilityRuntime();
-        if (deployCapabilityRuntime is null)
+        // Auto-open is honored only while a request stands, an owner is present, the user has not
+        // suppressed it for this run, and we are not in compact fallback.
+        if (!_isAutoOpenRequested || !HasOwner)
         {
-            _insightsPanel.Visibility = Visibility.Collapsed;
-            _shellRightPanelColumn.Width = new GridLength(0);
-            _insightsToggleButton.IsEnabled = false;
-            _insightsToggleButton.Opacity = 0.45;
-            ToolTipService.SetToolTip(_insightsToggleButton, "Toggle progress and results panel");
-            _rightPanelTitleTextBlock.Text = "Deploy Progress / Results";
-            _rightPanelEmptyStateBorder.Visibility = Visibility.Collapsed;
-            _issueBadge.Visibility = Visibility.Collapsed;
-            _issueBadgeTextBlock.Text = string.Empty;
-            return;
+            _isAutoOpenSuppressed = false;
         }
 
-        var shouldAutoOpenDeployRightPanel = CanActiveCapabilityOwnRightPanel() && deployCapabilityRuntime.ShouldAutoOpenRightPanel();
-        if (!shouldAutoOpenDeployRightPanel)
-        {
-            _isDeployRightPanelAutoOpenSuppressed = false;
-        }
-
-        if (shouldAutoOpenDeployRightPanel && !_isDeployRightPanelAutoOpenSuppressed)
+        if (_isAutoOpenRequested && HasOwner && !_isAutoOpenSuppressed && !_isShellRightPanelInCompactFallback)
         {
             _isShellRightPanelOpen = true;
         }
 
-        var hasOwner = CanActiveCapabilityOwnRightPanel();
-        var showPanel = hasOwner && _isShellRightPanelOpen && !_isShellRightPanelInCompactFallback;
+        var showPanel = HasOwner && _isShellRightPanelOpen && !_isShellRightPanelInCompactFallback;
         _insightsPanel.Visibility = showPanel ? Visibility.Visible : Visibility.Collapsed;
         _shellRightPanelColumn.Width = showPanel ? new GridLength(ShellRightPanelExpandedWidth) : new GridLength(0);
-        _insightsToggleButton.IsEnabled = hasOwner && !_isShellRightPanelInCompactFallback;
+        _insightsToggleButton.IsEnabled = HasOwner && !_isShellRightPanelInCompactFallback;
         _insightsToggleButton.Opacity = _insightsToggleButton.IsEnabled ? 1.0 : 0.45;
         ToolTipService.SetToolTip(_insightsToggleButton, "Toggle progress and results panel");
-        _rightPanelTitleTextBlock.Text = deployCapabilityRuntime.GetRightPanelTitleText();
-        _rightPanelEmptyStateBorder.Visibility = deployCapabilityRuntime.ShouldShowRightPanelEmptyState(showPanel)
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        deployCapabilityRuntime.ApplyRightPanelState(showPanel, _isShellRightPanelInCompactFallback);
-        _issueBadge.Visibility = Visibility.Collapsed;
-        _issueBadgeTextBlock.Text = string.Empty;
+        _rightPanelTitleTextBlock.Text = _title;
+        _isShown = showPanel;
+
+        if (_lastNotifiedShown != showPanel || _lastNotifiedUnavailable != _isShellRightPanelInCompactFallback)
+        {
+            _lastNotifiedShown = showPanel;
+            _lastNotifiedUnavailable = _isShellRightPanelInCompactFallback;
+            StateChanged?.Invoke();
+        }
     }
 
     public void TogglePanel()
     {
-        _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(_getActiveCapabilityKey());
-        if (_isShellRightPanelInCompactFallback ||
-            !CanActiveCapabilityOwnRightPanel() ||
-            (!_isDeployOnTheFlyActive() && !_isDeployFromTemplateActive()))
+        if (_isShellRightPanelInCompactFallback || !HasOwner)
         {
             return;
         }
@@ -147,32 +171,26 @@ internal sealed class ShellPanelStateManager
         ApplyRightPanelState();
     }
 
+    /// <summary>
+    /// Clears all right-panel state when the shell switches capabilities. The outgoing page is torn
+    /// down by the frame, so its content, title, and run-scoped open/auto-open flags must not leak
+    /// into the incoming capability.
+    /// </summary>
     public void ResetForCapabilitySwitch(string incomingCapabilityKey)
     {
-        _shellRightPanelOwnerCapabilityKey = ResolveRightPanelOwnerCapabilityKey(incomingCapabilityKey);
+        _ = incomingCapabilityKey;
         _isShellRightPanelOpen = false;
-        _isDeployRightPanelAutoOpenSuppressed = false;
-        _getDeployCapabilityRuntime()?.ResetRightPanelBehavior();
-    }
-
-    private bool CanActiveCapabilityOwnRightPanel()
-    {
-        return string.Equals(_shellRightPanelOwnerCapabilityKey, DeployCapabilityKey, StringComparison.Ordinal);
-    }
-
-    private string ResolveRightPanelOwnerCapabilityKey(string capabilityKey)
-    {
-        return string.Equals(capabilityKey, DeployCapabilityKey, StringComparison.Ordinal)
-            ? DeployCapabilityKey
-            : string.Empty;
+        _isAutoOpenRequested = false;
+        _isAutoOpenSuppressed = false;
+        _title = DefaultTitle;
+        _rightPanelContentHost.Content = null;
     }
 
     private void SetRightPanelOpenFromUserToggle(bool isOpen)
     {
         _isShellRightPanelOpen = isOpen;
-        _isDeployRightPanelAutoOpenSuppressed = !isOpen &&
-            CanActiveCapabilityOwnRightPanel() &&
-            _getDeployCapabilityRuntime()?.ShouldAutoOpenRightPanel() == true;
+        // A user close during a standing auto-open request suppresses further auto-open for this run.
+        _isAutoOpenSuppressed = !isOpen && HasOwner && _isAutoOpenRequested;
         ApplyRightPanelState();
     }
 }

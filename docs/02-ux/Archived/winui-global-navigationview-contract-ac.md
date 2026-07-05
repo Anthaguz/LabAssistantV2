@@ -67,7 +67,7 @@ Canonical route key format is:
 
 Examples:
 - `machines.overview`
-- `deploy.on_the_fly`
+- `deploy.quick_deploy`
 - `templates.library`
 - `assets.disks`
 

@@ -99,8 +99,8 @@ This is required for safe UI migration without behavior loss.
 **Intent:** Configure and run provisioning workflows (single VM or lab), with readiness checks, execution tracking, cancellation, cleanup, and outcomes.
 
 **Capabilities**
-- Configure on-the-fly VM deployment
-- Configure on-the-fly multi-VM/lab deployment
+- Configure Quick Deploy VM deployment
+- Configure Quick Deploy multi-VM/lab deployment
 - Deploy from template
 - Save current deployment config as template
 - Readiness/preflight checks (quick/full)
@@ -259,8 +259,8 @@ This groups concrete user operations into the future taxonomy.
 - Open advanced Hyper-V configuration UI (if feasible)
 
 ### Deploy
-- Deploy VM on-the-fly
-- Deploy multi-VM lab on-the-fly
+- Deploy VM with Quick Deploy
+- Deploy multi-VM lab with Quick Deploy
 - Deploy VM from template
 - Deploy lab from template
 - Save deployment config as template

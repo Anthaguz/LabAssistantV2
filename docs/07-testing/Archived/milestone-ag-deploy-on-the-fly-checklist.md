@@ -1,9 +1,9 @@
-# Milestone AG - Deploy On-the-Fly Verification Checklist
+# Milestone AG - Deploy Quick Deploy Verification Checklist
 
 > Historical note: this milestone doc is retained for decision or verification history only and is not authoritative for new work. Current authority lives in AGENTS.md, SRS, Acceptance Criteria, and the canonical docs named in docs/00-overview/authoritative-doc-map.md.
 
 
-**Purpose:** Manual closure checklist for Milestone AG (`#332`-`#336`) covering WinUI Deploy on-the-fly routing, readiness/gating, correction actions, execution behavior, and compact results UX.
+**Purpose:** Manual closure checklist for Milestone AG (`#332`-`#336`) covering WinUI Deploy Quick Deploy routing, readiness/gating, correction actions, execution behavior, and compact results UX.
 
 **Related contract references**
 - `docs/01-requirements/srs.md` (`FR-091`..`FR-094`)
@@ -16,7 +16,7 @@
 ## 1) Route and Surface Sanity
 
 - [ ] Launch WinUI app and navigate to Deploy capability.
-- [ ] Confirm on-the-fly route is reachable (`deploy.on_the_fly`).
+- [ ] Confirm Quick Deploy route is reachable (`deploy.quick_deploy`).
 - [ ] Confirm surface shows three functional regions:
   - VM entries list
   - VM properties editor
@@ -24,7 +24,7 @@
 - [ ] Confirm from-template deploy route remains reachable and unaffected.
 
 **Expected**
-- Deploy on-the-fly surface loads with no crashes or empty-host regressions.
+- Deploy Quick Deploy surface loads with no crashes or empty-host regressions.
 - Global nav behavior remains stable while switching between Deploy subviews.
 
 ---
@@ -63,7 +63,7 @@
 
 - [ ] Use **Resolve Suggestions** and confirm readiness state updates after applying suggestions.
 - [ ] Use **Open in Templates Editor** and confirm handoff to Templates editor with context loaded.
-- [ ] Return to Deploy on-the-fly and re-evaluate readiness.
+- [ ] Return to Deploy Quick Deploy and re-evaluate readiness.
 
 **Expected**
 - Correction actions are wired and visible.
@@ -103,7 +103,7 @@
 ## 7) Layout / Overflow / Scroll Ownership
 
 - [ ] Verify behavior at compact, normal, and wide window sizes.
-- [ ] Confirm no unbounded vertical growth in Deploy on-the-fly surface.
+- [ ] Confirm no unbounded vertical growth in Deploy Quick Deploy surface.
 - [ ] Confirm VM editor scroll ownership is local to the properties panel.
 - [ ] Confirm results pane remains usable at narrow widths (no hidden primary actions).
 

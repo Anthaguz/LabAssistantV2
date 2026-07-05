@@ -47,7 +47,7 @@
 
 ## Relationships
 - `LabTemplate` -> contains -> `VmTemplate` entries (`vmTemplates[]`)
-- Deployment operation -> uses -> `LabTemplate` or on-the-fly VM configuration
+- Deployment operation -> uses -> `LabTemplate` or Quick Deploy VM configuration
 - `VmTemplate` -> references -> VHDX catalog items (`vhdxId`) or fallback base VHD path (`vhdPath`)
 - Deployment operation -> produces -> `DeploymentReadinessReport` (quick/full preflight) before runtime execution
 - Deployment operation -> produces -> cleanup results and deployment outcome summary

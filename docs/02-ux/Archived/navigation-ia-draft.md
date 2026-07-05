@@ -159,8 +159,8 @@ Behavioral contract source:
 For Deploy extraction planning after AF, AG, AL, and the AM shared-capability refinement work:
 - `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact/drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime
 - shared Deploy composition must converge behind a Deploy-local composition owner rather than terminating in `MainWindow`
-- the Deploy-local composition owner is responsible for shared Deploy-local composition, shared route activation handling, shared workspace lifetime participation, and shared local interaction boundaries across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
-- Deploy remains an Overview-first capability: `deploy.overview` is the route-entry surface, `deploy.on_the_fly` remains the Quick Deploy workflow, and `deploy.from_template` remains a review/remediation/deploy workflow rather than a duplicate Quick Deploy editor
+- the Deploy-local composition owner is responsible for shared Deploy-local composition, shared route activation handling, shared workspace lifetime participation, and shared local interaction boundaries across `deploy.overview`, `deploy.quick_deploy`, and `deploy.from_template`
+- Deploy remains an Overview-first capability: `deploy.overview` is the route-entry surface, `deploy.quick_deploy` remains the Quick Deploy workflow, and `deploy.from_template` remains a review/remediation/deploy workflow rather than a duplicate Quick Deploy editor
 - capability-specific host interfaces implemented by `MainWindow` are temporary bridges only, and Deploy views must not depend on or receive `MainWindow` directly
 
 Behavioral contract source:
@@ -170,7 +170,7 @@ Behavioral contract source:
 
 For Deploy Overview extraction planning after the shared Deploy cleanup target:
 - `Deploy Overview` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
-- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.quick_deploy`, and `deploy.from_template`
 - an Overview-local seam is the target home for Overview-specific state, Overview-local navigation coordination, Overview-local interaction boundaries, and Overview-specific refresh or reconcile behavior on `deploy.overview`
 - `deploy.overview` remains the route-entry and index surface for `Deploy` and continues to use route-activation refresh within the existing long-lived Deploy workspace rather than per-navigation recreation
 - Overview does not become the owner of Quick Deploy-specific or From Template-specific workflow concerns, and Overview views must not depend on or receive `MainWindow` directly
@@ -182,7 +182,7 @@ Behavioral contract source:
 
 For Deploy From Template extraction planning after the shared Deploy cleanup target and Deploy Overview cleanup target:
 - `Deploy From Template` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
-- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.quick_deploy`, and `deploy.from_template`
 - a From Template-local seam is the target home for From Template-specific state, orchestration, interaction boundaries, composition or host cleanup, and refresh or reconcile behavior on `deploy.from_template`
 - `deploy.from_template` remains the distinct template-driven review/remediation/deploy surface inside the long-lived Deploy workspace and continues to use route-activation refresh within the existing workspace rather than per-navigation recreation
 - From Template does not become the owner of Quick Deploy-specific or Deploy Overview-specific workflow concerns, and From Template views must not depend on or receive `MainWindow` directly
@@ -194,9 +194,9 @@ Behavioral contract source:
 
 For Deploy Quick Deploy extraction planning after the shared Deploy cleanup target, Deploy Overview cleanup target, and Deploy From Template cleanup target:
 - `Deploy Quick Deploy` remains under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface
-- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
-- a Quick Deploy-local seam is the target home for Quick Deploy-specific state, orchestration, interaction boundaries, composition or host cleanup, and refresh or reconcile behavior on `deploy.on_the_fly`
-- `deploy.on_the_fly` remains the distinct on-the-fly deploy workflow surface inside the long-lived Deploy workspace and continues to use route-activation refresh within the existing workspace rather than per-navigation recreation
+- shared Deploy composition remains responsible only for shared capability-level composition concerns, including shared route activation handoff and long-lived workspace participation across `deploy.overview`, `deploy.quick_deploy`, and `deploy.from_template`
+- a Quick Deploy-local seam is the target home for Quick Deploy-specific state, orchestration, interaction boundaries, composition or host cleanup, and refresh or reconcile behavior on `deploy.quick_deploy`
+- `deploy.quick_deploy` remains the distinct Quick Deploy workflow surface inside the long-lived Deploy workspace and continues to use route-activation refresh within the existing workspace rather than per-navigation recreation
 - Quick Deploy does not become the owner of From Template-specific or Deploy Overview-specific workflow concerns, and Quick Deploy views must not depend on or receive `MainWindow` directly
 
 Behavioral contract source:
@@ -364,11 +364,11 @@ Examples:
 
 ### AF contract note
 - AF migration slice is `from-template` first with canonical route `deploy.from_template`.
-- `deploy.on_the_fly` migration is explicitly deferred in AF scope.
+- Quick Deploy migration is explicitly deferred in AF scope.
 - Deploy readiness/review surface must expose correction actions when AE compatibility issues block deploy.
 
 ### AG contract note
-- AG migration slice converges the `deploy.on_the_fly` workflow with canonical route `deploy.on_the_fly`.
+- AG migration slice converges the Quick Deploy workflow with canonical route `deploy.quick_deploy`.
 - AG reuses AF readiness/correction interaction patterns where applicable (blocking vs warning classification + explicit correction affordances).
 - AG keeps compact-first results visibility parity (sticky summary, concise rows, expandable details, collapsed global issues by default).
 

@@ -1,0 +1,20 @@
+<Page
+    x:Class="LabAssistant.WinUI.Views.Deploy.DeployPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:deployViews="using:LabAssistant.WinUI.Views.Deploy">
+    <TabView
+        x:Name="SubviewTabView"
+        IsAddTabButtonVisible="False"
+        SelectionChanged="SubviewTabView_SelectionChanged">
+        <TabViewItem x:Name="OverviewTabViewItem" Header="Overview" IsClosable="False">
+            <deployViews:DeployOverviewView x:Name="OverviewViewHost" />
+        </TabViewItem>
+        <TabViewItem x:Name="QuickDeployTabViewItem" Header="Quick Deploy" IsClosable="False">
+            <deployViews:DeployOnTheFlyView x:Name="QuickDeployViewHost" />
+        </TabViewItem>
+        <TabViewItem x:Name="FromTemplateTabViewItem" Header="From Template" IsClosable="False">
+            <deployViews:DeployFromTemplateView x:Name="FromTemplateViewHost" />
+        </TabViewItem>
+    </TabView>
+</Page>

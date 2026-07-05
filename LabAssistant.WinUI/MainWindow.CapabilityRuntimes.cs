@@ -35,7 +35,7 @@ public sealed partial class MainWindow
             () => runtime?.ApplyUiState(),
             (document, statusText) => runtime?.ShowEditorDocumentAsync(document, statusText) ?? Task.CompletedTask,
             statusText => runtime?.SetEditorStatus(statusText),
-            items => _deployCapabilityRuntime?.ReconcileTemplateSelection(items));
+            _ => { });
         var editorComposition = CreateTemplatesEditorWorkspaceComposition(
             () => runtime?.IsLoading ?? false,
             isLoading => runtime?.SetLoading(isLoading),
@@ -118,7 +118,7 @@ public sealed partial class MainWindow
             loadAvailableVmSwitchesAsync,
             loadAvailableVmSwitchInfoAsync,
             loadVhdxCatalogOptionsAsync,
-            () => _deployCapabilityRuntime?.RefreshTemplatesLoadingState());
+            () => { });
         return runtime;
     }
 
@@ -245,124 +245,6 @@ public sealed partial class MainWindow
             () => IsTemplatesLibraryActive,
             () => IsTemplatesEditorActive,
             () => IsTemplatesBuilderActive);
-    }
-
-    private DeployCapabilityRuntime CreateDeployCapabilityRuntime()
-    {
-        var shellBridge = CreateDeployCapabilityShellBridge();
-        var templatesShellAdapter = CreateDeployTemplatesShellAdapter();
-        var deploymentPreflightService = App.Services.GetRequiredService<IDeploymentPreflightService>();
-        var deploymentCoordinator = App.Services.GetRequiredService<IDeploymentCoordinator>();
-        var deploymentOutcomeSummaryBuilder = App.Services.GetRequiredService<IDeploymentOutcomeSummaryBuilder>();
-        var settingsStore = App.Services.GetRequiredService<IAppSettingsStore>();
-        var localCredentialSlotStore = App.Services.GetRequiredService<ILocalCredentialSlotStore>();
-        var vhdxCatalogStore = App.Services.GetRequiredService<IVhdxCatalogStore>();
-        var v2PlanningCapabilityService = App.Services.GetRequiredService<IV2PlanningCapabilityService>();
-        var v2RuntimeCapabilityService = App.Services.GetRequiredService<IV2RuntimeCapabilityService>();
-        var hyperVMachineAdminService = App.Services.GetRequiredService<IHyperVMachineAdminService>();
-
-        var referenceDataService = new DeployReferenceDataService(
-            settingsStore,
-            vhdxCatalogStore,
-            _machinesCapabilityService,
-            _templatesCapabilityService,
-            hyperVMachineAdminService);
-        var resolveSuggestionsService = new DeployResolveSuggestionsService();
-        var templateEditorLauncher = new DeployTemplateEditorLauncher(templatesShellAdapter);
-
-        var quickDeployLane = new DeployOnTheFlyWorkspaceOwner(
-            DeployOnTheFlyViewHost,
-            DeployOnTheFlyRightPanelViewHost,
-            referenceDataService,
-            resolveSuggestionsService,
-            templateEditorLauncher,
-            new DeployOnTheFlyWorkspaceShellBridge(
-                shellBridge.DispatcherQueue,
-                () => shellBridge.XamlRoot,
-                shellBridge.RequestResultsPanelToggle,
-                shellBridge.RefreshResultsPanelState),
-            deploymentPreflightService,
-            deploymentCoordinator,
-            deploymentOutcomeSummaryBuilder);
-
-        DeployWorkspaceComposition? workspaceComposition = null;
-        Action refreshSharedUiState = () => workspaceComposition?.RefreshSharedUiState();
-
-        var fromTemplateLane = new DeployFromTemplateWorkspaceComposition(
-            DeployFromTemplateViewHost,
-            DeployFromTemplateRightPanelViewHost,
-            templatesShellAdapter.ItemsSource,
-            new DeployFromTemplateWorkspaceHost(
-                referenceDataService,
-                resolveSuggestionsService,
-                templatesShellAdapter,
-                v2PlanningCapabilityService,
-                v2RuntimeCapabilityService,
-                localCredentialSlotStore,
-                refreshSharedUiState,
-                shellBridge.RefreshResultsPanelState,
-                (deploymentContext, mode) => deploymentPreflightService.RunAsync(deploymentContext, mode),
-                async deploymentContext =>
-                {
-                    await deploymentCoordinator.DeployAllAsync(deploymentContext);
-                    return deploymentOutcomeSummaryBuilder.Build(deploymentContext);
-                },
-                shellBridge.AttachProgressCallbacks,
-                shellBridge.RequestResultsPanelToggle));
-
-        workspaceComposition = new DeployWorkspaceComposition(
-            DeployLocalNavigationPanel,
-            DeployOverviewViewHost,
-            quickDeployLane,
-            DeploySubviewTabView,
-            DeployOverviewTabViewItem,
-            DeployQuickDeployTabViewItem,
-            DeployFromTemplateTabViewItem,
-            () => new DeployWorkspaceUiState(
-                QuickDeployDraftCount: quickDeployLane.DraftCount,
-                IsLoadingTemplates: fromTemplateLane.IsLoadingTemplates,
-                AvailableTemplateCount: templatesShellAdapter.GetLibraryItems().Count),
-            fromTemplateLane,
-            new DeployWorkspaceShellBridge(
-                () => shellBridge.IsDeployCapabilityActive,
-                () => shellBridge.IsDeployOverviewActive,
-                () => shellBridge.IsDeployOnTheFlyActive,
-                () => shellBridge.IsDeployFromTemplateActive,
-                shellBridge.NavigateToRoute));
-
-        var resultsPanelCoordinator = new DeployResultsPanelCoordinator(
-            quickDeployLane,
-            fromTemplateLane,
-            () => shellBridge.IsDeployOverviewActive,
-            () => shellBridge.IsDeployOnTheFlyActive,
-            () => shellBridge.IsDeployFromTemplateActive);
-
-        return new DeployCapabilityRuntime(shellBridge, fromTemplateLane, workspaceComposition, resultsPanelCoordinator);
-    }
-
-    private DeployCapabilityShellBridge CreateDeployCapabilityShellBridge()
-    {
-        return new DeployCapabilityShellBridge(
-            DispatcherQueue,
-            () => RootLayout.XamlRoot,
-            () => IsDeployCapabilityActive,
-            () => IsDeployOverviewActive,
-            () => IsDeployOnTheFlyActive,
-            () => IsDeployFromTemplateActive,
-            NavigateToRoute,
-            RequestDeployResultsPanelToggle,
-            ApplyRightPanelState);
-    }
-
-    private DeployTemplatesShellAdapter CreateDeployTemplatesShellAdapter()
-    {
-        return new DeployTemplatesShellAdapter(
-            _templatesCapabilityRuntime.LibraryItems,
-            () => _templatesCapabilityRuntime.IsLoading,
-            () => _templatesCapabilityRuntime.LibraryItems.ToList(),
-            forceRefresh => _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh),
-            filePath => _templatesCapabilityService.LoadForEditorAsync(filePath),
-            (document, statusText) => _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText));
     }
 
     private void SetInitialSize(int width, int height)

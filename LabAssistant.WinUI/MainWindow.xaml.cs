@@ -34,7 +34,6 @@ public sealed partial class MainWindow : Window
     private readonly ShellDialogService _dialogService;
     private readonly ShellKeyboardHandler _keyboardHandler;
     private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
-    private readonly DeployCapabilityRuntime _deployCapabilityRuntime;
 
     public MainWindow()
     {
@@ -61,14 +60,8 @@ public sealed partial class MainWindow : Window
             InsightsPanel,
             ShellRightPanelColumn,
             InsightsToggleButton,
-            IssueBadge,
-            IssueBadgeTextBlock,
             RightPanelTitleTextBlock,
-            RightPanelEmptyStateBorder,
-            () => navigationCoordinator?.ActiveCapabilityKey ?? string.Empty,
-            () => IsDeployOnTheFlyActive,
-            () => IsDeployFromTemplateActive,
-            () => _deployCapabilityRuntime,
+            RightPanelContentHost,
             () => RootLayout.ActualWidth);
         var panelVisibilityManager = new ShellPanelVisibilityManager(
             NonMachinesPlaceholderTextBlock,
@@ -80,6 +73,7 @@ public sealed partial class MainWindow : Window
             ["machines"] = typeof(Views.Machines.MachinesPage),
             ["assets"] = typeof(Views.Assets.AssetsPage),
             ["diagnostics"] = typeof(Views.Diagnostics.DiagnosticsPage),
+            ["deploy"] = typeof(Views.Deploy.DeployPage),
             ["settings"] = typeof(Views.Settings.SettingsPage)
         };
         _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
@@ -94,10 +88,14 @@ public sealed partial class MainWindow : Window
             CapabilityFrame,
             capabilityPageTypes,
             typeof(Views.Shell.ShellBlankPage));
-        _navigationCoordinator.SetShellHost(new ShellHost(_navigationCoordinator, () => RootLayout.XamlRoot, _dialogService));
+        _navigationCoordinator.SetShellHost(new ShellHost(
+            _navigationCoordinator,
+            () => RootLayout.XamlRoot,
+            _dialogService,
+            _shellPanelStateManager,
+            (document, statusText) => _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText)));
 
         _templatesCapabilityRuntime = templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
-        _deployCapabilityRuntime = CreateDeployCapabilityRuntime();
 
         ConfigureShellIcons();
         _navigationCoordinator.ConfigureNavigationView();
@@ -128,10 +126,6 @@ public sealed partial class MainWindow : Window
         ApplyState();
     }
 
-    private bool IsDeployOverviewActive => _navigationCoordinator.IsDeployOverviewActive;
-    private bool IsDeployFromTemplateActive => _navigationCoordinator.IsDeployFromTemplateActive;
-    private bool IsDeployOnTheFlyActive => _navigationCoordinator.IsDeployOnTheFlyActive;
-    private bool IsDeployCapabilityActive => _navigationCoordinator.IsDeployCapabilityActive;
     private bool IsTemplatesLibraryActive => _navigationCoordinator.IsTemplatesLibraryActive;
     private bool IsTemplatesEditorActive => _navigationCoordinator.IsTemplatesEditorActive;
     private bool IsTemplatesBuilderActive => _navigationCoordinator.IsTemplatesBuilderActive;
@@ -147,14 +141,11 @@ public sealed partial class MainWindow : Window
 
     private void ApplyCapabilityShellState()
     {
-        _deployCapabilityRuntime.ApplyShellState();
         _templatesCapabilityRuntime.ApplyShellState();
     }
 
     private void ResetRightPanelForCapabilitySwitch(string incomingCapabilityKey) =>
         _shellPanelStateManager.ResetForCapabilitySwitch(incomingCapabilityKey);
-
-    private void RequestDeployResultsPanelToggle() => _shellPanelStateManager.TogglePanel();
 
     private void NavigateToRoute(string routeKey) => _navigationCoordinator.NavigateToRoute(routeKey);
 

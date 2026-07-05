@@ -49,7 +49,7 @@ This checklist complements automated tests by validating real WinUI interaction 
 - Verify subview selector is shown inside workspace (not in global rail/top bar).
 
 ### B2. Capability/subview context transitions
-- Move to `Deploy`, switch between `On-the-fly` and `From Template`.
+- Move to `Deploy`, switch between `Quick Deploy` and `From Template`.
 - Move away to another capability, then back to `Deploy`.
 - Verify:
   - capability switch loads that capability default subview

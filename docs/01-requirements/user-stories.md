@@ -430,11 +430,11 @@
 
 ---
 
-## Epic D — Deployment (On-the-fly + From Template)
+## Epic D - Deployment (Quick Deploy + From Template)
 
 ---
 
-## Story US-030: Deploy a Single VM On-the-Fly
+## Story US-030: Deploy a Single VM with Quick Deploy
 **As a** support engineer  
 **I want** to deploy a single VM without creating a template  
 **So that** I can quickly reproduce an issue with minimal setup time
@@ -467,9 +467,9 @@
 
 ---
 
-## Story US-031: Deploy Multiple VMs On-the-Fly
+## Story US-031: Deploy Multiple VMs with Quick Deploy
 **As a** senior engineer  
-**I want** to deploy multiple VMs configured on-the-fly  
+**I want** to deploy multiple VMs configured inline via Quick Deploy  
 **So that** I can quickly spin up ad-hoc scenarios without authoring a template first
 
 **Links**
@@ -509,7 +509,7 @@
 
 ---
 
-## Story US-033: Save On-the-Fly Configuration as a Template
+## Story US-033: Save Quick Deploy Configuration as a Template
 **As a** engineer  
 **I want** to save an ad-hoc configuration as a VM template or lab template  
 **So that** I can reuse it later and share it
