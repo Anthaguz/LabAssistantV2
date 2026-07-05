@@ -107,10 +107,10 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 
 ### 3.2 Deployment
 
-- **FR-020:** The system shall allow users to deploy a single VM with configuration selected on-the-fly (without requiring a pre-existing template).
+- **FR-020:** The system shall allow users to deploy a single VM with configuration selected inline via Quick Deploy (without requiring a pre-existing template).
   - **Priority:** P0
 
-- **FR-021:** The system shall allow users to deploy multiple VMs configured on-the-fly.
+- **FR-021:** The system shall allow users to deploy multiple VMs configured inline via Quick Deploy.
   - **Priority:** P1
 
 - **FR-022:** The system shall allow deployment of labs from a saved lab template.
@@ -138,7 +138,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
 - **FR-028:** The system shall handle partial deployment failures with clear recovery guidance.
   - **Priority:** P1
 
-- **FR-029:** If a user deploys a VM or multi-VM configuration on-the-fly, the system shall allow saving that configuration as a template.
+- **FR-029:** If a user deploys a VM or multi-VM configuration via Quick Deploy, the system shall allow saving that configuration as a template.
   - **Priority:** P1
 
 - **FR-043:** The system shall perform a deployment readiness (preflight) evaluation before starting Hyper-V deployment actions.
@@ -404,7 +404,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** Effective identity precedence is `vhdxId` then `vhdxSignature` then `vhdPath`; unresolved conflicts/ambiguities block save until user selects a resolving catalog entry, and UI exposes actionable warning text.
   - **Priority:** P1
 
-- **FR-087:** WinUI Deploy migration Milestone AF shall implement `from-template` workflow as the first Deploy slice and explicitly defer `on-the-fly` migration.
+- **FR-087:** WinUI Deploy migration Milestone AF shall implement `from-template` workflow as the first Deploy slice and explicitly defer Quick Deploy migration.
   - **Acceptance details:** WinUI Deploy parent/child routing remains canonical with deterministic route key `deploy.from_template` for AF scope.
   - **Priority:** P1
 
@@ -420,19 +420,19 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Acceptance details:** sticky status/progress is always visible; per-VM rows are concise by default with expandable details; global warnings/errors are collapsed by default while remaining discoverable.
   - **Priority:** P1
 
-- **FR-091:** WinUI Deploy migration Milestone AG shall implement `on-the-fly` workflow convergence while leaving WPF Deploy untouched.
-  - **Acceptance details:** WinUI Deploy route model includes deterministic `deploy.on_the_fly` subview behavior for AG scope and preserves AF `deploy.from_template` behavior without contract drift.
+- **FR-091:** WinUI Deploy migration Milestone AG shall implement Quick Deploy workflow convergence while leaving WPF Deploy untouched.
+  - **Acceptance details:** WinUI Deploy route model includes deterministic `deploy.quick_deploy` subview behavior for AG scope and preserves AF `deploy.from_template` behavior without contract drift.
   - **Priority:** P1
 
-- **FR-092:** WinUI Deploy `on-the-fly` readiness shall classify input validation and environment checks as blocking or warning before start.
+- **FR-092:** WinUI Deploy Quick Deploy readiness shall classify input validation and environment checks as blocking or warning before start.
   - **Acceptance details:** Required unresolved inputs (for example missing required disk identity, invalid VM entry state, or invalid required switch selection) are blocking; Quick Deploy may keep zero switch rows when networking is optional, but if one or more switch rows are present each assigned switch must be valid and unique; non-critical mapping issues are warning-only with actionable guidance.
   - **Priority:** P1
 
-- **FR-093:** WinUI Deploy `on-the-fly` shall provide correction affordances for blocking readiness issues and gate execution until blocking issues are resolved.
+- **FR-093:** WinUI Deploy Quick Deploy shall provide correction affordances for blocking readiness issues and gate execution until blocking issues are resolved.
   - **Acceptance details:** readiness output provides explicit correction actions, should surface issues at field, group, or VM-row granularity where that improves fixability, and once unblocked deploy execution creates one NIC per assigned switch in listed order while preserving the first-switch compatibility/default rule; Quick Deploy draft editing remains live draft state rather than a per-VM apply workflow, and the handoff for saving the current draft into template authoring should remain explicitly labeled as a save-to-template action rather than an ambiguous editor-launch label.
   - **Priority:** P1
 
-- **FR-094:** WinUI Deploy `on-the-fly` results UX shall follow compact-first visibility parity with AF results patterns.
+- **FR-094:** WinUI Deploy Quick Deploy results UX shall follow compact-first visibility parity with AF results patterns.
   - **Acceptance details:** sticky summary/progress remains visible; per-VM rows are concise by default with expandable details; global warnings/errors remain collapsed by default and discoverable.
   - **Priority:** P1
 
@@ -681,15 +681,21 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-155:** WinUI `Deploy` shared composition cleanup shall converge shared `Deploy Overview`, `Quick Deploy`, and `From Template` composition into a Deploy-local composition owner instead of leaving shared capability composition responsibilities in `MainWindow`.
-  - **Acceptance details:** `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact or drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime; the Deploy-local composition owner becomes the long-term home for shared Deploy-local composition and interaction boundaries across `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`.
+  - **Acceptance details:** `MainWindow` remains the shell composition root and keeps only shell route switching, shell title/description, shell compact or drawer behavior, shell host visibility, right-panel infrastructure, and app-level workspace lifetime; the Deploy-local composition owner becomes the long-term home for shared Deploy-local composition and interaction boundaries across `deploy.overview`, `deploy.quick_deploy`, and `deploy.from_template`.
   - **Priority:** P1
+  - **Reconciliation note (frame-based navigation, task `nav-frame-based`):** FR-155 through FR-166 were written against the earlier model where every capability lived inside `MainWindow` as a long-lived workspace whose shared composition owner was a per-capability `DeployCapabilityRuntime` or `DeployWorkspaceComposition`.
+    The shell has since moved to frame-based capability navigation: Deploy is an on-demand `DeployPage` created on route entry and torn down on leave, hosting the Overview, Quick Deploy, and From Template subviews.
+    Overview binds to `DeployOverviewViewModel` through `x:Bind`; the Quick Deploy and From Template lanes are hosted by the capability page through their preserved controller/composition layer and complete their full `x:Bind` view-model binding as the migration finishes.
+    The shell right panel is now driven through the capability-agnostic `IShellRightPanel` seam rather than a Deploy-specific `ShellPanelStateManager` or `DeployCapabilityRuntime`.
+    Where the requirements below name `DeployCapabilityRuntime`, `DeployWorkspaceComposition`, `ShellPanelStateManager`, `MainWindow` ownership, a "long-lived Deploy workspace", or "rather than per-navigation recreation", read them as satisfied by the capability page, the shell right-panel seam, and the frame navigation lifecycle.
+    The Deploy capability page is the Deploy-local owner referenced here; `MainWindow` stays the shell composition root (FR-113); views never depend on `MainWindow`; and the behavioral route contracts below are preserved: Overview remains the route-entry summary/navigation surface, Quick Deploy remains the distinct multi-step deploy form at `deploy.quick_deploy`, and From Template remains a separate review/remediation/deploy workflow.
 
 - **FR-156:** WinUI `Deploy` shared composition cleanup shall treat capability-specific host interfaces implemented by `MainWindow` as temporary migration bridges only, and views shall not depend on or receive `MainWindow` directly.
   - **Acceptance details:** shared Deploy route activation handling, shared workspace lifetime participation, and shared local interaction boundaries for Deploy Overview, Quick Deploy, and From Template must converge behind the Deploy-local composition owner or narrow abstractions rather than direct `MainWindow` injection or permanent shell-host interface accumulation.
   - **Priority:** P1
 
 - **FR-157:** WinUI `Deploy` shared composition cleanup shall preserve the long-lived Deploy workspace/session model and the existing Overview-first navigation contract so route activation reconciles shared Deploy state rather than recreating the Deploy workspace on every route change.
-  - **Acceptance details:** cleanup-target definition must preserve `deploy.overview` as the route-entry surface, keep `deploy.on_the_fly` as the deep editor-oriented Quick Deploy workflow, keep `deploy.from_template` as a review/remediation/deploy workflow rather than a duplicate Quick Deploy editor, and remain explicit that Deploy Overview extraction details, From Template extraction details, Quick Deploy extraction details, runtime implementation, Deploy workflow redesign, and performance redesign are out of scope.
+  - **Acceptance details:** cleanup-target definition must preserve `deploy.overview` as the route-entry surface, keep `deploy.quick_deploy` as the deep editor-oriented Quick Deploy workflow, keep `deploy.from_template` as a review/remediation/deploy workflow rather than a duplicate Quick Deploy editor, and remain explicit that Deploy Overview extraction details, From Template extraction details, Quick Deploy extraction details, runtime implementation, Deploy workflow redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
 - **FR-158:** WinUI `Deploy Overview` cleanup shall remain under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface, while converging Overview-specific state and UI coordination behind an Overview-local seam.
@@ -717,15 +723,15 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-164:** WinUI `Deploy Quick Deploy` cleanup shall remain under shared `DeployWorkspaceComposition` rather than becoming a shell-owned surface, while converging Quick Deploy-specific state, orchestration, composition, and UI coordination behind a Quick Deploy-local seam.
-  - **Acceptance details:** the Quick Deploy cleanup target must explicitly keep shared Deploy composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make a Quick Deploy-local seam the target owner for on-the-fly deploy state, Quick Deploy orchestration, Quick Deploy-local interaction boundaries, and Quick Deploy-specific composition or host cleanup.
+  - **Acceptance details:** the Quick Deploy cleanup target must explicitly keep shared Deploy composition responsible only for shared capability-level composition concerns, must keep `MainWindow` limited to shell ownership, and must make a Quick Deploy-local seam the target owner for Quick Deploy deployment state, Quick Deploy orchestration, Quick Deploy-local interaction boundaries, and Quick Deploy-specific composition or host cleanup.
   - **Priority:** P1
 
-- **FR-165:** WinUI `Deploy Quick Deploy` cleanup shall preserve current `deploy.on_the_fly` behavior and boundaries while making Quick Deploy participation in the long-lived Deploy workspace explicit.
-  - **Acceptance details:** the Quick Deploy cleanup target must preserve `deploy.on_the_fly` as a distinct on-the-fly deploy workflow surface rather than the route-entry Deploy surface, must keep route activation refresh or reconcile behavior within the existing long-lived Deploy workspace rather than per-navigation recreation, and must preserve AG, AF, AL, and AM78-AM94 Deploy behavior contracts while narrowing ownership.
+- **FR-165:** WinUI `Deploy Quick Deploy` cleanup shall preserve current `deploy.quick_deploy` behavior and boundaries while making Quick Deploy participation in the long-lived Deploy workspace explicit.
+  - **Acceptance details:** the Quick Deploy cleanup target must preserve `deploy.quick_deploy` as a distinct Quick Deploy workflow surface rather than the route-entry Deploy surface, must keep route activation refresh or reconcile behavior within the existing long-lived Deploy workspace rather than per-navigation recreation, and must preserve AG, AF, AL, and AM78-AM94 Deploy behavior contracts while narrowing ownership.
   - **Priority:** P1
 
 - **FR-166:** WinUI `Deploy Quick Deploy` cleanup shall reject direct `MainWindow` view dependency, shared Deploy composition widening into the Quick Deploy workflow owner, Quick Deploy absorption of From Template or Overview semantics, and unapproved runtime or performance redesign during seam definition.
-  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Deploy composition must not become the Quick Deploy workflow owner; Quick Deploy-specific host bridges or control exposure remain temporary migration cleanup targets behind the Quick Deploy-local seam; `deploy.on_the_fly` must not absorb `deploy.from_template` semantics or Deploy Overview ownership; and the cleanup target must stay explicit that runtime implementation, From Template extraction details, Deploy Overview extraction details, Deploy behavior redesign, and performance redesign are out of scope.
+  - **Acceptance details:** views must not depend on or receive `MainWindow` directly; shared Deploy composition must not become the Quick Deploy workflow owner; Quick Deploy-specific host bridges or control exposure remain temporary migration cleanup targets behind the Quick Deploy-local seam; `deploy.quick_deploy` must not absorb `deploy.from_template` semantics or Deploy Overview ownership; and the cleanup target must stay explicit that runtime implementation, From Template extraction details, Deploy Overview extraction details, Deploy behavior redesign, and performance redesign are out of scope.
   - **Priority:** P1
 
 - **FR-167:** WinUI `Diagnostics` shared composition cleanup shall converge shared `Diagnostics Overview` and `Diagnostics Logs` composition into a Diagnostics-local composition owner instead of leaving shared capability composition responsibilities in `MainWindow`.
@@ -793,7 +799,7 @@ Each requirement must be **testable** and mapped to acceptance criteria.
   - **Priority:** P1
 
 - **FR-182:** WinUI `DeployResultsPanelCoordinator` shall remain a narrow shared Deploy seam for results-panel intent aggregation rather than a general shared Deploy owner.
-  - **Acceptance details:** the coordinator may aggregate active-lane title text, auto-open recommendations, Overview empty-state participation, and panel-state delegation across `deploy.on_the_fly` and `deploy.from_template`, while keeping its role limited to shared Deploy right-panel intent only.
+  - **Acceptance details:** the coordinator may aggregate active-lane title text, auto-open recommendations, Overview empty-state participation, and panel-state delegation across `deploy.quick_deploy` and `deploy.from_template`, while keeping its role limited to shared Deploy right-panel intent only.
   - **Priority:** P1
 
 - **FR-183:** WinUI `DeployResultsPanelCoordinator` shall reject shell right-panel infrastructure ownership, lane-local workflow ownership, and general shared Deploy helper ownership.

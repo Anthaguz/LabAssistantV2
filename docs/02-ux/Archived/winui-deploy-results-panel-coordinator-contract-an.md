@@ -65,7 +65,7 @@ It is not the general shared Deploy host.
 The coordinator may own:
 - shared Deploy results-panel intent aggregation across:
   - `deploy.overview`
-  - `deploy.on_the_fly`
+  - `deploy.quick_deploy`
   - `deploy.from_template`
 - active-lane-based right-panel title selection
 - active-lane-based auto-open recommendation for the shell to consume

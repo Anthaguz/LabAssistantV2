@@ -51,7 +51,7 @@ Use this checklist after AM automation passes to confirm the final shared Deploy
 - Confirm the summary surface shows Quick Deploy draft/readiness context plus From Template inventory/status context
 - If template inventory is still loading, confirm the Overview summary reflects loading rather than stale zero-state wording
 - Click the Quick Deploy overview action
-- Confirm navigation moves to `deploy.on_the_fly`
+- Confirm navigation moves to `deploy.quick_deploy`
 - Return to `Deploy > Overview`
 - Click the From Template overview action
 - Confirm navigation moves to `deploy.from_template`
@@ -71,7 +71,7 @@ Use this checklist after AM automation passes to confirm the final shared Deploy
 ## 4. Quick Deploy Collection / Editor / Readiness / Deploy / Results Sanity
 
 - Navigate to `Deploy > Quick Deploy`
-- Confirm the route resolves to `deploy.on_the_fly`
+- Confirm the route resolves to `deploy.quick_deploy`
 - Confirm VM entries list, editor surface, readiness summary, and results/right-panel surface are present without a redundant nested page banner
 - Add or select a VM entry and confirm editor state updates coherently
 - Edit VM fields and confirm draft/readiness affordances update while staying local to the Quick Deploy workflow

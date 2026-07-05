@@ -52,7 +52,7 @@ Code organization guidance for seam-heavy files is defined in `docs/03-architect
 Hyper-V execution-pattern authority is defined in `docs/03-architecture/hyperv-powershell-interaction.md`.
 
 ## 4. Key Workflows (end-to-end)
-### Workflow: Deploy Lab (on-the-fly or template-based)
+### Workflow: Deploy Lab (Quick Deploy or template-based)
 1. UI/ViewModel maintains a deployment readiness report and triggers **quick preflight** on relevant configuration changes (debounced).
 2. On Deploy click, UI/ViewModel runs **full preflight** and blocks deployment start if any blocking readiness failures exist.
 3. UI creates `MultiVmDeploymentContext` and starts business coordinator only after full preflight passes (warnings-only is allowed).

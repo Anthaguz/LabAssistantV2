@@ -228,7 +228,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
 - **Steps:**
   1. Run automated AF matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAFScenarioMatrixTests.cs`.
   2. Run the Milestone AF checklist in `docs/07-testing/Archived/milestone-af-deploy-from-template-checklist.md`.
-  3. Verify Deploy parent scope defaults to `deploy.from_template` and on-the-fly remains deferred for AF.
+  3. Verify Deploy parent scope defaults to `deploy.from_template` and Quick Deploy remains deferred for AF.
   4. Verify readiness/gating behavior (blocking disk identity conflicts, blocking missing assigned switch rows, gated deploy start).
   5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and route/context handoff.
   6. Verify deploy creates one NIC per assigned switch in listed order and does not silently discard later switch rows.
@@ -242,14 +242,14 @@ This file is a practical baseline plan for recurring regression checks. It does 
   - Compact-first results UX remains usable, dense-by-default, and expandable on demand.
   - AF closure evidence includes both automated structural checks and repeatable manual runtime verification.
 
-## TC-016: Milestone AG Deploy On-the-Fly Convergence Verification
+## TC-016: Milestone AG Deploy Quick Deploy Convergence Verification
 - **Related AC:** `AC-015`, `FR-091`, `FR-092`, `FR-093`, `FR-094`
 - **Type:** Manual (real Windows machine / Hyper-V host) + automated coverage
 - **Related milestone:** Milestone AG (`#332`, `#333`, `#334`, `#335`, `#336`)
 - **Steps:**
   1. Run automated AG matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAGScenarioMatrixTests.cs`.
   2. Run the Milestone AG checklist in `docs/07-testing/Archived/milestone-ag-deploy-on-the-fly-checklist.md`.
-  3. Verify route/scope behavior (`deploy.on_the_fly`) and Deploy subview continuity.
+  3. Verify route/scope behavior (`deploy.quick_deploy`) and Deploy subview continuity.
   4. Verify readiness gating (blocking vs warning) and deploy-start enablement rules, including duplicate/invalid multi-switch row handling.
   5. Verify correction actions (`Resolve Suggestions`, `Open in Templates Editor`) and context handoff.
   6. Verify Quick Deploy multi-switch editing (`add/remove`, zero-row valid, ordered persistence into VM draft state).
@@ -257,7 +257,7 @@ This file is a practical baseline plan for recurring regression checks. It does 
   8. Verify compact results behavior (sticky summary strip, per-VM rows, collapsed-by-default details, issue summary badge updates).
   9. Verify layout/overflow/scroll behavior across compact/normal/wide windows.
 - **Expected:**
-  - On-the-fly route and scaffold remain stable and contract-aligned.
+  - Quick Deploy route and scaffold remain stable and contract-aligned.
   - Readiness classification enforces blocking conditions and preserves warning-only flow.
   - Correction actions are discoverable and functional with predictable context transfer.
 - Quick Deploy supports ordered multi-switch VM authoring with explicit guard rails.
@@ -373,6 +373,9 @@ This file is a practical baseline plan for recurring regression checks. It does 
 ## TC-022: Milestone AM Deploy Extraction Closure Verification
 - **Related AC:** `AC-021`, `FR-108`, `FR-109`, `FR-110`, `FR-111`, `FR-112`
 - **Type:** Manual (real Windows machine / Hyper-V host where deploy execution is exercised) + automated coverage
+- **Reconciliation note (frame-based navigation, task `nav-frame-based`):** this milestone record predates frame-based navigation.
+  Deploy is now an on-demand `DeployPage` created on route entry and torn down on leave, with Overview, Quick Deploy, and From Template subviews bound to `DeployOverviewViewModel`, `DeployQuickDeployViewModel`, and `DeployFromTemplateWorkspaceViewModel` through `x:Bind`; the former `DeployWorkspaceComposition`, `DeployOverviewWorkspace*`, `DeployQuickDeployWorkspace*`, `DeployFromTemplateWorkspace*`, and long-lived-workspace/route-refresh model no longer exist.
+  The shell right panel is now driven through `IShellRightPanel`, and the Deploy behavioral contracts still hold (Overview route-entry/summary surface, Quick Deploy distinct multi-step deploy form, From Template review/remediation/deploy workflow, and right-panel results behavior) and remain the current verification target.
 - **Related milestone:** Milestone AM (`#399`, `#400`, `#401`, `#439`, `#441`, `#501`, `#502`, `#503`, `#504`, `#505`, `#506`, `#507`, `#508`, `#509`, `#510`, `#511`, `#512`, `#513`, `#514`, `#515`, `#516`, `#517`, `#518`, `#519`, `#520`, `#521`, `#522`, `#523`, `#524`, `#525`, `#526`, `#527`)
 - **Steps:**
   1. Run automated AM matrix tests in `LabAssistant.UI.Tests/Tests/MilestoneAMScenarioMatrixTests.cs`.
@@ -384,10 +387,10 @@ This file is a practical baseline plan for recurring regression checks. It does 
   7. Verify route switching preserves the long-lived Deploy workspace model and refresh/reconcile behavior rather than per-navigation recreation.
 - **Expected:**
   - Shared `DeployWorkspaceComposition` remains the shared capability composition owner, while `MainWindow` remains out of shared Deploy composition ownership.
-  - `deploy.overview` remains the stable/default Deploy surface, while `deploy.on_the_fly` and `deploy.from_template` remain distinct workflow surfaces.
+  - `deploy.overview` remains the stable/default Deploy surface, while `deploy.quick_deploy` and `deploy.from_template` remain distinct workflow surfaces.
   - `DeployOverviewWorkspaceViewModel` and `DeployOverviewWorkspaceComposition` remain the Overview-local seams, with the narrowed Overview interaction/view surface still represented.
   - `DeployFromTemplateWorkspaceViewModel`, `DeployFromTemplateWorkspaceController`, and `DeployFromTemplateWorkspaceComposition` remain the From Template-local seams, with the narrowed main/right-panel view surfaces still represented.
-  - `DeployOnTheFlyWorkspaceViewModel`, `DeployOnTheFlyWorkspaceHost`, `DeployOnTheFlyWorkspaceController`, and `DeployOnTheFlyWorkspaceComposition` remain the Quick Deploy-local seams, with controller-host ownership terminating in the local host rather than `MainWindow` and the narrowed main/right-panel view surfaces still represented.
+  - `DeployQuickDeployWorkspaceViewModel`, `DeployQuickDeployWorkspaceHost`, `DeployQuickDeployWorkspaceController`, and `DeployQuickDeployWorkspaceComposition` remain the Quick Deploy-local seams, with controller-host ownership terminating in the local host rather than `MainWindow` and the narrowed main/right-panel view surfaces still represented.
   - Deploy remains a long-lived workspace whose route activation refreshes/reconciles the active lane instead of recreating the capability surface.
   - AM closure evidence links both deterministic automated seam protection and repeatable manual runtime verification without introducing runtime Deploy changes.
 

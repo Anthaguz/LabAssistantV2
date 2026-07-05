@@ -1470,7 +1470,7 @@ Each readiness result shall include, at minimum:
 **Then**
 - AF route resolves to `deploy.from_template`
 - From-template workflow is the active Deploy slice for AF
-- On-the-fly migration remains explicitly deferred in AF scope
+- Quick Deploy migration remains explicitly deferred in AF scope
 
 ### 2) Required disk identity unresolved/ambiguous blocks deploy
 **Given**
@@ -1543,7 +1543,7 @@ Each readiness result shall include, at minimum:
   - ordered multi-switch NIC attach semantics
   - compact-first results presentation model
 - Out of scope:
-  - Deploy `on-the-fly` migration
+  - Deploy Quick Deploy migration
   - WPF Deploy changes
   - schema/model changes unrelated to approved compatibility behavior
 
@@ -1558,27 +1558,27 @@ Each readiness result shall include, at minimum:
 
 ---
 
-# AC-015 - WinUI Deploy On-the-Fly Convergence (AG1)
+# AC-015 - WinUI Deploy Quick Deploy Convergence (AG1)
 
 **Related FRs:** FR-091, FR-092, FR-093, FR-094, FR-014, FR-015, FR-020, FR-021, FR-024, FR-025, FR-043, FR-045
 
 ## Scenarios
 
-### 1) Deploy routing and on-the-fly entry
+### 1) Deploy routing and Quick Deploy entry
 **Given**
 - User is in WinUI global navigation
 
 **When**
-- User selects Deploy on-the-fly path (user-facing label may be `Quick Deploy`)
+- User selects the Deploy Quick Deploy path
 
 **Then**
-- Route resolves to `deploy.on_the_fly`
-- On-the-fly workflow is active for AG scope
+- Route resolves to `deploy.quick_deploy`
+- Quick Deploy workflow is active for AG scope
 - AF from-template behavior remains available and unchanged
 
-### 2) On-the-fly input model and required readiness checks
+### 2) Quick Deploy input model and required readiness checks
 **Given**
-- User configures one or more VM entries on-the-fly
+- User configures one or more VM entries inline via Quick Deploy
 
 **When**
 - Readiness evaluation runs
@@ -1608,7 +1608,7 @@ Each readiness result shall include, at minimum:
 - Readiness is unblocked
 
 **When**
-- User starts on-the-fly deploy
+- User starts Quick Deploy
 
 **Then**
 - Execution creates one NIC per assigned switch in listed order
@@ -1617,7 +1617,7 @@ Each readiness result shall include, at minimum:
 
 ### 5) Compact-first results visibility parity
 **Given**
-- On-the-fly deploy is running or completed
+- Quick Deploy is running or completed
 
 **When**
 - Results are shown
@@ -1629,7 +1629,7 @@ Each readiness result shall include, at minimum:
 
 ### 6) Quick Deploy editing and template-authoring handoff stay explicit
 **Given**
-- User edits one or more VM rows in the on-the-fly deploy workflow
+- User edits one or more VM rows in the Quick Deploy workflow
 
 **When**
 - User updates draft values or chooses to preserve the current draft for template authoring
@@ -1642,8 +1642,8 @@ Each readiness result shall include, at minimum:
 
 ## Scope boundary for AG implementation
 - In scope:
-  - WinUI `deploy.on_the_fly` route and workspace convergence
-  - On-the-fly readiness taxonomy and correction affordances
+  - WinUI `deploy.quick_deploy` route and workflow convergence
+  - Quick Deploy readiness taxonomy and correction affordances
   - Compact-first results UX parity with AF pattern
 - Out of scope:
   - WPF Deploy changes
@@ -1652,8 +1652,8 @@ Each readiness result shall include, at minimum:
   - deployment domain behavior redesign
 
 ## Definition of Done
-- [ ] `deploy.on_the_fly` route behavior is explicit and testable for AG
-- [ ] Blocking vs warning readiness taxonomy is explicit for on-the-fly inputs
+- [ ] `deploy.quick_deploy` route behavior is explicit and testable for AG
+- [ ] Blocking vs warning readiness taxonomy is explicit for Quick Deploy inputs
 - [ ] Correction affordances for blocking readiness issues are defined
 - [ ] Ordered multi-switch Quick Deploy readiness and execution semantics are explicit
 - [ ] Compact-first results parity contract is explicit and testable
@@ -1714,7 +1714,7 @@ Each readiness result shall include, at minimum:
 **Then**
 - Both flows follow the same canonical icon-state timeline rules
 - Existing readiness gating and deployment execution semantics remain unchanged
-- Route contracts remain intact (`deploy.from_template`, `deploy.on_the_fly`)
+- Route contracts remain intact (`deploy.from_template`, `deploy.quick_deploy`)
 
 ## Definition of Done
 - [ ] Canonical timeline states are explicit and testable
@@ -3277,6 +3277,12 @@ Each readiness result shall include, at minimum:
 
 **Related FRs:** FR-155, FR-156, FR-157, FR-087, FR-088, FR-089, FR-090, FR-091, FR-092, FR-093, FR-094, FR-100, FR-101, FR-102, FR-103, FR-125, FR-126, FR-127
 
+> **Reconciliation note (frame-based navigation, task `nav-frame-based`).**
+> AC-036, AC-037, AC-038, and AC-039 were authored against the earlier model where Deploy lived inside `MainWindow` as a long-lived workspace whose shared composition owner was `DeployWorkspaceComposition`.
+> The shell has since moved to frame-based capability navigation: Deploy is an on-demand `DeployPage` created on route entry and torn down on leave, and its Overview, Quick Deploy, and From Template subviews bind directly to `DeployOverviewViewModel`, `DeployQuickDeployViewModel`, and `DeployFromTemplateWorkspaceViewModel` through `x:Bind`.
+> The shell right panel is now driven through the capability-agnostic `IShellRightPanel` seam rather than a Deploy-specific `ShellPanelStateManager` or `DeployCapabilityRuntime`.
+> Read every reference below to `DeployWorkspaceComposition`, `ShellPanelStateManager`, a "long-lived Deploy workspace", `MainWindow` ownership, or "route-activation refresh rather than per-navigation recreation" as satisfied by the capability page, the shell right-panel seam, and its navigation lifecycle: the page is the Deploy-local owner, `MainWindow` stays shell-only, views never depend on `MainWindow`, and the behavioral contracts are preserved (Overview is the route-entry and summary/navigation surface, Quick Deploy remains the distinct multi-step deploy form at `deploy.quick_deploy`, and From Template remains a separate review/remediation/deploy workflow).
+
 ## Scenarios
 
 ### 1) MainWindow remains shell-only while shared Deploy composition moves behind a Deploy-local owner
@@ -3299,7 +3305,7 @@ Each readiness result shall include, at minimum:
 
 ### 2) Shared Deploy responsibilities converge behind the Deploy-local composition owner
 **Given**
-- `Deploy` includes `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template`
+- `Deploy` includes `deploy.overview`, `deploy.quick_deploy`, and `deploy.from_template`
 
 **When**
 - the shared ownership boundary is reviewed
@@ -3324,7 +3330,7 @@ Each readiness result shall include, at minimum:
 
 **Then**
 - `deploy.overview` remains the route-entry and index surface for `Deploy`
-- `deploy.on_the_fly` remains the deep editor-oriented `Quick Deploy` workflow
+- `deploy.quick_deploy` remains the deep editor-oriented Quick Deploy workflow
 - `deploy.from_template` remains a review/remediation/deploy workflow and does not collapse into the Quick Deploy editor surface
 - capability-specific host interfaces implemented by `MainWindow` are explicitly treated as temporary bridges only
 
@@ -3338,7 +3344,7 @@ Each readiness result shall include, at minimum:
 **Then**
 - views must not depend on or receive `MainWindow` directly
 - Deploy remains long-lived while the app session is open
-- navigation between `deploy.overview`, `deploy.on_the_fly`, and `deploy.from_template` activates and reconciles shared Deploy state rather than recreating the workspace every route change
+- navigation between `deploy.overview`, `deploy.quick_deploy`, and `deploy.from_template` activates and reconciles shared Deploy state rather than recreating the workspace every route change
 - runtime implementation, Deploy workflow redesign, and performance redesign remain out of scope
 
 ## Expected Boundary
@@ -3525,7 +3531,7 @@ Each readiness result shall include, at minimum:
 
 ### 2) Quick Deploy-local ownership is explicit without widening shared Deploy composition into the workflow owner
 **Given**
-- `deploy.on_the_fly` is the on-the-fly deploy workflow surface for the capability
+- `deploy.quick_deploy` is the Quick Deploy workflow surface for the capability
 
 **When**
 - Quick Deploy-local ownership is defined
@@ -3536,11 +3542,11 @@ Each readiness result shall include, at minimum:
   - Quick Deploy-specific orchestration
   - Quick Deploy-specific interaction boundaries used by the Quick Deploy surface
   - Quick Deploy-specific composition or host cleanup expectations
-  - Quick Deploy-specific refresh or reconcile behavior triggered by `deploy.on_the_fly` activation
+  - Quick Deploy-specific refresh or reconcile behavior triggered by `deploy.quick_deploy` activation
 - shared `DeployWorkspaceComposition` does not become the Quick Deploy workflow owner
 - shared Deploy composition keeps only cross-surface capability concerns such as shared route activation and workspace participation
 
-### 3) MainWindow and route-activation boundaries remain explicit for deploy.on_the_fly
+### 3) MainWindow and route-activation boundaries remain explicit for deploy.quick_deploy
 **Given**
 - AM33 and AM78 keep `MainWindow` limited to shell ownership and keep Deploy long-lived by default
 
@@ -3550,7 +3556,7 @@ Each readiness result shall include, at minimum:
 **Then**
 - views must not depend on or receive `MainWindow` directly
 - `Deploy Quick Deploy` continues to participate in long-lived Deploy workspace lifetime rather than per-navigation recreation
-- route activation of `deploy.on_the_fly` refreshes or reconciles Quick Deploy state within the existing Deploy workspace
+- route activation of `deploy.quick_deploy` refreshes or reconciles Quick Deploy state within the existing Deploy workspace
 
 ### 4) Deploy Quick Deploy remains behavior-preserving and does not absorb From Template or Overview semantics
 **Given**
@@ -3560,7 +3566,7 @@ Each readiness result shall include, at minimum:
 - the Quick Deploy cleanup target is defined
 
 **Then**
-- `deploy.on_the_fly` remains a distinct on-the-fly deploy workflow surface and not the route-entry Deploy surface
+- `deploy.quick_deploy` remains a distinct Quick Deploy workflow surface and not the route-entry Deploy surface
 - no From Template ownership is moved into Quick Deploy
 - no Deploy Overview ownership is moved into Quick Deploy
 - runtime implementation, From Template extraction details, Deploy Overview extraction details, Deploy behavior redesign, and performance redesign remain out of scope
@@ -3575,7 +3581,7 @@ Each readiness result shall include, at minimum:
 ## Definition of Done
 - [ ] shared Deploy vs Quick Deploy-local ownership is explicit and traceable
 - [ ] Quick Deploy-local state/orchestration/composition and host-cleanup expectations are explicit and traceable
-- [ ] long-lived Deploy workspace participation and `deploy.on_the_fly` route-activation refresh expectations are explicit and traceable
+- [ ] long-lived Deploy workspace participation and `deploy.quick_deploy` route-activation refresh expectations are explicit and traceable
 - [ ] From Template / Overview non-goals are explicit and traceable
 - [ ] behavior-preservation and non-goals are explicit and traceable
 
