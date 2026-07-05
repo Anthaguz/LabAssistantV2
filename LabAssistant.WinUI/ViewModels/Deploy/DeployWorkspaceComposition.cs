@@ -94,7 +94,7 @@ internal sealed class DeployWorkspaceComposition
         }
         else if (ReferenceEquals(selectedTab, _quickDeployTabViewItem))
         {
-            _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
+            _shellBridge.NavigateToRoute(ShellRouteKeys.DeployQuickDeploy);
         }
         else if (ReferenceEquals(selectedTab, _fromTemplateTabViewItem))
         {

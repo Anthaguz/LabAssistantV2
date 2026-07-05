@@ -7,7 +7,7 @@ public static class ShellRouteKeys
 {
     public const string MachinesOverview = "machines.overview";
     public const string DeployOverview = "deploy.overview";
-    public const string DeployOnTheFly = "deploy.on_the_fly";
+    public const string DeployQuickDeploy = "deploy.quick_deploy";
     public const string DeployFromTemplate = "deploy.from_template";
     public const string TemplatesLibrary = "templates.library";
     public const string TemplatesEditor = "templates.editor";
@@ -44,7 +44,7 @@ public sealed class ShellViewModel
                 isFooter: false,
                 [
                     new ShellSubview(ShellRouteKeys.DeployOverview, "Overview", ["Open Quick Deploy", "Open From Template"]),
-                    new ShellSubview(ShellRouteKeys.DeployOnTheFly, "Quick Deploy", ["Start", "Validate"]),
+                    new ShellSubview(ShellRouteKeys.DeployQuickDeploy, "Quick Deploy", ["Start", "Validate"]),
                     new ShellSubview(ShellRouteKeys.DeployFromTemplate, "From Template", ["Select Template", "Preview"]),
                 ]),
             new ShellCapability(

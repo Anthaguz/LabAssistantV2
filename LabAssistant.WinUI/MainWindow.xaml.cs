@@ -66,7 +66,7 @@ public sealed partial class MainWindow : Window
             RightPanelTitleTextBlock,
             RightPanelEmptyStateBorder,
             () => navigationCoordinator?.ActiveCapabilityKey ?? string.Empty,
-            () => IsDeployOnTheFlyActive,
+            () => IsDeployQuickDeployActive,
             () => IsDeployFromTemplateActive,
             () => _deployCapabilityRuntime,
             () => RootLayout.ActualWidth);
@@ -130,7 +130,7 @@ public sealed partial class MainWindow : Window
 
     private bool IsDeployOverviewActive => _navigationCoordinator.IsDeployOverviewActive;
     private bool IsDeployFromTemplateActive => _navigationCoordinator.IsDeployFromTemplateActive;
-    private bool IsDeployOnTheFlyActive => _navigationCoordinator.IsDeployOnTheFlyActive;
+    private bool IsDeployQuickDeployActive => _navigationCoordinator.IsDeployQuickDeployActive;
     private bool IsDeployCapabilityActive => _navigationCoordinator.IsDeployCapabilityActive;
     private bool IsTemplatesLibraryActive => _navigationCoordinator.IsTemplatesLibraryActive;
     private bool IsTemplatesEditorActive => _navigationCoordinator.IsTemplatesEditorActive;

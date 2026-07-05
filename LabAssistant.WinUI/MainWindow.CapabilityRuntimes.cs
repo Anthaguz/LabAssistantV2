@@ -347,7 +347,7 @@ public sealed partial class MainWindow
             () => RootLayout.XamlRoot,
             () => IsDeployCapabilityActive,
             () => IsDeployOverviewActive,
-            () => IsDeployOnTheFlyActive,
+            () => IsDeployQuickDeployActive,
             () => IsDeployFromTemplateActive,
             NavigateToRoute,
             RequestDeployResultsPanelToggle,

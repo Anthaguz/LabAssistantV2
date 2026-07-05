@@ -68,8 +68,8 @@ internal sealed class ShellNavigationCoordinator
     public bool IsMachinesOverviewActive => string.Equals(_activeRouteKey, ShellRouteKeys.MachinesOverview, StringComparison.Ordinal);
     public bool IsDeployOverviewActive => string.Equals(_activeRouteKey, ShellRouteKeys.DeployOverview, StringComparison.Ordinal);
     public bool IsDeployFromTemplateActive => string.Equals(_activeRouteKey, ShellRouteKeys.DeployFromTemplate, StringComparison.Ordinal);
-    public bool IsDeployOnTheFlyActive => string.Equals(_activeRouteKey, ShellRouteKeys.DeployOnTheFly, StringComparison.Ordinal);
-    public bool IsDeployCapabilityActive => IsDeployOverviewActive || IsDeployFromTemplateActive || IsDeployOnTheFlyActive;
+    public bool IsDeployQuickDeployActive => string.Equals(_activeRouteKey, ShellRouteKeys.DeployQuickDeploy, StringComparison.Ordinal);
+    public bool IsDeployCapabilityActive => IsDeployOverviewActive || IsDeployFromTemplateActive || IsDeployQuickDeployActive;
     public bool IsTemplatesLibraryActive => string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesLibrary, StringComparison.Ordinal);
     public bool IsTemplatesEditorActive => string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesEditor, StringComparison.Ordinal);
     public bool IsTemplatesBuilderActive => string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesBuilder, StringComparison.Ordinal);

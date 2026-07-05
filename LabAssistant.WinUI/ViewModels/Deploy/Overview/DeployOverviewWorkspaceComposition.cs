@@ -58,7 +58,7 @@ internal sealed class DeployOverviewWorkspaceComposition
 
     private void OpenQuickDeployRequested(object? sender, EventArgs e)
     {
-        _shellBridge.NavigateToRoute(ShellRouteKeys.DeployOnTheFly);
+        _shellBridge.NavigateToRoute(ShellRouteKeys.DeployQuickDeploy);
     }
 
     private void OpenFromTemplateRequested(object? sender, EventArgs e)
