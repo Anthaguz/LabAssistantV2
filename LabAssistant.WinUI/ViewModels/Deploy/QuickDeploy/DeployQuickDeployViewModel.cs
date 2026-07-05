@@ -754,6 +754,15 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
     private void RebuildSwitchRows(IReadOnlyList<string> selectedSwitches)
     {
+        // Keep the switch-row collection stable across readiness passes. This runs on every evaluate
+        // (via LoadEditorDraftFromSelection), and rebuilding tears down the bound ItemsControl, which
+        // closes any open switch dropdown mid-selection. Skip when the rows already reflect the
+        // requested selection against the current available switches.
+        if (SwitchRowsMatchCurrentState(selectedSwitches))
+        {
+            return;
+        }
+
         foreach (var existing in SwitchRows)
         {
             existing.PropertyChanged -= SwitchRow_PropertyChanged;
@@ -764,6 +773,68 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         {
             SwitchRows.Add(CreateSwitchRow(selectedSwitch));
         }
+    }
+
+    /// <summary>
+    /// Returns true when <see cref="SwitchRows"/> already mirrors what a rebuild for
+    /// <paramref name="selectedSwitches"/> would produce (same effective selection per row and the
+    /// same option set), so the destructive rebuild can be skipped and the dropdown stays open.
+    /// </summary>
+    private bool SwitchRowsMatchCurrentState(IReadOnlyList<string> selectedSwitches)
+    {
+        if (SwitchRows.Count != selectedSwitches.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < selectedSwitches.Count; index++)
+        {
+            var row = SwitchRows[index];
+            if (!string.Equals(row.EffectiveSwitchName, ResolveEffectiveSwitchName(selectedSwitches[index]), StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!SwitchRowOptionsMatchAvailable(row))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Mirrors <see cref="CreateSwitchRow"/> resolution: the effective host-switch name for a requested
+    /// value, or an empty string when it is blank or not among the current available switches.
+    /// </summary>
+    private string ResolveEffectiveSwitchName(string? requested) =>
+        !string.IsNullOrWhiteSpace(requested) &&
+        _availableSwitches.Contains(requested, StringComparer.OrdinalIgnoreCase)
+            ? _availableSwitches.First(name => string.Equals(name, requested, StringComparison.OrdinalIgnoreCase))
+            : string.Empty;
+
+    private bool SwitchRowOptionsMatchAvailable(DeployQuickDeploySwitchRowItem row)
+    {
+        if (row.Options.Count != _availableSwitches.Count + 1)
+        {
+            return false;
+        }
+
+        if (!string.Equals(row.Options[0], DeployQuickDeploySwitchRowItem.Placeholder, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < _availableSwitches.Count; index++)
+        {
+            if (!string.Equals(row.Options[index + 1], _availableSwitches[index], StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private DeployQuickDeploySwitchRowItem CreateSwitchRow(string? selectedSwitch)
@@ -777,12 +848,65 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
     private void RebuildVhdxCatalogItems()
     {
-        VhdxCatalogItems.Clear();
-        VhdxCatalogItems.Add(VhdxPlaceholder);
-        foreach (var option in _availableVhdxCatalogOptions)
+        // The catalog collection is the base-disk ComboBox ItemsSource. Clearing it resets the
+        // control's selection to null, which writes back through the TwoWay binding and would
+        // re-arm auto-evaluate - spinning the workflow and closing any open dropdown. The
+        // reference-data service reuses its option instances, so skip the rebuild entirely when
+        // the option set is unchanged. Any genuine rebuild runs under the editor-sync guard so the
+        // transient selection reset never schedules a readiness pass, and the prior selection is
+        // preserved across the rebuild.
+        if (VhdxCatalogItemsMatchCurrentOptions())
         {
-            VhdxCatalogItems.Add(option);
+            return;
         }
+
+        var wasSynchronizing = IsSynchronizingEditorDraft;
+        IsSynchronizingEditorDraft = true;
+        try
+        {
+            var previousSelection = SelectedVhdxCatalogItem;
+            VhdxCatalogItems.Clear();
+            VhdxCatalogItems.Add(VhdxPlaceholder);
+            foreach (var option in _availableVhdxCatalogOptions)
+            {
+                VhdxCatalogItems.Add(option);
+            }
+
+            SelectedVhdxCatalogItem = previousSelection is not null && VhdxCatalogItems.Contains(previousSelection)
+                ? previousSelection
+                : VhdxCatalogItems[0];
+        }
+        finally
+        {
+            IsSynchronizingEditorDraft = wasSynchronizing;
+        }
+    }
+
+    /// <summary>
+    /// Returns true when <see cref="VhdxCatalogItems"/> already mirrors the current catalog options
+    /// (placeholder followed by the same option instances), so a destructive rebuild can be skipped.
+    /// </summary>
+    private bool VhdxCatalogItemsMatchCurrentOptions()
+    {
+        if (VhdxCatalogItems.Count != _availableVhdxCatalogOptions.Count + 1)
+        {
+            return false;
+        }
+
+        if (!Equals(VhdxCatalogItems[0], VhdxPlaceholder))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < _availableVhdxCatalogOptions.Count; index++)
+        {
+            if (!ReferenceEquals(VhdxCatalogItems[index + 1], _availableVhdxCatalogOptions[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private object ResolveSelectedVhdxItem()

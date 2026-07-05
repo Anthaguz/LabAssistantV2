@@ -291,6 +291,7 @@
                                     Grid.Row="3"
                                     Grid.Column="1"
                                     HorizontalAlignment="Stretch"
+                                    AutomationProperties.Name="Base disk"
                                     ItemsSource="{x:Bind ViewModel.VhdxCatalogItems}"
                                     SelectedItem="{x:Bind ViewModel.SelectedVhdxCatalogItem, Mode=TwoWay}" />
 
@@ -312,11 +313,13 @@
                                                         Grid.Column="0"
                                                         MinWidth="220"
                                                         HorizontalAlignment="Stretch"
+                                                        AutomationProperties.Name="Host switch"
                                                         ItemsSource="{x:Bind Options}"
                                                         SelectedItem="{x:Bind SelectedSwitch, Mode=TwoWay}" />
                                                     <Button
                                                         Grid.Column="1"
                                                         Content="-"
+                                                        AutomationProperties.Name="Remove switch"
                                                         Click="OnRemoveSwitchRowClick"
                                                         ToolTipService.ToolTip="Remove switch" />
                                                 </Grid>

@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Diagnostics;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
@@ -413,5 +414,104 @@ public sealed class DeployQuickDeployViewModelTests
 
         Assert.False(harness.Vm.CanToggleResultsPanel);
         Assert.Equal("Expand the window to review the progress and results panel.", harness.Vm.ResultsPanelSummaryText);
+    }
+
+    /// <summary>
+    /// Regression guard for the combined-smoke-test blocker: Quick Deploy spun in a constant
+    /// re-evaluate loop. The base-disk ComboBox is bound TwoWay to
+    /// <see cref="DeployQuickDeployViewModel.SelectedVhdxCatalogItem"/> with its ItemsSource bound to
+    /// <see cref="DeployQuickDeployViewModel.VhdxCatalogItems"/>. Every readiness pass reloaded
+    /// reference data and rebuilt that collection, which reset the control's selection to null and
+    /// wrote it back through the binding, re-arming auto-evaluate and closing any open dropdown. This
+    /// test models that control feedback (null the selection whenever the collection is reset) and
+    /// asserts the workflow does NOT spin: readiness runs a bounded number of times.
+    /// </summary>
+    [Fact]
+    public async Task CatalogRebuildFeedback_DoesNotSpinAutoEvaluate()
+    {
+        var harness = CreateHarness(autoEvaluateDelayMs: 25);
+        var vm = harness.Vm;
+
+        // Mimic the WinUI ComboBox: when its ItemsSource is cleared, it drops its selection and
+        // writes null back through the TwoWay binding.
+        vm.VhdxCatalogItems.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                vm.SelectedVhdxCatalogItem = null;
+            }
+        };
+
+        vm.ApplyShellState(isActive: true);
+
+        await WaitUntilAsync(() => harness.Preflight.CallCount >= 1);
+        var runsAfterFirstPass = harness.Preflight.CallCount;
+
+        // Let several more debounce windows elapse; a spinning loop would keep incrementing.
+        await Task.Delay(200);
+
+        Assert.True(
+            harness.Preflight.CallCount <= runsAfterFirstPass,
+            $"Auto-evaluate spun: {harness.Preflight.CallCount} readiness runs (was {runsAfterFirstPass} after the first pass).");
+        Assert.True(harness.Preflight.CallCount <= 2, $"Unexpected readiness run count: {harness.Preflight.CallCount}.");
+    }
+
+    /// <summary>
+    /// Directly asserts the structural fix behind <see cref="CatalogRebuildFeedback_DoesNotSpinAutoEvaluate"/>:
+    /// a repeat reference-data ensure whose option set is unchanged must not rebuild the bound catalog
+    /// collection (no Reset raised) and must preserve the current selection, so the base-disk dropdown
+    /// stays open and keeps its value across every readiness pass.
+    /// </summary>
+    [Fact]
+    public async Task EnsureReferenceData_WhenOptionsUnchanged_DoesNotRebuildCatalogOrLoseSelection()
+    {
+        var harness = CreateHarness();
+        var vm = harness.Vm;
+        await ActivateReadyVmAsync(harness);
+
+        var selectedOption = vm.SelectedVhdxCatalogItem as TemplateVhdxCatalogOption;
+        Assert.NotNull(selectedOption);
+        var itemsSnapshot = vm.VhdxCatalogItems.ToList();
+
+        var resetRaised = 0;
+        vm.VhdxCatalogItems.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                resetRaised++;
+            }
+        };
+
+        await ((IDeployQuickDeployWorkspaceControllerHost)vm).EnsureReferenceDataAsync(forceRefresh: false);
+
+        Assert.Equal(0, resetRaised);
+        Assert.Equal(itemsSnapshot, vm.VhdxCatalogItems);
+        Assert.Same(selectedOption, vm.SelectedVhdxCatalogItem);
+    }
+
+    /// <summary>
+    /// Companion guard to the catalog stabilization: the switch-row collection backs the per-row
+    /// switch ComboBoxes, so it must survive a readiness pass untouched. Rebuilding it would tear down
+    /// the bound ItemsControl and close an open switch dropdown mid-selection. This asserts the row
+    /// instances are preserved across a repeat reference-data ensure when the selection is unchanged.
+    /// </summary>
+    [Fact]
+    public async Task EnsureReferenceData_WhenSwitchSelectionUnchanged_KeepsSwitchRowInstances()
+    {
+        var harness = CreateHarness();
+        var vm = harness.Vm;
+        await ActivateReadyVmAsync(harness);
+
+        var rowsSnapshot = vm.SwitchRows.ToList();
+        Assert.NotEmpty(rowsSnapshot);
+
+        await ((IDeployQuickDeployWorkspaceControllerHost)vm).EnsureReferenceDataAsync(forceRefresh: false);
+
+        Assert.Equal(rowsSnapshot.Count, vm.SwitchRows.Count);
+        for (var index = 0; index < rowsSnapshot.Count; index++)
+        {
+            Assert.Same(rowsSnapshot[index], vm.SwitchRows[index]);
+        }
+        Assert.Equal(SwitchName, vm.SwitchRows[0].SelectedSwitch);
     }
 }
