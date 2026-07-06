@@ -21,13 +21,16 @@ namespace LabAssistant.WinUI.Views.Templates;
 /// plus delegate-bag composition that lived in <c>MainWindow</c>.
 /// </summary>
 /// <remarks>
-/// The Library and Editor lanes are full x:Bind MVVM: their view models own their state, commands, and
-/// contractual logic, and are bound directly by the subviews (which resolve their own transient view
-/// models from DI). The Builder lane is retained on its preserved workspace composition as an interim
-/// adapter until it is migrated to MVVM; this page owns that composition for the Builder's lifetime.
-/// Because the page is transient, the pending editor document handed off by Deploy is drained from the
-/// app-lifetime <see cref="ITemplateEditorHandoff"/> mailbox on entry; a pending document always takes
-/// precedence over the requested initial subview.
+/// The Library, Editor, and Builder lanes are all full x:Bind MVVM: their view models own their
+/// state, commands, and contractual logic, and are bound directly by the subviews (which resolve
+/// their own transient view models from DI). This page owns those view models' lifecycle: it wires
+/// the cross-subview host and runs InitializeAsync on entry and CleanupAsync on leave. The lifecycle
+/// is deliberately page-scoped rather than driven by each subview's Loaded/Unloaded, because the
+/// hosted <see cref="TabView"/> unloads and reloads tab content on every tab switch; binding the
+/// view-model lifecycle to that would sever the cross-subview host and discard subview state each
+/// time the user changed tabs. Because the page is transient, the pending editor document handed off
+/// by Deploy is drained from the app-lifetime <see cref="ITemplateEditorHandoff"/> mailbox on entry;
+/// a pending document always takes precedence over the requested initial subview.
 /// </remarks>
 public sealed partial class TemplatesPage : Page, ICapabilityPage, ITemplatesLibraryHost, ITemplatesEditorHost, ITemplatesBuilderHost
 {
@@ -66,6 +69,14 @@ public sealed partial class TemplatesPage : Page, ICapabilityPage, ITemplatesLib
         EditorViewModel.Attach(_referenceDataService, this);
         BuilderViewModel.Attach(this);
 
+        // The page owns the subview view-model lifecycle for as long as it is the active capability.
+        // Initialization runs here (not from each view's Loaded) so that switching between the hosted
+        // tabs - which unloads and reloads the tab content - does not tear the view models down or
+        // sever the cross-subview host wiring above. Tearing down happens once, in OnNavigatedFrom.
+        _ = LibraryViewModel.InitializeAsync();
+        _ = EditorViewModel.InitializeAsync();
+        _ = BuilderViewModel.InitializeAsync();
+
         // A document handed off by Deploy (possibly while no page was alive) always wins over the
         // requested initial subview: show it in the Editor and route there.
         if (_handoff.TryTakePendingDocument(out var pendingDocument, out var pendingStatusText))
@@ -83,9 +94,11 @@ public sealed partial class TemplatesPage : Page, ICapabilityPage, ITemplatesLib
     {
         base.OnNavigatedFrom(e);
 
-        LibraryViewModel.Detach();
-        EditorViewModel.Detach();
-        BuilderViewModel.Detach();
+        // Tear the subview view models down once, on capability leave. CleanupAsync cancels any
+        // in-flight work (cleanup/cancellation policy) and detaches the cross-subview host.
+        _ = LibraryViewModel.CleanupAsync();
+        _ = EditorViewModel.CleanupAsync();
+        _ = BuilderViewModel.CleanupAsync();
         _referenceDataService = null;
         _handoff = null;
         _shellHost = null;
