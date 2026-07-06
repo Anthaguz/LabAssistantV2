@@ -35,6 +35,16 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployV2ReviewWorkspaceController.cs" Link="WinUI\DeployV2ReviewWorkspaceController.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployV2ReviewWorkspaceViewModel.cs" Link="WinUI\DeployV2ReviewWorkspaceViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesEditorVmDraftModels.cs" Link="WinUI\TemplatesEditorVmDraftModels.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesLibraryViewModel.cs" Link="WinUI\TemplatesLibraryViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesEditorViewModel.cs" Link="WinUI\TemplatesEditorViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesEditorLogic.cs" Link="WinUI\TemplatesEditorLogic.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplateListItem.cs" Link="WinUI\TemplateListItem.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplateSlotItem.cs" Link="WinUI\TemplateSlotItem.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\ITemplatesLibraryHost.cs" Link="WinUI\ITemplatesLibraryHost.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\ITemplatesEditorHost.cs" Link="WinUI\ITemplatesEditorHost.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesReferenceDataService.cs" Link="WinUI\TemplatesReferenceDataService.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplateEditorHandoff.cs" Link="WinUI\TemplateEditorHandoff.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\ITemplateEditorHandoff.cs" Link="WinUI\ITemplateEditorHandoff.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftModels.cs" Link="WinUI\TemplatesBuilderDraftModels.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderFieldKeys.cs" Link="WinUI\TemplatesBuilderFieldKeys.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderNetworkSwitchIntent.cs" Link="WinUI\TemplatesBuilderNetworkSwitchIntent.cs" />

@@ -80,8 +80,9 @@ public partial class App : Application
             serviceCollection.AddTransient<AssetsBaseDisksViewModel>();
             serviceCollection.AddTransient<AssetsSwitchesViewModel>();
             serviceCollection.AddSingleton<MachinesViewModel>();
-            serviceCollection.AddSingleton<TemplatesLibraryViewModel>();
-            serviceCollection.AddSingleton<TemplatesEditorViewModel>();
+            serviceCollection.AddSingleton<TemplatesReferenceDataService>();
+            serviceCollection.AddTransient<TemplatesLibraryViewModel>();
+            serviceCollection.AddTransient<TemplatesEditorViewModel>();
             serviceCollection.AddSingleton<TemplatesBuilderViewModel>();
             serviceCollection.AddSingleton<ILogLocationLauncher, LogLocationLauncher>();
             serviceCollection.AddTransient<DiagnosticsOverviewViewModel>();

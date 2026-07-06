@@ -3046,6 +3046,13 @@ Each readiness result shall include, at minimum:
 
 **Related FRs:** FR-146, FR-147, FR-148, FR-077, FR-078, FR-079, FR-125, FR-126, FR-127, FR-122, FR-123, FR-124
 
+> **Reconciliation note (frame-based navigation, task `nav-frame-based`).**
+> AC-033, AC-034, and AC-035 were authored against the earlier model where Templates lived inside `MainWindow` as a long-lived workspace whose shared composition owner was `TemplatesCapabilityRuntime` (with its per-subview `TemplatesLibraryWorkspaceComposition`, `TemplatesEditorWorkspaceComposition`, and `TemplatesWorkspaceShellBridge`).
+> The shell has since moved to frame-based capability navigation: Templates is an on-demand `TemplatesPage` created on route entry and torn down on leave, hosting the Library, Editor, and Builder subviews in a `TabView`.
+> The Library and Editor subviews bind to transient `TemplatesLibraryViewModel` and `TemplatesEditorViewModel` through `x:Bind`, resolving their view models from DI and reaching sibling subviews and dialogs through the injected `ITemplatesLibraryHost` and `ITemplatesEditorHost` seams the page implements; the Builder subview is hosted by the capability page through its preserved controller/composition layer and completes its full `x:Bind` binding as the migration finishes.
+> Cross-capability edit-template hand-off from Deploy flows through the app-lifetime `ITemplateEditorHandoff` mailbox, which stores a pending document and triggers shell routing to `templates.editor`; the page drains the mailbox on entry so a document handed off while no page is alive is honored on the next navigation.
+> Read every reference below to `TemplatesCapabilityRuntime`, a per-subview `WorkspaceComposition`/`WorkspaceController`/`WorkspaceShellBridge`, a "long-lived Templates workspace", `MainWindow` ownership, or "route-activation refresh rather than per-navigation recreation" as satisfied by the capability page, the injected subview host seams, the handoff mailbox, and its navigation lifecycle: the page is the Templates-local owner, `MainWindow` stays shell-only, views never depend on `MainWindow`, and the behavioral contracts are preserved (Library remains the stable/default Templates surface at `templates.library`, and Editor remains a workflow-state destination at `templates.editor` entered from explicit actions rather than a peer tab).
+
 ## Scenarios
 
 ### 1) MainWindow remains shell-only while shared Templates composition moves behind a Templates-local owner

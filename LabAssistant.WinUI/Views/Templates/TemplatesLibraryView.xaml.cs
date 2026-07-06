@@ -1,10 +1,16 @@
 using LabAssistant.WinUI.ViewModels.Templates;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Views.Templates;
 
+/// <summary>
+/// Templates Library subview. Binds directly to <see cref="TemplatesLibraryViewModel"/> via
+/// <c>x:Bind</c>; the inventory list, search inputs, selection detail, and commands are all bound with
+/// no imperative view-state marshalling. Resolves its own transient view model from DI and drives its
+/// lifecycle from <c>Loaded</c>/<c>Unloaded</c>. Cross-subview navigation and dialogs are provided by
+/// the hosting page via <see cref="ITemplatesLibraryHost"/>.
+/// </summary>
 public sealed partial class TemplatesLibraryView : UserControl
 {
     public TemplatesLibraryViewModel ViewModel { get; }
@@ -12,23 +18,9 @@ public sealed partial class TemplatesLibraryView : UserControl
     public TemplatesLibraryView()
     {
         ViewModel = App.Services.GetRequiredService<TemplatesLibraryViewModel>();
+        DataContext = ViewModel;
         InitializeComponent();
-        InitializeBridge();
-        Loaded += OnLoaded;
-        Unloaded += OnUnloaded;
-    }
-
-    partial void InitializeBridge();
-
-    private async void OnLoaded(object sender, RoutedEventArgs e)
-    {
-        AttachBridge();
-        await ViewModel.InitializeAsync();
-    }
-
-    private async void OnUnloaded(object sender, RoutedEventArgs e)
-    {
-        DetachBridge();
-        await ViewModel.CleanupAsync();
+        Loaded += async (_, _) => await ViewModel.InitializeAsync();
+        Unloaded += async (_, _) => await ViewModel.CleanupAsync();
     }
 }

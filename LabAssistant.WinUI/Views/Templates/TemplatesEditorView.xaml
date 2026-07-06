@@ -3,8 +3,12 @@
     x:Name="TemplatesEditorViewRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Templates">
-    <Grid
+    xmlns:converters="using:LabAssistant.WinUI.Converters"
+    xmlns:viewModels="using:LabAssistant.WinUI.ViewModels.Templates">
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+    <Grid
         RowSpacing="{StaticResource SpacingM}"
         AutomationProperties.LandmarkType="Main"
         XYFocusKeyboardNavigation="Enabled">
@@ -24,9 +28,9 @@
             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.TemplateIdText, Mode=OneWay}" TextWrapping="Wrap" />
             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.FilePathText, Mode=OneWay}" TextWrapping="Wrap" />
             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SlotCountText, Mode=OneWay}" TextWrapping="Wrap" />
-            <ProgressRing Width="24" Height="24" AutomationProperties.Name="Loading template editor" AutomationProperties.HelpText="Indicates whether template editor data is loading." IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
-            <TextBlock Foreground="{StaticResource ShellCriticalBrush}" AutomationProperties.LiveSetting="Assertive" Text="{x:Bind ViewModel.ErrorStateText, Mode=OneWay}" TextWrapping="Wrap" Visibility="{x:Bind ViewModel.ErrorVisibility, Mode=OneWay}" />
-            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" TextWrapping="Wrap" Visibility="{x:Bind ViewModel.StatusVisibility, Mode=OneWay}" />
+            <ProgressRing Width="24" Height="24" AutomationProperties.Name="Loading template editor" AutomationProperties.HelpText="Indicates whether template editor data is loading." IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock Foreground="{StaticResource ShellCriticalBrush}" AutomationProperties.LiveSetting="Assertive" Text="{x:Bind ViewModel.ErrorStateText, Mode=OneWay}" TextWrapping="Wrap" Visibility="{x:Bind ViewModel.HasError, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" TextWrapping="Wrap" Visibility="{x:Bind ViewModel.IsStatusVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
         </StackPanel>
 
         <Border Grid.Row="1" Padding="{StaticResource CardPadding}" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CardCornerRadius}" AutomationProperties.LandmarkType="Form">
@@ -79,7 +83,7 @@
 
             <Border Grid.Column="1" Padding="{StaticResource CardPadding}" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CardCornerRadius}" AutomationProperties.LandmarkType="Form">
                 <Grid>
-                    <ScrollViewer Visibility="{x:Bind ViewModel.SelectedSlotVisibility, Mode=OneWay}">
+                    <ScrollViewer Visibility="{x:Bind ViewModel.HasSelectedSlot, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel Margin="0,0,10,0" Spacing="{StaticResource SpacingS}">
                             <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" Text="{x:Bind ViewModel.SelectedSlotHeading, Mode=OneWay}" />
                             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedSlotSummary, Mode=OneWay}" TextWrapping="Wrap" />
@@ -129,7 +133,7 @@
                             <Button HorizontalAlignment="Left" TabIndex="13" AccessKey="P" AutomationProperties.Name="Apply slot changes" AutomationProperties.HelpText="Apply edits to the selected slot." Command="{x:Bind ViewModel.ApplySlotChangesCommand}" Content="Apply Slot Changes" IsEnabled="{x:Bind ViewModel.CanApplySlotChanges, Mode=OneWay}" />
                         </StackPanel>
                     </ScrollViewer>
-                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="Select a VM slot to edit its configuration." TextWrapping="Wrap" Visibility="{x:Bind ViewModel.NoSelectionVisibility, Mode=OneWay}" />
+                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="Select a VM slot to edit its configuration." TextWrapping="Wrap" Visibility="{x:Bind ViewModel.HasSelectedSlot, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
                 </Grid>
             </Border>
         </Grid>
