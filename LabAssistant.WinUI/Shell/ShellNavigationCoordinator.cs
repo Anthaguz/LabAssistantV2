@@ -5,6 +5,11 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace LabAssistant.WinUI.Shell;
 
+/// <summary>
+/// Thin adapter between the pure <see cref="ShellNavigationState"/> routing logic and the real
+/// shell chrome. Asks the state for a transition, then applies it to the capability
+/// <see cref="Frame"/>, the <see cref="NavigationView"/> selection, and header text.
+/// </summary>
 internal sealed class ShellNavigationCoordinator
 {
     private readonly ShellViewModel _shellViewModel;
@@ -13,17 +18,13 @@ internal sealed class ShellNavigationCoordinator
     private readonly TextBlock _currentRouteTextBlock;
     private readonly TextBlock _contentTitleTextBlock;
     private readonly TextBlock _contentDescriptionTextBlock;
-    private readonly ShellPanelVisibilityManager _panelVisibilityManager;
+    private readonly Action _applyRightPanelState;
     private readonly Action<string> _resetRightPanelForCapabilitySwitch;
     private readonly Frame _capabilityFrame;
-    private readonly IReadOnlyDictionary<string, Type> _capabilityPageTypes;
-    private readonly Type _blankPageType;
+    private readonly ShellNavigationState _state;
     private readonly Dictionary<string, NavigationViewItem> _routeToCapabilityNavigationItem = new(StringComparer.Ordinal);
 
     private IShellHost? _shellHost;
-    private ShellCapability _activeCapability;
-    private ShellSubview _activeSubview;
-    private string _activeRouteKey;
     private bool _isUpdatingNavigationSelection;
 
     public ShellNavigationCoordinator(
@@ -33,11 +34,10 @@ internal sealed class ShellNavigationCoordinator
         TextBlock currentRouteTextBlock,
         TextBlock contentTitleTextBlock,
         TextBlock contentDescriptionTextBlock,
-        ShellPanelVisibilityManager panelVisibilityManager,
+        Action applyRightPanelState,
         Action<string> resetRightPanelForCapabilitySwitch,
         Frame capabilityFrame,
-        IReadOnlyDictionary<string, Type> capabilityPageTypes,
-        Type blankPageType)
+        IReadOnlyDictionary<string, Type> capabilityPageTypes)
     {
         _shellViewModel = shellViewModel;
         _dispatcherQueue = dispatcherQueue;
@@ -45,14 +45,10 @@ internal sealed class ShellNavigationCoordinator
         _currentRouteTextBlock = currentRouteTextBlock;
         _contentTitleTextBlock = contentTitleTextBlock;
         _contentDescriptionTextBlock = contentDescriptionTextBlock;
-        _panelVisibilityManager = panelVisibilityManager;
+        _applyRightPanelState = applyRightPanelState;
         _resetRightPanelForCapabilitySwitch = resetRightPanelForCapabilitySwitch;
         _capabilityFrame = capabilityFrame;
-        _capabilityPageTypes = capabilityPageTypes;
-        _blankPageType = blankPageType;
-
-        _activeRouteKey = _shellViewModel.StartupRoute;
-        _shellViewModel.TryResolveRoute(_activeRouteKey, out _activeCapability, out _activeSubview);
+        _state = new ShellNavigationState(shellViewModel, capabilityPageTypes);
     }
 
     /// <summary>
@@ -61,26 +57,23 @@ internal sealed class ShellNavigationCoordinator
     /// </summary>
     public void SetShellHost(IShellHost shellHost) => _shellHost = shellHost;
 
-    /// <summary>True when the active capability is served by an on-demand capability page.</summary>
-    private bool IsActiveCapabilityMigrated => _capabilityPageTypes.ContainsKey(_activeCapability.Key);
-
-    public string ActiveCapabilityKey => _activeCapability.Key;
-    public bool IsMachinesOverviewActive => string.Equals(_activeRouteKey, ShellRouteKeys.MachinesOverview, StringComparison.Ordinal);
-    public bool IsDeployOverviewActive => string.Equals(_activeRouteKey, ShellRouteKeys.DeployOverview, StringComparison.Ordinal);
-    public bool IsDeployFromTemplateActive => string.Equals(_activeRouteKey, ShellRouteKeys.DeployFromTemplate, StringComparison.Ordinal);
-    public bool IsDeployQuickDeployActive => string.Equals(_activeRouteKey, ShellRouteKeys.DeployQuickDeploy, StringComparison.Ordinal);
+    public string ActiveCapabilityKey => _state.ActiveCapability.Key;
+    public bool IsMachinesOverviewActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.MachinesOverview, StringComparison.Ordinal);
+    public bool IsDeployOverviewActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.DeployOverview, StringComparison.Ordinal);
+    public bool IsDeployFromTemplateActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.DeployFromTemplate, StringComparison.Ordinal);
+    public bool IsDeployQuickDeployActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.DeployQuickDeploy, StringComparison.Ordinal);
     public bool IsDeployCapabilityActive => IsDeployOverviewActive || IsDeployFromTemplateActive || IsDeployQuickDeployActive;
-    public bool IsTemplatesLibraryActive => string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesLibrary, StringComparison.Ordinal);
-    public bool IsTemplatesEditorActive => string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesEditor, StringComparison.Ordinal);
-    public bool IsTemplatesBuilderActive => string.Equals(_activeRouteKey, ShellRouteKeys.TemplatesBuilder, StringComparison.Ordinal);
-    public bool IsAssetsOverviewActive => string.Equals(_activeRouteKey, ShellRouteKeys.AssetsOverview, StringComparison.Ordinal);
-    public bool IsAssetsBaseDisksActive => string.Equals(_activeRouteKey, ShellRouteKeys.AssetsBaseDisks, StringComparison.Ordinal);
-    public bool IsAssetsSwitchesActive => string.Equals(_activeRouteKey, ShellRouteKeys.AssetsSwitches, StringComparison.Ordinal);
+    public bool IsTemplatesLibraryActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.TemplatesLibrary, StringComparison.Ordinal);
+    public bool IsTemplatesEditorActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.TemplatesEditor, StringComparison.Ordinal);
+    public bool IsTemplatesBuilderActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.TemplatesBuilder, StringComparison.Ordinal);
+    public bool IsAssetsOverviewActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.AssetsOverview, StringComparison.Ordinal);
+    public bool IsAssetsBaseDisksActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.AssetsBaseDisks, StringComparison.Ordinal);
+    public bool IsAssetsSwitchesActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.AssetsSwitches, StringComparison.Ordinal);
     public bool IsAssetsCapabilityActive => IsAssetsOverviewActive || IsAssetsBaseDisksActive || IsAssetsSwitchesActive;
     public bool IsTemplatesCapabilityActive => IsTemplatesLibraryActive || IsTemplatesEditorActive || IsTemplatesBuilderActive;
-    public bool IsSettingsMachinesActive => string.Equals(_activeRouteKey, ShellRouteKeys.SettingsMachines, StringComparison.Ordinal);
-    public bool IsDiagnosticsOverviewActive => string.Equals(_activeRouteKey, ShellRouteKeys.DiagnosticsOverview, StringComparison.Ordinal);
-    public bool IsDiagnosticsLogsActive => string.Equals(_activeRouteKey, ShellRouteKeys.DiagnosticsLogs, StringComparison.Ordinal);
+    public bool IsSettingsMachinesActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.SettingsMachines, StringComparison.Ordinal);
+    public bool IsDiagnosticsOverviewActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.DiagnosticsOverview, StringComparison.Ordinal);
+    public bool IsDiagnosticsLogsActive => string.Equals(_state.ActiveRouteKey, ShellRouteKeys.DiagnosticsLogs, StringComparison.Ordinal);
     public bool IsDiagnosticsCapabilityActive => IsDiagnosticsOverviewActive || IsDiagnosticsLogsActive;
 
     public void ConfigureNavigationView()
@@ -116,26 +109,17 @@ internal sealed class ShellNavigationCoordinator
 
     public void NavigateToRoute(string routeKey)
     {
-        if (!_shellViewModel.TryResolveRoute(routeKey, out var capability, out var subview))
+        var transition = _state.TryChangeRoute(routeKey);
+        if (transition is null)
         {
             return;
         }
 
-        var changedCapability = !string.Equals(_activeCapability.Key, capability.Key, StringComparison.Ordinal);
-        var changedSubview = !string.Equals(_activeSubview.RouteKey, subview.RouteKey, StringComparison.Ordinal);
-        if (!changedCapability && !changedSubview)
+        if (transition.CapabilityChanged)
         {
-            return;
+            _resetRightPanelForCapabilitySwitch(transition.Capability.Key);
         }
 
-        if (changedCapability)
-        {
-            _resetRightPanelForCapabilitySwitch(capability.Key);
-        }
-
-        _activeCapability = capability;
-        _activeSubview = subview;
-        _activeRouteKey = subview.RouteKey;
         ApplyState();
     }
 
@@ -146,50 +130,36 @@ internal sealed class ShellNavigationCoordinator
     }
 
     /// <summary>
-    /// Updates shell-owned header context, panel visibility, and navigation selection for the
-    /// active route without touching the capability frame. Used both for full state application
-    /// and for subview changes a page reports back through <see cref="ReportActiveSubview"/>.
+    /// Updates shell-owned header context, right panel, and navigation selection for the active
+    /// route without touching the capability frame. Used both for full state application and for
+    /// subview changes a page reports back through <see cref="ReportActiveSubview"/>.
     /// </summary>
     private void ApplyHeaderAndPanels()
     {
-        _currentRouteTextBlock.Text = $"{_activeCapability.DisplayName} / {_activeSubview.DisplayName}";
-        _contentTitleTextBlock.Text = _activeCapability.DisplayName;
+        _currentRouteTextBlock.Text = $"{_state.ActiveCapability.DisplayName} / {_state.ActiveSubview.DisplayName}";
+        _contentTitleTextBlock.Text = _state.ActiveCapability.DisplayName;
         _contentDescriptionTextBlock.Text = GetContentDescription();
-        _panelVisibilityManager.ApplyVisibility(_activeCapability, _activeSubview);
+        _applyRightPanelState();
         QueueNavigationSelectionUpdate();
     }
 
     /// <summary>
-    /// Drives the capability frame for the active route. Migrated capabilities are shown in the
-    /// frame (navigated on-demand when the capability changes, or forwarded a subview change when
-    /// the page is already live); non-migrated capabilities keep the legacy inline content.
+    /// Drives the capability frame for the active route: navigates on-demand when the capability
+    /// changes (which also fires the outgoing page's real <c>OnNavigatedFrom</c>/<c>Unloaded</c>
+    /// teardown, so cleanup of page-owned resources like timers and in-flight work happens for
+    /// free), or forwards a subview change to the page already live in the frame.
     /// </summary>
     private void ApplyFrameState()
     {
-        if (!IsActiveCapabilityMigrated)
-        {
-            // Force a live capability page through its real teardown instead of leaving it
-            // loaded-but-hidden. Navigating to the blank page fires the previous page's
-            // OnNavigatedFrom/Unloaded so it can cancel timers and in-flight work.
-            if (_capabilityFrame.Content is not null && _capabilityFrame.Content.GetType() != _blankPageType)
-            {
-                _capabilityFrame.Navigate(_blankPageType);
-            }
-
-            _capabilityFrame.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        _capabilityFrame.Visibility = Visibility.Visible;
-        var pageType = _capabilityPageTypes[_activeCapability.Key];
+        var pageType = _state.ResolvePageType(_state.ActiveCapability.Key);
 
         if (_capabilityFrame.Content?.GetType() != pageType)
         {
-            _capabilityFrame.Navigate(pageType, new ShellNavigationRequest(_shellHost!, _activeRouteKey));
+            _capabilityFrame.Navigate(pageType, new ShellNavigationRequest(_shellHost!, _state.ActiveRouteKey));
         }
         else if (_capabilityFrame.Content is ICapabilityPage page)
         {
-            page.ShowSubview(_activeRouteKey);
+            page.ShowSubview(_state.ActiveRouteKey);
         }
     }
 
@@ -199,16 +169,10 @@ internal sealed class ShellNavigationCoordinator
     /// </summary>
     public void ReportActiveSubview(string routeKey)
     {
-        if (string.Equals(routeKey, _activeRouteKey, StringComparison.Ordinal) ||
-            !_shellViewModel.TryResolveRoute(routeKey, out var capability, out var subview) ||
-            !string.Equals(capability.Key, _activeCapability.Key, StringComparison.Ordinal))
+        if (_state.ReportActiveSubview(routeKey))
         {
-            return;
+            ApplyHeaderAndPanels();
         }
-
-        _activeSubview = subview;
-        _activeRouteKey = routeKey;
-        ApplyHeaderAndPanels();
     }
 
     public void HandleNavigationItemInvoked(NavigationViewItemInvokedEventArgs args)
@@ -229,7 +193,7 @@ internal sealed class ShellNavigationCoordinator
 
     public void QueueNavigationSelectionUpdate()
     {
-        if (!_routeToCapabilityNavigationItem.TryGetValue(_activeRouteKey, out var selectedNavigationItem) ||
+        if (!_routeToCapabilityNavigationItem.TryGetValue(_state.ActiveRouteKey, out var selectedNavigationItem) ||
             ReferenceEquals(_navigationView.SelectedItem, selectedNavigationItem))
         {
             return;
@@ -281,6 +245,6 @@ internal sealed class ShellNavigationCoordinator
             return "Inspect support-oriented diagnostics and structured log context from one capability surface.";
         }
 
-        return $"Use {_activeCapability.DisplayName} to continue to {_activeSubview.DisplayName}.";
+        return $"Use {_state.ActiveCapability.DisplayName} to continue to {_state.ActiveSubview.DisplayName}.";
     }
 }
