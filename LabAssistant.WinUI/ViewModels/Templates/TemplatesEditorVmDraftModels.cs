@@ -42,30 +42,3 @@ internal readonly record struct TemplateVhdxNormalizationResult(
     TemplateVhdxCatalogOption? EffectiveOption,
     string Message,
     string EffectiveSourceLabel);
-
-internal readonly record struct TemplatesEditorVmDraftState(
-    string VmIdText,
-    string VmName,
-    string VmMemoryText,
-    string VmCpuText,
-    string VmVhdxIdText,
-    string VmVhdPathText,
-    string VmVhdxSignatureText,
-    IReadOnlyList<string> SelectedSwitches,
-    TemplateVhdxCatalogOption? SelectedVhdxCatalogOption,
-    string VmSwitchGuidanceText,
-    string VmVhdxGuidanceText,
-    bool RequiresVhdxResolution,
-    bool IsEditingNewVmEntry,
-    bool HasChanges);
-
-internal readonly record struct TemplatesEditorVmDraftSnapshot(
-    string VmName,
-    string VmMemoryText,
-    string VmCpuText,
-    IReadOnlyList<string> SelectedSwitches,
-    TemplateVhdxCatalogOption? SelectedVhdxCatalogOption,
-    bool RequiresVhdxResolution,
-    string VhdxResolutionMessage,
-    bool IsEditingNewVmEntry,
-    bool HasChanges);

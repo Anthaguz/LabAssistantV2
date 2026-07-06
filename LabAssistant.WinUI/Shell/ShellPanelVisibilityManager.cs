@@ -7,19 +7,13 @@ internal sealed class ShellPanelVisibilityManager
 {
     private readonly FrameworkElement _nonMachinesPlaceholderTextBlock;
     private readonly Action _applyRightPanelState;
-    private readonly Action _applyTemplatesUiState;
-    private readonly Action _applyCapabilityShellState;
 
     public ShellPanelVisibilityManager(
         FrameworkElement nonMachinesPlaceholderTextBlock,
-        Action applyRightPanelState,
-        Action applyTemplatesUiState,
-        Action applyCapabilityShellState)
+        Action applyRightPanelState)
     {
         _nonMachinesPlaceholderTextBlock = nonMachinesPlaceholderTextBlock;
         _applyRightPanelState = applyRightPanelState;
-        _applyTemplatesUiState = applyTemplatesUiState;
-        _applyCapabilityShellState = applyCapabilityShellState;
     }
 
     public void ApplyVisibility(ShellCapability capability, ShellSubview subview)
@@ -37,8 +31,6 @@ internal sealed class ShellPanelVisibilityManager
             string.Equals(capability.Key, "diagnostics", StringComparison.Ordinal);
 
         _applyRightPanelState();
-        _applyTemplatesUiState();
         _nonMachinesPlaceholderTextBlock.Visibility = isKnownCapabilityActive ? Visibility.Collapsed : Visibility.Visible;
-        _applyCapabilityShellState();
     }
 }

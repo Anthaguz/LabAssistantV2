@@ -1,0 +1,20 @@
+<Page
+    x:Class="LabAssistant.WinUI.Views.Templates.TemplatesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:templateViews="using:LabAssistant.WinUI.Views.Templates">
+    <TabView
+        x:Name="SubviewTabView"
+        IsAddTabButtonVisible="False"
+        SelectionChanged="SubviewTabView_SelectionChanged">
+        <TabViewItem x:Name="LibraryTabViewItem" Header="Library" IsClosable="False">
+            <templateViews:TemplatesLibraryView x:Name="LibraryViewHost" />
+        </TabViewItem>
+        <TabViewItem x:Name="EditorTabViewItem" Header="Editor" IsClosable="False">
+            <templateViews:TemplatesEditorView x:Name="EditorViewHost" />
+        </TabViewItem>
+        <TabViewItem x:Name="BuilderTabViewItem" Header="Builder" IsClosable="False">
+            <templateViews:TemplatesBuilderView x:Name="BuilderViewHost" />
+        </TabViewItem>
+    </TabView>
+</Page>

@@ -1,15 +1,5 @@
-using LabAssistant.Business.Assets;
-using LabAssistant.Business.Machines;
-using LabAssistant.Business.Templates;
-using LabAssistant.Models.Configuration;
-using LabAssistant.Models.Deployment;
-using LabAssistant.Models.Templates;
-using LabAssistant.WinUI.Interop;
 using LabAssistant.WinUI.Shell;
 using LabAssistant.WinUI.ViewModels;
-using LabAssistant.WinUI.ViewModels.Deploy;
-using LabAssistant.WinUI.ViewModels.Machines;
-using LabAssistant.WinUI.ViewModels.Templates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -24,27 +14,16 @@ public sealed partial class MainWindow : Window
     private const string ShellApplicationTitle = "LabAssistant";
 
     private readonly ShellViewModel _shellViewModel = new();
-    private readonly IMachinesCapabilityService _machinesCapabilityService;
-    private readonly ITemplatesCapabilityService _templatesCapabilityService;
-    private readonly IAssetsSwitchesCapabilityService _assetsSwitchesCapabilityService;
     private readonly ShellLayoutManager _layoutManager;
     private readonly ShellPanelStateManager _shellPanelStateManager;
     private readonly ShellNavigationCoordinator _navigationCoordinator;
     private readonly ShellThemeManager _themeManager;
     private readonly ShellDialogService _dialogService;
     private readonly ShellKeyboardHandler _keyboardHandler;
-    private readonly TemplatesCapabilityRuntime _templatesCapabilityRuntime;
 
     public MainWindow()
     {
         InitializeComponent();
-
-        _machinesCapabilityService = App.Services.GetRequiredService<IMachinesCapabilityService>();
-        _templatesCapabilityService = App.Services.GetRequiredService<ITemplatesCapabilityService>();
-        _assetsSwitchesCapabilityService = App.Services.GetRequiredService<IAssetsSwitchesCapabilityService>();
-
-        ShellNavigationCoordinator? navigationCoordinator = null;
-        TemplatesCapabilityRuntime? templatesCapabilityRuntime = null;
 
         _layoutManager = new ShellLayoutManager(GlobalNavigationView);
         _themeManager = new ShellThemeManager(
@@ -65,18 +44,17 @@ public sealed partial class MainWindow : Window
             () => RootLayout.ActualWidth);
         var panelVisibilityManager = new ShellPanelVisibilityManager(
             NonMachinesPlaceholderTextBlock,
-            ApplyRightPanelState,
-            () => templatesCapabilityRuntime?.ApplyUiState(),
-            ApplyCapabilityShellState);
+            ApplyRightPanelState);
         var capabilityPageTypes = new Dictionary<string, Type>(StringComparer.Ordinal)
         {
             ["machines"] = typeof(Views.Machines.MachinesPage),
             ["assets"] = typeof(Views.Assets.AssetsPage),
             ["diagnostics"] = typeof(Views.Diagnostics.DiagnosticsPage),
             ["deploy"] = typeof(Views.Deploy.DeployPage),
+            ["templates"] = typeof(Views.Templates.TemplatesPage),
             ["settings"] = typeof(Views.Settings.SettingsPage)
         };
-        _navigationCoordinator = navigationCoordinator = new ShellNavigationCoordinator(
+        _navigationCoordinator = new ShellNavigationCoordinator(
             _shellViewModel,
             DispatcherQueue,
             GlobalNavigationView,
@@ -94,9 +72,10 @@ public sealed partial class MainWindow : Window
             _dialogService,
             _shellPanelStateManager));
 
-        _templatesCapabilityRuntime = templatesCapabilityRuntime = CreateTemplatesCapabilityRuntime();
+        // Shell chrome only: register the navigator the Templates editor hand-off uses to route to
+        // the Templates capability. The transient TemplatesPage drains the pending document on entry.
         App.Services.GetRequiredService<ViewModels.Templates.ITemplateEditorHandoff>()
-            .SetHandler((document, statusText) => _templatesCapabilityRuntime.ShowEditorDocumentAsync(document, statusText));
+            .SetNavigator(() => NavigateToRoute(ShellRouteKeys.TemplatesEditor));
 
         ConfigureShellIcons();
         _navigationCoordinator.ConfigureNavigationView();
@@ -110,27 +89,10 @@ public sealed partial class MainWindow : Window
         RootLayout.SizeChanged += RootLayout_SizeChanged;
         _layoutManager.CompactFallbackChanged += (_, isCompact) => _shellPanelStateManager.SetCompactFallback(isCompact);
 
-        RootLayout.Loaded += async (_, _) =>
-        {
-            RootLayout.Focus(FocusState.Programmatic);
-            try
-            {
-                await _templatesCapabilityRuntime.EnsureEditorReferenceDataAsync(forceRefresh: true);
-                await _templatesCapabilityRuntime.EnsureLibraryAsync(forceRefresh: true);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] Loaded initialization failed: {ex}");
-            }
-        };
+        RootLayout.Loaded += (_, _) => RootLayout.Focus(FocusState.Programmatic);
 
         ApplyState();
     }
-
-    private bool IsTemplatesLibraryActive => _navigationCoordinator.IsTemplatesLibraryActive;
-    private bool IsTemplatesEditorActive => _navigationCoordinator.IsTemplatesEditorActive;
-    private bool IsTemplatesBuilderActive => _navigationCoordinator.IsTemplatesBuilderActive;
-    private bool IsTemplatesCapabilityActive => _navigationCoordinator.IsTemplatesCapabilityActive;
 
     private void ApplyState()
     {
@@ -140,26 +102,10 @@ public sealed partial class MainWindow : Window
 
     private void ApplyRightPanelState() => _shellPanelStateManager.ApplyRightPanelState();
 
-    private void ApplyCapabilityShellState()
-    {
-        _templatesCapabilityRuntime.ApplyShellState();
-    }
-
     private void ResetRightPanelForCapabilitySwitch(string incomingCapabilityKey) =>
         _shellPanelStateManager.ResetForCapabilitySwitch(incomingCapabilityKey);
 
     private void NavigateToRoute(string routeKey) => _navigationCoordinator.NavigateToRoute(routeKey);
-
-    private Task<string?> PickTemplateFileForOpenAsync() => _dialogService.PickTemplateFileForOpenAsync();
-
-    private Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName) =>
-        _dialogService.PickTemplateFileForSaveAsync(suggestedFileName);
-
-    private Task<bool> ShowDeleteTemplateConfirmationDialogAsync(TemplateLibraryItem selectedTemplate) =>
-        _dialogService.ShowDeleteTemplateConfirmationDialogAsync(selectedTemplate);
-
-    private Task<bool> ShowRemoveTemplateVmConfirmationDialogAsync(string vmName) =>
-        _dialogService.ShowRemoveTemplateVmConfirmationDialogAsync(vmName);
 
     private void HamburgerButton_Click(object sender, RoutedEventArgs e) =>
         GlobalNavigationView.IsPaneOpen = !GlobalNavigationView.IsPaneOpen;

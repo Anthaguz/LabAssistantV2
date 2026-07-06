@@ -1,23 +1,66 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using LabAssistant.Business.Templates;
 
 namespace LabAssistant.WinUI.ViewModels.Templates;
 
 /// <summary>
-/// Default <see cref="ITemplateEditorHandoff"/> mediator. Registered as a DI singleton so the
-/// Templates runtime (created later, in the shell) can register its editor handler while Deploy
-/// resolves the same instance to request editor handoffs. This removes the Templates-specific
-/// method that previously sat on the otherwise capability-agnostic shell host seam.
+/// Default <see cref="ITemplateEditorHandoff"/> mediator. Registered as a DI singleton so the pending
+/// editor document survives the transient Templates page: Deploy resolves this instance to request an
+/// editor handoff, the shell registers a navigator, and the Templates page drains the pending document
+/// on entry. This keeps the Templates-specific routing off the otherwise capability-agnostic shell host.
 /// </summary>
 internal sealed class TemplateEditorHandoff : ITemplateEditorHandoff
 {
-    private Func<TemplateEditorDocument, string, Task>? _handler;
+    private readonly object _gate = new();
+    private Action? _navigator;
+    private TemplateEditorDocument? _pendingDocument;
+    private string _pendingStatusText = string.Empty;
 
     /// <inheritdoc />
-    public Task ShowInEditorAsync(TemplateEditorDocument document, string statusText) =>
-        _handler?.Invoke(document, statusText) ?? Task.CompletedTask;
+    public Task ShowInEditorAsync(TemplateEditorDocument document, string statusText)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        Action? navigator;
+        lock (_gate)
+        {
+            _pendingDocument = document;
+            _pendingStatusText = statusText ?? string.Empty;
+            navigator = _navigator;
+        }
+
+        navigator?.Invoke();
+        return Task.CompletedTask;
+    }
 
     /// <inheritdoc />
-    public void SetHandler(Func<TemplateEditorDocument, string, Task>? handler) => _handler = handler;
+    public void SetNavigator(Action? navigator)
+    {
+        lock (_gate)
+        {
+            _navigator = navigator;
+        }
+    }
+
+    /// <inheritdoc />
+    public bool TryTakePendingDocument([NotNullWhen(true)] out TemplateEditorDocument? document, out string statusText)
+    {
+        lock (_gate)
+        {
+            if (_pendingDocument is null)
+            {
+                document = null;
+                statusText = string.Empty;
+                return false;
+            }
+
+            document = _pendingDocument;
+            statusText = _pendingStatusText;
+            _pendingDocument = null;
+            _pendingStatusText = string.Empty;
+            return true;
+        }
+    }
 }

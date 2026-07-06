@@ -9,7 +9,8 @@ It tells you what the current shell looks like and what pattern to reach for fir
 
 The app is moving from a "every capability view is always instantiated and toggled by `Visibility`" shell toward on-demand capability pages hosted in a `Frame`.
 This is partial.
-As of now, `Machines`, `Diagnostics`, `Assets`, `Settings`, and `Deploy` are migrated; the remaining capability (`Templates`) still uses the older long-lived-workspace/runtime model.
+As of now, `Machines`, `Diagnostics`, `Assets`, `Settings`, and `Deploy` are migrated, and `Templates` is now page-hosted through `TemplatesPage` in the `Frame` as well.
+`Templates` Library and Editor subviews are on full `x:Bind` MVVM (transient view models resolved from DI, reached through injected host seams); its Builder subview still runs on its preserved controller/composition through an interim page-owned adapter, pending its own MVVM decomposition.
 
 Because of that, do not assume the whole app already works the frame way, and do not assume the older capabilities are wrong.
 When you touch a capability, prefer the migrated pattern below, but treating a not-yet-migrated capability as a bug (rather than as pending work) is itself a mistake.

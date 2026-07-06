@@ -2,8 +2,7 @@
     x:Class="LabAssistant.WinUI.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:machineViews="using:LabAssistant.WinUI.Views.Machines"
-    xmlns:templateViews="using:LabAssistant.WinUI.Views.Templates">
+    xmlns:machineViews="using:LabAssistant.WinUI.Views.Machines">
     <Grid x:Name="RootLayout" Background="{StaticResource ShellBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="56" />
@@ -138,35 +137,6 @@
                                     Grid.Column="0"
                                     IsNavigationStackEnabled="False"
                                     Visibility="Collapsed" />
-                                <Border
-                                    x:Name="TemplatesWorkspacePanel"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Padding="8"
-                                    Background="{StaticResource ShellContentBackgroundBrush}"
-                                    BorderBrush="{StaticResource ShellBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    VerticalAlignment="Stretch"
-                                    Visibility="Collapsed">
-                                    <Grid>
-                                        <templateViews:TemplatesLibraryView
-                                            x:Name="TemplatesLibraryViewHost"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch"
-                                            Visibility="Collapsed" />
-                                        <templateViews:TemplatesEditorView
-                                            x:Name="TemplatesEditorViewHost"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch"
-                                            Visibility="Collapsed" />
-                                        <templateViews:TemplatesBuilderView
-                                            x:Name="TemplatesBuilderViewHost"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch"
-                                            Visibility="Collapsed" />
-                                    </Grid>
-                                </Border>
                                 <TextBlock
                                     x:Name="NonMachinesPlaceholderTextBlock"
                                     Grid.Row="0"
