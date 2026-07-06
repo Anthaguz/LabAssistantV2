@@ -135,15 +135,7 @@
                                     x:Name="CapabilityFrame"
                                     Grid.Row="0"
                                     Grid.Column="0"
-                                    IsNavigationStackEnabled="False"
-                                    Visibility="Collapsed" />
-                                <TextBlock
-                                    x:Name="NonMachinesPlaceholderTextBlock"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="Select a capability to continue."
-                                    TextWrapping="Wrap" />
+                                    IsNavigationStackEnabled="False" />
                             </Grid>
                         </Grid>
                     </Border>
