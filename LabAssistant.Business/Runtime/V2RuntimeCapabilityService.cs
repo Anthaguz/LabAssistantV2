@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using LabAssistant.Business.Deployment;
+using LabAssistant.Business.Runtime.Scheduling;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
@@ -24,6 +25,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly V2NetworkSwitchRuntimeStage _networkSwitchRuntimeStage;
     private readonly IVmCleanupOrchestrator _cleanupOrchestrator;
     private readonly IStructuredLogger _structuredLogger;
+    private readonly IV2PlanScheduler _scheduler;
+    private readonly bool _useGraphScheduler;
+
+    /// <summary>Environment variable that force-enables the graph scheduler for manual real-hardware trials.</summary>
+    private const string GraphSchedulerEnvVariable = "LABASSISTANT_V2_USE_GRAPH_SCHEDULER";
 
     public V2RuntimeCapabilityService(
         Func<IPersistentPowerShellSession> sessionFactory,
@@ -31,7 +37,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         IGuestCommandExecutor guestCommandExecutor,
         IVmCleanupOrchestrator cleanupOrchestrator,
         IStructuredLogger? structuredLogger = null,
-        IHyperVMachineAdminService? machineAdminService = null)
+        IHyperVMachineAdminService? machineAdminService = null,
+        bool useGraphScheduler = false)
     {
         _sessionFactory = sessionFactory;
         _hyperVFactory = hyperVFactory;
@@ -44,6 +51,16 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         _networkSwitchRuntimeStage = new V2NetworkSwitchRuntimeStage(machineAdminService, structuredLogger);
         _cleanupOrchestrator = cleanupOrchestrator;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
+        _scheduler = new V2PlanScheduler();
+        _useGraphScheduler = useGraphScheduler || ResolveGraphSchedulerEnvOverride();
+    }
+
+    private static bool ResolveGraphSchedulerEnvOverride()
+    {
+        var value = Environment.GetEnvironmentVariable(GraphSchedulerEnvVariable);
+        return !string.IsNullOrWhiteSpace(value) &&
+               (string.Equals(value, "1", StringComparison.Ordinal) ||
+                string.Equals(value, "true", StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<V2RuntimeExecutionResult> ExecuteAsync(
@@ -88,6 +105,33 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             StringComparer.Ordinal);
 
         EnsureOperationId(multiContext);
+
+        IV2NodeExecutorRegistry? graphRegistry = null;
+        if (_useGraphScheduler)
+        {
+            graphRegistry = BuildGraphSchedulerRegistry(request, multiContext, states, trustStates, switchStates, executedNodeIds);
+            try
+            {
+                // Validate early, before any Hyper-V work: an unregistered kind (e.g. ApplyCapabilityRole), a cycle, or an
+                // unreachable node fails the run loudly rather than silently skipping work.
+                V2PlanGraph.Build(request.Plan).Validate(graphRegistry);
+            }
+            catch (V2SchedulerValidationException validation)
+            {
+                foreach (var state in states)
+                {
+                    state.Dispose();
+                }
+
+                return new V2RuntimeExecutionResult
+                {
+                    Success = false,
+                    DeploymentContext = multiContext,
+                    BlockingMessages = validation.Errors.ToList()
+                };
+            }
+        }
+
         using var cancellationRegistration = cancellationToken.Register(multiContext.RequestUserCancellation);
 
         multiContext.MarkRunning();
@@ -95,77 +139,27 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         try
         {
-            await _networkSwitchRuntimeStage.ExecuteAsync(
-                request,
-                multiContext,
-                BuildNetworkSwitchAffectedVmStates(states),
-                switchStates,
-                executedNodeIds,
-                cancellationToken);
-
-            if (!multiContext.IsCancellationRequested && states.All(state => state.Context.IsSuccess))
+            if (_useGraphScheduler)
             {
-                var rootStates = states
-                    .Where(state => IsRootFirstDomainController(state))
-                    .ToList();
-
-                if (rootStates.Count > 0)
-                {
-                    await ExecuteCriticalRootReadinessStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
-                }
-
-                var shouldContinue = !multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess);
-                if (shouldContinue)
-                {
-                    var nonRootStates = states
-                        .Where(state => !IsRootFirstDomainController(state))
-                        .ToList();
-
-                    if (request.Plan.Context.ResolvedDeploymentProfile == V2DeploymentProfile.Conservative)
-                    {
-                        await ExecuteRootPromotionStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
-                        if (!multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess))
-                        {
-                            await ExecuteRemainingStageAsync(
-                                request,
-                                multiContext,
-                                rootStates,
-                                nonRootStates,
-                                executedNodeIds,
-                                deferredNodeIds,
-                                cancellationToken);
-                        }
-                    }
-                    else
-                    {
-                        var rootPromotionTask = ExecuteRootPromotionStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
-                        var nonRootPreparationTask = ExecuteNonRootPreparationStageAsync(
-                            request,
-                            multiContext,
-                            nonRootStates,
-                            executedNodeIds,
-                            deferredNodeIds,
-                            cancellationToken);
-
-                        await Task.WhenAll(rootPromotionTask, nonRootPreparationTask);
-                        if (!multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess))
-                        {
-                            await ExecutePostRootRouterAndDomainProgressionAsync(
-                                request,
-                                multiContext,
-                                rootStates,
-                                nonRootStates,
-                                executedNodeIds,
-                                deferredNodeIds,
-                                cancellationToken);
-                        }
-                    }
-                }
+                await _scheduler.ExecuteAsync(
+                    request.Plan,
+                    graphRegistry!,
+                    V2SchedulerOptionsFactory.ForProfile(request.Plan.Context.ResolvedDeploymentProfile),
+                    _structuredLogger,
+                    cancellationToken);
             }
-
-            await _forestTrustRuntimeStage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
-            await CleanupFailedOrCancelledVmsAsync(multiContext, states);
-            await _networkSwitchRuntimeStage.CleanupCreatedAsync(multiContext, switchStates, cancellationToken);
+            else
+            {
+                await ExecuteLegacyStagePipelineAsync(
+                    request,
+                    multiContext,
+                    states,
+                    trustStates,
+                    switchStates,
+                    executedNodeIds,
+                    deferredNodeIds,
+                    cancellationToken);
+            }
         }
         finally
         {
@@ -191,6 +185,254 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             DeferredNodeIds = deferredNodeIds.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
             BlockingMessages = blockingMessages
         };
+    }
+
+    /// <summary>
+    /// The original hardcoded stage pipeline: network switches, then root readiness/promotion and the profile-specific
+    /// remaining stages, then trust/VM/switch cleanup. Preserved verbatim so the graph scheduler can run alongside it
+    /// (default off) until parity is proven. This is the code the O3 workstream will delete.
+    /// </summary>
+    private async Task ExecuteLegacyStagePipelineAsync(
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<RuntimeVmState> states,
+        IReadOnlyList<V2TrustRuntimeContext> trustStates,
+        IReadOnlyList<V2NetworkSwitchRuntimeContext> switchStates,
+        ISet<string> executedNodeIds,
+        ISet<string> deferredNodeIds,
+        CancellationToken cancellationToken)
+    {
+        await _networkSwitchRuntimeStage.ExecuteAsync(
+            request,
+            multiContext,
+            BuildNetworkSwitchAffectedVmStates(states),
+            switchStates,
+            executedNodeIds,
+            cancellationToken);
+
+        if (!multiContext.IsCancellationRequested && states.All(state => state.Context.IsSuccess))
+        {
+            var rootStates = states
+                .Where(state => IsRootFirstDomainController(state))
+                .ToList();
+
+            if (rootStates.Count > 0)
+            {
+                await ExecuteCriticalRootReadinessStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+            }
+
+            var shouldContinue = !multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess);
+            if (shouldContinue)
+            {
+                var nonRootStates = states
+                    .Where(state => !IsRootFirstDomainController(state))
+                    .ToList();
+
+                if (request.Plan.Context.ResolvedDeploymentProfile == V2DeploymentProfile.Conservative)
+                {
+                    await ExecuteRootPromotionStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+                    if (!multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess))
+                    {
+                        await ExecuteRemainingStageAsync(
+                            request,
+                            multiContext,
+                            rootStates,
+                            nonRootStates,
+                            executedNodeIds,
+                            deferredNodeIds,
+                            cancellationToken);
+                    }
+                }
+                else
+                {
+                    var rootPromotionTask = ExecuteRootPromotionStageAsync(rootStates, request, multiContext, executedNodeIds, deferredNodeIds, cancellationToken);
+                    var nonRootPreparationTask = ExecuteNonRootPreparationStageAsync(
+                        request,
+                        multiContext,
+                        nonRootStates,
+                        executedNodeIds,
+                        deferredNodeIds,
+                        cancellationToken);
+
+                    await Task.WhenAll(rootPromotionTask, nonRootPreparationTask);
+                    if (!multiContext.IsCancellationRequested && rootStates.All(state => state.Context.IsSuccess))
+                    {
+                        await ExecutePostRootRouterAndDomainProgressionAsync(
+                            request,
+                            multiContext,
+                            rootStates,
+                            nonRootStates,
+                            executedNodeIds,
+                            deferredNodeIds,
+                            cancellationToken);
+                    }
+                }
+            }
+        }
+
+        await _forestTrustRuntimeStage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+        await CleanupFailedOrCancelledVmsAsync(multiContext, states);
+        await _networkSwitchRuntimeStage.CleanupCreatedAsync(multiContext, switchStates, cancellationToken);
+    }
+
+    /// <summary>Node kinds executed against a single VM via <see cref="ExecutePlanNodeAsync"/>.</summary>
+    private static readonly V2PlanNodeKind[] GraphVmNodeKinds =
+    {
+        V2PlanNodeKind.ProvisionVm,
+        V2PlanNodeKind.EnableGuestServices,
+        V2PlanNodeKind.StartVm,
+        V2PlanNodeKind.GuestTransportReady,
+        V2PlanNodeKind.PrepareGuestNetwork,
+        V2PlanNodeKind.ConfigureBaseRemoteAccess,
+        V2PlanNodeKind.BaseRemoteAccessReady,
+        V2PlanNodeKind.PrepareRouterNetwork,
+        V2PlanNodeKind.InstallRouterRemoteAccessFeature,
+        V2PlanNodeKind.EnableRouterRouting,
+        V2PlanNodeKind.ConfigureRouterNat,
+        V2PlanNodeKind.ValidateCrossSwitchRouting,
+        V2PlanNodeKind.ValidateRouterEgress,
+        V2PlanNodeKind.InstallAdDomainServicesFeature,
+        V2PlanNodeKind.PromoteFirstDomainController,
+        V2PlanNodeKind.PromoteReplicaDomainController,
+        V2PlanNodeKind.ReplicaDomainReady,
+        V2PlanNodeKind.StabilizeDomainDns,
+        V2PlanNodeKind.JoinDomain,
+        V2PlanNodeKind.JoinedDomainReady,
+        V2PlanNodeKind.DomainReady,
+        V2PlanNodeKind.RouterReady
+    };
+
+    /// <summary>Forest-trust node kinds executed via the trust stage.</summary>
+    private static readonly V2PlanNodeKind[] GraphTrustNodeKinds =
+    {
+        V2PlanNodeKind.PrepareForestTrustDns,
+        V2PlanNodeKind.CreateForestTrust,
+        V2PlanNodeKind.ValidateForestTrust
+    };
+
+    /// <summary>
+    /// Builds the per-run executor registry for the graph scheduler. Each executor wraps an existing coordinator, stage,
+    /// or script-builder call unchanged; failure is surfaced to the scheduler by throwing after the wrapped call marks its
+    /// context. Cleanup delegates map to the three existing cleanup homes (per-VM delete, switch removal, trust removal)
+    /// and are guarded so each resource is cleaned at most once as the scheduler unwinds in reverse completion order.
+    /// <c>ApplyCapabilityRole</c> is intentionally not registered so a plan that contains it fails validation loudly.
+    /// </summary>
+    private IV2NodeExecutorRegistry BuildGraphSchedulerRegistry(
+        V2RuntimeExecutionRequest request,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<RuntimeVmState> states,
+        IReadOnlyList<V2TrustRuntimeContext> trustStates,
+        IReadOnlyList<V2NetworkSwitchRuntimeContext> switchStates,
+        ISet<string> executedNodeIds)
+    {
+        var stateByVmId = states.ToDictionary(state => state.PlanVm.VmId, StringComparer.OrdinalIgnoreCase);
+        var anchorStates = BuildForestTrustAnchorStates(states);
+        var affectedVmStates = BuildNetworkSwitchAffectedVmStates(states);
+
+        // Once-guards so cleanup runs at most once per resource across the scheduler's reverse-order unwind.
+        var cleanedVmIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var trustCleanupDone = new bool[1];
+        var switchCleanupDone = new bool[1];
+
+        Func<V2NodeExecutionContext, CancellationToken, Task> vmExecute = async (context, ct) =>
+        {
+            var node = context.Node;
+            if (!stateByVmId.TryGetValue(node.VmId, out var state))
+            {
+                return;
+            }
+
+            var wasSuccessBefore = state.Context.IsSuccess;
+            await ExecutePlanNodeAsync(state, node, request, multiContext, executedNodeIds, ct);
+            if (state.Context.WasCancelled)
+            {
+                throw new OperationCanceledException();
+            }
+
+            if (wasSuccessBefore && !state.Context.IsSuccess)
+            {
+                throw new InvalidOperationException(
+                    state.Context.FailureMessage ?? $"Node '{node.NodeId}' ({node.Kind}) failed.");
+            }
+        };
+
+        Func<V2NodeExecutionContext, CancellationToken, Task> vmCleanup = async (context, ct) =>
+        {
+            var node = context.Node;
+            if (!stateByVmId.TryGetValue(node.VmId, out var state))
+            {
+                return;
+            }
+
+            if (!cleanedVmIds.Add(state.PlanVm.VmId))
+            {
+                return;
+            }
+
+            await CleanupSingleVmAsync(state, multiContext);
+        };
+
+        Func<V2NodeExecutionContext, CancellationToken, Task> trustExecute = async (context, ct) =>
+        {
+            var (executed, success, wasCancelled) = await _forestTrustRuntimeStage.ExecuteTrustNodeAsync(
+                request, context.Node, anchorStates, multiContext, executedNodeIds, ct);
+            if (wasCancelled)
+            {
+                throw new OperationCanceledException();
+            }
+
+            if (executed && !success)
+            {
+                throw new InvalidOperationException($"Forest-trust node '{context.Node.NodeId}' ({context.Node.Kind}) failed.");
+            }
+        };
+
+        Func<V2NodeExecutionContext, CancellationToken, Task> trustCleanup = async (context, ct) =>
+        {
+            if (trustCleanupDone[0])
+            {
+                return;
+            }
+
+            trustCleanupDone[0] = true;
+            await _forestTrustRuntimeStage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+        };
+
+        Func<V2NodeExecutionContext, CancellationToken, Task> switchExecute = async (context, ct) =>
+        {
+            var success = await _networkSwitchRuntimeStage.EnsureNetworkSwitchNodeAsync(
+                request, context.Node, switchStates, multiContext, affectedVmStates, executedNodeIds);
+            if (!success)
+            {
+                throw new InvalidOperationException($"Network-switch node '{context.Node.NodeId}' failed.");
+            }
+        };
+
+        Func<V2NodeExecutionContext, CancellationToken, Task> switchCleanup = async (context, ct) =>
+        {
+            if (switchCleanupDone[0])
+            {
+                return;
+            }
+
+            switchCleanupDone[0] = true;
+            await _networkSwitchRuntimeStage.CleanupCreatedAsync(multiContext, switchStates, CancellationToken.None);
+        };
+
+        var executors = new List<IV2NodeExecutor>();
+        foreach (var kind in GraphVmNodeKinds)
+        {
+            executors.Add(new V2DelegatingNodeExecutor(kind, vmExecute, vmCleanup));
+        }
+
+        foreach (var kind in GraphTrustNodeKinds)
+        {
+            executors.Add(new V2DelegatingNodeExecutor(kind, trustExecute, trustCleanup));
+        }
+
+        executors.Add(new V2DelegatingNodeExecutor(V2PlanNodeKind.EnsureNetworkSwitch, switchExecute, switchCleanup));
+
+        return new V2NodeExecutorRegistry(executors);
     }
 
     private async Task ExecuteCriticalRootReadinessStageAsync(
@@ -2086,20 +2328,30 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         MultiVmDeploymentContext multiContext,
         IReadOnlyList<RuntimeVmState> states)
     {
-        foreach (var state in states.Where(NeedsCleanup))
+        foreach (var state in states)
         {
-            multiContext.MarkCleanupInProgress();
-            EmitVmScopedEvent("CleanupStarted", "info", multiContext, state.Context, "started");
-            var cleanupResult = await _cleanupOrchestrator.CleanupAsync(state.Context, state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory));
-            state.Context.CleanupResult = cleanupResult;
-            multiContext.CleanupResults.Add(cleanupResult);
-            EmitVmScopedEvent(
-                "CleanupCompleted",
-                cleanupResult.HasResiduals ? "warn" : "info",
-                multiContext,
-                state.Context,
-                cleanupResult.HasResiduals ? "completed_with_residuals" : "completed");
+            await CleanupSingleVmAsync(state, multiContext);
         }
+    }
+
+    private async Task CleanupSingleVmAsync(RuntimeVmState state, MultiVmDeploymentContext multiContext)
+    {
+        if (!NeedsCleanup(state))
+        {
+            return;
+        }
+
+        multiContext.MarkCleanupInProgress();
+        EmitVmScopedEvent("CleanupStarted", "info", multiContext, state.Context, "started");
+        var cleanupResult = await _cleanupOrchestrator.CleanupAsync(state.Context, state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory));
+        state.Context.CleanupResult = cleanupResult;
+        multiContext.CleanupResults.Add(cleanupResult);
+        EmitVmScopedEvent(
+            "CleanupCompleted",
+            cleanupResult.HasResiduals ? "warn" : "info",
+            multiContext,
+            state.Context,
+            cleanupResult.HasResiduals ? "completed_with_residuals" : "completed");
     }
 
     private static bool NeedsCleanup(RuntimeVmState state)

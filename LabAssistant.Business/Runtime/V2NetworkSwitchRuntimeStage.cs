@@ -161,6 +161,50 @@ internal sealed class V2NetworkSwitchRuntimeStage
         }
     }
 
+    /// <summary>
+    /// Ensures the single network switch referenced by <paramref name="node"/> for the graph scheduler.
+    /// The switch-before-VM ordering is enforced by the plan's dependency edges; this method resolves the requirement and
+    /// runtime state for the node and runs the existing ensure logic unchanged. Unlike the batch path it does not request
+    /// cancellation on failure - it returns <c>false</c> so the scheduler can drain and clean up.
+    /// </summary>
+    internal async Task<bool> EnsureNetworkSwitchNodeAsync(
+        V2RuntimeExecutionRequest request,
+        V2PlanNode node,
+        IReadOnlyList<V2NetworkSwitchRuntimeContext> switchStates,
+        MultiVmDeploymentContext multiContext,
+        IReadOnlyList<V2NetworkSwitchAffectedVmState> affectedVmStates,
+        ISet<string> executedNodeIds)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(switchStates);
+        ArgumentNullException.ThrowIfNull(multiContext);
+        ArgumentNullException.ThrowIfNull(affectedVmStates);
+        ArgumentNullException.ThrowIfNull(executedNodeIds);
+
+        var requirement = request.Plan.Context.NetworkSwitchRequirements.FirstOrDefault(item =>
+            string.Equals(item.NodeId, node.NodeId, StringComparison.Ordinal));
+        if (requirement is null)
+        {
+            return true;
+        }
+
+        var switchState = switchStates.FirstOrDefault(state =>
+            string.Equals(state.SwitchName, requirement.SwitchName, StringComparison.OrdinalIgnoreCase));
+        if (switchState is null)
+        {
+            return true;
+        }
+
+        var success = await EnsureNetworkSwitchAsync(requirement, switchState, multiContext, affectedVmStates);
+        if (success)
+        {
+            executedNodeIds.Add(requirement.NodeId);
+        }
+
+        return success;
+    }
+
     private async Task<bool> EnsureNetworkSwitchAsync(
         V2ResolvedNetworkSwitchRequirement requirement,
         V2NetworkSwitchRuntimeContext switchState,
