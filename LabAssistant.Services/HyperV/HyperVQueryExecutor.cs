@@ -51,7 +51,21 @@ public sealed class HyperVQueryExecutor : IHyperVQueryExecutor, IDisposable
         }
 
         var commandStopwatch = Stopwatch.StartNew();
-        var (output, error) = await session.ExecuteAsync(script, cancellationToken).ConfigureAwait(false);
+        string output;
+        string error;
+        try
+        {
+            (output, error) = await session.ExecuteAsync(script, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // A thrown execution (cancellation faults and kills the underlying session; a faulted session
+            // refuses further commands) leaves the cached session unusable. Evict and dispose it so the
+            // next call checks out a fresh, healthy session and the pool slot held by the dead session is
+            // reclaimed instead of leaking for the executor's lifetime.
+            EvictSession(session);
+            throw;
+        }
         commandStopwatch.Stop();
 
         HyperVPowerShellTimingLogger.LogQueryExecution(
@@ -68,6 +82,20 @@ public sealed class HyperVQueryExecutor : IHyperVQueryExecutor, IDisposable
             SessionCreationDurationMs = sessionCreationDurationMs,
             CommandDurationMs = commandStopwatch.ElapsedMilliseconds
         };
+    }
+
+    private void EvictSession(IPersistentPowerShellSession session)
+    {
+        lock (_sync)
+        {
+            if (ReferenceEquals(_session, session))
+            {
+                _session = null;
+            }
+        }
+
+        // Dispose outside the lock: for a pooled lease this returns/retires the handle, freeing the slot.
+        session.Dispose();
     }
 
     public void Dispose()
