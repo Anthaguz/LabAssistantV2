@@ -317,7 +317,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
             AdapterName = element.TryGetProperty("AdapterName", out var adapterName) ? adapterName.GetString() ?? string.Empty : string.Empty,
             SwitchName = element.TryGetProperty("SwitchName", out var switchName) ? switchName.GetString() : null,
             MacAddress = element.TryGetProperty("MacAddress", out var macAddress)
-                ? MacAddressNormalizer.Normalize(macAddress.GetString())
+                ? MacAddressNormalizer.NormalizeMacAddress(macAddress.GetString())
                 : string.Empty
         };
     }

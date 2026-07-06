@@ -13,7 +13,7 @@ public class MacAddressNormalizerTests
     [InlineData("00155DABCDEF", "00155DABCDEF")]
     public void Normalize_StripsSeparatorsAndUppercases(string input, string expected)
     {
-        Assert.Equal(expected, MacAddressNormalizer.Normalize(input));
+        Assert.Equal(expected, MacAddressNormalizer.NormalizeMacAddress(input));
     }
 
     [Theory]
@@ -22,7 +22,7 @@ public class MacAddressNormalizerTests
     [InlineData("   ")]
     public void Normalize_NullOrBlank_ReturnsEmpty(string? input)
     {
-        Assert.Equal(string.Empty, MacAddressNormalizer.Normalize(input));
+        Assert.Equal(string.Empty, MacAddressNormalizer.NormalizeMacAddress(input));
     }
 
     [Fact]
