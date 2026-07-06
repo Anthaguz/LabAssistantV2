@@ -1,3 +1,4 @@
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Shell;
 using LabAssistant.WinUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ public sealed partial class MainWindow : Window
     private readonly ShellThemeManager _themeManager;
     private readonly ShellDialogService _dialogService;
     private readonly ShellKeyboardHandler _keyboardHandler;
+    private readonly IStructuredLogger _structuredLogger = App.Services.GetRequiredService<IStructuredLogger>();
 
     public MainWindow()
     {
@@ -42,9 +44,6 @@ public sealed partial class MainWindow : Window
             RightPanelTitleTextBlock,
             RightPanelContentHost,
             () => RootLayout.ActualWidth);
-        var panelVisibilityManager = new ShellPanelVisibilityManager(
-            NonMachinesPlaceholderTextBlock,
-            ApplyRightPanelState);
         var capabilityPageTypes = new Dictionary<string, Type>(StringComparer.Ordinal)
         {
             ["machines"] = typeof(Views.Machines.MachinesPage),
@@ -61,11 +60,10 @@ public sealed partial class MainWindow : Window
             CurrentRouteTextBlock,
             ContentTitleTextBlock,
             ContentDescriptionTextBlock,
-            panelVisibilityManager,
+            ApplyRightPanelState,
             ResetRightPanelForCapabilitySwitch,
             CapabilityFrame,
-            capabilityPageTypes,
-            typeof(Views.Shell.ShellBlankPage));
+            capabilityPageTypes);
         _navigationCoordinator.SetShellHost(new ShellHost(
             _navigationCoordinator,
             () => RootLayout.XamlRoot,
@@ -90,6 +88,7 @@ public sealed partial class MainWindow : Window
         _layoutManager.CompactFallbackChanged += (_, isCompact) => _shellPanelStateManager.SetCompactFallback(isCompact);
 
         RootLayout.Loaded += (_, _) => RootLayout.Focus(FocusState.Programmatic);
+        Closed += MainWindow_Closed;
 
         ApplyState();
     }
@@ -98,6 +97,35 @@ public sealed partial class MainWindow : Window
     {
         _themeManager.ApplyTheme();
         _navigationCoordinator.ApplyState();
+    }
+
+    /// <summary>
+    /// Forces any live capability page through its real <c>OnNavigatedFrom</c>/<c>Unloaded</c>
+    /// teardown (stopping timers, cancelling in-flight work) before the window is destroyed.
+    /// Process exit alone would skip that lifecycle step and leak page-owned resources. Must
+    /// stay synchronous and cannot throw: the window is already closing and there is no safe
+    /// point to defer or retry cleanup.
+    /// </summary>
+    private void MainWindow_Closed(object sender, WindowEventArgs args)
+    {
+        var operationId = Guid.NewGuid().ToString("N");
+        var activeCapabilityKey = _navigationCoordinator.ActiveCapabilityKey;
+        var context = new Dictionary<string, object?> { ["capability"] = activeCapabilityKey };
+
+        try
+        {
+            if (CapabilityFrame.Content is not null && CapabilityFrame.Content.GetType() != typeof(Views.Shell.ShellBlankPage))
+            {
+                CapabilityFrame.Navigate(typeof(Views.Shell.ShellBlankPage));
+            }
+
+            _structuredLogger.Log(StructuredLogLevel.Info, "shell.window_closed_teardown", operationId, "ok", context);
+        }
+        catch (Exception ex)
+        {
+            context["error"] = ex.Message;
+            _structuredLogger.Log(StructuredLogLevel.Warn, "shell.window_closed_teardown", operationId, "failed", context);
+        }
     }
 
     private void ApplyRightPanelState() => _shellPanelStateManager.ApplyRightPanelState();

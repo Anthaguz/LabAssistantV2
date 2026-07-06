@@ -14,8 +14,9 @@ All three `Templates` subviews (Library, Editor, and the 6-step Builder wizard) 
 No capability is left running inline on the old always-instantiated shell.
 Prefer the migrated pattern below for any new capability.
 
-`ShellNavigationCoordinator` makes this explicit: `IsActiveCapabilityMigrated` is true only for capabilities present in the `capabilityPageTypes` map (`MainWindow.xaml.cs`).
-Migrated capabilities navigate the `Frame` to a page and tear it down on leave.
+There is no non-migrated fallback left: `ShellNavigationCoordinator` always resolves the active capability to a page type from the `capabilityPageTypes` map (`MainWindow.xaml.cs`) and navigates the `Frame` to it, tearing down the outgoing page on leave.
+A capability added without a `capabilityPageTypes` entry fails loudly with an `InvalidOperationException` rather than falling back to legacy inline content.
+The pure route-resolution and state-transition logic lives in `Shell/ShellNavigationState`, kept free of WinUI types so it is unit-testable without a runtime; the coordinator is a thin adapter that applies its transitions to the real `Frame`/`NavigationView`/header text.
 
 ## Reference implementations
 
