@@ -54,8 +54,15 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleProjectionCatalog.cs" Link="WinUI\TemplatesBuilderRoleProjectionCatalog.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderSectionProjections.cs" Link="WinUI\TemplatesBuilderSectionProjections.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkflowNavigation.cs" Link="WinUI\TemplatesBuilderWorkflowNavigation.cs" />
-    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkspaceController.cs" Link="WinUI\TemplatesBuilderWorkspaceController.cs" />
-    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkspaceViewModel.cs" Link="WinUI\TemplatesBuilderWorkspaceViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderValidationMerger.cs" Link="WinUI\TemplatesBuilderValidationMerger.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\ITemplatesBuilderHost.cs" Link="WinUI\ITemplatesBuilderHost.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderFieldViewModel.cs" Link="WinUI\BuilderFieldViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderSwitchOptionViewModel.cs" Link="WinUI\BuilderSwitchOptionViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderFieldRowViewModel.cs" Link="WinUI\BuilderFieldRowViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderNavRowViewModel.cs" Link="WinUI\BuilderNavRowViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyNodeViewModel.cs" Link="WinUI\BuilderTopologyNodeViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyForestViewModel.cs" Link="WinUI\BuilderTopologyForestViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesBuilderViewModel.cs" Link="WinUI\TemplatesBuilderViewModel.cs" />
 
     <!-- Quick Deploy lane (runtime-independent view model, controller, host, and item models). -->
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\QuickDeploy\DeployQuickDeployViewModel.cs" Link="WinUI\DeployQuickDeployViewModel.cs" />

@@ -75,7 +75,8 @@
                 AutomationProperties.Name="Template search"
                 AutomationProperties.HelpText="Search templates by name, identifier, or description."
                 PlaceholderText="Search by name, id, or description"
-                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay}" />
+                KeyDown="SearchTextBox_KeyDown"
+                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay}" />
             <Button Grid.Column="1" TabIndex="1" AccessKey="A" AutomationProperties.Name="Apply search" AutomationProperties.HelpText="Apply the template search filter." Command="{x:Bind ViewModel.ApplySearchCommand}" Content="Apply" IsEnabled="{x:Bind ViewModel.CanApplySearch, Mode=OneWay}" />
             <Button Grid.Column="2" TabIndex="2" AccessKey="C" AutomationProperties.Name="Clear search" AutomationProperties.HelpText="Clear the template search filter." Command="{x:Bind ViewModel.ClearSearchCommand}" Content="Clear" IsEnabled="{x:Bind ViewModel.CanClearSearch, Mode=OneWay}" />
             <Button Grid.Column="3" TabIndex="3" AccessKey="R" AutomationProperties.Name="Reload template library" AutomationProperties.HelpText="Reload the template library." Command="{x:Bind ViewModel.LoadCommand}" Content="Reload" IsEnabled="{x:Bind ViewModel.CanLoad, Mode=OneWay}" />

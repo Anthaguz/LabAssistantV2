@@ -3049,7 +3049,7 @@ Each readiness result shall include, at minimum:
 > **Reconciliation note (frame-based navigation, task `nav-frame-based`).**
 > AC-033, AC-034, and AC-035 were authored against the earlier model where Templates lived inside `MainWindow` as a long-lived workspace whose shared composition owner was `TemplatesCapabilityRuntime` (with its per-subview `TemplatesLibraryWorkspaceComposition`, `TemplatesEditorWorkspaceComposition`, and `TemplatesWorkspaceShellBridge`).
 > The shell has since moved to frame-based capability navigation: Templates is an on-demand `TemplatesPage` created on route entry and torn down on leave, hosting the Library, Editor, and Builder subviews in a `TabView`.
-> The Library and Editor subviews bind to transient `TemplatesLibraryViewModel` and `TemplatesEditorViewModel` through `x:Bind`, resolving their view models from DI and reaching sibling subviews and dialogs through the injected `ITemplatesLibraryHost` and `ITemplatesEditorHost` seams the page implements; the Builder subview is hosted by the capability page through its preserved controller/composition layer and completes its full `x:Bind` binding as the migration finishes.
+> The Library, Editor, and Builder subviews all bind to transient `TemplatesLibraryViewModel`, `TemplatesEditorViewModel`, and `TemplatesBuilderViewModel` through `x:Bind`, resolving their view models from DI and reaching sibling subviews and dialogs through the injected `ITemplatesLibraryHost`, `ITemplatesEditorHost`, and `ITemplatesBuilderHost` seams the page implements; the per-subview `WorkspaceComposition`/`WorkspaceController`/`WorkspaceViewModel` trio (including the Builder's) and the former interim page-owned Builder adapter no longer exist.
 > Cross-capability edit-template hand-off from Deploy flows through the app-lifetime `ITemplateEditorHandoff` mailbox, which stores a pending document and triggers shell routing to `templates.editor`; the page drains the mailbox on entry so a document handed off while no page is alive is honored on the next navigation.
 > Read every reference below to `TemplatesCapabilityRuntime`, a per-subview `WorkspaceComposition`/`WorkspaceController`/`WorkspaceShellBridge`, a "long-lived Templates workspace", `MainWindow` ownership, or "route-activation refresh rather than per-navigation recreation" as satisfied by the capability page, the injected subview host seams, the handoff mailbox, and its navigation lifecycle: the page is the Templates-local owner, `MainWindow` stays shell-only, views never depend on `MainWindow`, and the behavioral contracts are preserved (Library remains the stable/default Templates surface at `templates.library`, and Editor remains a workflow-state destination at `templates.editor` entered from explicit actions rather than a peer tab).
 
@@ -4961,8 +4961,8 @@ Each readiness result shall include, at minimum:
 - state, orchestration, composition, and view interaction seams are assigned
 
 **Then**
-- Builder-specific draft state and validation orchestration live behind Builder-local workspace/viewmodel/controller seams
-- Builder-specific view composition and UI coordination live behind Builder-local composition/view seams
+- Builder-specific draft state and validation orchestration live behind the Builder-local `TemplatesBuilderViewModel` (`x:Bind` MVVM), not in `MainWindow`, shared Templates composition, or the Editor
+- Builder-specific view composition and UI coordination live in the declarative `TemplatesBuilderView` bound to that view model, reached through the page's `ITemplatesBuilderHost` seam
 - shared Templates composition owns only Templates-level route activation, workspace participation, and cross-surface coordination
 - `MainWindow` remains limited to shell routing, shell chrome, shell containers, and app-level workspace lifetime
 - the current Templates Editor does not become the Builder workflow owner

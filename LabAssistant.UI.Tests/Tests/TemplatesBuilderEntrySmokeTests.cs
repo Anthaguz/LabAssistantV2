@@ -5,31 +5,37 @@ using Xunit;
 
 namespace LabAssistant.UI.Tests.Tests;
 
+/// <summary>
+/// Runtime-independent smoke coverage for the migrated <see cref="TemplatesBuilderViewModel"/>: entry
+/// (create draft) resilience with sparse reference data, malformed nested collections surfacing as
+/// validation blockers rather than throwing, and the full create -> navigate drill-in -> invalid edit
+/// -> save-blocked flow with no dispatcher or Hyper-V present.
+/// </summary>
 public sealed class TemplatesBuilderEntrySmokeTests
 {
     [Fact]
     public async Task BuilderCreateDraft_WithSparseReferenceData_DoesNotThrowAndNavigatesToBuilder()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
         var host = new RecordingBuilderHost
         {
             ReferenceData = new TemplatesBuilderReferenceData(null!, null!)
         };
-        var controller = new TemplatesBuilderWorkspaceController(new RecordingTemplatesCapabilityService(), workspace, host);
+        var viewModel = new TemplatesBuilderViewModel(new RecordingTemplatesCapabilityService());
+        viewModel.Attach(host);
 
-        var exception = await Record.ExceptionAsync(() => controller.CreateDraftAsync());
+        var exception = await Record.ExceptionAsync(() => viewModel.CreateDraftAsync());
 
         Assert.Null(exception);
-        Assert.True(workspace.HasActiveDraft);
+        Assert.True(viewModel.HasActiveDraft);
         Assert.True(host.NavigatedToBuilder);
-        Assert.Contains("switches: none loaded", workspace.ReferenceText, StringComparison.Ordinal);
-        Assert.Contains("catalog disks: none loaded", workspace.ReferenceText, StringComparison.Ordinal);
+        Assert.Contains("switches: none loaded", viewModel.ReferenceText, StringComparison.Ordinal);
+        Assert.Contains("catalog disks: none loaded", viewModel.ReferenceText, StringComparison.Ordinal);
     }
 
     [Fact]
     public void BuilderLoadNewDraft_WithMissingNestedNicCollection_ReportsValidationBlockerInsteadOfThrowing()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var viewModel = new TemplatesBuilderViewModel(new RecordingTemplatesCapabilityService());
         var draft = TemplatesBuilderDraftMapper.CreateSuggestedDraft(new TemplatesBuilderReferenceData(
             ["vSwitch-Core"],
             [
@@ -38,11 +44,11 @@ public sealed class TemplatesBuilderEntrySmokeTests
             ]));
         var malformedVm = draft.Vms[0] with { Nics = null! };
 
-        var exception = Record.Exception(() => workspace.LoadNewDraft(draft with { Vms = [malformedVm, draft.Vms[1]] }));
+        var exception = Record.Exception(() => viewModel.LoadNewDraft(draft with { Vms = [malformedVm, draft.Vms[1]] }));
 
         Assert.Null(exception);
-        Assert.True(workspace.HasValidationBlockers);
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.True(viewModel.HasValidationBlockers);
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.Network &&
             issue.ScopeKey == malformedVm.VmId &&
             issue.Message.Contains("networking data could not be loaded", StringComparison.Ordinal));
@@ -51,22 +57,22 @@ public sealed class TemplatesBuilderEntrySmokeTests
     [Fact]
     public async Task BuilderSmoke_CreateDraftNavigatesDrillInAndPreservesInvalidDraftWithoutHyperV()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
         var host = new RecordingBuilderHost
         {
             ReferenceData = CreateReferenceData()
         };
-        var controller = new TemplatesBuilderWorkspaceController(new RecordingTemplatesCapabilityService(), workspace, host);
+        var viewModel = new TemplatesBuilderViewModel(new RecordingTemplatesCapabilityService());
+        viewModel.Attach(host);
 
-        await controller.CreateDraftAsync();
+        await viewModel.CreateDraftAsync();
 
-        Assert.True(workspace.HasActiveDraft);
+        Assert.True(viewModel.HasActiveDraft);
         Assert.True(host.NavigatedToBuilder);
         Assert.False(host.NavigatedToLibrary);
-        Assert.Contains("vSwitch-Core", workspace.ReferenceText, StringComparison.Ordinal);
-        Assert.Contains("disk-dc", workspace.ReferenceText, StringComparison.Ordinal);
+        Assert.Contains("vSwitch-Core", viewModel.ReferenceText, StringComparison.Ordinal);
+        Assert.Contains("disk-dc", viewModel.ReferenceText, StringComparison.Ordinal);
 
-        var draft = workspace.CaptureDraft();
+        var draft = viewModel.CaptureDraft();
         var navigation = new TemplatesBuilderWorkflowNavigation();
         Assert.True(navigation.SelectStep(BuilderWorkflowStep.Vms, draft));
 
@@ -93,29 +99,29 @@ public sealed class TemplatesBuilderEntrySmokeTests
         Assert.False(host.NavigatedToLibrary);
 
         var invalidVm = draft.Vms[0] with { Name = "bad/name" };
-        workspace.ApplyDraft(draft with { Vms = [invalidVm, draft.Vms[1]] });
+        viewModel.ApplyDraft(draft with { Vms = [invalidVm, draft.Vms[1]] });
 
-        var retainedDraft = workspace.CaptureDraft();
+        var retainedDraft = viewModel.CaptureDraft();
         Assert.Equal("bad/name", retainedDraft.Vms[0].Name);
-        Assert.True(workspace.HasValidationBlockers);
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.True(viewModel.HasValidationBlockers);
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Message.Contains("unsupported characters", StringComparison.Ordinal));
 
         navigation.SelectStep(BuilderWorkflowStep.Review, retainedDraft);
         var reviewFooter = navigation.ProjectFooter(
             retainedDraft,
             canNavigate: true,
-            canSave: !workspace.HasValidationBlockers,
-            canSaveAs: !workspace.HasValidationBlockers);
+            canSave: !viewModel.HasValidationBlockers,
+            canSaveAs: !viewModel.HasValidationBlockers);
         Assert.True(reviewFooter.IsReview);
         Assert.False(reviewFooter.CanSave);
         Assert.False(reviewFooter.CanSaveAs);
 
-        await controller.SaveAsync();
-        await controller.SaveAsAsync();
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        await viewModel.SaveAsCommand.ExecuteAsync(null);
 
-        Assert.Contains("blocked", workspace.StatusText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("unsupported characters", workspace.StatusText, StringComparison.Ordinal);
+        Assert.Contains("blocked", viewModel.StatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unsupported characters", viewModel.StatusText, StringComparison.Ordinal);
         Assert.False(host.NavigatedToLibrary);
     }
 
@@ -165,25 +171,17 @@ public sealed class TemplatesBuilderEntrySmokeTests
             => Task.FromResult(new TemplateOperationResult());
     }
 
-    private sealed class RecordingBuilderHost : ITemplatesBuilderWorkspaceControllerHost
+    private sealed class RecordingBuilderHost : ITemplatesBuilderHost
     {
         public TemplatesBuilderReferenceData ReferenceData { get; init; } = new(Array.Empty<string>(), Array.Empty<TemplateVhdxCatalogOption>());
-
-        public bool IsTemplatesLoading { get; private set; }
 
         public bool NavigatedToBuilder { get; private set; }
 
         public bool NavigatedToLibrary { get; private set; }
 
-        public void SetTemplatesLoading(bool isLoading) => IsTemplatesLoading = isLoading;
+        public Task<TemplatesBuilderReferenceData> LoadBuilderReferenceDataAsync(bool forceRefresh) => Task.FromResult(ReferenceData);
 
-        public void ApplyWorkspaceState()
-        {
-        }
-
-        public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => Task.CompletedTask;
-
-        public Task<TemplatesBuilderReferenceData> LoadReferenceDataAsync(bool forceRefresh) => Task.FromResult(ReferenceData);
+        public Task ReloadLibraryAsync(bool forceRefresh) => Task.CompletedTask;
 
         public Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName)
             => Task.FromResult<string?>(@"C:\templates\v2-lab-template.json");

@@ -1,5 +1,4 @@
 using LabAssistant.Business.Templates;
-using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.ViewModels.Templates.Builder;
@@ -7,6 +6,13 @@ using Xunit;
 
 namespace LabAssistant.UI.Tests.Tests;
 
+/// <summary>
+/// Runtime-independent coverage for the Builder's scoped validation contract, exercised both through
+/// the pure <see cref="TemplatesBuilderDraftValidator"/> and through the migrated
+/// <see cref="TemplatesBuilderViewModel"/>'s scoped-revalidation merge (formerly the workspace view
+/// model). Also verifies Review aggregates validation state automatically with no manual Validate
+/// action, and that Save / Save As honor current blockers and final-build failures.
+/// </summary>
 public sealed class TemplatesBuilderDraftValidationTests
 {
     [Fact]
@@ -101,46 +107,46 @@ public sealed class TemplatesBuilderDraftValidationTests
     }
 
     [Fact]
-    public void BuilderWorkspace_UnrelatedDraftEdit_RetainsExistingScopedValidationState()
+    public void BuilderViewModel_UnrelatedDraftEdit_RetainsExistingScopedValidationState()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var viewModel = CreateViewModel();
         var draft = CreateBuilderDraft();
 
-        workspace.LoadNewDraft(draft);
-        workspace.ApplyDraft(draft with { Vms = [draft.Vms[0] with { Name = "bad/name" }, draft.Vms[1]] });
-        var blockerCount = workspace.ValidationState.Blockers.Count;
+        viewModel.LoadNewDraft(draft);
+        viewModel.ApplyDraft(draft with { Vms = [draft.Vms[0] with { Name = "bad/name" }, draft.Vms[1]] });
+        var blockerCount = viewModel.ValidationState.Blockers.Count;
 
-        workspace.ApplyDraft(workspace.CaptureDraft() with { TemplateDescription = "Unrelated description edit." });
+        viewModel.ApplyDraft(viewModel.CaptureDraft() with { TemplateDescription = "Unrelated description edit." });
 
         Assert.True(blockerCount > 0);
-        Assert.Equal(blockerCount, workspace.ValidationState.Blockers.Count);
-        Assert.Contains(workspace.ValidationState.Blockers, issue => issue.Category == TemplatesBuilderValidationCategory.VmIdentity);
+        Assert.Equal(blockerCount, viewModel.ValidationState.Blockers.Count);
+        Assert.Contains(viewModel.ValidationState.Blockers, issue => issue.Category == TemplatesBuilderValidationCategory.VmIdentity);
     }
 
     [Fact]
-    public void BuilderWorkspace_ScopedVmIdentityRefresh_PreservesOtherVmIdentityBlockers()
+    public void BuilderViewModel_ScopedVmIdentityRefresh_PreservesOtherVmIdentityBlockers()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var viewModel = CreateViewModel();
         var draft = CreateBuilderDraft();
         var vmAInvalid = draft.Vms[0] with { Name = "bad/name" };
         var vmBInvalid = draft.Vms[1] with { Name = "bad name" };
 
-        workspace.LoadNewDraft(draft);
-        workspace.ApplyDraft(draft with { Vms = [vmAInvalid, vmBInvalid] });
-        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
+        viewModel.LoadNewDraft(draft);
+        viewModel.ApplyDraft(draft with { Vms = [vmAInvalid, vmBInvalid] });
+        viewModel.ApplyDraft(viewModel.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
 
-        Assert.True(workspace.HasValidationBlockers);
-        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.ScopeKey == draft.Vms[0].VmId);
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.True(viewModel.HasValidationBlockers);
+        Assert.DoesNotContain(viewModel.ValidationState.Blockers, issue => issue.ScopeKey == draft.Vms[0].VmId);
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.VmIdentity &&
             issue.ScopeKey == draft.Vms[1].VmId &&
             issue.Message.Contains("unsupported characters", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void BuilderWorkspace_ScopedVmIdentityRefresh_RemovesResolvedDuplicateIdentityBlockers()
+    public void BuilderViewModel_ScopedVmIdentityRefresh_RemovesResolvedDuplicateIdentityBlockers()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var viewModel = CreateViewModel();
         var draft = CreateBuilderDraft();
         var duplicateVm = draft.Vms[1] with
         {
@@ -148,22 +154,22 @@ public sealed class TemplatesBuilderDraftValidationTests
             Name = draft.Vms[0].Name
         };
 
-        workspace.LoadNewDraft(draft);
-        workspace.ApplyDraft(draft with { Vms = [draft.Vms[0], duplicateVm] });
+        viewModel.LoadNewDraft(draft);
+        viewModel.ApplyDraft(draft with { Vms = [draft.Vms[0], duplicateVm] });
 
-        Assert.Contains(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM id", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
-        Assert.Contains(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM name", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+        Assert.Contains(viewModel.ValidationState.Blockers, issue => issue.Message.Contains("VM id", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+        Assert.Contains(viewModel.ValidationState.Blockers, issue => issue.Message.Contains("VM name", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
 
-        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], draft.Vms[1]] });
+        viewModel.ApplyDraft(viewModel.CaptureDraft() with { Vms = [draft.Vms[0], draft.Vms[1]] });
 
-        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM id", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
-        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.Message.Contains("VM name", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+        Assert.DoesNotContain(viewModel.ValidationState.Blockers, issue => issue.Message.Contains("VM id", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
+        Assert.DoesNotContain(viewModel.ValidationState.Blockers, issue => issue.Message.Contains("VM name", StringComparison.Ordinal) && issue.Message.Contains("unique", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void BuilderWorkspace_ScopedNetworkRefresh_PreservesOtherNetworkBlockers()
+    public void BuilderViewModel_ScopedNetworkRefresh_PreservesOtherNetworkBlockers()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var viewModel = CreateViewModel();
         var draft = CreateBuilderDraft();
         var branchNetwork = new TemplatesBuilderLabNetworkDraft("lab-branch", "Branch", "vSwitch-Branch", string.Empty, "10.1.0.0/24", string.Empty);
         var vmAInvalid = draft.Vms[0] with
@@ -175,28 +181,28 @@ public sealed class TemplatesBuilderDraftValidationTests
             Nics = [draft.Vms[1].Nics[0] with { NetworkId = "lab-branch", IpAddress = "10.2.0.20" }]
         };
 
-        workspace.LoadNewDraft(draft);
-        workspace.ApplyDraft(draft with
+        viewModel.LoadNewDraft(draft);
+        viewModel.ApplyDraft(draft with
         {
             LabNetworks = [draft.LabNetworks[0], branchNetwork],
             Vms = [vmAInvalid, vmBInvalid]
         });
-        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
+        viewModel.ApplyDraft(viewModel.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
 
-        Assert.True(workspace.HasValidationBlockers);
-        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue =>
+        Assert.True(viewModel.HasValidationBlockers);
+        Assert.DoesNotContain(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.Network &&
             issue.ScopeKey == "lab-core");
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.Network &&
             issue.ScopeKey == "lab-branch" &&
             issue.Message.Contains("must fit network", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void BuilderWorkspace_ScopedMembershipRefresh_PreservesOtherMembershipBlockers()
+    public void BuilderViewModel_ScopedMembershipRefresh_PreservesOtherMembershipBlockers()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var viewModel = CreateViewModel();
         var draft = CreateBuilderDraft();
         var vmAInvalid = draft.Vms[0] with
         {
@@ -206,22 +212,22 @@ public sealed class TemplatesBuilderDraftValidationTests
         };
         var vmBInvalid = draft.Vms[1] with { DomainId = "domain-missing" };
 
-        workspace.LoadNewDraft(draft);
-        workspace.ApplyDraft(draft with { Vms = [vmAInvalid, vmBInvalid] });
-        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
+        viewModel.LoadNewDraft(draft);
+        viewModel.ApplyDraft(draft with { Vms = [vmAInvalid, vmBInvalid] });
+        viewModel.ApplyDraft(viewModel.CaptureDraft() with { Vms = [draft.Vms[0], vmBInvalid] });
 
-        Assert.True(workspace.HasValidationBlockers);
-        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue => issue.ScopeKey == draft.Vms[0].VmId);
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.True(viewModel.HasValidationBlockers);
+        Assert.DoesNotContain(viewModel.ValidationState.Blockers, issue => issue.ScopeKey == draft.Vms[0].VmId);
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
             issue.ScopeKey == draft.Vms[1].VmId &&
             issue.Message.Contains("unknown domain", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void BuilderWorkspace_ScopedMembershipRefresh_ClearsSatisfiedDomainDcBlockerAndKeepsUnrelatedVmBlocker()
+    public void BuilderViewModel_ScopedMembershipRefresh_ClearsSatisfiedDomainDcBlockerAndKeepsUnrelatedVmBlocker()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
+        var viewModel = CreateViewModel();
         var draft = CreateBuilderDraft();
         var vmWithoutDcRole = draft.Vms[0] with
         {
@@ -232,92 +238,108 @@ public sealed class TemplatesBuilderDraftValidationTests
             DomainId = "domain-missing"
         };
 
-        workspace.LoadNewDraft(draft);
-        workspace.ApplyDraft(draft with { Vms = [vmWithoutDcRole, vmWithUnrelatedMembershipBlocker] });
+        viewModel.LoadNewDraft(draft);
+        viewModel.ApplyDraft(draft with { Vms = [vmWithoutDcRole, vmWithUnrelatedMembershipBlocker] });
 
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
             issue.ScopeKey == "domain-contoso" &&
             issue.Message.Contains("requires at least one VM assigned", StringComparison.Ordinal));
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
             issue.ScopeKey == draft.Vms[1].VmId &&
             issue.Message.Contains("unknown domain", StringComparison.Ordinal));
 
-        workspace.ApplyDraft(workspace.CaptureDraft() with { Vms = [draft.Vms[0], vmWithUnrelatedMembershipBlocker] });
+        viewModel.ApplyDraft(viewModel.CaptureDraft() with { Vms = [draft.Vms[0], vmWithUnrelatedMembershipBlocker] });
 
-        Assert.DoesNotContain(workspace.ValidationState.Blockers, issue =>
+        Assert.DoesNotContain(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
             issue.ScopeKey == "domain-contoso" &&
             issue.Message.Contains("requires at least one VM assigned", StringComparison.Ordinal));
-        Assert.Contains(workspace.ValidationState.Blockers, issue =>
+        Assert.Contains(viewModel.ValidationState.Blockers, issue =>
             issue.Category == TemplatesBuilderValidationCategory.VmMembership &&
             issue.ScopeKey == draft.Vms[1].VmId &&
             issue.Message.Contains("unknown domain", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void TemplatesBuilderView_ReviewAggregatesValidationStateWithoutManualValidateAction()
+    public void BuilderViewModel_ReviewAggregatesValidationStateWithoutManualValidateAction()
     {
-        var builderSource = File.ReadAllText(WinUIPath(Path.Combine("Views", "Templates", "TemplatesBuilderView.xaml.cs")));
-        var compositionSource = File.ReadAllText(WinUIPath(Path.Combine("ViewModels", "Templates", "Builder", "TemplatesBuilderWorkspaceComposition.cs")));
+        var viewModel = CreateViewModel();
+        var draft = CreateBuilderDraft();
+        var invalidDraft = draft with { Vms = [draft.Vms[0] with { Name = "bad/name" }, draft.Vms[1]] };
 
-        Assert.Contains("ValidationState: _workspace.ValidationState", compositionSource);
-        Assert.Contains("UpdateValidationState(_workspace.ValidationState)", compositionSource);
-        Assert.Contains("_validationState.BuildReviewSummary()", builderSource);
-        Assert.DoesNotContain("ValidateRequested", builderSource);
-        Assert.DoesNotContain("ValidateRequested", compositionSource);
+        // Loading an invalid draft computes validation blockers; the Review projection is
+        // seeded from the constructor render.
+        viewModel.LoadNewDraft(invalidDraft);
+        Assert.False(string.IsNullOrWhiteSpace(viewModel.ReviewSummaryText));
+
+        // Any real edit runs the pipeline that re-renders Review from the current validation
+        // state - there is no manual Validate action to press.
+        viewModel.SetDeploymentProfileCommand.Execute("Balanced");
+        Assert.True(viewModel.IsReviewBlockerVisible);
+        Assert.Contains("unsupported characters", viewModel.ReviewBlockerText, StringComparison.Ordinal);
+
+        // The Builder exposes no manual Validate command: Review is always derived from current state.
+        Assert.Null(typeof(TemplatesBuilderViewModel).GetProperty("ValidateCommand"));
     }
 
     [Fact]
     public async Task BuilderSaveAndSaveAs_AreBlockedByCurrentValidationBlockers()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
         var service = new RecordingTemplatesCapabilityService();
         var host = new RecordingBuilderHost();
-        var controller = new TemplatesBuilderWorkspaceController(service, workspace, host);
+        var viewModel = new TemplatesBuilderViewModel(service);
+        viewModel.Attach(host);
         var draft = CreateBuilderDraft();
 
-        workspace.LoadNewDraft(draft);
-        workspace.ApplyDraft(draft with { Vms = [draft.Vms[0] with { Name = "bad/name" }, draft.Vms[1]] });
+        viewModel.LoadNewDraft(draft);
+        viewModel.ApplyDraft(draft with { Vms = [draft.Vms[0] with { Name = "bad/name" }, draft.Vms[1]] });
 
-        Assert.True(workspace.HasValidationBlockers, string.Join(" | ", workspace.ValidationState.Blockers.Select(issue => issue.Message)));
+        Assert.True(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
 
-        await controller.SaveAsync();
-        await controller.SaveAsAsync();
+        await viewModel.SaveCommand.ExecuteAsync(null);
+        await viewModel.SaveAsCommand.ExecuteAsync(null);
 
         Assert.Equal(0, service.SaveCalls);
         Assert.Equal(0, host.SavePickerCalls);
-        Assert.Contains("blocked", workspace.StatusText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("unsupported characters", workspace.StatusText, StringComparison.Ordinal);
+        Assert.Contains("blocked", viewModel.StatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unsupported characters", viewModel.StatusText, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task BuilderSaveAndSaveAs_AreBlockedWhenFinalBuildFails()
     {
-        var workspace = new TemplatesBuilderWorkspaceViewModel();
         var service = new RecordingTemplatesCapabilityService();
         var host = new RecordingBuilderHost();
-        var controller = new TemplatesBuilderWorkspaceController(service, workspace, host);
+        var viewModel = new TemplatesBuilderViewModel(service);
+        viewModel.Attach(host);
         var draft = CreateBuilderDraft() with { TemplateName = string.Empty };
 
-        workspace.LoadNewDraft(draft);
+        viewModel.LoadNewDraft(draft);
 
-        Assert.False(workspace.HasValidationBlockers, string.Join(" | ", workspace.ValidationState.Blockers.Select(issue => issue.Message)));
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
 
-        await controller.SaveAsync();
-
-        Assert.Equal(0, service.SaveCalls);
-        Assert.Equal(0, host.SavePickerCalls);
-        Assert.Contains("Save blocked", workspace.StatusText, StringComparison.Ordinal);
-        Assert.Contains("Template name is required.", workspace.StatusText, StringComparison.Ordinal);
-
-        await controller.SaveAsAsync();
+        await viewModel.SaveCommand.ExecuteAsync(null);
 
         Assert.Equal(0, service.SaveCalls);
         Assert.Equal(0, host.SavePickerCalls);
-        Assert.Contains("Save As blocked", workspace.StatusText, StringComparison.Ordinal);
-        Assert.Contains("Template name is required.", workspace.StatusText, StringComparison.Ordinal);
+        Assert.Contains("Save blocked", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.Contains("Template name is required.", viewModel.StatusText, StringComparison.Ordinal);
+
+        await viewModel.SaveAsCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, service.SaveCalls);
+        Assert.Equal(0, host.SavePickerCalls);
+        Assert.Contains("Save As blocked", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.Contains("Template name is required.", viewModel.StatusText, StringComparison.Ordinal);
+    }
+
+    private static TemplatesBuilderViewModel CreateViewModel()
+    {
+        var viewModel = new TemplatesBuilderViewModel(new RecordingTemplatesCapabilityService());
+        viewModel.Attach(new RecordingBuilderHost());
+        return viewModel;
     }
 
     private static TemplatesBuilderDraftSnapshot CreateBuilderDraft()
@@ -330,18 +352,6 @@ public sealed class TemplatesBuilderDraftValidationTests
             ]);
 
         return TemplatesBuilderDraftMapper.CreateSuggestedDraft(referenceData);
-    }
-
-    private static string WinUIPath(string relativePath)
-    {
-        return Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "LabAssistant.WinUI",
-            relativePath));
     }
 
     private sealed class RecordingTemplatesCapabilityService : ITemplatesCapabilityService
@@ -386,22 +396,14 @@ public sealed class TemplatesBuilderDraftValidationTests
             => Task.FromResult(new TemplateOperationResult());
     }
 
-    private sealed class RecordingBuilderHost : ITemplatesBuilderWorkspaceControllerHost
+    private sealed class RecordingBuilderHost : ITemplatesBuilderHost
     {
         public int SavePickerCalls { get; private set; }
 
-        public bool IsTemplatesLoading { get; private set; }
-
-        public void SetTemplatesLoading(bool isLoading) => IsTemplatesLoading = isLoading;
-
-        public void ApplyWorkspaceState()
-        {
-        }
-
-        public Task EnsureTemplatesLibraryAsync(bool forceRefresh) => Task.CompletedTask;
-
-        public Task<TemplatesBuilderReferenceData> LoadReferenceDataAsync(bool forceRefresh)
+        public Task<TemplatesBuilderReferenceData> LoadBuilderReferenceDataAsync(bool forceRefresh)
             => Task.FromResult(new TemplatesBuilderReferenceData(Array.Empty<string>(), Array.Empty<TemplateVhdxCatalogOption>()));
+
+        public Task ReloadLibraryAsync(bool forceRefresh) => Task.CompletedTask;
 
         public Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName)
         {

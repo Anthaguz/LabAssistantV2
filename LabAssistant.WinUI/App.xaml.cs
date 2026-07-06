@@ -83,7 +83,7 @@ public partial class App : Application
             serviceCollection.AddSingleton<TemplatesReferenceDataService>();
             serviceCollection.AddTransient<TemplatesLibraryViewModel>();
             serviceCollection.AddTransient<TemplatesEditorViewModel>();
-            serviceCollection.AddSingleton<TemplatesBuilderViewModel>();
+            serviceCollection.AddTransient<TemplatesBuilderViewModel>();
             serviceCollection.AddSingleton<ILogLocationLauncher, LogLocationLauncher>();
             serviceCollection.AddTransient<DiagnosticsOverviewViewModel>();
             serviceCollection.AddTransient<DiagnosticsLogsViewModel>();
