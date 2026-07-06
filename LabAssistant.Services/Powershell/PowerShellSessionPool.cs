@@ -11,6 +11,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 {
     private readonly SessionPoolOptions _options;
     private readonly IStructuredLogger _structuredLogger;
+    private readonly Func<IPersistentPowerShellSession> _sessionFactory;
     private readonly Channel<IPersistentPowerShellSession> _availableSessions;
     private readonly ConcurrentDictionary<IPersistentPowerShellSession, SessionEntry> _sessions = new();
     private readonly ConcurrentDictionary<IPersistentPowerShellSession, byte> _disposedSessions = new();
@@ -37,12 +38,29 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
     /// <param name="options">The pool configuration.</param>
     /// <param name="structuredLogger">An optional structured logger for pool events.</param>
     public PowerShellSessionPool(SessionPoolOptions options, IStructuredLogger? structuredLogger)
+        : this(options, structuredLogger, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PowerShellSessionPool"/> class with an injectable
+    /// session factory. Exposed to tests so pool checkout/return semantics can be verified without
+    /// spawning real PowerShell processes.
+    /// </summary>
+    /// <param name="options">The pool configuration.</param>
+    /// <param name="structuredLogger">An optional structured logger for pool events.</param>
+    /// <param name="sessionFactory">Factory used to create backing sessions. Defaults to real sessions.</param>
+    internal PowerShellSessionPool(
+        SessionPoolOptions options,
+        IStructuredLogger? structuredLogger,
+        Func<IPersistentPowerShellSession>? sessionFactory)
     {
         ArgumentNullException.ThrowIfNull(options);
         ValidateOptions(options);
 
         _options = options;
         _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
+        _sessionFactory = sessionFactory ?? (() => new PersistentPowerShellSession());
         _availableSessions = Channel.CreateBounded<IPersistentPowerShellSession>(
             new BoundedChannelOptions(options.MaxPoolSize)
             {
@@ -127,25 +145,29 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (TryTakeAvailable(out var availableSession))
             {
-                if (TryMarkCheckedOut(availableSession))
+                // A session may have been disposed (for example, faulted by a cancelled command) after it
+                // was returned but before it was re-checked-out; never hand such a session back out.
+                if (_disposedSessions.ContainsKey(availableSession) || !TryMarkCheckedOut(availableSession))
                 {
-                    Log(
-                        StructuredLogLevel.Debug,
-                        "powershell.session-pool.checkout",
-                        "reused",
-                        new Dictionary<string, object?>
-                        {
-                            ["availableCount"] = AvailableCount,
-                            ["totalCount"] = TotalCount
-                        });
-
-                    return new PooledSessionHandle(availableSession, ReturnSession);
+                    RetireSession(availableSession);
+                    continue;
                 }
 
-                RetireSession(availableSession);
-                continue;
+                Log(
+                    StructuredLogLevel.Debug,
+                    "powershell.session-pool.checkout",
+                    "reused",
+                    new Dictionary<string, object?>
+                    {
+                        ["availableCount"] = AvailableCount,
+                        ["totalCount"] = TotalCount
+                    });
+
+                return new PooledSessionHandle(availableSession, ReturnSession, RetireSession);
             }
 
             var createdSession = await TryCreateSessionAsync(checkOutImmediately: true, cancellationToken).ConfigureAwait(false);
@@ -161,26 +183,30 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                         ["totalCount"] = TotalCount
                     });
 
-                return new PooledSessionHandle(createdSession, ReturnSession);
+                return new PooledSessionHandle(createdSession, ReturnSession, RetireSession);
             }
 
-            var waitedSession = await WaitForAvailableSessionAsync(cancellationToken).ConfigureAwait(false);
-            if (TryMarkCheckedOut(waitedSession))
-            {
-                Log(
-                    StructuredLogLevel.Debug,
-                    "powershell.session-pool.checkout",
-                    "waited",
-                    new Dictionary<string, object?>
-                    {
-                        ["availableCount"] = AvailableCount,
-                        ["totalCount"] = TotalCount
-                    });
+            // The pool is at capacity with nothing available. Callers here (per-VM deploy sessions) can
+            // legitimately hold a session for the full lifetime of a long operation, so blocking for a
+            // returned session would cap overall concurrency and serialize otherwise-parallel work.
+            // Hand out an overflow session instead; it is disposed on return rather than retained, so the
+            // warm pool stays bounded while concurrency is never reduced below the on-demand baseline.
+            var overflowSession = _sessionFactory();
+            _disposedSessions.TryRemove(overflowSession, out _);
 
-                return new PooledSessionHandle(waitedSession, ReturnSession);
-            }
+            Log(
+                StructuredLogLevel.Warn,
+                "powershell.session-pool.checkout",
+                "overflow",
+                new Dictionary<string, object?>
+                {
+                    ["availableCount"] = AvailableCount,
+                    ["totalCount"] = TotalCount
+                });
 
-            RetireSession(waitedSession);
+            // Both outcomes dispose the untracked overflow session: RetireSession removes any (absent)
+            // tracking entry and disposes it exactly once.
+            return new PooledSessionHandle(overflowSession, RetireSession, RetireSession);
         }
     }
 
@@ -345,7 +371,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                 return null;
             }
 
-            var session = new PersistentPowerShellSession();
+            var session = _sessionFactory();
             var entry = SessionEntry.Create(checkOutImmediately);
             if (!_sessions.TryAdd(session, entry))
             {
@@ -369,23 +395,6 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         finally
         {
             _stateGate.Release();
-        }
-    }
-
-    private async Task<IPersistentPowerShellSession> WaitForAvailableSessionAsync(CancellationToken cancellationToken)
-    {
-        using var timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCancellationTokenSource.CancelAfter(_options.CheckoutTimeout);
-
-        try
-        {
-            var session = await _availableSessions.Reader.ReadAsync(timeoutCancellationTokenSource.Token).ConfigureAwait(false);
-            Interlocked.Decrement(ref _availableCount);
-            return session;
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new TimeoutException($"Timed out waiting {_options.CheckoutTimeout} for a pooled PowerShell session.");
         }
     }
 

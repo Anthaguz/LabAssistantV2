@@ -30,13 +30,22 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHyperVAdministrativeCommandExecutor, HyperVAdministrativeCommandExecutor>();
         services.AddTransient<IGuestCommandExecutor, HyperVPowerShellDirectGuestCommandExecutor>();
 
+        // Hand out pooled sessions to all consumers. A session is checked out from the pre-warmed,
+        // health-monitored pool on demand and returned to it on dispose, so existing consumers that
+        // create-and-dispose a session transparently gain pooling without call-site changes.
         services.AddTransient<Func<IPersistentPowerShellSession>>(provider =>
-            () => provider.GetRequiredService<IPersistentPowerShellSession>()
-        );
+        {
+            var pool = provider.GetRequiredService<IPowerShellSessionPool>();
+            return () =>
+            {
+                var handle = pool.CheckoutAsync().GetAwaiter().GetResult();
+                return new PooledSessionLease(handle);
+            };
+        });
 
         services.AddTransient<Func<PowerShellHandle>>(_ => () => new PowerShellHandle());
         services.AddTransient<Func<IPersistentPowerShellSession, IHyperVService>>(
-            _ => session => new HyperVService(session)
+            provider => session => new HyperVService(session, provider.GetRequiredService<IStructuredLogger>())
         );
         services.AddTransient<IHyperVMachineAdminService, HyperVMachineAdminService>();
         services.AddSingleton<IVhdxFileAccessProbe, VhdxFileAccessProbe>();

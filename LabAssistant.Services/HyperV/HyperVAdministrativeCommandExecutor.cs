@@ -27,7 +27,7 @@ public sealed class HyperVAdministrativeCommandExecutor : IHyperVAdministrativeC
         sessionCreationStopwatch.Stop();
 
         var commandStopwatch = Stopwatch.StartNew();
-        var (output, error) = await session.ExecuteAsync(script).ConfigureAwait(false);
+        var (output, error) = await session.ExecuteAsync(script, cancellationToken).ConfigureAwait(false);
         commandStopwatch.Stop();
 
         HyperVPowerShellTimingLogger.LogAdministrativeCommand(

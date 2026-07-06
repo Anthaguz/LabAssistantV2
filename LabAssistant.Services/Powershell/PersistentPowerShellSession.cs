@@ -62,6 +62,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
     private readonly ConcurrentQueue<string> _nativeErrorLines = new();
     private readonly Task _nativeErrorPumpTask;
     private readonly SemaphoreSlim _executeLock = new(1, 1);
+    private volatile bool _faulted;
 
     public PersistentPowerShellSession() : this(new ProcessPersistentPowerShellHost())
     {
@@ -98,11 +99,32 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
         });
     }
 
-    public async Task<(string Output, string Error)> ExecuteAsync(string command)
+    /// <summary>
+    /// Gets a value indicating whether this session has been faulted (for example by a cancelled
+    /// command) and can no longer be safely reused.
+    /// </summary>
+    public bool IsFaulted => _faulted;
+
+    public Task<(string Output, string Error)> ExecuteAsync(string command)
+        => ExecuteAsync(command, null, CancellationToken.None);
+
+    public Task<(string Output, string Error)> ExecuteAsync(string command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, null, cancellationToken);
+
+    public async Task<(string Output, string Error)> ExecuteAsync(
+        string command,
+        IReadOnlyDictionary<string, string>? secureVariables,
+        CancellationToken cancellationToken)
     {
-        await _executeLock.WaitAsync().ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _executeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (_faulted)
+            {
+                throw new InvalidOperationException("The PowerShell session is faulted and can no longer execute commands.");
+            }
+
             while (_nativeErrorLines.TryDequeue(out _))
             {
             }
@@ -114,9 +136,16 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             // - PowerShell error records are emitted to stdout with a tagged prefix for deterministic capture
             // - stdout marker is the authoritative completion signal
             PersistentPowerShellSessionTrace.Log("ExecuteAsync: writing command to stdin.");
+
+            // Inject secret-bearing variables out-of-band. Their plaintext only ever exists base64-encoded
+            // on the stdin channel (never logged and never in the caller-visible command string), and each
+            // is removed from the runspace after the command runs so a reused/pooled session retains no secret.
+            var injectedVariableNames = await WriteSecureVariablesAsync(secureVariables).ConfigureAwait(false);
+
             await _input.WriteLineAsync("$__laErrStart = $Error.Count").ConfigureAwait(false);
             await _input.WriteLineAsync($"$__laCmd = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{commandBase64}'))").ConfigureAwait(false);
             await _input.WriteLineAsync("Invoke-Expression $__laCmd").ConfigureAwait(false);
+            await RemoveSecureVariablesAsync(injectedVariableNames).ConfigureAwait(false);
             await _input.WriteLineAsync("$__laErrDelta = [Math]::Max(0, ($Error.Count - $__laErrStart))").ConfigureAwait(false);
             await _input.WriteLineAsync("if ($__laErrDelta -gt 0) { $Error | Select-Object -First $__laErrDelta | ForEach-Object { [System.Console]::Out.WriteLine('" + ErrorLineMarker + "' + ($_.ToString())) } }").ConfigureAwait(false);
             await _input.WriteLineAsync($"[System.Console]::Out.WriteLine('{OutputMarker}'); [System.Console]::Out.Flush()").ConfigureAwait(false);
@@ -127,7 +156,7 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             var error = new StringBuilder();
 
             string? line;
-            while ((line = await _output.ReadLineAsync().ConfigureAwait(false)) != null)
+            while ((line = await ReadOutputLineAsync(cancellationToken).ConfigureAwait(false)) != null)
             {
                 if (string.Equals(line, OutputMarker, StringComparison.Ordinal))
                 {
@@ -155,9 +184,90 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             string cleanedError = PowerShellOutputCleaner.Clean(error.ToString());
             return (cleanedOutput, cleanedError);
         }
+        catch (OperationCanceledException)
+        {
+            // A cancelled command leaves the stdin/stdout envelope half-consumed, so the underlying
+            // process cannot be safely reused for the next command. Fault and kill it to guarantee no
+            // cross-command contamination; a pooled session is retired by its handle on the way out.
+            FaultAndKill();
+            throw;
+        }
         finally
         {
             _executeLock.Release();
+        }
+    }
+
+    private async Task<List<string>> WriteSecureVariablesAsync(IReadOnlyDictionary<string, string>? secureVariables)
+    {
+        var injectedVariableNames = new List<string>();
+        if (secureVariables is null)
+        {
+            return injectedVariableNames;
+        }
+
+        foreach (var pair in secureVariables)
+        {
+            if (string.IsNullOrEmpty(pair.Key))
+            {
+                continue;
+            }
+
+            var valueBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(pair.Value ?? string.Empty));
+            var nameLiteral = pair.Key.Replace("'", "''", StringComparison.Ordinal);
+            await _input.WriteLineAsync(
+                $"Set-Variable -Name '{nameLiteral}' -Value ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{valueBase64}')))").ConfigureAwait(false);
+            injectedVariableNames.Add(pair.Key);
+        }
+
+        return injectedVariableNames;
+    }
+
+    private async Task RemoveSecureVariablesAsync(IReadOnlyList<string> injectedVariableNames)
+    {
+        foreach (var name in injectedVariableNames)
+        {
+            var nameLiteral = name.Replace("'", "''", StringComparison.Ordinal);
+            await _input.WriteLineAsync($"Remove-Variable -Name '{nameLiteral}' -ErrorAction SilentlyContinue").ConfigureAwait(false);
+        }
+    }
+
+    private async Task<string?> ReadOutputLineAsync(CancellationToken cancellationToken)
+    {
+        var readTask = _output.ReadLineAsync();
+        if (!cancellationToken.CanBeCanceled)
+        {
+            return await readTask.ConfigureAwait(false);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var cancellationSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (cancellationToken.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancellationSignal))
+        {
+            var completed = await Task.WhenAny(readTask, cancellationSignal.Task).ConfigureAwait(false);
+            if (completed == cancellationSignal.Task)
+            {
+                // The abandoned read completes once FaultAndKill closes the process pipes.
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
+        return await readTask.ConfigureAwait(false);
+    }
+
+    private void FaultAndKill()
+    {
+        _faulted = true;
+        try
+        {
+            if (!_host.HasExited)
+            {
+                _host.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 
