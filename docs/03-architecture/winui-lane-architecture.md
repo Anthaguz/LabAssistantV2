@@ -150,11 +150,11 @@ This doc does not require:
 
 ## 7) Templates V2 Builder Application
 
-`templates.builder` is a non-trivial Templates workflow-state destination and should use the full lane/workspace split when implemented.
+`templates.builder` is a non-trivial Templates workflow-state destination, now migrated onto the frame-based capability-page pattern like the rest of Templates.
 
-Builder-specific draft state, validation flow, deterministic-suggestion confirmation, save orchestration, and V2 topology authoring sequence belong behind Builder-local workspace/viewmodel/controller seams. Builder-specific view composition and UI coordination belong behind Builder-local composition/view seams.
+Builder-specific draft state, validation flow, deterministic-suggestion confirmation, save orchestration, and V2 topology authoring sequence belong to the Builder-local `TemplatesBuilderViewModel` (transient, `x:Bind` MVVM, dispatcher-free), with all draft/topology/section/validation shaping kept in the pure `Builder/*` helpers. Builder-specific view composition and UI coordination live in the declarative `TemplatesBuilderView` bound to that view model.
 
-Shared Templates composition remains responsible only for Templates-level workspace participation, route activation, and cross-surface coordination. `MainWindow` remains shell-only, and the current Templates Editor remains the V1/simple/legacy editing destination rather than becoming the Builder workflow owner.
+The transient `TemplatesPage` hosts the Builder subview and reaches reference data, library reload, the Save As file picker, and cross-subview navigation through the injected `ITemplatesBuilderHost` seam. `MainWindow` remains shell-only, and the current Templates Editor remains the V1/simple/legacy editing destination rather than becoming the Builder workflow owner.
 
 ## 8) Update Rule
 

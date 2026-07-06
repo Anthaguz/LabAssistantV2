@@ -5,18 +5,17 @@ The root `AGENTS.md` still governs; this file only adds UI-specific context.
 It is descriptive, not a mandate.
 It tells you what the current shell looks like and what pattern to reach for first, so you do not accidentally rebuild an older model.
 
-## Status: navigation is mid-migration
+## Status: navigation migration complete
 
-The app is moving from a "every capability view is always instantiated and toggled by `Visibility`" shell toward on-demand capability pages hosted in a `Frame`.
-This is partial.
-As of now, `Machines`, `Diagnostics`, `Assets`, `Settings`, and `Deploy` are migrated, and `Templates` is now page-hosted through `TemplatesPage` in the `Frame` as well.
-`Templates` Library and Editor subviews are on full `x:Bind` MVVM (transient view models resolved from DI, reached through injected host seams); its Builder subview still runs on its preserved controller/composition through an interim page-owned adapter, pending its own MVVM decomposition.
+The app has moved from a "every capability view is always instantiated and toggled by `Visibility`" shell to on-demand capability pages hosted in a `Frame`.
+As of now, every capability - `Machines`, `Diagnostics`, `Assets`, `Settings`, `Deploy`, and `Templates` - is page-hosted through its capability page in the `Frame`.
+All three `Templates` subviews (Library, Editor, and the 6-step Builder wizard) are on full `x:Bind` MVVM: transient view models resolved from DI, reached through injected host seams, with no delegate-bag workspace composition/controller glue remaining.
 
-Because of that, do not assume the whole app already works the frame way, and do not assume the older capabilities are wrong.
-When you touch a capability, prefer the migrated pattern below, but treating a not-yet-migrated capability as a bug (rather than as pending work) is itself a mistake.
+No capability is left running inline on the old always-instantiated shell.
+Prefer the migrated pattern below for any new capability.
 
 `ShellNavigationCoordinator` makes this explicit: `IsActiveCapabilityMigrated` is true only for capabilities present in the `capabilityPageTypes` map (`MainWindow.xaml.cs`).
-Migrated capabilities navigate the `Frame` to a page and tear it down on leave; non-migrated ones fall back to the older behavior.
+Migrated capabilities navigate the `Frame` to a page and tear it down on leave.
 
 ## Reference implementations
 
