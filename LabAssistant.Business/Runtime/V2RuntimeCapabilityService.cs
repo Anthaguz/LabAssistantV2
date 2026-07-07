@@ -827,7 +827,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     state.Context,
                     DeploymentStepKeys.V2BaseRemoteAccessReady,
                     "Base remote access ready",
-                    _ => Task.CompletedTask,
+                    context => WaitForBaseRemoteAccessReadyAsync(state, request, context, cancellationToken),
                     multiContext,
                     cancellationToken);
                 executedNodeIds.Add(node.NodeId);
@@ -1149,6 +1149,53 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 DeploymentStepKeys.V2ConfigureBaseRemoteAccess,
                 $"Failed to configure base remote access on '{context.VmName}'. {result.Error}".Trim());
         }
+    }
+
+    private async Task WaitForBaseRemoteAccessReadyAsync(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        CancellationToken cancellationToken)
+    {
+        var credential = ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            DeploymentStepKeys.V2BaseRemoteAccessReady,
+            "bootstrap");
+        if (credential is null)
+        {
+            return;
+        }
+
+        string? lastError = null;
+        for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.ShouldAbort?.Invoke() == true)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            var probeResult = await _baseRemoteAccessRuntimeCoordinator.ProbeBaseRemoteAccessReadyAsync(
+                context.VmName,
+                credential,
+                cancellationToken);
+            if (probeResult.Success)
+            {
+                return;
+            }
+
+            lastError = probeResult.Error;
+            if (attempt < request.GuestTransportMaxRetries)
+            {
+                await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+            }
+        }
+
+        context.MarkFailure(
+            DeploymentStepKeys.V2BaseRemoteAccessReady,
+            $"Base remote access did not become ready on '{context.VmName}'. Last error: {lastError ?? "unknown"}");
     }
 
     private async Task PrepareRouterNetworkAsync(

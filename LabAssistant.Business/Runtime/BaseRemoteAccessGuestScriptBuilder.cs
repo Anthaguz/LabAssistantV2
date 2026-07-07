@@ -42,4 +42,28 @@ internal static class BaseRemoteAccessGuestScriptBuilder
         sb.AppendLine("Write-Output 'Base remote access configured'");
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Builds a guest probe that verifies the durable outcome of
+    /// <see cref="BuildConfigureBaseRemoteAccessScript"/>: RDP is enabled
+    /// (<c>fDenyTSConnections = 0</c>) and an RDP-tcp listener is present and listening on 3389.
+    /// The script throws when readiness cannot be confirmed so the caller can retry the gate.
+    /// </summary>
+    public static string BuildProbeBaseRemoteAccessReadyScript()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("$ErrorActionPreference = 'Stop'");
+        sb.AppendLine();
+        sb.AppendLine("$deny = (Get-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -ErrorAction Stop).fDenyTSConnections");
+        sb.AppendLine("if ($deny -ne 0) { throw \"RDP is not enabled. fDenyTSConnections=$deny\" }");
+        sb.AppendLine();
+        sb.AppendLine("$rdpSetting = Get-CimInstance -ClassName Win32_TSGeneralSetting -Namespace 'root/cimv2/terminalservices' -Filter \"TerminalName='RDP-tcp'\" -ErrorAction SilentlyContinue");
+        sb.AppendLine("if ($null -eq $rdpSetting) { throw 'RDP-tcp listener is not present.' }");
+        sb.AppendLine();
+        sb.AppendLine("$listening = Get-NetTCPConnection -State Listen -LocalPort 3389 -ErrorAction SilentlyContinue");
+        sb.AppendLine("if ($null -eq $listening) { throw 'No listener is bound to TCP 3389.' }");
+        sb.AppendLine();
+        sb.AppendLine("Write-Output 'Base remote access ready'");
+        return sb.ToString();
+    }
 }
