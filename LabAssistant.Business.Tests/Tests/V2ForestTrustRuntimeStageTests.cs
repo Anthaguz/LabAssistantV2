@@ -287,6 +287,80 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.DoesNotContain(executedNodeIds, nodeId => nodeId == "trust:trust-contoso-fabrikam:CreateForestTrust");
     }
 
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_SourceValidationTransientFailure_RetriesThenSucceeds()
+    {
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 3;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var sourceValidationAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Forest trust validated", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref sourceValidationAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult { Success = false, Error = "trust object not yet replicated" });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.True(sourceValidationAttempts >= 2, $"Expected source-side validation to retry, saw {sourceValidationAttempts} attempt(s).");
+        Assert.Contains("trust:trust-contoso-fabrikam:ValidateForestTrust", executedNodeIds);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.TrustReady);
+        Assert.False(trustContext.CleanupAttempted);
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_SourceValidationAlwaysFails_FailsAfterExhaustingRetries()
+    {
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 3;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var sourceValidationAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Forest trust validated", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref sourceValidationAttempts);
+                    return Task.FromResult(new GuestCommandResult { Success = false, Error = "trust object never replicated" });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.Equal(3, sourceValidationAttempts);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.False(trustContext.TrustReady);
+        Assert.True(trustContext.CleanupAttempted);
+    }
+
     private static (MultiVmDeploymentContext MultiContext, IReadOnlyList<V2ForestTrustAnchorState> Anchors) CreateForestTrustStageContext(
         V2RuntimeExecutionRequest request)
     {

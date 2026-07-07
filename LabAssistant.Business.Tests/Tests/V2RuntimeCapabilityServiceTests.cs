@@ -381,6 +381,100 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_BaseRemoteAccessReady_ProbeNeverReady_FailsAfterExhaustingRetries()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 3;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Get-NetTCPConnection", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref probeAttempts);
+                    return Task.FromResult(new GuestCommandResult { Success = false, Error = "RDP listener not yet bound." });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Equal(3, probeAttempts);
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "dc01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("Base remote access did not become ready", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BaseRemoteAccessReady_ProbeTransientFailure_RetriesThenSucceeds()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 3;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Get-NetTCPConnection", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref probeAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult { Success = false, Error = "RDP listener not yet bound." });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.True(probeAttempts >= 2, $"Expected the gate to retry the probe, saw {probeAttempts} attempt(s).");
+        Assert.Contains("vm:vm-dc01:BaseRemoteAccessReady", result.ExecutedNodeIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BaseRemoteAccessReady_ProbeReady_CompletesGate()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("vm:vm-dc01:BaseRemoteAccessReady", result.ExecutedNodeIds);
+        Assert.Contains(
+            scripts,
+            entry => entry.VmName == "dc01" &&
+                     entry.Script.Contains("Get-NetTCPConnection", StringComparison.Ordinal) &&
+                     entry.Script.Contains("fDenyTSConnections", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ChildDomainProgression_UsesSharedPerDomainRuntime()
     {
         var request = await CreateRuntimeRequestWithChildDomainAsync();
