@@ -933,12 +933,7 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             return true;
         }
 
-        if (nics.Any(nic =>
-                !string.IsNullOrWhiteSpace(nic.NetworkId) ||
-                !string.IsNullOrWhiteSpace(nic.IpAddress) ||
-                nic.PrefixLength.HasValue ||
-                !string.IsNullOrWhiteSpace(nic.DefaultGateway) ||
-                nic.DnsServers.Count > 0))
+        if (nics.Any(NicRequiresGuestConfiguration))
         {
             return true;
         }
@@ -948,6 +943,22 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                vm.SoftwareConfig?.Enabled == true ||
                vm.TimeZoneConfig?.Enabled == true;
     }
+
+    /// <summary>
+    /// A NIC needs in-guest network preparation only when it carries configuration to apply (a lab-network
+    /// binding, a static address, a gateway, or DNS servers). A bare NIC that only names a switch takes DHCP
+    /// and needs no guest-side work. This is the single source of truth shared by
+    /// <see cref="DetermineGuestWorkRequirement"/> and <see cref="ResolvedVmState.RequiresNetworkBootstrap"/>:
+    /// keeping both on the same predicate guarantees the PrepareGuestNetwork node is never emitted without the
+    /// GuestTransportReady gate that must precede it, so it can never become an orphaned in-degree-zero node the
+    /// ready-set scheduler would admit before the VM is even started.
+    /// </summary>
+    private static bool NicRequiresGuestConfiguration(V2ResolvedVmNetworkInterface nic)
+        => !string.IsNullOrWhiteSpace(nic.NetworkId) ||
+           !string.IsNullOrWhiteSpace(nic.IpAddress) ||
+           nic.PrefixLength.HasValue ||
+           !string.IsNullOrWhiteSpace(nic.DefaultGateway) ||
+           nic.DnsServers.Count > 0;
 
     private static bool DetermineRouterRequirement(IReadOnlyList<ResolvedVmState> states, bool domainRequired)
     {
@@ -1869,7 +1880,12 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
         public string? EffectiveParentDomainAdminSlot { get; set; }
 
-        public bool RequiresNetworkBootstrap => ResolvedNics.Count > 0;
+        /// <summary>
+        /// True only when at least one NIC carries in-guest network configuration to apply. Shares
+        /// <see cref="NicRequiresGuestConfiguration"/> with <see cref="DetermineGuestWorkRequirement"/> so the
+        /// PrepareGuestNetwork node is emitted only alongside the GuestTransportReady gate that must precede it.
+        /// </summary>
+        public bool RequiresNetworkBootstrap => ResolvedNics.Any(NicRequiresGuestConfiguration);
 
         public bool TopologyRoleIs(string role)
             => string.Equals(TopologyRole, role, StringComparison.OrdinalIgnoreCase);
