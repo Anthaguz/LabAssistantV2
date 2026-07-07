@@ -92,7 +92,10 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 EmitVmScopedEvent(eventName, level, multiContext, state.Context, result, extraContext);
         }
 
-        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        // Executors run concurrently (graph scheduler dispatch and legacy Task.WhenAll fan-out both mutate this),
+        // so the executed-id sink must be thread-safe. It feeds only the ExecutedNodeIds report, not deployment
+        // correctness, but the concurrent core we are standardizing on must not carry a latent data race.
+        var executedNodeIds = new ConcurrentHashSet<string>(StringComparer.Ordinal);
         var trustStates = _forestTrustRuntimeStage.InitializeRuntimeState(
             request,
             BuildForestTrustAnchorStates(states),
