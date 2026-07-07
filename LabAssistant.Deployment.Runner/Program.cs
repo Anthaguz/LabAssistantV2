@@ -15,7 +15,8 @@ namespace LabAssistant.Deployment.Runner;
 ///   --probe       after --deploy, probe the guest over PowerShell Direct.
 ///   --teardown    after --deploy, stop and delete the scenario VMs (no orphans).
 ///   --no-graph    disable the ready-set graph scheduler (use the legacy fan-out).
-///   --vm NAME     override the VM name (default harness-standalone-01).
+///   --scenario N  select the topology: standalone (default) or dc (single first domain controller).
+///   --vm NAME     override the VM name (default depends on the scenario).
 /// </remarks>
 internal static class Program
 {
@@ -25,7 +26,8 @@ internal static class Program
         var probe = Has(args, "--probe");
         var teardown = Has(args, "--teardown");
         var useGraph = !Has(args, "--no-graph");
-        var vmName = ArgValue(args, "--vm") ?? "harness-standalone-01";
+        var scenarioName = ArgValue(args, "--scenario") ?? "standalone";
+        var vmName = ArgValue(args, "--vm");
 
         using var log = new RunLog();
         log.Line("=== LabAssistant deployment runner (harness) ===");
@@ -51,7 +53,8 @@ internal static class Program
             log.Line($"Isolated config root: {env.AppRoot}");
 
             var harness = new LabDeploymentHarness(env, log.Line);
-            var scenario = LabScenarioLibrary.Standalone(options, vmName);
+            var scenario = SelectScenario(scenarioName, options, vmName, log);
+            log.Line($"Scenario: {scenario.Name}  expected VMs: [{string.Join(", ", scenario.ExpectedVmNames)}]");
 
             if (planOnly)
             {
@@ -109,6 +112,21 @@ internal static class Program
 
     private static bool Has(string[] args, string name) =>
         args.Any(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
+
+    private static LabScenario SelectScenario(string name, HarnessOptions options, string? vmName, RunLog log)
+    {
+        switch (name.Trim().ToLowerInvariant())
+        {
+            case "dc":
+            case "domaincontroller":
+                return LabScenarioLibrary.DomainController(options, vmName ?? "harness-dc-01");
+            case "standalone":
+                return LabScenarioLibrary.Standalone(options, vmName ?? "harness-standalone-01");
+            default:
+                log.Line($"Unknown scenario '{name}', falling back to standalone.");
+                return LabScenarioLibrary.Standalone(options, vmName ?? "harness-standalone-01");
+        }
+    }
 
     private static string? ArgValue(string[] args, string name)
     {

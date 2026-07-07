@@ -35,11 +35,14 @@ public sealed class LabDeploymentHarness
     public async Task<V2PlanBuildResult> BuildPlanAsync(LabScenario scenario, CancellationToken cancellationToken = default)
     {
         PrepareScenario(scenario);
-        var switchNames = DeriveTemplateSwitchNames(scenario.Template);
-        var switchInfo = switchNames
-            .Select(n => new V2AvailableSwitchInfo { Name = n, SwitchType = "External" })
+        var declaredCreateSwitches = DeclaredCreateSwitchNames(scenario.Template);
+        var availableSwitchNames = DeriveTemplateSwitchNames(scenario.Template)
+            .Where(n => !declaredCreateSwitches.Contains(n))
             .ToList();
-        return await BuildPlanCoreAsync(scenario.Template, switchNames, switchInfo);
+        var switchInfo = availableSwitchNames
+            .Select(n => new V2AvailableSwitchInfo { Name = n, SwitchType = "Internal" })
+            .ToList();
+        return await BuildPlanCoreAsync(scenario.Template, availableSwitchNames, switchInfo);
     }
 
     /// <summary>
@@ -260,10 +263,23 @@ public sealed class LabDeploymentHarness
     private static IReadOnlyList<string> DeriveTemplateSwitchNames(LabTemplate template) =>
         template.VmTemplates
             .SelectMany(v => (v.SwitchNames ?? new List<string>()).Append(v.SwitchName))
+            .Concat(template.LabNetworks?.Select(n => n.SwitchName) ?? Enumerable.Empty<string?>())
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Select(s => s!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    /// <summary>
+    /// Switch names the template asks the deployment to create (they declare a switch type in the lab networks).
+    /// Offline plan validation omits these from the fake host inventory so the planner plans to create them, which
+    /// exercises the switch-ensure ordering exactly as a real deploy would on a clean host.
+    /// </summary>
+    private static HashSet<string> DeclaredCreateSwitchNames(LabTemplate template) =>
+        new(
+            (template.LabNetworks ?? new List<LabNetworkTemplate>())
+                .Where(n => !string.IsNullOrWhiteSpace(n.SwitchType) && !string.IsNullOrWhiteSpace(n.SwitchName))
+                .Select(n => n.SwitchName!.Trim()),
+            StringComparer.OrdinalIgnoreCase);
 
     private static string Truncate(string value, int max) =>
         value.Length <= max ? value : value.Substring(0, max) + "...";
