@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="LabAssistant.Business.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\LabAssistant.Data\LabAssistant.Data.csproj" />
     <ProjectReference Include="..\LabAssistant.Models\LabAssistant.Models.csproj" />
     <ProjectReference Include="..\LabAssistant.Services\LabAssistant.Services.csproj" />

@@ -179,6 +179,46 @@ public sealed class V2ForestTrustRuntimeStage
         }
     }
 
+    /// <summary>
+    /// Executes a single forest-trust plan node (prepare DNS, create, or validate) for the graph scheduler.
+    /// Ordering (both anchors ready, prepare -&gt; create -&gt; validate) is enforced by the plan's dependency edges, so this
+    /// method only resolves the trust and its source anchor context and runs the existing per-node step unchanged.
+    /// Returns whether the node executed, whether it succeeded, and whether it was cancelled, so the caller can signal
+    /// failure to the scheduler without this stage taking a dependency on scheduler types.
+    /// </summary>
+    internal async Task<(bool Executed, bool Success, bool WasCancelled)> ExecuteTrustNodeAsync(
+        V2RuntimeExecutionRequest request,
+        V2PlanNode node,
+        IReadOnlyList<V2ForestTrustAnchorState> anchorStates,
+        MultiVmDeploymentContext multiContext,
+        ISet<string> executedNodeIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(anchorStates);
+        ArgumentNullException.ThrowIfNull(multiContext);
+        ArgumentNullException.ThrowIfNull(executedNodeIds);
+
+        var trust = request.Plan.Context.Trusts.FirstOrDefault(candidate =>
+            string.Equals(candidate.TrustId, node.TrustId, StringComparison.OrdinalIgnoreCase));
+        if (trust is null)
+        {
+            return (false, true, false);
+        }
+
+        var contextByVmId = anchorStates.ToDictionary(state => state.VmId, StringComparer.OrdinalIgnoreCase);
+        if (!contextByVmId.TryGetValue(trust.SourceAnchorVmId, out var sourceState))
+        {
+            return (false, true, false);
+        }
+
+        var wasSuccessBefore = sourceState.Context.IsSuccess;
+        await ExecuteTrustPlanNodeAsync(sourceState.Context, node, request, multiContext, executedNodeIds, cancellationToken);
+        var success = !(wasSuccessBefore && !sourceState.Context.IsSuccess);
+        return (true, success, sourceState.Context.WasCancelled);
+    }
+
     private async Task ExecuteTrustPlanNodeAsync(
         VmDeploymentContext context,
         V2PlanNode node,

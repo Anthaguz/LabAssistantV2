@@ -5,7 +5,7 @@ using Xunit;
 
 namespace LabAssistant.Business.Tests.Tests;
 
-public sealed class V2PlanningCapabilityServiceTests
+public sealed partial class V2PlanningCapabilityServiceTests
 {
     private readonly IV2PlanningCapabilityService _service = new V2PlanningCapabilityService();
 
