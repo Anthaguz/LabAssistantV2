@@ -165,6 +165,89 @@ public sealed partial class V2PlanningCapabilityServiceTests
             CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Scheduler_BareSwitchStandaloneVm_DoesNotOrphanGuestNetworkNode()
+    {
+        // Regression: a standalone VM with only a switch attachment (a bare DHCP NIC, no lab-network binding,
+        // static address, gateway, or DNS) requires no in-guest work. The planner must NOT emit PrepareGuestNetwork
+        // for it, because that node's only gate (GuestTransportReady) is likewise absent. If it were emitted it would
+        // become an orphaned in-degree-zero node that the ready-set scheduler admits at t=0 - concurrently with
+        // ProvisionVm, before the VM even exists. This mirrors the first real headless V2 smoke-test template.
+        var plan = await _service.BuildPlanAsync(CreateBareSwitchStandaloneRequest());
+
+        Assert.True(plan.Success);
+        Assert.DoesNotContain(plan.Nodes, node => node.Kind == V2PlanNodeKind.PrepareGuestNetwork);
+
+        // The only legitimate in-degree-zero (entry) node kinds are ProvisionVm and the switch-ensure kinds. Any
+        // other node reaching in-degree zero is an accidental orphan the fail-closed graph validation cannot catch.
+        var inDegree = BuildInDegree(plan);
+        foreach (var node in plan.Nodes)
+        {
+            if (IsLegitimateEntryKind(node.Kind))
+            {
+                continue;
+            }
+
+            Assert.True(
+                inDegree[node.NodeId] > 0,
+                $"Node '{node.NodeId}' (kind {node.Kind}) is an orphaned in-degree-zero node - it has no dependency gate, so the scheduler would admit it before its prerequisites run.");
+        }
+
+        var result = await RunGraphSchedulerAsync(plan);
+
+        Assert.True(result.Success);
+        AssertAllEdgesHonored(plan, result);
+        AssertAdmittedBefore(result, NodeId(plan, V2PlanNodeKind.ProvisionVm), NodeId(plan, V2PlanNodeKind.StartVm));
+    }
+
+    private static bool IsLegitimateEntryKind(V2PlanNodeKind kind) =>
+        kind is V2PlanNodeKind.ProvisionVm or V2PlanNodeKind.EnsureNetworkSwitch;
+
+    private static Dictionary<string, int> BuildInDegree(V2PlanBuildResult plan)
+    {
+        var inDegree = plan.Nodes.ToDictionary(node => node.NodeId, _ => 0, StringComparer.Ordinal);
+        foreach (var dependency in plan.Dependencies)
+        {
+            if (inDegree.ContainsKey(dependency.ToNodeId))
+            {
+                inDegree[dependency.ToNodeId] += 1;
+            }
+        }
+
+        return inDegree;
+    }
+
+    private static V2PlanBuildRequest CreateBareSwitchStandaloneRequest()
+    {
+        var template = CreateBaseTemplate("Balanced");
+        template.VmTemplates =
+        [
+            new VmTemplate
+            {
+                VmId = "vm-bare",
+                Name = "bare01",
+                MemoryMb = 4096,
+                CpuCount = 2,
+                VhdxId = "disk-bare",
+                MembershipMode = V2MembershipModeCatalog.Standalone,
+                SwitchName = "Default Switch",
+                SwitchNames = ["Default Switch"]
+            }
+        ];
+
+        return new V2PlanBuildRequest
+        {
+            Template = template,
+            CatalogItems =
+            [
+                CreateCatalogItem("disk-bare", "slot-local")
+            ],
+            AvailableSwitchNames = ["Default Switch"],
+            AvailableSwitches = [CreateSwitch("Default Switch", "Internal")],
+            ResolvedCredentialSlotKeys = ["slot-local"]
+        };
+    }
+
     private static void AssertAllEdgesHonored(V2PlanBuildResult plan, V2SchedulerRunResult result)
     {
         var admissionIndex = BuildAdmissionIndex(result);
