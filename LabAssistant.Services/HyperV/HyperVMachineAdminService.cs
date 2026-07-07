@@ -765,7 +765,7 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 
     private static string Quote(string value)
     {
-        return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
+        return PowerShellCommandBuilder.Quote(value);
     }
 
     private async Task<HyperVMachineStorageInfo?> GetVmStorageInfoAsync(string vmName)
