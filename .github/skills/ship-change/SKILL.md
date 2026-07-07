@@ -33,6 +33,15 @@ Never open an issue to narrate work already done.
 - Use an umbrella integration branch (for example `goal/<name>`) only for an explicitly approved multi-PR goal.
   Sub-branches then branch off the umbrella branch and PR back into it, and only the final umbrella PR targets `master`.
 
+### Temporary worktrees
+
+When the current session sits on a messy umbrella branch, ship a discrete change from a fresh worktree off `origin/master`.
+
+- Create it outside the repository working tree, never inside it (for example a sibling scratch directory such as `../_worktrees/<slug>`).
+- Make the change, push the branch, and open the PR from there.
+- Remove it with `git worktree remove <path>` once the PR is pushed.
+  The branch and PR live on the remote, so the local worktree is disposable.
+
 ## Commits
 
 - Small, focused, one reason to change.

@@ -110,7 +110,17 @@ From repo root:
 
 UI targets `net8.0-windows`, so builds run on Windows with .NET SDK 8.
 
-## 8. Deeper Rules and Workflows (load on demand)
+## 8. Workspace Hygiene
+
+Keep the repository working tree clean and singular.
+
+- Never nest a second clone, git worktree, scratch project, or generated artifact inside the repository working tree.
+  The only nested checkouts allowed are the app-managed `copilot-worktrees/` sessions.
+- Temporary worktrees used to ship a discrete branch live outside the repository tree and are removed once their PR is pushed.
+- Throwaway runners, logs, downloaded images, and other scratch belong outside the tree or in an ignored scratch directory.
+  Never commit them and never leave them in the repository root.
+
+## 9. Deeper Rules and Workflows (load on demand)
 
 This file holds only always-on invariants.
 Procedural workflows live in skills that load when that work is happening, and detailed contracts live in canonical docs.
