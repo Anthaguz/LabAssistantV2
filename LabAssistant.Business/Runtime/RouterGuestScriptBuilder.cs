@@ -1,9 +1,17 @@
 using System.Text;
+using LabAssistant.Services.PowerShell;
 
 namespace LabAssistant.Business.Runtime;
 
 internal static class RouterGuestScriptBuilder
 {
+    // Guest-side Get-NetAdapter returns MACs as separator-delimited hex (00-15-5D-..), while Hyper-V
+    // injects them bare (00155D..). Comparing the raw values silently mismatches, so every emitted
+    // comparison reduces the guest value to the same canonical form as Services MacAddressNormalizer
+    // (separators stripped, upper-cased) and compares it against the already-normalized injected MAC.
+    private const string CanonicalMacFunction =
+        "function ConvertTo-CanonicalMac { param([string]$Value) if ([string]::IsNullOrWhiteSpace($Value)) { return '' } return (($Value -replace '[-:. ]', '')).ToUpperInvariant() }";
+
     public static string BuildPrepareRouterNetworkScript(IReadOnlyList<RouterNicPlan> nics)
     {
         var ordered = nics
@@ -21,7 +29,7 @@ internal static class RouterGuestScriptBuilder
                 : "@(" + string.Join(", ", nic.DnsServers.Select(value => $"'{EscapeSingleQuotedLiteral(value)}'")) + ")";
             sb.Append("    [pscustomobject]@{");
             sb.Append($" SwitchName = '{EscapeSingleQuotedLiteral(nic.SwitchName)}';");
-            sb.Append($" MacAddress = '{EscapeSingleQuotedLiteral(nic.MacAddress)}';");
+            sb.Append($" MacAddress = '{EscapeSingleQuotedLiteral(MacAddressNormalizer.NormalizeMacAddress(nic.MacAddress))}';");
             sb.Append($" IsExternal = ${nic.IsExternal.ToString().ToLowerInvariant()};");
             sb.Append($" IpAddress = {ToPowerShellString(nic.IpAddress)};");
             sb.Append($" PrefixLength = {ToNullableInt(nic.PrefixLength)};");
@@ -31,8 +39,9 @@ internal static class RouterGuestScriptBuilder
         }
 
         sb.AppendLine(")");
+        sb.AppendLine(CanonicalMacFunction);
         sb.AppendLine("foreach ($target in $targetNics) {");
-        sb.AppendLine("    $adapter = Get-NetAdapter | Where-Object { $_.MacAddress -eq $target.MacAddress } | Select-Object -First 1");
+        sb.AppendLine("    $adapter = Get-NetAdapter | Where-Object { (ConvertTo-CanonicalMac $_.MacAddress) -eq $target.MacAddress } | Select-Object -First 1");
         sb.AppendLine("    if (-not $adapter) { throw \"Router adapter with MAC $($target.MacAddress) for switch '$($target.SwitchName)' was not found.\" }");
         sb.AppendLine("    $interfaceIndex = $adapter.ifIndex");
         sb.AppendLine("    if ($target.IsExternal) {");
@@ -82,18 +91,20 @@ Write-Output 'Router remote-access features ready'
             "Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object {",
             "    Set-NetIPInterface -InterfaceIndex $_.ifIndex -Forwarding Enabled -AddressFamily IPv4 -ErrorAction Stop",
             "}",
-            $"$externalMac = '{EscapeSingleQuotedLiteral(externalMacAddress)}'",
-            "$externalAdapter = Get-NetAdapter | Where-Object { $_.MacAddress -eq $externalMac } | Select-Object -First 1",
+            CanonicalMacFunction,
+            $"$externalMac = '{EscapeSingleQuotedLiteral(MacAddressNormalizer.NormalizeMacAddress(externalMacAddress))}'",
+            "$externalAdapter = Get-NetAdapter | Where-Object { (ConvertTo-CanonicalMac $_.MacAddress) -eq $externalMac } | Select-Object -First 1",
             "if (-not $externalAdapter) { throw 'External router adapter was not found in the guest OS.' }",
             "Write-Output $externalAdapter.Name");
     }
 
     public static string BuildConfigureRouterNatScript(string externalMacAddress, IReadOnlyList<string> internalMacAddresses)
     {
-        var internalMacs = "@(" + string.Join(", ", internalMacAddresses.Select(value => $"'{EscapeSingleQuotedLiteral(value)}'")) + ")";
+        var internalMacs = "@(" + string.Join(", ", internalMacAddresses.Select(value => $"'{EscapeSingleQuotedLiteral(MacAddressNormalizer.NormalizeMacAddress(value))}'")) + ")";
         return string.Join(
             Environment.NewLine,
-            $"$externalMac = '{EscapeSingleQuotedLiteral(externalMacAddress)}'",
+            CanonicalMacFunction,
+            $"$externalMac = '{EscapeSingleQuotedLiteral(MacAddressNormalizer.NormalizeMacAddress(externalMacAddress))}'",
             $"$internalMacs = {internalMacs}",
             "function Invoke-NetshNatCommand {",
             "    param([string[]]$Arguments, [switch]$IgnoreMissing)",
@@ -104,10 +115,10 @@ Write-Output 'Router remote-access features ready'
             "    if ($IgnoreMissing -and ($outputText -match 'not found|does not exist|not configured|not installed')) { return }",
             "    throw \"netsh $($Arguments -join ' ') failed with exit code $exitCode. Output: $outputText\"",
             "}",
-            "$externalAdapter = Get-NetAdapter | Where-Object { $_.MacAddress -eq $externalMac } | Select-Object -First 1",
+            "$externalAdapter = Get-NetAdapter | Where-Object { (ConvertTo-CanonicalMac $_.MacAddress) -eq $externalMac } | Select-Object -First 1",
             "if (-not $externalAdapter) { throw 'External NAT adapter was not found.' }",
             "$internalAdapters = foreach ($mac in $internalMacs) {",
-            "    $adapter = Get-NetAdapter | Where-Object { $_.MacAddress -eq $mac } | Select-Object -First 1",
+            "    $adapter = Get-NetAdapter | Where-Object { (ConvertTo-CanonicalMac $_.MacAddress) -eq $mac } | Select-Object -First 1",
             "    if (-not $adapter) { throw \"Internal NAT adapter with MAC $mac was not found.\" }",
             "    $adapter",
             "}",
@@ -125,8 +136,9 @@ Write-Output 'Router remote-access features ready'
     {
         return string.Join(
             Environment.NewLine,
-            $"$externalMac = '{EscapeSingleQuotedLiteral(externalMacAddress)}'",
-            "$adapter = Get-NetAdapter | Where-Object { $_.MacAddress -eq $externalMac } | Select-Object -First 1",
+            CanonicalMacFunction,
+            $"$externalMac = '{EscapeSingleQuotedLiteral(MacAddressNormalizer.NormalizeMacAddress(externalMacAddress))}'",
+            "$adapter = Get-NetAdapter | Where-Object { (ConvertTo-CanonicalMac $_.MacAddress) -eq $externalMac } | Select-Object -First 1",
             "if (-not $adapter) { throw 'External router adapter was not found for egress validation.' }",
             "if ($adapter.Status -ne 'Up') { Write-Output 'HOST_OFFLINE'; return }",
             "$defaultRoute = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1",
