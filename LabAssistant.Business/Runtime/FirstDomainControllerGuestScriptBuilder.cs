@@ -44,6 +44,7 @@ Write-Output 'AD-Domain-Services ready'
     {
         return string.Join(
             Environment.NewLine,
+            BuildAlreadyDomainControllerGuard(domain.DnsName),
             "Import-Module ADDSDeployment -ErrorAction Stop",
             $"$secureDsrmPassword = ConvertTo-SecureString '{EscapeSingleQuotedLiteral(dsrmPassword)}' -AsPlainText -Force",
             "Install-ADDSForest `",
@@ -72,6 +73,7 @@ Write-Output 'AD-Domain-Services ready'
 
         return string.Join(
             Environment.NewLine,
+            BuildAlreadyDomainControllerGuard(domain.DnsName),
             "Import-Module ADDSDeployment -ErrorAction Stop",
             $"$parentDomainPassword = ConvertTo-SecureString '{EscapeSingleQuotedLiteral(parentDomainAdminCredential.Password)}' -AsPlainText -Force",
             $"$parentDomainCredential = New-Object System.Management.Automation.PSCredential ('{EscapeSingleQuotedLiteral(parentDomainAdminCredential.Username)}', $parentDomainPassword)",
@@ -104,6 +106,7 @@ Write-Output 'AD-Domain-Services ready'
 
         return string.Join(
             Environment.NewLine,
+            BuildAlreadyDomainControllerGuard(domain.DnsName),
             "Import-Module ADDSDeployment -ErrorAction Stop",
             $"$parentDomainPassword = ConvertTo-SecureString '{EscapeSingleQuotedLiteral(parentDomainAdminCredential.Password)}' -AsPlainText -Force",
             $"$parentDomainCredential = New-Object System.Management.Automation.PSCredential ('{EscapeSingleQuotedLiteral(parentDomainAdminCredential.Username)}', $parentDomainPassword)",
@@ -157,6 +160,17 @@ Write-Output 'AD-Domain-Services ready'
 
     private static string EscapeSingleQuotedLiteral(string value) =>
         value.Replace("'", "''", StringComparison.Ordinal);
+
+    // Idempotency guard: if the machine is already a domain controller (DomainRole 4 or 5)
+    // for the intended domain, short-circuit before re-running promotion, which would otherwise fail.
+    private static string BuildAlreadyDomainControllerGuard(string expectedDomainName) =>
+        string.Join(
+            Environment.NewLine,
+            "$existing = Get-CimInstance Win32_ComputerSystem",
+            $"if ($existing.DomainRole -in 4, 5 -and $existing.Domain -ieq '{EscapeSingleQuotedLiteral(expectedDomainName)}') {{",
+            "    Write-Output $existing.Domain",
+            "    return",
+            "}");
 
     private static string GetChildLabel(string childDomainName, string parentDomainName)
     {
