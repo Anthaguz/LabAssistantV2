@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>LabAssistant.Deployment.Runner</RootNamespace>
+    <AssemblyName>LabAssistant.Deployment.Runner</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LabAssistant.Deployment.Harness\LabAssistant.Deployment.Harness.csproj" />
+  </ItemGroup>
+
+</Project>
