@@ -423,36 +423,78 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
-        var sourceResult = await _forestTrustRuntimeCoordinator.ValidateForestTrustAsync(
+        var sourceValidated = await ValidateTrustSideWithRetryAsync(
+            request,
+            context,
             trust.SourceAnchorVmName,
             sourceCredential,
             trust.TargetDomainDnsName,
             cancellationToken);
-        if (!sourceResult.Success)
+        if (!sourceValidated.Success)
         {
             context.MarkFailure(
                 DeploymentStepKeys.V2ValidateForestTrust,
-                $"Source-side validation failed for forest trust '{trust.TrustId}'. {sourceResult.Error}".Trim());
-            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", sourceResult.Error);
+                $"Source-side validation failed for forest trust '{trust.TrustId}'. {sourceValidated.Error}".Trim());
+            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", sourceValidated.Error);
             return;
         }
 
-        var targetResult = await _forestTrustRuntimeCoordinator.ValidateForestTrustAsync(
+        var targetValidated = await ValidateTrustSideWithRetryAsync(
+            request,
+            context,
             trust.TargetAnchorVmName,
             targetCredential,
             trust.SourceDomainDnsName,
             cancellationToken);
-        if (!targetResult.Success)
+        if (!targetValidated.Success)
         {
             context.MarkFailure(
                 DeploymentStepKeys.V2ValidateForestTrust,
-                $"Target-side validation failed for forest trust '{trust.TrustId}'. {targetResult.Error}".Trim());
-            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", targetResult.Error);
+                $"Target-side validation failed for forest trust '{trust.TrustId}'. {targetValidated.Error}".Trim());
+            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", targetValidated.Error);
             return;
         }
 
         MarkTrustReady(multiContext, trust.TrustId);
         EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "success");
+    }
+
+    // AD trust objects replicate asynchronously, so validation is retried up to the shared
+    // guest-transport retry budget before the side is treated as failed. Mirrors the AD readiness gates.
+    private async Task<GuestCommandResult> ValidateTrustSideWithRetryAsync(
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        string anchorVmName,
+        V2RuntimeCredential domainAdminCredential,
+        string trustedDomainName,
+        CancellationToken cancellationToken)
+    {
+        GuestCommandResult result = new() { Success = false, Error = "Forest trust validation was not attempted." };
+        for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.ShouldAbort?.Invoke() == true)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            result = await _forestTrustRuntimeCoordinator.ValidateForestTrustAsync(
+                anchorVmName,
+                domainAdminCredential,
+                trustedDomainName,
+                cancellationToken);
+            if (result.Success)
+            {
+                return result;
+            }
+
+            if (attempt < request.GuestTransportMaxRetries)
+            {
+                await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+            }
+        }
+
+        return result;
     }
 
     private async Task ExecuteTrustStepAsync(
