@@ -36,7 +36,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         var scriptList = scripts.ToList();
         var firstDns = scriptList.FindIndex(entry => entry.Script.Contains("Add-DnsServerConditionalForwarderZone", StringComparison.Ordinal));
-        var createTrust = scriptList.FindIndex(entry => entry.VmName == "dc01" && entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
+        var createTrust = scriptList.FindIndex(entry => entry.VmName == "dc01" && entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal));
         var sourceValidation = scriptList.FindIndex(entry => entry.VmName == "dc01" && entry.Script.Contains("Forest trust validated", StringComparison.Ordinal));
         var targetValidation = scriptList.FindIndex(entry => entry.VmName == "fabrikamdc01" && entry.Script.Contains("Forest trust validated", StringComparison.Ordinal));
 
@@ -46,7 +46,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.True(targetValidation > createTrust);
         Assert.Contains(scriptList, entry => entry.VmName == "dc01" && entry.Script.Contains("fabrikam.com", StringComparison.Ordinal));
         Assert.Contains(scriptList, entry => entry.VmName == "fabrikamdc01" && entry.Script.Contains("contoso.com", StringComparison.Ordinal));
-        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal));
+        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal));
 
         var trustContext = Assert.Single(multiContext.V2TrustContexts);
         Assert.True(trustContext.TrustObjectsCreated);
@@ -59,6 +59,49 @@ public sealed partial class V2RuntimeCapabilityServiceTests
             item.Context != null &&
             item.Context.TryGetValue("trustId", out var trustId) &&
             string.Equals(trustId?.ToString(), "trust-contoso-fabrikam", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_BareDomainAdmin_QualifiesCredentialsWithDomainNetBios()
+    {
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        // The real harness seeds domain-admin slots with a bare "Administrator". After dcpromo the local SAM is gone,
+        // so PowerShell Direct into each promoted DC and the cross-forest CreateTrustRelationship target credential must be
+        // NetBIOS-qualified (DOMAIN\User) by the stage, or authentication resolves against the wrong directory.
+        var credentialSlots = (Dictionary<string, V2RuntimeCredential>)request.CredentialSlotValues;
+        credentialSlots["slot-admin"] = new V2RuntimeCredential { Username = "Administrator", Password = "Password123!" };
+        credentialSlots["slot-fabrikam-admin"] = new V2RuntimeCredential { Username = "Administrator", Password = "Password123!" };
+
+        var scripts = new ConcurrentQueue<(string VmName, string Username, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, credential, script, _) =>
+            {
+                scripts.Enqueue((vmName, credential?.Username ?? string.Empty, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+
+        var scriptList = scripts.ToList();
+
+        // CreateTrustRelationship embeds the cross-forest target credential in its script; it must name the TARGET forest.
+        Assert.Contains(scriptList, entry =>
+            entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal) &&
+            entry.Script.Contains(@"FABRIKAM\Administrator", StringComparison.Ordinal));
+        Assert.DoesNotContain(scriptList, entry =>
+            entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal) &&
+            entry.Script.Contains("$targetUser = 'Administrator'", StringComparison.Ordinal));
+
+        // PowerShell Direct into each promoted DC must log on as DOMAIN\Administrator, never a bare local account.
+        Assert.Contains(scriptList, entry => entry.VmName == "dc01" && entry.Username == @"CONTOSO\Administrator");
+        Assert.Contains(scriptList, entry => entry.VmName == "fabrikamdc01" && entry.Username == @"FABRIKAM\Administrator");
+        Assert.DoesNotContain(scriptList, entry => string.Equals(entry.Username, "Administrator", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -91,9 +134,9 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         var scriptList = scripts.ToList();
         Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Add-DnsServerConditionalForwarderZone", StringComparison.Ordinal));
-        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
+        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal));
         Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Forest trust validated", StringComparison.Ordinal));
-        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal));
+        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -106,7 +149,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
             OnExecuteAsync = (vmName, _, script, _) =>
             {
                 scripts.Enqueue((vmName, script));
-                if (vmName == "dc01" && script.Contains("New-ADTrust", StringComparison.Ordinal))
+                if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
                 {
                     return Task.FromResult(new GuestCommandResult { Success = false, Error = "trust create failed after source object creation" });
                 }
@@ -129,8 +172,8 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.False(trustContext.CleanupResidual);
 
         var scriptList = scripts.ToList();
-        Assert.Contains(scriptList, entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
-        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal)));
+        Assert.Contains(scriptList, entry => entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal));
+        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal)));
         Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-DnsServerZone", StringComparison.Ordinal));
     }
 
@@ -145,8 +188,8 @@ public sealed partial class V2RuntimeCapabilityServiceTests
             {
                 scripts.Enqueue((vmName, script));
                 if (vmName == "dc01" &&
-                    script.Contains("New-ADTrust", StringComparison.Ordinal) &&
-                    scripts.Count(entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal)) == 2)
+                    script.Contains("CreateTrustRelationship", StringComparison.Ordinal) &&
+                    scripts.Count(entry => entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal)) == 2)
                 {
                     return Task.FromResult(new GuestCommandResult { Success = false, Error = "later trust create failed" });
                 }
@@ -173,8 +216,8 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.False(failedTrust.CleanupResidual);
 
         var scriptList = scripts.ToList();
-        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal)));
-        Assert.Equal(4, scriptList.Count(entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal)));
+        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal)));
+        Assert.Equal(4, scriptList.Count(entry => entry.Script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal)));
         Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-DnsServerZone", StringComparison.Ordinal));
     }
 
@@ -212,7 +255,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         var scriptList = scripts.ToList();
         Assert.Contains(scriptList, entry => entry.Script.Contains("Add-DnsServerConditionalForwarderZone", StringComparison.Ordinal));
-        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal)));
+        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal)));
         Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-DnsServerZone", StringComparison.Ordinal));
     }
 
@@ -227,7 +270,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         guestExecutor.OnExecuteAsync = (vmName, _, script, _) =>
         {
             scripts.Enqueue((vmName, script));
-            if (vmName == "dc01" && script.Contains("New-ADTrust", StringComparison.Ordinal))
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
             {
                 multiContext.RequestUserCancellation();
             }
@@ -247,8 +290,8 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.False(trustContext.CleanupResidual);
 
         var scriptList = scripts.ToList();
-        Assert.Contains(scriptList, entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
-        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal)));
+        Assert.Contains(scriptList, entry => entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal));
+        Assert.Equal(2, scriptList.Count(entry => entry.Script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal)));
         Assert.DoesNotContain(executedNodeIds, nodeId => nodeId == "trust:trust-contoso-fabrikam:ValidateForestTrust");
     }
 
@@ -282,8 +325,8 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.False(trustContext.CleanupAttempted);
 
         var scriptList = scripts.ToList();
-        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
-        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("Remove-ADTrust", StringComparison.Ordinal));
+        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal));
+        Assert.DoesNotContain(scriptList, entry => entry.Script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal));
         Assert.DoesNotContain(executedNodeIds, nodeId => nodeId == "trust:trust-contoso-fabrikam:CreateForestTrust");
     }
 

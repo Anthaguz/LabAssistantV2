@@ -588,7 +588,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.Contains("trust:trust-contoso-fabrikam:CreateForestTrust", result.ExecutedNodeIds);
         Assert.Contains("trust:trust-contoso-fabrikam:ValidateForestTrust", result.ExecutedNodeIds);
         var scriptList = scripts.ToList();
-        Assert.Contains(scriptList, entry => entry.Script.Contains("New-ADTrust", StringComparison.Ordinal));
+        Assert.Contains(scriptList, entry => entry.Script.Contains("CreateTrustRelationship", StringComparison.Ordinal));
         Assert.Contains(scriptList, entry => entry.Script.Contains("Forest trust validated", StringComparison.Ordinal));
     }
 
