@@ -6,8 +6,8 @@ using Xunit;
 namespace LabAssistant.Services.Tests;
 
 /// <summary>
-/// Behavior tests for the per-VM guest session model: one dedicated, reused connection per VM, guest steps
-/// serialized within a VM but parallel across VMs, self-heal/invalidate, and mandatory teardown. All run
+/// Behavior tests for the per-VM guest dispatcher: one dedicated session per VM reused across steps, guest
+/// steps serialized within a VM but parallel across VMs, harmless invalidate, and mandatory teardown. All run
 /// against a fake session, so no Hyper-V or real PowerShell process is required.
 /// </summary>
 public class PerVmGuestSessionTests
@@ -108,7 +108,7 @@ public class PerVmGuestSessionTests
     }
 
     [Fact]
-    public async Task InvalidateVmSession_DropsGuestConnection_ButKeepsHostSession()
+    public async Task InvalidateVmSession_IsHarmlessNoOp_AndKeepsDispatcher()
     {
         var factory = new RecordingSessionFactory();
         using var executor = new HyperVPowerShellDirectGuestCommandExecutor(factory.Create);
@@ -118,9 +118,10 @@ public class PerVmGuestSessionTests
         await executor.ExecutePowerShellDirectAsync("vm-a", Credential(), "AfterReboot");
 
         var session = factory.Sessions[0];
-        Assert.Equal(1, factory.CreatedCount);       // same dedicated host runspace reused
-        Assert.Equal(0, session.DisposeCount);       // not torn down, just the guest connection dropped
-        Assert.Contains(session.Commands, c => c.Contains("$__laGuestSession = $null", StringComparison.Ordinal));
+        Assert.Equal(1, factory.CreatedCount);   // same dedicated dispatcher reused
+        Assert.Equal(0, session.DisposeCount);    // not torn down
+        // Every step is already a fresh hop, so invalidation self-heals for free: it dispatches no extra command.
+        Assert.Equal(2, session.Commands.Count);
     }
 
     [Fact]

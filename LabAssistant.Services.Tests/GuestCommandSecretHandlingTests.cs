@@ -24,13 +24,13 @@ public class GuestCommandSecretHandlingTests
         Assert.DoesNotContain(Password, command, StringComparison.Ordinal);
         // The password is referenced only by variable name, never inlined as a plaintext literal.
         Assert.Contains("$__laGuestPassword", command, StringComparison.Ordinal);
-        Assert.DoesNotContain("ConvertTo-SecureString '", command, StringComparison.Ordinal);
-        // The reused-connection shape: dispatch goes through a held-open guest session, not a fresh per-step hop.
-        Assert.Contains("New-PSSession -VMName 'Router01'", command, StringComparison.Ordinal);
-        Assert.Contains("Invoke-Command -Session $__laGuestSession", command, StringComparison.Ordinal);
-        // Self-heals when the connection is missing, severed by a reboot, or opened for a different identity.
-        Assert.Contains("$__laGuestSession.State -ne 'Opened'", command, StringComparison.Ordinal);
-        Assert.Contains("$__laGuestSessionUser -ne 'Administrator'", command, StringComparison.Ordinal);
+        // The SecureString is built with AppendChar, never ConvertTo-SecureString (which autoloads a module that
+        // races the stdin-EOF teardown from a .NET-hosted powershell child and can null the password).
+        Assert.DoesNotContain("ConvertTo-SecureString", command, StringComparison.Ordinal);
+        Assert.Contains("$guestSecurePassword.AppendChar", command, StringComparison.Ordinal);
+        // The one-shot shape: each step is a fresh PowerShell Direct hop, not a reused held-open session.
+        Assert.Contains("Invoke-Command -VMName 'Router01'", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("New-PSSession", command, StringComparison.Ordinal);
     }
 
     [Fact]

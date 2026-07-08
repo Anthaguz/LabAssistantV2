@@ -5,21 +5,22 @@ using LabAssistant.Services.PowerShell;
 namespace LabAssistant.Services.GuestExecution;
 
 /// <summary>
-/// Dispatches guest scripts over PowerShell Direct, keeping one dedicated, reused connection per VM.
+/// Dispatches guest scripts over PowerShell Direct, keeping one dedicated dispatcher per VM.
 /// </summary>
 /// <remarks>
-/// Each VM gets its own <see cref="VmGuestSession"/> (a dedicated host runspace plus a held-open in-guest
-/// connection). Routing every guest step for a VM through that single session gives two properties for free:
-/// the connection is established once and reused across steps (no per-step reconnect), and guest steps for the
-/// same VM are inherently serialized (a single session runs one command at a time). Different VMs keep
-/// independent sessions, so cross-VM parallelism is preserved.
+/// Each VM gets its own <see cref="VmGuestSession"/> (a dedicated one-shot guest-command session plus a per-VM
+/// serialization lock). Every guest step is a fresh PowerShell Direct hop: reuse of a held-open in-guest
+/// connection is impossible over a stdin-driven host, because the host must close stdin (EOF) for the
+/// connection to negotiate at all. Routing every step for a VM through its <see cref="VmGuestSession"/> still
+/// gives one useful property for free: guest steps for the same VM are serialized (its lock admits one at a
+/// time), while different VMs keep independent dispatchers so cross-VM parallelism is preserved.
 ///
-/// The dedicated host runspaces are intentionally minted from a factory that does NOT draw on the shared
+/// The dedicated sessions are intentionally minted from a factory that does NOT draw on the shared
 /// catalog/admin pool, so a lab with many VMs cannot exhaust that pool and stall read queries.
 ///
 /// This executor can outlive a single deployment (it is shared through a singleton runtime service), so the
 /// deploy orchestrator must call <see cref="DisposeAllVmSessions"/> at the end of every run to guarantee no
-/// host runspace or guest connection leaks between deployments.
+/// per-VM dispatcher leaks between deployments.
 /// </remarks>
 public sealed class HyperVPowerShellDirectGuestCommandExecutor : IGuestCommandExecutor, IDisposable
 {

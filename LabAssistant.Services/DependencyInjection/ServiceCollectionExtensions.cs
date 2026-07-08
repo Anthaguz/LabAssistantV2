@@ -28,13 +28,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPowerShellExecutor, PowerShellExecutor>();
         services.AddSingleton<IHyperVQueryExecutor, HyperVQueryExecutor>();
         services.AddSingleton<IHyperVAdministrativeCommandExecutor, HyperVAdministrativeCommandExecutor>();
-        // The guest executor holds one dedicated, reused PowerShell Direct connection per VM, so it must NOT
-        // draw on the shared catalog/admin pool: pinning a pooled session per VM would drain the small pool and
-        // stall read queries. Give it its own factory that mints a fresh, dedicated host runspace, budgeted only
-        // by the scheduler's concurrent-VM cap. Registered as a singleton so the per-VM session map survives the
-        // whole deployment (the runtime service that consumes it is itself a singleton).
+        // The guest executor dispatches every guest step as a fresh PowerShell Direct hop through a dedicated
+        // per-VM session, so it must NOT draw on the shared catalog/admin pool. Give it a factory that mints a
+        // one-shot session: each command runs as a short-lived powershell.exe whose stdin is closed before the
+        // command executes. That closed stdin (EOF) is mandatory - PowerShell Direct connection negotiation
+        // hangs indefinitely while the host holds an open input stream, which was the long-standing
+        // guest-transport blocker. Registered as a singleton so the per-VM dispatcher map survives the whole
+        // deployment (the runtime service that consumes it is itself a singleton).
         services.AddSingleton<IGuestCommandExecutor>(_ =>
-            new HyperVPowerShellDirectGuestCommandExecutor(() => new PersistentPowerShellSession()));
+            new HyperVPowerShellDirectGuestCommandExecutor(() => new OneShotPowerShellDirectSession()));
 
         // Hand out pooled sessions to all consumers. A session is checked out from the pre-warmed,
         // health-monitored pool on demand and returned to it on dispose, so existing consumers that
