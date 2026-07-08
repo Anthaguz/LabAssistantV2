@@ -1131,12 +1131,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         VmDeploymentContext context,
         CancellationToken cancellationToken)
     {
-        var credential = ResolveCredential(
-            request.CredentialSlotValues,
-            state.PlanVm.EffectiveBootstrapCredentialSlot,
+        var credential = ResolveBaseRemoteAccessCredential(
+            state,
+            request,
             context,
-            DeploymentStepKeys.V2ConfigureBaseRemoteAccess,
-            "bootstrap");
+            DeploymentStepKeys.V2ConfigureBaseRemoteAccess);
         if (credential is null)
         {
             return;
@@ -1162,12 +1161,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         VmDeploymentContext context,
         CancellationToken cancellationToken)
     {
-        var credential = ResolveCredential(
-            request.CredentialSlotValues,
-            state.PlanVm.EffectiveBootstrapCredentialSlot,
+        var credential = ResolveBaseRemoteAccessCredential(
+            state,
+            request,
             context,
-            DeploymentStepKeys.V2BaseRemoteAccessReady,
-            "bootstrap");
+            DeploymentStepKeys.V2BaseRemoteAccessReady);
         if (credential is null)
         {
             return;
@@ -1592,6 +1590,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        if (parentDomainAdminCredential is not null && parentDomain is not null)
+        {
+            parentDomainAdminCredential = QualifyDomainCredential(parentDomainAdminCredential, parentDomain.NetBiosName);
+        }
+
         if (domain.RelationKind is V2DomainRelationKind.Child or V2DomainRelationKind.Tree)
         {
             string? lastDnsError = null;
@@ -1669,6 +1672,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         {
             return;
         }
+
+        domainAdminCredential = QualifyDomainCredential(domainAdminCredential, domain.NetBiosName);
 
         string? lastError = null;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
@@ -1754,6 +1759,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        domainJoinCredential = QualifyDomainCredential(domainJoinCredential, domain.NetBiosName);
+
         var result = await _domainProgressionRuntimeCoordinator.PromoteReplicaDomainControllerAsync(
             context.VmName,
             bootstrapCredential,
@@ -1796,6 +1803,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         {
             return;
         }
+
+        domainAdminCredential = QualifyDomainCredential(domainAdminCredential, domain.NetBiosName);
 
         string? lastError = null;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
@@ -1869,6 +1878,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        domainAdminCredential = QualifyDomainCredential(domainAdminCredential, domain.NetBiosName);
+
         var domainControllerTargets = request.Template.VmTemplates
             .Where(vm => string.Equals(vm.DomainId, domain.DomainId, StringComparison.OrdinalIgnoreCase) &&
                          (string.Equals(vm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) ||
@@ -1930,6 +1941,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        joinCredential = QualifyDomainCredential(joinCredential, domain.NetBiosName);
+
         var result = await _domainProgressionRuntimeCoordinator.JoinDomainAsync(
             context.VmName,
             bootstrapCredential,
@@ -1977,6 +1990,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         {
             return;
         }
+
+        domainAdminCredential = QualifyDomainCredential(domainAdminCredential, domain.NetBiosName);
 
         string? lastError = null;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
@@ -2183,6 +2198,65 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
     private static bool SwitchTypeIs(string? switchType, string expectedType)
         => string.Equals(switchType, expectedType, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsDomainControllerRole(RuntimeVmState state)
+        => string.Equals(state.PlanVm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(state.PlanVm.TopologyRole, "ReplicaDomainController", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Prefixes a bare admin username with the target domain NetBIOS name so PowerShell Direct authenticates
+    /// against the directory rather than a local SAM account. After dcpromo a domain controller no longer has
+    /// local accounts, so its administrator must be addressed as DOMAIN\User; an already-qualified username
+    /// (containing '\' or '@') or a missing NetBIOS name is returned unchanged.
+    /// </summary>
+    private static V2RuntimeCredential QualifyDomainCredential(V2RuntimeCredential credential, string? netBiosName)
+    {
+        var username = credential.Username ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(netBiosName) ||
+            username.Contains('\\', StringComparison.Ordinal) ||
+            username.Contains('@', StringComparison.Ordinal))
+        {
+            return credential;
+        }
+
+        return new V2RuntimeCredential
+        {
+            Username = $"{netBiosName}\\{username}",
+            Password = credential.Password
+        };
+    }
+
+    /// <summary>
+    /// Resolves the credential a base-remote-access (RDP enablement) step must use on this VM. On a promoted
+    /// domain controller the local bootstrap account has been removed by dcpromo, and the plan orders base
+    /// remote access after DomainReady, so the domain administrator (qualified with the domain NetBIOS name)
+    /// is the only valid identity. Standalone VMs, routers, and member servers keep their local account and
+    /// continue to use the bootstrap credential.
+    /// </summary>
+    private static V2RuntimeCredential? ResolveBaseRemoteAccessCredential(
+        RuntimeVmState state,
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        string stepKey)
+    {
+        if (IsDomainControllerRole(state))
+        {
+            var domainAdmin = ResolveCredential(
+                request.CredentialSlotValues,
+                state.PlanVm.EffectiveDomainAdminCredentialSlot,
+                context,
+                stepKey,
+                "domain-admin");
+            return domainAdmin is null ? null : QualifyDomainCredential(domainAdmin, state.Domain?.NetBiosName);
+        }
+
+        return ResolveCredential(
+            request.CredentialSlotValues,
+            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            context,
+            stepKey,
+            "bootstrap");
+    }
 
     private static V2RuntimeCredential? ResolveCredential(
         IReadOnlyDictionary<string, V2RuntimeCredential> credentialSlotValues,
