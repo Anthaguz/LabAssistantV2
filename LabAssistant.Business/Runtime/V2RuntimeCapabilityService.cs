@@ -166,6 +166,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
         finally
         {
+            // Mandatory cleanup: the guest executor is a shared singleton that outlives this run, so every
+            // per-VM guest session (dedicated host runspace + in-guest connection) opened during the deploy
+            // must be torn down here, on success, failure, or cancellation, so nothing leaks into the next run.
+            _guestCommandExecutor.DisposeAllVmSessions();
+
             foreach (var state in states)
             {
                 EmitVmTerminalEvent(multiContext, state.Context);

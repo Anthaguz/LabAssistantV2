@@ -25,6 +25,12 @@ public class GuestCommandSecretHandlingTests
         // The password is referenced only by variable name, never inlined as a plaintext literal.
         Assert.Contains("$__laGuestPassword", command, StringComparison.Ordinal);
         Assert.DoesNotContain("ConvertTo-SecureString '", command, StringComparison.Ordinal);
+        // The reused-connection shape: dispatch goes through a held-open guest session, not a fresh per-step hop.
+        Assert.Contains("New-PSSession -VMName 'Router01'", command, StringComparison.Ordinal);
+        Assert.Contains("Invoke-Command -Session $__laGuestSession", command, StringComparison.Ordinal);
+        // Self-heals when the connection is missing, severed by a reboot, or opened for a different identity.
+        Assert.Contains("$__laGuestSession.State -ne 'Opened'", command, StringComparison.Ordinal);
+        Assert.Contains("$__laGuestSessionUser -ne 'Administrator'", command, StringComparison.Ordinal);
     }
 
     [Fact]
