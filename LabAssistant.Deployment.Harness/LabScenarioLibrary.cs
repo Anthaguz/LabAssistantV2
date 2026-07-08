@@ -545,6 +545,299 @@ public static class LabScenarioLibrary
     }
 
     /// <summary>
+    /// A forest root domain controller plus a tree-domain domain controller: a second domain tree in the SAME
+    /// forest but with its own DNS namespace (tailspin.lab alongside smoke.lab), rather than a child under the
+    /// root's namespace. Both DCs sit on the same Internal switch; the tree DC's only DNS server is the root DC,
+    /// so the scheduler holds the tree promotion until the root domain is ready. This exercises the tree-domain
+    /// promotion path (Install-ADDSDomain -DomainType TreeDomain), which is distinct from the child-domain path.
+    /// </summary>
+    public static LabScenario TreeDomain(
+        HarnessOptions options,
+        string rootDcVmName = "harness-dc-01",
+        string treeDcVmName = "harness-dc-02")
+    {
+        const string switchName = "LabCore";
+        const string networkId = "lab-core";
+        const string forestId = "forest-smoke";
+        const string rootDomainId = "domain-smoke";
+        const string treeDomainId = "domain-tree";
+        const string rootDcVmId = "vm-dc01";
+        const string treeDcVmId = "vm-dc02";
+        const string domainAdminSlot = "smoke-domain-admin";
+        const string dsrmSlot = "smoke-dsrm";
+
+        var template = new LabTemplate
+        {
+            Name = "Harness Tree Domain Smoke",
+            Description = "Forest root DC plus a second-tree DC (own namespace) through the V2 planner + runtime.",
+            SchemaVersion = TemplateSchemaVersionCatalog.V2SchemaVersion,
+            TemplateType = LabTemplate.SupportedTemplateType,
+            DeploymentProfile = "Balanced",
+            LabNetworks = new List<LabNetworkTemplate>
+            {
+                new() { NetworkId = networkId, Name = "Core", SwitchName = switchName, SwitchType = "Internal" }
+            },
+            DirectoryTopology = new V2DirectoryTopologyTemplate
+            {
+                Forests = new List<V2ForestTemplate>
+                {
+                    new() { ForestId = forestId, RootDomainId = rootDomainId }
+                },
+                Domains = new List<V2DomainTemplate>
+                {
+                    new()
+                    {
+                        DomainId = rootDomainId,
+                        DnsName = "smoke.lab",
+                        NetBiosName = "SMOKE",
+                        ForestId = forestId,
+                        RelationKind = V2DomainRelationKind.Root,
+                        FirstDomainControllerVmId = rootDcVmId
+                    },
+                    new()
+                    {
+                        DomainId = treeDomainId,
+                        DnsName = "tailspin.lab",
+                        NetBiosName = "TAILSPIN",
+                        ForestId = forestId,
+                        RelationKind = V2DomainRelationKind.Tree,
+                        ParentDomainId = rootDomainId,
+                        FirstDomainControllerVmId = treeDcVmId
+                    }
+                }
+            },
+            VmTemplates = new List<VmTemplate>
+            {
+                new()
+                {
+                    VmId = rootDcVmId,
+                    Name = rootDcVmName,
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = options.BaseImageId,
+                    VhdPath = options.BaseImagePath,
+                    TopologyRole = "RootDomainController",
+                    DomainId = rootDomainId,
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = HarnessOptions.BootstrapSlotKey,
+                        DomainAdmin = domainAdminSlot,
+                        Dsrm = dsrmSlot
+                    },
+                    Nics = new List<VmNetworkInterfaceTemplate>
+                    {
+                        new()
+                        {
+                            NicId = "nic-dc",
+                            NetworkId = networkId,
+                            IpAddress = "10.0.0.10",
+                            PrefixLength = 24,
+                            DnsServers = new List<string> { "10.0.0.10" }
+                        }
+                    }
+                },
+                new()
+                {
+                    VmId = treeDcVmId,
+                    Name = treeDcVmName,
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = options.BaseImageId,
+                    VhdPath = options.BaseImagePath,
+                    TopologyRole = "RootDomainController",
+                    DomainId = treeDomainId,
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = HarnessOptions.BootstrapSlotKey,
+                        DomainAdmin = domainAdminSlot,
+                        ParentDomainAdmin = domainAdminSlot,
+                        Dsrm = dsrmSlot
+                    },
+                    Nics = new List<VmNetworkInterfaceTemplate>
+                    {
+                        new()
+                        {
+                            NicId = "nic-dc2",
+                            NetworkId = networkId,
+                            IpAddress = "10.0.0.11",
+                            PrefixLength = 24,
+                            DnsServers = new List<string> { "10.0.0.10" }
+                        }
+                    }
+                }
+            },
+            NetworkConfig = new NetworkConfig { SwitchName = switchName }
+        };
+
+        var password = NonEmptyPassword(options);
+        return new LabScenario
+        {
+            Name = "TreeDomain",
+            Template = template,
+            ExtraCredentials = new[]
+            {
+                new CredentialSeed { SlotKey = domainAdminSlot, Username = options.AdminUser, Password = password },
+                new CredentialSeed { SlotKey = dsrmSlot, Username = options.AdminUser, Password = password }
+            },
+            ExpectedVmNames = new[] { rootDcVmName, treeDcVmName }
+        };
+    }
+
+    /// <summary>
+    /// Two independent single-DC forests (smoke.lab and contoso.lab) on the same Internal switch, joined by a
+    /// bidirectional forest trust. Exercises the V2 forest-trust runtime stage end to end: conditional DNS
+    /// forwarders in both directions plus a bidirectional forest trust. Both root DCs use a bare "Administrator" domain-admin slot,
+    /// so this run also proves whether the trust stage qualifies the cross-forest target credential with the
+    /// target NetBIOS (an unqualified "Administrator" would authenticate against the source forest and fail).
+    /// </summary>
+    public static LabScenario ForestTrust(
+        HarnessOptions options,
+        string smokeDcVmName = "harness-dc-01",
+        string contosoDcVmName = "harness-dc-02")
+    {
+        const string switchName = "LabCore";
+        const string networkId = "lab-core";
+        const string smokeForestId = "forest-smoke";
+        const string contosoForestId = "forest-contoso";
+        const string smokeDomainId = "domain-smoke";
+        const string contosoDomainId = "domain-contoso";
+        const string smokeDcVmId = "vm-dc01";
+        const string contosoDcVmId = "vm-dc02";
+        const string smokeAdminSlot = "smoke-domain-admin";
+        const string contosoAdminSlot = "contoso-domain-admin";
+        const string smokeDsrmSlot = "smoke-dsrm";
+        const string contosoDsrmSlot = "contoso-dsrm";
+
+        var template = new LabTemplate
+        {
+            Name = "Harness Forest Trust Smoke",
+            Description = "Two single-DC forests joined by a bidirectional forest trust through the V2 planner + runtime.",
+            SchemaVersion = TemplateSchemaVersionCatalog.V2SchemaVersion,
+            TemplateType = LabTemplate.SupportedTemplateType,
+            DeploymentProfile = "Balanced",
+            LabNetworks = new List<LabNetworkTemplate>
+            {
+                new() { NetworkId = networkId, Name = "Core", SwitchName = switchName, SwitchType = "Internal" }
+            },
+            DirectoryTopology = new V2DirectoryTopologyTemplate
+            {
+                Forests = new List<V2ForestTemplate>
+                {
+                    new() { ForestId = smokeForestId, RootDomainId = smokeDomainId },
+                    new() { ForestId = contosoForestId, RootDomainId = contosoDomainId }
+                },
+                Domains = new List<V2DomainTemplate>
+                {
+                    new()
+                    {
+                        DomainId = smokeDomainId,
+                        DnsName = "smoke.lab",
+                        NetBiosName = "SMOKE",
+                        ForestId = smokeForestId,
+                        RelationKind = V2DomainRelationKind.Root,
+                        FirstDomainControllerVmId = smokeDcVmId
+                    },
+                    new()
+                    {
+                        DomainId = contosoDomainId,
+                        DnsName = "contoso.lab",
+                        NetBiosName = "CONTOSO",
+                        ForestId = contosoForestId,
+                        RelationKind = V2DomainRelationKind.Root,
+                        FirstDomainControllerVmId = contosoDcVmId
+                    }
+                },
+                Trusts = new List<V2TrustTemplate>
+                {
+                    new()
+                    {
+                        TrustId = "trust-smoke-contoso",
+                        SourceDomainId = smokeDomainId,
+                        TargetDomainId = contosoDomainId,
+                        TrustType = V2TrustType.Forest,
+                        Direction = V2TrustDirection.Bidirectional
+                    }
+                }
+            },
+            VmTemplates = new List<VmTemplate>
+            {
+                new()
+                {
+                    VmId = smokeDcVmId,
+                    Name = smokeDcVmName,
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = options.BaseImageId,
+                    VhdPath = options.BaseImagePath,
+                    TopologyRole = "RootDomainController",
+                    DomainId = smokeDomainId,
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = HarnessOptions.BootstrapSlotKey,
+                        DomainAdmin = smokeAdminSlot,
+                        Dsrm = smokeDsrmSlot
+                    },
+                    Nics = new List<VmNetworkInterfaceTemplate>
+                    {
+                        new()
+                        {
+                            NicId = "nic-dc",
+                            NetworkId = networkId,
+                            IpAddress = "10.0.0.10",
+                            PrefixLength = 24,
+                            DnsServers = new List<string> { "10.0.0.10" }
+                        }
+                    }
+                },
+                new()
+                {
+                    VmId = contosoDcVmId,
+                    Name = contosoDcVmName,
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = options.BaseImageId,
+                    VhdPath = options.BaseImagePath,
+                    TopologyRole = "RootDomainController",
+                    DomainId = contosoDomainId,
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = HarnessOptions.BootstrapSlotKey,
+                        DomainAdmin = contosoAdminSlot,
+                        Dsrm = contosoDsrmSlot
+                    },
+                    Nics = new List<VmNetworkInterfaceTemplate>
+                    {
+                        new()
+                        {
+                            NicId = "nic-dc2",
+                            NetworkId = networkId,
+                            IpAddress = "10.0.0.11",
+                            PrefixLength = 24,
+                            DnsServers = new List<string> { "10.0.0.11" }
+                        }
+                    }
+                }
+            },
+            NetworkConfig = new NetworkConfig { SwitchName = switchName }
+        };
+
+        var password = NonEmptyPassword(options);
+        return new LabScenario
+        {
+            Name = "ForestTrust",
+            Template = template,
+            ExtraCredentials = new[]
+            {
+                new CredentialSeed { SlotKey = smokeAdminSlot, Username = options.AdminUser, Password = password },
+                new CredentialSeed { SlotKey = contosoAdminSlot, Username = options.AdminUser, Password = password },
+                new CredentialSeed { SlotKey = smokeDsrmSlot, Username = options.AdminUser, Password = password },
+                new CredentialSeed { SlotKey = contosoDsrmSlot, Username = options.AdminUser, Password = password }
+            },
+            ExpectedVmNames = new[] { smokeDcVmName, contosoDcVmName }
+        };
+    }
+
+    /// <summary>
     /// Returns the supplied admin password when a real deploy password is present, otherwise a throwaway
     /// placeholder. The credential store rejects empty passwords, and plan-only validation seeds slots without a
     /// real password, so extra credential slots must always carry a non-empty value even when unused by planning.

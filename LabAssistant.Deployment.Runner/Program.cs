@@ -74,8 +74,16 @@ internal static class Program
                 case "childdomain":
                     scenario = LabScenarioLibrary.ChildDomain(options);
                     break;
+                case "tree-domain":
+                case "treedomain":
+                    scenario = LabScenarioLibrary.TreeDomain(options);
+                    break;
+                case "forest-trust":
+                case "foresttrust":
+                    scenario = LabScenarioLibrary.ForestTrust(options);
+                    break;
                 default:
-                    log.Line($"Unknown scenario '{scenarioName}'. Valid: standalone, dc, dc-member, replica-dc, child-domain.");
+                    log.Line($"Unknown scenario '{scenarioName}'. Valid: standalone, dc, dc-member, replica-dc, child-domain, tree-domain, forest-trust.");
                     log.Line("RESULT: unknown-scenario");
                     return 3;
             }
