@@ -23,6 +23,13 @@ public sealed class HarnessOptions
     /// <summary>Supplies the local admin password baked into the base image. Never defaulted (no committed secret).</summary>
     public const string AdminPasswordEnvVar = "LABASSISTANT_SMOKE_ADMIN_PASSWORD";
 
+    /// <summary>
+    /// Optional fixed config root. When set, the isolated environment uses this directory instead of a
+    /// throwaway temp root and does NOT delete it on disposal, so the seeded stores and the runtime's
+    /// structured event log (<c>Logs\structured-events.jsonl</c>) survive the run for post-mortem diagnosis.
+    /// </summary>
+    public const string AppRootEnvVar = "LABASSISTANT_SMOKE_APP_ROOT";
+
     /// <summary>Default prepared base image path on this host.</summary>
     public const string DefaultBaseImagePath = @"D:\BaseDisks\WinServer2022-Base.vhdx";
 
@@ -68,6 +75,7 @@ public sealed class HarnessOptions
             BaseImageId = Env(BaseImageIdEnvVar) ?? DefaultBaseImageId,
             AdminUser = Env(AdminUserEnvVar) ?? DefaultAdminUser,
             AdminPassword = Env(AdminPasswordEnvVar) ?? string.Empty,
+            AppRootOverride = Env(AppRootEnvVar),
             UseGraphScheduler = useGraphScheduler
         };
     }
