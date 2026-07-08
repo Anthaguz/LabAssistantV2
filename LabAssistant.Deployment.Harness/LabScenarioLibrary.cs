@@ -151,6 +151,132 @@ public static class LabScenarioLibrary
     }
 
     /// <summary>
+    /// A first domain controller plus one member server that joins the new forest. Both VMs sit on the same
+    /// Internal switch; the member's only DNS server is the domain controller, so the ready-set scheduler must
+    /// hold the member's join until the DC's domain is ready. This is the first multi-VM topology and the first
+    /// exercise of the JoinDomain / JoinedDomainReady runtime path end to end.
+    /// </summary>
+    public static LabScenario DomainMember(
+        HarnessOptions options,
+        string dcVmName = "harness-dc-01",
+        string memberVmName = "harness-mem-01")
+    {
+        const string switchName = "LabCore";
+        const string networkId = "lab-core";
+        const string forestId = "forest-smoke";
+        const string domainId = "domain-smoke";
+        const string dcVmId = "vm-dc01";
+        const string memberVmId = "vm-mem01";
+        const string domainAdminSlot = "smoke-domain-admin";
+        const string dsrmSlot = "smoke-dsrm";
+
+        var template = new LabTemplate
+        {
+            Name = "Harness Domain Member Smoke",
+            Description = "First domain controller plus a member server joining the new forest through V2.",
+            SchemaVersion = TemplateSchemaVersionCatalog.V2SchemaVersion,
+            TemplateType = LabTemplate.SupportedTemplateType,
+            DeploymentProfile = "Balanced",
+            LabNetworks = new List<LabNetworkTemplate>
+            {
+                new() { NetworkId = networkId, Name = "Core", SwitchName = switchName, SwitchType = "Internal" }
+            },
+            DirectoryTopology = new V2DirectoryTopologyTemplate
+            {
+                Forests = new List<V2ForestTemplate>
+                {
+                    new() { ForestId = forestId, RootDomainId = domainId }
+                },
+                Domains = new List<V2DomainTemplate>
+                {
+                    new()
+                    {
+                        DomainId = domainId,
+                        DnsName = "smoke.lab",
+                        NetBiosName = "SMOKE",
+                        ForestId = forestId,
+                        RelationKind = V2DomainRelationKind.Root,
+                        FirstDomainControllerVmId = dcVmId
+                    }
+                }
+            },
+            VmTemplates = new List<VmTemplate>
+            {
+                new()
+                {
+                    VmId = dcVmId,
+                    Name = dcVmName,
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = options.BaseImageId,
+                    VhdPath = options.BaseImagePath,
+                    TopologyRole = "RootDomainController",
+                    DomainId = domainId,
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = HarnessOptions.BootstrapSlotKey,
+                        DomainAdmin = domainAdminSlot,
+                        Dsrm = dsrmSlot
+                    },
+                    Nics = new List<VmNetworkInterfaceTemplate>
+                    {
+                        new()
+                        {
+                            NicId = "nic-dc",
+                            NetworkId = networkId,
+                            IpAddress = "10.0.0.10",
+                            PrefixLength = 24,
+                            DnsServers = new List<string> { "10.0.0.10" }
+                        }
+                    }
+                },
+                new()
+                {
+                    VmId = memberVmId,
+                    Name = memberVmName,
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = options.BaseImageId,
+                    VhdPath = options.BaseImagePath,
+                    MembershipMode = V2MembershipModeCatalog.DomainMember,
+                    DomainId = domainId,
+                    CredentialSlots = new VmCredentialSlotBindings
+                    {
+                        LocalBootstrap = HarnessOptions.BootstrapSlotKey,
+                        DomainAdmin = domainAdminSlot,
+                        DomainJoin = domainAdminSlot
+                    },
+                    Nics = new List<VmNetworkInterfaceTemplate>
+                    {
+                        new()
+                        {
+                            NicId = "nic-mem",
+                            NetworkId = networkId,
+                            IpAddress = "10.0.0.20",
+                            PrefixLength = 24,
+                            DnsServers = new List<string> { "10.0.0.10" }
+                        }
+                    }
+                }
+            },
+            NetworkConfig = new NetworkConfig { SwitchName = switchName }
+        };
+
+        var password = NonEmptyPassword(options);
+        return new LabScenario
+        {
+            Name = "DomainMember",
+            Template = template,
+            ExtraCredentials = new[]
+            {
+                new CredentialSeed { SlotKey = domainAdminSlot, Username = options.AdminUser, Password = password },
+                new CredentialSeed { SlotKey = dsrmSlot, Username = options.AdminUser, Password = password }
+            },
+            ExpectedVmNames = new[] { dcVmName, memberVmName }
+        };
+    }
+
+    /// <summary>
     /// Returns the supplied admin password when a real deploy password is present, otherwise a throwaway
     /// placeholder. The credential store rejects empty passwords, and plan-only validation seeds slots without a
     /// real password, so extra credential slots must always carry a non-empty value even when unused by planning.

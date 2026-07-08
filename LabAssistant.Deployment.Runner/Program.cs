@@ -62,8 +62,12 @@ internal static class Program
                 case "domaincontroller":
                     scenario = LabScenarioLibrary.DomainController(options, ArgValue(args, "--vm") ?? "harness-dc-01");
                     break;
+                case "dc-member":
+                case "domainmember":
+                    scenario = LabScenarioLibrary.DomainMember(options);
+                    break;
                 default:
-                    log.Line($"Unknown scenario '{scenarioName}'. Valid: standalone, dc.");
+                    log.Line($"Unknown scenario '{scenarioName}'. Valid: standalone, dc, dc-member.");
                     log.Line("RESULT: unknown-scenario");
                     return 3;
             }
