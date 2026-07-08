@@ -2004,7 +2004,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             var localResult = await _domainProgressionRuntimeCoordinator.VerifyJoinedDomainLocallyAsync(
                 context.VmName,
-                bootstrapCredential,
+                QualifyLocalCredential(bootstrapCredential),
                 domain.DnsName,
                 cancellationToken);
             if (!localResult.Success)
@@ -2227,6 +2227,30 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     }
 
     /// <summary>
+    /// Prefixes a bare admin username with ".\" so PowerShell Direct authenticates against the guest's LOCAL SAM
+    /// account rather than a domain. This matters after a member joins a domain: the guest's default logon domain
+    /// becomes the AD domain, so a bare username (e.g. "Administrator") is resolved against the directory and the
+    /// local bootstrap account can no longer be reached without an explicit local qualifier. An already-qualified
+    /// username (containing '\' or '@') is returned unchanged. ".\User" is also valid on a standalone/workgroup
+    /// guest, so this is safe to apply to any non-domain-controller VM.
+    /// </summary>
+    private static V2RuntimeCredential QualifyLocalCredential(V2RuntimeCredential credential)
+    {
+        var username = credential.Username ?? string.Empty;
+        if (username.Contains('\\', StringComparison.Ordinal) ||
+            username.Contains('@', StringComparison.Ordinal))
+        {
+            return credential;
+        }
+
+        return new V2RuntimeCredential
+        {
+            Username = $".\\{username}",
+            Password = credential.Password
+        };
+    }
+
+    /// <summary>
     /// Resolves the credential a base-remote-access (RDP enablement) step must use on this VM. On a promoted
     /// domain controller the local bootstrap account has been removed by dcpromo, and the plan orders base
     /// remote access after DomainReady, so the domain administrator (qualified with the domain NetBIOS name)
@@ -2250,12 +2274,18 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return domainAdmin is null ? null : QualifyDomainCredential(domainAdmin, state.Domain?.NetBiosName);
         }
 
-        return ResolveCredential(
+        var bootstrap = ResolveCredential(
             request.CredentialSlotValues,
             state.PlanVm.EffectiveBootstrapCredentialSlot,
             context,
             stepKey,
             "bootstrap");
+
+        // Non-DC VMs keep their local SAM account, but a domain member's default logon domain becomes the AD
+        // domain after it joins (and this step is ordered after JoinedDomainReady), so the bootstrap credential
+        // must be explicitly local-qualified to reach the local account. ".\" is also valid on a standalone or
+        // router guest, so applying it unconditionally here is safe.
+        return bootstrap is null ? null : QualifyLocalCredential(bootstrap);
     }
 
     private static V2RuntimeCredential? ResolveCredential(

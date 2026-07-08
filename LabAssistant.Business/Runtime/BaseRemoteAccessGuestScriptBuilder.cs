@@ -33,8 +33,14 @@ internal static class BaseRemoteAccessGuestScriptBuilder
 
         if (options.SetPrivateNetworkProfile)
         {
+            // Only demote Public networks to Private. A DomainAuthenticated profile (present once a machine has
+            // joined a domain) is already a trusted network and Windows refuses to change its category at all -
+            // Set-NetConnectionProfile throws "the NetworkCategory cannot be changed from 'DomainAuthenticated'".
+            // The intent here is purely to get the NIC off the restrictive Public category, which DomainAuthenticated
+            // already satisfies, so we skip those (and already-Private) profiles rather than fail the whole step.
             sb.AppendLine("$profiles = Get-NetConnectionProfile -ErrorAction SilentlyContinue");
             sb.AppendLine("foreach ($profile in $profiles) {");
+            sb.AppendLine("    if ($profile.NetworkCategory -eq 'DomainAuthenticated' -or $profile.NetworkCategory -eq 'Private') { continue }");
             sb.AppendLine("    Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory Private -ErrorAction Stop");
             sb.AppendLine("}");
             sb.AppendLine();
