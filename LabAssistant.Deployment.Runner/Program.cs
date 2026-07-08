@@ -70,8 +70,12 @@ internal static class Program
                 case "replicadomaincontroller":
                     scenario = LabScenarioLibrary.ReplicaDomainController(options);
                     break;
+                case "child-domain":
+                case "childdomain":
+                    scenario = LabScenarioLibrary.ChildDomain(options);
+                    break;
                 default:
-                    log.Line($"Unknown scenario '{scenarioName}'. Valid: standalone, dc, dc-member, replica-dc.");
+                    log.Line($"Unknown scenario '{scenarioName}'. Valid: standalone, dc, dc-member, replica-dc, child-domain.");
                     log.Line("RESULT: unknown-scenario");
                     return 3;
             }
