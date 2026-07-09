@@ -27,8 +27,21 @@ internal static class GuestNetworkGuestScriptBuilder
         }
 
         sb.AppendLine(")");
-        sb.AppendLine("$adapters = Get-NetAdapter -Physical:$false | Sort-Object ifIndex");
-        sb.AppendLine("if ($adapters.Count -lt $targetNics.Count) { throw 'Not enough guest NICs available to satisfy template network intent.' }");
+        // Guest transport (VMBus/PowerShell Direct) becomes ready before the guest's synthetic NIC is
+        // enumerable, so a single-shot Get-NetAdapter can momentarily see fewer adapters than the template
+        // intends and wrongly fail. Wait (bounded) for the expected adapter count to appear before configuring.
+        sb.AppendLine("$__laNicDeadline = (Get-Date).AddSeconds(180)");
+        sb.AppendLine("$adapters = @(Get-NetAdapter -Physical:$false -ErrorAction SilentlyContinue | Sort-Object ifIndex)");
+        sb.AppendLine("while ($adapters.Count -lt $targetNics.Count -and (Get-Date) -lt $__laNicDeadline) {");
+        sb.AppendLine("    Start-Sleep -Seconds 3");
+        sb.AppendLine("    $adapters = @(Get-NetAdapter -Physical:$false -ErrorAction SilentlyContinue | Sort-Object ifIndex)");
+        sb.AppendLine("}");
+        sb.AppendLine("if ($adapters.Count -lt $targetNics.Count) {");
+        sb.AppendLine("    $allAdapters = @(Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue | Sort-Object ifIndex)");
+        sb.AppendLine("    $inventory = ($allAdapters | ForEach-Object { \"$($_.Name) [ifIndex=$($_.ifIndex); status=$($_.Status); hidden=$($_.Hidden); desc=$($_.InterfaceDescription)]\" }) -join '; '");
+        sb.AppendLine("    if (-not $inventory) { $inventory = '(no adapters enumerated at all)' }");
+        sb.AppendLine("    throw \"Not enough guest NICs available to satisfy template network intent. Wanted $($targetNics.Count), matched $($adapters.Count) after waiting 180s. All adapters seen (incl. hidden): $inventory\"");
+        sb.AppendLine("}");
         sb.AppendLine("for ($index = 0; $index -lt $targetNics.Count; $index++) {");
         sb.AppendLine("    $target = $targetNics[$index]");
         sb.AppendLine("    $adapter = $adapters[$index]");

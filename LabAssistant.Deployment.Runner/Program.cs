@@ -15,7 +15,8 @@ namespace LabAssistant.Deployment.Runner;
 ///   --probe       after --deploy, probe the guest over PowerShell Direct.
 ///   --teardown    after --deploy, stop and delete the scenario VMs (no orphans).
 ///   --no-graph    disable the ready-set graph scheduler (use the legacy fan-out).
-///   --vm NAME     override the VM name (default harness-standalone-01).
+///   --scenario S  select the topology: standalone (default) or dc (single first domain controller).
+///   --vm NAME     override the VM name (default depends on scenario).
 /// </remarks>
 internal static class Program
 {
@@ -25,14 +26,14 @@ internal static class Program
         var probe = Has(args, "--probe");
         var teardown = Has(args, "--teardown");
         var useGraph = !Has(args, "--no-graph");
-        var vmName = ArgValue(args, "--vm") ?? "harness-standalone-01";
+        var scenarioName = (ArgValue(args, "--scenario") ?? "standalone").ToLowerInvariant();
 
         using var log = new RunLog();
         log.Line("=== LabAssistant deployment runner (harness) ===");
 
         var options = HarnessOptions.FromEnvironment(useGraph);
         log.Line($"Base image: {options.BaseImagePath} (id {options.BaseImageId})");
-        log.Line($"Graph scheduler: {(useGraph ? "ENABLED" : "disabled (legacy)")}  mode={(planOnly ? "plan-only" : "deploy")} probe={probe} teardown={teardown}");
+        log.Line($"Graph scheduler: {(useGraph ? "ENABLED" : "disabled (legacy)")}  mode={(planOnly ? "plan-only" : "deploy")} probe={probe} teardown={teardown} scenario={scenarioName}");
 
         if (!planOnly)
         {
@@ -47,11 +48,46 @@ internal static class Program
 
         try
         {
-            using var env = new IsolatedLabEnvironment(options);
+            await using var env = new IsolatedLabEnvironment(options);
             log.Line($"Isolated config root: {env.AppRoot}");
 
             var harness = new LabDeploymentHarness(env, log.Line);
-            var scenario = LabScenarioLibrary.Standalone(options, vmName);
+            LabScenario scenario;
+            switch (scenarioName)
+            {
+                case "standalone":
+                    scenario = LabScenarioLibrary.Standalone(options, ArgValue(args, "--vm") ?? "harness-standalone-01");
+                    break;
+                case "dc":
+                case "domaincontroller":
+                    scenario = LabScenarioLibrary.DomainController(options, ArgValue(args, "--vm") ?? "harness-dc-01");
+                    break;
+                case "dc-member":
+                case "domainmember":
+                    scenario = LabScenarioLibrary.DomainMember(options);
+                    break;
+                case "replica-dc":
+                case "replicadomaincontroller":
+                    scenario = LabScenarioLibrary.ReplicaDomainController(options);
+                    break;
+                case "child-domain":
+                case "childdomain":
+                    scenario = LabScenarioLibrary.ChildDomain(options);
+                    break;
+                case "tree-domain":
+                case "treedomain":
+                    scenario = LabScenarioLibrary.TreeDomain(options);
+                    break;
+                case "forest-trust":
+                case "foresttrust":
+                    scenario = LabScenarioLibrary.ForestTrust(options);
+                    break;
+                default:
+                    log.Line($"Unknown scenario '{scenarioName}'. Valid: standalone, dc, dc-member, replica-dc, child-domain, tree-domain, forest-trust.");
+                    log.Line("RESULT: unknown-scenario");
+                    return 3;
+            }
+            log.Line($"Scenario: {scenario.Name}  expected VMs: {string.Join(", ", scenario.ExpectedVmNames)}");
 
             if (planOnly)
             {

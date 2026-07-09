@@ -1,13 +1,34 @@
+using System.Collections.Concurrent;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Services.PowerShell;
 
 namespace LabAssistant.Services.GuestExecution;
 
-public sealed class HyperVPowerShellDirectGuestCommandExecutor : IGuestCommandExecutor
+/// <summary>
+/// Dispatches guest scripts over PowerShell Direct, keeping one dedicated dispatcher per VM.
+/// </summary>
+/// <remarks>
+/// Each VM gets its own <see cref="VmGuestSession"/> (a dedicated one-shot guest-command session plus a per-VM
+/// serialization lock). Every guest step is a fresh PowerShell Direct hop: reuse of a held-open in-guest
+/// connection is impossible over a stdin-driven host, because the host must close stdin (EOF) for the
+/// connection to negotiate at all. Routing every step for a VM through its <see cref="VmGuestSession"/> still
+/// gives one useful property for free: guest steps for the same VM are serialized (its lock admits one at a
+/// time), while different VMs keep independent dispatchers so cross-VM parallelism is preserved.
+///
+/// The dedicated sessions are intentionally minted from a factory that does NOT draw on the shared
+/// catalog/admin pool, so a lab with many VMs cannot exhaust that pool and stall read queries.
+///
+/// This executor can outlive a single deployment (it is shared through a singleton runtime service), so the
+/// deploy orchestrator must call <see cref="DisposeAllVmSessions"/> at the end of every run to guarantee no
+/// per-VM dispatcher leaks between deployments.
+/// </remarks>
+public sealed class HyperVPowerShellDirectGuestCommandExecutor : IGuestCommandExecutor, IDisposable
 {
-    private const string GuestPasswordVariableName = "__laGuestPassword";
-
     private readonly Func<IPersistentPowerShellSession> _sessionFactory;
+    private readonly ConcurrentDictionary<string, VmGuestSession> _vmSessions =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _sessionCreationLock = new();
+    private bool _disposed;
 
     public HyperVPowerShellDirectGuestCommandExecutor(Func<IPersistentPowerShellSession> sessionFactory)
     {
@@ -25,18 +46,12 @@ public sealed class HyperVPowerShellDirectGuestCommandExecutor : IGuestCommandEx
         ArgumentNullException.ThrowIfNull(credential);
         ArgumentException.ThrowIfNullOrWhiteSpace(credential.Username);
         ArgumentException.ThrowIfNullOrWhiteSpace(script);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        using var session = _sessionFactory();
-        var command = BuildPowerShellDirectCommand(vmName, credential.Username, script);
+        var session = GetOrCreateSession(vmName);
 
-        // The password is provided out-of-band via a secure variable so it never appears in the command
-        // text that could be captured by logs or diagnostics. The session removes it after execution.
-        var secureVariables = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [GuestPasswordVariableName] = credential.Password ?? string.Empty
-        };
-
-        var result = await session.ExecuteAsync(command, secureVariables, cancellationToken);
+        var result = await session.ExecuteAsync(credential.Username, credential.Password, script, cancellationToken)
+            .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
         return new GuestCommandResult
@@ -47,20 +62,87 @@ public sealed class HyperVPowerShellDirectGuestCommandExecutor : IGuestCommandEx
         };
     }
 
+    public void InvalidateVmSession(string vmName)
+    {
+        if (string.IsNullOrWhiteSpace(vmName))
+        {
+            return;
+        }
+
+        if (_vmSessions.TryGetValue(vmName, out var session))
+        {
+            // Best-effort: dropping the in-guest connection is an optimization; the next dispatch self-heals
+            // anyway, so a cancelled/failed invalidation must not surface as a deploy error.
+            session.InvalidateAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+    }
+
+    public void DisposeVmSession(string vmName)
+    {
+        if (string.IsNullOrWhiteSpace(vmName))
+        {
+            return;
+        }
+
+        if (_vmSessions.TryRemove(vmName, out var session))
+        {
+            session.Dispose();
+        }
+    }
+
+    public void DisposeAllVmSessions()
+    {
+        foreach (var key in _vmSessions.Keys.ToArray())
+        {
+            if (_vmSessions.TryRemove(key, out var session))
+            {
+                session.Dispose();
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        DisposeAllVmSessions();
+    }
+
     /// <summary>
-    /// Builds the host-side command that establishes the guest credential and dispatches the caller's
-    /// script into the guest. No secret is interpolated: the plaintext password is injected separately
-    /// as the <c>$__laGuestPassword</c> runspace variable, so the returned string is safe to log.
+    /// Returns the VM's session, creating it under a lock so a burst of concurrent first-calls for the same VM
+    /// cannot spin up more than one dedicated host runspace. <see cref="ConcurrentDictionary{TKey,TValue}"/>'s
+    /// value factory can run more than once under contention, which for a process-backed session would leak a
+    /// runspace, so creation is serialized explicitly.
+    /// </summary>
+    private VmGuestSession GetOrCreateSession(string vmName)
+    {
+        if (_vmSessions.TryGetValue(vmName, out var existing))
+        {
+            return existing;
+        }
+
+        lock (_sessionCreationLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_vmSessions.TryGetValue(vmName, out existing))
+            {
+                return existing;
+            }
+
+            var created = new VmGuestSession(vmName, _sessionFactory());
+            _vmSessions[vmName] = created;
+            return created;
+        }
+    }
+
+    /// <summary>
+    /// Builds the guest dispatch command for a VM. Retained for the secret-handling tests that assert the
+    /// emitted command never inlines the plaintext password; delegates to <see cref="VmGuestSession"/>.
     /// </summary>
     internal static string BuildPowerShellDirectCommand(string vmName, string username, string script)
-    {
-        return string.Join(
-            Environment.NewLine,
-            $"$guestSecurePassword = ConvertTo-SecureString ${GuestPasswordVariableName} -AsPlainText -Force",
-            $"$guestCredential = New-Object System.Management.Automation.PSCredential ({PowerShellCommandBuilder.Quote(username)}, $guestSecurePassword)",
-            $"try {{ Invoke-Command -VMName {PowerShellCommandBuilder.Quote(vmName)} -Credential $guestCredential -ErrorAction Stop -ScriptBlock {{",
-            script,
-            "} }",
-            "finally { Remove-Variable -Name 'guestSecurePassword','guestCredential' -ErrorAction SilentlyContinue }");
-    }
+        => VmGuestSession.BuildDispatchCommand(vmName, username, script);
 }

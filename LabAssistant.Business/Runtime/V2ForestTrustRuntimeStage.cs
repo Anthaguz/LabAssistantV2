@@ -296,6 +296,12 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
+        // On a promoted DC the local SAM is gone, so PowerShell Direct must authenticate DOMAIN\User; the target
+        // credential is also used cross-forest to authenticate to the target forest when creating the trust and
+        // must name the target forest, not the source.
+        sourceCredential = QualifyDomainCredential(sourceCredential, trust.SourceDomainNetBiosName);
+        targetCredential = QualifyDomainCredential(targetCredential, trust.TargetDomainNetBiosName);
+
         var sourceDnsServers = GetDomainControllerDnsServers(trust.SourceDomainId, request.Plan.Context.Vms);
         var targetDnsServers = GetDomainControllerDnsServers(trust.TargetDomainId, request.Plan.Context.Vms);
         if (sourceDnsServers.Count == 0 || targetDnsServers.Count == 0)
@@ -372,6 +378,9 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
+        sourceCredential = QualifyDomainCredential(sourceCredential, trust.SourceDomainNetBiosName);
+        targetCredential = QualifyDomainCredential(targetCredential, trust.TargetDomainNetBiosName);
+
         MarkTrustObjectsCreated(multiContext, trust.TrustId);
         var result = await _forestTrustRuntimeCoordinator.CreateBidirectionalForestTrustAsync(
             trust.SourceAnchorVmName,
@@ -422,6 +431,9 @@ public sealed class V2ForestTrustRuntimeStage
             EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "warn", "Missing source or target domain-admin credential material.");
             return;
         }
+
+        sourceCredential = QualifyDomainCredential(sourceCredential, trust.SourceDomainNetBiosName);
+        targetCredential = QualifyDomainCredential(targetCredential, trust.TargetDomainNetBiosName);
 
         var sourceValidated = await ValidateTrustSideWithRetryAsync(
             request,
@@ -602,6 +614,29 @@ public sealed class V2ForestTrustRuntimeStage
         }
 
         return credential;
+    }
+
+    /// <summary>
+    /// Prefixes a bare admin username with the domain NetBIOS name (DOMAIN\User) so PowerShell Direct authenticates
+    /// against the directory rather than a (now-absent) local SAM account on a promoted DC, and so the cross-forest
+    /// target credential used to create the cross-forest trust unambiguously names the target forest. An already-qualified username
+    /// (containing '\' or '@') or a missing NetBIOS name is returned unchanged.
+    /// </summary>
+    private static V2RuntimeCredential QualifyDomainCredential(V2RuntimeCredential credential, string? netBiosName)
+    {
+        var username = credential.Username ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(netBiosName) ||
+            username.Contains('\\', StringComparison.Ordinal) ||
+            username.Contains('@', StringComparison.Ordinal))
+        {
+            return credential;
+        }
+
+        return new V2RuntimeCredential
+        {
+            Username = $"{netBiosName}\\{username}",
+            Password = credential.Password
+        };
     }
 
     private static void MarkTrustObjectsCreated(MultiVmDeploymentContext multiContext, string trustId)

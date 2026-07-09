@@ -9,6 +9,38 @@ public interface IGuestCommandExecutor
         V2RuntimeCredential credential,
         string script,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Drops the persistent guest session for <paramref name="vmName"/> (if any) so the next guest step
+    /// re-establishes a fresh connection. Call this around a step that reboots the guest, since a reboot
+    /// severs the in-guest runspace. Implementations that keep no per-VM session may treat this as a no-op;
+    /// self-healing implementations also detect a broken session on the next call, so this is an explicit
+    /// optimization rather than a correctness requirement.
+    /// </summary>
+    /// <remarks>Default no-op so stateless implementations and test fakes remain valid.</remarks>
+    void InvalidateVmSession(string vmName)
+    {
+    }
+
+    /// <summary>
+    /// Disposes the persistent guest session for a single VM, releasing its dedicated host runspace and the
+    /// in-guest connection. Call this once a VM's guest steps are complete.
+    /// </summary>
+    /// <remarks>Default no-op so stateless implementations and test fakes remain valid.</remarks>
+    void DisposeVmSession(string vmName)
+    {
+    }
+
+    /// <summary>
+    /// Disposes every persistent guest session this executor is holding. Because a single executor instance
+    /// can outlive an individual deployment (for example when registered as a shared singleton), the deploy
+    /// orchestrator must call this at the end of every run so no host runspace or guest connection leaks
+    /// across deployments. Cleanup is mandatory even on failure or cancellation.
+    /// </summary>
+    /// <remarks>Default no-op so stateless implementations and test fakes remain valid.</remarks>
+    void DisposeAllVmSessions()
+    {
+    }
 }
 
 public sealed class GuestCommandResult

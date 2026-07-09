@@ -26,7 +26,7 @@ public sealed class StandaloneDeploymentSmokeTests
         var options = HarnessOptions.FromEnvironment(useGraphScheduler: true);
         var scenario = LabScenarioLibrary.Standalone(options, vmName: "harness-smoke-standalone-01");
 
-        using var environment = new IsolatedLabEnvironment(options);
+        await using var environment = new IsolatedLabEnvironment(options);
         var harness = new LabDeploymentHarness(environment, _output.WriteLine);
 
         try

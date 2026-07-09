@@ -14,7 +14,7 @@ namespace LabAssistant.Deployment.Harness;
 /// <c>%APPDATA%\LabAssistant</c>. It seeds the base-image catalog entry and bootstrap credential slot so a
 /// V2 plan can be built and executed. Disposal deletes an owned temp root and restores the scheduler env var.
 /// </summary>
-public sealed class IsolatedLabEnvironment : IDisposable
+public sealed class IsolatedLabEnvironment : IAsyncDisposable
 {
     /// <summary>
     /// Environment variable read by the V2 runtime at construction to select the ready-set graph scheduler.
@@ -133,10 +133,15 @@ public sealed class IsolatedLabEnvironment : IDisposable
         catalogStore.Save(Settings.CatalogPath, items);
     }
 
-    /// <summary>Disposes the provider, restores the scheduler env var, and deletes an owned temp root.</summary>
-    public void Dispose()
+    /// <summary>
+    /// Disposes the provider, restores the scheduler env var, and deletes an owned temp root. This is async
+    /// because the composed DI graph contains services (notably the host <c>PowerShellSessionPool</c>) that
+    /// implement <see cref="IAsyncDisposable"/> only; a synchronous <c>ServiceProvider.Dispose()</c> throws on
+    /// them, which would mask the real deploy result and leak the owned temp root.
+    /// </summary>
+    public async ValueTask DisposeAsync()
     {
-        _provider.Dispose();
+        await _provider.DisposeAsync().ConfigureAwait(false);
 
         if (_schedulerFlagTouched)
         {

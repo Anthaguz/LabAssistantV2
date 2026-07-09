@@ -23,17 +23,24 @@ internal static class BaseRemoteAccessGuestScriptBuilder
 
         if (options.DisableRdpNla)
         {
-            sb.AppendLine("$rdpSetting = Get-CimInstance -ClassName Win32_TSGeneralSetting -Namespace 'root/cimv2/terminalservices' -Filter \"TerminalName='RDP-tcp'\"");
-            sb.AppendLine("if ($null -eq $rdpSetting) { throw 'RDP terminal settings could not be resolved.' }");
-            sb.AppendLine("$nlaResult = Invoke-CimMethod -InputObject $rdpSetting -MethodName SetUserAuthenticationRequired -Arguments @{ UserAuthenticationRequired = 0 }");
-            sb.AppendLine("if ($nlaResult.ReturnValue -ne 0) { throw \"Failed to disable RDP NLA. ReturnValue=$($nlaResult.ReturnValue)\" }");
+            // Disable NLA by writing the WinStation registry value the RDP service reads directly. This is the
+            // durable equivalent of Win32_TSGeneralSetting.SetUserAuthenticationRequired(0), but deterministic
+            // over PowerShell Direct: the CIM method can return a null ReturnValue on a freshly booted guest
+            // (its terminalservices WMI provider is not reliably ready), which wrongly tripped a hard failure.
+            sb.AppendLine("Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 0 -Type DWord -ErrorAction Stop");
             sb.AppendLine();
         }
 
         if (options.SetPrivateNetworkProfile)
         {
+            // Only demote Public networks to Private. A DomainAuthenticated profile (present once a machine has
+            // joined a domain) is already a trusted network and Windows refuses to change its category at all -
+            // Set-NetConnectionProfile throws "the NetworkCategory cannot be changed from 'DomainAuthenticated'".
+            // The intent here is purely to get the NIC off the restrictive Public category, which DomainAuthenticated
+            // already satisfies, so we skip those (and already-Private) profiles rather than fail the whole step.
             sb.AppendLine("$profiles = Get-NetConnectionProfile -ErrorAction SilentlyContinue");
             sb.AppendLine("foreach ($profile in $profiles) {");
+            sb.AppendLine("    if ($profile.NetworkCategory -eq 'DomainAuthenticated' -or $profile.NetworkCategory -eq 'Private') { continue }");
             sb.AppendLine("    Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory Private -ErrorAction Stop");
             sb.AppendLine("}");
             sb.AppendLine();

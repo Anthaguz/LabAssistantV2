@@ -437,6 +437,7 @@ public class LabTemplateStore : ILabTemplateStore
             NetworkId = source.NetworkId,
             Name = source.Name,
             SwitchName = source.SwitchName,
+            SwitchType = source.SwitchType,
             Subnet = source.Subnet,
             Notes = source.Notes
         };

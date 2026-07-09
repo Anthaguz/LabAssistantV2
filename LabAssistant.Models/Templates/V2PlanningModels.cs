@@ -121,6 +121,8 @@ public sealed class V2ResolvedTrustPlanningContext
 
     public string SourceDomainDnsName { get; init; } = string.Empty;
 
+    public string? SourceDomainNetBiosName { get; init; }
+
     public string? SourceForestId { get; init; }
 
     public string SourceAnchorVmId { get; init; } = string.Empty;
@@ -132,6 +134,8 @@ public sealed class V2ResolvedTrustPlanningContext
     public string TargetDomainId { get; init; } = string.Empty;
 
     public string TargetDomainDnsName { get; init; } = string.Empty;
+
+    public string? TargetDomainNetBiosName { get; init; }
 
     public string? TargetForestId { get; init; }
 
