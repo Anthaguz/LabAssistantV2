@@ -99,6 +99,11 @@ public sealed class LabDeploymentHarness
             _log($"  blocking: {message}");
         }
 
+        if (!result.Success)
+        {
+            LogFailureDiagnostics(result.DeploymentContext);
+        }
+
         var probeSucceeded = false;
         string? probeOutput = null;
         if (probeGuest && result.Success)
@@ -125,6 +130,83 @@ public sealed class LabDeploymentHarness
             GuestProbeSucceeded = probeSucceeded,
             GuestProbeOutput = probeOutput
         };
+    }
+
+    /// <summary>
+    /// Surfaces the concrete reason a runtime execution failed. The runtime records failure detail on the
+    /// deployment context rather than always returning blocking messages, so when Success is false with no
+    /// blocking text this dumps the per-VM failure step, message, recent logs, guest step outcomes, and any
+    /// cleanup residuals. If no VM-level failure is present it falls back to switch/trust cleanup residuals so a
+    /// pure network/switch failure is still visible. Pure observability - it never changes runtime behavior.
+    /// </summary>
+    private void LogFailureDiagnostics(MultiVmDeploymentContext context)
+    {
+        _log($"Failure diagnostics (operation {context.OperationId}, state {context.OperationState}):");
+
+        var failedVms = context.VmContexts.Where(v => !v.IsSuccess).ToList();
+        foreach (var vm in failedVms)
+        {
+            _log($"  VM '{vm.VmName}': IsSuccess={vm.IsSuccess} WasCancelled={vm.WasCancelled} FailureStepKey={vm.FailureStepKey ?? "(none)"}");
+            if (!string.IsNullOrWhiteSpace(vm.FailureMessage))
+            {
+                _log($"    FailureMessage: {vm.FailureMessage}");
+            }
+
+            const int tailCount = 15;
+            var logTail = vm.Logs.Skip(Math.Max(0, vm.Logs.Count - tailCount)).ToList();
+            if (logTail.Count > 0)
+            {
+                _log($"    Last {logTail.Count} log line(s):");
+                foreach (var line in logTail)
+                {
+                    _log($"      | {line}");
+                }
+            }
+
+            if (vm.GuestStepOutcomes.Count > 0)
+            {
+                _log("    Guest step outcomes:");
+                foreach (var outcome in vm.GuestStepOutcomes)
+                {
+                    var skip = string.IsNullOrWhiteSpace(outcome.SkipReason) ? string.Empty : $" skipReason={outcome.SkipReason}";
+                    var msg = string.IsNullOrWhiteSpace(outcome.Message) ? string.Empty : $" - {outcome.Message}";
+                    _log($"      {outcome.StepKey} ({outcome.DisplayName}): {outcome.Result}{skip}{msg}");
+                }
+            }
+
+            if (vm.CleanupResult is not null)
+            {
+                _log($"    Cleanup residuals: {(vm.CleanupResult.HasResiduals ? "YES" : "none")}");
+                foreach (var residual in vm.CleanupResult.Residuals)
+                {
+                    _log($"      residual {residual.ResourceType} '{residual.Identifier}' -> {residual.SuggestedAction}");
+                }
+            }
+        }
+
+        if (failedVms.Count == 0)
+        {
+            _log("  No VM-level failure recorded; inspecting switch/trust cleanup state.");
+
+            foreach (var cleanup in context.CleanupResults.Where(c => c.HasResiduals))
+            {
+                _log($"  VM cleanup residuals for '{cleanup.VmName}':");
+                foreach (var residual in cleanup.Residuals)
+                {
+                    _log($"    residual {residual.ResourceType} '{residual.Identifier}' -> {residual.SuggestedAction}");
+                }
+            }
+
+            foreach (var sw in context.V2NetworkSwitchContexts)
+            {
+                _log($"  Switch '{sw.SwitchName}' ({sw.SwitchType}): CreatedByDeployment={sw.CreatedByDeployment} Ready={sw.Ready} CleanupAttempted={sw.CleanupAttempted} CleanupResidual={sw.CleanupResidual}");
+            }
+
+            foreach (var trust in context.V2TrustContexts)
+            {
+                _log($"  Trust '{trust.TrustId}' ({trust.SourceDomainId} -> {trust.TargetDomainId}): Created={trust.TrustObjectsCreated} Ready={trust.TrustReady} CleanupAttempted={trust.CleanupAttempted} CleanupResidual={trust.CleanupResidual}");
+            }
+        }
     }
 
     /// <summary>
