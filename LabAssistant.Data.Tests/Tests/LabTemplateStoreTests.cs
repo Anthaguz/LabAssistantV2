@@ -627,6 +627,70 @@ public class LabTemplateStoreTests
         Assert.Equal("Canonical-1", loaded.VmTemplates[0].SwitchName);
     }
 
+    [Fact]
+    public void SaveToFile_V2Template_PreservesLabNetworkSwitchType()
+    {
+        // Regression: NormalizeForSave clones each LabNetwork on save, and the clone previously omitted
+        // SwitchType. Since SwitchType is what drives the V2 planner to create Internal switches, dropping it
+        // meant any saved V2 template silently lost its switch-create declaration and failed switch resolution
+        // on a clean host. This guards both the in-memory template (SaveToFile must not mutate the caller's
+        // object) and the persisted round-trip.
+        var folder = BuildTempRoot();
+        var path = Path.Combine(folder, "v2-switchtype.json");
+        var store = new LabTemplateStore();
+        var labNetwork = new LabNetworkTemplate
+        {
+            NetworkId = "core-net",
+            Name = "Core",
+            SwitchName = "LabCore",
+            SwitchType = "Internal"
+        };
+        var template = new LabTemplate
+        {
+            Id = "lab-v2",
+            Name = "Lab V2 SwitchType",
+            SchemaVersion = "2.0.0",
+            ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning,
+            CreatedWithAppVersion = "1.0.0",
+            TemplateType = "lab-template",
+            TemplateRevision = 1,
+            LabNetworks = [labNetwork],
+            VmTemplates =
+            {
+                new VmTemplate
+                {
+                    VmId = "vm-1",
+                    Name = "dc1",
+                    MemoryMb = 4096,
+                    CpuCount = 2,
+                    VhdxId = "win-server-2025-gen2-core",
+                    Nics =
+                    [
+                        new VmNetworkInterfaceTemplate
+                        {
+                            NicId = "primary",
+                            NetworkId = "core-net",
+                            IpAddress = "10.0.0.10",
+                            PrefixLength = 24,
+                            DnsServers = ["10.0.0.10"]
+                        }
+                    ]
+                }
+            }
+        };
+
+        store.SaveToFile(path, template);
+        var loaded = store.LoadFromFile(path);
+        var json = File.ReadAllText(path);
+
+        Assert.Equal("Internal", loaded.LabNetworks?.Single().SwitchType);
+        Assert.Contains("\"switchType\": \"Internal\"", json);
+        // NormalizeForSave replaces the template's LabNetworks with clones in place; those clones must keep
+        // SwitchType so a caller that reuses the template after saving (like the deployment harness) still
+        // sees the switch-create declaration.
+        Assert.Equal("Internal", template.LabNetworks?.Single().SwitchType);
+    }
+
     private static string BuildTempRoot()
     {
         var folder = Path.Combine(Path.GetTempPath(), "LabAssistantTests", Guid.NewGuid().ToString("N"));
