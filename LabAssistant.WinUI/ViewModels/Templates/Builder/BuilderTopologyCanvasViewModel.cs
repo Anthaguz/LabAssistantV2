@@ -31,6 +31,7 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
     private readonly Action<BuilderForestDomainResourceKind, int>? _onManageMachines;
     private readonly Dictionary<string, BuilderCanvasNodePosition> _pinned = new(StringComparer.Ordinal);
     private Dictionary<string, BuilderCanvasNodeViewModel> _nodeLookup = new(StringComparer.Ordinal);
+    private List<ForestFrameGroup> _frameGroups = [];
 
     internal BuilderTopologyCanvasViewModel(
         TemplatesBuilderDirectoryTopologyProjection projection,
@@ -53,6 +54,13 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
 
     [ObservableProperty]
     private ObservableCollection<BuilderCanvasEdgeViewModel> _edges = [];
+
+    /// <summary>
+    /// The forest frames: enclosing group boxes drawn behind the domain nodes and sized to hug the domains of
+    /// each forest. A forest is a frame here, not a node, so it never appears in <see cref="Nodes"/>.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<BuilderCanvasForestFrameViewModel> _frames = [];
 
     [ObservableProperty]
     private double _canvasWidth = MinCanvasWidth;
@@ -81,6 +89,7 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         node.Y = Math.Max(0, y);
         _pinned[nodeId] = new BuilderCanvasNodePosition(node.X, node.Y);
         RecomputeEdges();
+        RecomputeFrames();
         UpdateExtent();
     }
 
@@ -90,44 +99,49 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         var nodes = new List<BuilderCanvasNodeViewModel>();
         var lookup = new Dictionary<string, BuilderCanvasNodeViewModel>(StringComparer.Ordinal);
 
+        var frameGroups = new List<ForestFrameGroup>();
         foreach (var forest in projection.Forests)
         {
-            var position = ResolvePosition(forest.NodeId, autoLayout);
-            var command = forest.CanSelect
-                ? new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Forest, forest.ForestIndex))
-                : null;
-            // Real forests offer +tree and delete; the unassigned-domains pseudo forest (CanSelect=false) offers neither.
+            // Domains are the nodes; add them first so the frame can be sized around their positions.
+            foreach (var root in forest.RootNodes)
+            {
+                AddDomainNode(root, autoLayout, nodes, lookup);
+            }
+
+            var memberNodeIds = new List<string>();
+            foreach (var root in forest.RootNodes)
+            {
+                CollectDomainNodeIds(root, memberNodeIds);
+            }
+
+            // A forest with no domains has nothing to enclose, so it renders no frame (it reappears the moment
+            // it gains a domain).
+            if (memberNodeIds.Count == 0)
+            {
+                continue;
+            }
+
+            // Real forests offer selection, +tree, and delete; the unassigned-domains pseudo forest
+            // (CanSelect=false) is a grouping frame only and offers none of them.
             var forestIndex = forest.ForestIndex;
+            var selectCommand = forest.CanSelect
+                ? new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Forest, forestIndex))
+                : null;
             var addTreeCommand = forest.CanSelect && _onAddTree is not null
                 ? new RelayCommand(() => _onAddTree(forestIndex))
                 : null;
             var deleteForestCommand = forest.CanSelect && _onDelete is not null
                 ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Forest, forestIndex))
                 : null;
-            var node = new BuilderCanvasNodeViewModel(
+            var frame = new BuilderCanvasForestFrameViewModel(
                 forest.NodeId,
-                isForest: true,
                 forest.Label,
-                subtext: "Forest",
-                tooltip: forest.Label,
                 forest.IsSelected,
-                isAccent: forest.IsSelected,
-                hasMissingParent: false,
-                NodeWidth,
-                NodeHeight,
-                position.X,
-                position.Y,
-                command,
-                addChildCommand: null,
-                addTreeCommand: addTreeCommand,
-                deleteCommand: deleteForestCommand);
-            nodes.Add(node);
-            lookup[node.NodeId] = node;
-
-            foreach (var root in forest.RootNodes)
-            {
-                AddDomainNode(root, autoLayout, nodes, lookup);
-            }
+                forest.CanSelect,
+                selectCommand,
+                addTreeCommand,
+                deleteForestCommand);
+            frameGroups.Add(new ForestFrameGroup(frame, memberNodeIds));
         }
 
         // The Standalone container is a peer box of the forests. It only exists when the draft has standalone
@@ -187,8 +201,11 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         }
 
         _nodeLookup = lookup;
+        _frameGroups = frameGroups;
         Nodes = new ObservableCollection<BuilderCanvasNodeViewModel>(nodes);
         Edges = new ObservableCollection<BuilderCanvasEdgeViewModel>(edges);
+        Frames = new ObservableCollection<BuilderCanvasForestFrameViewModel>(frameGroups.Select(group => group.Frame));
+        RecomputeFrames();
         HasNodes = nodes.Count > 0;
         UpdateExtent();
     }
@@ -272,6 +289,62 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Recomputes every forest frame to hug the current positions of its member domain nodes (plus the frame
+    /// padding). Called after a rebuild and after any node drag so a frame always tracks the domains it encloses.
+    /// </summary>
+    private void RecomputeFrames()
+    {
+        foreach (var group in _frameGroups)
+        {
+            if (TryComputeMemberBounds(group.MemberNodeIds, out var minX, out var minY, out var maxX, out var maxY))
+            {
+                group.Frame.X = minX - BuilderCanvasMetrics.FramePadding;
+                group.Frame.Y = minY - BuilderCanvasMetrics.FramePadding;
+                group.Frame.Width = (maxX - minX) + (BuilderCanvasMetrics.FramePadding * 2);
+                group.Frame.Height = (maxY - minY) + (BuilderCanvasMetrics.FramePadding * 2);
+            }
+        }
+    }
+
+    private bool TryComputeMemberBounds(
+        IReadOnlyList<string> memberNodeIds,
+        out double minX,
+        out double minY,
+        out double maxX,
+        out double maxY)
+    {
+        minX = double.PositiveInfinity;
+        minY = double.PositiveInfinity;
+        maxX = double.NegativeInfinity;
+        maxY = double.NegativeInfinity;
+        var any = false;
+        foreach (var nodeId in memberNodeIds)
+        {
+            if (!_nodeLookup.TryGetValue(nodeId, out var node))
+            {
+                continue;
+            }
+
+            any = true;
+            minX = Math.Min(minX, node.X);
+            minY = Math.Min(minY, node.Y);
+            maxX = Math.Max(maxX, node.X + node.Width);
+            maxY = Math.Max(maxY, node.Y + node.Height);
+        }
+
+        return any;
+    }
+
+    private static void CollectDomainNodeIds(TemplatesBuilderDomainTopologyNodeProjection domain, List<string> into)
+    {
+        into.Add(domain.NodeId);
+        foreach (var child in domain.Children)
+        {
+            CollectDomainNodeIds(child, into);
+        }
+    }
+
     private void UpdateExtent()
     {
         var width = MinCanvasWidth;
@@ -282,7 +355,20 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             height = Math.Max(height, node.Y + node.Height + Margin);
         }
 
+        // Frames extend a padding beyond their domains, so include them or a frame's right/bottom edge could
+        // fall off the scrollable extent.
+        foreach (var frame in Frames)
+        {
+            width = Math.Max(width, frame.X + frame.Width + Margin);
+            height = Math.Max(height, frame.Y + frame.Height + Margin);
+        }
+
         CanvasWidth = width;
         CanvasHeight = height;
     }
+
+    /// <summary>Pairs a forest frame with the ids of the domain nodes it encloses, so it can be re-sized on drag.</summary>
+    private readonly record struct ForestFrameGroup(
+        BuilderCanvasForestFrameViewModel Frame,
+        IReadOnlyList<string> MemberNodeIds);
 }

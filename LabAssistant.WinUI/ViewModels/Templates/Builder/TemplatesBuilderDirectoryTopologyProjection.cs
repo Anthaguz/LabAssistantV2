@@ -71,16 +71,9 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
             domainsByForest.TryGetValue(forest.ForestId, out var domains);
             domains ??= [];
             var forestNodeId = CreateForestNodeId(forest, forestIndex);
+            // The forest renders as an enclosing frame around its domain nodes, so it emits no forest->domain
+            // edge; only the parent-child domain edges (added inside BuildForestRoots) connect the nodes.
             var rootNodes = BuildForestRoots(forest, domains, selectedKind, selectedIndex, edges);
-
-            foreach (var root in rootNodes)
-            {
-                edges.Add(new TemplatesBuilderTopologyEdgeProjection(
-                    $"edge:{forestNodeId}->{root.NodeId}",
-                    forestNodeId,
-                    root.NodeId,
-                    "ForestDomainRoot"));
-            }
 
             forestProjections.Add(new TemplatesBuilderForestTopologyProjection(
                 forestNodeId,
@@ -101,14 +94,6 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
             var unassignedForest = new TemplatesBuilderForestDraft("__unassigned__", string.Empty);
             var forestNodeId = "forest:unassigned-domains";
             var rootNodes = BuildForestRoots(unassignedForest, unassignedDomains, selectedKind, selectedIndex, edges);
-            foreach (var root in rootNodes)
-            {
-                edges.Add(new TemplatesBuilderTopologyEdgeProjection(
-                    $"edge:{forestNodeId}->{root.NodeId}",
-                    forestNodeId,
-                    root.NodeId,
-                    "ForestDomainRoot"));
-            }
 
             forestProjections.Add(new TemplatesBuilderForestTopologyProjection(
                 forestNodeId,

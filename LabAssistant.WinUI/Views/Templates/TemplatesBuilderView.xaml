@@ -12,7 +12,8 @@
         <converters:BoolToUniformThicknessConverter x:Key="BoolToUniformThickness" />
         <converters:BoolToFontWeightConverter x:Key="BoolToFontWeight" />
 
-        <!-- Directory-topology canvas: forest and domain nodes positioned on a Canvas by X/Y, with drawn edges. -->
+        <!-- Directory-topology canvas: each forest is an enclosing frame drawn behind its member domain nodes,
+             domains are the draggable nodes, and edges connect parent to child/tree domains. -->
         <DataTemplate x:Key="BuilderCanvasEdgeTemplate" x:DataType="builder:BuilderCanvasEdgeViewModel">
             <Line
                 X1="{x:Bind X1, Mode=OneWay}"
@@ -22,6 +23,79 @@
                 IsHitTestVisible="False"
                 Stroke="{x:Bind IsForestRoot, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellTextSecondaryBrush|ShellBorderBrush}"
                 StrokeThickness="1.6" />
+        </DataTemplate>
+
+        <!-- Forest enclosing frame: a group box auto-sized around its member domain nodes, with a header pill
+             straddling the top border. The body is not hit-testable so pointer events reach the domains inside;
+             only the pill routes forest selection and the add-tree / delete affordances. -->
+        <DataTemplate x:Key="BuilderCanvasFrameTemplate" x:DataType="builder:BuilderCanvasForestFrameViewModel">
+            <Grid>
+                <Grid.RenderTransform>
+                    <TranslateTransform X="{x:Bind X, Mode=OneWay}" Y="{x:Bind Y, Mode=OneWay}" />
+                </Grid.RenderTransform>
+                <Border
+                    Width="{x:Bind Width, Mode=OneWay}"
+                    Height="{x:Bind Height, Mode=OneWay}"
+                    Background="{StaticResource BuilderForestFrameFillBrush}"
+                    BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|BuilderForestFrameBorderBrush}"
+                    BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
+                    CornerRadius="8"
+                    IsHitTestVisible="False" />
+                <Border
+                    Margin="12,-13,0,0"
+                    Padding="8,1,6,1"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Background="{StaticResource BuilderForestPillBrush}"
+                    BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|BuilderForestFrameBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="11"
+                    PointerEntered="OnFrameHeaderPointerEntered"
+                    PointerExited="OnFrameHeaderPointerExited">
+                    <StackPanel VerticalAlignment="Center" Orientation="Horizontal" Spacing="6">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Text="&#x1F332;" />
+                        <Button
+                            Padding="2,0,2,0"
+                            VerticalAlignment="Center"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Command="{x:Bind SelectCommand}"
+                            IsEnabled="{x:Bind CanSelect}"
+                            ToolTipService.ToolTip="Select forest">
+                            <TextBlock
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Foreground="{StaticResource BuilderForestPillTextBrush}"
+                                Text="{x:Bind Label}" />
+                        </Button>
+                        <Button
+                            Padding="4,0,4,0"
+                            MinHeight="20"
+                            VerticalAlignment="Center"
+                            Command="{x:Bind AddTreeCommand}"
+                            Content="+ tree"
+                            FontSize="11"
+                            IsEnabled="{x:Bind CanAddTree}"
+                            ToolTipService.ToolTip="Add tree domain"
+                            Visibility="{x:Bind CanAddTree, Converter={StaticResource BoolToVisibility}}" />
+                        <Button
+                            Padding="4,0,4,0"
+                            MinWidth="20"
+                            MinHeight="20"
+                            VerticalAlignment="Center"
+                            Command="{x:Bind DeleteCommand}"
+                            Content="&#xE711;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="10"
+                            IsEnabled="{x:Bind CanDelete}"
+                            ToolTipService.ToolTip="Delete forest"
+                            Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="BuilderCanvasNodeTemplate" x:DataType="builder:BuilderCanvasNodeViewModel">
@@ -572,6 +646,13 @@
                                                     Width="{x:Bind ViewModel.TopologyCanvas.CanvasWidth, Mode=OneWay}"
                                                     Height="{x:Bind ViewModel.TopologyCanvas.CanvasHeight, Mode=OneWay}"
                                                     Background="Transparent">
+                                                    <ItemsControl ItemTemplate="{StaticResource BuilderCanvasFrameTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Frames, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
                                                     <ItemsControl ItemTemplate="{StaticResource BuilderCanvasEdgeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Edges, Mode=OneWay}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>

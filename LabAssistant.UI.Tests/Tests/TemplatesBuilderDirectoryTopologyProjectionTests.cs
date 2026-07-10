@@ -20,10 +20,8 @@ public sealed class TemplatesBuilderDirectoryTopologyProjectionTests
         Assert.True(root.IsRootDomain);
         Assert.False(root.IsTreeRoot);
         Assert.True(root.IsSelected);
-        Assert.Contains(projection.Edges, edge =>
-            edge.EdgeKind == "ForestDomainRoot" &&
-            edge.SourceNodeId == "forest:forest-contoso" &&
-            edge.TargetNodeId == "domain:domain-contoso");
+        // The forest is now an enclosing frame, not a node, so it emits no forest->root-domain edge.
+        Assert.DoesNotContain(projection.Edges, edge => edge.EdgeKind == "ForestDomainRoot");
     }
 
     [Fact]

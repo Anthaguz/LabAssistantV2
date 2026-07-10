@@ -12,15 +12,42 @@ namespace LabAssistant.UI.Tests.Tests;
 public sealed class BuilderTopologyCanvasViewModelTests
 {
     [Fact]
-    public void Build_ProducesOneNodePerForestAndDomainPlusEveryProjectionEdge()
+    public void Build_ProducesADomainNodePerDomainAForestFramePerForestAndParentChildEdges()
     {
         var canvas = CreateCanvas(CreateTopologyDraft(), out _);
 
         Assert.True(canvas.HasNodes);
-        Assert.Equal(6, canvas.Nodes.Count);
-        Assert.Equal(4, canvas.Edges.Count);
-        Assert.Contains(canvas.Nodes, node => node.NodeId == "forest:forest-contoso" && node.IsForest);
-        Assert.Contains(canvas.Nodes, node => node.NodeId == "domain:domain-child" && !node.IsForest);
+        // The four domains are the nodes; the two forests are frames, not nodes.
+        Assert.Equal(4, canvas.Nodes.Count);
+        Assert.All(canvas.Nodes, node => Assert.False(node.IsForest));
+        Assert.Equal(2, canvas.Frames.Count);
+        Assert.Contains(canvas.Frames, frame => frame.FrameId == "forest:forest-contoso");
+        Assert.Contains(canvas.Nodes, node => node.NodeId == "domain:domain-child");
+        // Only the parent-child domain edge survives; a forest no longer edges to its root domain.
+        var edge = Assert.Single(canvas.Edges);
+        Assert.Equal("domain:domain-contoso", edge.SourceNodeId);
+        Assert.Equal("domain:domain-child", edge.TargetNodeId);
+    }
+
+    [Fact]
+    public void Build_SizesEachForestFrameToEncloseItsMemberDomains()
+    {
+        var canvas = CreateCanvas(CreateTopologyDraft(), out _);
+
+        var frame = Assert.Single(canvas.Frames, f => f.FrameId == "forest:forest-contoso");
+        var members = canvas.Nodes
+            .Where(node => node.NodeId is "domain:domain-contoso" or "domain:domain-child" or "domain:domain-tree")
+            .ToList();
+        Assert.Equal(3, members.Count);
+        var minX = members.Min(node => node.X);
+        var minY = members.Min(node => node.Y);
+        var maxX = members.Max(node => node.X + node.Width);
+        var maxY = members.Max(node => node.Y + node.Height);
+        // The frame wraps the bounding box of its domains: it starts above/left and ends below/right of them.
+        Assert.True(frame.X < minX);
+        Assert.True(frame.Y < minY);
+        Assert.True(frame.X + frame.Width > maxX);
+        Assert.True(frame.Y + frame.Height > maxY);
     }
 
     [Fact]
@@ -47,12 +74,12 @@ public sealed class BuilderTopologyCanvasViewModelTests
     }
 
     [Fact]
-    public void TappingAForestNode_RoutesForestSelection()
+    public void TappingAForestFrame_RoutesForestSelection()
     {
         var canvas = CreateCanvas(CreateTopologyDraft(), out var selections);
 
-        var forest = Assert.Single(canvas.Nodes, node => node.NodeId == "forest:forest-fabrikam");
-        forest.SelectCommand!.Execute(null);
+        var frame = Assert.Single(canvas.Frames, f => f.FrameId == "forest:forest-fabrikam");
+        frame.SelectCommand!.Execute(null);
 
         var selection = Assert.Single(selections);
         Assert.Equal(BuilderForestDomainResourceKind.Forest, selection.Kind);
@@ -60,11 +87,12 @@ public sealed class BuilderTopologyCanvasViewModelTests
     }
 
     [Fact]
-    public void UnassignedPseudoForest_IsNotSelectable()
+    public void UnassignedPseudoForestFrame_IsNotSelectable()
     {
         var canvas = CreateCanvas(CreateMissingReferenceDraft(), out _);
 
-        var unassigned = Assert.Single(canvas.Nodes, node => node.NodeId == "forest:unassigned-domains");
+        var unassigned = Assert.Single(canvas.Frames, frame => frame.FrameId == "forest:unassigned-domains");
+        Assert.False(unassigned.CanSelect);
         Assert.Null(unassigned.SelectCommand);
     }
 
@@ -83,12 +111,12 @@ public sealed class BuilderTopologyCanvasViewModelTests
     {
         var canvas = CreateCanvas(CreateTopologyDraft(), out _);
 
-        canvas.MoveNode("forest:forest-contoso", 480, 260);
-        var moved = Assert.Single(canvas.Nodes, node => node.NodeId == "forest:forest-contoso");
+        canvas.MoveNode("domain:domain-contoso", 480, 260);
+        var moved = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-contoso");
         Assert.Equal(480, moved.X, 6);
         Assert.Equal(260, moved.Y, 6);
 
-        canvas.MoveNode("forest:forest-contoso", -50, -20);
+        canvas.MoveNode("domain:domain-contoso", -50, -20);
         Assert.Equal(0, moved.X, 6);
         Assert.Equal(0, moved.Y, 6);
     }
@@ -97,14 +125,27 @@ public sealed class BuilderTopologyCanvasViewModelTests
     public void MoveNode_RecomputesEveryEdgeTouchingTheMovedNode()
     {
         var canvas = CreateCanvas(CreateTopologyDraft(), out _);
-        var edge = Assert.Single(canvas.Edges, e => e.SourceNodeId == "forest:forest-contoso" && e.TargetNodeId == "domain:domain-contoso");
+        var edge = Assert.Single(canvas.Edges, e => e.SourceNodeId == "domain:domain-contoso" && e.TargetNodeId == "domain:domain-child");
         var beforeX1 = edge.X1;
         var beforeY1 = edge.Y1;
 
-        canvas.MoveNode("forest:forest-contoso", 600, 400);
+        canvas.MoveNode("domain:domain-contoso", 600, 400);
 
         Assert.True(Math.Abs(edge.X1 - beforeX1) > 0.5 || Math.Abs(edge.Y1 - beforeY1) > 0.5,
             "the edge endpoint on the moved node should have been recomputed");
+    }
+
+    [Fact]
+    public void MoveNode_ResizesTheOwningForestFrameToTrackTheDomain()
+    {
+        var canvas = CreateCanvas(CreateTopologyDraft(), out _);
+        var frame = Assert.Single(canvas.Frames, f => f.FrameId == "forest:forest-contoso");
+        var beforeRight = frame.X + frame.Width;
+
+        canvas.MoveNode("domain:domain-child", 1200, 260);
+
+        Assert.True(frame.X + frame.Width > beforeRight,
+            "moving a member domain right must grow its enclosing forest frame");
     }
 
     [Fact]
@@ -113,7 +154,7 @@ public sealed class BuilderTopologyCanvasViewModelTests
         var canvas = CreateCanvas(CreateTopologyDraft(), out _);
         var beforeWidth = canvas.CanvasWidth;
 
-        canvas.MoveNode("forest:forest-contoso", beforeWidth + 400, 40);
+        canvas.MoveNode("domain:domain-contoso", beforeWidth + 400, 40);
 
         Assert.True(canvas.CanvasWidth > beforeWidth, "moving a node past the right edge must grow the canvas width");
     }
@@ -125,10 +166,10 @@ public sealed class BuilderTopologyCanvasViewModelTests
         var canvas = CreateCanvas(draft, out _);
         var fabrikamBefore = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-fabrikam").X;
 
-        canvas.MoveNode("forest:forest-contoso", 777, 333);
+        canvas.MoveNode("domain:domain-contoso", 777, 333);
         canvas.Rebuild(TemplatesBuilderDirectoryTopologyProjector.Project(draft, BuilderForestDomainResourceKind.Domain, selectedIndex: 0));
 
-        var contosoAfter = Assert.Single(canvas.Nodes, node => node.NodeId == "forest:forest-contoso");
+        var contosoAfter = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-contoso");
         Assert.Equal(777, contosoAfter.X, 6);
         Assert.Equal(333, contosoAfter.Y, 6);
         var fabrikamAfter = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-fabrikam").X;

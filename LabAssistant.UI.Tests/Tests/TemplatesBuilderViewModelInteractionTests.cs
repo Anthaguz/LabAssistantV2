@@ -301,9 +301,9 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         viewModel.LoadNewDraft(NamedDraft());
         viewModel.NextStepCommand.Execute(null);
 
-        var forestNode = viewModel.TopologyCanvas!.Nodes.First(node => node.IsForest);
-        Assert.NotNull(forestNode.DeleteCommand);
-        forestNode.DeleteCommand!.Execute(null);
+        var forestFrame = viewModel.TopologyCanvas!.Frames.First();
+        Assert.NotNull(forestFrame.DeleteCommand);
+        forestFrame.DeleteCommand!.Execute(null);
 
         var after = viewModel.CaptureDraft();
         Assert.Empty(after.Forests);
@@ -360,8 +360,8 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         viewModel.LoadNewDraft(NamedDraft());
         viewModel.NextStepCommand.Execute(null);
 
-        var forestNode = viewModel.TopologyCanvas!.Nodes.First(node => node.IsForest);
-        forestNode.SelectCommand!.Execute(null);
+        var forestFrame = viewModel.TopologyCanvas!.Frames.First();
+        forestFrame.SelectCommand!.Execute(null);
 
         var rootDnsName = viewModel.CaptureDraft().Domains[0].DnsName;
         var forestName = FindForestDomainField(viewModel, "Forest Name");

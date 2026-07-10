@@ -154,4 +154,20 @@ public sealed partial class TemplatesBuilderView : UserControl
     // the event bubbling to the node Border, so clicking an affordance never starts a drag or a selection.
     private void OnNodeAffordancePointerPressed(object sender, PointerRoutedEventArgs e)
         => e.Handled = true;
+
+    private void OnFrameHeaderPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BuilderCanvasForestFrameViewModel frame })
+        {
+            frame.AffordancesRevealed = true;
+        }
+    }
+
+    private void OnFrameHeaderPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BuilderCanvasForestFrameViewModel frame })
+        {
+            frame.AffordancesRevealed = false;
+        }
+    }
 }

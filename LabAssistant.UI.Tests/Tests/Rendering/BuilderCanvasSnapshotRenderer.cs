@@ -14,8 +14,10 @@ namespace LabAssistant.UI.Tests.Tests.Rendering;
 internal static class BuilderCanvasSnapshotRenderer
 {
     private static readonly Color Background = Color.FromArgb(15, 24, 48);
-    private static readonly Color ForestFill = Color.FromArgb(22, 42, 32);
-    private static readonly Color ForestBorder = Color.FromArgb(96, 176, 128);
+    private static readonly Color FrameFill = Color.FromArgb(40, 34, 197, 94);
+    private static readonly Color FrameBorder = Color.FromArgb(52, 211, 153);
+    private static readonly Color StandaloneFill = Color.FromArgb(38, 44, 54);
+    private static readonly Color StandaloneBorder = Color.FromArgb(120, 130, 148);
     private static readonly Color DomainFill = Color.FromArgb(27, 42, 74);
     private static readonly Color DomainBorder = Color.FromArgb(92, 128, 196);
     private static readonly Color SelectedFill = Color.FromArgb(38, 58, 96);
@@ -23,7 +25,7 @@ internal static class BuilderCanvasSnapshotRenderer
     private static readonly Color LabelColor = Color.FromArgb(226, 234, 252);
     private static readonly Color SubtextColor = Color.FromArgb(150, 166, 200);
     private static readonly Color MissingColor = Color.FromArgb(240, 120, 120);
-    private static readonly Color ForestEdge = Color.FromArgb(120, 140, 176);
+    private static readonly Color FrameLabelColor = Color.FromArgb(190, 236, 210);
     private static readonly Color DomainEdge = Color.FromArgb(84, 96, 128);
 
     public static void Render(BuilderTopologyCanvasViewModel canvas, string caption, string outputPath)
@@ -43,6 +45,7 @@ internal static class BuilderCanvasSnapshotRenderer
             graphics.DrawString(caption, captionFont, captionBrush, 8, 6);
             graphics.TranslateTransform(0, 26);
 
+            DrawFrames(graphics, canvas);
             DrawEdges(graphics, canvas);
             DrawNodes(graphics, canvas);
         }
@@ -51,11 +54,34 @@ internal static class BuilderCanvasSnapshotRenderer
         bitmap.Save(outputPath, ImageFormat.Png);
     }
 
+    private static void DrawFrames(Graphics graphics, BuilderTopologyCanvasViewModel canvas)
+    {
+        using var labelFont = new Font("Segoe UI", 9f, FontStyle.Bold);
+
+        foreach (var frame in canvas.Frames)
+        {
+            var rect = new RectangleF((float)frame.X, (float)frame.Y, (float)frame.Width, (float)frame.Height);
+            using (var fillBrush = new SolidBrush(FrameFill))
+            {
+                graphics.FillRectangle(fillBrush, rect);
+            }
+
+            using (var borderPen = new Pen(frame.IsSelected ? AccentBorder : FrameBorder, frame.IsSelected ? 2.2f : 1.4f))
+            {
+                graphics.DrawRectangle(borderPen, rect.X, rect.Y, rect.Width, rect.Height);
+            }
+
+            // Header pill label, straddling the frame's top border like the running canvas.
+            using var labelBrush = new SolidBrush(FrameLabelColor);
+            graphics.DrawString(frame.Label, labelFont, labelBrush, rect.X + 12, rect.Y - 8);
+        }
+    }
+
     private static void DrawEdges(Graphics graphics, BuilderTopologyCanvasViewModel canvas)
     {
         foreach (var edge in canvas.Edges)
         {
-            using var pen = new Pen(edge.IsForestRoot ? ForestEdge : DomainEdge, 1.6f);
+            using var pen = new Pen(DomainEdge, 1.6f);
             graphics.DrawLine(pen, (float)edge.X1, (float)edge.Y1, (float)edge.X2, (float)edge.Y2);
         }
     }
@@ -68,8 +94,8 @@ internal static class BuilderCanvasSnapshotRenderer
         foreach (var node in canvas.Nodes)
         {
             var rect = new RectangleF((float)node.X, (float)node.Y, (float)node.Width, (float)node.Height);
-            var fill = node.IsSelected ? SelectedFill : node.IsForest ? ForestFill : DomainFill;
-            var border = node.IsAccent ? AccentBorder : node.IsForest ? ForestBorder : DomainBorder;
+            var fill = node.IsSelected ? SelectedFill : node.IsStandalone ? StandaloneFill : DomainFill;
+            var border = node.IsAccent ? AccentBorder : node.IsStandalone ? StandaloneBorder : DomainBorder;
 
             using (var fillBrush = new SolidBrush(fill))
             {
