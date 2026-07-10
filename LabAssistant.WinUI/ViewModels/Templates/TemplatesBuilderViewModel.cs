@@ -112,7 +112,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     // Forests & Domains.
     [ObservableProperty] private bool _addForestEnabled;
     [ObservableProperty] private bool _addDomainEnabled;
-    [ObservableProperty] private ObservableCollection<BuilderTopologyForestViewModel> _topologyForests = [];
+    [ObservableProperty] private BuilderTopologyCanvasViewModel? _topologyCanvas;
     [ObservableProperty] private bool _hasTopologyForests;
     [ObservableProperty] private string _forestDomainDetailTitle = string.Empty;
     [ObservableProperty] private ObservableCollection<BuilderFieldRowViewModel> _forestDomainDetailRows = [];
@@ -1075,51 +1075,27 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private void RenderForestDomainList()
     {
         var projection = TemplatesBuilderDirectoryTopologyProjector.Project(_draft, _selectedForestDomainKind, _selectedForestDomainIndex);
-        var forests = new ObservableCollection<BuilderTopologyForestViewModel>();
-        foreach (var forest in projection.Forests)
+        if (TopologyCanvas is null)
         {
-            forests.Add(BuildTopologyForest(forest));
+            TopologyCanvas = new BuilderTopologyCanvasViewModel(projection, OnTopologyCanvasSelect);
+        }
+        else
+        {
+            TopologyCanvas.Rebuild(projection);
         }
 
-        TopologyForests = forests;
-        HasTopologyForests = forests.Count > 0;
+        HasTopologyForests = projection.Forests.Count > 0;
     }
 
-    private BuilderTopologyForestViewModel BuildTopologyForest(TemplatesBuilderForestTopologyProjection forest)
+    private void OnTopologyCanvasSelect(BuilderForestDomainResourceKind kind, int index)
     {
-        var nodes = new List<BuilderTopologyNodeViewModel>();
-        foreach (var root in forest.RootNodes)
+        if (kind == BuilderForestDomainResourceKind.Forest)
         {
-            AddTopologyNode(nodes, root);
+            SelectForest(index);
         }
-
-        var forestIndex = forest.ForestIndex;
-        var selectCommand = forest.CanSelect ? new RelayCommand(() => SelectForest(forestIndex)) : null;
-        return new BuilderTopologyForestViewModel(forest.Label, forest.CanSelect, forest.IsSelected, selectCommand, nodes);
-    }
-
-    private void AddTopologyNode(List<BuilderTopologyNodeViewModel> nodes, TemplatesBuilderDomainTopologyNodeProjection node)
-    {
-        var label = $"{FormatTopologyNodePrefix(node)} {node.Label}";
-        var subtext = node.HasMissingParent ? "Missing parent reference" : node.RelationLabel;
-        var isAccent = node.IsSelected || node.IsRootDomain;
-        var borderThickness = node.IsSelected ? 2 : node.IsRootDomain ? 1.5 : 1;
-        var tooltip = $"{node.RelationLabel}: {node.Label}";
-        var domainIndex = node.DomainIndex;
-        nodes.Add(new BuilderTopologyNodeViewModel(
-            label,
-            subtext,
-            node.Depth,
-            node.IsSelected,
-            isAccent,
-            node.HasMissingParent,
-            borderThickness,
-            tooltip,
-            new RelayCommand(() => SelectDomain(domainIndex))));
-
-        foreach (var child in node.Children)
+        else
         {
-            AddTopologyNode(nodes, child);
+            SelectDomain(index);
         }
     }
 
@@ -1558,21 +1534,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         }
 
         return string.IsNullOrWhiteSpace(fallback) ? "(unnamed)" : fallback.Trim();
-    }
-
-    private static string FormatTopologyNodePrefix(TemplatesBuilderDomainTopologyNodeProjection node)
-    {
-        if (node.IsRootDomain)
-        {
-            return "[Root]";
-        }
-
-        if (node.IsTreeRoot)
-        {
-            return "[Tree]";
-        }
-
-        return node.Depth > 0 ? "[Child]" : "[Domain]";
     }
 
     private static string NormalizeDeploymentProfile(string profile)
