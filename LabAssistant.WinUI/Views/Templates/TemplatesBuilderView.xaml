@@ -42,6 +42,13 @@
                 PointerPressed="OnNodePointerPressed"
                 PointerReleased="OnNodePointerReleased"
                 ToolTipService.ToolTip="{x:Bind Tooltip}">
+                <!-- Canvas position. The hosting ItemsControl wraps each node in a ContentPresenter that sits at
+                     the Canvas origin; attached-property (Canvas.Left/Top) Style-setter bindings do not apply
+                     reliably in WinUI, so every node otherwise piled at (0,0). Positioning the template root with
+                     an x:Bind TranslateTransform is compiled-binding reliable and tracks live drag updates. -->
+                <Border.RenderTransform>
+                    <TranslateTransform X="{x:Bind X, Mode=OneWay}" Y="{x:Bind Y, Mode=OneWay}" />
+                </Border.RenderTransform>
                 <Grid>
                     <!-- Standalone container cue: a gray dashed frame so it reads as "not a directory". -->
                     <Rectangle
@@ -578,12 +585,6 @@
                                                                 <Canvas />
                                                             </ItemsPanelTemplate>
                                                         </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemContainerStyle>
-                                                            <Style TargetType="ContentPresenter">
-                                                                <Setter Property="Canvas.Left" Value="{Binding X}" />
-                                                                <Setter Property="Canvas.Top" Value="{Binding Y}" />
-                                                            </Style>
-                                                        </ItemsControl.ItemContainerStyle>
                                                     </ItemsControl>
                                                     <TextBlock
                                                         Margin="16"
