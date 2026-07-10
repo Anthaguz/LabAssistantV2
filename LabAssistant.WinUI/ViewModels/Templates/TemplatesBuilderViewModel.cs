@@ -54,6 +54,13 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private BuilderForestDomainResourceKind _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
     private int _selectedForestDomainIndex;
 
+    // Level 2 (machine authoring) state. When zoomed in, the active container is either a domain
+    // (_machineContainerId = domain id, _isStandaloneContainer = false) or the Standalone container
+    // (_isStandaloneContainer = true). _selectedMachineVmIndex indexes draft.Vms for the highlighted card.
+    private string _machineContainerId = string.Empty;
+    private bool _isStandaloneContainer;
+    private int _selectedMachineVmIndex = -1;
+
     // Guards programmatic field/observable writes so refreshing the forms does not re-enter the edit
     // pipeline (the imperative view guarded the same recompute with _isUpdatingDraft).
     private bool _isApplyingDraft;
@@ -112,12 +119,22 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     // Forests & Domains.
     [ObservableProperty] private bool _addForestEnabled;
     [ObservableProperty] private bool _addTreeEnabled;
+    [ObservableProperty] private bool _addStandaloneMachineEnabled;
     [ObservableProperty] private BuilderTopologyCanvasViewModel? _topologyCanvas;
     [ObservableProperty] private bool _hasTopologyForests;
     [ObservableProperty] private string _forestDomainDetailTitle = string.Empty;
     [ObservableProperty] private ObservableCollection<BuilderFieldRowViewModel> _forestDomainDetailRows = [];
     [ObservableProperty] private bool _hasForestDomainDetail;
     [ObservableProperty] private bool _forestDomainDetailEmpty = true;
+
+    // Forests & Domains - Level 2 (machines inside one domain or the Standalone container).
+    [ObservableProperty] private bool _isMachineLevelVisible;
+    [ObservableProperty] private string _machineLevelTitle = string.Empty;
+    [ObservableProperty] private string _machineLevelSubtitle = string.Empty;
+    [ObservableProperty] private ObservableCollection<BuilderMachineCardViewModel> _machineCards = [];
+    [ObservableProperty] private bool _hasMachineCards;
+    [ObservableProperty] private string _machineLevelEmptyText = "No machines yet.";
+    [ObservableProperty] private string _addComputerLabel = "+ Add computer";
 
     // Credentials.
     [ObservableProperty] private bool _addCredentialEnabled;
@@ -383,6 +400,157 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         _selectedForestDomainKind = result.SelectedKind;
         _selectedForestDomainIndex = result.SelectedIndex;
         RenderAndNotify(result.Draft with { IsSaveConfirmed = false });
+    }
+
+    // ----- Level 2: machine authoring inside a domain or the Standalone container -----
+
+    // Canvas manage-machines affordance (double-tap or the hover button): zoom from Level 1 into the machines
+    // of a domain, or of the Standalone container.
+    private void ManageMachinesAt(BuilderForestDomainResourceKind kind, int index)
+    {
+        var draft = CaptureWorkingDraft();
+        if (kind == BuilderForestDomainResourceKind.Standalone)
+        {
+            ZoomIntoStandalone(draft);
+            return;
+        }
+
+        if (kind != BuilderForestDomainResourceKind.Domain || index < 0 || index >= draft.Domains.Count)
+        {
+            return;
+        }
+
+        ZoomIntoDomain(draft.Domains[index].DomainId);
+    }
+
+    private void ZoomIntoDomain(string domainId)
+    {
+        _isStandaloneContainer = false;
+        _machineContainerId = domainId;
+        _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
+        var projection = TemplatesBuilderMachineProjector.ProjectDomainMachines(_draft, domainId, -1);
+        _selectedMachineVmIndex = projection.Machines.Count > 0 ? projection.Machines[0].VmIndex : -1;
+        IsMachineLevelVisible = true;
+        RenderMachineLevel();
+    }
+
+    private void ZoomIntoStandalone(TemplatesBuilderDraftSnapshot draft)
+    {
+        _isStandaloneContainer = true;
+        _machineContainerId = TemplatesBuilderMachineProjector.StandaloneContainerId;
+        _selectedForestDomainKind = BuilderForestDomainResourceKind.Standalone;
+        var projection = TemplatesBuilderMachineProjector.ProjectStandaloneMachines(draft, -1);
+        _selectedMachineVmIndex = projection.Machines.Count > 0 ? projection.Machines[0].VmIndex : -1;
+        IsMachineLevelVisible = true;
+        RenderMachineLevel();
+    }
+
+    [RelayCommand]
+    private void BackToTopology()
+    {
+        IsMachineLevelVisible = false;
+    }
+
+    // Level 1 entry point for standalone machines: there is no Standalone box until one exists, so this creates
+    // the first standalone machine (a workgroup box: router, root CA, ...) and zooms straight into it.
+    [RelayCommand]
+    private void AddStandaloneMachine()
+    {
+        var draft = CaptureWorkingDraft();
+        var result = TemplatesBuilderMachineAuthoring.AddStandaloneComputer(draft);
+        _isStandaloneContainer = true;
+        _machineContainerId = TemplatesBuilderMachineProjector.StandaloneContainerId;
+        _selectedForestDomainKind = BuilderForestDomainResourceKind.Standalone;
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        IsMachineLevelVisible = true;
+        RenderAndNotify(result.Draft);
+    }
+
+    [RelayCommand]
+    private void AddComputer()
+    {
+        var draft = CaptureWorkingDraft();
+        var result = _isStandaloneContainer
+            ? TemplatesBuilderMachineAuthoring.AddStandaloneComputer(draft)
+            : TemplatesBuilderMachineAuthoring.AddDomainComputer(draft, _machineContainerId);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft);
+    }
+
+    private void SelectMachineCard(int vmIndex)
+    {
+        _selectedMachineVmIndex = vmIndex;
+        RenderMachineLevel();
+    }
+
+    private void DeleteMachineCard(int vmIndex)
+    {
+        var draft = CaptureWorkingDraft();
+        var result = TemplatesBuilderMachineAuthoring.DeleteComputer(draft, vmIndex);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft);
+    }
+
+    private void RenderMachineLevel()
+    {
+        if (!IsMachineLevelVisible)
+        {
+            MachineCards = [];
+            HasMachineCards = false;
+            return;
+        }
+
+        var projection = _isStandaloneContainer
+            ? TemplatesBuilderMachineProjector.ProjectStandaloneMachines(_draft, _selectedMachineVmIndex)
+            : TemplatesBuilderMachineProjector.ProjectDomainMachines(_draft, _machineContainerId, _selectedMachineVmIndex);
+
+        MachineLevelTitle = projection.Title;
+        MachineLevelSubtitle = _isStandaloneContainer
+            ? "Standalone machines - no domain membership"
+            : "Machines in this domain";
+        MachineLevelEmptyText = _isStandaloneContainer
+            ? "No standalone machines yet. Add a computer to get started."
+            : "No machines in this domain yet. Add a computer to get started.";
+        AddComputerLabel = "+ Add computer";
+
+        var cards = new ObservableCollection<BuilderMachineCardViewModel>();
+        foreach (var card in projection.Machines)
+        {
+            var vmIndex = card.VmIndex;
+            // A domain's only domain controller cannot be deleted, so it offers no delete affordance.
+            var canDelete = !(card.IsDomainController && IsOnlyDomainControllerInContainer(vmIndex));
+            cards.Add(new BuilderMachineCardViewModel(
+                card.NodeId,
+                card.VmIndex,
+                card.Label,
+                card.RoleLabel,
+                card.Subtext,
+                card.IsDomainController,
+                card.IsSelected,
+                new RelayCommand(() => SelectMachineCard(vmIndex)),
+                canDelete ? new RelayCommand(() => DeleteMachineCard(vmIndex)) : null));
+        }
+
+        MachineCards = cards;
+        HasMachineCards = cards.Count > 0;
+    }
+
+    private bool IsOnlyDomainControllerInContainer(int vmIndex)
+    {
+        if (vmIndex < 0 || vmIndex >= _draft.Vms.Count)
+        {
+            return false;
+        }
+
+        var target = _draft.Vms[vmIndex];
+        if (!target.IsActiveDirectoryDomainController || string.IsNullOrWhiteSpace(target.DomainId))
+        {
+            return false;
+        }
+
+        return _draft.Vms.Count(vm =>
+            vm.IsActiveDirectoryDomainController &&
+            string.Equals(vm.DomainId?.Trim(), target.DomainId.Trim(), StringComparison.OrdinalIgnoreCase)) <= 1;
     }
 
     [RelayCommand]
@@ -1042,6 +1210,11 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         IsGeneralVisible = projection.ActiveStep == BuilderWorkflowStep.General;
         IsNetworksVisible = projection.ActiveStep == BuilderWorkflowStep.Networks;
         IsForestsDomainsVisible = projection.ActiveStep == BuilderWorkflowStep.ForestsDomains;
+        if (!IsForestsDomainsVisible && IsMachineLevelVisible)
+        {
+            // Level 2 is a sub-surface of the Forests & Domains step; leaving the step drops back to Level 1.
+            IsMachineLevelVisible = false;
+        }
         IsCredentialsVisible = projection.ActiveStep == BuilderWorkflowStep.Credentials;
         IsVmsVisible = projection.ActiveStep == BuilderWorkflowStep.Vms;
         IsReviewVisible = projection.ActiveStep == BuilderWorkflowStep.Review;
@@ -1125,6 +1298,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         RenderNetworkDetail();
         RenderCredentialDetail();
         RenderForestDomainDetail();
+        RenderMachineLevel();
         RenderVmOverview();
         RenderVmDetail();
         RenderReview();
@@ -1175,7 +1349,8 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                 OnTopologyCanvasSelect,
                 AddChildDomainAt,
                 AddTreeAt,
-                DeleteForestDomainAt);
+                DeleteForestDomainAt,
+                ManageMachinesAt);
         }
         else
         {
@@ -1191,10 +1366,23 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         {
             SelectForest(index);
         }
+        else if (kind == BuilderForestDomainResourceKind.Standalone)
+        {
+            SelectStandaloneContainer();
+        }
         else
         {
             SelectDomain(index);
         }
+    }
+
+    // Selecting the Standalone container highlights it at Level 1 (its detail panel is intentionally empty -
+    // standalone machines are authored at Level 2 by managing the container, not by editing directory fields).
+    private void SelectStandaloneContainer()
+    {
+        _selectedForestDomainKind = BuilderForestDomainResourceKind.Standalone;
+        _selectedForestDomainIndex = -1;
+        RenderDraftResources(refreshNavigator: false);
     }
 
     private void RenderNetworkDetail()
@@ -1471,6 +1659,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         AddCredentialEnabled = _canNavigate;
         AddForestEnabled = _canNavigate;
         AddTreeEnabled = _canNavigate;
+        AddStandaloneMachineEnabled = _canNavigate;
         AddVmEnabled = _canNavigate;
         BackToLibraryEnabled = !IsLoading;
 

@@ -28,10 +28,13 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
         IRelayCommand? selectCommand,
         IRelayCommand? addChildCommand = null,
         IRelayCommand? addTreeCommand = null,
-        IRelayCommand? deleteCommand = null)
+        IRelayCommand? deleteCommand = null,
+        bool isStandalone = false,
+        IRelayCommand? manageMachinesCommand = null)
     {
         NodeId = nodeId;
         IsForest = isForest;
+        IsStandalone = isStandalone;
         Label = label;
         Subtext = subtext;
         Tooltip = tooltip;
@@ -46,12 +49,20 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
         AddChildCommand = addChildCommand;
         AddTreeCommand = addTreeCommand;
         DeleteCommand = deleteCommand;
+        ManageMachinesCommand = manageMachinesCommand;
     }
 
     public string NodeId { get; }
 
     /// <summary>True for a forest container, false for a domain. Drives the distinct forest chrome.</summary>
     public bool IsForest { get; }
+
+    /// <summary>
+    /// True for the Level 1 Standalone container box. It shares the forest container chrome shape but is
+    /// styled gray/dashed to read as "not a directory" - it holds domain-unset machines (router, root CA,
+    /// any workgroup box) and, like a domain, zooms into Level 2 when managed.
+    /// </summary>
+    public bool IsStandalone { get; }
 
     public string Label { get; }
 
@@ -98,6 +109,13 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
     /// <summary>Delete affordance: remove this forest (whole tree) or this domain subtree. Null when not deletable.</summary>
     public IRelayCommand? DeleteCommand { get; }
 
+    /// <summary>
+    /// Manage-machines affordance: zoom into this container's Level 2 machine list. Offered on domain nodes
+    /// and the Standalone container; null on forest nodes (a forest has no machines of its own). Bound both to
+    /// a hover button and to the node's double-tap so the zoom is discoverable and quick.
+    /// </summary>
+    public IRelayCommand? ManageMachinesCommand { get; }
+
     /// <summary>True when the domain hover-+ (add child) affordance should be offered.</summary>
     public bool CanAddChild => AddChildCommand is not null;
 
@@ -106,6 +124,9 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
 
     /// <summary>True when the delete affordance should be offered.</summary>
     public bool CanDelete => DeleteCommand is not null;
+
+    /// <summary>True when the manage-machines (zoom to Level 2) affordance should be offered.</summary>
+    public bool CanManageMachines => ManageMachinesCommand is not null;
 
     public double CenterX => X + (Width / 2);
 

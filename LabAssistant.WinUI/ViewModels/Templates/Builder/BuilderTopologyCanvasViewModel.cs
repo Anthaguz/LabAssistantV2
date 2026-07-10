@@ -28,6 +28,7 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
     private readonly Action<int>? _onAddChildDomain;
     private readonly Action<int>? _onAddTree;
     private readonly Action<BuilderForestDomainResourceKind, int>? _onDelete;
+    private readonly Action<BuilderForestDomainResourceKind, int>? _onManageMachines;
     private readonly Dictionary<string, BuilderCanvasNodePosition> _pinned = new(StringComparer.Ordinal);
     private Dictionary<string, BuilderCanvasNodeViewModel> _nodeLookup = new(StringComparer.Ordinal);
 
@@ -36,12 +37,14 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         Action<BuilderForestDomainResourceKind, int> onSelect,
         Action<int>? onAddChildDomain = null,
         Action<int>? onAddTree = null,
-        Action<BuilderForestDomainResourceKind, int>? onDelete = null)
+        Action<BuilderForestDomainResourceKind, int>? onDelete = null,
+        Action<BuilderForestDomainResourceKind, int>? onManageMachines = null)
     {
         _onSelect = onSelect;
         _onAddChildDomain = onAddChildDomain;
         _onAddTree = onAddTree;
         _onDelete = onDelete;
+        _onManageMachines = onManageMachines;
         BuildFrom(projection);
     }
 
@@ -127,6 +130,39 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             }
         }
 
+        // The Standalone container is a peer box of the forests. It only exists when the draft has standalone
+        // machines (the projector returns null otherwise). It shares the container shape but styles gray/dashed
+        // via IsStandalone, selects the Standalone kind, and zooms to its Level 2 machine list when managed.
+        if (projection.Standalone is { } standalone)
+        {
+            var standalonePosition = ResolvePosition(standalone.NodeId, autoLayout);
+            var manageStandaloneCommand = _onManageMachines is not null
+                ? new RelayCommand(() => _onManageMachines(BuilderForestDomainResourceKind.Standalone, 0))
+                : null;
+            var machineWord = standalone.MachineCount == 1 ? "machine" : "machines";
+            var standaloneNode = new BuilderCanvasNodeViewModel(
+                standalone.NodeId,
+                isForest: true,
+                standalone.Label,
+                subtext: $"{standalone.MachineCount} {machineWord}",
+                tooltip: "Standalone machines (no domain)",
+                standalone.IsSelected,
+                isAccent: standalone.IsSelected,
+                hasMissingParent: false,
+                NodeWidth,
+                NodeHeight,
+                standalonePosition.X,
+                standalonePosition.Y,
+                new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Standalone, 0)),
+                addChildCommand: null,
+                addTreeCommand: null,
+                deleteCommand: null,
+                isStandalone: true,
+                manageMachinesCommand: manageStandaloneCommand);
+            nodes.Add(standaloneNode);
+            lookup[standaloneNode.NodeId] = standaloneNode;
+        }
+
         var edges = new List<BuilderCanvasEdgeViewModel>();
         foreach (var edge in projection.Edges)
         {
@@ -172,6 +208,9 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         var deleteCommand = _onDelete is not null
             ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Domain, domainIndex))
             : null;
+        var manageMachinesCommand = _onManageMachines is not null
+            ? new RelayCommand(() => _onManageMachines(BuilderForestDomainResourceKind.Domain, domainIndex))
+            : null;
         var node = new BuilderCanvasNodeViewModel(
             domain.NodeId,
             isForest: false,
@@ -188,7 +227,9 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Domain, domainIndex)),
             addChildCommand: addChildCommand,
             addTreeCommand: null,
-            deleteCommand: deleteCommand);
+            deleteCommand: deleteCommand,
+            isStandalone: false,
+            manageMachinesCommand: manageMachinesCommand);
         nodes.Add(node);
         lookup[node.NodeId] = node;
 

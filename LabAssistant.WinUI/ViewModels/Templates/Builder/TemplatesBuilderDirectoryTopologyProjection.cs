@@ -4,7 +4,19 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
 internal readonly record struct TemplatesBuilderDirectoryTopologyProjection(
     IReadOnlyList<TemplatesBuilderForestTopologyProjection> Forests,
-    IReadOnlyList<TemplatesBuilderTopologyEdgeProjection> Edges);
+    IReadOnlyList<TemplatesBuilderTopologyEdgeProjection> Edges,
+    TemplatesBuilderStandaloneContainerProjection? Standalone);
+
+/// <summary>
+/// The Level 1 "Standalone" container: a gray, dashed box shown next to the forests that holds every machine
+/// whose domain is unset (a router, a root CA, any workgroup box). It is only present when the draft actually
+/// has standalone machines; opening it zooms to Level 2 and lists those machines the same way a domain does.
+/// </summary>
+internal readonly record struct TemplatesBuilderStandaloneContainerProjection(
+    string NodeId,
+    string Label,
+    int MachineCount,
+    bool IsSelected);
 
 internal readonly record struct TemplatesBuilderForestTopologyProjection(
     string NodeId,
@@ -109,7 +121,34 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
                 rootNodes));
         }
 
-        return new TemplatesBuilderDirectoryTopologyProjection(forestProjections, edges);
+        return new TemplatesBuilderDirectoryTopologyProjection(
+            forestProjections,
+            edges,
+            ProjectStandaloneContainer(draft, selectedKind));
+    }
+
+    /// <summary>
+    /// Emits the Level 1 Standalone container when the draft has at least one standalone machine (a machine
+    /// whose membership mode is Standalone). Returns null otherwise so the container only appears when it has
+    /// something to hold.
+    /// </summary>
+    private static TemplatesBuilderStandaloneContainerProjection? ProjectStandaloneContainer(
+        TemplatesBuilderDraftSnapshot draft,
+        BuilderForestDomainResourceKind selectedKind)
+    {
+        var machineCount = draft.Vms.Count(vm =>
+            V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) ||
+            (string.IsNullOrWhiteSpace(vm.DomainId) && !vm.IsActiveDirectoryDomainController));
+        if (machineCount == 0)
+        {
+            return null;
+        }
+
+        return new TemplatesBuilderStandaloneContainerProjection(
+            TemplatesBuilderMachineProjector.StandaloneContainerNodeId,
+            "Standalone",
+            machineCount,
+            selectedKind == BuilderForestDomainResourceKind.Standalone);
     }
 
     private static IReadOnlyList<TemplatesBuilderDomainTopologyNodeProjection> BuildForestRoots(

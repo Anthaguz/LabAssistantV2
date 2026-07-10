@@ -56,6 +56,14 @@ internal static class BuilderTopologyCanvasLayout
             positions[forest.NodeId] = new BuilderCanvasNodePosition(forestCenterX - (nodeWidth / 2), marginY);
         }
 
+        // The Standalone container is a peer of the forests: give it the next free leaf column at the top row,
+        // so it sits to the right of every forest band without overlapping them.
+        if (projection.Standalone is { } standalone)
+        {
+            var centerX = NextLeafCenter();
+            positions[standalone.NodeId] = new BuilderCanvasNodePosition(centerX - (nodeWidth / 2), marginY);
+        }
+
         return positions;
     }
 }

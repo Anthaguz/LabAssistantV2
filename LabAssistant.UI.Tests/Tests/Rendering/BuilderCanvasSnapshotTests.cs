@@ -116,6 +116,19 @@ public sealed class BuilderCanvasSnapshotTests
             BuilderForestDomainResourceKind.Forest,
             0);
 
+        yield return (
+            "07-standalone-container",
+            "Standalone container (router + root CA) sits beside the contoso forest",
+            Draft(
+                [F("contoso", "d-contoso")],
+                [D("d-contoso", "contoso.lab", "CONTOSO", "contoso", V2DomainRelationKind.Root)],
+                [
+                    Vm("vm-router", "lab-router"),
+                    Vm("vm-rootca", "lab-rootca")
+                ]),
+            BuilderForestDomainResourceKind.Standalone,
+            0);
+
         // Phase 1 scenarios are driven through the REAL authoring engine so the pictures reflect exactly what
         // the add-forest / add-child / add-tree gestures produce (born-with-DC drafts, forest-name-follows-root).
         var empty = Draft([], []);
@@ -168,9 +181,18 @@ public sealed class BuilderCanvasSnapshotTests
         string parentDomainId = "")
         => new(domainId, dnsName, netbios, forestId, relation.ToString(), parentDomainId);
 
+    private static TemplatesBuilderVmDraft Vm(
+        string vmId,
+        string name,
+        string membershipMode = V2MembershipModeCatalog.Standalone,
+        string domainId = "",
+        bool isDomainController = false)
+        => new(vmId, name, "4096", "2", string.Empty, membershipMode, domainId, isDomainController, default, []);
+
     private static TemplatesBuilderDraftSnapshot Draft(
         IReadOnlyList<TemplatesBuilderForestDraft> forests,
-        IReadOnlyList<TemplatesBuilderDomainDraft> domains)
+        IReadOnlyList<TemplatesBuilderDomainDraft> domains,
+        IReadOnlyList<TemplatesBuilderVmDraft>? vms = null)
         => new(
             "Snapshot draft",
             "Draft for canvas snapshot rendering.",
@@ -179,6 +201,6 @@ public sealed class BuilderCanvasSnapshotTests
             [],
             forests,
             domains,
-            [],
+            vms ?? [],
             false);
 }

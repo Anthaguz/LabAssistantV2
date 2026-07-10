@@ -52,6 +52,8 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderNetworkSwitchIntent.cs" Link="WinUI\TemplatesBuilderNetworkSwitchIntent.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDirectoryTopologyProjection.cs" Link="WinUI\TemplatesBuilderDirectoryTopologyProjection.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderTopologyAuthoring.cs" Link="WinUI\TemplatesBuilderTopologyAuthoring.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineProjection.cs" Link="WinUI\TemplatesBuilderMachineProjection.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineAuthoring.cs" Link="WinUI\TemplatesBuilderMachineAuthoring.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftMapper.cs" Link="WinUI\TemplatesBuilderDraftMapper.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftValidator.cs" Link="WinUI\TemplatesBuilderDraftValidator.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleProjectionCatalog.cs" Link="WinUI\TemplatesBuilderRoleProjectionCatalog.cs" />
@@ -68,6 +70,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasEdgeViewModel.cs" Link="WinUI\BuilderCanvasEdgeViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyCanvasLayout.cs" Link="WinUI\BuilderTopologyCanvasLayout.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyCanvasViewModel.cs" Link="WinUI\BuilderTopologyCanvasViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderMachineCardViewModel.cs" Link="WinUI\BuilderMachineCardViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesBuilderViewModel.cs" Link="WinUI\TemplatesBuilderViewModel.cs" />
 
     <!-- Quick Deploy lane (runtime-independent view model, controller, host, and item models). -->

@@ -26,12 +26,19 @@ namespace LabAssistant.WinUI.Views.Templates;
 public sealed partial class TemplatesBuilderView : UserControl
 {
     private const double DragThreshold = 4;
+    private static readonly TimeSpan DoubleClickWindow = TimeSpan.FromMilliseconds(400);
 
     private BuilderCanvasNodeViewModel? _dragNode;
     private Point _dragStartPointer;
     private double _dragStartX;
     private double _dragStartY;
     private bool _dragMoved;
+
+    // Manual double-click detection: the node Border captures the pointer and marks its pointer events handled
+    // for dragging, which suppresses the framework Tapped/DoubleTapped gestures, so we recognize a double-click
+    // from two threshold-free releases on the same node within the window.
+    private BuilderCanvasNodeViewModel? _lastClickNode;
+    private DateTimeOffset _lastClickTime;
 
     public TemplatesBuilderViewModel ViewModel { get; }
 
@@ -95,13 +102,36 @@ public sealed partial class TemplatesBuilderView : UserControl
         _dragNode = null;
         _dragMoved = false;
 
-        // A press that never crossed the drag threshold is a selection, not a move.
+        // A press that never crossed the drag threshold is a click. Two clicks on the same node within the
+        // window zoom into its Level 2 machines (manage); a single click selects.
         if (!moved)
         {
-            node.SelectCommand?.Execute(null);
+            var now = DateTimeOffset.UtcNow;
+            var isDoubleClick = ReferenceEquals(node, _lastClickNode) && (now - _lastClickTime) <= DoubleClickWindow;
+            if (isDoubleClick && node.ManageMachinesCommand is not null)
+            {
+                _lastClickNode = null;
+                node.ManageMachinesCommand.Execute(null);
+            }
+            else
+            {
+                node.SelectCommand?.Execute(null);
+                _lastClickNode = node;
+                _lastClickTime = now;
+            }
         }
 
         e.Handled = true;
+    }
+
+    // A Level 2 machine card selects on tap; its delete button stops the pointer before this fires.
+    private void OnMachineCardTapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BuilderMachineCardViewModel card })
+        {
+            card.SelectCommand?.Execute(null);
+            e.Handled = true;
+        }
     }
 
     private void OnNodePointerEntered(object sender, PointerRoutedEventArgs e)

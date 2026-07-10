@@ -141,6 +141,26 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void BuilderDraftMapping_RoundTripsStandaloneMachineThroughLabTemplateWithoutLoss()
+    {
+        // A standalone machine (a workgroup box: router, root CA, ...) must survive the draft -> LabTemplate ->
+        // draft round-trip as a standalone with no domain, so Level 2 authoring never weakens the contract.
+        var draft = TemplatesBuilderMachineAuthoring.AddStandaloneComputer(NamedDraft()).Draft;
+        var standaloneName = draft.Vms[^1].Name;
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(draft, "template-standalone-round-trip", 1, "1.0.0", sourceFilePath: null);
+        Assert.NotNull(build.Document);
+
+        var mappedBack = TemplatesBuilderDraftMapper.FromTemplate(build.Document!.Template);
+
+        Assert.Equal(draft.Vms.Count, mappedBack.Vms.Count);
+        var standalone = mappedBack.Vms.Single(vm => vm.Name == standaloneName);
+        Assert.True(V2MembershipModeCatalog.IsStandalone(standalone.MembershipMode));
+        Assert.True(string.IsNullOrEmpty(standalone.DomainId));
+        Assert.False(standalone.IsActiveDirectoryDomainController);
+    }
+
+    [Fact]
     public async Task BuilderShowDocument_LoadsMappedVmsIntoDraftAtViewModelLevel()
     {
         var draft = NamedDraft();
@@ -348,6 +368,128 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         Assert.NotNull(forestName);
         Assert.True(forestName!.IsReadOnly);
         Assert.Equal(rootDnsName, forestName.Value);
+    }
+
+    [Fact]
+    public void AddStandaloneMachine_CreatesStandaloneVmAndZoomsIntoLevel2()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+        var before = viewModel.CaptureDraft();
+
+        viewModel.AddStandaloneMachineCommand.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        Assert.Equal(before.Vms.Count + 1, after.Vms.Count);
+        var added = after.Vms[^1];
+        Assert.True(V2MembershipModeCatalog.IsStandalone(added.MembershipMode));
+        Assert.Equal(string.Empty, added.DomainId);
+        Assert.False(added.IsActiveDirectoryDomainController);
+
+        // Adding a standalone machine zooms straight into the Standalone container's Level 2 list.
+        Assert.True(viewModel.IsMachineLevelVisible);
+        Assert.Equal("Standalone", viewModel.MachineLevelTitle);
+        Assert.True(viewModel.HasMachineCards);
+        Assert.Single(viewModel.MachineCards);
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+    }
+
+    [Fact]
+    public void ManageMachines_ZoomIntoDomain_ListsDomainControllerFirstThenMember()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        Assert.NotNull(domainNode.ManageMachinesCommand);
+        domainNode.ManageMachinesCommand!.Execute(null);
+
+        Assert.True(viewModel.IsMachineLevelVisible);
+        Assert.Equal("contoso.com", viewModel.MachineLevelTitle);
+        Assert.Equal(2, viewModel.MachineCards.Count);
+        // The directory anchor (domain controller) sorts first.
+        Assert.True(viewModel.MachineCards[0].IsDomainController);
+        Assert.False(viewModel.MachineCards[1].IsDomainController);
+    }
+
+    [Fact]
+    public void AddComputer_InDomain_AddsMemberServerAndSelectsItStayingValid()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        domainNode.ManageMachinesCommand!.Execute(null);
+        var before = viewModel.CaptureDraft();
+
+        viewModel.AddComputerCommand.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        Assert.Equal(before.Vms.Count + 1, after.Vms.Count);
+        var added = after.Vms[^1];
+        Assert.False(added.IsActiveDirectoryDomainController);
+        Assert.Equal("domain-contoso", added.DomainId);
+        Assert.True(V2MembershipModeCatalog.IsDomainMember(added.MembershipMode));
+
+        // The Level 2 list refreshes to include the new machine, selected.
+        Assert.Equal(3, viewModel.MachineCards.Count);
+        Assert.Contains(viewModel.MachineCards, card => card.VmIndex == after.Vms.Count - 1 && card.IsSelected);
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+    }
+
+    [Fact]
+    public void DeleteMachine_RemovesMemberButOnlyDomainControllerOffersNoDelete()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        domainNode.ManageMachinesCommand!.Execute(null);
+
+        // The lone domain controller cannot be deleted, so its card exposes no delete affordance.
+        var dcCard = viewModel.MachineCards.Single(card => card.IsDomainController);
+        Assert.False(dcCard.CanDelete);
+        Assert.Null(dcCard.DeleteCommand);
+
+        // A member server can be removed; the container drops to just the domain controller.
+        var memberCard = viewModel.MachineCards.Single(card => !card.IsDomainController);
+        Assert.True(memberCard.CanDelete);
+        memberCard.DeleteCommand!.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        Assert.DoesNotContain(after.Vms, vm => vm.VmId == "vm-member01");
+        Assert.Contains(after.Vms, vm => vm.IsActiveDirectoryDomainController && vm.DomainId == "domain-contoso");
+        Assert.Single(viewModel.MachineCards);
+        Assert.True(viewModel.MachineCards[0].IsDomainController);
+    }
+
+    [Fact]
+    public void BackToTopology_LeavesLevel2AndShowsStandaloneContainerAtLevel1()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+
+        viewModel.AddStandaloneMachineCommand.Execute(null);
+        Assert.True(viewModel.IsMachineLevelVisible);
+
+        viewModel.BackToTopologyCommand.Execute(null);
+        Assert.False(viewModel.IsMachineLevelVisible);
+
+        // The Standalone container is now present as a Level 1 node (it exists only once a standalone machine does).
+        Assert.Contains(viewModel.TopologyCanvas!.Nodes, node => node.IsStandalone);
+    }
+
+    private static void GoToForestsDomains(TemplatesBuilderViewModel viewModel)
+    {
+        // LoadNewDraft does not render; the first Next renders and advances to Networks, the second to Forests & Domains.
+        viewModel.NextStepCommand.Execute(null);
+        viewModel.NextStepCommand.Execute(null);
+        Assert.True(viewModel.IsForestsDomainsVisible);
     }
 
     private static BuilderFieldViewModel? FindForestDomainField(TemplatesBuilderViewModel viewModel, string header)
