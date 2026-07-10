@@ -21,8 +21,8 @@
                 X2="{x:Bind X2, Mode=OneWay}"
                 Y2="{x:Bind Y2, Mode=OneWay}"
                 IsHitTestVisible="False"
-                Stroke="{x:Bind IsForestRoot, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellTextSecondaryBrush|ShellBorderBrush}"
-                StrokeThickness="1.6" />
+                Stroke="{x:Bind IsForestRoot, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextSecondaryBrush}"
+                StrokeThickness="2" />
         </DataTemplate>
 
         <!-- Forest enclosing frame: a group box auto-sized around its member domain nodes, with a header pill
@@ -114,8 +114,9 @@
                 PointerExited="OnNodePointerExited"
                 PointerMoved="OnNodePointerMoved"
                 PointerPressed="OnNodePointerPressed"
-                PointerReleased="OnNodePointerReleased"
-                ToolTipService.ToolTip="{x:Bind Tooltip}">
+                PointerReleased="OnNodePointerReleased">
+                <!-- No body tooltip: the card already shows the name + relation, and a hover tooltip here
+                     overlapped the card and its affordances. Accessibility still reads AutomationProperties.Name. -->
                 <!-- Canvas position. The hosting ItemsControl wraps each node in a ContentPresenter that sits at
                      the Canvas origin; attached-property (Canvas.Left/Top) Style-setter bindings do not apply
                      reliably in WinUI, so every node otherwise piled at (0,0). Positioning the template root with
@@ -150,24 +151,41 @@
                             TextWrapping="NoWrap" />
                     </StackPanel>
 
-                    <!-- Delete affordance: revealed on hover; stops pointer bubbling so it never starts a drag/selection. -->
-                    <Button
+                    <!-- Top-right action cluster, revealed on hover: manage machines (zoom to Level 2) then delete.
+                         Kept on the right edge so it never overlaps the left-aligned name or intercepts a click on
+                         it; each button stops pointer bubbling so it never starts a drag/selection. Each button
+                         hides when its command is not offered (for example the Standalone box has no delete). -->
+                    <StackPanel
                         HorizontalAlignment="Right"
                         VerticalAlignment="Top"
                         Margin="0,-2,-4,0"
-                        Padding="4,0,4,0"
-                        MinWidth="20"
-                        MinHeight="20"
-                        Command="{x:Bind DeleteCommand}"
-                        Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets"
-                        FontSize="10"
-                        IsEnabled="{x:Bind CanDelete}"
-                        PointerPressed="OnNodeAffordancePointerPressed"
-                        ToolTipService.ToolTip="Delete"
-                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                        Orientation="Horizontal"
+                        Spacing="2">
+                        <Button
+                            Padding="4,0,4,0"
+                            MinWidth="20"
+                            MinHeight="20"
+                            Command="{x:Bind ManageMachinesCommand}"
+                            Content="&#xE740;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="10"
+                            PointerPressed="OnNodeAffordancePointerPressed"
+                            ToolTipService.ToolTip="Manage machines"
+                            Visibility="{x:Bind ShowManageMachinesAffordance, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                        <Button
+                            Padding="4,0,4,0"
+                            MinWidth="20"
+                            MinHeight="20"
+                            Command="{x:Bind DeleteCommand}"
+                            Content="&#xE711;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="10"
+                            PointerPressed="OnNodeAffordancePointerPressed"
+                            ToolTipService.ToolTip="Delete"
+                            Visibility="{x:Bind ShowDeleteAffordance, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
 
-                    <!-- Domain hover-+ (add child) affordance. -->
+                    <!-- Domain hover-+ (add child) affordance: bottom-right so it reads as "add a child below". -->
                     <Button
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
@@ -179,43 +197,9 @@
                         Content="&#xE710;"
                         FontFamily="Segoe MDL2 Assets"
                         FontSize="10"
-                        IsEnabled="{x:Bind CanAddChild}"
                         PointerPressed="OnNodeAffordancePointerPressed"
                         ToolTipService.ToolTip="Add child domain"
-                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-
-                    <!-- Forest +tree affordance. -->
-                    <Button
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Bottom"
-                        Margin="-4,0,0,-2"
-                        Padding="4,0,4,0"
-                        MinHeight="20"
-                        Command="{x:Bind AddTreeCommand}"
-                        Content="+ Tree"
-                        FontSize="10"
-                        IsEnabled="{x:Bind CanAddTree}"
-                        PointerPressed="OnNodeAffordancePointerPressed"
-                        ToolTipService.ToolTip="Add tree domain"
-                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-
-                    <!-- Manage-machines affordance: zoom into this container's Level 2 machine list (domains and the
-                         Standalone container). Offered on domains and Standalone; disabled on forests. -->
-                    <Button
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Margin="-4,-2,0,0"
-                        Padding="4,0,4,0"
-                        MinWidth="20"
-                        MinHeight="20"
-                        Command="{x:Bind ManageMachinesCommand}"
-                        Content="&#xE740;"
-                        FontFamily="Segoe MDL2 Assets"
-                        FontSize="10"
-                        IsEnabled="{x:Bind CanManageMachines}"
-                        PointerPressed="OnNodeAffordancePointerPressed"
-                        ToolTipService.ToolTip="Manage machines"
-                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                        Visibility="{x:Bind ShowAddChildAffordance, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
             </Border>
         </DataTemplate>

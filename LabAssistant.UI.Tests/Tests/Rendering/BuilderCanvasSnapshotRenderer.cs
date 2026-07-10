@@ -26,7 +26,7 @@ internal static class BuilderCanvasSnapshotRenderer
     private static readonly Color SubtextColor = Color.FromArgb(150, 166, 200);
     private static readonly Color MissingColor = Color.FromArgb(240, 120, 120);
     private static readonly Color FrameLabelColor = Color.FromArgb(190, 236, 210);
-    private static readonly Color DomainEdge = Color.FromArgb(84, 96, 128);
+    private static readonly Color DomainEdge = Color.FromArgb(203, 213, 225);
 
     public static void Render(BuilderTopologyCanvasViewModel canvas, string caption, string outputPath)
     {
@@ -81,7 +81,7 @@ internal static class BuilderCanvasSnapshotRenderer
     {
         foreach (var edge in canvas.Edges)
         {
-            using var pen = new Pen(DomainEdge, 1.6f);
+            using var pen = new Pen(DomainEdge, 2f);
             graphics.DrawLine(pen, (float)edge.X1, (float)edge.Y1, (float)edge.X2, (float)edge.Y2);
         }
     }

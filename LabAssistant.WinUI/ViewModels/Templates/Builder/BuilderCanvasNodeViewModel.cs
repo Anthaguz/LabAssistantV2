@@ -91,10 +91,13 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
 
     /// <summary>
     /// Presentation-only hover state: true while the pointer is over the node, revealing its affordance
-    /// buttons (hover-+, +tree, delete). Kept on the node so the reveal is per-node without view-tree scans;
-    /// it carries no draft meaning and is never persisted.
+    /// buttons (manage machines, add child, delete). Kept on the node so the reveal is per-node without
+    /// view-tree scans; it carries no draft meaning and is never persisted.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowManageMachinesAffordance))]
+    [NotifyPropertyChangedFor(nameof(ShowAddChildAffordance))]
+    [NotifyPropertyChangedFor(nameof(ShowDeleteAffordance))]
     private bool _affordancesRevealed;
 
     /// <summary>Null when the node cannot be selected (for example the unassigned-domains pseudo forest).</summary>
@@ -127,6 +130,15 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
 
     /// <summary>True when the manage-machines (zoom to Level 2) affordance should be offered.</summary>
     public bool CanManageMachines => ManageMachinesCommand is not null;
+
+    /// <summary>Hover-gated visibility for the manage-machines affordance (revealed only while hovered).</summary>
+    public bool ShowManageMachinesAffordance => AffordancesRevealed && CanManageMachines;
+
+    /// <summary>Hover-gated visibility for the add-child affordance (revealed only while hovered).</summary>
+    public bool ShowAddChildAffordance => AffordancesRevealed && CanAddChild;
+
+    /// <summary>Hover-gated visibility for the delete affordance (revealed only while hovered).</summary>
+    public bool ShowDeleteAffordance => AffordancesRevealed && CanDelete;
 
     public double CenterX => X + (Width / 2);
 
