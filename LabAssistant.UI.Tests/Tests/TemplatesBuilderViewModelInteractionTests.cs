@@ -208,6 +208,153 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         Assert.False(string.IsNullOrWhiteSpace(viewModel.VmDetailTitle));
     }
 
+    [Fact]
+    public void AddForest_BornWithRootDomainAndDomainControllerSelectingForest_StaysValid()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        var before = viewModel.CaptureDraft();
+
+        viewModel.AddForestCommand.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        Assert.Equal(before.Forests.Count + 1, after.Forests.Count);
+        Assert.Equal(before.Domains.Count + 1, after.Domains.Count);
+
+        // The new forest is born with its root domain's first domain controller, so the draft stays valid.
+        var newForest = after.Forests[^1];
+        var rootDomain = after.Domains.Single(domain => domain.DomainId == newForest.RootDomainId);
+        Assert.Contains(after.Vms, vm => vm.IsActiveDirectoryDomainController && vm.DomainId == rootDomain.DomainId);
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+
+        // Selection follows the new forest so its detail panel is what the user sees.
+        Assert.Equal("Selected Forest Detail", viewModel.ForestDomainDetailTitle);
+    }
+
+    [Fact]
+    public void AddTree_AddsTreeDomainWithBornDomainControllerToActiveForest()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        var before = viewModel.CaptureDraft();
+        var forestId = before.Forests[0].ForestId;
+
+        viewModel.AddTreeCommand.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        var tree = after.Domains[^1];
+        Assert.Equal(nameof(V2DomainRelationKind.Tree), tree.RelationKind);
+        Assert.Equal(forestId, tree.ForestId);
+        Assert.Equal(string.Empty, tree.ParentDomainId);
+        Assert.Contains(after.Vms, vm => vm.IsActiveDirectoryDomainController && vm.DomainId == tree.DomainId);
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+    }
+
+    [Fact]
+    public void CanvasAddChild_AddsChildDomainUnderHoveredDomainAndSelectsIt()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        viewModel.NextStepCommand.Execute(null); // force a render so the canvas is populated
+        var before = viewModel.CaptureDraft();
+
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        Assert.NotNull(domainNode.AddChildCommand);
+        domainNode.AddChildCommand!.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        Assert.Equal(before.Domains.Count + 1, after.Domains.Count);
+        var child = after.Domains[^1];
+        Assert.Equal(nameof(V2DomainRelationKind.Child), child.RelationKind);
+        Assert.Equal(before.Domains[0].DomainId, child.ParentDomainId);
+        Assert.Contains(after.Vms, vm => vm.IsActiveDirectoryDomainController && vm.DomainId == child.DomainId);
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+
+        // The freshly created child domain is selected.
+        Assert.Equal("Selected Domain Detail", viewModel.ForestDomainDetailTitle);
+    }
+
+    [Fact]
+    public void CanvasDelete_RemovesForestAndItsDomainsAndVms()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        viewModel.NextStepCommand.Execute(null);
+
+        var forestNode = viewModel.TopologyCanvas!.Nodes.First(node => node.IsForest);
+        Assert.NotNull(forestNode.DeleteCommand);
+        forestNode.DeleteCommand!.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        Assert.Empty(after.Forests);
+        Assert.Empty(after.Domains);
+        // Deleting the forest removes its domain-joined VMs (the whole forest is gone).
+        Assert.DoesNotContain(after.Vms, vm => vm.IsActiveDirectoryDomainController);
+    }
+
+    [Fact]
+    public void RootDomainRelation_IsRenderedReadOnlyAndLockedToRoot()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        viewModel.NextStepCommand.Execute(null);
+
+        var rootNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        rootNode.SelectCommand!.Execute(null);
+
+        var relation = FindForestDomainField(viewModel, "Relation");
+        Assert.NotNull(relation);
+        Assert.True(relation!.IsReadOnly);
+        Assert.Equal(nameof(V2DomainRelationKind.Root), relation.Value);
+    }
+
+    [Fact]
+    public void NonRootRelationEdit_ChildToTree_ClearsParentThroughEngine()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        viewModel.NextStepCommand.Execute(null);
+
+        // Create and select a child domain, then flip its relation to Tree via the detail combo.
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        domainNode.AddChildCommand!.Execute(null);
+        var childBefore = viewModel.CaptureDraft().Domains[^1];
+        Assert.Equal(nameof(V2DomainRelationKind.Child), childBefore.RelationKind);
+        Assert.False(string.IsNullOrEmpty(childBefore.ParentDomainId));
+
+        var relation = FindForestDomainField(viewModel, "Relation");
+        Assert.NotNull(relation);
+        Assert.False(relation!.IsReadOnly);
+        relation.Value = nameof(V2DomainRelationKind.Tree);
+
+        var childAfter = viewModel.CaptureDraft().Domains[^1];
+        Assert.Equal(nameof(V2DomainRelationKind.Tree), childAfter.RelationKind);
+        Assert.Equal(string.Empty, childAfter.ParentDomainId);
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+    }
+
+    [Fact]
+    public void ForestDetail_IsReadOnlyAndNameFollowsRootDomainDnsName()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        viewModel.NextStepCommand.Execute(null);
+
+        var forestNode = viewModel.TopologyCanvas!.Nodes.First(node => node.IsForest);
+        forestNode.SelectCommand!.Execute(null);
+
+        var rootDnsName = viewModel.CaptureDraft().Domains[0].DnsName;
+        var forestName = FindForestDomainField(viewModel, "Forest Name");
+        Assert.NotNull(forestName);
+        Assert.True(forestName!.IsReadOnly);
+        Assert.Equal(rootDnsName, forestName.Value);
+    }
+
+    private static BuilderFieldViewModel? FindForestDomainField(TemplatesBuilderViewModel viewModel, string header)
+        => viewModel.ForestDomainDetailRows
+            .SelectMany(row => row.Right is null ? new[] { row.Left } : new[] { row.Left, row.Right })
+            .FirstOrDefault(field => field is not null && field.Header == header);
+
     private static TemplatesBuilderViewModel CreateViewModel()
     {
         var viewModel = new TemplatesBuilderViewModel(new StubTemplatesCapabilityService());

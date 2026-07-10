@@ -366,10 +366,18 @@ internal static class TemplatesBuilderDraftValidator
             {
                 AddBlocker(issues, TemplatesBuilderValidationCategory.Domain, $"Domain '{Display(domain.DomainId)}' relation kind must be Root, Child, or Tree.", scopeKey);
             }
-            else if (relationKind != V2DomainRelationKind.Root &&
+            else if (relationKind == V2DomainRelationKind.Child &&
                      (string.IsNullOrWhiteSpace(domain.ParentDomainId) || !domainIds.Contains(domain.ParentDomainId.Trim())))
             {
+                // A child domain is a subdomain and must name an existing parent domain.
                 AddBlocker(issues, TemplatesBuilderValidationCategory.Domain, $"Domain '{Display(domain.DomainId)}' requires a valid parent domain reference.", scopeKey);
+            }
+            else if (relationKind == V2DomainRelationKind.Tree &&
+                     !string.IsNullOrWhiteSpace(domain.ParentDomainId) && !domainIds.Contains(domain.ParentDomainId.Trim()))
+            {
+                // A tree domain roots its own namespace and attaches to the forest via ForestId, so a parent is
+                // optional; but if one is carried it must still resolve to a real domain.
+                AddBlocker(issues, TemplatesBuilderValidationCategory.Domain, $"Domain '{Display(domain.DomainId)}' references an unknown parent domain '{domain.ParentDomainId}'.", scopeKey);
             }
         }
 

@@ -111,7 +111,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
     // Forests & Domains.
     [ObservableProperty] private bool _addForestEnabled;
-    [ObservableProperty] private bool _addDomainEnabled;
+    [ObservableProperty] private bool _addTreeEnabled;
     [ObservableProperty] private BuilderTopologyCanvasViewModel? _topologyCanvas;
     [ObservableProperty] private bool _hasTopologyForests;
     [ObservableProperty] private string _forestDomainDetailTitle = string.Empty;
@@ -285,25 +285,104 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private void AddForest()
     {
         var draft = CaptureWorkingDraft();
-        var forests = draft.Forests
-            .Append(new TemplatesBuilderForestDraft($"forest-{draft.Forests.Count + 1}", string.Empty))
-            .ToList();
-        _selectedForestDomainKind = BuilderForestDomainResourceKind.Forest;
-        _selectedForestDomainIndex = forests.Count - 1;
-        RenderAndNotify(draft with { Forests = forests, IsSaveConfirmed = false });
+        ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.AddForest(draft));
     }
 
     [RelayCommand]
-    private void AddDomain()
+    private void AddTree()
     {
         var draft = CaptureWorkingDraft();
-        var forestId = draft.Forests.FirstOrDefault().ForestId;
-        var domains = draft.Domains
-            .Append(new TemplatesBuilderDomainDraft($"domain-{draft.Domains.Count + 1}", "example.local", "EXAMPLE", forestId, nameof(V2DomainRelationKind.Root), string.Empty))
-            .ToList();
-        _selectedForestDomainKind = BuilderForestDomainResourceKind.Domain;
-        _selectedForestDomainIndex = domains.Count - 1;
-        RenderAndNotify(draft with { Domains = domains, IsSaveConfirmed = false });
+        var forestId = ResolveActiveForestId(draft);
+        if (string.IsNullOrWhiteSpace(forestId))
+        {
+            return;
+        }
+
+        ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.AddTree(draft, forestId));
+    }
+
+    // Canvas hover-+ affordance: add a child domain under the domain the pointer is over.
+    private void AddChildDomainAt(int domainIndex)
+    {
+        var draft = CaptureWorkingDraft();
+        if (domainIndex < 0 || domainIndex >= draft.Domains.Count)
+        {
+            return;
+        }
+
+        ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.AddChildDomain(draft, draft.Domains[domainIndex].DomainId));
+    }
+
+    // Canvas forest header +tree affordance: add a tree domain to the hovered forest.
+    private void AddTreeAt(int forestIndex)
+    {
+        var draft = CaptureWorkingDraft();
+        if (forestIndex < 0 || forestIndex >= draft.Forests.Count)
+        {
+            return;
+        }
+
+        ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.AddTree(draft, draft.Forests[forestIndex].ForestId));
+    }
+
+    // Canvas delete affordance: remove a forest (and its whole tree) or a domain subtree.
+    private void DeleteForestDomainAt(BuilderForestDomainResourceKind kind, int index)
+    {
+        var draft = CaptureWorkingDraft();
+        if (kind == BuilderForestDomainResourceKind.Forest)
+        {
+            if (index < 0 || index >= draft.Forests.Count)
+            {
+                return;
+            }
+
+            ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.DeleteForest(draft, draft.Forests[index].ForestId));
+            return;
+        }
+
+        if (index < 0 || index >= draft.Domains.Count)
+        {
+            return;
+        }
+
+        ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.DeleteDomain(draft, draft.Domains[index].DomainId));
+    }
+
+    // Prefers the currently-selected forest so toolbar "Add Tree" targets what the user is looking at; falls
+    // back to the forest owning the selected domain, then the first forest.
+    private string ResolveActiveForestId(TemplatesBuilderDraftSnapshot draft)
+    {
+        if (draft.Forests.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest &&
+            _selectedForestDomainIndex >= 0 &&
+            _selectedForestDomainIndex < draft.Forests.Count)
+        {
+            return draft.Forests[_selectedForestDomainIndex].ForestId;
+        }
+
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain &&
+            _selectedForestDomainIndex >= 0 &&
+            _selectedForestDomainIndex < draft.Domains.Count)
+        {
+            var owningForestId = draft.Domains[_selectedForestDomainIndex].ForestId;
+            if (draft.Forests.Any(forest => string.Equals(forest.ForestId, owningForestId, StringComparison.OrdinalIgnoreCase)))
+            {
+                return owningForestId;
+            }
+        }
+
+        return draft.Forests[0].ForestId;
+    }
+
+    private void ApplyTopologyResult(TopologyAuthoringResult result)
+    {
+        _selectedForestDomainKind = result.SelectedKind;
+        _selectedForestDomainIndex = result.SelectedIndex;
+        RenderAndNotify(result.Draft with { IsSaveConfirmed = false });
     }
 
     [RelayCommand]
@@ -606,6 +685,13 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             RenderNetworkDetail();
         }
 
+        // A relation change can coerce the relation and seed/clear the parent, so refresh the detail panel to
+        // reflect the engine's decision (mirrors the switch-selection re-render above).
+        if (Equals(field.FieldKey, TemplatesBuilderFieldKeys.DomainRelationKind))
+        {
+            RenderForestDomainDetail();
+        }
+
         RenderVmOverview();
         ApplyDraft(_draft);
         RenderReview();
@@ -733,32 +819,39 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
     private TemplatesBuilderDraftSnapshot UpdateSelectedForestOrDomain(TemplatesBuilderDraftSnapshot draft)
     {
-        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest &&
-            _selectedForestDomainIndex >= 0 &&
-            _selectedForestDomainIndex < draft.Forests.Count &&
-            FieldHas(_forestDomainFields, TemplatesBuilderFieldKeys.ForestId))
-        {
-            var forests = draft.Forests.ToList();
-            forests[_selectedForestDomainIndex] = new TemplatesBuilderForestDraft(
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.ForestId),
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.ForestRootDomainId));
-            return draft with { Forests = forests };
-        }
-
+        // Forests are non-editable: the forest name follows its root domain and its id/linkage are derived,
+        // so there are no writable forest fields to fold back here.
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain &&
             _selectedForestDomainIndex >= 0 &&
             _selectedForestDomainIndex < draft.Domains.Count &&
-            FieldHas(_forestDomainFields, TemplatesBuilderFieldKeys.DomainId))
+            FieldHas(_forestDomainFields, TemplatesBuilderFieldKeys.DomainDnsName))
         {
             var domains = draft.Domains.ToList();
-            domains[_selectedForestDomainIndex] = new TemplatesBuilderDomainDraft(
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainId),
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainDnsName),
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainNetBiosName),
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainForestId),
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainRelationKind),
-                FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainParentDomainId));
-            return draft with { Domains = domains };
+            var existing = domains[_selectedForestDomainIndex];
+
+            // Merge only the editable fields onto the existing record so the read-only identity/linkage
+            // fields (DomainId, ForestId, ParentDomainId) are never wiped by the write-back.
+            var merged = existing with
+            {
+                DnsName = FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainDnsName),
+                NetBiosName = FieldHas(_forestDomainFields, TemplatesBuilderFieldKeys.DomainNetBiosName)
+                    ? FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainNetBiosName)
+                    : existing.NetBiosName
+            };
+            domains[_selectedForestDomainIndex] = merged;
+            draft = draft with { Domains = domains };
+
+            // The relation field is only present for non-root domains and is limited to Tree/Child; route it
+            // through the authoring engine so one-root-per-forest and parent seeding/clearing stay invariant.
+            if (FieldHas(_forestDomainFields, TemplatesBuilderFieldKeys.DomainRelationKind))
+            {
+                draft = TemplatesBuilderTopologyAuthoring.ApplyDomainRelationEdit(
+                    draft,
+                    _selectedForestDomainIndex,
+                    FieldText(_forestDomainFields, TemplatesBuilderFieldKeys.DomainRelationKind));
+            }
+
+            return draft;
         }
 
         return draft;
@@ -1077,7 +1170,12 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         var projection = TemplatesBuilderDirectoryTopologyProjector.Project(_draft, _selectedForestDomainKind, _selectedForestDomainIndex);
         if (TopologyCanvas is null)
         {
-            TopologyCanvas = new BuilderTopologyCanvasViewModel(projection, OnTopologyCanvasSelect);
+            TopologyCanvas = new BuilderTopologyCanvasViewModel(
+                projection,
+                OnTopologyCanvasSelect,
+                AddChildDomainAt,
+                AddTreeAt,
+                DeleteForestDomainAt);
         }
         else
         {
@@ -1168,10 +1266,12 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count > 0)
         {
             var forest = _draft.Forests[_selectedForestDomainIndex];
+            var forestName = TemplatesBuilderTopologyAuthoring.ResolveForestName(_draft, forest);
             var fields = new List<BuilderFieldViewModel>
             {
-                Text(TemplatesBuilderFieldKeys.ForestId, "Forest ID", forest.ForestId),
-                Text(TemplatesBuilderFieldKeys.ForestRootDomainId, "Root Domain ID", forest.RootDomainId)
+                // The forest is named for its root domain and cannot be renamed here; both fields are derived.
+                ReadOnly("Forest Name", forestName),
+                ReadOnly("Root Domain ID", forest.RootDomainId)
             };
             _forestDomainFields = fields;
             ForestDomainDetailTitle = "Selected Forest Detail";
@@ -1184,15 +1284,29 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain && _draft.Domains.Count > 0)
         {
             var domain = _draft.Domains[_selectedForestDomainIndex];
+            var isRoot = TemplatesBuilderTopologyAuthoring.IsForestRoot(_draft, domain.DomainId);
             var fields = new List<BuilderFieldViewModel>
             {
-                Text(TemplatesBuilderFieldKeys.DomainId, "Domain ID", domain.DomainId),
+                ReadOnly("Domain ID", domain.DomainId),
                 Text(TemplatesBuilderFieldKeys.DomainDnsName, "DNS Name", domain.DnsName),
                 Text(TemplatesBuilderFieldKeys.DomainNetBiosName, "NetBIOS", domain.NetBiosName),
-                Text(TemplatesBuilderFieldKeys.DomainForestId, "Forest ID", domain.ForestId),
-                Combo(TemplatesBuilderFieldKeys.DomainRelationKind, "Relation", domain.RelationKind, selectFirstWhenMissing: true, nameof(V2DomainRelationKind.Root), nameof(V2DomainRelationKind.Child), nameof(V2DomainRelationKind.Tree)),
-                Text(TemplatesBuilderFieldKeys.DomainParentDomainId, "Parent Domain ID", domain.ParentDomainId)
+                ReadOnly("Forest ID", domain.ForestId)
             };
+
+            if (isRoot)
+            {
+                // The forest root is locked to Root: there can be exactly one root per forest, so the relation
+                // is shown read-only rather than as an editable choice.
+                fields.Add(ReadOnly("Relation", nameof(V2DomainRelationKind.Root)));
+            }
+            else
+            {
+                // A non-root domain may only ever be a Tree or a Child, never a second Root.
+                fields.Add(Combo(TemplatesBuilderFieldKeys.DomainRelationKind, "Relation", domain.RelationKind, selectFirstWhenMissing: true, nameof(V2DomainRelationKind.Tree), nameof(V2DomainRelationKind.Child)));
+            }
+
+            fields.Add(ReadOnly("Parent Domain ID", domain.ParentDomainId));
+
             _forestDomainFields = fields;
             ForestDomainDetailTitle = "Selected Domain Detail";
             ForestDomainDetailRows = PairRows(fields);
@@ -1356,7 +1470,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         AddNetworkEnabled = _canNavigate;
         AddCredentialEnabled = _canNavigate;
         AddForestEnabled = _canNavigate;
-        AddDomainEnabled = _canNavigate;
+        AddTreeEnabled = _canNavigate;
         AddVmEnabled = _canNavigate;
         BackToLibraryEnabled = !IsLoading;
 

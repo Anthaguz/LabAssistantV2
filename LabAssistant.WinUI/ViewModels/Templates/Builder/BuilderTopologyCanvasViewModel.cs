@@ -25,14 +25,23 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
     private const double MinCanvasHeight = 320;
 
     private readonly Action<BuilderForestDomainResourceKind, int> _onSelect;
+    private readonly Action<int>? _onAddChildDomain;
+    private readonly Action<int>? _onAddTree;
+    private readonly Action<BuilderForestDomainResourceKind, int>? _onDelete;
     private readonly Dictionary<string, BuilderCanvasNodePosition> _pinned = new(StringComparer.Ordinal);
     private Dictionary<string, BuilderCanvasNodeViewModel> _nodeLookup = new(StringComparer.Ordinal);
 
     internal BuilderTopologyCanvasViewModel(
         TemplatesBuilderDirectoryTopologyProjection projection,
-        Action<BuilderForestDomainResourceKind, int> onSelect)
+        Action<BuilderForestDomainResourceKind, int> onSelect,
+        Action<int>? onAddChildDomain = null,
+        Action<int>? onAddTree = null,
+        Action<BuilderForestDomainResourceKind, int>? onDelete = null)
     {
         _onSelect = onSelect;
+        _onAddChildDomain = onAddChildDomain;
+        _onAddTree = onAddTree;
+        _onDelete = onDelete;
         BuildFrom(projection);
     }
 
@@ -84,6 +93,14 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             var command = forest.CanSelect
                 ? new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Forest, forest.ForestIndex))
                 : null;
+            // Real forests offer +tree and delete; the unassigned-domains pseudo forest (CanSelect=false) offers neither.
+            var forestIndex = forest.ForestIndex;
+            var addTreeCommand = forest.CanSelect && _onAddTree is not null
+                ? new RelayCommand(() => _onAddTree(forestIndex))
+                : null;
+            var deleteForestCommand = forest.CanSelect && _onDelete is not null
+                ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Forest, forestIndex))
+                : null;
             var node = new BuilderCanvasNodeViewModel(
                 forest.NodeId,
                 isForest: true,
@@ -97,7 +114,10 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
                 NodeHeight,
                 position.X,
                 position.Y,
-                command);
+                command,
+                addChildCommand: null,
+                addTreeCommand: addTreeCommand,
+                deleteCommand: deleteForestCommand);
             nodes.Add(node);
             lookup[node.NodeId] = node;
 
@@ -146,6 +166,12 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         var position = ResolvePosition(domain.NodeId, autoLayout);
         var subtext = domain.HasMissingParent ? "Missing parent reference" : domain.RelationLabel;
         var domainIndex = domain.DomainIndex;
+        var addChildCommand = _onAddChildDomain is not null
+            ? new RelayCommand(() => _onAddChildDomain(domainIndex))
+            : null;
+        var deleteCommand = _onDelete is not null
+            ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Domain, domainIndex))
+            : null;
         var node = new BuilderCanvasNodeViewModel(
             domain.NodeId,
             isForest: false,
@@ -159,7 +185,10 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             NodeHeight,
             position.X,
             position.Y,
-            new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Domain, domainIndex)));
+            new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Domain, domainIndex)),
+            addChildCommand: addChildCommand,
+            addTreeCommand: null,
+            deleteCommand: deleteCommand);
         nodes.Add(node);
         lookup[node.NodeId] = node;
 

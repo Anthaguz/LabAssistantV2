@@ -103,4 +103,25 @@ public sealed partial class TemplatesBuilderView : UserControl
 
         e.Handled = true;
     }
+
+    private void OnNodePointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BuilderCanvasNodeViewModel node })
+        {
+            node.AffordancesRevealed = true;
+        }
+    }
+
+    private void OnNodePointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BuilderCanvasNodeViewModel node })
+        {
+            node.AffordancesRevealed = false;
+        }
+    }
+
+    // An affordance button (delete / add child / add tree) owns its own press: marking it handled here stops
+    // the event bubbling to the node Border, so clicking an affordance never starts a drag or a selection.
+    private void OnNodeAffordancePointerPressed(object sender, PointerRoutedEventArgs e)
+        => e.Handled = true;
 }

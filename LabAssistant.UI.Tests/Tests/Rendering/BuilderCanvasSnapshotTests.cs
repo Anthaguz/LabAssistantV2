@@ -115,6 +115,45 @@ public sealed class BuilderCanvasSnapshotTests
                 ]),
             BuilderForestDomainResourceKind.Forest,
             0);
+
+        // Phase 1 scenarios are driven through the REAL authoring engine so the pictures reflect exactly what
+        // the add-forest / add-child / add-tree gestures produce (born-with-DC drafts, forest-name-follows-root).
+        var empty = Draft([], []);
+
+        var addForest = TemplatesBuilderTopologyAuthoring.AddForest(empty);
+        yield return (
+            "p1-01-engine-add-forest",
+            "Phase 1 engine: AddForest -> forest label follows root domain DNS name",
+            addForest.Draft,
+            addForest.SelectedKind,
+            addForest.SelectedIndex);
+
+        var forestId = addForest.Draft.Forests[0].ForestId;
+        var rootDomainId = addForest.Draft.Forests[0].RootDomainId;
+
+        var addChild = TemplatesBuilderTopologyAuthoring.AddChildDomain(addForest.Draft, rootDomainId);
+        yield return (
+            "p1-02-engine-add-child",
+            "Phase 1 engine: AddChildDomain under root (child born with its own DC)",
+            addChild.Draft,
+            addChild.SelectedKind,
+            addChild.SelectedIndex);
+
+        var addTree = TemplatesBuilderTopologyAuthoring.AddTree(addForest.Draft, forestId);
+        yield return (
+            "p1-03-engine-add-tree",
+            "Phase 1 engine: AddTree in active forest (parentless top-level namespace)",
+            addTree.Draft,
+            addTree.SelectedKind,
+            addTree.SelectedIndex);
+
+        var secondForest = TemplatesBuilderTopologyAuthoring.AddForest(addForest.Draft);
+        yield return (
+            "p1-04-engine-two-forests",
+            "Phase 1 engine: two forests (contoso.lab + fabrikam.lab) each named after its root",
+            secondForest.Draft,
+            BuilderForestDomainResourceKind.Forest,
+            0);
     }
 
     private static TemplatesBuilderForestDraft F(string forestId, string rootDomainId)

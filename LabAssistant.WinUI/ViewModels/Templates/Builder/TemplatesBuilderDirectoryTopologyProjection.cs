@@ -75,7 +75,7 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
                 forestIndex,
                 forest.ForestId,
                 forest.RootDomainId,
-                FormatForestLabel(forest, forestIndex),
+                FormatForestLabel(forest, domains, forestIndex),
                 true,
                 selectedKind == BuilderForestDomainResourceKind.Forest && selectedIndex == forestIndex,
                 rootNodes));
@@ -230,8 +230,18 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
     private static string FormatStableSegment(string value, int index)
         => string.IsNullOrWhiteSpace(value) ? $"draft-{index}" : value.Trim();
 
-    private static string FormatForestLabel(TemplatesBuilderForestDraft forest, int index)
-        => string.IsNullOrWhiteSpace(forest.ForestId) ? $"Forest {index + 1}" : forest.ForestId.Trim();
+    private static string FormatForestLabel(
+        TemplatesBuilderForestDraft forest,
+        IReadOnlyList<IndexedDomain> domains,
+        int index)
+    {
+        // The forest name follows its root domain's DNS name (the forest is named for its root domain);
+        // ResolveForestName falls back to the forest id, then we fall back to an ordinal label.
+        var resolved = TemplatesBuilderTopologyAuthoring.ResolveForestName(
+            domains.Select(item => item.Domain).ToList(),
+            forest);
+        return string.IsNullOrWhiteSpace(resolved) ? $"Forest {index + 1}" : resolved;
+    }
 
     private static string FormatDomainLabel(TemplatesBuilderDomainDraft domain, int index)
         => !string.IsNullOrWhiteSpace(domain.DnsName)
