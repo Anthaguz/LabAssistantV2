@@ -57,6 +57,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftMapper.cs" Link="WinUI\TemplatesBuilderDraftMapper.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftValidator.cs" Link="WinUI\TemplatesBuilderDraftValidator.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleProjectionCatalog.cs" Link="WinUI\TemplatesBuilderRoleProjectionCatalog.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleAuthoring.cs" Link="WinUI\TemplatesBuilderRoleAuthoring.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderSectionProjections.cs" Link="WinUI\TemplatesBuilderSectionProjections.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkflowNavigation.cs" Link="WinUI\TemplatesBuilderWorkflowNavigation.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderValidationMerger.cs" Link="WinUI\TemplatesBuilderValidationMerger.cs" />

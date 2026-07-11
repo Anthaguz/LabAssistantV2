@@ -97,6 +97,15 @@ internal readonly record struct TemplatesBuilderVmDraft(
     /// <c>TopologyRole = "Router"</c> and is reconstructed from it on load.
     /// </summary>
     public bool IsRouter { get; init; }
+
+    /// <summary>
+    /// Non-structural Windows roles enabled on this VM (DNS, DHCP, File Server, ADCS, ...) by catalog key.
+    /// The structural directory role (domain controller / router) is NOT stored here: it stays on
+    /// <see cref="IsActiveDirectoryDomainController"/> / <see cref="IsRouter"/> and the persisted
+    /// <c>TopologyRole</c>, which the deploy pipeline depends on. Null or empty means none. This is additive
+    /// authoring state introduced with the Level 2 machine inspector; it does not affect the deploy pipeline.
+    /// </summary>
+    public IReadOnlyList<string>? AdditionalRoles { get; init; }
 }
 
 internal readonly record struct TemplatesBuilderNicDraft(
