@@ -107,6 +107,21 @@ public sealed class BuilderTopologyCanvasViewModelTests
     }
 
     [Fact]
+    public void DomainNode_SurfacesItsSwitchSubnetInTheSubtext()
+    {
+        var canvas = CreateCanvas(CreateSubnettedTopologyDraft(), out _);
+
+        var contoso = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-contoso");
+        // The domain's one auto-allocated switch subnet reads alongside its relation label.
+        Assert.Contains("Root domain", contoso.Subtext);
+        Assert.Contains("10.0.0.0/24", contoso.Subtext);
+
+        // A domain with no homed switch yet shows only the relation label, no trailing separator.
+        var tree = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-tree");
+        Assert.Equal("Tree root", tree.Subtext);
+    }
+
+    [Fact]
     public void MoveNode_UpdatesPositionAndClampsToTheOrigin()
     {
         var canvas = CreateCanvas(CreateTopologyDraft(), out _);
@@ -217,6 +232,27 @@ public sealed class BuilderTopologyCanvasViewModelTests
                 new TemplatesBuilderDomainDraft("domain-child", "child.contoso.com", "CHILD", "forest-contoso", nameof(V2DomainRelationKind.Child), "domain-contoso"),
                 new TemplatesBuilderDomainDraft("domain-tree", "tailspintoys.com", "TAILSPIN", "forest-contoso", nameof(V2DomainRelationKind.Tree), string.Empty),
                 new TemplatesBuilderDomainDraft("domain-fabrikam", "fabrikam.com", "FABRIKAM", "forest-fabrikam", nameof(V2DomainRelationKind.Root), string.Empty)
+            ],
+            [],
+            false);
+
+    private static TemplatesBuilderDraftSnapshot CreateSubnettedTopologyDraft()
+        => new(
+            "Topology draft",
+            "Draft for canvas subnet-label tests.",
+            "Balanced",
+            [
+                // Only the contoso root domain has a homed switch; the tree domain has none yet.
+                new TemplatesBuilderLabNetworkDraft("net-contoso", "LabNet", "LabNet", "Internal", "10.0.0.0/24", string.Empty)
+                {
+                    DomainId = "domain-contoso"
+                }
+            ],
+            [],
+            [new TemplatesBuilderForestDraft("forest-contoso", "domain-contoso")],
+            [
+                new TemplatesBuilderDomainDraft("domain-contoso", "contoso.com", "CONTOSO", "forest-contoso", nameof(V2DomainRelationKind.Root), string.Empty),
+                new TemplatesBuilderDomainDraft("domain-tree", "tailspintoys.com", "TAILSPIN", "forest-contoso", nameof(V2DomainRelationKind.Tree), string.Empty)
             ],
             [],
             false);

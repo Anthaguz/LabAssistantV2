@@ -39,7 +39,8 @@ internal readonly record struct TemplatesBuilderDomainTopologyNodeProjection(
     bool IsTreeRoot,
     bool HasMissingParent,
     bool IsSelected,
-    IReadOnlyList<TemplatesBuilderDomainTopologyNodeProjection> Children);
+    IReadOnlyList<TemplatesBuilderDomainTopologyNodeProjection> Children,
+    string Subnet);
 
 internal readonly record struct TemplatesBuilderTopologyEdgeProjection(
     string EdgeId,
@@ -56,6 +57,12 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
     {
         var forestProjections = new List<TemplatesBuilderForestTopologyProjection>(draft.Forests.Count);
         var edges = new List<TemplatesBuilderTopologyEdgeProjection>();
+        // Each domain owns exactly one switch under the one-switch-per-domain model; surface that switch's
+        // subnet on the domain node so the CIDR the reconciler auto-allocated is visible on the canvas.
+        var subnetByDomainId = draft.LabNetworks
+            .Where(network => !string.IsNullOrWhiteSpace(network.DomainId) && !string.IsNullOrWhiteSpace(network.Subnet))
+            .GroupBy(network => network.DomainId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().Subnet.Trim(), StringComparer.OrdinalIgnoreCase);
         var indexedDomains = draft.Domains
             .Select((domain, index) => new IndexedDomain(index, domain))
             .ToList();
@@ -73,7 +80,7 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
             var forestNodeId = CreateForestNodeId(forest, forestIndex);
             // The forest renders as an enclosing frame around its domain nodes, so it emits no forest->domain
             // edge; only the parent-child domain edges (added inside BuildForestRoots) connect the nodes.
-            var rootNodes = BuildForestRoots(forest, domains, selectedKind, selectedIndex, edges);
+            var rootNodes = BuildForestRoots(forest, domains, selectedKind, selectedIndex, edges, subnetByDomainId);
 
             forestProjections.Add(new TemplatesBuilderForestTopologyProjection(
                 forestNodeId,
@@ -93,7 +100,7 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
         {
             var unassignedForest = new TemplatesBuilderForestDraft("__unassigned__", string.Empty);
             var forestNodeId = "forest:unassigned-domains";
-            var rootNodes = BuildForestRoots(unassignedForest, unassignedDomains, selectedKind, selectedIndex, edges);
+            var rootNodes = BuildForestRoots(unassignedForest, unassignedDomains, selectedKind, selectedIndex, edges, subnetByDomainId);
 
             forestProjections.Add(new TemplatesBuilderForestTopologyProjection(
                 forestNodeId,
@@ -141,7 +148,8 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
         IReadOnlyList<IndexedDomain> domains,
         BuilderForestDomainResourceKind selectedKind,
         int selectedIndex,
-        List<TemplatesBuilderTopologyEdgeProjection> edges)
+        List<TemplatesBuilderTopologyEdgeProjection> edges,
+        IReadOnlyDictionary<string, string> subnetByDomainId)
     {
         var byParent = domains
             .Where(item => !string.IsNullOrWhiteSpace(item.Domain.ParentDomainId))
@@ -159,7 +167,7 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
             .ToList();
 
         return rootCandidates
-            .Select(item => BuildDomainNode(item, forest, byParent, domainIds, selectedKind, selectedIndex, edges, 0))
+            .Select(item => BuildDomainNode(item, forest, byParent, domainIds, selectedKind, selectedIndex, edges, subnetByDomainId, 0))
             .ToList();
     }
 
@@ -171,6 +179,7 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
         BuilderForestDomainResourceKind selectedKind,
         int selectedIndex,
         List<TemplatesBuilderTopologyEdgeProjection> edges,
+        IReadOnlyDictionary<string, string> subnetByDomainId,
         int depth)
     {
         var nodeId = CreateDomainNodeId(item.Domain, item.Index);
@@ -180,7 +189,7 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
         {
             foreach (var child in childDomains.OrderBy(child => child.Index))
             {
-                var childNode = BuildDomainNode(child, forest, byParent, domainIds, selectedKind, selectedIndex, edges, depth + 1);
+                var childNode = BuildDomainNode(child, forest, byParent, domainIds, selectedKind, selectedIndex, edges, subnetByDomainId, depth + 1);
                 edges.Add(new TemplatesBuilderTopologyEdgeProjection(
                     $"edge:{nodeId}->{childNode.NodeId}",
                     nodeId,
@@ -198,6 +207,11 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
             !string.IsNullOrWhiteSpace(item.Domain.ParentDomainId) &&
             !domainIds.Contains(item.Domain.ParentDomainId);
 
+        var subnet = !string.IsNullOrWhiteSpace(item.Domain.DomainId) &&
+            subnetByDomainId.TryGetValue(item.Domain.DomainId, out var domainSubnet)
+                ? domainSubnet
+                : string.Empty;
+
         return new TemplatesBuilderDomainTopologyNodeProjection(
             nodeId,
             item.Index,
@@ -209,7 +223,8 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
             isTreeRoot,
             hasMissingParent,
             selectedKind == BuilderForestDomainResourceKind.Domain && selectedIndex == item.Index,
-            children);
+            children,
+            subnet);
     }
 
     private static bool IsRootCandidate(

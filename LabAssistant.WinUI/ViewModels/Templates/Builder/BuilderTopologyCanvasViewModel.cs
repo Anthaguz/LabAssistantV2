@@ -217,7 +217,12 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         Dictionary<string, BuilderCanvasNodeViewModel> lookup)
     {
         var position = ResolvePosition(domain.NodeId, autoLayout);
-        var subtext = domain.HasMissingParent ? "Missing parent reference" : domain.RelationLabel;
+        var relationText = domain.HasMissingParent ? "Missing parent reference" : domain.RelationLabel;
+        // Surface the domain's auto-allocated switch subnet next to the relation so the CIDR is visible on the
+        // node without opening the machine list. The subnet is empty until the reconciler has homed the domain.
+        var subtext = string.IsNullOrWhiteSpace(domain.Subnet)
+            ? relationText
+            : $"{relationText} \u00b7 {domain.Subnet}";
         var domainIndex = domain.DomainIndex;
         var addChildCommand = _onAddChildDomain is not null
             ? new RelayCommand(() => _onAddChildDomain(domainIndex))
