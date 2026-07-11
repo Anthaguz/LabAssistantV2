@@ -1,4 +1,3 @@
-using System.Net;
 using LabAssistant.Models.Templates;
 
 namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
@@ -431,7 +430,7 @@ internal static class TemplatesBuilderDraftValidator
                 var networkKey = string.IsNullOrWhiteSpace(nic.NetworkId) ? "(unassigned)" : nic.NetworkId.Trim();
                 var scopeKey = networkKey;
 
-                if (!string.IsNullOrWhiteSpace(nic.IpAddress) && !TryParseIpv4(nic.IpAddress, out var address))
+                if (!string.IsNullOrWhiteSpace(nic.IpAddress) && !BuilderLabSubnet.TryParseAddress(nic.IpAddress, out _))
                 {
                     AddBlocker(issues, TemplatesBuilderValidationCategory.Network, $"VM '{Display(vm.Name)}' NIC '{Display(nic.NicId)}' IP address must be a valid IPv4 address.", scopeKey);
                     continue;
@@ -487,18 +486,18 @@ internal static class TemplatesBuilderDraftValidator
             return;
         }
 
-        if (!TryParseIpv4(nic.IpAddress, out var address))
+        if (!BuilderLabSubnet.TryParseAddress(nic.IpAddress, out var address))
         {
             return;
         }
 
-        if (!TryParseCidr(network.Subnet, out var networkAddress, out var prefixLength))
+        if (!BuilderLabSubnet.TryParseCidr(network.Subnet, out var subnet))
         {
             AddBlocker(issues, TemplatesBuilderValidationCategory.Network, $"Network '{Display(network.NetworkId)}' subnet must be valid IPv4 CIDR notation.", Scope(network.NetworkId));
             return;
         }
 
-        if (!IsInSubnet(address, networkAddress, prefixLength))
+        if (!subnet.Contains(address))
         {
             AddBlocker(issues, TemplatesBuilderValidationCategory.Network, $"VM '{Display(vm.Name)}' NIC '{Display(nic.NicId)}' IP address must fit network '{Display(network.NetworkId)}' subnet '{network.Subnet}'.", scopeKey);
         }
@@ -646,10 +645,6 @@ internal static class TemplatesBuilderDraftValidator
         return value.Trim().All(character => char.IsLetterOrDigit(character) || character is '-' or '_' or '.');
     }
 
-    private static bool TryParseIpv4(string value, out IPAddress address)
-        => IPAddress.TryParse(value.Trim(), out address!) &&
-           address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
-
     private static bool TryParseOptionalPrefix(string value, out int? prefix)
     {
         prefix = null;
@@ -665,39 +660,6 @@ internal static class TemplatesBuilderDraftValidator
 
         prefix = parsed;
         return true;
-    }
-
-    private static bool TryParseCidr(string value, out IPAddress networkAddress, out int prefixLength)
-    {
-        networkAddress = IPAddress.None;
-        prefixLength = 0;
-        var parts = value.Split('/', StringSplitOptions.TrimEntries);
-        if (parts.Length != 2 ||
-            !TryParseIpv4(parts[0], out networkAddress) ||
-            !int.TryParse(parts[1], out prefixLength) ||
-            prefixLength is < 0 or > 32)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool IsInSubnet(IPAddress address, IPAddress networkAddress, int prefixLength)
-    {
-        var addressValue = ToUInt32(address);
-        var networkValue = ToUInt32(networkAddress);
-        var mask = prefixLength == 0 ? 0u : uint.MaxValue << (32 - prefixLength);
-        return (addressValue & mask) == (networkValue & mask);
-    }
-
-    private static uint ToUInt32(IPAddress address)
-    {
-        var bytes = address.GetAddressBytes();
-        return ((uint)bytes[0] << 24) |
-               ((uint)bytes[1] << 16) |
-               ((uint)bytes[2] << 8) |
-               bytes[3];
     }
 
     private static string Display(string value)
