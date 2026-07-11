@@ -318,12 +318,38 @@ internal static class TemplatesBuilderDraftMapper
                 MembershipMode = membershipMode,
                 DomainId = V2MembershipModeCatalog.IsDomainMember(membershipMode) ? vm.DomainId.Trim() : null,
                 CredentialSlots = CreateCredentialSlots(vm.CredentialSlots),
+                RoleConfig = MapRoleConfig(vm),
                 Nics = nics.Count == 0 ? null : nics
             });
         }
 
         return vms;
     }
+
+    // Authored non-structural roles (DNS/DHCP/File/ADCS, plus any keys a future builder version does not yet
+    // recognize) persist through the implemented role guest step. The structural DC role is NOT stored here:
+    // it lives on TopologyRole so the deploy pipeline stays the single source of truth for topology intent.
+    private static RoleStepConfig? MapRoleConfig(TemplatesBuilderVmDraft vm)
+    {
+        var roles = NormalizeAdditionalRoles(vm.AdditionalRoles);
+        if (roles.Count == 0)
+        {
+            return null;
+        }
+
+        return new RoleStepConfig
+        {
+            Enabled = true,
+            Roles = roles
+        };
+    }
+
+    private static List<string> NormalizeAdditionalRoles(IEnumerable<string>? roles)
+        => (roles ?? Array.Empty<string>())
+            .Where(role => !string.IsNullOrWhiteSpace(role))
+            .Select(role => role.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private static string? ResolveTopologyRole(TemplatesBuilderVmDraft vm)
     {
@@ -471,9 +497,18 @@ internal static class TemplatesBuilderDraftMapper
                     vm.CredentialSlots?.ParentDomainAdmin ?? string.Empty),
                 CopyNics(vm.Nics))
             {
-                IsRouter = TemplatesBuilderRoleProjectionCatalog.IsRouterTopologyRole(vm.TopologyRole)
+                IsRouter = TemplatesBuilderRoleProjectionCatalog.IsRouterTopologyRole(vm.TopologyRole),
+                AdditionalRoles = CopyAdditionalRoles(vm.RoleConfig)
             })
             .ToList();
+
+    // Round-trips the persisted role guest step back into authoring state. Unknown keys are preserved so
+    // reopening a template authored by a newer builder (or hand-edited) never silently drops a role.
+    private static IReadOnlyList<string>? CopyAdditionalRoles(RoleStepConfig? roleConfig)
+    {
+        var roles = NormalizeAdditionalRoles(roleConfig?.Roles);
+        return roles.Count > 0 ? roles : null;
+    }
 
     private static IReadOnlyList<TemplatesBuilderNicDraft> CopyNics(IEnumerable<VmNetworkInterfaceTemplate>? nics)
         => nics?

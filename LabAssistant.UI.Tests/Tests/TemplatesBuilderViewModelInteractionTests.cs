@@ -161,6 +161,51 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void BuilderDraftMapping_RoundTripsAuthoredNonStructuralRoleThroughRoleConfig()
+    {
+        // Authoring a non-structural role (here DHCP on a member server) must survive the
+        // draft -> LabTemplate -> draft round-trip. The role persists through the implemented role guest
+        // step (RoleConfig), never the app-capability taxonomy, so the deploy contract stays honest.
+        var draft = NamedDraft();
+        var memberIndex = FirstNonDomainControllerIndex(draft);
+
+        var authored = TemplatesBuilderRoleAuthoring.SetAdditionalRole(
+            draft, memberIndex, TemplatesBuilderRoleProjectionCatalog.DhcpServerRoleKey, enabled: true).Draft;
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(authored, "template-roles", 1, "1.0.0", sourceFilePath: null);
+        Assert.NotNull(build.Document);
+
+        var vmName = authored.Vms[memberIndex].Name;
+        var templateVm = build.Document!.Template.VmTemplates.Single(vm => vm.Name == vmName);
+        Assert.True(templateVm.RoleConfig?.Enabled);
+        Assert.Contains(TemplatesBuilderRoleProjectionCatalog.DhcpServerRoleKey, templateVm.RoleConfig!.Roles!);
+
+        var mappedBack = TemplatesBuilderDraftMapper.FromTemplate(build.Document.Template);
+        var mappedVm = mappedBack.Vms.Single(vm => vm.Name == vmName);
+        Assert.Contains(TemplatesBuilderRoleProjectionCatalog.DhcpServerRoleKey, mappedVm.AdditionalRoles ?? []);
+    }
+
+    [Fact]
+    public void BuilderDraftMapping_PreservesUnknownAuthoredRoleKeysWithoutDropping()
+    {
+        // A template authored by a newer builder (or hand-edited) may carry role keys this build does not
+        // recognize. The mapper must round-trip them untouched so reopening never silently drops a role.
+        var draft = NamedDraft();
+        var memberIndex = FirstNonDomainControllerIndex(draft);
+        var vms = draft.Vms.ToList();
+        vms[memberIndex] = vms[memberIndex] with { AdditionalRoles = new[] { "future-mystery-role" } };
+        var seeded = draft with { Vms = vms };
+        var vmName = seeded.Vms[memberIndex].Name;
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(seeded, "template-unknown-roles", 1, "1.0.0", sourceFilePath: null);
+        Assert.NotNull(build.Document);
+
+        var mappedBack = TemplatesBuilderDraftMapper.FromTemplate(build.Document!.Template);
+        var mappedVm = mappedBack.Vms.Single(vm => vm.Name == vmName);
+        Assert.Contains("future-mystery-role", mappedVm.AdditionalRoles ?? []);
+    }
+
+    [Fact]
     public async Task BuilderShowDocument_LoadsMappedVmsIntoDraftAtViewModelLevel()
     {
         var draft = NamedDraft();
@@ -530,6 +575,19 @@ public sealed class TemplatesBuilderViewModelInteractionTests
             ]);
 
         return TemplatesBuilderDraftMapper.CreateSuggestedDraft(referenceData) with { TemplateName = "Interaction Lab" };
+    }
+
+    private static int FirstNonDomainControllerIndex(TemplatesBuilderDraftSnapshot draft)
+    {
+        for (var i = 0; i < draft.Vms.Count; i++)
+        {
+            if (!draft.Vms[i].IsActiveDirectoryDomainController)
+            {
+                return i;
+            }
+        }
+
+        return draft.Vms.Count - 1;
     }
 
     private sealed class StubTemplatesCapabilityService : ITemplatesCapabilityService
