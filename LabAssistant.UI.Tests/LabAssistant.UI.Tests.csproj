@@ -54,6 +54,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderTopologyAuthoring.cs" Link="WinUI\TemplatesBuilderTopologyAuthoring.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineProjection.cs" Link="WinUI\TemplatesBuilderMachineProjection.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineAuthoring.cs" Link="WinUI\TemplatesBuilderMachineAuthoring.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineBasicsAuthoring.cs" Link="WinUI\TemplatesBuilderMachineBasicsAuthoring.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftMapper.cs" Link="WinUI\TemplatesBuilderDraftMapper.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftValidator.cs" Link="WinUI\TemplatesBuilderDraftValidator.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleProjectionCatalog.cs" Link="WinUI\TemplatesBuilderRoleProjectionCatalog.cs" />
