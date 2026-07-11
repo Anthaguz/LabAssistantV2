@@ -301,15 +301,29 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         viewModel.LoadNewDraft(NamedDraft());
         viewModel.NextStepCommand.Execute(null);
 
-        var forestFrame = viewModel.TopologyCanvas!.Frames.First();
+        // A lab must keep at least one directory, so a forest is only deletable when another forest exists.
+        // Add a second forest, then delete the first and confirm its domains/VMs are gone while the other stays.
+        viewModel.AddForestCommand.Execute(null);
+        var before = viewModel.CaptureDraft();
+        Assert.Equal(2, before.Forests.Count);
+        var firstForestId = before.Forests[0].ForestId;
+        var survivingForestId = before.Forests[1].ForestId;
+        var removedDomainIds = before.Domains
+            .Where(domain => string.Equals(domain.ForestId, firstForestId, System.StringComparison.OrdinalIgnoreCase))
+            .Select(domain => domain.DomainId)
+            .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
+
+        var forestFrame = viewModel.TopologyCanvas!.Frames.First(frame => frame.FrameId == $"forest:{firstForestId}");
         Assert.NotNull(forestFrame.DeleteCommand);
         forestFrame.DeleteCommand!.Execute(null);
 
         var after = viewModel.CaptureDraft();
-        Assert.Empty(after.Forests);
-        Assert.Empty(after.Domains);
+        Assert.Single(after.Forests);
+        Assert.Contains(after.Forests, forest => forest.ForestId == survivingForestId);
+        Assert.DoesNotContain(after.Forests, forest => forest.ForestId == firstForestId);
+        Assert.DoesNotContain(after.Domains, domain => domain.ForestId == firstForestId);
         // Deleting the forest removes its domain-joined VMs (the whole forest is gone).
-        Assert.DoesNotContain(after.Vms, vm => vm.IsActiveDirectoryDomainController);
+        Assert.DoesNotContain(after.Vms, vm => vm.DomainId is not null && removedDomainIds.Contains(vm.DomainId));
     }
 
     [Fact]

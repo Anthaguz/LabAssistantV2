@@ -167,6 +167,13 @@ internal static class TemplatesBuilderTopologyAuthoring
             string.Equals(forest.RootDomainId, target.DomainId, StringComparison.OrdinalIgnoreCase));
         var deletingForestRoot = !string.IsNullOrWhiteSpace(owningForest.ForestId);
 
+        // A lab must keep at least one directory. Deleting the root of the only forest would remove every
+        // domain, which strips the required router and blanks the canvas with no way back, so it is a no-op.
+        if (deletingForestRoot && draft.Forests.Count <= 1)
+        {
+            return Unchanged(draft);
+        }
+
         HashSet<string> removedDomainIds;
         var remainingForests = draft.Forests.ToList();
 
@@ -218,6 +225,12 @@ internal static class TemplatesBuilderTopologyAuthoring
         var forest = draft.Forests.FirstOrDefault(item =>
             string.Equals(item.ForestId, forestId, StringComparison.OrdinalIgnoreCase));
         if (string.IsNullOrWhiteSpace(forest.ForestId))
+        {
+            return Unchanged(draft);
+        }
+
+        // A lab must keep at least one directory: refuse to delete the only forest (see DeleteDomain).
+        if (draft.Forests.Count <= 1)
         {
             return Unchanged(draft);
         }

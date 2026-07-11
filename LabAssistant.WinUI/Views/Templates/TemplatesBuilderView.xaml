@@ -105,8 +105,8 @@
                 Padding="10,6,10,6"
                 AutomationProperties.Name="{x:Bind Tooltip}"
                 Background="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellBackgroundBrush|ShellContentBackgroundBrush}"
-                BorderBrush="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
-                BorderThickness="{x:Bind IsAccent, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
+                BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
+                BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
                 CornerRadius="6"
                 PointerCanceled="OnNodePointerCaptureLost"
                 PointerCaptureLost="OnNodePointerCaptureLost"
@@ -125,19 +125,10 @@
                     <TranslateTransform X="{x:Bind X, Mode=OneWay}" Y="{x:Bind Y, Mode=OneWay}" />
                 </Border.RenderTransform>
                 <Grid>
-                    <!-- Standalone container cue: a gray dashed frame so it reads as "not a directory". -->
-                    <Rectangle
-                        RadiusX="6"
-                        RadiusY="6"
-                        IsHitTestVisible="False"
-                        Stroke="{StaticResource ShellTextSecondaryBrush}"
-                        StrokeDashArray="3,3"
-                        StrokeThickness="1.2"
-                        Visibility="{x:Bind IsStandalone, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel VerticalAlignment="Center" Spacing="2">
                         <TextBlock
-                            FontWeight="{x:Bind IsAccent, Converter={StaticResource BoolToFontWeight}}"
-                            Foreground="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
+                            FontWeight="{x:Bind IsRootDomain, Converter={StaticResource BoolToFontWeight}}"
+                            Foreground="{x:Bind IsRootDomain, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
                             MaxLines="1"
                             Text="{x:Bind Label}"
                             TextTrimming="CharacterEllipsis"

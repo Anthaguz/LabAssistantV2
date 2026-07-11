@@ -129,18 +129,52 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
     }
 
     [Fact]
-    public void DeleteDomain_ForestRoot_RemovesWholeForestAndAllItsDomainsAndVms()
+    public void DeleteDomain_ForestRootWhenAnotherForestExists_RemovesThatForestAndKeepsTheOther()
     {
+        // With more than one forest the root is deletable: deleting one forest's root removes that whole forest
+        // and its domains/VMs while the other forest survives.
+        var start = SuggestedDraft();
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(start).Draft;
+        var firstForestId = twoForests.Forests[0].ForestId;
+        var root = twoForests.Domains.First(domain =>
+            string.Equals(domain.ForestId, firstForestId, System.StringComparison.OrdinalIgnoreCase));
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(twoForests, root.DomainId);
+        var draft = result.Draft;
+
+        Assert.Single(draft.Forests);
+        Assert.DoesNotContain(draft.Forests, forest => forest.ForestId == firstForestId);
+        Assert.DoesNotContain(draft.Domains, domain => domain.ForestId == firstForestId);
+        Assert.DoesNotContain(draft.Vms, vm => vm.DomainId == root.DomainId);
+        AssertValid(draft);
+    }
+
+    [Fact]
+    public void DeleteDomain_SoleForestRoot_IsNoOpToKeepAtLeastOneDirectory()
+    {
+        // Deleting the root of the only forest would empty the entire topology (and strip the required router),
+        // blanking the canvas with no way back, so it is refused.
         var start = SuggestedDraft();
         var root = start.Domains[0];
 
         var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(start, root.DomainId);
-        var draft = result.Draft;
 
-        Assert.Empty(draft.Forests);
-        Assert.Empty(draft.Domains);
-        // Both suggested VMs belonged to the deleted forest's domain, so none may reference a removed domain.
-        Assert.DoesNotContain(draft.Vms, vm => vm.DomainId == root.DomainId);
+        Assert.Single(result.Draft.Forests);
+        Assert.Contains(result.Draft.Domains, domain => domain.DomainId == root.DomainId);
+        AssertValid(result.Draft);
+    }
+
+    [Fact]
+    public void DeleteForest_SoleForest_IsNoOpToKeepAtLeastOneDirectory()
+    {
+        var start = SuggestedDraft();
+        var forestId = start.Forests[0].ForestId;
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteForest(start, forestId);
+
+        Assert.Single(result.Draft.Forests);
+        Assert.Contains(result.Draft.Forests, forest => forest.ForestId == forestId);
+        AssertValid(result.Draft);
     }
 
     [Fact]

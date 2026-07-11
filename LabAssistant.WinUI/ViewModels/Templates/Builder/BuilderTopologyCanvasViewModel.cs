@@ -99,13 +99,20 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         var nodes = new List<BuilderCanvasNodeViewModel>();
         var lookup = new Dictionary<string, BuilderCanvasNodeViewModel>(StringComparer.Ordinal);
 
+        // A lab must always keep at least one directory: when only one real (selectable) forest remains, its
+        // root domain and the forest itself are not deletable - deleting them would cascade to zero domains,
+        // which strips the required router and leaves a blank canvas with no way back. Count only real forests
+        // (the unassigned-domains pseudo forest is CanSelect=false and never deletable anyway).
+        var realForestCount = projection.Forests.Count(forest => forest.CanSelect);
+        var protectLastForest = realForestCount <= 1;
+
         var frameGroups = new List<ForestFrameGroup>();
         foreach (var forest in projection.Forests)
         {
             // Domains are the nodes; add them first so the frame can be sized around their positions.
             foreach (var root in forest.RootNodes)
             {
-                AddDomainNode(root, autoLayout, nodes, lookup);
+                AddDomainNode(root, autoLayout, nodes, lookup, protectLastForest);
             }
 
             var memberNodeIds = new List<string>();
@@ -130,7 +137,7 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             var addTreeCommand = forest.CanSelect && _onAddTree is not null
                 ? new RelayCommand(() => _onAddTree(forestIndex))
                 : null;
-            var deleteForestCommand = forest.CanSelect && _onDelete is not null
+            var deleteForestCommand = forest.CanSelect && !protectLastForest && _onDelete is not null
                 ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Forest, forestIndex))
                 : null;
             var frame = new BuilderCanvasForestFrameViewModel(
@@ -214,7 +221,8 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         TemplatesBuilderDomainTopologyNodeProjection domain,
         IReadOnlyDictionary<string, BuilderCanvasNodePosition> autoLayout,
         List<BuilderCanvasNodeViewModel> nodes,
-        Dictionary<string, BuilderCanvasNodeViewModel> lookup)
+        Dictionary<string, BuilderCanvasNodeViewModel> lookup,
+        bool protectLastForest)
     {
         var position = ResolvePosition(domain.NodeId, autoLayout);
         var relationText = domain.HasMissingParent ? "Missing parent reference" : domain.RelationLabel;
@@ -227,7 +235,10 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         var addChildCommand = _onAddChildDomain is not null
             ? new RelayCommand(() => _onAddChildDomain(domainIndex))
             : null;
-        var deleteCommand = _onDelete is not null
+        // The root domain of the only remaining forest is not deletable (see protectLastForest in BuildFrom);
+        // deleting it would empty the whole topology and blank the canvas.
+        var canDelete = !(domain.IsRootDomain && protectLastForest);
+        var deleteCommand = canDelete && _onDelete is not null
             ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Domain, domainIndex))
             : null;
         var manageMachinesCommand = _onManageMachines is not null
@@ -251,13 +262,14 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             addTreeCommand: null,
             deleteCommand: deleteCommand,
             isStandalone: false,
-            manageMachinesCommand: manageMachinesCommand);
+            manageMachinesCommand: manageMachinesCommand,
+            isRootDomain: domain.IsRootDomain);
         nodes.Add(node);
         lookup[node.NodeId] = node;
 
         foreach (var child in domain.Children)
         {
-            AddDomainNode(child, autoLayout, nodes, lookup);
+            AddDomainNode(child, autoLayout, nodes, lookup, protectLastForest);
         }
     }
 

@@ -30,7 +30,8 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
         IRelayCommand? addTreeCommand = null,
         IRelayCommand? deleteCommand = null,
         bool isStandalone = false,
-        IRelayCommand? manageMachinesCommand = null)
+        IRelayCommand? manageMachinesCommand = null,
+        bool isRootDomain = false)
     {
         NodeId = nodeId;
         IsForest = isForest;
@@ -40,6 +41,7 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
         Tooltip = tooltip;
         IsSelected = isSelected;
         IsAccent = isAccent;
+        IsRootDomain = isRootDomain;
         HasMissingParent = hasMissingParent;
         Width = width;
         Height = height;
@@ -74,6 +76,13 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
 
     /// <summary>True for a selected node or a root domain; drives the accent border and emphasized label.</summary>
     public bool IsAccent { get; }
+
+    /// <summary>
+    /// True when this node is the root domain of its forest. Drives a persistent label emphasis (bold + accent
+    /// text) that is independent of selection, so the root reads as special without stealing the selection
+    /// outline - selection is shown by the border (<see cref="IsSelected"/>) alone to avoid two blue outlines.
+    /// </summary>
+    public bool IsRootDomain { get; }
 
     public bool HasMissingParent { get; }
 

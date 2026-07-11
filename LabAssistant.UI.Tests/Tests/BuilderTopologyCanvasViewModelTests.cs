@@ -191,6 +191,57 @@ public sealed class BuilderTopologyCanvasViewModelTests
         Assert.Equal(fabrikamBefore, fabrikamAfter, 6);
     }
 
+    [Fact]
+    public void Build_MarksOnlyRootDomainsAsRootForTheLabelEmphasis()
+    {
+        var canvas = CreateCanvas(CreateTopologyDraft(), out _);
+
+        Assert.True(Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-contoso").IsRootDomain);
+        Assert.True(Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-fabrikam").IsRootDomain);
+        Assert.False(Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-child").IsRootDomain);
+        Assert.False(Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-tree").IsRootDomain);
+    }
+
+    [Fact]
+    public void Build_WithMultipleForests_LetsEveryRootAndForestBeDeleted()
+    {
+        var canvas = CreateCanvasWithDeletes(CreateTopologyDraft());
+
+        // With two real forests, deleting either root (or forest) still leaves a directory, so both are offered.
+        Assert.True(Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-contoso").CanDelete);
+        Assert.True(Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-fabrikam").CanDelete);
+        Assert.True(Assert.Single(canvas.Frames, f => f.FrameId == "forest:forest-contoso").CanDelete);
+        Assert.True(Assert.Single(canvas.Frames, f => f.FrameId == "forest:forest-fabrikam").CanDelete);
+    }
+
+    [Fact]
+    public void Build_WithOnlyOneForest_ProtectsItsRootAndFrameFromDeletion()
+    {
+        var canvas = CreateCanvasWithDeletes(CreateSubnettedTopologyDraft());
+
+        // The sole forest must survive: deleting its root would empty the whole topology and blank the canvas,
+        // so the root domain and the forest frame expose no delete affordance.
+        var root = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-contoso");
+        Assert.True(root.IsRootDomain);
+        Assert.False(root.CanDelete);
+        Assert.Null(root.DeleteCommand);
+        Assert.False(Assert.Single(canvas.Frames, f => f.FrameId == "forest:forest-contoso").CanDelete);
+
+        // Non-root domains in that same forest stay deletable - only the root is protected.
+        Assert.True(Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-tree").CanDelete);
+    }
+
+    // Wires an onDelete callback so the built nodes/frames actually expose their delete affordance; the delete
+    // command is null when no callback is supplied, which is the wrong thing to assert deletability against.
+    private static BuilderTopologyCanvasViewModel CreateCanvasWithDeletes(TemplatesBuilderDraftSnapshot draft)
+    {
+        var projection = TemplatesBuilderDirectoryTopologyProjector.Project(draft, BuilderForestDomainResourceKind.Forest, selectedIndex: 0);
+        return new BuilderTopologyCanvasViewModel(
+            projection,
+            onSelect: (_, _) => { },
+            onDelete: (_, _) => { });
+    }
+
     private static BuilderTopologyCanvasViewModel CreateCanvas(
         TemplatesBuilderDraftSnapshot draft,
         out List<(BuilderForestDomainResourceKind Kind, int Index)> selections)

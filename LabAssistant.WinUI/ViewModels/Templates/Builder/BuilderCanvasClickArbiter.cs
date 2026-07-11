@@ -36,24 +36,31 @@ public sealed class BuilderCanvasClickArbiter
     }
 
     /// <summary>
-    /// Records a click on <paramref name="node"/> at <paramref name="now"/> and returns whether it resolves to
-    /// a select or a manage. A click on the same node within the window (measured from the previous click)
-    /// resolves to <see cref="ClickResult.Manage"/>; any other click resolves to <see cref="ClickResult.Select"/>.
-    /// After a manage the streak resets, so a third rapid click on the same node starts a fresh single click
-    /// rather than immediately managing again.
+    /// Records a click on the node identified by <paramref name="nodeKey"/> at <paramref name="now"/> and
+    /// returns whether it resolves to a select or a manage. A click on the same node within the window (measured
+    /// from the previous click) resolves to <see cref="ClickResult.Manage"/>; any other click resolves to
+    /// <see cref="ClickResult.Select"/>. After a manage the streak resets, so a third rapid click on the same
+    /// node starts a fresh single click rather than immediately managing again.
     /// </summary>
-    public ClickResult Register(object node, DateTimeOffset now)
+    /// <remarks>
+    /// Identity is compared by value (<see cref="object.Equals(object, object)"/>), not by reference, so callers
+    /// must pass a STABLE key that survives a canvas rebuild - a single click selects the node, which rebuilds
+    /// the canvas and replaces every node view model instance, so the second click never shares the first's
+    /// object reference. Passing the node's stable id (a string) keeps double-click recognition working across
+    /// that rebuild.
+    /// </remarks>
+    public ClickResult Register(object nodeKey, DateTimeOffset now)
     {
-        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(nodeKey);
 
-        var isDoubleClick = ReferenceEquals(node, _lastClickNode) && (now - _lastClickTime) <= _doubleClickWindow;
+        var isDoubleClick = Equals(nodeKey, _lastClickNode) && (now - _lastClickTime) <= _doubleClickWindow;
         if (isDoubleClick)
         {
             _lastClickNode = null;
             return ClickResult.Manage;
         }
 
-        _lastClickNode = node;
+        _lastClickNode = nodeKey;
         _lastClickTime = now;
         return ClickResult.Select;
     }

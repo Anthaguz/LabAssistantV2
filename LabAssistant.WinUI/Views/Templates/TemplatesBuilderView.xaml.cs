@@ -108,10 +108,12 @@ public sealed partial class TemplatesBuilderView : UserControl
         }
 
         // A press that never crossed the drag threshold is a click. Two clicks on the same node within the
-        // window zoom into its Level 2 machines (manage); a single click selects.
+        // window zoom into its Level 2 machines (manage); a single click selects. The arbiter is keyed on the
+        // stable NodeId, not the node instance: a select rebuilds the canvas and replaces every node view model,
+        // so the second click sees a different object and would never match by reference.
         if (!moved)
         {
-            var result = _clickArbiter.Register(node, DateTimeOffset.UtcNow);
+            var result = _clickArbiter.Register(node.NodeId, DateTimeOffset.UtcNow);
             if (result == BuilderCanvasClickArbiter.ClickResult.Manage && node.ManageMachinesCommand is not null)
             {
                 node.ManageMachinesCommand.Execute(null);

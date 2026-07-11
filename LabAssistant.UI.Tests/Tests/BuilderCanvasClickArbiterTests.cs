@@ -55,6 +55,22 @@ public sealed class BuilderCanvasClickArbiterTests
     }
 
     [Fact]
+    public void TwoClicksWithEqualButDistinctKeys_SelectThenManage()
+    {
+        // The view keys the arbiter on the node's stable id, not the node instance: selecting a node rebuilds
+        // the canvas and replaces every node view model, so the second click carries a different string object
+        // that is Equal-but-not-ReferenceEqual to the first. Value equality must still recognize the pair as a
+        // double click, otherwise double-click-to-manage never fires after the first click rebuilds the canvas.
+        var arbiter = new BuilderCanvasClickArbiter(Window);
+        var firstKey = new string("domain-1".ToCharArray());
+        var secondKey = new string("domain-1".ToCharArray());
+
+        Assert.False(ReferenceEquals(firstKey, secondKey));
+        Assert.Equal(BuilderCanvasClickArbiter.ClickResult.Select, arbiter.Register(firstKey, At(0)));
+        Assert.Equal(BuilderCanvasClickArbiter.ClickResult.Manage, arbiter.Register(secondKey, At(200)));
+    }
+
+    [Fact]
     public void ThirdRapidClickAfterManage_StartsFreshSingleClick()
     {
         var arbiter = new BuilderCanvasClickArbiter(Window);
