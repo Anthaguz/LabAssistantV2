@@ -36,9 +36,9 @@ public sealed partial class TemplatesBuilderView : UserControl
 
     // Manual double-click detection: the node Border captures the pointer and marks its pointer events handled
     // for dragging, which suppresses the framework Tapped/DoubleTapped gestures, so we recognize a double-click
-    // from two threshold-free releases on the same node within the window.
-    private BuilderCanvasNodeViewModel? _lastClickNode;
-    private DateTimeOffset _lastClickTime;
+    // from two threshold-free releases on the same node within the window. The select-vs-manage timing decision
+    // lives in a pure, unit-tested arbiter; the view only owns the pointer plumbing around it.
+    private readonly BuilderCanvasClickArbiter _clickArbiter = new(DoubleClickWindow);
 
     public TemplatesBuilderViewModel ViewModel { get; }
 
@@ -92,36 +92,46 @@ public sealed partial class TemplatesBuilderView : UserControl
             return;
         }
 
+        // Snapshot and clear the drag state BEFORE releasing capture. ReleasePointerCapture synchronously
+        // re-raises PointerCaptureLost; if _dragNode were still set, that re-entrant handler would run the
+        // click-detection path a second time and a single physical click would be miscounted as a double-click
+        // (zooming into the machine list instead of selecting the domain). Clearing first makes the re-entrant
+        // PointerCaptureLost a no-op, so a click is recognized exactly once here.
         var node = _dragNode;
         var moved = _dragMoved;
+        _dragNode = null;
+        _dragMoved = false;
+
         if (sender is FrameworkElement element)
         {
             element.ReleasePointerCapture(e.Pointer);
         }
 
-        _dragNode = null;
-        _dragMoved = false;
-
         // A press that never crossed the drag threshold is a click. Two clicks on the same node within the
         // window zoom into its Level 2 machines (manage); a single click selects.
         if (!moved)
         {
-            var now = DateTimeOffset.UtcNow;
-            var isDoubleClick = ReferenceEquals(node, _lastClickNode) && (now - _lastClickTime) <= DoubleClickWindow;
-            if (isDoubleClick && node.ManageMachinesCommand is not null)
+            var result = _clickArbiter.Register(node, DateTimeOffset.UtcNow);
+            if (result == BuilderCanvasClickArbiter.ClickResult.Manage && node.ManageMachinesCommand is not null)
             {
-                _lastClickNode = null;
                 node.ManageMachinesCommand.Execute(null);
             }
             else
             {
                 node.SelectCommand?.Execute(null);
-                _lastClickNode = node;
-                _lastClickTime = now;
             }
         }
 
         e.Handled = true;
+    }
+
+    // Drag-state cleanup for pointer capture loss / cancellation. Deliberately does NOT run click detection:
+    // ReleasePointerCapture inside OnNodePointerReleased re-raises PointerCaptureLost re-entrantly, and a click
+    // is already recognized there. Running detection here too would double-count a single click as a zoom.
+    private void OnNodePointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        _dragNode = null;
+        _dragMoved = false;
     }
 
     // A Level 2 machine card selects on tap; its delete button stops the pointer before this fires.

@@ -68,6 +68,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasGeometry.cs" Link="WinUI\BuilderCanvasGeometry.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasMetrics.cs" Link="WinUI\BuilderCanvasMetrics.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasNodeViewModel.cs" Link="WinUI\BuilderCanvasNodeViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasClickArbiter.cs" Link="WinUI\BuilderCanvasClickArbiter.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasForestFrameViewModel.cs" Link="WinUI\BuilderCanvasForestFrameViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasEdgeViewModel.cs" Link="WinUI\BuilderCanvasEdgeViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyCanvasLayout.cs" Link="WinUI\BuilderTopologyCanvasLayout.cs" />
