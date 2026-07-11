@@ -291,12 +291,24 @@ internal static class TemplatesBuilderTopologyAuthoring
             requested = V2DomainRelationKind.Tree;
         }
 
+        // Becoming a Child needs a valid parent. On a well-formed draft the forest root always qualifies, but a
+        // malformed/orphan domain (its forest or root is missing) has none - coerce it to Tree rather than emit a
+        // Child with an empty parent, honoring the invariant that this method never lands the draft in an invalid
+        // relation state.
+        var resolvedParent = requested == V2DomainRelationKind.Child
+            ? ResolveChildParent(draft, existing)
+            : string.Empty;
+        if (requested == V2DomainRelationKind.Child && string.IsNullOrWhiteSpace(resolvedParent))
+        {
+            requested = V2DomainRelationKind.Tree;
+        }
+
         var updated = requested == V2DomainRelationKind.Tree
             ? existing with { RelationKind = nameof(V2DomainRelationKind.Tree), ParentDomainId = string.Empty }
             : existing with
             {
                 RelationKind = nameof(V2DomainRelationKind.Child),
-                ParentDomainId = ResolveChildParent(draft, existing)
+                ParentDomainId = resolvedParent
             };
 
         return ReplaceDomain(draft, domainIndex, updated);

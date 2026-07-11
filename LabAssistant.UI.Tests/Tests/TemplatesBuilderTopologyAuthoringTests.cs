@@ -250,6 +250,22 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
     }
 
     [Fact]
+    public void ApplyDomainRelationEdit_OrphanDomainRequestingChild_CoercesToTreeInsteadOfEmptyParent()
+    {
+        // A malformed/orphan domain (its forest and root are absent) has no valid parent to become a Child of.
+        // The edit must never produce a Child with an empty parent; it coerces to Tree instead.
+        var orphan = new TemplatesBuilderDomainDraft(
+            "domain-orphan", "orphan.lab", "ORPHAN", "forest-missing", nameof(V2DomainRelationKind.Tree), string.Empty);
+        var draft = new TemplatesBuilderDraftSnapshot(
+            "Orphan draft", string.Empty, "Balanced", [], [], [], [orphan], [], false);
+
+        var updated = TemplatesBuilderTopologyAuthoring.ApplyDomainRelationEdit(draft, 0, nameof(V2DomainRelationKind.Child));
+
+        Assert.Equal(nameof(V2DomainRelationKind.Tree), updated.Domains[0].RelationKind);
+        Assert.Equal(string.Empty, updated.Domains[0].ParentDomainId);
+    }
+
+    [Fact]
     public void ResolveForestName_DerivesFromRootDomainDnsNameAndFollowsRename()
     {
         var start = SuggestedDraft();
