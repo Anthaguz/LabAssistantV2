@@ -387,11 +387,13 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         Assert.Equal(string.Empty, added.DomainId);
         Assert.False(added.IsActiveDirectoryDomainController);
 
-        // Adding a standalone machine zooms straight into the Standalone container's Level 2 list.
+        // Adding a standalone machine zooms straight into the Standalone container's Level 2 list, which now also
+        // lists the auto-created required router (itself a standalone VM), so both cards are present.
         Assert.True(viewModel.IsMachineLevelVisible);
         Assert.Equal("Standalone", viewModel.MachineLevelTitle);
         Assert.True(viewModel.HasMachineCards);
-        Assert.Single(viewModel.MachineCards);
+        Assert.Equal(2, viewModel.MachineCards.Count);
+        Assert.Contains(after.Vms, vm => vm.IsRouter);
         Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
     }
 

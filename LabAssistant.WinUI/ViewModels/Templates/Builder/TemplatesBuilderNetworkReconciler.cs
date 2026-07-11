@@ -213,16 +213,22 @@ internal static class TemplatesBuilderNetworkReconciler
         }
         else
         {
+            // The router runs the same base OS as the rest of the lab, so seed its disk and local-bootstrap slot
+            // from an existing VM. The user can override both in the detail panel; a later reconcile preserves them.
+            var donor = withoutRouter.FirstOrDefault(vm => !string.IsNullOrWhiteSpace(vm.VhdxId));
+            var localSlot = withoutRouter
+                .Select(vm => vm.CredentialSlots.LocalBootstrap)
+                .FirstOrDefault(slot => !string.IsNullOrWhiteSpace(slot)) ?? string.Empty;
             router = new TemplatesBuilderVmDraft(
                 VmId: RouterVmId,
                 Name: RouterVmName,
                 MemoryMb: "2048",
                 CpuCount: "2",
-                VhdxId: string.Empty,
+                VhdxId: donor.VhdxId ?? string.Empty,
                 MembershipMode: V2MembershipModeCatalog.Standalone,
                 DomainId: string.Empty,
                 IsActiveDirectoryDomainController: false,
-                CredentialSlots: new TemplatesBuilderVmCredentialSlotDraft(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty),
+                CredentialSlots: new TemplatesBuilderVmCredentialSlotDraft(localSlot, string.Empty, string.Empty, string.Empty, string.Empty),
                 Nics: routerNics)
             {
                 IsRouter = true

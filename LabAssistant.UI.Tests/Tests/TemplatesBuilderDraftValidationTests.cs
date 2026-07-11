@@ -344,14 +344,63 @@ public sealed class TemplatesBuilderDraftValidationTests
 
     private static TemplatesBuilderDraftSnapshot CreateBuilderDraft()
     {
-        var referenceData = new TemplatesBuilderReferenceData(
-            ["vSwitch-Core"],
+        // A raw (pre-reconcile) two-VM draft so these validator / scoped-refresh tests keep addressing the DC at
+        // Vms[0] and the member at Vms[1]. The network reconciler is exercised by its own dedicated tests and by
+        // the ViewModel interaction tests; wiring it in here would inject the auto-created router and reorder VMs,
+        // which is orthogonal to what this suite verifies.
+        return new TemplatesBuilderDraftSnapshot(
+            TemplateName: "V2 Topology Template",
+            TemplateDescription: "Topology-first V2 template draft.",
+            DeploymentProfile: "Balanced",
+            LabNetworks:
             [
-                new TemplateVhdxCatalogOption("disk-dc", @"C:\base\disk-dc.vhdx", "Windows Server", "2022", 2, "sig-dc"),
-                new TemplateVhdxCatalogOption("disk-member", @"C:\base\disk-member.vhdx", "Windows Server", "2022", 2, "sig-member")
-            ]);
-
-        return TemplatesBuilderDraftMapper.CreateSuggestedDraft(referenceData);
+                new TemplatesBuilderLabNetworkDraft("lab-core", "Core", "vSwitch-Core", string.Empty, "10.0.0.0/24", "Core lab network")
+            ],
+            CredentialSlots:
+            [
+                new TemplatesBuilderCredentialSlotDraft("slot-local", "Local bootstrap", "local bootstrap"),
+                new TemplatesBuilderCredentialSlotDraft("slot-admin", "Domain admin", "domain administration"),
+                new TemplatesBuilderCredentialSlotDraft("slot-join", "Domain join", "domain join"),
+                new TemplatesBuilderCredentialSlotDraft("slot-dsrm", "DSRM", "domain controller recovery")
+            ],
+            Forests:
+            [
+                new TemplatesBuilderForestDraft("forest-contoso", "domain-contoso")
+            ],
+            Domains:
+            [
+                new TemplatesBuilderDomainDraft("domain-contoso", "contoso.com", "CONTOSO", "forest-contoso", nameof(V2DomainRelationKind.Root), string.Empty)
+            ],
+            Vms:
+            [
+                new TemplatesBuilderVmDraft(
+                    "vm-dc01",
+                    "dc01",
+                    "4096",
+                    "2",
+                    "disk-dc",
+                    V2MembershipModeCatalog.DomainMember,
+                    "domain-contoso",
+                    IsActiveDirectoryDomainController: true,
+                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", string.Empty, "slot-dsrm", string.Empty),
+                    [
+                        new TemplatesBuilderNicDraft("nic-dc", "Domain", "lab-core", string.Empty, "10.0.0.10", "24", "10.0.0.1", ["10.0.0.10"])
+                    ]),
+                new TemplatesBuilderVmDraft(
+                    "vm-member01",
+                    "member01",
+                    "4096",
+                    "2",
+                    "disk-member",
+                    V2MembershipModeCatalog.DomainMember,
+                    "domain-contoso",
+                    IsActiveDirectoryDomainController: false,
+                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", "slot-join", string.Empty, string.Empty),
+                    [
+                        new TemplatesBuilderNicDraft("nic-member", "Domain", "lab-core", string.Empty, "10.0.0.20", "24", "10.0.0.1", ["10.0.0.10"])
+                    ])
+            ],
+            IsSaveConfirmed: false);
     }
 
     private sealed class RecordingTemplatesCapabilityService : ITemplatesCapabilityService

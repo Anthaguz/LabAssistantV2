@@ -187,6 +187,21 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
     }
 
     [Fact]
+    public void CreatedRouter_InheritsDiskAndLocalBootstrapFromAnExistingVm()
+    {
+        var dc = Dc("dc", "d1") with
+        {
+            VhdxId = "base-ws2022",
+            CredentialSlots = new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", string.Empty, "slot-dsrm", string.Empty)
+        };
+        var draft = Reconcile(DraftWith(domains: [Domain("d1", "contoso.lab", "CONTOSO")], vms: [dc]));
+
+        var router = draft.Vms.Single(vm => vm.IsRouter);
+        Assert.Equal("base-ws2022", router.VhdxId);
+        Assert.Equal("slot-local", router.CredentialSlots.LocalBootstrap);
+    }
+
+    [Fact]
     public void NoDomainsAndNoStandalone_ProducesNoNetworksAndNoRouter()
     {
         var draft = Reconcile(DraftWith(domains: [], vms: []));

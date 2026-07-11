@@ -909,6 +909,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
     private void RenderAndNotify(TemplatesBuilderDraftSnapshot draft)
     {
+        // Structural authoring (add/remove a domain or a machine) all funnels through here, so this is the single
+        // point where the network layout is reconciled back to the one-switch-per-domain + required-router model.
+        // It is idempotent and preserves valid user-set addresses, so it is safe to run on every render.
+        draft = TemplatesBuilderNetworkReconciler.Reconcile(draft);
         _isApplyingDraft = true;
         try
         {

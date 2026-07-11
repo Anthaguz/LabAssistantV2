@@ -15,7 +15,7 @@ internal static class TemplatesBuilderDraftMapper
         var dcDisk = vhdxCatalogOptions.FirstOrDefault()?.Id ?? string.Empty;
         var memberDisk = vhdxCatalogOptions.Skip(1).FirstOrDefault()?.Id ?? dcDisk;
 
-        return new TemplatesBuilderDraftSnapshot(
+        return TemplatesBuilderNetworkReconciler.Reconcile(new TemplatesBuilderDraftSnapshot(
             TemplateName: "V2 Topology Template",
             TemplateDescription: "Topology-first V2 template draft.",
             DeploymentProfile: "Balanced",
@@ -67,14 +67,14 @@ internal static class TemplatesBuilderDraftMapper
                         new TemplatesBuilderNicDraft("nic-member", "Domain", "lab-core", string.Empty, "10.0.0.20", "24", "10.0.0.1", ["10.0.0.10"])
                     ])
             ],
-            IsSaveConfirmed: false);
+            IsSaveConfirmed: false));
     }
 
     public static TemplatesBuilderDraftSnapshot FromTemplate(LabTemplate template)
     {
         ArgumentNullException.ThrowIfNull(template);
 
-        return new TemplatesBuilderDraftSnapshot(
+        return TemplatesBuilderNetworkReconciler.Reconcile(new TemplatesBuilderDraftSnapshot(
             TemplateName: template.Name,
             TemplateDescription: template.Description ?? string.Empty,
             DeploymentProfile: template.DeploymentProfile ?? "Balanced",
@@ -83,7 +83,7 @@ internal static class TemplatesBuilderDraftMapper
             Forests: CopyForests(template.DirectoryTopology?.Forests),
             Domains: CopyDomains(template.DirectoryTopology?.Domains),
             Vms: CopyVms(template.VmTemplates),
-            IsSaveConfirmed: false);
+            IsSaveConfirmed: false));
     }
 
     public static TemplatesBuilderDraftBuildResult BuildDocument(
