@@ -1,7 +1,7 @@
 namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
 /// <summary>Which panel a catalog entry belongs to in the Level 2 machine inspector.</summary>
-internal enum TemplatesBuilderRoleCategory
+public enum TemplatesBuilderRoleCategory
 {
     Role,
     Feature

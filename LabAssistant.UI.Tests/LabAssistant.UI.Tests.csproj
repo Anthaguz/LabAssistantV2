@@ -77,6 +77,8 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyCanvasLayout.cs" Link="WinUI\BuilderTopologyCanvasLayout.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyCanvasViewModel.cs" Link="WinUI\BuilderTopologyCanvasViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderMachineCardViewModel.cs" Link="WinUI\BuilderMachineCardViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderRoleRowViewModel.cs" Link="WinUI\BuilderRoleRowViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderMachineInspectorViewModel.cs" Link="WinUI\BuilderMachineInspectorViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesBuilderViewModel.cs" Link="WinUI\TemplatesBuilderViewModel.cs" />
 
     <!-- Quick Deploy lane (runtime-independent view model, controller, host, and item models). -->

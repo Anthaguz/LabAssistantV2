@@ -60,6 +60,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private string _machineContainerId = string.Empty;
     private bool _isStandaloneContainer;
     private int _selectedMachineVmIndex = -1;
+    private readonly HashSet<string> _expandedRoleConfigKeys = new(StringComparer.OrdinalIgnoreCase);
 
     // Guards programmatic field/observable writes so refreshing the forms does not re-enter the edit
     // pipeline (the imperative view guarded the same recompute with _isUpdatingDraft).
@@ -135,6 +136,11 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     [ObservableProperty] private bool _hasMachineCards;
     [ObservableProperty] private string _machineLevelEmptyText = "No machines yet.";
     [ObservableProperty] private string _addComputerLabel = "+ Add computer";
+    [ObservableProperty] private BuilderMachineInspectorViewModel? _selectedMachineInspector;
+    [ObservableProperty] private bool _hasSelectedMachineInspector;
+    [ObservableProperty] private string _roleSearchText = string.Empty;
+    [ObservableProperty] private bool _isRolesPanelExpanded = true;
+    [ObservableProperty] private bool _isFeaturesPanelExpanded;
 
     // Credentials.
     [ObservableProperty] private bool _addCredentialEnabled;
@@ -449,6 +455,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private void BackToTopology()
     {
         IsMachineLevelVisible = false;
+        RebuildSelectedMachineInspector();
     }
 
     // Level 1 entry point for standalone machines: there is no Standalone box until one exists, so this creates
@@ -491,12 +498,78 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         RenderAndNotify(result.Draft);
     }
 
+    [RelayCommand]
+    private void ToggleSelectedMachineRole(string? roleKey)
+    {
+        if (string.IsNullOrWhiteSpace(roleKey))
+        {
+            return;
+        }
+
+        var draft = CaptureWorkingDraft();
+        if (_selectedMachineVmIndex < 0 || _selectedMachineVmIndex >= draft.Vms.Count)
+        {
+            return;
+        }
+
+        var definition = TemplatesBuilderRoleProjectionCatalog.FindRole(roleKey);
+        if (definition is null || TemplatesBuilderRoleProjectionCatalog.IsStructuralRole(definition.Value.Key))
+        {
+            return;
+        }
+
+        var projected = TemplatesBuilderRoleProjectionCatalog.ProjectRole(draft.Vms[_selectedMachineVmIndex], definition.Value);
+        if (projected.IsLocked)
+        {
+            return;
+        }
+
+        var result = TemplatesBuilderRoleAuthoring.SetAdditionalRole(
+            draft,
+            _selectedMachineVmIndex,
+            definition.Value.Key,
+            enabled: !projected.IsAssigned);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft);
+    }
+
+    [RelayCommand]
+    private void ToggleRolesPanel()
+    {
+        IsRolesPanelExpanded = !IsRolesPanelExpanded;
+        RebuildSelectedMachineInspector();
+    }
+
+    [RelayCommand]
+    private void ToggleFeaturesPanel()
+    {
+        IsFeaturesPanelExpanded = !IsFeaturesPanelExpanded;
+        RebuildSelectedMachineInspector();
+    }
+
+    [RelayCommand]
+    private void ToggleRoleConfiguration(string? roleKey)
+    {
+        if (string.IsNullOrWhiteSpace(roleKey))
+        {
+            return;
+        }
+
+        if (!_expandedRoleConfigKeys.Remove(roleKey))
+        {
+            _expandedRoleConfigKeys.Add(roleKey);
+        }
+
+        RebuildSelectedMachineInspector();
+    }
+
     private void RenderMachineLevel()
     {
         if (!IsMachineLevelVisible)
         {
             MachineCards = [];
             HasMachineCards = false;
+            RebuildSelectedMachineInspector();
             return;
         }
 
@@ -533,6 +606,90 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
         MachineCards = cards;
         HasMachineCards = cards.Count > 0;
+        RebuildSelectedMachineInspector();
+    }
+
+    private void RebuildSelectedMachineInspector()
+    {
+        if (!IsMachineLevelVisible || _selectedMachineVmIndex < 0 || _selectedMachineVmIndex >= _draft.Vms.Count)
+        {
+            SelectedMachineInspector = null;
+            HasSelectedMachineInspector = false;
+            return;
+        }
+
+        var projection = _isStandaloneContainer
+            ? TemplatesBuilderMachineProjector.ProjectStandaloneMachines(_draft, _selectedMachineVmIndex)
+            : TemplatesBuilderMachineProjector.ProjectDomainMachines(_draft, _machineContainerId, _selectedMachineVmIndex);
+        var matchingCards = projection.Machines.Where(machine => machine.VmIndex == _selectedMachineVmIndex).ToList();
+        if (matchingCards.Count == 0)
+        {
+            SelectedMachineInspector = null;
+            HasSelectedMachineInspector = false;
+            return;
+        }
+
+        var card = matchingCards[0];
+        var vm = _draft.Vms[_selectedMachineVmIndex];
+        var roleRows = new List<BuilderRoleRowViewModel>();
+        var featureRows = new List<BuilderRoleRowViewModel>();
+        foreach (var role in TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm).Where(MatchesRoleSearch))
+        {
+            var row = BuildRoleRow(role);
+            if (role.Category == TemplatesBuilderRoleCategory.Feature)
+            {
+                featureRows.Add(row);
+            }
+            else
+            {
+                roleRows.Add(row);
+            }
+        }
+
+        SelectedMachineInspector = new BuilderMachineInspectorViewModel(
+            card.Label,
+            card.RoleLabel,
+            card.Subtext,
+            RoleSearchText,
+            IsRolesPanelExpanded,
+            IsFeaturesPanelExpanded,
+            roleRows,
+            featureRows,
+            ToggleRolesPanelCommand,
+            ToggleFeaturesPanelCommand);
+        HasSelectedMachineInspector = true;
+    }
+
+    private BuilderRoleRowViewModel BuildRoleRow(TemplatesBuilderVmRoleProjection role)
+    {
+        var isStructural = TemplatesBuilderRoleProjectionCatalog.IsStructuralRole(role.RoleKey);
+        var canToggle = !isStructural && !role.IsLocked;
+        var statusNote = isStructural
+            ? "Domain controllers are managed from the machine list."
+            : role.StatusNote;
+        var roleKey = role.RoleKey;
+        return new BuilderRoleRowViewModel(
+            role.RoleKey,
+            role.DisplayName,
+            role.Description,
+            role.Category,
+            role.IsAssigned,
+            role.IsInstallOnly,
+            role.IsLocked,
+            role.HasConfiguration,
+            statusNote,
+            _expandedRoleConfigKeys.Contains(role.RoleKey),
+            canToggle,
+            canToggle ? new RelayCommand(() => ToggleSelectedMachineRole(roleKey)) : null,
+            role.HasConfiguration ? new RelayCommand(() => ToggleRoleConfiguration(roleKey)) : null);
+    }
+
+    private bool MatchesRoleSearch(TemplatesBuilderVmRoleProjection role)
+    {
+        var search = RoleSearchText?.Trim();
+        return string.IsNullOrWhiteSpace(search) ||
+               role.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               role.Description.Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsOnlyDomainControllerInContainer(int vmIndex)
@@ -1942,4 +2099,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     partial void OnTemplateNameChanged(string value) => HandleGeneralEdit();
 
     partial void OnTemplateDescriptionChanged(string value) => HandleGeneralEdit();
+
+    partial void OnRoleSearchTextChanged(string value) => RebuildSelectedMachineInspector();
 }

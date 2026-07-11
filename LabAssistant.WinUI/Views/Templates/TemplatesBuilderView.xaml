@@ -261,6 +261,87 @@
             </Border>
         </DataTemplate>
 
+        <!-- Level 2 selected-machine inspector rows. -->
+        <DataTemplate x:Key="BuilderRoleRowTemplate" x:DataType="builder:BuilderRoleRowViewModel">
+            <Border
+                Margin="0,0,0,6"
+                Padding="10"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox
+                            Grid.Column="0"
+                            VerticalAlignment="Top"
+                            Command="{x:Bind ToggleCommand}"
+                            IsChecked="{x:Bind IsAssigned, Mode=OneWay}"
+                            IsEnabled="{x:Bind IsToggleEnabled}" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock
+                                FontWeight="SemiBold"
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                Text="{x:Bind DisplayName}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{x:Bind Description}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind HasDescription, Converter={StaticResource BoolToVisibility}}" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Border
+                                    Padding="6,2,6,2"
+                                    Background="{StaticResource ShellContentBackgroundBrush}"
+                                    BorderBrush="{StaticResource ShellAccentBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Visibility="{x:Bind ShowInstallOnlyBadge, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock
+                                        FontSize="11"
+                                        Foreground="{StaticResource ShellAccentBrush}"
+                                        Text="Install only" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{x:Bind StatusNote}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind HasStatusNote, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                        <ToggleButton
+                            Grid.Column="2"
+                            Padding="8,3,8,3"
+                            VerticalAlignment="Top"
+                            Command="{x:Bind ToggleConfigCommand}"
+                            Content="Configure"
+                            IsChecked="{x:Bind IsConfigExpanded, Mode=OneWay}"
+                            Visibility="{x:Bind ShowConfigureButton, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+                    <Border
+                        Margin="34,0,0,0"
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Visibility="{x:Bind ShowConfigurationArea, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Configuration coming soon."
+                            TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <!-- Navigator / resource-list rows. -->
         <DataTemplate x:Key="BuilderNavButtonRowTemplate" x:DataType="builder:BuilderNavRowViewModel">
             <Button
@@ -710,6 +791,140 @@
                                         Text="{x:Bind ViewModel.MachineLevelEmptyText, Mode=OneWay}"
                                         TextWrapping="Wrap"
                                         Visibility="{x:Bind ViewModel.HasMachineCards, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                    <Border
+                                        Padding="14"
+                                        Background="{StaticResource ShellContentBackgroundBrush}"
+                                        BorderBrush="{StaticResource ShellBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource CardCornerRadius}"
+                                        Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock
+                                                    FontSize="18"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                    Text="{Binding SelectedMachineInspector.MachineTitle}" />
+                                                <TextBlock
+                                                    FontSize="13"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource ShellAccentBrush}"
+                                                    Text="{Binding SelectedMachineInspector.RoleLabel}" />
+                                                <TextBlock
+                                                    FontSize="12"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="{Binding SelectedMachineInspector.Subtext}"
+                                                    TextWrapping="Wrap" />
+                                            </StackPanel>
+
+                                            <TextBox
+                                                Header="Search roles and features"
+                                                PlaceholderText="Search by name or description"
+                                                Text="{Binding RoleSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                            <Border
+                                                Padding="0"
+                                                Background="{StaticResource ShellBackgroundBrush}"
+                                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6">
+                                                <StackPanel>
+                                                    <Button
+                                                        Padding="10,8,10,8"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Stretch"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Command="{Binding SelectedMachineInspector.ToggleRolesPanelCommand}">
+                                                        <Grid ColumnSpacing="8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock
+                                                                Grid.Column="0"
+                                                                VerticalAlignment="Center"
+                                                                FontFamily="Segoe MDL2 Assets"
+                                                                FontSize="12"
+                                                                Text="{Binding SelectedMachineInspector.RolesPanelChevron}" />
+                                                            <TextBlock
+                                                                Grid.Column="1"
+                                                                FontWeight="SemiBold"
+                                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                Text="Roles" />
+                                                        </Grid>
+                                                    </Button>
+                                                    <StackPanel
+                                                        Padding="10,0,10,10"
+                                                        Visibility="{Binding SelectedMachineInspector.IsRolesPanelExpanded, Converter={StaticResource BoolToVisibility}}">
+                                                        <ItemsControl ItemTemplate="{StaticResource BuilderRoleRowTemplate}" ItemsSource="{Binding SelectedMachineInspector.RoleRows}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Spacing="0" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                        </ItemsControl>
+                                                        <TextBlock
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="No roles match the search."
+                                                            TextWrapping="Wrap"
+                                                            Visibility="{Binding SelectedMachineInspector.HasRoleRows, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Border
+                                                Padding="0"
+                                                Background="{StaticResource ShellBackgroundBrush}"
+                                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6">
+                                                <StackPanel>
+                                                    <Button
+                                                        Padding="10,8,10,8"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Stretch"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Command="{Binding SelectedMachineInspector.ToggleFeaturesPanelCommand}">
+                                                        <Grid ColumnSpacing="8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock
+                                                                Grid.Column="0"
+                                                                VerticalAlignment="Center"
+                                                                FontFamily="Segoe MDL2 Assets"
+                                                                FontSize="12"
+                                                                Text="{Binding SelectedMachineInspector.FeaturesPanelChevron}" />
+                                                            <TextBlock
+                                                                Grid.Column="1"
+                                                                FontWeight="SemiBold"
+                                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                Text="Features" />
+                                                        </Grid>
+                                                    </Button>
+                                                    <StackPanel
+                                                        Padding="10,0,10,10"
+                                                        Visibility="{Binding SelectedMachineInspector.IsFeaturesPanelExpanded, Converter={StaticResource BoolToVisibility}}">
+                                                        <ItemsControl ItemTemplate="{StaticResource BuilderRoleRowTemplate}" ItemsSource="{Binding SelectedMachineInspector.FeatureRows}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Spacing="0" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                        </ItemsControl>
+                                                        <TextBlock
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="No features available yet."
+                                                            TextWrapping="Wrap"
+                                                            Visibility="{Binding SelectedMachineInspector.HasFeatures, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
