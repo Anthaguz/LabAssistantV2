@@ -78,7 +78,7 @@ internal static class TemplatesBuilderDraftMapper
             TemplateName: template.Name,
             TemplateDescription: template.Description ?? string.Empty,
             DeploymentProfile: template.DeploymentProfile ?? "Balanced",
-            LabNetworks: CopyLabNetworks(template.LabNetworks),
+            LabNetworks: CopyLabNetworks(template.LabNetworks, template.VmTemplates),
             CredentialSlots: BuildCredentialSlotReferences(template.VmTemplates),
             Forests: CopyForests(template.DirectoryTopology?.Forests),
             Domains: CopyDomains(template.DirectoryTopology?.Domains),
@@ -314,7 +314,7 @@ internal static class TemplatesBuilderDraftMapper
                 MemoryMb = memoryMb,
                 CpuCount = cpuCount,
                 VhdxId = Optional(vm.VhdxId),
-                TopologyRole = vm.IsActiveDirectoryDomainController ? TemplatesBuilderRoleProjectionCatalog.ActiveDirectoryDomainControllerTopologyRole : null,
+                TopologyRole = ResolveTopologyRole(vm),
                 MembershipMode = membershipMode,
                 DomainId = V2MembershipModeCatalog.IsDomainMember(membershipMode) ? vm.DomainId.Trim() : null,
                 CredentialSlots = CreateCredentialSlots(vm.CredentialSlots),
@@ -323,6 +323,18 @@ internal static class TemplatesBuilderDraftMapper
         }
 
         return vms;
+    }
+
+    private static string? ResolveTopologyRole(TemplatesBuilderVmDraft vm)
+    {
+        if (vm.IsRouter)
+        {
+            return TemplatesBuilderRoleProjectionCatalog.RouterTopologyRole;
+        }
+
+        return vm.IsActiveDirectoryDomainController
+            ? TemplatesBuilderRoleProjectionCatalog.ActiveDirectoryDomainControllerTopologyRole
+            : null;
     }
 
     private static List<VmNetworkInterfaceTemplate> MapNics(TemplatesBuilderVmDraft vm, List<string> errors)
@@ -378,16 +390,51 @@ internal static class TemplatesBuilderDraftMapper
             : slots;
     }
 
-    private static IReadOnlyList<TemplatesBuilderLabNetworkDraft> CopyLabNetworks(IEnumerable<LabNetworkTemplate>? networks)
-        => networks?
+    private static IReadOnlyList<TemplatesBuilderLabNetworkDraft> CopyLabNetworks(
+        IEnumerable<LabNetworkTemplate>? networks,
+        IEnumerable<VmTemplate>? vms)
+    {
+        var vmList = vms?.ToList() ?? [];
+        return networks?
             .Select(network => new TemplatesBuilderLabNetworkDraft(
                 network.NetworkId,
                 network.Name,
                 network.SwitchName ?? string.Empty,
                 network.SwitchType ?? string.Empty,
                 network.Subnet ?? string.Empty,
-                network.Notes ?? string.Empty))
+                network.Notes ?? string.Empty)
+            {
+                DomainId = ReconstructNetworkDomainId(network.NetworkId, vmList)
+            })
             .ToList() ?? [];
+    }
+
+    // A network's owning domain is not persisted on the network; it is recovered from the domain-member VMs
+    // whose NICs sit on the network. Empty when no domain member references it (the shared standalone switch).
+    private static string ReconstructNetworkDomainId(string? networkId, IReadOnlyList<VmTemplate> vms)
+    {
+        if (string.IsNullOrWhiteSpace(networkId))
+        {
+            return string.Empty;
+        }
+
+        foreach (var vm in vms)
+        {
+            if (!V2MembershipModeCatalog.IsDomainMember(vm.MembershipMode) || string.IsNullOrWhiteSpace(vm.DomainId))
+            {
+                continue;
+            }
+
+            var onNetwork = (vm.Nics ?? Enumerable.Empty<VmNetworkInterfaceTemplate>())
+                .Any(nic => string.Equals(nic.NetworkId, networkId, StringComparison.OrdinalIgnoreCase));
+            if (onNetwork)
+            {
+                return vm.DomainId.Trim();
+            }
+        }
+
+        return string.Empty;
+    }
 
     private static IReadOnlyList<TemplatesBuilderForestDraft> CopyForests(IEnumerable<V2ForestTemplate>? forests)
         => forests?
@@ -422,7 +469,10 @@ internal static class TemplatesBuilderDraftMapper
                     vm.CredentialSlots?.DomainJoin ?? string.Empty,
                     vm.CredentialSlots?.Dsrm ?? string.Empty,
                     vm.CredentialSlots?.ParentDomainAdmin ?? string.Empty),
-                CopyNics(vm.Nics)))
+                CopyNics(vm.Nics))
+            {
+                IsRouter = TemplatesBuilderRoleProjectionCatalog.IsRouterTopologyRole(vm.TopologyRole)
+            })
             .ToList();
 
     private static IReadOnlyList<TemplatesBuilderNicDraft> CopyNics(IEnumerable<VmNetworkInterfaceTemplate>? nics)

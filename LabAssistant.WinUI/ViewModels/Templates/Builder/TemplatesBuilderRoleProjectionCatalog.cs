@@ -17,6 +17,9 @@ internal static class TemplatesBuilderRoleProjectionCatalog
     public const string ActiveDirectoryDomainControllerDisplayName = "Active Directory Domain Controller";
     public const string ActiveDirectoryDomainControllerTopologyRole = "FirstDomainController";
 
+    /// <summary>The persisted topology role that marks the required network router VM (bridges every switch).</summary>
+    public const string RouterTopologyRole = "Router";
+
     private const string LegacyRootDomainControllerTopologyRole = "RootDomainController";
 
     private static readonly TemplatesBuilderRoleCatalogEntry[] AuthorableRoles =
@@ -40,4 +43,8 @@ internal static class TemplatesBuilderRoleProjectionCatalog
     public static bool IsActiveDirectoryDomainControllerTopologyRole(string? topologyRole)
         => string.Equals(topologyRole, ActiveDirectoryDomainControllerTopologyRole, StringComparison.OrdinalIgnoreCase) ||
            string.Equals(topologyRole, LegacyRootDomainControllerTopologyRole, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>True when the persisted topology role marks the network router VM.</summary>
+    public static bool IsRouterTopologyRole(string? topologyRole)
+        => string.Equals(topologyRole, RouterTopologyRole, StringComparison.OrdinalIgnoreCase);
 }

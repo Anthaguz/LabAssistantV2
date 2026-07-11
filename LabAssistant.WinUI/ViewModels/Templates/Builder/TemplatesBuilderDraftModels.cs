@@ -45,7 +45,15 @@ internal readonly record struct TemplatesBuilderLabNetworkDraft(
     string SwitchName,
     string SwitchType,
     string Subnet,
-    string Notes);
+    string Notes)
+{
+    /// <summary>
+    /// The domain this switch belongs to under the one-switch-per-domain model. In-memory only (never
+    /// persisted): reconstructed on load from the NICs that reference this network. Empty for the single
+    /// shared standalone switch that seats standalone machines.
+    /// </summary>
+    public string DomainId { get; init; }
+}
 
 internal readonly record struct TemplatesBuilderCredentialSlotDraft(
     string SlotKey,
@@ -81,7 +89,15 @@ internal readonly record struct TemplatesBuilderVmDraft(
     string DomainId,
     bool IsActiveDirectoryDomainController,
     TemplatesBuilderVmCredentialSlotDraft CredentialSlots,
-    IReadOnlyList<TemplatesBuilderNicDraft> Nics);
+    IReadOnlyList<TemplatesBuilderNicDraft> Nics)
+{
+    /// <summary>
+    /// True for the single required router VM the network model auto-creates: a standalone box that carries a
+    /// NIC on every switch (holding each switch's .1) and bridges them. Maps to the persisted
+    /// <c>TopologyRole = "Router"</c> and is reconstructed from it on load.
+    /// </summary>
+    public bool IsRouter { get; init; }
+}
 
 internal readonly record struct TemplatesBuilderNicDraft(
     string NicId,
