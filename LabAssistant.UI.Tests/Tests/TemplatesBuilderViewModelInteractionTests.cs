@@ -529,6 +529,121 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void MachineInspectorBasics_CommitCommandsUpdateSelectedMemberFields()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        ZoomIntoDomainMachineLevel(viewModel);
+
+        var memberCard = viewModel.MachineCards.Single(card => !card.IsDomainController);
+        memberCard.SelectCommand!.Execute(null);
+        var memberVmId = viewModel.CaptureDraft().Vms[memberCard.VmIndex].VmId;
+        var inspector = viewModel.SelectedMachineInspector;
+        Assert.NotNull(inspector);
+
+        inspector!.CommitMachineNameCommand!.Execute("Member-File-01");
+        inspector = viewModel.SelectedMachineInspector;
+        inspector!.CommitMachineCpuCountCommand!.Execute("6");
+        inspector = viewModel.SelectedMachineInspector;
+        inspector!.CommitMachineMemoryMbCommand!.Execute("12288");
+        inspector = viewModel.SelectedMachineInspector;
+        inspector!.CommitMachineBaseDiskCommand!.Execute("disk-dc");
+
+        var draftAfter = viewModel.CaptureDraft();
+        var updated = draftAfter.Vms.Single(vm => vm.VmId == memberVmId);
+        Assert.Equal("Member-File-01", updated.Name);
+        Assert.Equal("6", updated.CpuCount);
+        Assert.Equal("12288", updated.MemoryMb);
+        Assert.Equal("disk-dc", updated.VhdxId);
+    }
+
+    [Fact]
+    public void MachineInspectorHostIp_CommitOctetsUpdatesSelectedMachinePrimaryNicAddress()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        ZoomIntoDomainMachineLevel(viewModel);
+
+        var memberCard = viewModel.MachineCards.Single(card => !card.IsDomainController);
+        memberCard.SelectCommand!.Execute(null);
+        var selectedCard = viewModel.MachineCards.Single(card => card.IsSelected);
+        Assert.Equal(memberCard.VmIndex, selectedCard.VmIndex);
+        var draftBefore = viewModel.CaptureDraft();
+        var memberVmId = draftBefore.Vms[memberCard.VmIndex].VmId;
+        var memberIndex = draftBefore.Vms.ToList().FindIndex(vm => vm.VmId == memberVmId);
+        Assert.True(memberIndex >= 0);
+        var inspector = viewModel.SelectedMachineInspector;
+        Assert.NotNull(inspector);
+        Assert.Equal(memberCard.Label, inspector!.MachineTitle);
+        Assert.True(inspector!.IsHostAddressEditable);
+
+        var editableOctets = FindHostOctetsForStatus(draftBefore, memberIndex, MachineHostAddressStatus.Ok, requireDifferentFromCurrent: true);
+        inspector.CommitMachineHostOctetsCommand!.Execute(editableOctets);
+
+        var expectedAddress = $"{inspector.HostAddressFixedOctetPrefix}{string.Join(".", editableOctets)}";
+        var draftAfter = viewModel.CaptureDraft();
+        var updated = draftAfter.Vms.Single(vm => vm.VmId == memberVmId);
+        Assert.Contains(updated.Nics, nic => nic.IpAddress == expectedAddress);
+
+        var updatedIndex = draftAfter.Vms.ToList().FindIndex(vm => vm.VmId == memberVmId);
+        Assert.True(updatedIndex >= 0);
+        var projectedAfter = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(draftAfter, updatedIndex);
+        Assert.Equal(editableOctets, projectedAfter.Octets);
+    }
+
+    [Fact]
+    public void MachineInspectorHostIp_ProjectionExposesMemberEditorAndRouterHiddenRow()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        ZoomIntoDomainMachineLevel(viewModel);
+
+        var draft = viewModel.CaptureDraft();
+        var memberCard = viewModel.MachineCards.Single(card => !card.IsDomainController);
+        var memberVm = draft.Vms[memberCard.VmIndex];
+        var memberHostView = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(draft, memberCard.VmIndex);
+        Assert.True(memberHostView.IsEditable);
+
+        var memberIpParts = memberVm.Nics[0].IpAddress.Split('.');
+        Assert.Equal(4, memberIpParts.Length);
+        var fixedOctetCount = 4 - memberHostView.EditableOctetCount;
+        var expectedPrefix = $"{string.Join(".", memberIpParts.Take(fixedOctetCount))}.";
+        Assert.Equal(expectedPrefix, memberHostView.FixedOctetPrefix);
+
+        var routerIndex = draft.Vms.ToList().FindIndex(vm => vm.IsRouter);
+        Assert.True(routerIndex >= 0);
+        var routerHostView = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(draft, routerIndex);
+        Assert.False(routerHostView.IsEditable);
+    }
+
+    [Fact]
+    public void MachineInspectorHostIp_ReservedRouterCommitSurfacesReservedRouterStatusInInspector()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        ZoomIntoDomainMachineLevel(viewModel);
+
+        var draft = viewModel.CaptureDraft();
+        var memberCard = viewModel.MachineCards.Single(card => !card.IsDomainController);
+        var memberVmId = draft.Vms[memberCard.VmIndex].VmId;
+        var memberIndex = draft.Vms.ToList().FindIndex(vm => vm.VmId == memberVmId);
+        Assert.True(memberIndex >= 0);
+        var memberHostView = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(draft, memberCard.VmIndex);
+        Assert.True(memberHostView.IsEditable);
+        var reservedRouterOctets = FindHostOctetsForStatus(draft, memberIndex, MachineHostAddressStatus.ReservedRouter, requireDifferentFromCurrent: false);
+
+        memberCard.SelectCommand!.Execute(null);
+        var selectedCard = viewModel.MachineCards.Single(card => card.IsSelected);
+        Assert.Equal(memberCard.VmIndex, selectedCard.VmIndex);
+        var inspector = viewModel.SelectedMachineInspector;
+        Assert.NotNull(inspector);
+        Assert.Equal(memberCard.Label, inspector!.MachineTitle);
+        inspector!.CommitMachineHostOctetsCommand!.Execute(reservedRouterOctets);
+
+        Assert.Equal(nameof(MachineHostAddressStatus.ReservedRouter), viewModel.SelectedMachineInspector!.HostAddressStatusKey);
+    }
+
+    [Fact]
     public void BackToTopology_LeavesLevel2AndShowsStandaloneContainerAtLevel1()
     {
         var viewModel = CreateViewModel();
@@ -543,6 +658,65 @@ public sealed class TemplatesBuilderViewModelInteractionTests
 
         // The Standalone container is now present as a Level 1 node (it exists only once a standalone machine does).
         Assert.Contains(viewModel.TopologyCanvas!.Nodes, node => node.IsStandalone);
+    }
+
+    private static void ZoomIntoDomainMachineLevel(TemplatesBuilderViewModel viewModel)
+    {
+        GoToForestsDomains(viewModel);
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        domainNode.ManageMachinesCommand!.Execute(null);
+        Assert.True(viewModel.IsMachineLevelVisible);
+    }
+
+    private static IReadOnlyList<int> FindHostOctetsForStatus(
+        TemplatesBuilderDraftSnapshot draft,
+        int vmIndex,
+        MachineHostAddressStatus targetStatus,
+        bool requireDifferentFromCurrent)
+    {
+        var projected = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(draft, vmIndex);
+        Assert.True(projected.IsEditable);
+
+        if (projected.EditableOctetCount == 1)
+        {
+            for (var octet = 0; octet <= 255; octet++)
+            {
+                var candidate = new[] { octet };
+                if (requireDifferentFromCurrent && projected.Octets.SequenceEqual(candidate))
+                {
+                    continue;
+                }
+
+                var authored = TemplatesBuilderMachineBasicsAuthoring.SetMachineHostOctets(draft, vmIndex, candidate).Draft;
+                if (TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(authored, vmIndex).Status == targetStatus)
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        if (projected.EditableOctetCount == 2)
+        {
+            for (var first = 0; first <= 255; first++)
+            {
+                for (var second = 0; second <= 255; second++)
+                {
+                    var candidate = new[] { first, second };
+                    if (requireDifferentFromCurrent && projected.Octets.SequenceEqual(candidate))
+                    {
+                        continue;
+                    }
+
+                    var authored = TemplatesBuilderMachineBasicsAuthoring.SetMachineHostOctets(draft, vmIndex, candidate).Draft;
+                    if (TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(authored, vmIndex).Status == targetStatus)
+                    {
+                        return candidate;
+                    }
+                }
+            }
+        }
+
+        throw new Xunit.Sdk.XunitException($"No editable octets produced status '{targetStatus}' for vm index {vmIndex}.");
     }
 
     private static void GoToForestsDomains(TemplatesBuilderViewModel viewModel)

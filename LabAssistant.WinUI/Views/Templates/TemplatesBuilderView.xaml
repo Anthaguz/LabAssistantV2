@@ -817,6 +817,147 @@
                                                     TextWrapping="Wrap" />
                                             </StackPanel>
 
+                                            <Border
+                                                Padding="10"
+                                                Background="{StaticResource ShellBackgroundBrush}"
+                                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6">
+                                                <StackPanel Spacing="8">
+                                                    <TextBlock
+                                                        FontWeight="SemiBold"
+                                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                        Text="Machine settings" />
+                                                    <Grid ColumnSpacing="10" RowSpacing="8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="150" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+
+                                                        <TextBlock
+                                                            Grid.Row="0"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Name" />
+                                                        <TextBox
+                                                            Grid.Row="0"
+                                                            Grid.Column="1"
+                                                            LostFocus="OnInspectorMachineNameLostFocus"
+                                                            Text="{Binding SelectedMachineInspector.MachineNameText, Mode=OneWay}" />
+
+                                                        <TextBlock
+                                                            Grid.Row="1"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="vCPU count" />
+                                                        <TextBox
+                                                            Grid.Row="1"
+                                                            Grid.Column="1"
+                                                            LostFocus="OnInspectorMachineCpuCountLostFocus"
+                                                            Text="{Binding SelectedMachineInspector.MachineCpuCountText, Mode=OneWay}" />
+
+                                                        <TextBlock
+                                                            Grid.Row="2"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Startup memory (MB)" />
+                                                        <TextBox
+                                                            Grid.Row="2"
+                                                            Grid.Column="1"
+                                                            LostFocus="OnInspectorMachineMemoryMbLostFocus"
+                                                            Text="{Binding SelectedMachineInspector.MachineMemoryMbText, Mode=OneWay}" />
+
+                                                        <TextBlock
+                                                            Grid.Row="3"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Base disk" />
+                                                        <ComboBox
+                                                            Grid.Row="3"
+                                                            Grid.Column="1"
+                                                            DisplayMemberPath="DisplayLabel"
+                                                            ItemsSource="{Binding SelectedMachineInspector.BaseDiskOptions}"
+                                                            SelectedValue="{Binding SelectedMachineInspector.SelectedBaseDiskId, Mode=OneWay}"
+                                                            SelectedValuePath="Id"
+                                                            SelectionChanged="OnInspectorMachineBaseDiskSelectionChanged" />
+
+                                                        <TextBlock
+                                                            Grid.Row="4"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Top"
+                                                            Margin="0,6,0,0"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Host IP address"
+                                                            Visibility="{Binding SelectedMachineInspector.IsHostAddressEditable, Converter={StaticResource BoolToVisibility}}" />
+                                                        <StackPanel
+                                                            Grid.Row="4"
+                                                            Grid.Column="1"
+                                                            Spacing="4"
+                                                            Visibility="{Binding SelectedMachineInspector.IsHostAddressEditable, Converter={StaticResource BoolToVisibility}}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <TextBlock
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                    Text="{Binding SelectedMachineInspector.HostAddressFixedOctetPrefix}" />
+                                                                <Grid Width="54">
+                                                                    <TextBox
+                                                                        x:Name="InspectorHostOctetOneTextBox"
+                                                                        MinWidth="54"
+                                                                        LostFocus="OnInspectorMachineHostOctetLostFocus"
+                                                                        Text="{Binding SelectedMachineInspector.HostAddressOctetOneText, Mode=OneWay}" />
+                                                                    <Border
+                                                                        BorderBrush="{StaticResource ShellCriticalBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="4"
+                                                                        IsHitTestVisible="False"
+                                                                        Visibility="{Binding SelectedMachineInspector.ShowHostAddressErrorOutline, Converter={StaticResource BoolToVisibility}}" />
+                                                                </Grid>
+                                                                <TextBlock
+                                                                    VerticalAlignment="Center"
+                                                                    Text="."
+                                                                    Visibility="{Binding SelectedMachineInspector.HasSecondHostOctet, Converter={StaticResource BoolToVisibility}}" />
+                                                                <Grid
+                                                                    Width="54"
+                                                                    Visibility="{Binding SelectedMachineInspector.HasSecondHostOctet, Converter={StaticResource BoolToVisibility}}">
+                                                                    <TextBox
+                                                                        x:Name="InspectorHostOctetTwoTextBox"
+                                                                        MinWidth="54"
+                                                                        LostFocus="OnInspectorMachineHostOctetLostFocus"
+                                                                        Text="{Binding SelectedMachineInspector.HostAddressOctetTwoText, Mode=OneWay}" />
+                                                                    <Border
+                                                                        BorderBrush="{StaticResource ShellCriticalBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="4"
+                                                                        IsHitTestVisible="False"
+                                                                        Visibility="{Binding SelectedMachineInspector.ShowHostAddressErrorOutline, Converter={StaticResource BoolToVisibility}}" />
+                                                                </Grid>
+                                                            </StackPanel>
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                Text="{Binding SelectedMachineInspector.HostAddressSubnetCidr}" />
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{StaticResource ShellCriticalBrush}"
+                                                                Text="{Binding SelectedMachineInspector.HostAddressValidationMessage}"
+                                                                TextWrapping="Wrap"
+                                                                Visibility="{Binding SelectedMachineInspector.HasHostAddressValidationMessage, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+
                                             <TextBox
                                                 Header="Search roles and features"
                                                 PlaceholderText="Search by name or description"

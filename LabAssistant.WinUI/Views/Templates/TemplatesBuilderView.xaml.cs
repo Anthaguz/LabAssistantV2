@@ -1,5 +1,6 @@
 using LabAssistant.WinUI.ViewModels.Templates;
 using LabAssistant.WinUI.ViewModels.Templates.Builder;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -182,4 +183,72 @@ public sealed partial class TemplatesBuilderView : UserControl
             frame.AffordancesRevealed = false;
         }
     }
+
+    private void OnInspectorMachineNameLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            ViewModel.SelectedMachineInspector?.CommitMachineNameCommand?.Execute(textBox.Text);
+        }
+    }
+
+    private void OnInspectorMachineCpuCountLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            ViewModel.SelectedMachineInspector?.CommitMachineCpuCountCommand?.Execute(textBox.Text);
+        }
+    }
+
+    private void OnInspectorMachineMemoryMbLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox)
+        {
+            ViewModel.SelectedMachineInspector?.CommitMachineMemoryMbCommand?.Execute(textBox.Text);
+        }
+    }
+
+    private void OnInspectorMachineBaseDiskSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var selectedId = (sender as ComboBox)?.SelectedValue as string;
+        ViewModel.SelectedMachineInspector?.CommitMachineBaseDiskCommand?.Execute(selectedId);
+    }
+
+    private void OnInspectorMachineHostOctetLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (IsFocusWithinHostOctetEditors())
+        {
+            return;
+        }
+
+        var inspector = ViewModel.SelectedMachineInspector;
+        if (inspector is null || inspector.CommitMachineHostOctetsCommand is null)
+        {
+            return;
+        }
+
+        var octets = new List<int> { ParseOctet(InspectorHostOctetOneTextBox?.Text) };
+        if (inspector.HasSecondHostOctet)
+        {
+            octets.Add(ParseOctet(InspectorHostOctetTwoTextBox?.Text));
+        }
+
+        inspector.CommitMachineHostOctetsCommand.Execute(octets);
+    }
+
+    private bool IsFocusWithinHostOctetEditors()
+    {
+        var root = XamlRoot;
+        if (root is null)
+        {
+            return false;
+        }
+
+        var focusedElement = FocusManager.GetFocusedElement(root);
+        return ReferenceEquals(focusedElement, InspectorHostOctetOneTextBox) ||
+               ReferenceEquals(focusedElement, InspectorHostOctetTwoTextBox);
+    }
+
+    private static int ParseOctet(string? text)
+        => int.TryParse(text?.Trim(), out var octet) ? octet : -1;
 }

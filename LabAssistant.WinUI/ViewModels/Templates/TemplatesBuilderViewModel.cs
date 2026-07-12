@@ -39,6 +39,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private TemplatesBuilderDraftSnapshot _validatedDraft = CreateEmptyDraft();
     private TemplatesBuilderValidationState _validationState = TemplatesBuilderValidationState.Empty;
     private IReadOnlyList<V2AvailableSwitchInfo> _availableSwitchInventory = Array.Empty<V2AvailableSwitchInfo>();
+    private IReadOnlyList<TemplateVhdxCatalogOption> _vhdxCatalogOptions = Array.Empty<TemplateVhdxCatalogOption>();
 
     private string _templateId = Guid.NewGuid().ToString("N");
     private int _templateRevision = 1;
@@ -534,6 +535,51 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void CommitSelectedMachineName(string? name)
+    {
+        var draft = CaptureWorkingDraft();
+        var result = TemplatesBuilderMachineBasicsAuthoring.SetMachineName(draft, _selectedMachineVmIndex, name);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft);
+    }
+
+    [RelayCommand]
+    private void CommitSelectedMachineCpuCount(string? cpuCount)
+    {
+        var draft = CaptureWorkingDraft();
+        var result = TemplatesBuilderMachineBasicsAuthoring.SetMachineCpuCount(draft, _selectedMachineVmIndex, cpuCount);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft);
+    }
+
+    [RelayCommand]
+    private void CommitSelectedMachineMemoryMb(string? memoryMb)
+    {
+        var draft = CaptureWorkingDraft();
+        var result = TemplatesBuilderMachineBasicsAuthoring.SetMachineMemoryMb(draft, _selectedMachineVmIndex, memoryMb);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft);
+    }
+
+    [RelayCommand]
+    private void CommitSelectedMachineBaseDisk(string? vhdxId)
+    {
+        var draft = CaptureWorkingDraft();
+        var result = TemplatesBuilderMachineBasicsAuthoring.SetMachineBaseDisk(draft, _selectedMachineVmIndex, vhdxId);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft);
+    }
+
+    [RelayCommand]
+    private void CommitSelectedMachineHostOctets(IReadOnlyList<int> octets)
+    {
+        var draft = CaptureWorkingDraft();
+        var result = TemplatesBuilderMachineBasicsAuthoring.SetMachineHostOctets(draft, _selectedMachineVmIndex, octets);
+        _selectedMachineVmIndex = result.SelectedVmIndex;
+        RenderAndNotify(result.Draft, reconcileNetworkLayout: false);
+    }
+
+    [RelayCommand]
     private void ToggleRolesPanel()
     {
         IsRolesPanelExpanded = !IsRolesPanelExpanded;
@@ -631,6 +677,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
         var card = matchingCards[0];
         var vm = _draft.Vms[_selectedMachineVmIndex];
+        var hostAddress = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(_draft, _selectedMachineVmIndex);
+        var baseDiskOptions = _vhdxCatalogOptions
+            .Select(option => new BuilderMachineInspectorViewModel.BaseDiskOption(option.Id, option.DisplayLabel))
+            .ToList();
         var roleRows = new List<BuilderRoleRowViewModel>();
         var featureRows = new List<BuilderRoleRowViewModel>();
         foreach (var role in TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm).Where(MatchesRoleSearch))
@@ -653,8 +703,25 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             RoleSearchText,
             IsRolesPanelExpanded,
             IsFeaturesPanelExpanded,
+            vm.Name,
+            vm.CpuCount,
+            vm.MemoryMb,
+            baseDiskOptions,
+            vm.VhdxId,
+            hostAddress.IsEditable,
+            hostAddress.FixedOctetPrefix,
+            hostAddress.EditableOctetCount > 1,
+            hostAddress.Octets.Count > 0 ? hostAddress.Octets[0].ToString() : string.Empty,
+            hostAddress.Octets.Count > 1 ? hostAddress.Octets[1].ToString() : string.Empty,
+            hostAddress.SubnetCidr,
+            hostAddress.Status.ToString(),
             roleRows,
             featureRows,
+            CommitSelectedMachineNameCommand,
+            CommitSelectedMachineCpuCountCommand,
+            CommitSelectedMachineMemoryMbCommand,
+            CommitSelectedMachineBaseDiskCommand,
+            CommitSelectedMachineHostOctetsCommand,
             ToggleRolesPanelCommand,
             ToggleFeaturesPanelCommand);
         HasSelectedMachineInspector = true;
@@ -913,7 +980,8 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     {
         var availableSwitches = CopyList(referenceData.AvailableVmSwitches);
         _availableSwitchInventory = CopyList(referenceData.AvailableSwitchInventory);
-        var vhdxCatalogOptions = CopyList(referenceData.VhdxCatalogOptions);
+        _vhdxCatalogOptions = CopyList(referenceData.VhdxCatalogOptions);
+        var vhdxCatalogOptions = _vhdxCatalogOptions;
         var switchText = availableSwitches.Count == 0
             ? "switches: none loaded"
             : $"switches: {string.Join(", ", availableSwitches)}";
@@ -1064,12 +1132,17 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         return draft;
     }
 
-    private void RenderAndNotify(TemplatesBuilderDraftSnapshot draft)
+    private void RenderAndNotify(TemplatesBuilderDraftSnapshot draft, bool reconcileNetworkLayout = true)
     {
         // Structural authoring (add/remove a domain or a machine) all funnels through here, so this is the single
         // point where the network layout is reconciled back to the one-switch-per-domain + required-router model.
-        // It is idempotent and preserves valid user-set addresses, so it is safe to run on every render.
-        draft = TemplatesBuilderNetworkReconciler.Reconcile(draft);
+        // Machine inspector host-IP edits opt out so their soft-validation statuses (reserved/duplicate/...) can
+        // surface immediately instead of being auto-normalized away.
+        if (reconcileNetworkLayout)
+        {
+            draft = TemplatesBuilderNetworkReconciler.Reconcile(draft);
+        }
+
         _isApplyingDraft = true;
         try
         {
