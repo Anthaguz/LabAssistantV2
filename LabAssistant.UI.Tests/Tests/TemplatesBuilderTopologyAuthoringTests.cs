@@ -150,6 +150,30 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
     }
 
     [Fact]
+    public void DeleteDomain_ForestRootWithStandaloneMachines_KeepsStandaloneMachines()
+    {
+        // Regression: deleting one forest's root removes only that forest, never the standalone machines that
+        // live outside every domain. A standalone VM carries no DomainId, so the delete cascade - which is
+        // scoped to the removed forest's domains - must leave it untouched. This reproduces the reported bug
+        // where deleting the first forest's root blanked the whole canvas, standalone machines included.
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var added = TemplatesBuilderMachineAuthoring.AddStandaloneComputer(twoForests);
+        var standaloneVmId = added.Draft.Vms[added.SelectedVmIndex].VmId;
+        var reconciled = TemplatesBuilderNetworkReconciler.Reconcile(added.Draft);
+
+        var firstForestId = reconciled.Forests[0].ForestId;
+        var root = reconciled.Domains.First(domain =>
+            string.Equals(domain.ForestId, firstForestId, StringComparison.OrdinalIgnoreCase));
+
+        var afterDelete = TemplatesBuilderNetworkReconciler.Reconcile(
+            TemplatesBuilderTopologyAuthoring.DeleteDomain(reconciled, root.DomainId).Draft);
+
+        Assert.DoesNotContain(afterDelete.Forests, forest => forest.ForestId == firstForestId);
+        Assert.Contains(afterDelete.Vms, vm => vm.VmId == standaloneVmId);
+        AssertValid(afterDelete);
+    }
+
+    [Fact]
     public void DeleteDomain_SoleForestRoot_IsNoOpToKeepAtLeastOneDirectory()
     {
         // Deleting the root of the only forest would empty the entire topology (and strip the required router),
