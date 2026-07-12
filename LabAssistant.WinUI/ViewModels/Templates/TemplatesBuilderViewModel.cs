@@ -70,6 +70,12 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     // pipeline (the imperative view guarded the same recompute with _isUpdatingDraft).
     private bool _isApplyingDraft;
 
+    // True only while RebuildSelectedMachineInspector is assigning SelectedMachineInspector. That assignment
+    // re-binds the base-disk ComboBox, which raises a synchronous SelectionChanged echo on the same call stack;
+    // suppressing commits during the window stops the echo from re-entering the render pipeline and overflowing
+    // the stack. This is the render-boundary backstop to the value guard in CommitSelectedMachineBaseDisk.
+    private bool _isRebuildingMachineInspector;
+
     // Live field view models per detail scope; the edit pipeline reads working values straight off
     // these instead of scanning the visual tree by field key.
     private IReadOnlyList<BuilderFieldViewModel> _networkFields = Array.Empty<BuilderFieldViewModel>();
@@ -616,10 +622,12 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         // Re-entrancy guard for the base-disk ComboBox. Rebuilding the inspector hands the ComboBox a fresh
         // ItemsSource and re-applies SelectedValue, which WinUI reports back through SelectionChanged as if the
         // user had picked a disk. Committing that echo would re-render, rebuild the inspector, and fire again -
-        // an unbounded recursion that overflows the stack. A null/empty id is only ever the transient value while
-        // the ItemsSource is being swapped (the options list is the non-empty VHDX catalog, with no empty entry),
-        // and an id equal to the current base disk is the echo of our own render; both are genuine no-ops.
-        if (string.IsNullOrWhiteSpace(vhdxId) ||
+        // an unbounded recursion that overflows the stack. _isRebuildingMachineInspector drops the echo raised
+        // synchronously while we assign the inspector; the value checks drop any later stray echo. A null/empty id
+        // is only ever the transient value while the ItemsSource is being swapped (the options list is the
+        // non-empty VHDX catalog, with no empty entry), and an id equal to the current base disk is our own render.
+        if (_isRebuildingMachineInspector ||
+            string.IsNullOrWhiteSpace(vhdxId) ||
             _selectedMachineVmIndex < 0 ||
             _selectedMachineVmIndex >= _draft.Vms.Count ||
             string.Equals(_draft.Vms[_selectedMachineVmIndex].VhdxId ?? string.Empty, vhdxId.Trim(), StringComparison.Ordinal))
@@ -732,74 +740,84 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
     private void RebuildSelectedMachineInspector()
     {
-        if (!IsMachineLevelVisible || _selectedMachineVmIndex < 0 || _selectedMachineVmIndex >= _draft.Vms.Count)
+        // The flag is read by CommitSelectedMachineBaseDisk to drop the ComboBox SelectionChanged echo that fires
+        // synchronously while we assign SelectedMachineInspector below.
+        _isRebuildingMachineInspector = true;
+        try
         {
-            SelectedMachineInspector = null;
-            HasSelectedMachineInspector = false;
-            return;
-        }
-
-        var projection = _isStandaloneContainer
-            ? TemplatesBuilderMachineProjector.ProjectStandaloneMachines(_draft, _selectedMachineVmIndex)
-            : TemplatesBuilderMachineProjector.ProjectDomainMachines(_draft, _machineContainerId, _selectedMachineVmIndex);
-        var matchingCards = projection.Machines.Where(machine => machine.VmIndex == _selectedMachineVmIndex).ToList();
-        if (matchingCards.Count == 0)
-        {
-            SelectedMachineInspector = null;
-            HasSelectedMachineInspector = false;
-            return;
-        }
-
-        var card = matchingCards[0];
-        var vm = _draft.Vms[_selectedMachineVmIndex];
-        var hostAddress = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(_draft, _selectedMachineVmIndex);
-        var baseDiskOptions = _vhdxCatalogOptions
-            .Select(option => new BuilderMachineInspectorViewModel.BaseDiskOption(option.Id, option.DisplayLabel))
-            .ToList();
-        var roleRows = new List<BuilderRoleRowViewModel>();
-        var featureRows = new List<BuilderRoleRowViewModel>();
-        foreach (var role in TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm).Where(MatchesRoleSearch))
-        {
-            var row = BuildRoleRow(role);
-            if (role.Category == TemplatesBuilderRoleCategory.Feature)
+            if (!IsMachineLevelVisible || _selectedMachineVmIndex < 0 || _selectedMachineVmIndex >= _draft.Vms.Count)
             {
-                featureRows.Add(row);
+                SelectedMachineInspector = null;
+                HasSelectedMachineInspector = false;
+                return;
             }
-            else
-            {
-                roleRows.Add(row);
-            }
-        }
 
-        SelectedMachineInspector = new BuilderMachineInspectorViewModel(
-            card.Label,
-            card.RoleLabel,
-            card.Subtext,
-            RoleSearchText,
-            IsRolesPanelExpanded,
-            IsFeaturesPanelExpanded,
-            vm.Name,
-            vm.CpuCount,
-            vm.MemoryMb,
-            baseDiskOptions,
-            vm.VhdxId,
-            hostAddress.IsEditable,
-            hostAddress.FixedOctetPrefix,
-            hostAddress.EditableOctetCount > 1,
-            hostAddress.Octets.Count > 0 ? hostAddress.Octets[0].ToString() : string.Empty,
-            hostAddress.Octets.Count > 1 ? hostAddress.Octets[1].ToString() : string.Empty,
-            hostAddress.SubnetCidr,
-            hostAddress.Status.ToString(),
-            roleRows,
-            featureRows,
-            CommitSelectedMachineNameCommand,
-            CommitSelectedMachineCpuCountCommand,
-            CommitSelectedMachineMemoryMbCommand,
-            CommitSelectedMachineBaseDiskCommand,
-            CommitSelectedMachineHostOctetsCommand,
-            ToggleRolesPanelCommand,
-            ToggleFeaturesPanelCommand);
-        HasSelectedMachineInspector = true;
+            var projection = _isStandaloneContainer
+                ? TemplatesBuilderMachineProjector.ProjectStandaloneMachines(_draft, _selectedMachineVmIndex)
+                : TemplatesBuilderMachineProjector.ProjectDomainMachines(_draft, _machineContainerId, _selectedMachineVmIndex);
+            var matchingCards = projection.Machines.Where(machine => machine.VmIndex == _selectedMachineVmIndex).ToList();
+            if (matchingCards.Count == 0)
+            {
+                SelectedMachineInspector = null;
+                HasSelectedMachineInspector = false;
+                return;
+            }
+
+            var card = matchingCards[0];
+            var vm = _draft.Vms[_selectedMachineVmIndex];
+            var hostAddress = TemplatesBuilderMachineBasicsAuthoring.ProjectHostAddress(_draft, _selectedMachineVmIndex);
+            var baseDiskOptions = _vhdxCatalogOptions
+                .Select(option => new BuilderMachineInspectorViewModel.BaseDiskOption(option.Id, option.DisplayLabel))
+                .ToList();
+            var roleRows = new List<BuilderRoleRowViewModel>();
+            var featureRows = new List<BuilderRoleRowViewModel>();
+            foreach (var role in TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm).Where(MatchesRoleSearch))
+            {
+                var row = BuildRoleRow(role);
+                if (role.Category == TemplatesBuilderRoleCategory.Feature)
+                {
+                    featureRows.Add(row);
+                }
+                else
+                {
+                    roleRows.Add(row);
+                }
+            }
+
+            SelectedMachineInspector = new BuilderMachineInspectorViewModel(
+                card.Label,
+                card.RoleLabel,
+                card.Subtext,
+                RoleSearchText,
+                IsRolesPanelExpanded,
+                IsFeaturesPanelExpanded,
+                vm.Name,
+                vm.CpuCount,
+                vm.MemoryMb,
+                baseDiskOptions,
+                vm.VhdxId,
+                hostAddress.IsEditable,
+                hostAddress.FixedOctetPrefix,
+                hostAddress.EditableOctetCount > 1,
+                hostAddress.Octets.Count > 0 ? hostAddress.Octets[0].ToString() : string.Empty,
+                hostAddress.Octets.Count > 1 ? hostAddress.Octets[1].ToString() : string.Empty,
+                hostAddress.SubnetCidr,
+                hostAddress.Status.ToString(),
+                roleRows,
+                featureRows,
+                CommitSelectedMachineNameCommand,
+                CommitSelectedMachineCpuCountCommand,
+                CommitSelectedMachineMemoryMbCommand,
+                CommitSelectedMachineBaseDiskCommand,
+                CommitSelectedMachineHostOctetsCommand,
+                ToggleRolesPanelCommand,
+                ToggleFeaturesPanelCommand);
+            HasSelectedMachineInspector = true;
+        }
+        finally
+        {
+            _isRebuildingMachineInspector = false;
+        }
     }
 
     private BuilderRoleRowViewModel BuildRoleRow(TemplatesBuilderVmRoleProjection role)
