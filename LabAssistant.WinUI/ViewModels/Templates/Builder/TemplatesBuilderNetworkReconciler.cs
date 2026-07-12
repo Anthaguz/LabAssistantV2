@@ -22,8 +22,9 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 /// - the LabAssistant host implicitly holds the last usable address (.254 on a /24) - never assigned to a VM;
 /// - each VM's primary NIC sits on its switch, is gatewayed through the router when one exists (no gateway in
 ///   a single-subnet lab, where a .1 default route would point at nothing), points DNS at its domain
-///   controller, and is assigned the next free host address when it lacks a valid in-subnet one (user-set
-///   valid addresses are preserved; duplicates are left for validation to flag, not silently reassigned).
+///   controller, and is assigned the next free host address when it lacks a valid in-subnet one (a user-set
+///   valid, non-duplicate address is preserved; when two VMs on the same switch hold the same address the
+///   later-bound one is reassigned to the next free host so a reconcile never leaves a duplicate behind).
 ///
 /// Everything is value-to-value over the immutable draft snapshot, so it is fully unit-testable without a XAML
 /// host and never touches Hyper-V.
