@@ -74,7 +74,12 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
 
     public bool IsSelected { get; }
 
-    /// <summary>True for a selected node or a root domain; drives the accent border and emphasized label.</summary>
+    /// <summary>
+    /// True for a selected node or a root domain. Consumed only by the offline canvas snapshot renderer to draw
+    /// an emphasis border; the live XAML does not bind this. In the app the selection border is driven by
+    /// <see cref="IsSelected"/> alone and root emphasis by <see cref="IsRootDomain"/> label styling, so a
+    /// non-root selection never leaves the root showing a second selection outline.
+    /// </summary>
     public bool IsAccent { get; }
 
     /// <summary>
