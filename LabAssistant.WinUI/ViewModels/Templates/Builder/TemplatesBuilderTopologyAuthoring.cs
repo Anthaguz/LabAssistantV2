@@ -167,12 +167,10 @@ internal static class TemplatesBuilderTopologyAuthoring
             string.Equals(forest.RootDomainId, target.DomainId, StringComparison.OrdinalIgnoreCase));
         var deletingForestRoot = !string.IsNullOrWhiteSpace(owningForest.ForestId);
 
-        // A lab must keep at least one directory. Deleting the root of the only forest would remove every
-        // domain, which strips the required router and blanks the canvas with no way back, so it is a no-op.
-        if (deletingForestRoot && draft.Forests.Count <= 1)
-        {
-            return Unchanged(draft);
-        }
+        // Deleting a forest root removes the whole forest. This is allowed even for the only forest: a lab may
+        // legitimately hold just standalone (workgroup) machines and no directory at all, and the user can add a
+        // forest or standalone machine again from Level 1, so it never dead-ends. Save is still gated on there
+        // being at least one machine (see TemplatesBuilderDraftValidator), which is the real floor.
 
         HashSet<string> removedDomainIds;
         var remainingForests = draft.Forests.ToList();
@@ -210,27 +208,19 @@ internal static class TemplatesBuilderTopologyAuthoring
             IsSaveConfirmed = false
         };
 
-        return new TopologyAuthoringResult(
-            result,
-            BuilderForestDomainResourceKind.Forest,
-            result.Forests.Count > 0 ? 0 : 0);
+        return PostDeleteSelection(result);
     }
 
     /// <summary>
     /// Deletes a forest by its id (removes the forest and everything in it). Equivalent to deleting its root
-    /// domain, and a no-op when the forest has no root yet.
+    /// domain, and a no-op when the forest has no root yet. Deleting the only forest is allowed: the lab may be
+    /// left with just standalone machines (or empty), and Level 1 can always add a forest again.
     /// </summary>
     public static TopologyAuthoringResult DeleteForest(TemplatesBuilderDraftSnapshot draft, string forestId)
     {
         var forest = draft.Forests.FirstOrDefault(item =>
             string.Equals(item.ForestId, forestId, StringComparison.OrdinalIgnoreCase));
         if (string.IsNullOrWhiteSpace(forest.ForestId))
-        {
-            return Unchanged(draft);
-        }
-
-        // A lab must keep at least one directory: refuse to delete the only forest (see DeleteDomain).
-        if (draft.Forests.Count <= 1)
         {
             return Unchanged(draft);
         }
@@ -253,7 +243,24 @@ internal static class TemplatesBuilderTopologyAuthoring
             IsSaveConfirmed = false
         };
 
-        return new TopologyAuthoringResult(result, BuilderForestDomainResourceKind.Forest, 0);
+        return PostDeleteSelection(result);
+    }
+
+    // After a delete, focus the first surviving forest; if the lab is now directory-less, focus the Standalone
+    // container when a workgroup machine survived, otherwise leave nothing meaningful selected (Forest/0 clamps
+    // to "nothing" when there are no forests). Keeps the canvas and detail panel pointed at something coherent.
+    private static TopologyAuthoringResult PostDeleteSelection(TemplatesBuilderDraftSnapshot draft)
+    {
+        if (draft.Forests.Count > 0)
+        {
+            return new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Forest, 0);
+        }
+
+        var hasStandaloneMachine = draft.Vms.Any(vm =>
+            V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !vm.IsRouter);
+        return hasStandaloneMachine
+            ? new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Standalone, 0)
+            : new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Forest, 0);
     }
 
     /// <summary>
