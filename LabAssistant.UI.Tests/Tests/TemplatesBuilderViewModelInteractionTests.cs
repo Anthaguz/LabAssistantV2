@@ -598,6 +598,41 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void MachineGridItems_MirrorsMachineCardsThenAppendsTheAddPlaceholder()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        ZoomIntoDomainMachineLevel(viewModel);
+
+        // The grid source is the machine cards in order followed by exactly one trailing add-computer
+        // placeholder tile, so the "+ Add computer" affordance wraps inline with the cards. MachineCards
+        // itself stays machine-only (the count/Single interaction tests rely on that).
+        Assert.Equal(viewModel.MachineCards.Count + 1, viewModel.MachineGridItems.Count);
+        for (var i = 0; i < viewModel.MachineCards.Count; i++)
+        {
+            Assert.Same(viewModel.MachineCards[i], viewModel.MachineGridItems[i]);
+        }
+
+        var placeholder = Assert.IsType<BuilderAddMachinePlaceholder>(viewModel.MachineGridItems[^1]);
+        Assert.True(placeholder.IsEnabled);
+        Assert.Single(viewModel.MachineGridItems.OfType<BuilderAddMachinePlaceholder>());
+    }
+
+    [Fact]
+    public void MachineGridItems_IsClearedWhenLeavingTheMachineLevel()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        ZoomIntoDomainMachineLevel(viewModel);
+        Assert.NotEmpty(viewModel.MachineGridItems);
+
+        viewModel.BackToTopologyCommand.Execute(null);
+
+        Assert.False(viewModel.IsMachineLevelVisible);
+        Assert.Empty(viewModel.MachineGridItems);
+    }
+
+    [Fact]
     public void MachineInspectorHostIp_ProjectionExposesMemberEditorAndRouterHiddenRow()
     {
         var viewModel = CreateViewModel();

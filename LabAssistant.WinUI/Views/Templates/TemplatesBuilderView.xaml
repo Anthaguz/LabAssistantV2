@@ -195,11 +195,13 @@
             </Border>
         </DataTemplate>
 
-        <!-- Level 2 machine card: one VM inside a domain or the Standalone container. -->
+        <!-- Level 2 machine card: one VM inside a domain or the Standalone container. Rendered as a fixed-width
+             tile so it wraps in the UniformGridLayout grid; inter-tile spacing comes from the layout, not a margin. -->
         <DataTemplate x:Key="BuilderMachineCardTemplate" x:DataType="builder:BuilderMachineCardViewModel">
             <Border
-                Margin="0,0,0,6"
                 Padding="12,10,12,10"
+                Width="240"
+                MinHeight="64"
                 Background="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellBackgroundBrush|ShellContentBackgroundBrush}"
                 BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
                 BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
@@ -260,6 +262,44 @@
                 </Grid>
             </Border>
         </DataTemplate>
+
+        <!-- Level 2 add-computer placeholder: a dotted-outline tile the same size as a machine card that flows as
+             the trailing item in the grid. WinUI Border has no dashed brush, so the dotted outline is a Rectangle
+             overlay with a dash array; the whole tile is the add button, disabled via the placeholder IsEnabled. -->
+        <DataTemplate x:Key="BuilderAddMachinePlaceholderTemplate" x:DataType="builder:BuilderAddMachinePlaceholder">
+            <Button
+                Padding="0"
+                Width="240"
+                MinHeight="64"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                Background="Transparent"
+                BorderThickness="0"
+                Command="{x:Bind AddCommand}"
+                IsEnabled="{x:Bind IsEnabled, Mode=OneWay}"
+                ToolTipService.ToolTip="Add a computer">
+                <Grid>
+                    <Rectangle
+                        RadiusX="6"
+                        RadiusY="6"
+                        Stroke="{StaticResource ShellBorderBrush}"
+                        StrokeDashArray="4 3"
+                        StrokeThickness="1" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontWeight="SemiBold"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="{x:Bind Label}" />
+                </Grid>
+            </Button>
+        </DataTemplate>
+
+        <!-- Chooses the machine-card vs add-placeholder tile for the single Level 2 grid source. -->
+        <local:BuilderMachineGridItemTemplateSelector
+            x:Key="BuilderMachineGridItemTemplateSelector"
+            AddPlaceholderTemplate="{StaticResource BuilderAddMachinePlaceholderTemplate}"
+            MachineCardTemplate="{StaticResource BuilderMachineCardTemplate}" />
 
         <!-- Level 2 selected-machine inspector rows. -->
         <DataTemplate x:Key="BuilderRoleRowTemplate" x:DataType="builder:BuilderRoleRowViewModel">
@@ -758,13 +798,17 @@
 
                                 <!-- Level 2: machines inside the zoomed-in domain or the Standalone container. -->
                                 <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.IsMachineLevelVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                        <Button
-                                            Command="{x:Bind ViewModel.BackToTopologyCommand}"
-                                            Content="&#xE72B; Back to topology"
-                                            FontFamily="Segoe MDL2 Assets"
-                                            ToolTipService.ToolTip="Back to the directory topology" />
-                                    </StackPanel>
+                                    <!-- Back affordance: only the arrow uses the symbol font; the label stays in the
+                                         default font so it no longer renders as tofu boxes. -->
+                                    <Button
+                                        HorizontalAlignment="Left"
+                                        Command="{x:Bind ViewModel.BackToTopologyCommand}"
+                                        ToolTipService.ToolTip="Back to the directory topology">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontSize="14" Glyph="&#xE72B;" />
+                                            <TextBlock Text="Back to topology" />
+                                        </StackPanel>
+                                    </Button>
                                     <TextBlock
                                         FontWeight="SemiBold"
                                         FontSize="18"
@@ -775,22 +819,42 @@
                                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                                         Text="{x:Bind ViewModel.MachineLevelSubtitle, Mode=OneWay}"
                                         TextWrapping="Wrap" />
-                                    <Button
-                                        Command="{x:Bind ViewModel.AddComputerCommand}"
-                                        Content="{x:Bind ViewModel.AddComputerLabel, Mode=OneWay}"
-                                        IsEnabled="{x:Bind ViewModel.AddVmEnabled, Mode=OneWay}" />
-                                    <ItemsControl ItemTemplate="{StaticResource BuilderMachineCardTemplate}" ItemsSource="{x:Bind ViewModel.MachineCards, Mode=OneWay}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="0" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                    <TextBlock
-                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.MachineLevelEmptyText, Mode=OneWay}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{x:Bind ViewModel.HasMachineCards, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                    <!-- Level 2 body: a wrapping tile grid of machines on the left, the selected-machine
+                                         inspector pinned in a scrollable column on the right so editing never scrolls the grid. -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="360" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="10">
+                                            <!-- Machine cards plus the trailing dotted "+ Add computer" placeholder wrap together. -->
+                                            <ItemsRepeater ItemTemplate="{StaticResource BuilderMachineGridItemTemplateSelector}" ItemsSource="{x:Bind ViewModel.MachineGridItems, Mode=OneWay}">
+                                                <ItemsRepeater.Layout>
+                                                    <UniformGridLayout
+                                                        ItemsStretch="None"
+                                                        MinColumnSpacing="10"
+                                                        MinItemWidth="240"
+                                                        MinRowSpacing="10" />
+                                                </ItemsRepeater.Layout>
+                                            </ItemsRepeater>
+                                            <TextBlock
+                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                Text="{x:Bind ViewModel.MachineLevelEmptyText, Mode=OneWay}"
+                                                TextWrapping="Wrap"
+                                                Visibility="{x:Bind ViewModel.HasMachineCards, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                        </StackPanel>
+                                        <ScrollViewer
+                                            Grid.Column="1"
+                                            VerticalScrollBarVisibility="Auto"
+                                            VerticalScrollMode="Auto">
+                                            <Grid>
+                                                <TextBlock
+                                                    HorizontalAlignment="Center"
+                                                    Margin="0,20,0,0"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="Select a machine to edit its settings."
+                                                    TextWrapping="Wrap"
+                                                    Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
                                     <Border
                                         Padding="14"
                                         Background="{StaticResource ShellContentBackgroundBrush}"
@@ -1066,6 +1130,9 @@
                                             </Border>
                                         </StackPanel>
                                     </Border>
+                                            </Grid>
+                                        </ScrollViewer>
+                                    </Grid>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

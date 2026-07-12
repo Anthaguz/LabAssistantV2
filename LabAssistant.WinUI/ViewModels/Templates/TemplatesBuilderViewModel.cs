@@ -63,6 +63,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private int _selectedMachineVmIndex = -1;
     private readonly HashSet<string> _expandedRoleConfigKeys = new(StringComparer.OrdinalIgnoreCase);
 
+    // Persistent trailing tile for the Level 2 machine grid. Its IsEnabled tracks AddVmEnabled so the
+    // placeholder can always be present in MachineGridItems and simply disable when adding is not allowed.
+    private readonly BuilderAddMachinePlaceholder _machinePlaceholder;
+
     // Guards programmatic field/observable writes so refreshing the forms does not re-enter the edit
     // pipeline (the imperative view guarded the same recompute with _isUpdatingDraft).
     private bool _isApplyingDraft;
@@ -77,6 +81,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     public TemplatesBuilderViewModel(ITemplatesCapabilityService templatesCapabilityService)
     {
         _templatesCapabilityService = templatesCapabilityService;
+        _machinePlaceholder = new BuilderAddMachinePlaceholder("+ Add computer", AddComputerCommand);
         PropertyChanged += OnSelfPropertyChanged;
         RebuildDeploymentProfileRows();
         RenderAll();
@@ -134,6 +139,9 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     [ObservableProperty] private string _machineLevelTitle = string.Empty;
     [ObservableProperty] private string _machineLevelSubtitle = string.Empty;
     [ObservableProperty] private ObservableCollection<BuilderMachineCardViewModel> _machineCards = [];
+    // View-only grid source: the machine cards followed by the trailing add-computer placeholder tile.
+    // Kept separate from MachineCards (which stays machine-only) so the placeholder can flow in the same wrap.
+    [ObservableProperty] private ObservableCollection<object> _machineGridItems = [];
     [ObservableProperty] private bool _hasMachineCards;
     [ObservableProperty] private string _machineLevelEmptyText = "No machines yet.";
     [ObservableProperty] private string _addComputerLabel = "+ Add computer";
@@ -456,7 +464,9 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private void BackToTopology()
     {
         IsMachineLevelVisible = false;
-        RebuildSelectedMachineInspector();
+        // RenderMachineLevel clears the (now hidden) machine collections and rebuilds the inspector, so leaving
+        // Level 2 does not strand stale machine cards or the add-computer placeholder behind the topology view.
+        RenderMachineLevel();
     }
 
     // Level 1 entry point for standalone machines: there is no Standalone box until one exists, so this creates
@@ -614,6 +624,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         if (!IsMachineLevelVisible)
         {
             MachineCards = [];
+            MachineGridItems = [];
             HasMachineCards = false;
             RebuildSelectedMachineInspector();
             return;
@@ -652,6 +663,17 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
         MachineCards = cards;
         HasMachineCards = cards.Count > 0;
+
+        // The grid source mirrors the machine cards and appends the persistent add-computer placeholder so it
+        // wraps as the trailing tile. MachineCards itself stays machine-only for the interaction tests.
+        var gridItems = new ObservableCollection<object>();
+        foreach (var card in cards)
+        {
+            gridItems.Add(card);
+        }
+
+        gridItems.Add(_machinePlaceholder);
+        MachineGridItems = gridItems;
         RebuildSelectedMachineInspector();
     }
 
@@ -945,6 +967,9 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         _preservedTrusts = Array.Empty<V2TrustTemplate>();
         ApplyDraft(draft with { IsSaveConfirmed = false }, TemplatesBuilderValidationRequest.All());
         _hasActiveDraft = true;
+        // A draft is now active, so the authoring gates (add forest/tree/network/credential/vm/standalone and the
+        // machine add-computer placeholder) must enable immediately instead of staying dead until the first edit.
+        RefreshActionState();
         ContextText = "Editing new V2 Builder draft.";
         SetStatus("Review the suggested topology, then save.");
     }
@@ -958,6 +983,8 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         _preservedTrusts = CopyTrusts(document.Template.DirectoryTopology?.Trusts);
         ApplyDraft(TemplatesBuilderDraftMapper.FromTemplate(document.Template), TemplatesBuilderValidationRequest.All());
         _hasActiveDraft = true;
+        // A draft is now active, so the authoring gates must enable immediately (see LoadNewDraft).
+        RefreshActionState();
         ContextText = string.IsNullOrWhiteSpace(_sourceFilePath)
             ? "Editing V2 Builder draft."
             : $"Editing V2 template: {_sourceFilePath}";
@@ -1895,6 +1922,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         AddTreeEnabled = _canNavigate;
         AddStandaloneMachineEnabled = _canNavigate;
         AddVmEnabled = _canNavigate;
+        _machinePlaceholder.IsEnabled = _canNavigate;
         BackToLibraryEnabled = !IsLoading;
 
         var projection = _navigation.Project(_draft, _canNavigate);
