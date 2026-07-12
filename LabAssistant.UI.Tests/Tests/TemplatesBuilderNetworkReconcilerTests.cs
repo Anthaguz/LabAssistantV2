@@ -8,17 +8,17 @@ namespace LabAssistant.UI.Tests.Tests;
 
 /// <summary>
 /// Behavior coverage for <see cref="TemplatesBuilderNetworkReconciler"/> - the pure function that keeps a
-/// draft's network layout consistent with the locked one-switch-per-domain + required-router model. These
-/// tests build draft snapshots directly (no XAML host, no Hyper-V) and assert the reconciler's contract:
-/// one Internal switch per domain with a stable auto-allocated subnet, a shared standalone switch only when
-/// standalone machines exist, a single required router bridging every switch at .1, VM IPs auto-assigned in
-/// subnet (preserving valid ones, never duplicating), gateways through the router, DNS at the domain's DC,
-/// and full idempotency.
+/// draft's network layout consistent with the locked one-switch-per-domain model. These tests build draft
+/// snapshots directly (no XAML host, no Hyper-V) and assert the reconciler's contract: one Internal switch per
+/// domain with a stable auto-allocated subnet, a shared standalone switch only when standalone machines exist,
+/// a router bridging every switch at .1 ONLY when there are at least two switches to route between (a
+/// single-subnet lab has none), VM IPs auto-assigned in subnet (preserving valid ones, never duplicating),
+/// gateways through the router when one exists, DNS at the domain's DC, and full idempotency.
 /// </summary>
 public sealed class TemplatesBuilderNetworkReconcilerTests
 {
     [Fact]
-    public void SingleDomain_CreatesOneInternalSwitchAndRequiredRouter()
+    public void SingleDomain_CreatesOneInternalSwitchAndNoRouter()
     {
         var draft = Reconcile(DraftWith(
             domains: [Domain("d1", "contoso.lab", "CONTOSO")],
@@ -29,15 +29,12 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
         Assert.Equal("10.0.0.0/24", network.Subnet);
         Assert.Equal(V2SwitchTypeCatalog.Internal, network.SwitchType);
 
-        var router = Assert.Single(draft.Vms, vm => vm.IsRouter);
-        Assert.True(V2MembershipModeCatalog.IsStandalone(router.MembershipMode));
-        var routerNic = Assert.Single(router.Nics);
-        Assert.Equal("10.0.0.1", routerNic.IpAddress);
-        Assert.Equal(network.NetworkId, routerNic.NetworkId);
+        // One switch means nothing to route between, so the lab carries no router VM.
+        Assert.DoesNotContain(draft.Vms, vm => vm.IsRouter);
     }
 
     [Fact]
-    public void DomainController_GetsInSubnetAddressGatewayAndSelfDns()
+    public void DomainController_GetsInSubnetAddressAndSelfDnsButNoGatewayWithoutARouter()
     {
         var draft = Reconcile(DraftWith(
             domains: [Domain("d1", "contoso.lab", "CONTOSO")],
@@ -48,7 +45,8 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
         Assert.True(BuilderLabSubnet.TryParseCidr("10.0.0.0/24", out var subnet));
         Assert.True(BuilderLabSubnet.TryParseAddress(nic.IpAddress, out var address));
         Assert.True(subnet.Contains(address));
-        Assert.Equal("10.0.0.1", nic.DefaultGateway);
+        // No router in a single-subnet lab, so no default route is pinned.
+        Assert.Equal(string.Empty, nic.DefaultGateway);
         Assert.Equal([nic.IpAddress], nic.DnsServers);
     }
 
@@ -113,14 +111,14 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
     }
 
     [Fact]
-    public void RemovingADomain_RebuildsRouterNicSet()
+    public void RemovingADomain_DropsToOneSwitchAndRemovesTheRouter()
     {
         var two = Reconcile(DraftWith(
             domains: [Domain("d1", "contoso.lab", "CONTOSO"), Domain("d2", "fabrikam.lab", "FABRIKAM")],
             vms: [Dc("dc1", "d1"), Dc("dc2", "d2")]));
         Assert.Equal(2, two.Vms.Single(vm => vm.IsRouter).Nics.Count);
 
-        // Drop d2 and its DC, then reconcile again: the router must shed the d2 NIC.
+        // Drop d2 and its DC, then reconcile again: a single switch remains, so the router is retired.
         var reduced = two with
         {
             Domains = two.Domains.Where(domain => domain.DomainId != "d2").ToList(),
@@ -129,7 +127,7 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
         var after = Reconcile(reduced);
 
         Assert.Single(after.LabNetworks);
-        Assert.Single(after.Vms.Single(vm => vm.IsRouter).Nics);
+        Assert.DoesNotContain(after.Vms, vm => vm.IsRouter);
     }
 
     [Fact]
@@ -189,16 +187,44 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
     [Fact]
     public void CreatedRouter_InheritsDiskAndLocalBootstrapFromAnExistingVm()
     {
+        // A domain plus a standalone machine yields two switches, which is what earns a router; the new router
+        // seeds its disk and local bootstrap slot from an existing VM.
         var dc = Dc("dc", "d1") with
         {
             VhdxId = "base-ws2022",
             CredentialSlots = new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", string.Empty, "slot-dsrm", string.Empty)
         };
-        var draft = Reconcile(DraftWith(domains: [Domain("d1", "contoso.lab", "CONTOSO")], vms: [dc]));
+        var draft = Reconcile(DraftWith(
+            domains: [Domain("d1", "contoso.lab", "CONTOSO")],
+            vms: [dc, Standalone("rootca")]));
 
         var router = draft.Vms.Single(vm => vm.IsRouter);
         Assert.Equal("base-ws2022", router.VhdxId);
         Assert.Equal("slot-local", router.CredentialSlots.LocalBootstrap);
+    }
+
+    [Fact]
+    public void SingleDomainWithStandaloneMachine_HasTwoSwitchesAndARouter()
+    {
+        var draft = Reconcile(DraftWith(
+            domains: [Domain("d1", "contoso.lab", "CONTOSO")],
+            vms: [Dc("dc", "d1"), Standalone("rootca")]));
+
+        Assert.Equal(2, draft.LabNetworks.Count);
+        var router = Assert.Single(draft.Vms, vm => vm.IsRouter);
+        Assert.Equal(2, router.Nics.Count);
+    }
+
+    [Fact]
+    public void StandaloneOnly_HasOneSwitchAndNoRouter()
+    {
+        var draft = Reconcile(DraftWith(domains: [], vms: [Standalone("box1"), Standalone("box2")]));
+
+        var network = Assert.Single(draft.LabNetworks);
+        Assert.Equal(string.Empty, network.DomainId);
+        Assert.DoesNotContain(draft.Vms, vm => vm.IsRouter);
+        // A router-less standalone switch pins no default route on its machines.
+        Assert.All(draft.Vms, vm => Assert.Equal(string.Empty, vm.Nics[0].DefaultGateway));
     }
 
     [Fact]

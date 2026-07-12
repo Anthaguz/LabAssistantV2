@@ -145,8 +145,11 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     {
         // A standalone machine (a workgroup box: router, root CA, ...) must survive the draft -> LabTemplate ->
         // draft round-trip as a standalone with no domain, so Level 2 authoring never weakens the contract.
-        var draft = TemplatesBuilderMachineAuthoring.AddStandaloneComputer(NamedDraft()).Draft;
-        var standaloneName = draft.Vms[^1].Name;
+        // Reconcile first (as the app does on every edit) so both sides agree on the auto-created router that a
+        // second switch brings.
+        var draft = TemplatesBuilderNetworkReconciler.Reconcile(
+            TemplatesBuilderMachineAuthoring.AddStandaloneComputer(NamedDraft()).Draft);
+        var standaloneName = draft.Vms.Single(vm => V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !vm.IsRouter).Name;
 
         var build = TemplatesBuilderDraftMapper.BuildDocument(draft, "template-standalone-round-trip", 1, "1.0.0", sourceFilePath: null);
         Assert.NotNull(build.Document);
@@ -440,8 +443,11 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         viewModel.AddStandaloneMachineCommand.Execute(null);
 
         var after = viewModel.CaptureDraft();
-        Assert.Equal(before.Vms.Count + 1, after.Vms.Count);
-        var added = after.Vms[^1];
+        // Adding the first standalone machine to a single-domain lab creates a second switch, crossing the
+        // >= 2-switch threshold, so the reconciler also materializes the router. Two VMs appear: the standalone
+        // itself and the auto-created router.
+        Assert.Equal(before.Vms.Count + 2, after.Vms.Count);
+        var added = after.Vms.Single(vm => V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !vm.IsRouter);
         Assert.True(V2MembershipModeCatalog.IsStandalone(added.MembershipMode));
         Assert.Equal(string.Empty, added.DomainId);
         Assert.False(added.IsActiveDirectoryDomainController);
@@ -595,7 +601,10 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     public void MachineInspectorHostIp_ProjectionExposesMemberEditorAndRouterHiddenRow()
     {
         var viewModel = CreateViewModel();
-        viewModel.LoadNewDraft(NamedDraft());
+        // A router only exists once there are two switches, so seed a standalone machine (which adds the
+        // standalone switch) and reconcile before loading, giving the draft both a domain member and a router.
+        viewModel.LoadNewDraft(TemplatesBuilderNetworkReconciler.Reconcile(
+            TemplatesBuilderMachineAuthoring.AddStandaloneComputer(NamedDraft()).Draft));
         ZoomIntoDomainMachineLevel(viewModel);
 
         var draft = viewModel.CaptureDraft();

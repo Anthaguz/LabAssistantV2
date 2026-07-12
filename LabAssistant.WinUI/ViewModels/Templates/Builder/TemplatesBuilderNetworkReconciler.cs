@@ -13,9 +13,14 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 /// - every domain owns exactly one Internal switch, its subnet auto-allocated from a base plan
 ///   (10.0.0.0/24, 10.0.1.0/24, ...), stable across edits (an existing subnet is never reshuffled);
 /// - standalone (workgroup) machines share a single standalone switch;
-/// - a single required router VM bridges every switch, holding the first usable address (.1) on each;
+/// - a router VM is created ONLY when there are at least two switches to bridge (so a single-subnet lab - one
+///   domain, or standalone-only - has no router, since there is nothing to route between); when present it
+///   bridges every switch, holding the first usable address (.1) on each;
+/// - the .1 slot is always reserved so VM addressing stays stable whether or not a router exists (adding a
+///   second switch later must not renumber the machines that were already placed);
 /// - the LabAssistant host implicitly holds the last usable address (.254 on a /24) - never assigned to a VM;
-/// - each VM's primary NIC sits on its switch, is gatewayed through the router, points DNS at its domain
+/// - each VM's primary NIC sits on its switch, is gatewayed through the router when one exists (no gateway in
+///   a single-subnet lab, where a .1 default route would point at nothing), points DNS at its domain
 ///   controller, and is assigned the next free host address when it lacks a valid in-subnet one (user-set
 ///   valid addresses are preserved; duplicates are left for validation to flag, not silently reassigned).
 ///
@@ -42,7 +47,8 @@ internal static class TemplatesBuilderNetworkReconciler
     {
         var networks = EnsureNetworks(draft);
         var vms = EnsureRouter(draft.Vms ?? [], networks);
-        vms = AssignAddresses(vms, networks, draft.Domains ?? []);
+        var hasRouter = vms.Any(vm => vm.IsRouter);
+        vms = AssignAddresses(vms, networks, draft.Domains ?? [], hasRouter);
         return draft with { LabNetworks = networks, Vms = vms };
     }
 
@@ -168,7 +174,7 @@ internal static class TemplatesBuilderNetworkReconciler
         return string.IsNullOrWhiteSpace(sanitized) ? "lab" : sanitized;
     }
 
-    // ----- router: a single standalone VM with a NIC (holding .1) on every switch -----
+    // ----- router: a single standalone VM with a NIC (holding .1) on every switch, only when >= 2 switches -----
 
     private static IReadOnlyList<TemplatesBuilderVmDraft> EnsureRouter(
         IReadOnlyList<TemplatesBuilderVmDraft> vms,
@@ -176,8 +182,9 @@ internal static class TemplatesBuilderNetworkReconciler
     {
         var withoutRouter = vms.Where(vm => !vm.IsRouter).ToList();
 
-        // The router is required whenever there is at least one switch to bridge and gateway.
-        if (networks.Count == 0)
+        // The router only earns its keep when there are at least two switches to bridge and route between. A
+        // single-subnet lab (one domain, or standalone-only) needs no router, so drop any stale one it may hold.
+        if (networks.Count < 2)
         {
             return withoutRouter;
         }
@@ -246,7 +253,8 @@ internal static class TemplatesBuilderNetworkReconciler
     private static IReadOnlyList<TemplatesBuilderVmDraft> AssignAddresses(
         IReadOnlyList<TemplatesBuilderVmDraft> vms,
         IReadOnlyList<TemplatesBuilderLabNetworkDraft> networks,
-        IReadOnlyList<TemplatesBuilderDomainDraft> domains)
+        IReadOnlyList<TemplatesBuilderDomainDraft> domains,
+        bool hasRouter)
     {
         var domainNetwork = networks
             .Where(network => !string.IsNullOrWhiteSpace(network.DomainId))
@@ -293,7 +301,7 @@ internal static class TemplatesBuilderNetworkReconciler
                 continue;
             }
 
-            var (bound, address) = BindNic(vm, network, gatewayDns: null, UsedFor(network.NetworkId));
+            var (bound, address) = BindNic(vm, network, gatewayDns: null, UsedFor(network.NetworkId), hasRouter);
             updated[i] = bound;
             if (!string.IsNullOrWhiteSpace(address) && !dcAddressByDomain.ContainsKey(vm.DomainId))
             {
@@ -314,12 +322,12 @@ internal static class TemplatesBuilderNetworkReconciler
                 domainNetwork.TryGetValue(vm.DomainId, out var memberNetwork))
             {
                 dcAddressByDomain.TryGetValue(vm.DomainId, out var dnsAddress);
-                var (bound, _) = BindNic(vm, memberNetwork, dnsAddress, UsedFor(memberNetwork.NetworkId));
+                var (bound, _) = BindNic(vm, memberNetwork, dnsAddress, UsedFor(memberNetwork.NetworkId), hasRouter);
                 updated[i] = bound;
             }
             else if (V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !string.IsNullOrWhiteSpace(standaloneNetwork.NetworkId))
             {
-                var (bound, _) = BindNic(vm, standaloneNetwork, gatewayDns: null, UsedFor(standaloneNetwork.NetworkId));
+                var (bound, _) = BindNic(vm, standaloneNetwork, gatewayDns: null, UsedFor(standaloneNetwork.NetworkId), hasRouter);
                 updated[i] = bound;
             }
         }
@@ -333,7 +341,8 @@ internal static class TemplatesBuilderNetworkReconciler
         TemplatesBuilderVmDraft vm,
         TemplatesBuilderLabNetworkDraft network,
         string? gatewayDns,
-        HashSet<uint> used)
+        HashSet<uint> used,
+        bool hasRouter)
     {
         if (!BuilderLabSubnet.TryParseCidr(network.Subnet, out var subnet))
         {
@@ -368,7 +377,9 @@ internal static class TemplatesBuilderNetworkReconciler
             used.Add(addr);
         }
 
-        var router = subnet.RouterAddress is { } routerAddress ? BuilderLabSubnet.FormatAddress(routerAddress) : string.Empty;
+        // A default route is only meaningful when a router actually holds .1; in a single-subnet lab we leave the
+        // gateway empty rather than point every VM at a non-existent .1.
+        var router = hasRouter && subnet.RouterAddress is { } routerAddress ? BuilderLabSubnet.FormatAddress(routerAddress) : string.Empty;
         IReadOnlyList<string> dns = vm.IsActiveDirectoryDomainController && !string.IsNullOrWhiteSpace(address)
             ? [address]
             : !string.IsNullOrWhiteSpace(gatewayDns) ? [gatewayDns!] : existing.DnsServers ?? [];
