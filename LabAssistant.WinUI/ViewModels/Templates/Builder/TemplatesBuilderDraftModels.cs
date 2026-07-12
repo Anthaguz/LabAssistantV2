@@ -37,7 +37,16 @@ internal readonly record struct TemplatesBuilderDraftSnapshot(
     IReadOnlyList<TemplatesBuilderForestDraft> Forests,
     IReadOnlyList<TemplatesBuilderDomainDraft> Domains,
     IReadOnlyList<TemplatesBuilderVmDraft> Vms,
-    bool IsSaveConfirmed);
+    bool IsSaveConfirmed)
+{
+    /// <summary>
+    /// Authored forest trusts. Init-only (not a positional ctor parameter) so it rides along on
+    /// <c>with { ... }</c> edits without threading through every snapshot reconstruction. Null means none;
+    /// consumers read <c>Trusts ?? []</c>. Any code that rebuilds the snapshot via the positional ctor
+    /// (see ApplyDraft) must copy this across explicitly, or authored trusts are silently dropped.
+    /// </summary>
+    public IReadOnlyList<TemplatesBuilderTrustDraft>? Trusts { get; init; }
+}
 
 internal readonly record struct TemplatesBuilderLabNetworkDraft(
     string NetworkId,

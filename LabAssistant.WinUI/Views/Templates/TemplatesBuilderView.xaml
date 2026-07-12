@@ -25,6 +25,22 @@
                 StrokeThickness="2" />
         </DataTemplate>
 
+        <!-- Forest trust connector: a distinct dashed accent line drawn frame-to-frame between two forests
+             (outer edge of one green box to the outer edge of the other), so a trust reads as a separate concept
+             from the solid parent-child domain edges. Static style (no converter); endpoints are computed by the
+             canvas view model from the live frame geometry. -->
+        <DataTemplate x:Key="BuilderCanvasTrustEdgeTemplate" x:DataType="builder:BuilderCanvasEdgeViewModel">
+            <Line
+                X1="{x:Bind X1, Mode=OneWay}"
+                Y1="{x:Bind Y1, Mode=OneWay}"
+                X2="{x:Bind X2, Mode=OneWay}"
+                Y2="{x:Bind Y2, Mode=OneWay}"
+                IsHitTestVisible="False"
+                Stroke="{StaticResource ShellAccentBrush}"
+                StrokeDashArray="5 3"
+                StrokeThickness="2" />
+        </DataTemplate>
+
         <!-- Forest enclosing frame: a group box auto-sized around its member domain nodes, with a header pill
              straddling the top border. The body is not hit-testable so pointer events reach the domains inside;
              only the pill routes forest selection and the add-tree / delete affordances. -->
@@ -749,6 +765,13 @@
                                                             </ItemsPanelTemplate>
                                                         </ItemsControl.ItemsPanel>
                                                     </ItemsControl>
+                                                    <ItemsControl ItemTemplate="{StaticResource BuilderCanvasTrustEdgeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.TrustEdges, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
                                                     <ItemsControl ItemTemplate="{StaticResource BuilderCanvasEdgeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Edges, Mode=OneWay}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>
@@ -787,6 +810,41 @@
                                                     </ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
                                             </ItemsControl>
+                                            <!-- Forest trust authoring: only shown when a forest is selected and the draft has
+                                                 at least two forests (see CanAuthorForestTrust). Pick another forest and add a
+                                                 forest trust, or remove one of this forest's existing trusts. -->
+                                            <StackPanel
+                                                Spacing="6"
+                                                Visibility="{x:Bind ViewModel.CanAuthorForestTrust, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                    Text="Forest trusts" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ComboBox
+                                                        MinWidth="160"
+                                                        DisplayMemberPath="Label"
+                                                        ItemsSource="{x:Bind ViewModel.ForestTrustTargets, Mode=OneWay}"
+                                                        PlaceholderText="Select forest"
+                                                        SelectedItem="{x:Bind ViewModel.SelectedForestTrustTarget, Mode=TwoWay}" />
+                                                    <Button
+                                                        Command="{x:Bind ViewModel.AddForestTrustCommand}"
+                                                        Content="Add forest trust" />
+                                                </StackPanel>
+                                                <ItemsControl ItemsSource="{x:Bind ViewModel.ForestTrustRows, Mode=OneWay}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="builder:BuilderForestTrustRowViewModel">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <TextBlock
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                    Text="{x:Bind Label}" />
+                                                                <Button Command="{x:Bind RemoveCommand}" Content="Remove" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
                                             <TextBlock
                                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                                                 Text="No forest or domain selected."

@@ -141,6 +141,108 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void BuilderDraftMapping_RoundTripsForestTrustThroughLabTemplate()
+    {
+        // A forest trust authored between two forests persists as a Forest / Bidirectional trust anchored on the
+        // two forests' root domain ids, and must survive draft -> LabTemplate -> draft without loss.
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(NamedDraft()).Draft;
+        var authored = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        var expected = (authored.Trusts ?? [])[0];
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(authored, "template-forest-trust", 1, "1.0.0", sourceFilePath: null);
+        Assert.NotNull(build.Document);
+
+        var persisted = Assert.Single(build.Document!.Template.DirectoryTopology!.Trusts);
+        Assert.Equal(V2TrustType.Forest, persisted.TrustType);
+        Assert.Equal(V2TrustDirection.Bidirectional, persisted.Direction);
+
+        var mappedBack = TemplatesBuilderDraftMapper.FromTemplate(build.Document.Template);
+        var trust = Assert.Single(mappedBack.Trusts ?? []);
+        Assert.Equal(expected.TrustId, trust.TrustId);
+        Assert.Equal(expected.SourceDomainId, trust.SourceDomainId);
+        Assert.Equal(expected.TargetDomainId, trust.TargetDomainId);
+        Assert.Equal(nameof(V2TrustType.Forest), trust.TrustType);
+        Assert.Equal(nameof(V2TrustDirection.Bidirectional), trust.Direction);
+    }
+
+    [Fact]
+    public void BuilderDraftMapping_PreservesHandAuthoredExternalTrust()
+    {
+        // A hand-authored / unknown trust (e.g. an External domain-to-domain trust, a future concept) must not be
+        // silently dropped by the round-trip - the mapper preserves whatever trusts the draft carries.
+        var baseDraft = NamedDraft();
+        var external = new TemplatesBuilderTrustDraft(
+            "trust-hand-authored",
+            baseDraft.Domains[0].DomainId,
+            "domain-partner",
+            nameof(V2TrustType.External),
+            nameof(V2TrustDirection.Inbound));
+        var draft = baseDraft with { Trusts = new[] { external } };
+
+        var build = TemplatesBuilderDraftMapper.BuildDocument(draft, "template-external-trust", 1, "1.0.0", sourceFilePath: null);
+        Assert.NotNull(build.Document);
+
+        var mappedBack = TemplatesBuilderDraftMapper.FromTemplate(build.Document!.Template);
+        var trust = Assert.Single(mappedBack.Trusts ?? []);
+        Assert.Equal("trust-hand-authored", trust.TrustId);
+        Assert.Equal(nameof(V2TrustType.External), trust.TrustType);
+        Assert.Equal(nameof(V2TrustDirection.Inbound), trust.Direction);
+        Assert.Equal("domain-partner", trust.TargetDomainId);
+    }
+
+    [Fact]
+    public void ForestTrust_SurvivesUnrelatedAuthoringEditThroughCaptureApply()
+    {
+        // The trust model lives on the draft snapshot as an init-only property. An unrelated authoring edit
+        // reconstructs the snapshot; the trust must survive that capture -> apply round-trip.
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(viewModel.CaptureDraft()).Draft;
+        var withTrust = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        viewModel.ApplyDraft(withTrust);
+        Assert.Single(viewModel.CaptureDraft().Trusts ?? []);
+
+        // An unrelated edit (add a standalone machine) reconstructs the snapshot without touching trusts.
+        var edited = TemplatesBuilderMachineAuthoring.AddStandaloneComputer(viewModel.CaptureDraft()).Draft;
+        viewModel.ApplyDraft(edited);
+
+        Assert.Single(viewModel.CaptureDraft().Trusts ?? []);
+    }
+
+    [Fact]
+    public void ForestTrustAffordance_AddThenRemoveTrustFromSelectedForest()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        // Render so the forest/domain detail panel populates, then add a second forest to make trusts possible.
+        viewModel.NextStepCommand.Execute(null);
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(viewModel.CaptureDraft()).Draft;
+        viewModel.ApplyDraft(twoForests);
+
+        // Select the first forest via its canvas frame so the affordance state renders.
+        var forestFrameId = viewModel.CaptureDraft().Forests[0].ForestId;
+        var frame = viewModel.TopologyCanvas!.Frames.First(f => f.FrameId.Contains(forestFrameId));
+        frame.SelectCommand!.Execute(null);
+
+        Assert.True(viewModel.CanAuthorForestTrust);
+        Assert.NotNull(viewModel.SelectedForestTrustTarget);
+
+        viewModel.AddForestTrustCommand.Execute(null);
+        Assert.Single(viewModel.CaptureDraft().Trusts ?? []);
+
+        // Re-select the source forest and remove the trust via its row command.
+        var sourceForestId = viewModel.CaptureDraft().Trusts![0].SourceDomainId;
+        var sourceFrame = viewModel.TopologyCanvas!.Frames.First(f =>
+            viewModel.CaptureDraft().Forests.Any(forest =>
+                f.FrameId.Contains(forest.ForestId) && forest.RootDomainId == sourceForestId));
+        sourceFrame.SelectCommand!.Execute(null);
+        Assert.NotEmpty(viewModel.ForestTrustRows);
+        viewModel.ForestTrustRows[0].RemoveCommand.Execute(null);
+
+        Assert.Empty(viewModel.CaptureDraft().Trusts ?? []);
+    }
+
+    [Fact]
     public void BuilderDraftMapping_RoundTripsStandaloneMachineThroughLabTemplateWithoutLoss()
     {
         // A standalone machine (a workgroup box: router, root CA, ...) must survive the draft -> LabTemplate ->

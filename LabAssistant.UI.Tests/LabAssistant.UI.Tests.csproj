@@ -81,6 +81,10 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderAddMachinePlaceholder.cs" Link="WinUI\BuilderAddMachinePlaceholder.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderRoleRowViewModel.cs" Link="WinUI\BuilderRoleRowViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderMachineInspectorViewModel.cs" Link="WinUI\BuilderMachineInspectorViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderTrustDraft.cs" Link="WinUI\TemplatesBuilderTrustDraft.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderTrustEdgeProjection.cs" Link="WinUI\TemplatesBuilderTrustEdgeProjection.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderForestTrustTargetViewModel.cs" Link="WinUI\BuilderForestTrustTargetViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderForestTrustRowViewModel.cs" Link="WinUI\BuilderForestTrustRowViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesBuilderViewModel.cs" Link="WinUI\TemplatesBuilderViewModel.cs" />
 
     <!-- Quick Deploy lane (runtime-independent view model, controller, host, and item models). -->

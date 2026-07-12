@@ -192,6 +192,65 @@ public sealed class BuilderTopologyCanvasViewModelTests
     }
 
     [Fact]
+    public void Build_TrustEdge_TerminatesOnBothForestFrameBoundaries()
+    {
+        var canvas = CreateCanvas(TopologyDraftWithTrust(), out _);
+
+        var edge = Assert.Single(canvas.TrustEdges);
+        Assert.Equal("ForestTrust", edge.EdgeKind);
+        var source = Assert.Single(canvas.Frames, f => f.FrameId == edge.SourceNodeId);
+        var target = Assert.Single(canvas.Frames, f => f.FrameId == edge.TargetNodeId);
+        AssertPointOnFrameBoundary(source, edge.X1, edge.Y1);
+        AssertPointOnFrameBoundary(target, edge.X2, edge.Y2);
+    }
+
+    [Fact]
+    public void MoveNode_MovesTheForestFrameAndItsTrustEndpoints()
+    {
+        var canvas = CreateCanvas(TopologyDraftWithTrust(), out _);
+        var edge = Assert.Single(canvas.TrustEdges);
+        var beforeX1 = edge.X1;
+        var beforeY1 = edge.Y1;
+
+        // Dragging a member of the source forest resizes its frame, so the trust endpoint anchored on that
+        // frame must move with it.
+        canvas.MoveNode("domain:domain-contoso", 1400, 900);
+
+        Assert.True(Math.Abs(edge.X1 - beforeX1) > 0.5 || Math.Abs(edge.Y1 - beforeY1) > 0.5,
+            "the trust endpoint on the moved forest's frame should track the drag");
+    }
+
+    // A point returned by the frame-boundary geometry sits on the rectangle perimeter and within its extent.
+    private static void AssertPointOnFrameBoundary(BuilderCanvasForestFrameViewModel frame, double x, double y)
+    {
+        const double tolerance = 0.5;
+        var left = frame.X;
+        var right = frame.X + frame.Width;
+        var top = frame.Y;
+        var bottom = frame.Y + frame.Height;
+
+        var onVerticalEdge = Math.Abs(x - left) <= tolerance || Math.Abs(x - right) <= tolerance;
+        var onHorizontalEdge = Math.Abs(y - top) <= tolerance || Math.Abs(y - bottom) <= tolerance;
+        Assert.True(onVerticalEdge || onHorizontalEdge, "trust endpoint must lie on the frame perimeter");
+        Assert.InRange(x, left - tolerance, right + tolerance);
+        Assert.InRange(y, top - tolerance, bottom + tolerance);
+    }
+
+    private static TemplatesBuilderDraftSnapshot TopologyDraftWithTrust()
+        => CreateTopologyDraft() with
+        {
+            Trusts =
+            [
+                new TemplatesBuilderTrustDraft(
+                    "trust-contoso-fabrikam",
+                    "domain-contoso",
+                    "domain-fabrikam",
+                    nameof(V2TrustType.Forest),
+                    nameof(V2TrustDirection.Bidirectional))
+            ]
+        };
+
+    [Fact]
     public void Build_MarksOnlyRootDomainsAsRootForTheLabelEmphasis()
     {
         var canvas = CreateCanvas(CreateTopologyDraft(), out _);

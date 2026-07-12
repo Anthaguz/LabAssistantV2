@@ -5,7 +5,8 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 internal readonly record struct TemplatesBuilderDirectoryTopologyProjection(
     IReadOnlyList<TemplatesBuilderForestTopologyProjection> Forests,
     IReadOnlyList<TemplatesBuilderTopologyEdgeProjection> Edges,
-    TemplatesBuilderStandaloneContainerProjection? Standalone);
+    TemplatesBuilderStandaloneContainerProjection? Standalone,
+    IReadOnlyList<TemplatesBuilderTrustEdgeProjection> TrustEdges);
 
 /// <summary>
 /// The Level 1 "Standalone" container: a gray, dashed box shown next to the forests that holds every machine
@@ -116,7 +117,54 @@ internal static class TemplatesBuilderDirectoryTopologyProjector
         return new TemplatesBuilderDirectoryTopologyProjection(
             forestProjections,
             edges,
-            ProjectStandaloneContainer(draft, selectedKind));
+            ProjectStandaloneContainer(draft, selectedKind),
+            ProjectTrustEdges(draft));
+    }
+
+    /// <summary>
+    /// Projects each authored forest trust as a single frame-to-frame edge. A trust is anchored on two forests'
+    /// root domain ids; this maps each endpoint to its owning forest, then to that forest's node id (the same id
+    /// the frame uses), so the canvas can draw the dashed connector between the two green boxes. A trust whose
+    /// endpoints do not resolve to two distinct rendered forests is skipped (nothing to connect).
+    /// </summary>
+    private static IReadOnlyList<TemplatesBuilderTrustEdgeProjection> ProjectTrustEdges(TemplatesBuilderDraftSnapshot draft)
+    {
+        var trusts = draft.Trusts;
+        if (trusts is not { Count: > 0 })
+        {
+            return [];
+        }
+
+        // Root domain id -> forest node id, using the same id helper the frame is built from.
+        var forestNodeIdByRoot = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (forest, forestIndex) in draft.Forests.Select((forest, index) => (forest, index)))
+        {
+            var root = forest.RootDomainId?.Trim();
+            if (!string.IsNullOrWhiteSpace(root) && !forestNodeIdByRoot.ContainsKey(root))
+            {
+                forestNodeIdByRoot[root] = CreateForestNodeId(forest, forestIndex);
+            }
+        }
+
+        var trustEdges = new List<TemplatesBuilderTrustEdgeProjection>(trusts.Count);
+        foreach (var trust in trusts)
+        {
+            var source = trust.SourceDomainId?.Trim() ?? string.Empty;
+            var target = trust.TargetDomainId?.Trim() ?? string.Empty;
+            if (!forestNodeIdByRoot.TryGetValue(source, out var sourceNodeId) ||
+                !forestNodeIdByRoot.TryGetValue(target, out var targetNodeId) ||
+                string.Equals(sourceNodeId, targetNodeId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var trustEdgeId = string.IsNullOrWhiteSpace(trust.TrustId)
+                ? $"trust:{sourceNodeId}->{targetNodeId}"
+                : $"trust:{trust.TrustId.Trim()}";
+            trustEdges.Add(new TemplatesBuilderTrustEdgeProjection(trustEdgeId, sourceNodeId, targetNodeId));
+        }
+
+        return trustEdges;
     }
 
     /// <summary>

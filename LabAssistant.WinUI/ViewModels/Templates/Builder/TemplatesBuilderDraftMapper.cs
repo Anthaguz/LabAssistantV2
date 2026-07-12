@@ -83,7 +83,10 @@ internal static class TemplatesBuilderDraftMapper
             Forests: CopyForests(template.DirectoryTopology?.Forests),
             Domains: CopyDomains(template.DirectoryTopology?.Domains),
             Vms: CopyVms(template.VmTemplates),
-            IsSaveConfirmed: false));
+            IsSaveConfirmed: false)
+        {
+            Trusts = CopyTrustsToDraft(template.DirectoryTopology?.Trusts)
+        });
     }
 
     public static TemplatesBuilderDraftBuildResult BuildDocument(
@@ -91,8 +94,7 @@ internal static class TemplatesBuilderDraftMapper
         string templateId,
         int templateRevision,
         string createdWithAppVersion,
-        string? sourceFilePath,
-        IReadOnlyList<V2TrustTemplate>? preservedTrusts = null)
+        string? sourceFilePath)
     {
         var errors = new List<string>();
         var template = new LabTemplate
@@ -125,7 +127,7 @@ internal static class TemplatesBuilderDraftMapper
         {
             Forests = MapForests(draft.Forests, errors),
             Domains = MapDomains(draft.Domains, draft.Vms, errors),
-            Trusts = CopyTrusts(preservedTrusts)
+            Trusts = MapTrusts(draft.Trusts, errors)
         };
         template.VmTemplates = MapVms(draft.Vms, errors);
 
@@ -568,24 +570,54 @@ internal static class TemplatesBuilderDraftMapper
     private static bool IsActiveDirectoryDomainController(string? topologyRole)
         => TemplatesBuilderRoleProjectionCatalog.IsActiveDirectoryDomainControllerTopologyRole(topologyRole);
 
-    private static List<V2TrustTemplate>? CopyTrusts(IReadOnlyList<V2TrustTemplate>? trusts)
+    private static List<V2TrustTemplate>? MapTrusts(IReadOnlyList<TemplatesBuilderTrustDraft>? drafts, List<string> errors)
     {
-        if (trusts is not { Count: > 0 })
+        if (drafts is not { Count: > 0 })
         {
             return null;
         }
 
-        return trusts
-            .Select(trust => new V2TrustTemplate
+        var trusts = new List<V2TrustTemplate>(drafts.Count);
+        foreach (var draft in drafts)
+        {
+            if (string.IsNullOrWhiteSpace(draft.SourceDomainId) || string.IsNullOrWhiteSpace(draft.TargetDomainId))
             {
-                TrustId = trust.TrustId,
-                SourceDomainId = trust.SourceDomainId,
-                TargetDomainId = trust.TargetDomainId,
-                TrustType = trust.TrustType,
-                Direction = trust.Direction
-            })
-            .ToList();
+                errors.Add("Each trust requires a source and target domain id.");
+                continue;
+            }
+
+            trusts.Add(new V2TrustTemplate
+            {
+                TrustId = string.IsNullOrWhiteSpace(draft.TrustId) ? Guid.NewGuid().ToString("N") : draft.TrustId.Trim(),
+                SourceDomainId = draft.SourceDomainId.Trim(),
+                TargetDomainId = draft.TargetDomainId.Trim(),
+                TrustType = ParseTrustType(draft.TrustType),
+                Direction = ParseTrustDirection(draft.Direction)
+            });
+        }
+
+        return trusts;
     }
+
+    private static IReadOnlyList<TemplatesBuilderTrustDraft>? CopyTrustsToDraft(IEnumerable<V2TrustTemplate>? trusts)
+    {
+        var copied = trusts?
+            .Select(trust => new TemplatesBuilderTrustDraft(
+                trust.TrustId,
+                trust.SourceDomainId,
+                trust.TargetDomainId,
+                trust.TrustType.ToString(),
+                trust.Direction.ToString()))
+            .ToList();
+
+        return copied is { Count: > 0 } ? copied : null;
+    }
+
+    private static V2TrustType ParseTrustType(string? value)
+        => Enum.TryParse<V2TrustType>(value, ignoreCase: true, out var trustType) ? trustType : V2TrustType.External;
+
+    private static V2TrustDirection ParseTrustDirection(string? value)
+        => Enum.TryParse<V2TrustDirection>(value, ignoreCase: true, out var direction) ? direction : V2TrustDirection.Bidirectional;
 
     private static List<string>? CopyList(IEnumerable<string>? values)
     {

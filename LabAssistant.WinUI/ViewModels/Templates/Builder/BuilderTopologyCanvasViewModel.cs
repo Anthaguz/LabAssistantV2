@@ -31,6 +31,8 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
     private readonly Action<BuilderForestDomainResourceKind, int>? _onManageMachines;
     private readonly Dictionary<string, BuilderCanvasNodePosition> _pinned = new(StringComparer.Ordinal);
     private Dictionary<string, BuilderCanvasNodeViewModel> _nodeLookup = new(StringComparer.Ordinal);
+    private Dictionary<string, BuilderCanvasForestFrameViewModel> _frameLookup = new(StringComparer.Ordinal);
+    private IReadOnlyList<TemplatesBuilderTrustEdgeProjection> _trustEdgeProjections = [];
     private List<ForestFrameGroup> _frameGroups = [];
 
     internal BuilderTopologyCanvasViewModel(
@@ -54,6 +56,15 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
 
     [ObservableProperty]
     private ObservableCollection<BuilderCanvasEdgeViewModel> _edges = [];
+
+    /// <summary>
+    /// Forest trust connectors: dashed edges drawn frame-to-frame (outer edge of one forest box to the outer
+    /// edge of the other), distinct from the domain parent-child <see cref="Edges"/>. Each terminates on the
+    /// boundary of a forest frame toward the other frame's center, so a trust tracks both frames as their member
+    /// domains are dragged.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<BuilderCanvasEdgeViewModel> _trustEdges = [];
 
     /// <summary>
     /// The forest frames: enclosing group boxes drawn behind the domain nodes and sized to hug the domains of
@@ -90,6 +101,7 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         _pinned[nodeId] = new BuilderCanvasNodePosition(node.X, node.Y);
         RecomputeEdges();
         RecomputeFrames();
+        RecomputeTrustEdges();
         UpdateExtent();
     }
 
@@ -209,10 +221,14 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
 
         _nodeLookup = lookup;
         _frameGroups = frameGroups;
+        _frameLookup = frameGroups.ToDictionary(group => group.Frame.FrameId, group => group.Frame, StringComparer.Ordinal);
+        _trustEdgeProjections = projection.TrustEdges ?? [];
         Nodes = new ObservableCollection<BuilderCanvasNodeViewModel>(nodes);
         Edges = new ObservableCollection<BuilderCanvasEdgeViewModel>(edges);
         Frames = new ObservableCollection<BuilderCanvasForestFrameViewModel>(frameGroups.Select(group => group.Frame));
         RecomputeFrames();
+        // Trust edges anchor on frame geometry, so they are built only after the frames have been sized above.
+        BuildTrustEdges();
         HasNodes = nodes.Count > 0;
         UpdateExtent();
     }
@@ -322,6 +338,74 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
                 group.Frame.Height = (maxY - minY) + (BuilderCanvasMetrics.FramePadding * 2);
             }
         }
+    }
+
+    /// <summary>
+    /// Builds the dashed forest-trust connectors from the projected trust edges, terminating each on the outer
+    /// boundary of its two forest frames. Called once per rebuild after the frames have been sized.
+    /// </summary>
+    private void BuildTrustEdges()
+    {
+        var trustEdges = new List<BuilderCanvasEdgeViewModel>(_trustEdgeProjections.Count);
+        foreach (var projected in _trustEdgeProjections)
+        {
+            if (!_frameLookup.TryGetValue(projected.SourceForestNodeId, out var source) ||
+                !_frameLookup.TryGetValue(projected.TargetForestNodeId, out var target))
+            {
+                continue;
+            }
+
+            var (x1, y1, x2, y2) = ComputeTrustEndpoints(source, target);
+            trustEdges.Add(new BuilderCanvasEdgeViewModel(
+                projected.TrustEdgeId,
+                projected.SourceForestNodeId,
+                projected.TargetForestNodeId,
+                "ForestTrust",
+                isForestRoot: false,
+                x1,
+                y1,
+                x2,
+                y2));
+        }
+
+        TrustEdges = new ObservableCollection<BuilderCanvasEdgeViewModel>(trustEdges);
+    }
+
+    /// <summary>
+    /// Recomputes every forest-trust edge's endpoints from the current frame geometry, so a trust follows both
+    /// frames as their member domains are dragged. Called after <see cref="RecomputeFrames"/> on a node move.
+    /// </summary>
+    private void RecomputeTrustEdges()
+    {
+        foreach (var edge in TrustEdges)
+        {
+            if (!_frameLookup.TryGetValue(edge.SourceNodeId, out var source) ||
+                !_frameLookup.TryGetValue(edge.TargetNodeId, out var target))
+            {
+                continue;
+            }
+
+            var (x1, y1, x2, y2) = ComputeTrustEndpoints(source, target);
+            edge.X1 = x1;
+            edge.Y1 = y1;
+            edge.X2 = x2;
+            edge.Y2 = y2;
+        }
+    }
+
+    // Terminates the trust line on each frame's boundary toward the other frame's center, yielding an
+    // outer-edge-to-outer-edge segment between the two green forest boxes.
+    private static (double X1, double Y1, double X2, double Y2) ComputeTrustEndpoints(
+        BuilderCanvasForestFrameViewModel source,
+        BuilderCanvasForestFrameViewModel target)
+    {
+        var sourceCenterX = source.X + (source.Width / 2);
+        var sourceCenterY = source.Y + (source.Height / 2);
+        var targetCenterX = target.X + (target.Width / 2);
+        var targetCenterY = target.Y + (target.Height / 2);
+        var (x1, y1) = BuilderCanvasGeometry.EdgePoint(source.X, source.Y, source.Width, source.Height, targetCenterX, targetCenterY);
+        var (x2, y2) = BuilderCanvasGeometry.EdgePoint(target.X, target.Y, target.Width, target.Height, sourceCenterX, sourceCenterY);
+        return (x1, y1, x2, y2);
     }
 
     private bool TryComputeMemberBounds(

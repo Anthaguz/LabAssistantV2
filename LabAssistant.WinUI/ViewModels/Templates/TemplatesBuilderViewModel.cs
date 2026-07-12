@@ -45,7 +45,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private int _templateRevision = 1;
     private string _createdWithAppVersion = "1.0.0";
     private string? _sourceFilePath;
-    private IReadOnlyList<V2TrustTemplate> _preservedTrusts = Array.Empty<V2TrustTemplate>();
 
     private bool _hasActiveDraft;
     private bool _canNavigate;
@@ -133,6 +132,12 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     [ObservableProperty] private ObservableCollection<BuilderFieldRowViewModel> _forestDomainDetailRows = [];
     [ObservableProperty] private bool _hasForestDomainDetail;
     [ObservableProperty] private bool _forestDomainDetailEmpty = true;
+
+    // Forest trust authoring (Level 1 detail panel, only when a forest is selected and >=2 forests exist).
+    [ObservableProperty] private bool _canAuthorForestTrust;
+    [ObservableProperty] private ObservableCollection<BuilderForestTrustTargetViewModel> _forestTrustTargets = [];
+    [ObservableProperty] private BuilderForestTrustTargetViewModel? _selectedForestTrustTarget;
+    [ObservableProperty] private ObservableCollection<BuilderForestTrustRowViewModel> _forestTrustRows = [];
 
     // Forests & Domains - Level 2 (machines inside one domain or the Standalone container).
     [ObservableProperty] private bool _isMachineLevelVisible;
@@ -331,6 +336,40 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         }
 
         ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.AddTree(draft, forestId));
+    }
+
+    // Level 1 detail-panel affordance: author a forest trust from the selected forest to the forest chosen in
+    // the "Add forest trust" combo box. No-ops unless a forest is selected and a distinct target is picked.
+    [RelayCommand]
+    private void AddForestTrust()
+    {
+        if (_selectedForestDomainKind != BuilderForestDomainResourceKind.Forest)
+        {
+            return;
+        }
+
+        var target = SelectedForestTrustTarget;
+        if (target is null)
+        {
+            return;
+        }
+
+        var draft = CaptureWorkingDraft();
+        var sourceIndex = _selectedForestDomainIndex;
+        ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.AddForestTrust(draft, sourceIndex, target.ForestIndex));
+    }
+
+    // Level 1 detail-panel affordance: remove the selected forest's trust identified by trustId. Invoked by the
+    // per-row remove command on each existing-trust row.
+    private void RemoveForestTrustById(string? trustId)
+    {
+        if (string.IsNullOrWhiteSpace(trustId))
+        {
+            return;
+        }
+
+        var draft = CaptureWorkingDraft();
+        ApplyTopologyResult(TemplatesBuilderTopologyAuthoring.RemoveForestTrust(draft, trustId));
     }
 
     // Canvas hover-+ affordance: add a child domain under the domain the pointer is over.
@@ -951,8 +990,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             _templateId,
             _templateRevision,
             _createdWithAppVersion,
-            _sourceFilePath,
-            _preservedTrusts);
+            _sourceFilePath);
 
     #endregion
 
@@ -964,7 +1002,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         _templateRevision = 1;
         _createdWithAppVersion = "1.0.0";
         _sourceFilePath = null;
-        _preservedTrusts = Array.Empty<V2TrustTemplate>();
         ApplyDraft(draft with { IsSaveConfirmed = false }, TemplatesBuilderValidationRequest.All());
         _hasActiveDraft = true;
         // A draft is now active, so the authoring gates (add forest/tree/network/credential/vm/standalone and the
@@ -980,7 +1017,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         _templateRevision = document.Template.TemplateRevision;
         _createdWithAppVersion = document.Template.CreatedWithAppVersion;
         _sourceFilePath = document.SourceFilePath;
-        _preservedTrusts = CopyTrusts(document.Template.DirectoryTopology?.Trusts);
         ApplyDraft(TemplatesBuilderDraftMapper.FromTemplate(document.Template), TemplatesBuilderValidationRequest.All());
         _hasActiveDraft = true;
         // A draft is now active, so the authoring gates must enable immediately (see LoadNewDraft).
@@ -997,7 +1033,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         _templateId = document.Template.Id;
         _templateRevision = document.Template.TemplateRevision;
         _createdWithAppVersion = document.Template.CreatedWithAppVersion;
-        _preservedTrusts = CopyTrusts(document.Template.DirectoryTopology?.Trusts);
         _draft = _draft with { IsSaveConfirmed = false };
         _validatedDraft = _validatedDraft with { IsSaveConfirmed = false };
         ContextText = $"Editing V2 template: {filePath}";
@@ -1034,6 +1069,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         var forests = CopyList(draft.Forests);
         var domains = CopyList(draft.Domains);
         var vms = CopyList(draft.Vms);
+        var trusts = CopyList(draft.Trusts);
         var editableContentChanged =
             !string.Equals(_validatedDraft.TemplateName, draft.TemplateName ?? string.Empty, StringComparison.Ordinal) ||
             !string.Equals(_validatedDraft.TemplateDescription, draft.TemplateDescription ?? string.Empty, StringComparison.Ordinal) ||
@@ -1042,7 +1078,8 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             !_validatedDraft.CredentialSlots.SequenceEqual(credentialSlots) ||
             !_validatedDraft.Forests.SequenceEqual(forests) ||
             !_validatedDraft.Domains.SequenceEqual(domains) ||
-            !_validatedDraft.Vms.SequenceEqual(vms);
+            !_validatedDraft.Vms.SequenceEqual(vms) ||
+            !(_validatedDraft.Trusts ?? []).SequenceEqual(trusts);
 
         var isSaveConfirmed = editableContentChanged && _validatedDraft.IsSaveConfirmed
             ? false
@@ -1057,7 +1094,12 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             forests,
             domains,
             vms,
-            isSaveConfirmed);
+            isSaveConfirmed)
+        {
+            // Trusts is an init-only property, so the positional ctor above drops it: copy it across
+            // explicitly or authored trusts vanish the instant any unrelated edit is applied.
+            Trusts = trusts
+        };
 
         if (validationRequest.Categories.Count > 0)
         {
@@ -1712,6 +1754,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
     private void RenderForestDomainDetail()
     {
+        RenderForestTrustAffordance();
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count > 0)
         {
             var forest = _draft.Forests[_selectedForestDomainIndex];
@@ -1768,6 +1811,95 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         ForestDomainDetailRows = [];
         HasForestDomainDetail = false;
         ForestDomainDetailEmpty = true;
+    }
+
+    // Populates the "Add forest trust" affordance shown only when a forest is selected and the draft has at
+    // least two forests: the candidate target forests (the other forests not already trusted to this one) and
+    // the selected forest's existing trusts (each removable). Clears the state for any other selection.
+    private void RenderForestTrustAffordance()
+    {
+        if (_selectedForestDomainKind != BuilderForestDomainResourceKind.Forest ||
+            _selectedForestDomainIndex < 0 ||
+            _selectedForestDomainIndex >= _draft.Forests.Count ||
+            _draft.Forests.Count < 2)
+        {
+            CanAuthorForestTrust = false;
+            ForestTrustTargets = [];
+            SelectedForestTrustTarget = null;
+            ForestTrustRows = [];
+            return;
+        }
+
+        var selectedForest = _draft.Forests[_selectedForestDomainIndex];
+        var selectedRoot = selectedForest.RootDomainId?.Trim() ?? string.Empty;
+        var existingTrusts = _draft.Trusts ?? [];
+
+        var targets = new List<BuilderForestTrustTargetViewModel>();
+        for (var index = 0; index < _draft.Forests.Count; index++)
+        {
+            if (index == _selectedForestDomainIndex)
+            {
+                continue;
+            }
+
+            var forest = _draft.Forests[index];
+            var root = forest.RootDomainId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(root) ||
+                existingTrusts.Any(trust => TrustJoinsRoots(trust, selectedRoot, root)))
+            {
+                continue;
+            }
+
+            targets.Add(new BuilderForestTrustTargetViewModel(
+                index,
+                TemplatesBuilderTopologyAuthoring.ResolveForestName(_draft, forest)));
+        }
+
+        ForestTrustTargets = new ObservableCollection<BuilderForestTrustTargetViewModel>(targets);
+        SelectedForestTrustTarget = targets.FirstOrDefault();
+        CanAuthorForestTrust = true;
+
+        var rows = new List<BuilderForestTrustRowViewModel>();
+        foreach (var trust in existingTrusts)
+        {
+            var source = trust.SourceDomainId?.Trim() ?? string.Empty;
+            var target = trust.TargetDomainId?.Trim() ?? string.Empty;
+            string partnerRoot;
+            if (string.Equals(source, selectedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                partnerRoot = target;
+            }
+            else if (string.Equals(target, selectedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                partnerRoot = source;
+            }
+            else
+            {
+                continue;
+            }
+
+            var partnerForest = _draft.Forests.FirstOrDefault(forest =>
+                string.Equals(forest.RootDomainId?.Trim() ?? string.Empty, partnerRoot, StringComparison.OrdinalIgnoreCase));
+            var partnerName = string.IsNullOrWhiteSpace(partnerForest.ForestId)
+                ? partnerRoot
+                : TemplatesBuilderTopologyAuthoring.ResolveForestName(_draft, partnerForest);
+            rows.Add(new BuilderForestTrustRowViewModel(
+                trust.TrustId,
+                partnerName,
+                new RelayCommand(() => RemoveForestTrustById(trust.TrustId))));
+        }
+
+        ForestTrustRows = new ObservableCollection<BuilderForestTrustRowViewModel>(rows);
+    }
+
+    private static bool TrustJoinsRoots(TemplatesBuilderTrustDraft trust, string rootA, string rootB)
+    {
+        var source = trust.SourceDomainId?.Trim() ?? string.Empty;
+        var target = trust.TargetDomainId?.Trim() ?? string.Empty;
+        return (string.Equals(source, rootA, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(target, rootB, StringComparison.OrdinalIgnoreCase)) ||
+               (string.Equals(source, rootB, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(target, rootA, StringComparison.OrdinalIgnoreCase));
     }
 
     private void RenderVmOverview()
@@ -2159,25 +2291,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         var dcCount = draft.Vms.Count(vm => vm.IsActiveDirectoryDomainController);
         var nicCount = draft.Vms.Sum(vm => vm.Nics.Count);
         return $"{draft.LabNetworks.Count} networks, {draft.CredentialSlots.Count} credential slot references, {draft.Forests.Count} forests, {draft.Domains.Count} domains, {draft.Vms.Count} VMs, {dcCount} Active Directory Domain Controller role assignments, {nicCount} NICs.";
-    }
-
-    private static IReadOnlyList<V2TrustTemplate> CopyTrusts(IEnumerable<V2TrustTemplate>? trusts)
-    {
-        if (trusts is null)
-        {
-            return Array.Empty<V2TrustTemplate>();
-        }
-
-        return trusts
-            .Select(trust => new V2TrustTemplate
-            {
-                TrustId = trust.TrustId,
-                SourceDomainId = trust.SourceDomainId,
-                TargetDomainId = trust.TargetDomainId,
-                TrustType = trust.TrustType,
-                Direction = trust.Direction
-            })
-            .ToList();
     }
 
     private static IReadOnlyList<T> CopyList<T>(IEnumerable<T>? values)

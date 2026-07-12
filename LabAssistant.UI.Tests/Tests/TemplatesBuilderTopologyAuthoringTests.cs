@@ -310,6 +310,83 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
         Assert.Equal("renamed.lab", TemplatesBuilderTopologyAuthoring.ResolveForestName(renamed, renamed.Forests[0]));
     }
 
+    [Fact]
+    public void AddForestTrust_BetweenTwoForests_CreatesForestBidirectionalTrustBetweenRoots()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var sourceRoot = twoForests.Forests[0].RootDomainId;
+        var targetRoot = twoForests.Forests[1].RootDomainId;
+
+        var result = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1);
+        var trusts = result.Draft.Trusts ?? [];
+
+        var trust = Assert.Single(trusts);
+        Assert.Equal(nameof(V2TrustType.Forest), trust.TrustType);
+        Assert.Equal(nameof(V2TrustDirection.Bidirectional), trust.Direction);
+        Assert.True(
+            (trust.SourceDomainId == sourceRoot && trust.TargetDomainId == targetRoot) ||
+            (trust.SourceDomainId == targetRoot && trust.TargetDomainId == sourceRoot));
+        Assert.Equal(BuilderForestDomainResourceKind.Forest, result.SelectedKind);
+    }
+
+    [Fact]
+    public void AddForestTrust_SameForest_IsNoOp()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+
+        var result = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 0);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
+    }
+
+    [Fact]
+    public void AddForestTrust_DuplicateUnorderedPair_IsNoOp()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var once = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+
+        // Authoring the reverse ordering is the same unordered pair and must not add a second trust.
+        var twice = TemplatesBuilderTopologyAuthoring.AddForestTrust(once, 1, 0).Draft;
+
+        Assert.Single(twice.Trusts ?? []);
+    }
+
+    [Fact]
+    public void RemoveForestTrust_RemovesTrustById()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var authored = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        var trustId = (authored.Trusts ?? [])[0].TrustId;
+
+        var result = TemplatesBuilderTopologyAuthoring.RemoveForestTrust(authored, trustId);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
+    }
+
+    [Fact]
+    public void DeleteForest_PrunesTrustsAnchoredOnThatForest()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var authored = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        var doomedForestId = authored.Forests[0].ForestId;
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteForest(authored, doomedForestId);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
+    }
+
+    [Fact]
+    public void DeleteDomain_ForestRoot_PrunesTrustsAnchoredOnThatForest()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var authored = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        var doomedRoot = authored.Forests[0].RootDomainId;
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(authored, doomedRoot);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
+    }
+
     private static void AssertDistinct(IEnumerable<string> values)
     {
         var list = values.ToList();
