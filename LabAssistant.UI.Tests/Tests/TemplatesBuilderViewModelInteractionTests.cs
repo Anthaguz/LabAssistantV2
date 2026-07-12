@@ -545,22 +545,21 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         viewModel.AddStandaloneMachineCommand.Execute(null);
 
         var after = viewModel.CaptureDraft();
-        // Adding the first standalone machine to a single-domain lab creates a second switch, crossing the
-        // >= 2-switch threshold, so the reconciler also materializes the router. Two VMs appear: the standalone
-        // itself and the auto-created router.
-        Assert.Equal(before.Vms.Count + 2, after.Vms.Count);
+        // Adding the first standalone machine to a single-domain lab keeps ONE switch (the standalone rides the
+        // domain's switch), so no router is materialized: exactly one VM is added, the standalone itself.
+        Assert.Equal(before.Vms.Count + 1, after.Vms.Count);
         var added = after.Vms.Single(vm => V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !vm.IsRouter);
         Assert.True(V2MembershipModeCatalog.IsStandalone(added.MembershipMode));
         Assert.Equal(string.Empty, added.DomainId);
         Assert.False(added.IsActiveDirectoryDomainController);
 
-        // Adding a standalone machine zooms straight into the Standalone container's Level 2 list, which now also
-        // lists the auto-created required router (itself a standalone VM), so both cards are present.
+        // Adding a standalone machine zooms straight into the Standalone container's Level 2 list, which holds
+        // just the one standalone machine (no auto-router in a single-domain lab).
         Assert.True(viewModel.IsMachineLevelVisible);
         Assert.Equal("Standalone", viewModel.MachineLevelTitle);
         Assert.True(viewModel.HasMachineCards);
-        Assert.Equal(2, viewModel.MachineCards.Count);
-        Assert.Contains(after.Vms, vm => vm.IsRouter);
+        Assert.Single(viewModel.MachineCards);
+        Assert.DoesNotContain(after.Vms, vm => vm.IsRouter);
         Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
     }
 
@@ -738,10 +737,10 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     public void MachineInspectorHostIp_ProjectionExposesMemberEditorAndRouterHiddenRow()
     {
         var viewModel = CreateViewModel();
-        // A router only exists once there are two switches, so seed a standalone machine (which adds the
-        // standalone switch) and reconcile before loading, giving the draft both a domain member and a router.
+        // A router only exists once there are two switches, so seed a second forest (a second domain, hence a
+        // second switch) and reconcile before loading, giving the draft both a domain member and a router.
         viewModel.LoadNewDraft(TemplatesBuilderNetworkReconciler.Reconcile(
-            TemplatesBuilderMachineAuthoring.AddStandaloneComputer(NamedDraft()).Draft));
+            TemplatesBuilderTopologyAuthoring.AddForest(NamedDraft()).Draft));
         ZoomIntoDomainMachineLevel(viewModel);
 
         var draft = viewModel.CaptureDraft();

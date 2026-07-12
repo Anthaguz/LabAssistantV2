@@ -10,10 +10,11 @@ namespace LabAssistant.UI.Tests.Tests;
 /// Behavior coverage for <see cref="TemplatesBuilderNetworkReconciler"/> - the pure function that keeps a
 /// draft's network layout consistent with the locked one-switch-per-domain model. These tests build draft
 /// snapshots directly (no XAML host, no Hyper-V) and assert the reconciler's contract: one Internal switch per
-/// domain with a stable auto-allocated subnet, a shared standalone switch only when standalone machines exist,
-/// a router bridging every switch at .1 ONLY when there are at least two switches to route between (a
-/// single-subnet lab has none), VM IPs auto-assigned in subnet (preserving valid ones, never duplicating),
-/// gateways through the router when one exists, DNS at the domain's DC, and full idempotency.
+/// domain with a stable auto-allocated subnet, a dedicated standalone switch only in a domainless lab (standalone
+/// machines ride the first domain's switch otherwise), a router bridging every switch at .1 ONLY when there are
+/// at least two switches to route between (a single-subnet lab has none), VM IPs auto-assigned in subnet
+/// (preserving valid ones, never duplicating), gateways through the router when one exists, DNS at the domain's
+/// DC, and full idempotency.
 /// </summary>
 public sealed class TemplatesBuilderNetworkReconcilerTests
 {
@@ -83,21 +84,25 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
     }
 
     [Fact]
-    public void StandaloneMachine_GetsSharedStandaloneSwitchBridgedByRouter()
+    public void StandaloneMachine_RidesFirstDomainSwitch_WithNoSeparateSwitchOrRouter()
     {
         var draft = Reconcile(DraftWith(
             domains: [Domain("d1", "contoso.lab", "CONTOSO")],
             vms: [Dc("dc", "d1"), Standalone("rootca")]));
 
-        var standalone = Assert.Single(draft.LabNetworks, network => string.IsNullOrEmpty(network.DomainId));
-        Assert.Equal(V2SwitchTypeCatalog.Internal, standalone.SwitchType);
+        // A single domain plus a standalone machine stays at ONE switch: the standalone rides the domain switch,
+        // so there is no dedicated standalone network and nothing to route, hence no router.
+        var network = Assert.Single(draft.LabNetworks);
+        Assert.Equal("d1", network.DomainId);
+        Assert.DoesNotContain(draft.LabNetworks, n => string.IsNullOrEmpty(n.DomainId));
+        Assert.DoesNotContain(draft.Vms, vm => vm.IsRouter);
 
         var standaloneVm = draft.Vms.Single(vm => vm.VmId == "rootca");
         var nic = Assert.Single(standaloneVm.Nics);
-        Assert.Equal(standalone.NetworkId, nic.NetworkId);
-
-        var router = draft.Vms.Single(vm => vm.IsRouter);
-        Assert.Contains(router.Nics, routerNic => routerNic.NetworkId == standalone.NetworkId);
+        Assert.Equal(network.NetworkId, nic.NetworkId);
+        Assert.True(BuilderLabSubnet.TryParseCidr(network.Subnet, out var subnet));
+        Assert.True(BuilderLabSubnet.TryParseAddress(nic.IpAddress, out var address));
+        Assert.True(subnet.Contains(address));
     }
 
     [Fact]
@@ -187,16 +192,16 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
     [Fact]
     public void CreatedRouter_InheritsDiskAndLocalBootstrapFromAnExistingVm()
     {
-        // A domain plus a standalone machine yields two switches, which is what earns a router; the new router
-        // seeds its disk and local bootstrap slot from an existing VM.
-        var dc = Dc("dc", "d1") with
+        // Two domains yield two switches, which is what earns a router; the new router seeds its disk and local
+        // bootstrap slot from an existing VM.
+        var dc = Dc("dc1", "d1") with
         {
             VhdxId = "base-ws2022",
             CredentialSlots = new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", string.Empty, "slot-dsrm", string.Empty)
         };
         var draft = Reconcile(DraftWith(
-            domains: [Domain("d1", "contoso.lab", "CONTOSO")],
-            vms: [dc, Standalone("rootca")]));
+            domains: [Domain("d1", "contoso.lab", "CONTOSO"), Domain("d2", "fabrikam.lab", "FABRIKAM")],
+            vms: [dc, Dc("dc2", "d2")]));
 
         var router = draft.Vms.Single(vm => vm.IsRouter);
         Assert.Equal("base-ws2022", router.VhdxId);
@@ -204,15 +209,22 @@ public sealed class TemplatesBuilderNetworkReconcilerTests
     }
 
     [Fact]
-    public void SingleDomainWithStandaloneMachine_HasTwoSwitchesAndARouter()
+    public void MultipleDomainsWithStandalone_HaveRouterAndStandaloneRidesFirstDomainSwitch()
     {
         var draft = Reconcile(DraftWith(
-            domains: [Domain("d1", "contoso.lab", "CONTOSO")],
-            vms: [Dc("dc", "d1"), Standalone("rootca")]));
+            domains: [Domain("d1", "contoso.lab", "CONTOSO"), Domain("d2", "fabrikam.lab", "FABRIKAM")],
+            vms: [Dc("dc1", "d1"), Dc("dc2", "d2"), Standalone("rootca")]));
 
+        // Two domains => two switches => a router. There is still no dedicated standalone switch; the standalone
+        // machine rides the first domain's switch.
         Assert.Equal(2, draft.LabNetworks.Count);
+        Assert.DoesNotContain(draft.LabNetworks, n => string.IsNullOrEmpty(n.DomainId));
         var router = Assert.Single(draft.Vms, vm => vm.IsRouter);
         Assert.Equal(2, router.Nics.Count);
+
+        var firstDomainNetwork = draft.LabNetworks.Single(n => n.DomainId == "d1");
+        var standaloneVm = draft.Vms.Single(vm => vm.VmId == "rootca");
+        Assert.Equal(firstDomainNetwork.NetworkId, standaloneVm.Nics[0].NetworkId);
     }
 
     [Fact]

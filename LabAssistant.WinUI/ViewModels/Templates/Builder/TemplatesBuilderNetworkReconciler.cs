@@ -12,7 +12,8 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 ///
 /// - every domain owns exactly one Internal switch, its subnet auto-allocated from a base plan
 ///   (10.0.0.0/24, 10.0.1.0/24, ...), stable across edits (an existing subnet is never reshuffled);
-/// - standalone (workgroup) machines share a single standalone switch;
+/// - standalone (workgroup) machines ride the FIRST domain's switch when a domain exists, and only get their
+///   own dedicated switch in a domainless lab (so a single-domain lab keeps exactly one switch, hence no router);
 /// - a router VM is created ONLY when there are at least two switches to bridge (so a single-subnet lab - one
 ///   domain, or standalone-only - has no router, since there is nothing to route between); when present it
 ///   bridges every switch, holding the first usable address (.1) on each;
@@ -105,10 +106,13 @@ internal static class TemplatesBuilderNetworkReconciler
             });
         }
 
-        // A single standalone switch, only when there is a standalone (non-router) machine to seat on it.
-        var needsStandalone = (draft.Vms ?? []).Any(vm =>
+        // Standalone (workgroup) machines ride the first domain's switch when a domain exists, so a dedicated
+        // standalone switch is created ONLY in a domainless lab. This keeps a single-domain lab at exactly one
+        // switch (hence no auto-router) while still giving a domainless standalone-only lab something to sit on.
+        var hasStandaloneMachine = (draft.Vms ?? []).Any(vm =>
             V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !vm.IsRouter);
-        if (needsStandalone)
+        var hasDomainSwitch = result.Count > 0;
+        if (hasStandaloneMachine && !hasDomainSwitch)
         {
             var current = existing.FirstOrDefault(network =>
                 string.Equals(network.NetworkId, StandaloneNetworkId, StringComparison.OrdinalIgnoreCase));
@@ -260,7 +264,13 @@ internal static class TemplatesBuilderNetworkReconciler
             .Where(network => !string.IsNullOrWhiteSpace(network.DomainId))
             .GroupBy(network => network.DomainId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-        var standaloneNetwork = networks.FirstOrDefault(network => string.IsNullOrWhiteSpace(network.DomainId));
+        // Standalone machines seat on the first domain's switch when a domain exists; otherwise on the lone
+        // dedicated standalone switch. Domain networks are emitted first, so the first DomainId-bearing network
+        // is deterministically the first domain's.
+        var firstDomainNetwork = networks.FirstOrDefault(network => !string.IsNullOrWhiteSpace(network.DomainId));
+        var standaloneNetwork = !string.IsNullOrWhiteSpace(firstDomainNetwork.NetworkId)
+            ? firstDomainNetwork
+            : networks.FirstOrDefault(network => string.IsNullOrWhiteSpace(network.DomainId));
 
         var updated = vms.ToList();
         var usedByNetwork = new Dictionary<string, HashSet<uint>>(StringComparer.OrdinalIgnoreCase);
