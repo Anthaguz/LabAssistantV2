@@ -1777,7 +1777,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
     private void RenderNetworkDetail()
     {
-        if (_draft.LabNetworks.Count == 0)
+        // Guard the full index range, not just emptiness: the selection index is a mutable field that can lag a
+        // collection shrink on paths that render before EnsureSelectedResourcesInBounds runs, so an out-of-range
+        // index must fall back to the same empty-detail state rather than throw IndexOutOfRangeException.
+        if (_selectedNetworkIndex < 0 || _selectedNetworkIndex >= _draft.LabNetworks.Count)
         {
             _networkFields = Array.Empty<BuilderFieldViewModel>();
             NetworkDetailRows = [];
@@ -1816,7 +1819,8 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
     private void RenderCredentialDetail()
     {
-        if (_draft.CredentialSlots.Count == 0)
+        // See RenderNetworkDetail: range-guard the mutable selection index, not just the empty case.
+        if (_selectedCredentialSlotIndex < 0 || _selectedCredentialSlotIndex >= _draft.CredentialSlots.Count)
         {
             _credentialFields = Array.Empty<BuilderFieldViewModel>();
             CredentialDetailRows = [];
@@ -1842,7 +1846,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     private void RenderForestDomainDetail()
     {
         RenderForestTrustAffordance();
-        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count > 0)
+        // Range-guard the mutable selection index (not just Count > 0): a stale index paired with a matching kind
+        // would otherwise index past the end and throw. Out-of-range falls through to the cleared-detail state.
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest &&
+            _selectedForestDomainIndex >= 0 && _selectedForestDomainIndex < _draft.Forests.Count)
         {
             ClearDomainSubnetEditor();
             var forest = _draft.Forests[_selectedForestDomainIndex];
@@ -1861,7 +1868,8 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             return;
         }
 
-        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain && _draft.Domains.Count > 0)
+        if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain &&
+            _selectedForestDomainIndex >= 0 && _selectedForestDomainIndex < _draft.Domains.Count)
         {
             var domain = _draft.Domains[_selectedForestDomainIndex];
             RenderSelectedDomainSubnetEditor(domain);

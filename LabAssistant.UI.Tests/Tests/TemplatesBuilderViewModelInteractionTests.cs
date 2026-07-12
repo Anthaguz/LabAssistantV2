@@ -477,6 +477,30 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void CanvasDelete_RemovingTheSelectedDomain_KeepsDetailPanelCoherent()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        viewModel.NextStepCommand.Execute(null);
+
+        // Add a child domain (it becomes the selection), then delete that same selected domain. The selection
+        // index now points past the shrunk domain list, so the detail re-render must stay in bounds and clear
+        // or reselect coherently instead of throwing IndexOutOfRangeException.
+        var rootNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        rootNode.AddChildCommand!.Execute(null);
+        var child = viewModel.CaptureDraft().Domains[^1];
+        var childNode = viewModel.TopologyCanvas!.Nodes.Single(node => node.NodeId == $"domain:{child.DomainId}");
+        Assert.NotNull(childNode.DeleteCommand);
+
+        childNode.DeleteCommand!.Execute(null);
+
+        var after = viewModel.CaptureDraft();
+        Assert.Single(after.Domains);
+        Assert.DoesNotContain(after.Domains, domain => domain.DomainId == child.DomainId);
+        Assert.False(viewModel.HasValidationBlockers, string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+    }
+
+    [Fact]
     public void RootDomainRelation_IsRenderedReadOnlyAndLockedToRoot()
     {
         var viewModel = CreateViewModel();
