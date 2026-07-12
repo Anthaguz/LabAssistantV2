@@ -110,7 +110,8 @@ public sealed class TemplatesBuilderRoleAuthoringTests
 
         Assert.True(adcs.IsAssigned);
         Assert.True(adcs.IsInstallOnly);
-        Assert.False(string.IsNullOrWhiteSpace(adcs.StatusNote));
+        // The install-only state is shown by the IsInstallOnly badge alone now; no long status note.
+        Assert.True(string.IsNullOrWhiteSpace(adcs.StatusNote));
     }
 
     [Fact]

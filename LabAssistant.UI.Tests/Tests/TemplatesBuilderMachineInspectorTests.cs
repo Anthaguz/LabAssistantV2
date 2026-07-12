@@ -65,7 +65,7 @@ public sealed class TemplatesBuilderMachineInspectorTests
     }
 
     [Fact]
-    public void Inspector_AdcsRowShowsInstallOnlyBadgeAndStatus()
+    public void Inspector_AdcsRowShowsInstallOnlyBadge()
     {
         var viewModel = CreateDomainMachineLevelViewModel();
         SelectMemberMachine(viewModel);
@@ -74,7 +74,8 @@ public sealed class TemplatesBuilderMachineInspectorTests
         var adcs = inspector.RoleRows.Single(row => row.RoleKey == TemplatesBuilderRoleProjectionCatalog.CertificateServicesRoleKey);
         Assert.True(adcs.IsInstallOnly);
         Assert.True(adcs.ShowInstallOnlyBadge);
-        Assert.Contains("installed now", adcs.StatusNote, StringComparison.OrdinalIgnoreCase);
+        // The long "guided configuration is added later" note was removed; the compact badge is the only signal.
+        Assert.True(string.IsNullOrWhiteSpace(adcs.StatusNote));
     }
 
     private static BuilderMachineInspectorViewModel AssertInspector(TemplatesBuilderViewModel viewModel)

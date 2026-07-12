@@ -71,7 +71,6 @@ internal static class TemplatesBuilderRoleProjectionCatalog
     public const string FileServerRoleKey = "file-server";
     public const string CertificateServicesRoleKey = "ad-certificate-services";
 
-    private const string AdcsInstallOnlyNote = "The role is installed now; guided configuration is added later.";
     private const string DnsLinkedNote = "Enabled and linked automatically with Active Directory Domain Services.";
 
     private static readonly TemplatesBuilderRoleDefinition[] Catalog =
@@ -155,11 +154,9 @@ internal static class TemplatesBuilderRoleProjectionCatalog
     public static TemplatesBuilderVmRoleProjection ProjectRole(TemplatesBuilderVmDraft vm, TemplatesBuilderRoleDefinition definition)
     {
         var dnsForcedByAdds = IsDnsRole(definition.Key) && vm.IsActiveDirectoryDomainController;
-        var note = dnsForcedByAdds
-            ? DnsLinkedNote
-            : definition.IsInstallOnly
-                ? AdcsInstallOnlyNote
-                : string.Empty;
+        // The "install only" state is surfaced by the IsInstallOnly badge alone; no long explanatory note. Only
+        // the ADDS->DNS auto-link keeps a status note, since that behavior is otherwise invisible to the user.
+        var note = dnsForcedByAdds ? DnsLinkedNote : string.Empty;
 
         return new TemplatesBuilderVmRoleProjection(
             definition.Key,
