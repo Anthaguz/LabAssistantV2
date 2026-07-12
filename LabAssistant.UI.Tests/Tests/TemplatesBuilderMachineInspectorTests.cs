@@ -78,6 +78,39 @@ public sealed class TemplatesBuilderMachineInspectorTests
         Assert.True(string.IsNullOrWhiteSpace(adcs.StatusNote));
     }
 
+    [Fact]
+    public void CommitMachineBaseDisk_IgnoresEchoAndNullSelections_ButCommitsRealChange()
+    {
+        // Locks the fix for the base-disk ComboBox re-entrancy that overflowed the stack on zoom-in: rebuilding the
+        // inspector re-applies SelectedValue, which WinUI reports back through SelectionChanged as a "selection". A
+        // render always mints a fresh inspector instance, so an untouched instance proves the commit was a no-op.
+        var viewModel = CreateDomainMachineLevelViewModel();
+        var inspector = AssertInspector(viewModel);
+
+        var currentDisk = inspector.SelectedBaseDiskId;
+        Assert.False(string.IsNullOrEmpty(currentDisk));
+
+        var dcIndex = viewModel.MachineCards.Single(card => card.IsDomainController).VmIndex;
+
+        // Echo of the current selection - the guard must skip it, leaving the same inspector instance in place.
+        inspector.CommitMachineBaseDiskCommand!.Execute(currentDisk);
+        Assert.Same(inspector, viewModel.SelectedMachineInspector);
+
+        // Transient null / whitespace while the ItemsSource is swapped - also no-ops.
+        inspector.CommitMachineBaseDiskCommand!.Execute(null);
+        Assert.Same(inspector, viewModel.SelectedMachineInspector);
+        inspector.CommitMachineBaseDiskCommand!.Execute("   ");
+        Assert.Same(inspector, viewModel.SelectedMachineInspector);
+
+        Assert.Equal(currentDisk, viewModel.CaptureDraft().Vms[dcIndex].VhdxId);
+
+        // A genuinely different disk commits once and re-renders (new inspector instance).
+        var differentDisk = currentDisk == "disk-dc" ? "disk-member" : "disk-dc";
+        inspector.CommitMachineBaseDiskCommand!.Execute(differentDisk);
+        Assert.NotSame(inspector, viewModel.SelectedMachineInspector);
+        Assert.Equal(differentDisk, viewModel.CaptureDraft().Vms[dcIndex].VhdxId);
+    }
+
     private static BuilderMachineInspectorViewModel AssertInspector(TemplatesBuilderViewModel viewModel)
     {
         Assert.True(viewModel.HasSelectedMachineInspector);

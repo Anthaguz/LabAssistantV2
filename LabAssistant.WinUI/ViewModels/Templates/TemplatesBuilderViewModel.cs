@@ -613,6 +613,20 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     [RelayCommand]
     private void CommitSelectedMachineBaseDisk(string? vhdxId)
     {
+        // Re-entrancy guard for the base-disk ComboBox. Rebuilding the inspector hands the ComboBox a fresh
+        // ItemsSource and re-applies SelectedValue, which WinUI reports back through SelectionChanged as if the
+        // user had picked a disk. Committing that echo would re-render, rebuild the inspector, and fire again -
+        // an unbounded recursion that overflows the stack. A null/empty id is only ever the transient value while
+        // the ItemsSource is being swapped (the options list is the non-empty VHDX catalog, with no empty entry),
+        // and an id equal to the current base disk is the echo of our own render; both are genuine no-ops.
+        if (string.IsNullOrWhiteSpace(vhdxId) ||
+            _selectedMachineVmIndex < 0 ||
+            _selectedMachineVmIndex >= _draft.Vms.Count ||
+            string.Equals(_draft.Vms[_selectedMachineVmIndex].VhdxId ?? string.Empty, vhdxId.Trim(), StringComparison.Ordinal))
+        {
+            return;
+        }
+
         var draft = CaptureWorkingDraft();
         var result = TemplatesBuilderMachineBasicsAuthoring.SetMachineBaseDisk(draft, _selectedMachineVmIndex, vhdxId);
         _selectedMachineVmIndex = result.SelectedVmIndex;
