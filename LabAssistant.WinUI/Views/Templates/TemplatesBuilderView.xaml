@@ -883,6 +883,7 @@
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="360" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="10">
@@ -902,8 +903,16 @@
                                                 TextWrapping="Wrap"
                                                 Visibility="{x:Bind ViewModel.HasMachineCards, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
                                         </StackPanel>
-                                        <ScrollViewer
+                                        <!-- A single hairline separates the machine grid from the inspector; the inspector
+                                             itself is outline-less so the settings read as part of the same surface. -->
+                                        <Border
                                             Grid.Column="1"
+                                            Width="1"
+                                            Margin="0,4,0,4"
+                                            Background="{StaticResource ShellBorderBrush}"
+                                            Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                        <ScrollViewer
+                                            Grid.Column="2"
                                             VerticalScrollBarVisibility="Auto"
                                             VerticalScrollMode="Auto">
                                             <Grid>
@@ -915,11 +924,7 @@
                                                     TextWrapping="Wrap"
                                                     Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
                                     <Border
-                                        Padding="14"
-                                        Background="{StaticResource ShellContentBackgroundBrush}"
-                                        BorderBrush="{StaticResource ShellBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="{StaticResource CardCornerRadius}"
+                                        Padding="0,0,4,0"
                                         Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
                                         <StackPanel Spacing="12">
                                             <StackPanel Spacing="3">
