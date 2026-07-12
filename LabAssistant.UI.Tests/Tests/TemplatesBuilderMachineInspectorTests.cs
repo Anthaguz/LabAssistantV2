@@ -142,6 +142,28 @@ public sealed class TemplatesBuilderMachineInspectorTests
         Assert.Equal(dcName, AssertInspector(viewModel).MachineNameText);
     }
 
+    [Fact]
+    public void SingleDomain_ShowsSubnetSubtext_AndSurvivesWorkingDraftCapture()
+    {
+        // Regression: the domain switch's in-memory DomainId (the reconciler's domain<->switch link that feeds the
+        // node subnet subtext) was dropped whenever CaptureWorkingDraft rebuilt the selected network, so a lone
+        // domain rendered "Root domain" with no subnet. Capture runs on ordinary navigation (NextStep), so this
+        // reproduces without any explicit network edit.
+        var viewModel = new TemplatesBuilderViewModel(new RecordingTemplatesCapabilityService());
+        viewModel.Attach(new StubBuilderHost());
+        viewModel.LoadNewDraft(NamedDraft());
+        viewModel.NextStepCommand.Execute(null);
+        viewModel.NextStepCommand.Execute(null);
+
+        var draft = viewModel.CaptureDraft();
+        Assert.Single(draft.Domains);
+        var domainNetwork = draft.LabNetworks.Single(network => !string.IsNullOrWhiteSpace(network.DomainId));
+        Assert.Equal("domain-contoso", domainNetwork.DomainId);
+
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest && !node.IsStandalone);
+        Assert.Contains(domainNetwork.Subnet, domainNode.Subtext);
+    }
+
     private static BuilderMachineInspectorViewModel AssertInspector(TemplatesBuilderViewModel viewModel)
     {
         Assert.True(viewModel.HasSelectedMachineInspector);

@@ -1273,17 +1273,21 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
         var networks = draft.LabNetworks.ToList();
         var current = networks[_selectedNetworkIndex];
-        networks[_selectedNetworkIndex] = new TemplatesBuilderLabNetworkDraft(
-            current.NetworkId,
-            FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkName),
-            FieldHas(_networkFields, TemplatesBuilderFieldKeys.NetworkSwitchName)
+        // Rebuild via `with` so the in-memory-only DomainId (the reconciler's domain<->switch link that drives the
+        // subnet subtext) survives a field edit. A positional re-construction would silently drop it, unhoming the
+        // switch from its domain and blanking the node's subnet until the next structural reconcile.
+        networks[_selectedNetworkIndex] = current with
+        {
+            Name = FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkName),
+            SwitchName = FieldHas(_networkFields, TemplatesBuilderFieldKeys.NetworkSwitchName)
                 ? FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkSwitchName)
                 : current.SwitchName,
-            FieldHas(_networkFields, TemplatesBuilderFieldKeys.NetworkSwitchType)
+            SwitchType = FieldHas(_networkFields, TemplatesBuilderFieldKeys.NetworkSwitchType)
                 ? FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkSwitchType)
                 : current.SwitchType,
-            FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkSubnet),
-            FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkNotes));
+            Subnet = FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkSubnet),
+            Notes = FieldText(_networkFields, TemplatesBuilderFieldKeys.NetworkNotes)
+        };
         return draft with { LabNetworks = networks };
     }
 
