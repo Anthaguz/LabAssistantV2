@@ -811,6 +811,31 @@
                                                     </ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
                                             </ItemsControl>
+                                            <StackPanel
+                                                Spacing="4"
+                                                Visibility="{x:Bind ViewModel.ShowDomainSubnetEditor, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="Subnet" />
+                                                <Grid>
+                                                    <TextBox
+                                                        x:Name="DomainSubnetTextBox"
+                                                        LostFocus="OnDomainSubnetLostFocus"
+                                                        Text="{x:Bind ViewModel.DomainSubnetValue, Mode=TwoWay}" />
+                                                    <Border
+                                                        BorderBrush="{StaticResource ShellCriticalBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="4"
+                                                        IsHitTestVisible="False"
+                                                        Visibility="{x:Bind ViewModel.ShowDomainSubnetErrorOutline, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                                </Grid>
+                                                <TextBlock
+                                                    FontSize="11"
+                                                    Foreground="{StaticResource ShellCriticalBrush}"
+                                                    Text="{x:Bind ViewModel.DomainSubnetValidationMessage, Mode=OneWay}"
+                                                    TextWrapping="Wrap"
+                                                    Visibility="{x:Bind ViewModel.HasDomainSubnetValidationMessage, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                            </StackPanel>
                                             <!-- Forest trust authoring: only shown when a forest is selected and the draft has
                                                  at least two forests (see CanAuthorForestTrust). Pick another forest and add a
                                                  forest trust, or remove one of this forest's existing trusts. -->

@@ -535,6 +535,113 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void DomainSubnetEditor_ShowsDomainSubnetAndHidesForForest()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+
+        var draft = viewModel.CaptureDraft();
+        var domain = draft.Domains[0];
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        domainNode.SelectCommand!.Execute(null);
+
+        var network = viewModel.CaptureDraft().LabNetworks.Single(candidate => candidate.DomainId == domain.DomainId);
+        Assert.True(viewModel.ShowDomainSubnetEditor);
+        Assert.Equal(network.Subnet, viewModel.DomainSubnetValue);
+
+        var forestFrame = viewModel.TopologyCanvas!.Frames.First();
+        forestFrame.SelectCommand!.Execute(null);
+
+        Assert.False(viewModel.ShowDomainSubnetEditor);
+        Assert.False(viewModel.HasDomainSubnetValidationMessage);
+        Assert.Equal(string.Empty, viewModel.DomainSubnetValidationMessage);
+    }
+
+    [Fact]
+    public void DomainSubnetCommit_ValidValueUpdatesNetworkPreservesDomainIdAndReflowsDomainControllerIp()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+
+        var domain = viewModel.CaptureDraft().Domains[0];
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        domainNode.SelectCommand!.Execute(null);
+
+        viewModel.CommitSelectedDomainSubnet("10.9.9.0/24");
+
+        var draftAfter = viewModel.CaptureDraft();
+        var network = draftAfter.LabNetworks.Single(candidate => candidate.DomainId == domain.DomainId);
+        Assert.Equal("10.9.9.0/24", network.Subnet);
+        Assert.Equal(domain.DomainId, network.DomainId);
+        Assert.False(viewModel.HasDomainSubnetValidationMessage);
+        Assert.Equal(string.Empty, viewModel.DomainSubnetValidationMessage);
+
+        var dc = draftAfter.Vms.Single(vm => vm.IsActiveDirectoryDomainController && vm.DomainId == domain.DomainId);
+        Assert.NotEmpty(dc.Nics);
+        Assert.True(BuilderLabSubnet.TryParseCidr("10.9.9.0/24", out var subnet));
+        Assert.True(BuilderLabSubnet.TryParseAddress(dc.Nics[0].IpAddress, out var dcAddress));
+        Assert.True(subnet.Contains(dcAddress), dc.Nics[0].IpAddress);
+    }
+
+    [Fact]
+    public void DomainSubnetCommit_InvalidValuePersistsRawTextAndDoesNotReconcileVmIps()
+    {
+        var viewModel = CreateViewModel();
+        var twoDomainDraft = TemplatesBuilderNetworkReconciler.Reconcile(
+            TemplatesBuilderTopologyAuthoring.AddForest(NamedDraft()).Draft);
+        viewModel.LoadNewDraft(twoDomainDraft);
+        GoToForestsDomains(viewModel);
+
+        var domain = viewModel.CaptureDraft().Domains[1];
+        var domainNode = viewModel.TopologyCanvas!.Nodes.Single(node => node.NodeId == $"domain:{domain.DomainId}");
+        domainNode.SelectCommand!.Execute(null);
+        var draftBefore = viewModel.CaptureDraft();
+        var ipAddressesBefore = draftBefore.Vms.ToDictionary(
+            vm => vm.VmId,
+            vm => string.Join("|", vm.Nics.Select(nic => nic.IpAddress)));
+
+        viewModel.CommitSelectedDomainSubnet("not-a-cidr");
+
+        var draftAfter = viewModel.CaptureDraft();
+        var network = draftAfter.LabNetworks.Single(candidate => candidate.DomainId == domain.DomainId);
+        Assert.Equal("not-a-cidr", network.Subnet);
+        Assert.True(viewModel.HasDomainSubnetValidationMessage);
+        Assert.Contains("valid CIDR", viewModel.DomainSubnetValidationMessage);
+        foreach (var vm in draftAfter.Vms)
+        {
+            Assert.True(ipAddressesBefore.TryGetValue(vm.VmId, out var beforeIps));
+            Assert.Equal(beforeIps, string.Join("|", vm.Nics.Select(nic => nic.IpAddress)));
+        }
+    }
+
+    [Fact]
+    public void DomainSubnetCommit_CollidingValueNamesTheOtherDomainAndStillPersists()
+    {
+        var viewModel = CreateViewModel();
+        var twoDomainDraft = TemplatesBuilderNetworkReconciler.Reconcile(
+            TemplatesBuilderTopologyAuthoring.AddForest(NamedDraft()).Draft);
+        viewModel.LoadNewDraft(twoDomainDraft);
+        GoToForestsDomains(viewModel);
+
+        var draft = viewModel.CaptureDraft();
+        var domainA = draft.Domains[0];
+        var domainB = draft.Domains[1];
+        var subnetA = draft.LabNetworks.Single(network => network.DomainId == domainA.DomainId).Subnet;
+        var domainBNode = viewModel.TopologyCanvas!.Nodes.Single(node => node.NodeId == $"domain:{domainB.DomainId}");
+        domainBNode.SelectCommand!.Execute(null);
+
+        viewModel.CommitSelectedDomainSubnet(subnetA);
+
+        var draftAfter = viewModel.CaptureDraft();
+        var networkB = draftAfter.LabNetworks.Single(network => network.DomainId == domainB.DomainId);
+        Assert.Equal(subnetA, networkB.Subnet);
+        Assert.True(viewModel.HasDomainSubnetValidationMessage);
+        Assert.Contains(domainA.DnsName, viewModel.DomainSubnetValidationMessage);
+    }
+
+    [Fact]
     public void AddStandaloneMachine_CreatesStandaloneVmAndZoomsIntoLevel2()
     {
         var viewModel = CreateViewModel();

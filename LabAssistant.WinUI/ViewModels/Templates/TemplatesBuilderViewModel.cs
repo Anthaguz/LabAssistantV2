@@ -138,6 +138,11 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     [ObservableProperty] private ObservableCollection<BuilderFieldRowViewModel> _forestDomainDetailRows = [];
     [ObservableProperty] private bool _hasForestDomainDetail;
     [ObservableProperty] private bool _forestDomainDetailEmpty = true;
+    [ObservableProperty] private string _domainSubnetValue = string.Empty;
+    [ObservableProperty] private bool _showDomainSubnetEditor;
+    [ObservableProperty] private string _domainSubnetValidationMessage = string.Empty;
+    [ObservableProperty] private bool _hasDomainSubnetValidationMessage;
+    [ObservableProperty] private bool _showDomainSubnetErrorOutline;
 
     // Forest trust authoring (Level 1 detail panel, only when a forest is selected and >=2 forests exist).
     [ObservableProperty] private bool _canAuthorForestTrust;
@@ -460,6 +465,52 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         _selectedForestDomainKind = result.SelectedKind;
         _selectedForestDomainIndex = result.SelectedIndex;
         RenderAndNotify(result.Draft with { IsSaveConfirmed = false });
+    }
+
+    /// <summary>Commits the selected domain subnet after the dedicated editor loses focus.</summary>
+    public void CommitSelectedDomainSubnet(string rawText)
+    {
+        if (_selectedForestDomainKind != BuilderForestDomainResourceKind.Domain ||
+            _selectedForestDomainIndex < 0 ||
+            _selectedForestDomainIndex >= _draft.Domains.Count)
+        {
+            return;
+        }
+
+        var domain = _draft.Domains[_selectedForestDomainIndex];
+        var networkIndex = FindDomainNetworkIndex(_draft, domain.DomainId);
+        if (networkIndex < 0)
+        {
+            return;
+        }
+
+        var trimmed = (rawText ?? string.Empty).Trim();
+        var current = _draft.LabNetworks[networkIndex];
+        if (string.Equals(trimmed, current.Subnet ?? string.Empty, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var networks = _draft.LabNetworks.ToList();
+        networks[networkIndex] = current with { Subnet = trimmed };
+        _draft = _draft with { LabNetworks = networks, IsSaveConfirmed = false };
+
+        var validation = EvaluateDomainSubnet(_draft, current.NetworkId, domain.DomainId, trimmed);
+        ApplyDomainSubnetValidation(validation.Message);
+        if (validation.IsCidrValid)
+        {
+            RenderAndNotify(_draft, reconcileNetworkLayout: true);
+        }
+        else
+        {
+            ApplyDraft(_draft);
+            RenderResourceLists(refreshNavigator: true);
+            RenderForestDomainDetail();
+            RenderReview();
+            RefreshActionState();
+        }
+
+        RefreshSelectedDomainSubnetValidation();
     }
 
     // ----- Level 2: machine authoring inside a domain or the Standalone container -----
@@ -1793,6 +1844,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         RenderForestTrustAffordance();
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Forest && _draft.Forests.Count > 0)
         {
+            ClearDomainSubnetEditor();
             var forest = _draft.Forests[_selectedForestDomainIndex];
             var forestName = TemplatesBuilderTopologyAuthoring.ResolveForestName(_draft, forest);
             var fields = new List<BuilderFieldViewModel>
@@ -1812,6 +1864,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         if (_selectedForestDomainKind == BuilderForestDomainResourceKind.Domain && _draft.Domains.Count > 0)
         {
             var domain = _draft.Domains[_selectedForestDomainIndex];
+            RenderSelectedDomainSubnetEditor(domain);
             var isRoot = TemplatesBuilderTopologyAuthoring.IsForestRoot(_draft, domain.DomainId);
             var fields = new List<BuilderFieldViewModel>
             {
@@ -1843,10 +1896,144 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             return;
         }
 
+        ClearDomainSubnetEditor();
         _forestDomainFields = Array.Empty<BuilderFieldViewModel>();
         ForestDomainDetailRows = [];
         HasForestDomainDetail = false;
         ForestDomainDetailEmpty = true;
+    }
+
+    private void RenderSelectedDomainSubnetEditor(TemplatesBuilderDomainDraft domain)
+    {
+        var network = FindDomainNetwork(_draft, domain.DomainId);
+        DomainSubnetValue = network.Subnet ?? string.Empty;
+        ShowDomainSubnetEditor = true;
+
+        var validation = EvaluateDomainSubnet(
+            _draft,
+            network.NetworkId ?? string.Empty,
+            domain.DomainId,
+            DomainSubnetValue);
+        ApplyDomainSubnetValidation(validation.Message);
+    }
+
+    private void RefreshSelectedDomainSubnetValidation()
+    {
+        if (_selectedForestDomainKind != BuilderForestDomainResourceKind.Domain ||
+            _selectedForestDomainIndex < 0 ||
+            _selectedForestDomainIndex >= _draft.Domains.Count)
+        {
+            ClearDomainSubnetEditor();
+            return;
+        }
+
+        var domain = _draft.Domains[_selectedForestDomainIndex];
+        var network = FindDomainNetwork(_draft, domain.DomainId);
+        var subnet = network.Subnet ?? string.Empty;
+        var validation = EvaluateDomainSubnet(
+            _draft,
+            network.NetworkId ?? string.Empty,
+            domain.DomainId,
+            subnet);
+        ApplyDomainSubnetValidation(validation.Message);
+    }
+
+    private void ClearDomainSubnetEditor()
+    {
+        DomainSubnetValue = string.Empty;
+        ShowDomainSubnetEditor = false;
+        ApplyDomainSubnetValidation(string.Empty);
+    }
+
+    private void ApplyDomainSubnetValidation(string message)
+    {
+        DomainSubnetValidationMessage = message ?? string.Empty;
+        HasDomainSubnetValidationMessage = !string.IsNullOrWhiteSpace(DomainSubnetValidationMessage);
+        ShowDomainSubnetErrorOutline = HasDomainSubnetValidationMessage;
+    }
+
+    private static (bool IsCidrValid, string Message) EvaluateDomainSubnet(
+        TemplatesBuilderDraftSnapshot draft,
+        string networkId,
+        string domainId,
+        string subnetText)
+    {
+        if (!BuilderLabSubnet.TryParseCidr(subnetText, out var parsed))
+        {
+            return (false, "Enter a valid CIDR such as 10.0.0.0/24");
+        }
+
+        var collision = FindCollidingDomainNetwork(draft, networkId, domainId, parsed.NetworkAddress);
+        if (!string.IsNullOrWhiteSpace(collision.DomainId))
+        {
+            return (true, $"Subnet overlaps domain {ResolveDomainDisplayName(draft, collision.DomainId)}");
+        }
+
+        return (true, string.Empty);
+    }
+
+    private static TemplatesBuilderLabNetworkDraft FindDomainNetwork(
+        TemplatesBuilderDraftSnapshot draft,
+        string domainId)
+        => draft.LabNetworks.FirstOrDefault(network =>
+            !string.IsNullOrWhiteSpace(network.DomainId) &&
+            string.Equals(network.DomainId, domainId, StringComparison.OrdinalIgnoreCase));
+
+    private static int FindDomainNetworkIndex(TemplatesBuilderDraftSnapshot draft, string domainId)
+    {
+        for (var index = 0; index < draft.LabNetworks.Count; index++)
+        {
+            var network = draft.LabNetworks[index];
+            if (!string.IsNullOrWhiteSpace(network.DomainId) &&
+                string.Equals(network.DomainId, domainId, StringComparison.OrdinalIgnoreCase))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static TemplatesBuilderLabNetworkDraft FindCollidingDomainNetwork(
+        TemplatesBuilderDraftSnapshot draft,
+        string networkId,
+        string domainId,
+        uint networkAddress)
+    {
+        foreach (var network in draft.LabNetworks)
+        {
+            if (string.IsNullOrWhiteSpace(network.DomainId) ||
+                string.Equals(network.NetworkId, networkId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(network.DomainId, domainId, StringComparison.OrdinalIgnoreCase) ||
+                !BuilderLabSubnet.TryParseCidr(network.Subnet, out var otherSubnet))
+            {
+                continue;
+            }
+
+            if (otherSubnet.NetworkAddress == networkAddress)
+            {
+                return network;
+            }
+        }
+
+        return default;
+    }
+
+    private static string ResolveDomainDisplayName(TemplatesBuilderDraftSnapshot draft, string domainId)
+    {
+        var domain = draft.Domains.FirstOrDefault(candidate =>
+            string.Equals(candidate.DomainId, domainId, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(domain.DnsName))
+        {
+            return domain.DnsName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(domain.NetBiosName))
+        {
+            return domain.NetBiosName;
+        }
+
+        return domainId;
     }
 
     // Populates the "Add forest trust" affordance shown only when a forest is selected and the draft has at

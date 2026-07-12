@@ -219,6 +219,11 @@ public sealed partial class TemplatesBuilderView : UserControl
         ViewModel.SelectedMachineInspector?.CommitMachineBaseDiskCommand?.Execute(selectedId);
     }
 
+    private void OnDomainSubnetLostFocus(object sender, RoutedEventArgs e)
+    {
+        ViewModel.CommitSelectedDomainSubnet(DomainSubnetTextBox?.Text ?? string.Empty);
+    }
+
     private void OnInspectorMachineHostOctetLostFocus(object sender, RoutedEventArgs e)
     {
         if (IsFocusWithinHostOctetEditors())
