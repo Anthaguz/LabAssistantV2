@@ -222,6 +222,7 @@
                 BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
                 BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
                 CornerRadius="6"
+                Tag="{x:Bind}"
                 Tapped="OnMachineCardTapped"
                 ToolTipService.ToolTip="{x:Bind Label}">
                 <Grid ColumnSpacing="10">

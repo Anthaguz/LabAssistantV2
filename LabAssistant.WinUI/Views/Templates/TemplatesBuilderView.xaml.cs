@@ -138,9 +138,14 @@ public sealed partial class TemplatesBuilderView : UserControl
     }
 
     // A Level 2 machine card selects on tap; its delete button stops the pointer before this fires.
+    // The cards live in an ItemsRepeater, which - unlike ItemsControl/ListView - does NOT set each realized
+    // child's DataContext to its data item, so we carry the card view model on the Border's Tag (bound with
+    // x:Bind in the template) and read it here. DataContext is kept as a fallback for any non-repeater host.
     private void OnMachineCardTapped(object sender, TappedRoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: BuilderMachineCardViewModel card })
+        var card = (sender as FrameworkElement)?.Tag as BuilderMachineCardViewModel
+            ?? (sender as FrameworkElement)?.DataContext as BuilderMachineCardViewModel;
+        if (card is not null)
         {
             card.SelectCommand?.Execute(null);
             e.Handled = true;

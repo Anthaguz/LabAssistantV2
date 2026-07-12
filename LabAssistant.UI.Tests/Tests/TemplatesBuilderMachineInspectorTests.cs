@@ -111,6 +111,37 @@ public sealed class TemplatesBuilderMachineInspectorTests
         Assert.Equal(differentDisk, viewModel.CaptureDraft().Vms[dcIndex].VhdxId);
     }
 
+    [Fact]
+    public void SelectingMachineCards_MovesSelectionAndInspectorBetweenMachines()
+    {
+        // Locks the Level 2 card-tap selection contract the view relies on: tapping a card runs its SelectCommand,
+        // which must move both the selected flag and the inspector to that machine. The live regression was purely
+        // in the view (ItemsRepeater does not set a realized child's DataContext, so the tap handler read the wrong
+        // object) - this asserts the view-model side stays sound so a fresh render always re-targets the inspector.
+        var viewModel = CreateDomainMachineLevelViewModel();
+
+        var dcIndex = viewModel.MachineCards.Single(card => card.IsDomainController).VmIndex;
+        var memberIndex = viewModel.MachineCards.Single(card => !card.IsDomainController).VmIndex;
+        var dcName = viewModel.CaptureDraft().Vms[dcIndex].Name;
+        var memberName = viewModel.CaptureDraft().Vms[memberIndex].Name;
+
+        viewModel.MachineCards.Single(card => card.VmIndex == dcIndex).SelectCommand!.Execute(null);
+        Assert.Equal(dcIndex, viewModel.MachineCards.Single(card => card.IsSelected).VmIndex);
+        var dcInspector = AssertInspector(viewModel);
+        Assert.Equal(dcName, dcInspector.MachineNameText);
+
+        viewModel.MachineCards.Single(card => card.VmIndex == memberIndex).SelectCommand!.Execute(null);
+        Assert.Equal(memberIndex, viewModel.MachineCards.Single(card => card.IsSelected).VmIndex);
+        var memberInspector = AssertInspector(viewModel);
+        Assert.NotSame(dcInspector, memberInspector);
+        Assert.Equal(memberName, memberInspector.MachineNameText);
+
+        // Tapping back to the first card must re-target again - the selection is not one-way.
+        viewModel.MachineCards.Single(card => card.VmIndex == dcIndex).SelectCommand!.Execute(null);
+        Assert.Equal(dcIndex, viewModel.MachineCards.Single(card => card.IsSelected).VmIndex);
+        Assert.Equal(dcName, AssertInspector(viewModel).MachineNameText);
+    }
+
     private static BuilderMachineInspectorViewModel AssertInspector(TemplatesBuilderViewModel viewModel)
     {
         Assert.True(viewModel.HasSelectedMachineInspector);
