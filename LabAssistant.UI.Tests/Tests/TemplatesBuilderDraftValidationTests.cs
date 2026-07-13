@@ -124,6 +124,54 @@ public sealed class TemplatesBuilderDraftValidationTests
     }
 
     [Fact]
+    public void BuilderViewModel_ValidationIssuesBar_MirrorsBlockersAndWarnings()
+    {
+        var viewModel = CreateViewModel();
+        var draft = CreateBuilderDraft();
+
+        viewModel.LoadNewDraft(draft);
+
+        // A general-scope edit renders through the topbar-refresh path, so the issues bar reflects
+        // the live validation state (blockers first, then warnings) with its visibility flag tracking
+        // whether any issue is present.
+        viewModel.SetDeploymentProfileCommand.Execute("Balanced");
+        AssertIssuesBarMirrorsValidation(viewModel);
+
+        // Introduce an invalid VM name, then re-render: the resulting VmIdentity blocker must surface.
+        var invalid = viewModel.CaptureDraft();
+        viewModel.ApplyDraft(invalid with { Vms = [invalid.Vms[0] with { Name = "bad/name" }, invalid.Vms[1]] });
+        viewModel.SetDeploymentProfileCommand.Execute("Balanced");
+
+        Assert.True(viewModel.HasValidationIssues);
+        Assert.NotEmpty(viewModel.ValidationState.Blockers);
+        AssertIssuesBarMirrorsValidation(viewModel);
+        Assert.All(
+            viewModel.ValidationState.Blockers,
+            blocker => Assert.Contains(viewModel.ValidationIssues, row => row.IsBlocker && row.Message == blocker.Message));
+
+        // Restoring a valid name drops that blocker; the bar re-mirrors the reduced state.
+        var restored = viewModel.CaptureDraft();
+        viewModel.ApplyDraft(restored with { Vms = [restored.Vms[0] with { Name = "dc01" }, restored.Vms[1]] });
+        viewModel.SetDeploymentProfileCommand.Execute("Balanced");
+
+        AssertIssuesBarMirrorsValidation(viewModel);
+        Assert.DoesNotContain(viewModel.ValidationIssues, row => row.Message.Contains("bad/name", StringComparison.Ordinal));
+    }
+
+    private static void AssertIssuesBarMirrorsValidation(TemplatesBuilderViewModel viewModel)
+    {
+        var expectedMessages = viewModel.ValidationState.Blockers
+            .Select(issue => issue.Message)
+            .Concat(viewModel.ValidationState.Warnings.Select(issue => issue.Message))
+            .ToList();
+
+        Assert.Equal(expectedMessages, viewModel.ValidationIssues.Select(row => row.Message).ToList());
+        Assert.Equal(viewModel.ValidationState.Blockers.Count, viewModel.ValidationIssues.Count(row => row.IsBlocker));
+        Assert.Equal(viewModel.ValidationState.Warnings.Count, viewModel.ValidationIssues.Count(row => !row.IsBlocker));
+        Assert.Equal(expectedMessages.Count > 0, viewModel.HasValidationIssues);
+    }
+
+    [Fact]
     public void BuilderViewModel_ScopedVmIdentityRefresh_PreservesOtherVmIdentityBlockers()
     {
         var viewModel = CreateViewModel();

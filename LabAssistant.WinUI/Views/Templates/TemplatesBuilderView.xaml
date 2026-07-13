@@ -1172,13 +1172,56 @@
                 </ScrollViewer>
             </Grid>
 
-            <Border Grid.Row="2" Padding="0,4,0,0">
+            <StackPanel Grid.Row="2" Spacing="6">
+                <Border
+                    Padding="12,10"
+                    Background="{StaticResource ShellBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    Visibility="{x:Bind ViewModel.HasValidationIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Spacing="6">
+                        <TextBlock
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Issues" />
+                        <ScrollViewer
+                            MaxHeight="132"
+                            HorizontalScrollMode="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.ValidationIssues, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="builder:BuilderValidationIssueRow">
+                                        <Grid Margin="0,2" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="64" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                Grid.Column="0"
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Foreground="{x:Bind IsBlocker, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellCriticalBrush|ShellTextSecondaryBrush}"
+                                                Text="{x:Bind SeverityLabel}" />
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                FontSize="12"
+                                                Text="{x:Bind Message}"
+                                                TextWrapping="Wrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
                 <TextBlock
                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                     Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
                     TextWrapping="Wrap"
                     Visibility="{x:Bind ViewModel.IsStatusVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-            </Border>
+            </StackPanel>
         </Grid>
     </Border>
 </UserControl>

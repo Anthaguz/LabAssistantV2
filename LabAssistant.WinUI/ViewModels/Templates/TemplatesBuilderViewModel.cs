@@ -100,6 +100,8 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     [ObservableProperty] private string _validationChipText = "Valid";
     [ObservableProperty] private bool _validationChipIsOk = true;
     [ObservableProperty] private string _builderBreadcrumbText = "Topology";
+    [ObservableProperty] private ObservableCollection<BuilderValidationIssueRow> _validationIssues = [];
+    [ObservableProperty] private bool _hasValidationIssues;
 
     // General.
     [ObservableProperty] private string _templateName = string.Empty;
@@ -2291,6 +2293,19 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             : _validationState.Warnings.Count > 0
                 ? $"{_validationState.Warnings.Count} warning(s)"
                 : "Valid";
+
+        ValidationIssues.Clear();
+        foreach (var blocker in _validationState.Blockers)
+        {
+            ValidationIssues.Add(new BuilderValidationIssueRow(blocker.Message, isBlocker: true));
+        }
+
+        foreach (var warning in _validationState.Warnings)
+        {
+            ValidationIssues.Add(new BuilderValidationIssueRow(warning.Message, isBlocker: false));
+        }
+
+        HasValidationIssues = ValidationIssues.Count > 0;
 
         var containerDisplayName = string.IsNullOrWhiteSpace(MachineLevelTitle) ? "Topology" : MachineLevelTitle;
         BuilderBreadcrumbText = IsMachineLevelVisible

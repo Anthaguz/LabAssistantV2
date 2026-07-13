@@ -67,6 +67,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderSwitchOptionViewModel.cs" Link="WinUI\BuilderSwitchOptionViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderFieldRowViewModel.cs" Link="WinUI\BuilderFieldRowViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderNavRowViewModel.cs" Link="WinUI\BuilderNavRowViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderValidationIssueRow.cs" Link="WinUI\BuilderValidationIssueRow.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasGeometry.cs" Link="WinUI\BuilderCanvasGeometry.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasMetrics.cs" Link="WinUI\BuilderCanvasMetrics.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasNodeViewModel.cs" Link="WinUI\BuilderCanvasNodeViewModel.cs" />
