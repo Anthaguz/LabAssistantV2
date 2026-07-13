@@ -628,7 +628,7 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
-    public void DomainSubnetCommit_InvalidValuePersistsRawTextAndDoesNotReconcileVmIps()
+    public void DomainSubnetCommit_InvalidValueKeepsDraftSubnetShowsRawTextAndDoesNotReconcileVmIps()
     {
         var viewModel = CreateViewModel();
         var twoDomainDraft = TemplatesBuilderNetworkReconciler.Reconcile(
@@ -640,6 +640,7 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         var domainNode = viewModel.TopologyCanvas!.Nodes.Single(node => node.NodeId == $"domain:{domain.DomainId}");
         domainNode.SelectCommand!.Execute(null);
         var draftBefore = viewModel.CaptureDraft();
+        var subnetBefore = draftBefore.LabNetworks.Single(candidate => candidate.DomainId == domain.DomainId).Subnet;
         var ipAddressesBefore = draftBefore.Vms.ToDictionary(
             vm => vm.VmId,
             vm => string.Join("|", vm.Nics.Select(nic => nic.IpAddress)));
@@ -648,14 +649,48 @@ public sealed class TemplatesBuilderViewModelInteractionTests
 
         var draftAfter = viewModel.CaptureDraft();
         var network = draftAfter.LabNetworks.Single(candidate => candidate.DomainId == domain.DomainId);
-        Assert.Equal("not-a-cidr", network.Subnet);
+        // The garbage value is NOT written into the draft: the network keeps its last valid subnet so the canvas
+        // label never blanks and Save can never persist a non-CIDR subnet.
+        Assert.Equal(subnetBefore, network.Subnet);
+        Assert.NotEqual("not-a-cidr", network.Subnet);
+        // The raw text stays in the editor field with a soft-red message so the user can fix it in place.
+        Assert.Equal("not-a-cidr", viewModel.DomainSubnetValue);
         Assert.True(viewModel.HasDomainSubnetValidationMessage);
+        Assert.True(viewModel.ShowDomainSubnetErrorOutline);
         Assert.Contains("valid CIDR", viewModel.DomainSubnetValidationMessage);
         foreach (var vm in draftAfter.Vms)
         {
             Assert.True(ipAddressesBefore.TryGetValue(vm.VmId, out var beforeIps));
             Assert.Equal(beforeIps, string.Join("|", vm.Nics.Select(nic => nic.IpAddress)));
         }
+    }
+
+    [Fact]
+    public void DomainSubnetCommit_ClearingSubnetKeepsDraftSubnetAndCanvasLabel()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+        GoToForestsDomains(viewModel);
+
+        var domain = viewModel.CaptureDraft().Domains[0];
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest);
+        domainNode.SelectCommand!.Execute(null);
+
+        var subnetBefore = viewModel.CaptureDraft().LabNetworks.Single(n => n.DomainId == domain.DomainId).Subnet;
+        Assert.False(string.IsNullOrWhiteSpace(subnetBefore));
+
+        // Reproduces the reported bug: clearing the field must not blank the domain's on-canvas subnet label.
+        viewModel.CommitSelectedDomainSubnet(string.Empty);
+
+        var draftAfter = viewModel.CaptureDraft();
+        var network = draftAfter.LabNetworks.Single(n => n.DomainId == domain.DomainId);
+        Assert.Equal(subnetBefore, network.Subnet);
+        Assert.Equal(string.Empty, viewModel.DomainSubnetValue);
+        Assert.True(viewModel.HasDomainSubnetValidationMessage);
+
+        // The canvas node still carries the CIDR in its subtext, so the label stays visible.
+        var node = viewModel.TopologyCanvas!.Nodes.Single(n => n.NodeId == $"domain:{domain.DomainId}");
+        Assert.Contains(subnetBefore, node.Subtext);
     }
 
     [Fact]

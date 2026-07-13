@@ -491,8 +491,23 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
         var trimmed = (rawText ?? string.Empty).Trim();
         var current = _draft.LabNetworks[networkIndex];
+        var validation = EvaluateDomainSubnet(_draft, current.NetworkId, domain.DomainId, trimmed);
+
+        // An unparseable subnet is never written into the draft. Persisting it would blank the domain's on-canvas
+        // subnet label (an empty or non-CIDR value drops out of the topology projection) and would let a garbage
+        // subnet reach Save. Instead the raw text stays in the editor field with a soft-red message so the user
+        // can correct it in place, while the network keeps its last valid subnet. This mirrors the machine
+        // inspector's octet editor, which likewise no-ops on invalid input rather than corrupting the draft.
+        if (!validation.IsCidrValid)
+        {
+            DomainSubnetValue = trimmed;
+            ApplyDomainSubnetValidation(validation.Message);
+            return;
+        }
+
         if (string.Equals(trimmed, current.Subnet ?? string.Empty, StringComparison.Ordinal))
         {
+            ApplyDomainSubnetValidation(validation.Message);
             return;
         }
 
@@ -500,21 +515,9 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         networks[networkIndex] = current with { Subnet = trimmed };
         _draft = _draft with { LabNetworks = networks, IsSaveConfirmed = false };
 
-        var validation = EvaluateDomainSubnet(_draft, current.NetworkId, domain.DomainId, trimmed);
-        ApplyDomainSubnetValidation(validation.Message);
-        if (validation.IsCidrValid)
-        {
-            RenderAndNotify(_draft, reconcileNetworkLayout: true);
-        }
-        else
-        {
-            ApplyDraft(_draft);
-            RenderResourceLists(refreshNavigator: true);
-            RenderForestDomainDetail();
-            RenderReview();
-            RefreshActionState();
-        }
-
+        // A parseable subnet (including one that overlaps another domain - a soft warning, not a hard block) is
+        // committed and the layout reconciled so VM addresses reflow onto the new block.
+        RenderAndNotify(_draft, reconcileNetworkLayout: true);
         RefreshSelectedDomainSubnetValidation();
     }
 
