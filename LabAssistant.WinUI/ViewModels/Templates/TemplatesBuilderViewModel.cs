@@ -2322,10 +2322,14 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         PreviousStepEnabled = footer.CanGoPrevious;
         NextStepEnabled = footer.CanGoNext;
         NextStepVisible = !footer.IsReview;
-        SaveAsEnabled = footer.CanSaveAs;
-        SaveEnabled = footer.CanSave;
-        SaveVisible = footer.IsReview;
-        SaveAsVisible = footer.IsReview;
+        // Phase 4 retired the stepper/Review route: the canvas is the permanent Builder surface and Save / Save As
+        // live in the topbar, so they are always visible. Enablement is driven purely by draft + validation state
+        // (canSave = active draft, not loading, no blockers) rather than by the now-unreachable Review route, which
+        // would otherwise leave both buttons permanently hidden and disabled.
+        SaveEnabled = canSave;
+        SaveAsEnabled = canSave;
+        SaveVisible = true;
+        SaveAsVisible = true;
         PreviousStepTooltip = FormatCommandLabel("Previous", footer.PreviousTargetLabel);
         NextStepTooltip = FormatCommandLabel("Next", footer.NextTargetLabel);
     }

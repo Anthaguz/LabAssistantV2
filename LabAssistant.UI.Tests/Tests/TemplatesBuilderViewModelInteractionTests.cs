@@ -117,6 +117,24 @@ public sealed class TemplatesBuilderViewModelInteractionTests
     }
 
     [Fact]
+    public void BuilderSave_OnCanvasDraftWithoutReviewNavigation_IsVisibleAndEnabled()
+    {
+        // Phase 4 retired the stepper/Review route: the topbar Save / Save As must be visible and enabled on a clean
+        // draft without ever navigating to the (now-removed) Review step. Regression guard for the shell refactor that
+        // left Save gated on the unreachable Review route, which hid and disabled both buttons permanently.
+        var viewModel = CreateViewModel();
+        viewModel.LoadNewDraft(NamedDraft());
+
+        Assert.False(
+            viewModel.HasValidationBlockers,
+            string.Join(" | ", viewModel.ValidationState.Blockers.Select(issue => issue.Message)));
+        Assert.True(viewModel.SaveVisible);
+        Assert.True(viewModel.SaveEnabled);
+        Assert.True(viewModel.SaveAsVisible);
+        Assert.True(viewModel.SaveAsEnabled);
+    }
+
+    [Fact]
     public void BuilderDraftMapping_RoundTripsVmsDomainsAndNetworksThroughLabTemplate()
     {
         var draft = NamedDraft();
