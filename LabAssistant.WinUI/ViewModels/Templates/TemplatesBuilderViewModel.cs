@@ -97,6 +97,9 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
     [ObservableProperty] private string _referenceText = "No reference data loaded.";
     [ObservableProperty] private string _statusText = "Create or open a V2 Builder draft.";
     [ObservableProperty] private bool _isStatusVisible;
+    [ObservableProperty] private string _validationChipText = "Valid";
+    [ObservableProperty] private bool _validationChipIsOk = true;
+    [ObservableProperty] private string _builderBreadcrumbText = "Topology";
 
     // General.
     [ObservableProperty] private string _templateName = string.Empty;
@@ -739,6 +742,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             MachineGridItems = [];
             HasMachineCards = false;
             RebuildSelectedMachineInspector();
+            RefreshTopbarState();
             return;
         }
 
@@ -787,6 +791,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         gridItems.Add(_machinePlaceholder);
         MachineGridItems = gridItems;
         RebuildSelectedMachineInspector();
+        RefreshTopbarState();
     }
 
     private void RebuildSelectedMachineInspector()
@@ -1240,6 +1245,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         RenderVmOverview();
         ApplyDraft(_draft);
         RenderReview();
+        RefreshTopbarState();
         RefreshActionState();
     }
 
@@ -1260,6 +1266,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         RenderVmOverview();
         ApplyDraft(_draft);
         RenderReview();
+        RefreshTopbarState();
         RefreshActionState();
     }
 
@@ -1310,6 +1317,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
 
         ApplyDraft(_draft);
         RenderReview();
+        RefreshTopbarState();
         RefreshActionState();
     }
 
@@ -1600,11 +1608,6 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         IsGeneralVisible = projection.ActiveStep == BuilderWorkflowStep.General;
         IsNetworksVisible = projection.ActiveStep == BuilderWorkflowStep.Networks;
         IsForestsDomainsVisible = projection.ActiveStep == BuilderWorkflowStep.ForestsDomains;
-        if (!IsForestsDomainsVisible && IsMachineLevelVisible)
-        {
-            // Level 2 is a sub-surface of the Forests & Domains step; leaving the step drops back to Level 1.
-            IsMachineLevelVisible = false;
-        }
         IsCredentialsVisible = projection.ActiveStep == BuilderWorkflowStep.Credentials;
         IsVmsVisible = projection.ActiveStep == BuilderWorkflowStep.Vms;
         IsReviewVisible = projection.ActiveStep == BuilderWorkflowStep.Review;
@@ -2273,6 +2276,22 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                 ? string.Join(Environment.NewLine, _validationState.Warnings.Select(issue => issue.Message))
                 : "Builder validation has no current blockers or warnings.";
         IsReviewBlockerVisible = _validationState.HasBlockers || _validationState.Warnings.Count > 0;
+        RefreshTopbarState();
+    }
+
+    private void RefreshTopbarState()
+    {
+        ValidationChipIsOk = !_validationState.HasBlockers;
+        ValidationChipText = _validationState.HasBlockers
+            ? $"{_validationState.Blockers.Count} blocker(s)"
+            : _validationState.Warnings.Count > 0
+                ? $"{_validationState.Warnings.Count} warning(s)"
+                : "Valid";
+
+        var containerDisplayName = string.IsNullOrWhiteSpace(MachineLevelTitle) ? "Topology" : MachineLevelTitle;
+        BuilderBreadcrumbText = IsMachineLevelVisible
+            ? $"{containerDisplayName} . machines"
+            : "Topology";
     }
 
     private void RefreshActionState()
