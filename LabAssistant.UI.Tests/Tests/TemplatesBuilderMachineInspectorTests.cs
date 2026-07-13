@@ -164,6 +164,24 @@ public sealed class TemplatesBuilderMachineInspectorTests
         Assert.Contains(domainNetwork.Subnet, domainNode.Subtext);
     }
 
+    [Fact]
+    public async Task MachineInspector_SurfacesReadOnlyBootstrapAccountFromBaseDisk()
+    {
+        // The Level 2 machine inspector shows the base disk's baked-in local admin (bootstrap account) as a read-only
+        // field, so the user sees which identity the deploy reuses without authoring any credentials.
+        var viewModel = new TemplatesBuilderViewModel(new RecordingTemplatesCapabilityService());
+        viewModel.Attach(new BootstrapAwareBuilderHost());
+        await viewModel.CreateDraftAsync();
+
+        var domainNode = viewModel.TopologyCanvas!.Nodes.First(node => !node.IsForest && !node.IsStandalone);
+        domainNode.ManageMachinesCommand!.Execute(null);
+        Assert.True(viewModel.IsMachineLevelVisible);
+
+        var inspector = AssertInspector(viewModel);
+        Assert.True(inspector.HasBootstrapAccount);
+        Assert.Equal("Administrator", inspector.BootstrapAccountText);
+    }
+
     private static BuilderMachineInspectorViewModel AssertInspector(TemplatesBuilderViewModel viewModel)
     {
         Assert.True(viewModel.HasSelectedMachineInspector);
@@ -209,6 +227,30 @@ public sealed class TemplatesBuilderMachineInspectorTests
     {
         public Task<TemplatesBuilderReferenceData> LoadBuilderReferenceDataAsync(bool forceRefresh)
             => Task.FromResult(new TemplatesBuilderReferenceData(Array.Empty<string>(), Array.Empty<TemplateVhdxCatalogOption>()));
+
+        public Task ReloadLibraryAsync(bool forceRefresh) => Task.CompletedTask;
+
+        public Task<string?> PickTemplateFileForSaveAsync(string suggestedFileName)
+            => Task.FromResult<string?>(@"C:\templates\save-as.json");
+
+        public void NavigateToBuilder()
+        {
+        }
+
+        public void NavigateToLibrary()
+        {
+        }
+    }
+
+    private sealed class BootstrapAwareBuilderHost : ITemplatesBuilderHost
+    {
+        public Task<TemplatesBuilderReferenceData> LoadBuilderReferenceDataAsync(bool forceRefresh)
+            => Task.FromResult(new TemplatesBuilderReferenceData(
+                ["vSwitch-Core"],
+                [
+                    new TemplateVhdxCatalogOption("disk-dc", @"C:\base\disk-dc.vhdx", "Windows Server", "2022", 2, "sig-dc", "Administrator"),
+                    new TemplateVhdxCatalogOption("disk-member", @"C:\base\disk-member.vhdx", "Windows Server", "2022", 2, "sig-member", "Administrator")
+                ]));
 
         public Task ReloadLibraryAsync(bool forceRefresh) => Task.CompletedTask;
 

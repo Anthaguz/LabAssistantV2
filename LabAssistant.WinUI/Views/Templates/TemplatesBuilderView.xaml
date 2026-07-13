@@ -910,6 +910,7 @@
                                                             <RowDefinition Height="Auto" />
                                                             <RowDefinition Height="Auto" />
                                                             <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
                                                         </Grid.RowDefinitions>
 
                                                         <TextBlock
@@ -1024,6 +1025,29 @@
                                                                 Text="{Binding SelectedMachineInspector.HostAddressValidationMessage}"
                                                                 TextWrapping="Wrap"
                                                                 Visibility="{Binding SelectedMachineInspector.HasHostAddressValidationMessage, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+
+                                                        <TextBlock
+                                                            Grid.Row="5"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Top"
+                                                            Margin="0,6,0,0"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Bootstrap account"
+                                                            Visibility="{Binding SelectedMachineInspector.HasBootstrapAccount, Converter={StaticResource BoolToVisibility}}" />
+                                                        <StackPanel
+                                                            Grid.Row="5"
+                                                            Grid.Column="1"
+                                                            Spacing="2"
+                                                            Visibility="{Binding SelectedMachineInspector.HasBootstrapAccount, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock
+                                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                Text="{Binding SelectedMachineInspector.BootstrapAccountText}" />
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                Text="Local admin baked into the base disk, reused at deploy time."
+                                                                TextWrapping="Wrap" />
                                                         </StackPanel>
                                                     </Grid>
                                                 </StackPanel>

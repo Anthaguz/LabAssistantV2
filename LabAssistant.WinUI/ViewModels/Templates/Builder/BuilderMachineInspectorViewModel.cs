@@ -39,6 +39,7 @@ public sealed class BuilderMachineInspectorViewModel
         string machineMemoryMbText,
         IReadOnlyList<BaseDiskOption> baseDiskOptions,
         string selectedBaseDiskId,
+        string bootstrapAccountText,
         bool isHostAddressEditable,
         string hostAddressFixedOctetPrefix,
         bool hasSecondHostOctet,
@@ -67,6 +68,7 @@ public sealed class BuilderMachineInspectorViewModel
         MachineMemoryMbText = machineMemoryMbText;
         BaseDiskOptions = new ObservableCollection<BaseDiskOption>(baseDiskOptions ?? []);
         SelectedBaseDiskId = selectedBaseDiskId ?? string.Empty;
+        BootstrapAccountText = bootstrapAccountText ?? string.Empty;
         IsHostAddressEditable = isHostAddressEditable;
         HostAddressFixedOctetPrefix = hostAddressFixedOctetPrefix ?? string.Empty;
         HasSecondHostOctet = hasSecondHostOctet;
@@ -118,6 +120,12 @@ public sealed class BuilderMachineInspectorViewModel
 
     /// <summary>Gets the selected base-disk catalog id.</summary>
     public string SelectedBaseDiskId { get; }
+
+    /// <summary>Gets the read-only bootstrap (local admin) account baked into the selected base disk, if advertised.</summary>
+    public string BootstrapAccountText { get; }
+
+    /// <summary>Gets whether a bootstrap account is known for the selected base disk.</summary>
+    public bool HasBootstrapAccount => !string.IsNullOrWhiteSpace(BootstrapAccountText);
 
     /// <summary>Gets whether host-octet editing is available for the selected machine.</summary>
     public bool IsHostAddressEditable { get; }

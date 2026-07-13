@@ -825,6 +825,9 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
             var baseDiskOptions = _vhdxCatalogOptions
                 .Select(option => new BuilderMachineInspectorViewModel.BaseDiskOption(option.Id, option.DisplayLabel))
                 .ToList();
+            var bootstrapAccountText = _vhdxCatalogOptions
+                .FirstOrDefault(option => string.Equals(option.Id, vm.VhdxId, StringComparison.OrdinalIgnoreCase))
+                ?.BootstrapLocalUser ?? string.Empty;
             var roleRows = new List<BuilderRoleRowViewModel>();
             var featureRows = new List<BuilderRoleRowViewModel>();
             foreach (var role in TemplatesBuilderRoleProjectionCatalog.ProjectVmRoles(vm).Where(MatchesRoleSearch))
@@ -852,6 +855,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                 vm.MemoryMb,
                 baseDiskOptions,
                 vm.VhdxId,
+                bootstrapAccountText,
                 hostAddress.IsEditable,
                 hostAddress.FixedOctetPrefix,
                 hostAddress.EditableOctetCount > 1,

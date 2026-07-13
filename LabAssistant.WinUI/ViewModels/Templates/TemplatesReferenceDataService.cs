@@ -85,7 +85,8 @@ internal sealed class TemplatesReferenceDataService
             item.OsName,
             item.OsVersion,
             item.Generation,
-            item.Signature)));
+            item.Signature,
+            item.BootstrapExpectedLocalUser)));
     }
 
     private async Task<IReadOnlyList<string>> LoadAvailableVmSwitchesAsync()
