@@ -609,25 +609,10 @@
 
                                 <!-- Level 1: directory topology (forests, domains, and the Standalone container). -->
                                 <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.IsMachineLevelVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}">
-                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                        <Button
-                                            Command="{x:Bind ViewModel.AddForestCommand}"
-                                            Content="Add Forest"
-                                            IsEnabled="{x:Bind ViewModel.AddForestEnabled, Mode=OneWay}" />
-                                        <Button
-                                            Command="{x:Bind ViewModel.AddTreeCommand}"
-                                            Content="Add Tree"
-                                            IsEnabled="{x:Bind ViewModel.AddTreeEnabled, Mode=OneWay}" />
-                                        <Button
-                                            Command="{x:Bind ViewModel.AddStandaloneMachineCommand}"
-                                            Content="+ Standalone machine"
-                                            IsEnabled="{x:Bind ViewModel.AddStandaloneMachineEnabled, Mode=OneWay}"
-                                            ToolTipService.ToolTip="Add a workgroup machine (router, root CA, ...) with no domain" />
-                                    </StackPanel>
                                     <TextBlock
                                         FontSize="12"
                                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="Hover a domain for + to add a child. Double-click a domain or the Standalone box (or use its manage icon) to add machines."
+                                        Text="Hover a domain for + to add a child (or use a forest header to add a tree). Double-click a domain or the Standalone box (or use its manage icon) to add machines."
                                         TextWrapping="Wrap" />
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions>
@@ -641,6 +626,7 @@
                                             BorderBrush="{StaticResource ShellBorderBrush}"
                                             BorderThickness="1"
                                             CornerRadius="4">
+                                            <Grid>
                                             <ScrollViewer
                                                 HorizontalScrollBarVisibility="Auto"
                                                 HorizontalScrollMode="Auto"
@@ -690,6 +676,30 @@
                                                         Visibility="{x:Bind ViewModel.HasTopologyForests, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
                                                 </Grid>
                                             </ScrollViewer>
+                                            <!-- Floating Level 1 action cluster (top-right over the canvas): global
+                                                 authoring actions that have no on-node home. New forest seeds a
+                                                 root-domain-born-with-DC forest; add standalone machine also breaks
+                                                 the cold-start where a domainless lab hides the empty Standalone box.
+                                                 Trees are added from a forest header, so no global tree button here. -->
+                                            <StackPanel
+                                                Margin="12"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Orientation="Horizontal"
+                                                Spacing="{StaticResource SpacingS}">
+                                                <Button
+                                                    Background="{StaticResource ShellAccentBrush}"
+                                                    Command="{x:Bind ViewModel.AddForestCommand}"
+                                                    Content="New forest"
+                                                    Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                                                    IsEnabled="{x:Bind ViewModel.AddForestEnabled, Mode=OneWay}" />
+                                                <Button
+                                                    Command="{x:Bind ViewModel.AddStandaloneMachineCommand}"
+                                                    Content="Add standalone machine"
+                                                    IsEnabled="{x:Bind ViewModel.AddStandaloneMachineEnabled, Mode=OneWay}"
+                                                    ToolTipService.ToolTip="Add a workgroup machine (router, root CA, ...) with no domain" />
+                                            </StackPanel>
+                                            </Grid>
                                         </Border>
                                         <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingS}">
                                             <TextBlock
