@@ -3,6 +3,20 @@
 public interface IPersistentPowerShellSession : IDisposable
 {
     /// <summary>
+    /// Gets a value indicating whether the session is still safe to reuse. A session becomes unusable
+    /// once it faults (for example a cancelled command tore down its runspace) or once its backing
+    /// process exits. The pool consults this on return and checkout so a dead session is retired
+    /// instead of being handed back out and failing the next command.
+    /// </summary>
+    /// <remarks>
+    /// Provided as a default interface member reporting always-alive so pre-existing lightweight
+    /// implementers (test doubles that only supply <see cref="ExecuteAsync(string)"/>) keep satisfying
+    /// the contract. Process-backed implementations (for example <see cref="PersistentPowerShellSession"/>)
+    /// override this member.
+    /// </remarks>
+    bool IsAlive => true;
+
+    /// <summary>
     /// Executes a command in the persistent session.
     /// </summary>
     /// <param name="command">The PowerShell command text to execute.</param>

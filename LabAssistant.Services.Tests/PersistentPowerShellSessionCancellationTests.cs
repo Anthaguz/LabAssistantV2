@@ -44,6 +44,7 @@ public class PersistentPowerShellSessionCancellationTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => executeTask);
 
         Assert.True(session.IsFaulted);
+        Assert.False(session.IsAlive);
         Assert.True(host.KillCalled);
         Assert.True(host.KillEntireProcessTree);
     }
@@ -62,6 +63,26 @@ public class PersistentPowerShellSessionCancellationTests
 
         // A faulted session must not run further commands with a fresh (uncancelled) token.
         await Assert.ThrowsAsync<InvalidOperationException>(() => session.ExecuteAsync("Get-Date"));
+    }
+
+    [Fact]
+    public void IsAlive_FreshSession_IsTrue()
+    {
+        var host = new ControllableHost();
+        using var session = new PersistentPowerShellSession(host);
+
+        // A fresh, unfaulted session whose host has not exited is safe to reuse.
+        Assert.True(session.IsAlive);
+    }
+
+    [Fact]
+    public void IsAlive_WhenHostProcessHasExited_IsFalse()
+    {
+        var host = new ControllableHost { HasExitedValue = true };
+        using var session = new PersistentPowerShellSession(host);
+
+        // The backing process is gone, so the session must report itself dead even without a fault.
+        Assert.False(session.IsAlive);
     }
 
     private sealed class ControllableHost : IPersistentPowerShellHost
