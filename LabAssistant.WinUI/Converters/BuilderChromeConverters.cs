@@ -46,19 +46,6 @@ public sealed class BoolToUniformThicknessConverter : IValueConverter
 }
 
 /// <summary>
-/// Converts a <see cref="double"/> to a uniform <see cref="Thickness"/>. Reproduces the directory
-/// topology node border thickness (2 selected, 1.5 root domain, 1 otherwise) the view model computes.
-/// </summary>
-public sealed class DoubleToUniformThicknessConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-        => new Thickness(value is double thickness ? thickness : 1);
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-        => throw new NotSupportedException();
-}
-
-/// <summary>
 /// Converts a boolean to a <see cref="FontWeight"/> (SemiBold when true, Normal otherwise). Reproduces
 /// the emphasized labels the Builder rendered on selected nav rows and root/selected topology nodes.
 /// </summary>
@@ -66,22 +53,6 @@ public sealed class BoolToFontWeightConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
         => value is bool boolean && boolean ? FontWeights.SemiBold : FontWeights.Normal;
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-        => throw new NotSupportedException();
-}
-
-/// <summary>
-/// Converts a topology node depth to its left indentation margin, reproducing the Builder's
-/// <c>min(depth, 4) * 14</c> left margin exactly.
-/// </summary>
-public sealed class DepthToIndentMarginConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        var depth = value is int number ? number : 0;
-        return new Thickness(Math.Min(depth, 4) * 14, 0, 0, 0);
-    }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
         => throw new NotSupportedException();

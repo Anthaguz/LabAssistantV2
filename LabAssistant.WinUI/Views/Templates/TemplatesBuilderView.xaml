@@ -10,113 +10,51 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
         <converters:BoolToResourceBrushConverter x:Key="BoolToResourceBrush" />
         <converters:BoolToUniformThicknessConverter x:Key="BoolToUniformThickness" />
-        <converters:DoubleToUniformThicknessConverter x:Key="DoubleToUniformThickness" />
         <converters:BoolToFontWeightConverter x:Key="BoolToFontWeight" />
-        <converters:DepthToIndentMarginConverter x:Key="DepthToIndentMargin" />
 
-        <!-- A domain node in the directory-topology tree. -->
-        <DataTemplate x:Key="BuilderTopologyNodeTemplate" x:DataType="builder:BuilderTopologyNodeViewModel">
-            <Button
-                AutomationProperties.Name="{x:Bind Tooltip}"
-                Background="Transparent"
-                BorderThickness="0"
-                Command="{x:Bind SelectCommand}"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Stretch"
-                Padding="0"
-                ToolTipService.ToolTip="{x:Bind Tooltip}">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" />
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
-                </Button.Resources>
-                <Border
-                    Margin="{x:Bind Depth, Converter={StaticResource DepthToIndentMargin}}"
-                    Padding="8,5,8,5"
-                    Background="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellBackgroundBrush|ShellContentBackgroundBrush}"
-                    BorderBrush="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
-                    BorderThickness="{x:Bind BorderThickness, Converter={StaticResource DoubleToUniformThickness}}"
-                    CornerRadius="4">
-                    <StackPanel Spacing="2">
-                        <TextBlock
-                            FontWeight="{x:Bind IsAccent, Converter={StaticResource BoolToFontWeight}}"
-                            Foreground="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
-                            MaxLines="1"
-                            Text="{x:Bind Label}"
-                            TextTrimming="CharacterEllipsis"
-                            TextWrapping="NoWrap" />
-                        <TextBlock
-                            Foreground="{x:Bind HasMissingParent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellCriticalBrush|ShellTextSecondaryBrush}"
-                            MaxLines="1"
-                            Text="{x:Bind Subtext}"
-                            TextTrimming="CharacterEllipsis"
-                            TextWrapping="NoWrap" />
-                    </StackPanel>
-                </Border>
-            </Button>
+        <!-- Directory-topology canvas: forest and domain nodes positioned on a Canvas by X/Y, with drawn edges. -->
+        <DataTemplate x:Key="BuilderCanvasEdgeTemplate" x:DataType="builder:BuilderCanvasEdgeViewModel">
+            <Line
+                X1="{x:Bind X1, Mode=OneWay}"
+                Y1="{x:Bind Y1, Mode=OneWay}"
+                X2="{x:Bind X2, Mode=OneWay}"
+                Y2="{x:Bind Y2, Mode=OneWay}"
+                IsHitTestVisible="False"
+                Stroke="{x:Bind IsForestRoot, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellTextSecondaryBrush|ShellBorderBrush}"
+                StrokeThickness="1.6" />
         </DataTemplate>
 
-        <!-- A forest card hosting the flattened pre-order list of its domain nodes. -->
-        <DataTemplate x:Key="BuilderTopologyForestTemplate" x:DataType="builder:BuilderTopologyForestViewModel">
+        <DataTemplate x:Key="BuilderCanvasNodeTemplate" x:DataType="builder:BuilderCanvasNodeViewModel">
             <Border
-                Padding="8"
-                Background="{StaticResource ShellBackgroundBrush}"
-                BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
-                BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
-                CornerRadius="4">
-                <StackPanel Spacing="6">
-                    <Button
-                        AutomationProperties.Name="{x:Bind Label}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Command="{x:Bind SelectCommand}"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Stretch"
-                        Padding="0"
-                        ToolTipService.ToolTip="{x:Bind Label}"
-                        Visibility="{x:Bind CanSelect, Converter={StaticResource BoolToVisibility}}">
-                        <Button.Resources>
-                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" />
-                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
-                        </Button.Resources>
-                        <Border
-                            Padding="8,5,8,5"
-                            Background="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellBackgroundBrush|ShellContentBackgroundBrush}"
-                            BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
-                            BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
-                            CornerRadius="4">
-                            <TextBlock
-                                FontWeight="{x:Bind IsSelected, Converter={StaticResource BoolToFontWeight}}"
-                                Foreground="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
-                                MaxLines="1"
-                                Text="{x:Bind Label}"
-                                TextTrimming="CharacterEllipsis"
-                                TextWrapping="NoWrap" />
-                        </Border>
-                    </Button>
+                Width="{x:Bind Width}"
+                Height="{x:Bind Height}"
+                Padding="10,6,10,6"
+                AutomationProperties.Name="{x:Bind Tooltip}"
+                Background="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellBackgroundBrush|ShellContentBackgroundBrush}"
+                BorderBrush="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
+                BorderThickness="{x:Bind IsAccent, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
+                CornerRadius="6"
+                PointerCanceled="OnNodePointerReleased"
+                PointerCaptureLost="OnNodePointerReleased"
+                PointerMoved="OnNodePointerMoved"
+                PointerPressed="OnNodePointerPressed"
+                PointerReleased="OnNodePointerReleased"
+                ToolTipService.ToolTip="{x:Bind Tooltip}">
+                <StackPanel VerticalAlignment="Center" Spacing="2">
                     <TextBlock
-                        FontWeight="SemiBold"
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        FontWeight="{x:Bind IsAccent, Converter={StaticResource BoolToFontWeight}}"
+                        Foreground="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
+                        MaxLines="1"
                         Text="{x:Bind Label}"
-                        Visibility="{x:Bind CanSelect, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
-                    <ItemsControl
-                        ItemTemplate="{StaticResource BuilderTopologyNodeTemplate}"
-                        ItemsSource="{x:Bind Nodes}"
-                        Visibility="{x:Bind HasNodes, Converter={StaticResource BoolToVisibility}}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Spacing="6" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                    </ItemsControl>
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
                     <TextBlock
-                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="No domains in this forest."
-                        TextWrapping="Wrap"
-                        Visibility="{x:Bind IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                        FontSize="11"
+                        Foreground="{x:Bind HasMissingParent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellCriticalBrush|ShellTextSecondaryBrush}"
+                        MaxLines="1"
+                        Text="{x:Bind Subtext}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
                 </StackPanel>
             </Border>
         </DataTemplate>
@@ -447,28 +385,58 @@
                                 </StackPanel>
                                 <Grid ColumnSpacing="10">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="240" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="320" />
                                     </Grid.ColumnDefinitions>
-                                    <ScrollViewer
+                                    <Border
                                         Grid.Column="0"
-                                        HorizontalScrollBarVisibility="Disabled"
-                                        VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Spacing="{StaticResource SpacingS}">
-                                            <ItemsControl ItemTemplate="{StaticResource BuilderTopologyForestTemplate}" ItemsSource="{x:Bind ViewModel.TopologyForests, Mode=OneWay}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <StackPanel Spacing="{StaticResource SpacingS}" />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                            </ItemsControl>
-                                            <TextBlock
-                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                Text="No forests in this draft."
-                                                TextWrapping="Wrap"
-                                                Visibility="{x:Bind ViewModel.HasTopologyForests, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
-                                        </StackPanel>
-                                    </ScrollViewer>
+                                        MinHeight="400"
+                                        Background="{StaticResource ShellBackgroundBrush}"
+                                        BorderBrush="{StaticResource ShellBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <ScrollViewer
+                                            HorizontalScrollBarVisibility="Auto"
+                                            HorizontalScrollMode="Auto"
+                                            VerticalScrollBarVisibility="Auto"
+                                            VerticalScrollMode="Auto"
+                                            ZoomMode="Disabled">
+                                            <Grid
+                                                x:Name="TopologyCanvasSurface"
+                                                Width="{x:Bind ViewModel.TopologyCanvas.CanvasWidth, Mode=OneWay}"
+                                                Height="{x:Bind ViewModel.TopologyCanvas.CanvasHeight, Mode=OneWay}"
+                                                Background="Transparent">
+                                                <ItemsControl ItemTemplate="{StaticResource BuilderCanvasEdgeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Edges, Mode=OneWay}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <Canvas />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                </ItemsControl>
+                                                <ItemsControl ItemTemplate="{StaticResource BuilderCanvasNodeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Nodes, Mode=OneWay}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <Canvas />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemContainerStyle>
+                                                        <Style TargetType="ContentPresenter">
+                                                            <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                                            <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                                        </Style>
+                                                    </ItemsControl.ItemContainerStyle>
+                                                </ItemsControl>
+                                                <TextBlock
+                                                    Margin="16"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="No forests in this draft."
+                                                    TextWrapping="Wrap"
+                                                    Visibility="{x:Bind ViewModel.HasTopologyForests, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                            </Grid>
+                                        </ScrollViewer>
+                                    </Border>
                                     <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingS}">
                                         <TextBlock
                                             FontWeight="SemiBold"
