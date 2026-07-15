@@ -220,6 +220,41 @@ public sealed class BuilderTopologyCanvasViewModelTests
             "the trust endpoint on the moved forest's frame should track the drag");
     }
 
+    [Fact]
+    public void Rebuild_EvictsPinsForRemovedNodes_SoARecycledIdReLaysOut_ButKeepsSurvivingPins()
+    {
+        // _pinned only ever grew as nodes were dragged, and a deleted node's stale coordinates would be silently
+        // inherited by a later node that resolves to the same content-derived NodeId. BuildFrom now prunes pins
+        // whose node is absent from the fresh projection.
+        var draft = CreateTopologyDraft();
+        var canvas = CreateCanvas(draft, out _);
+
+        canvas.MoveNode("domain:domain-contoso", 700, 120);
+        canvas.MoveNode("domain:domain-child", 900, 500);
+
+        // Rebuild from a projection that no longer contains domain-child: its pin must be evicted.
+        var withoutChild = draft with
+        {
+            Domains = draft.Domains.Where(domain => domain.DomainId != "domain-child").ToList()
+        };
+        canvas.Rebuild(TemplatesBuilderDirectoryTopologyProjector.Project(withoutChild, BuilderForestDomainResourceKind.Forest, selectedIndex: 0));
+        Assert.DoesNotContain(canvas.Nodes, node => node.NodeId == "domain:domain-child");
+
+        // Rebuild again with the full draft: a node with the recycled stable id must auto-layout, not inherit the
+        // evicted drag coordinates. Its position must match a never-dragged reference build.
+        canvas.Rebuild(TemplatesBuilderDirectoryTopologyProjector.Project(draft, BuilderForestDomainResourceKind.Forest, selectedIndex: 0));
+        var reference = CreateCanvas(draft, out _);
+        var expected = Assert.Single(reference.Nodes, node => node.NodeId == "domain:domain-child");
+        var reintroduced = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-child");
+        Assert.Equal(expected.X, reintroduced.X, 6);
+        Assert.Equal(expected.Y, reintroduced.Y, 6);
+
+        // A pin whose node was never removed must survive the rebuilds unchanged.
+        var contoso = Assert.Single(canvas.Nodes, node => node.NodeId == "domain:domain-contoso");
+        Assert.Equal(700, contoso.X, 6);
+        Assert.Equal(120, contoso.Y, 6);
+    }
+
     // A point returned by the frame-boundary geometry sits on the rectangle perimeter and within its extent.
     private static void AssertPointOnFrameBoundary(BuilderCanvasForestFrameViewModel frame, double x, double y)
     {

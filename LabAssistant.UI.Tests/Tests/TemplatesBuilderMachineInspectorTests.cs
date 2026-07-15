@@ -182,6 +182,71 @@ public sealed class TemplatesBuilderMachineInspectorTests
         Assert.Equal("Administrator", inspector.BootstrapAccountText);
     }
 
+    [Theory]
+    [InlineData(MachineHostAddressStatus.Duplicate)]
+    [InlineData(MachineHostAddressStatus.ReservedRouter)]
+    [InlineData(MachineHostAddressStatus.ReservedHost)]
+    [InlineData(MachineHostAddressStatus.OutOfSubnet)]
+    [InlineData(MachineHostAddressStatus.NetworkOrBroadcast)]
+    [InlineData(MachineHostAddressStatus.Invalid)]
+    public void HostAddressStatus_ErrorStates_ProduceInlineMessageAndOutline(MachineHostAddressStatus status)
+    {
+        // The inspector now receives the status as the MachineHostAddressStatus enum by value, so a future rename
+        // of any member is compiler-enforced through the projection. This asserts every error status still maps to
+        // a non-empty inline message and the red outline, so a broken mapping fails here instead of silently
+        // making an invalid address look valid.
+        var inspector = CreateInspectorWithHostStatus(status);
+
+        Assert.Equal(status, inspector.HostAddressStatus);
+        Assert.False(string.IsNullOrWhiteSpace(inspector.HostAddressValidationMessage));
+        Assert.True(inspector.HasHostAddressValidationMessage);
+        Assert.True(inspector.ShowHostAddressErrorOutline);
+    }
+
+    [Theory]
+    [InlineData(MachineHostAddressStatus.Ok)]
+    [InlineData(MachineHostAddressStatus.Empty)]
+    public void HostAddressStatus_ValidStates_ProduceNoMessageOrOutline(MachineHostAddressStatus status)
+    {
+        var inspector = CreateInspectorWithHostStatus(status);
+
+        Assert.Equal(status, inspector.HostAddressStatus);
+        Assert.True(string.IsNullOrWhiteSpace(inspector.HostAddressValidationMessage));
+        Assert.False(inspector.HasHostAddressValidationMessage);
+        Assert.False(inspector.ShowHostAddressErrorOutline);
+    }
+
+    private static BuilderMachineInspectorViewModel CreateInspectorWithHostStatus(MachineHostAddressStatus status)
+        => new(
+            machineTitle: "srv-01",
+            roleLabel: "Member server",
+            subtext: "Member server",
+            searchText: string.Empty,
+            isRolesPanelExpanded: false,
+            isFeaturesPanelExpanded: false,
+            machineNameText: "srv-01",
+            machineCpuCountText: "2",
+            machineMemoryMbText: "2048",
+            baseDiskOptions: [],
+            selectedBaseDiskId: "disk-member",
+            bootstrapAccountText: string.Empty,
+            isHostAddressEditable: true,
+            hostAddressFixedOctetPrefix: "10.0.0.",
+            hasSecondHostOctet: false,
+            hostAddressOctetOneText: "5",
+            hostAddressOctetTwoText: string.Empty,
+            hostAddressSubnetCidr: "10.0.0.0/24",
+            hostAddressStatus: status,
+            roleRows: [],
+            featureRows: [],
+            commitMachineNameCommand: null,
+            commitMachineCpuCountCommand: null,
+            commitMachineMemoryMbCommand: null,
+            commitMachineBaseDiskCommand: null,
+            commitMachineHostOctetsCommand: null,
+            toggleRolesPanelCommand: null,
+            toggleFeaturesPanelCommand: null);
+
     private static BuilderMachineInspectorViewModel AssertInspector(TemplatesBuilderViewModel viewModel)
     {
         Assert.True(viewModel.HasSelectedMachineInspector);

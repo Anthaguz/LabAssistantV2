@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 
 namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
@@ -215,18 +213,53 @@ public readonly record struct BuilderLabSubnet
         return true;
     }
 
-    /// <summary>Parses a dotted-quad IPv4 literal into a packed uint.</summary>
+    /// <summary>
+    /// Parses a strict dotted-quad IPv4 literal into a packed uint. Requires exactly four dot-separated octets,
+    /// each a decimal integer 0-255 with no leading zeros (a lone "0" is allowed, "00"/"01" are not). Non-canonical
+    /// forms that <c>IPAddress.TryParse</c> silently reinterprets - octal ("010.0.0.0"),
+    /// hex ("0x0a.0.0.1"), and short forms ("10.5", "1.2.3", "10") - are rejected, because this type is the single
+    /// source of CIDR truth and such input would otherwise be committed and reflow every VM onto a misparsed block.
+    /// </summary>
     public static bool TryParseAddress(string? value, out uint address)
     {
         address = 0;
-        if (string.IsNullOrWhiteSpace(value) ||
-            !IPAddress.TryParse(value.Trim(), out var parsed) ||
-            parsed.AddressFamily != AddressFamily.InterNetwork)
+        if (string.IsNullOrWhiteSpace(value))
         {
             return false;
         }
 
-        address = ToUInt32(parsed);
+        var octetTexts = value.Trim().Split('.');
+        if (octetTexts.Length != 4)
+        {
+            return false;
+        }
+
+        uint packed = 0;
+        foreach (var octetText in octetTexts)
+        {
+            // Reject anything but plain base-10 digits: this also rules out signs, whitespace, "0x.." hex, and
+            // empty segments, none of which int.TryParse alone would consistently exclude across cultures.
+            if (octetText.Length == 0 || !octetText.All(char.IsAsciiDigit))
+            {
+                return false;
+            }
+
+            // No leading zeros: "00"/"01" are ambiguous (octal-looking) and never a canonical octet; a single "0" is fine.
+            if (octetText.Length > 1 && octetText[0] == '0')
+            {
+                return false;
+            }
+
+            if (!int.TryParse(octetText, NumberStyles.None, CultureInfo.InvariantCulture, out var octet) ||
+                octet is < 0 or > 255)
+            {
+                return false;
+            }
+
+            packed = (packed << 8) | (uint)octet;
+        }
+
+        address = packed;
         return true;
     }
 
@@ -239,12 +272,6 @@ public readonly record struct BuilderLabSubnet
 
     private static uint MaskFor(int prefixLength)
         => prefixLength == 0 ? 0u : uint.MaxValue << (32 - prefixLength);
-
-    private static uint ToUInt32(IPAddress address)
-    {
-        var bytes = address.GetAddressBytes();
-        return ((uint)bytes[0] << 24) | ((uint)bytes[1] << 16) | ((uint)bytes[2] << 8) | bytes[3];
-    }
 
     private static int[] ToOctets(uint address)
         => [(int)(address >> 24) & 0xFF, (int)(address >> 16) & 0xFF, (int)(address >> 8) & 0xFF, (int)address & 0xFF];

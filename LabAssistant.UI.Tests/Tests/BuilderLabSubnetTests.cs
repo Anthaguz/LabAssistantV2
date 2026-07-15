@@ -141,4 +141,39 @@ public sealed class BuilderLabSubnetTests
         Assert.Equal("10.0.9.42", BuilderLabSubnet.FormatAddress(composed));
         Assert.Equal(new[] { 9, 42 }, subnet.EditableOctetsOf(composed));
     }
+
+    [Theory]
+    [InlineData("010.0.0.0")]   // octal-looking leading zero, silently reinterpreted by IPAddress.TryParse
+    [InlineData("10.5")]        // short form -> 10.0.0.5
+    [InlineData("1.2.3")]       // short form -> 1.2.0.3
+    [InlineData("10")]          // single value -> 0.0.0.10
+    [InlineData("0x0a.0.0.1")]  // hex octet
+    [InlineData("1.2.3.4.5")]   // too many octets
+    [InlineData("256.0.0.0")]   // octet out of range
+    [InlineData("1.2.3.256")]   // octet out of range
+    [InlineData("00.0.0.0")]    // leading zero (not a lone "0")
+    [InlineData("1.2.3.")]      // empty trailing octet
+    [InlineData(" 1.2.3.4 ")]   // trims outer whitespace but inner spaces would be rejected elsewhere
+    public void TryParseAddress_RejectsNonCanonicalOrOutOfRange(string value)
+    {
+        // " 1.2.3.4 " is actually valid after the outer trim; assert only the genuinely invalid cases here.
+        if (value.Trim() == "1.2.3.4")
+        {
+            Assert.True(BuilderLabSubnet.TryParseAddress(value, out _));
+            return;
+        }
+
+        Assert.False(BuilderLabSubnet.TryParseAddress(value, out _));
+    }
+
+    [Theory]
+    [InlineData("10.0.5.0", "10.0.5.0")]
+    [InlineData("0.0.0.0", "0.0.0.0")]
+    [InlineData("255.255.255.255", "255.255.255.255")]
+    [InlineData("192.168.1.10", "192.168.1.10")]
+    public void TryParseAddress_AcceptsCanonicalDottedQuads(string value, string expected)
+    {
+        Assert.True(BuilderLabSubnet.TryParseAddress(value, out var address));
+        Assert.Equal(expected, BuilderLabSubnet.FormatAddress(address));
+    }
 }

@@ -867,7 +867,7 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                 hostAddress.Octets.Count > 0 ? hostAddress.Octets[0].ToString() : string.Empty,
                 hostAddress.Octets.Count > 1 ? hostAddress.Octets[1].ToString() : string.Empty,
                 hostAddress.SubnetCidr,
-                hostAddress.Status.ToString(),
+                hostAddress.Status,
                 roleRows,
                 featureRows,
                 CommitSelectedMachineNameCommand,
@@ -2453,7 +2453,13 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
         var forestDomainCount = _selectedForestDomainKind == BuilderForestDomainResourceKind.Forest
             ? _draft.Forests.Count
             : _draft.Domains.Count;
-        _selectedForestDomainIndex = ClampIndex(_selectedForestDomainIndex, forestDomainCount);
+
+        // Preserve the "nothing selected" sentinel when there is nothing to select. ClampIndex would fold a
+        // negative index back to 0, silently re-pointing at a nonexistent forest/domain; keeping -1 here matches
+        // the authoring layer's post-delete contract and every consumer's "index < 0 means no selection" guard.
+        _selectedForestDomainIndex = forestDomainCount == 0
+            ? TemplatesBuilderTopologyAuthoring.NoSelectionIndex
+            : ClampIndex(_selectedForestDomainIndex, forestDomainCount);
     }
 
     private void OnSelfPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

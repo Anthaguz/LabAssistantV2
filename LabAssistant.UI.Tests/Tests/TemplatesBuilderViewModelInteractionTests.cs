@@ -969,7 +969,7 @@ public sealed class TemplatesBuilderViewModelInteractionTests
         Assert.Equal(memberCard.Label, inspector!.MachineTitle);
         inspector!.CommitMachineHostOctetsCommand!.Execute(reservedRouterOctets);
 
-        Assert.Equal(nameof(MachineHostAddressStatus.ReservedRouter), viewModel.SelectedMachineInspector!.HostAddressStatusKey);
+        Assert.Equal(MachineHostAddressStatus.ReservedRouter, viewModel.SelectedMachineInspector!.HostAddressStatus);
     }
 
     [Fact]
