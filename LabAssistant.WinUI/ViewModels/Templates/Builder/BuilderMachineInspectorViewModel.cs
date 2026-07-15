@@ -46,7 +46,7 @@ public sealed class BuilderMachineInspectorViewModel
         string hostAddressOctetOneText,
         string hostAddressOctetTwoText,
         string hostAddressSubnetCidr,
-        string hostAddressStatusKey,
+        MachineHostAddressStatus hostAddressStatus,
         IReadOnlyList<BuilderRoleRowViewModel> roleRows,
         IReadOnlyList<BuilderRoleRowViewModel> featureRows,
         IRelayCommand<string?>? commitMachineNameCommand,
@@ -75,8 +75,8 @@ public sealed class BuilderMachineInspectorViewModel
         HostAddressOctetOneText = hostAddressOctetOneText ?? string.Empty;
         HostAddressOctetTwoText = hostAddressOctetTwoText ?? string.Empty;
         HostAddressSubnetCidr = hostAddressSubnetCidr ?? string.Empty;
-        HostAddressStatusKey = hostAddressStatusKey ?? string.Empty;
-        HostAddressValidationMessage = BuildHostAddressValidationMessage(HostAddressStatusKey);
+        HostAddressStatus = hostAddressStatus;
+        HostAddressValidationMessage = BuildHostAddressValidationMessage(HostAddressStatus);
         RoleRows = new ObservableCollection<BuilderRoleRowViewModel>(roleRows);
         FeatureRows = new ObservableCollection<BuilderRoleRowViewModel>(featureRows);
         CommitMachineNameCommand = commitMachineNameCommand;
@@ -145,8 +145,8 @@ public sealed class BuilderMachineInspectorViewModel
     /// <summary>Gets the host subnet hint shown under the octet editors.</summary>
     public string HostAddressSubnetCidr { get; }
 
-    /// <summary>Gets the host-address status key projected by the engine.</summary>
-    public string HostAddressStatusKey { get; }
+    /// <summary>Gets the host-address status projected by the engine.</summary>
+    public MachineHostAddressStatus HostAddressStatus { get; }
 
     /// <summary>Gets the inline host-address validation message.</summary>
     public string HostAddressValidationMessage { get; }
@@ -198,15 +198,15 @@ public sealed class BuilderMachineInspectorViewModel
     /// <summary>Gets the chevron glyph for the Features panel header.</summary>
     public string FeaturesPanelChevron => IsFeaturesPanelExpanded ? "\uE70D" : "\uE76C";
 
-    private static string BuildHostAddressValidationMessage(string statusKey)
-        => statusKey switch
+    private static string BuildHostAddressValidationMessage(MachineHostAddressStatus status)
+        => status switch
         {
-            "Duplicate" => "Another machine already uses this address",
-            "ReservedRouter" => "Reserved for the router (.1)",
-            "ReservedHost" => "Reserved for the host",
-            "OutOfSubnet" => "Outside the subnet",
-            "NetworkOrBroadcast" => "Network or broadcast address",
-            "Invalid" => "Not a valid address",
+            MachineHostAddressStatus.Duplicate => "Another machine already uses this address",
+            MachineHostAddressStatus.ReservedRouter => "Reserved for the router (.1)",
+            MachineHostAddressStatus.ReservedHost => "Reserved for the host",
+            MachineHostAddressStatus.OutOfSubnet => "Outside the subnet",
+            MachineHostAddressStatus.NetworkOrBroadcast => "Network or broadcast address",
+            MachineHostAddressStatus.Invalid => "Not a valid address",
             _ => string.Empty
         };
 }

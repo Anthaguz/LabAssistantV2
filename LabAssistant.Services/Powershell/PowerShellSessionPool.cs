@@ -156,6 +156,27 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                     || !availableSession.IsAlive
                     || !TryMarkCheckedOut(availableSession))
                 {
+                    // Mirror ReturnSession's "retired-dead" diagnostics on the checkout path so a session that
+                    // died while idle in the queue is not silently discarded. The reason distinguishes the three
+                    // ways a queued session can be unusable: already disposed, its backing process exited, or it
+                    // could not be transitioned to checked-out.
+                    var retireReason = _disposedSessions.ContainsKey(availableSession)
+                        ? "disposed"
+                        : !availableSession.IsAlive
+                            ? "not-alive"
+                            : "mark-failed";
+
+                    Log(
+                        StructuredLogLevel.Warn,
+                        "powershell.session-pool.checkout",
+                        "retired-dead",
+                        new Dictionary<string, object?>
+                        {
+                            ["reason"] = retireReason,
+                            ["availableCount"] = AvailableCount,
+                            ["totalCount"] = TotalCount
+                        });
+
                     RetireSession(availableSession);
                     continue;
                 }

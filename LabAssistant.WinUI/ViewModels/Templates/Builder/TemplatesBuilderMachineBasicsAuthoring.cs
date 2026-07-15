@@ -6,9 +6,11 @@ namespace LabAssistant.WinUI.ViewModels.Templates.Builder;
 
 /// <summary>
 /// How a machine's host address reads against its switch subnet. Drives the inspector's inline IP feedback
-/// (for example a red outline) without the view re-deriving any CIDR math.
+/// (for example a red outline) without the view re-deriving any CIDR math. Passed through to the inspector view
+/// model by value so a rename of any member is compiler-enforced end to end rather than silently dropping the
+/// inline error.
 /// </summary>
-internal enum MachineHostAddressStatus
+public enum MachineHostAddressStatus
 {
     /// <summary>The address is a valid, assignable, non-duplicate host in the subnet.</summary>
     Ok,

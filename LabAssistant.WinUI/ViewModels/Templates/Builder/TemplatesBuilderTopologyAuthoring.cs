@@ -24,6 +24,13 @@ internal readonly record struct TopologyAuthoringResult(
 /// </summary>
 internal static class TemplatesBuilderTopologyAuthoring
 {
+    /// <summary>
+    /// The <see cref="TopologyAuthoringResult.SelectedIndex"/> value meaning "nothing is selected". Returned when a
+    /// delete (or a no-op on an already directory-less draft) leaves no forest/domain to focus, so consumers keep
+    /// their existing "index &lt; 0 means no selection" guard instead of pointing at a nonexistent forest at index 0.
+    /// </summary>
+    internal const int NoSelectionIndex = -1;
+
     // Friendly default first-labels for newly authored domains, generalized from the forest cycle in the
     // canvas spec (contoso, fabrikam, then contoso3, contoso4, ...). Purely a naming convenience; the user
     // renames freely afterward. The sequence guarantees a valid, unique default so a new lab is immediately
@@ -315,7 +322,10 @@ internal static class TemplatesBuilderTopologyAuthoring
             .ToList();
 
         var result = draft with { Trusts = trusts, IsSaveConfirmed = false };
-        return new TopologyAuthoringResult(result, BuilderForestDomainResourceKind.Forest, draft.Forests.Count > 0 ? 0 : 0);
+        return new TopologyAuthoringResult(
+            result,
+            BuilderForestDomainResourceKind.Forest,
+            draft.Forests.Count > 0 ? 0 : NoSelectionIndex);
     }
 
     // Drops any forest trust whose source or target no longer names a surviving forest root domain. Called from
@@ -356,8 +366,8 @@ internal static class TemplatesBuilderTopologyAuthoring
     }
 
     // After a delete, focus the first surviving forest; if the lab is now directory-less, focus the Standalone
-    // container when a workgroup machine survived, otherwise leave nothing meaningful selected (Forest/0 clamps
-    // to "nothing" when there are no forests). Keeps the canvas and detail panel pointed at something coherent.
+    // container when a workgroup machine survived, otherwise report no selection (index -1) so the canvas and
+    // detail panel honestly show nothing selected rather than pointing at a nonexistent forest at index 0.
     private static TopologyAuthoringResult PostDeleteSelection(TemplatesBuilderDraftSnapshot draft)
     {
         // Deleting a forest (or a forest root, which takes the whole forest with it) strips that forest's root
@@ -374,7 +384,7 @@ internal static class TemplatesBuilderTopologyAuthoring
             V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !vm.IsRouter);
         return hasStandaloneMachine
             ? new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Standalone, 0)
-            : new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Forest, 0);
+            : new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Forest, NoSelectionIndex);
     }
 
     /// <summary>
@@ -596,7 +606,7 @@ internal static class TemplatesBuilderTopologyAuthoring
     }
 
     private static TopologyAuthoringResult Unchanged(TemplatesBuilderDraftSnapshot draft)
-        => new(draft, BuilderForestDomainResourceKind.Forest, draft.Forests.Count > 0 ? 0 : 0);
+        => new(draft, BuilderForestDomainResourceKind.Forest, draft.Forests.Count > 0 ? 0 : NoSelectionIndex);
 
     private static string NextFriendlyToken(ISet<string> takenFirstLabels)
     {

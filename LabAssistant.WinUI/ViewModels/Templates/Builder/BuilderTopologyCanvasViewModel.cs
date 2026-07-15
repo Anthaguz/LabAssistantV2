@@ -220,6 +220,21 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         }
 
         _nodeLookup = lookup;
+
+        // _pinned only ever grew as nodes were dragged (MoveNode). Evict any pin whose node is absent from the
+        // freshly built lookup so the map cannot grow unbounded across a long editing session, and so a later
+        // node that resolves to the same stable content-derived NodeId auto-lays-out instead of silently
+        // inheriting a deleted node's dragged coordinates. MoveNode only ever pins ids present in _nodeLookup,
+        // so intersecting against lookup never evicts a still-live pin.
+        if (_pinned.Count > 0)
+        {
+            var stalePins = _pinned.Keys.Where(key => !lookup.ContainsKey(key)).ToList();
+            foreach (var stalePin in stalePins)
+            {
+                _pinned.Remove(stalePin);
+            }
+        }
+
         _frameGroups = frameGroups;
         _frameLookup = frameGroups.ToDictionary(group => group.Frame.FrameId, group => group.Frame, StringComparer.Ordinal);
         _trustEdgeProjections = projection.TrustEdges ?? [];

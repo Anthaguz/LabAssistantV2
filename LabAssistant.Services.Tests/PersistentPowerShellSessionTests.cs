@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Text;
 using Xunit;
 
@@ -125,6 +126,21 @@ public class PersistentPowerShellSessionTests
         Assert.DoesNotContain("PS ", second.Output, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void IsAlive_WhenHostThrowsWin32ExceptionOnQuery_TreatsSessionAsDead()
+    {
+        // Process.HasExited can throw more than InvalidOperationException (Win32Exception from the underlying
+        // handle, and others). Every pool caller queries IsAlive outside a guard, so an unqueryable host must be
+        // reported as dead here rather than throwing and orphaning the session.
+        var host = new FakeHost { HasExitedException = new Win32Exception("access denied while querying exit code") };
+        using var session = new PersistentPowerShellSession(host);
+
+        Assert.False(session.IsAlive);
+
+        // Let the using-scope dispose run against a queryable host so teardown does not rethrow the injected fault.
+        host.HasExitedException = null;
+    }
+
     private sealed class FakeHost : IPersistentPowerShellHost
     {
         public RecordingTextWriter Input { get; } = new();
@@ -133,6 +149,7 @@ public class PersistentPowerShellSessionTests
         public Queue<bool> WaitForExitResults { get; set; } = new(new[] { true });
         public List<int> WaitForExitCalls { get; } = [];
         public bool HasExitedValue { get; set; } = false;
+        public Exception? HasExitedException { get; set; }
         public bool KillCalled { get; private set; }
         public bool KillEntireProcessTree { get; private set; }
         public bool DisposeCalled { get; private set; }
@@ -140,7 +157,7 @@ public class PersistentPowerShellSessionTests
         TextWriter IPersistentPowerShellHost.Input => Input;
         TextReader IPersistentPowerShellHost.Output => Stdout;
         TextReader IPersistentPowerShellHost.Error => Stderr;
-        bool IPersistentPowerShellHost.HasExited => HasExitedValue;
+        bool IPersistentPowerShellHost.HasExited => HasExitedException is not null ? throw HasExitedException : HasExitedValue;
 
         bool IPersistentPowerShellHost.WaitForExit(int milliseconds)
         {

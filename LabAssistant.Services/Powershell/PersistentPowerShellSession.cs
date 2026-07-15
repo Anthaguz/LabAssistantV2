@@ -123,8 +123,12 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
             {
                 return !_host.HasExited;
             }
-            catch (InvalidOperationException)
+            catch (Exception)
             {
+                // Any failure to query the host (InvalidOperationException after disposal, Win32Exception from
+                // the underlying Process handle, and so on) means liveness is indeterminate. An unqueryable host
+                // must be treated as dead so the pool retires it rather than handing it back out or leaking it -
+                // every caller invokes IsAlive outside a guard, so a rethrow here would orphan the session.
                 return false;
             }
         }

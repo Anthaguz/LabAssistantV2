@@ -212,6 +212,46 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
     }
 
     [Fact]
+    public void DeleteForest_LastForestWithNoStandalone_ReportsNoSelectionAndRendersSafely()
+    {
+        // Deleting the only forest with nothing else to focus must honestly report "no selection" (index < 0)
+        // instead of pointing at a nonexistent forest at index 0. The documented clear-selection contract used to
+        // be dead code (Forests.Count > 0 ? 0 : 0), masked only by downstream clamps.
+        var start = SuggestedDraft();
+        var forestId = start.Forests[0].ForestId;
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteForest(start, forestId);
+
+        Assert.Empty(result.Draft.Forests);
+        Assert.Equal(BuilderForestDomainResourceKind.Forest, result.SelectedKind);
+        Assert.True(result.SelectedIndex < 0);
+        Assert.Equal(TemplatesBuilderTopologyAuthoring.NoSelectionIndex, result.SelectedIndex);
+
+        // Rendering the now directory-less draft with the sentinel index must be safe: the projector and canvas
+        // produce an empty graph rather than dereferencing a negative or out-of-range forest index.
+        var projection = TemplatesBuilderDirectoryTopologyProjector.Project(
+            result.Draft, result.SelectedKind, result.SelectedIndex);
+        var canvas = new BuilderTopologyCanvasViewModel(projection, (_, _) => { });
+
+        Assert.False(canvas.HasNodes);
+        Assert.Empty(canvas.Nodes);
+        Assert.Empty(canvas.Frames);
+    }
+
+    [Fact]
+    public void DeleteDomain_LastForestRootWithNoStandalone_ReportsNoSelection()
+    {
+        var start = SuggestedDraft();
+        var root = start.Domains[0];
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(start, root.DomainId);
+
+        Assert.Empty(result.Draft.Forests);
+        Assert.Empty(result.Draft.Domains);
+        Assert.Equal(TemplatesBuilderTopologyAuthoring.NoSelectionIndex, result.SelectedIndex);
+    }
+
+    [Fact]
     public void DeleteDomain_TreeSubtree_RemovesTreeAndItsChildrenButKeepsRoot()
     {
         var start = SuggestedDraft();

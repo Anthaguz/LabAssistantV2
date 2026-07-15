@@ -1,3 +1,4 @@
+using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
 using Xunit;
 
@@ -137,6 +138,89 @@ public class PowerShellSessionPoolTests
         // report itself alive via the default member, so the liveness gate never retires such sessions.
         IPersistentPowerShellSession minimal = new MinimalSession();
         Assert.True(minimal.IsAlive);
+    }
+
+    [Fact]
+    public async Task CheckoutAsync_RetiringDeadAvailableSession_LogsSymmetricWarnEvent()
+    {
+        // Finding 2: the checkout skip branch used to retire a dead available session with no log, unlike
+        // ReturnSession which logs a "retired-dead" Warn. This asserts the symmetric diagnostic now fires so a
+        // session dying while idle in the queue is not silently discarded.
+        var logger = new RecordingStructuredLogger();
+        var factory = new CountingSessionFactory();
+        await using var pool = new PowerShellSessionPool(Options(4), logger, factory.Create);
+
+        var firstHandle = await pool.CheckoutAsync();
+        var firstSession = (FakeSession)firstHandle.Session;
+        await firstHandle.DisposeAsync();
+
+        firstSession.IsAlive = false;
+
+        var secondHandle = await pool.CheckoutAsync();
+
+        var retired = Assert.Single(logger.Events, e =>
+            e.EventName == "powershell.session-pool.checkout"
+            && e.Result == "retired-dead");
+        Assert.Equal(StructuredLogLevel.Warn, retired.Level);
+        Assert.NotNull(retired.Context);
+        Assert.True(retired.Context!.TryGetValue("reason", out var reason));
+        Assert.Equal("not-alive", reason as string);
+
+        await secondHandle.DisposeAsync();
+    }
+
+    private sealed record RecordedEvent(
+        StructuredLogLevel Level,
+        string EventName,
+        string? Result,
+        IReadOnlyDictionary<string, object?>? Context);
+
+    private sealed class RecordingStructuredLogger : IStructuredLogger
+    {
+        private readonly List<RecordedEvent> _events = [];
+        private readonly object _sync = new();
+
+        public IReadOnlyList<RecordedEvent> Events
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _events.ToList();
+                }
+            }
+        }
+
+        public void Log(StructuredLogEvent logEvent)
+        {
+            // The pool logs via the structured overload below; this best-effort mapping exists only to satisfy
+            // the interface for completeness.
+            var level = logEvent.Level switch
+            {
+                "debug" => StructuredLogLevel.Debug,
+                "warn" => StructuredLogLevel.Warn,
+                "error" => StructuredLogLevel.Error,
+                _ => StructuredLogLevel.Info
+            };
+
+            lock (_sync)
+            {
+                _events.Add(new RecordedEvent(level, logEvent.Event, logEvent.Result, logEvent.Context));
+            }
+        }
+
+        public void Log(
+            StructuredLogLevel level,
+            string eventName,
+            string operationId,
+            string? result = null,
+            IReadOnlyDictionary<string, object?>? context = null)
+        {
+            lock (_sync)
+            {
+                _events.Add(new RecordedEvent(level, eventName, result, context));
+            }
+        }
     }
 
     private sealed class CountingSessionFactory
