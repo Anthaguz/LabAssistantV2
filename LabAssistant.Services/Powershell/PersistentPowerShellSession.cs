@@ -105,6 +105,31 @@ public class PersistentPowerShellSession : IPersistentPowerShellSession
     /// </summary>
     public bool IsFaulted => _faulted;
 
+    /// <summary>
+    /// Gets a value indicating whether the session is still safe to reuse: it has not faulted and its
+    /// backing process has not exited. An indeterminate host (one that throws when queried, for example
+    /// after disposal) is treated as dead so the pool retires rather than reuses it.
+    /// </summary>
+    public bool IsAlive
+    {
+        get
+        {
+            if (_faulted)
+            {
+                return false;
+            }
+
+            try
+            {
+                return !_host.HasExited;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
+    }
+
     public Task<(string Output, string Error)> ExecuteAsync(string command)
         => ExecuteAsync(command, null, CancellationToken.None);
 

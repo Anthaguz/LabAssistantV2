@@ -16,6 +16,10 @@ internal sealed class PooledSessionLease : IPersistentPowerShellSession
         _handle = handle ?? throw new ArgumentNullException(nameof(handle));
     }
 
+    // Report the liveness of the underlying pooled session so a consumer holding a lease sees the truth
+    // (a session faulted mid-operation, or whose backing process exited, is no longer safe to reuse).
+    public bool IsAlive => _handle.Session.IsAlive;
+
     public Task<(string Output, string Error)> ExecuteAsync(string command)
         => ExecuteAsync(command, null, CancellationToken.None);
 

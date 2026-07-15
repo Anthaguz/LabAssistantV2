@@ -149,9 +149,12 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 
             if (TryTakeAvailable(out var availableSession))
             {
-                // A session may have been disposed (for example, faulted by a cancelled command) after it
-                // was returned but before it was re-checked-out; never hand such a session back out.
-                if (_disposedSessions.ContainsKey(availableSession) || !TryMarkCheckedOut(availableSession))
+                // A session may have died (disposed after being faulted by a cancelled command, or its
+                // backing process exited while it sat idle in the queue) after it was returned but before
+                // it was re-checked-out; never hand such a session back out - retire it and keep looking.
+                if (_disposedSessions.ContainsKey(availableSession)
+                    || !availableSession.IsAlive
+                    || !TryMarkCheckedOut(availableSession))
                 {
                     RetireSession(availableSession);
                     continue;
@@ -417,6 +420,24 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
             return;
         }
 
+        // Never return a dead session to the available queue - a faulted or exited session would be handed
+        // straight back out and fail the next command. Retire it so the pool only ever holds live sessions.
+        if (!session.IsAlive)
+        {
+            Log(
+                StructuredLogLevel.Warn,
+                "powershell.session-pool.return",
+                "retired-dead",
+                new Dictionary<string, object?>
+                {
+                    ["availableCount"] = AvailableCount,
+                    ["totalCount"] = TotalCount
+                });
+
+            RetireSession(session);
+            return;
+        }
+
         entry.MarkReturned(DateTimeOffset.UtcNow);
         if (TryEnqueueAvailable(session))
         {
@@ -490,6 +511,13 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 
     private async Task<bool> IsHealthyAsync(IPersistentPowerShellSession session)
     {
+        // A faulted or exited session can never pass and probing it would just throw; short-circuit so the
+        // caller retires it without running a doomed echo command.
+        if (!session.IsAlive)
+        {
+            return false;
+        }
+
         try
         {
             var (output, error) = await session.ExecuteAsync("echo test").ConfigureAwait(false);

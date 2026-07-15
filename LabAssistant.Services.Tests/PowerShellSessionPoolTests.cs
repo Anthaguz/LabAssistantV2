@@ -84,6 +84,61 @@ public class PowerShellSessionPoolTests
         await held.DisposeAsync();
     }
 
+    [Fact]
+    public async Task Dispose_DeadSession_IsRetiredNotReturnedToPool()
+    {
+        var factory = new CountingSessionFactory();
+        await using var pool = new PowerShellSessionPool(Options(4), null, factory.Create);
+
+        var handle = await pool.CheckoutAsync();
+        var session = (FakeSession)handle.Session;
+
+        // The session died while checked out (faulted by a cancelled command, or its process exited).
+        session.IsAlive = false;
+        await handle.DisposeAsync();
+
+        // It must be retired and disposed, never queued for reuse.
+        Assert.True(session.Disposed);
+        Assert.Equal(0, pool.AvailableCount);
+        Assert.Equal(0, pool.TotalCount);
+    }
+
+    [Fact]
+    public async Task CheckoutAsync_SkipsAndRetiresDeadAvailableSession_HandsOutFreshOne()
+    {
+        var factory = new CountingSessionFactory();
+        await using var pool = new PowerShellSessionPool(Options(4), null, factory.Create);
+
+        // Return a healthy session so it sits in the available queue.
+        var firstHandle = await pool.CheckoutAsync();
+        var firstSession = (FakeSession)firstHandle.Session;
+        await firstHandle.DisposeAsync();
+        Assert.Equal(1, pool.AvailableCount);
+
+        // It dies while idle in the queue (for example the backing process exited).
+        firstSession.IsAlive = false;
+
+        // The next checkout must not hand the dead one back out; it retires it and creates a fresh session.
+        var secondHandle = await pool.CheckoutAsync();
+
+        Assert.NotSame(firstSession, secondHandle.Session);
+        Assert.True(firstSession.Disposed);
+        Assert.Equal(2, factory.CreatedCount);
+        Assert.Equal(0, pool.AvailableCount);
+        Assert.Equal(1, pool.TotalCount);
+
+        await secondHandle.DisposeAsync();
+    }
+
+    [Fact]
+    public void IsAlive_DefaultInterfaceMember_ReportsAliveForMinimalImplementers()
+    {
+        // A lightweight implementer that only supplies ExecuteAsync must keep satisfying the contract and
+        // report itself alive via the default member, so the liveness gate never retires such sessions.
+        IPersistentPowerShellSession minimal = new MinimalSession();
+        Assert.True(minimal.IsAlive);
+    }
+
     private sealed class CountingSessionFactory
     {
         private int _created;
@@ -101,10 +156,23 @@ public class PowerShellSessionPoolTests
     {
         public bool Disposed { get; private set; }
 
+        // Controls the liveness the pool consults on return and checkout; defaults to alive.
+        public bool IsAlive { get; set; } = true;
+
         // Health-check probes call ExecuteAsync("echo test"); returning "test" keeps the session healthy.
         public Task<(string Output, string Error)> ExecuteAsync(string command)
             => Task.FromResult(("test", string.Empty));
 
         public void Dispose() => Disposed = true;
+    }
+
+    private sealed class MinimalSession : IPersistentPowerShellSession
+    {
+        public Task<(string Output, string Error)> ExecuteAsync(string command)
+            => Task.FromResult((string.Empty, string.Empty));
+
+        public void Dispose()
+        {
+        }
     }
 }
