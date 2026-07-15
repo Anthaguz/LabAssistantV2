@@ -57,6 +57,7 @@ They do not override product behavior contracts; they define how behavior should
 - `docs/03-architecture/winui-shell-bootstrap-runtime.md`
 - `docs/03-architecture/winui-lane-architecture.md`
 - `docs/03-architecture/winui-shared-seam-ownership.md`
+- `docs/03-architecture/winui-templates-builder-canvas.md` (target design and phased delivery plan for the Templates Builder canvas redesign; each phase promotes part of it into current behavior, so treat unshipped sections as design intent rather than current implementation)
 
 ### 8) Active execution authority
 - the current GitHub issue brief or issue body for the active slice
