@@ -15,7 +15,7 @@ internal static class TemplatesBuilderDraftMapper
         var dcDisk = vhdxCatalogOptions.FirstOrDefault()?.Id ?? string.Empty;
         var memberDisk = vhdxCatalogOptions.Skip(1).FirstOrDefault()?.Id ?? dcDisk;
 
-        return new TemplatesBuilderDraftSnapshot(
+        return TemplatesBuilderNetworkReconciler.Reconcile(new TemplatesBuilderDraftSnapshot(
             TemplateName: "V2 Topology Template",
             TemplateDescription: "Topology-first V2 template draft.",
             DeploymentProfile: "Balanced",
@@ -67,23 +67,26 @@ internal static class TemplatesBuilderDraftMapper
                         new TemplatesBuilderNicDraft("nic-member", "Domain", "lab-core", string.Empty, "10.0.0.20", "24", "10.0.0.1", ["10.0.0.10"])
                     ])
             ],
-            IsSaveConfirmed: false);
+            IsSaveConfirmed: false));
     }
 
     public static TemplatesBuilderDraftSnapshot FromTemplate(LabTemplate template)
     {
         ArgumentNullException.ThrowIfNull(template);
 
-        return new TemplatesBuilderDraftSnapshot(
+        return TemplatesBuilderNetworkReconciler.Reconcile(new TemplatesBuilderDraftSnapshot(
             TemplateName: template.Name,
             TemplateDescription: template.Description ?? string.Empty,
             DeploymentProfile: template.DeploymentProfile ?? "Balanced",
-            LabNetworks: CopyLabNetworks(template.LabNetworks),
+            LabNetworks: CopyLabNetworks(template.LabNetworks, template.VmTemplates),
             CredentialSlots: BuildCredentialSlotReferences(template.VmTemplates),
             Forests: CopyForests(template.DirectoryTopology?.Forests),
             Domains: CopyDomains(template.DirectoryTopology?.Domains),
             Vms: CopyVms(template.VmTemplates),
-            IsSaveConfirmed: false);
+            IsSaveConfirmed: false)
+        {
+            Trusts = CopyTrustsToDraft(template.DirectoryTopology?.Trusts)
+        });
     }
 
     public static TemplatesBuilderDraftBuildResult BuildDocument(
@@ -91,8 +94,7 @@ internal static class TemplatesBuilderDraftMapper
         string templateId,
         int templateRevision,
         string createdWithAppVersion,
-        string? sourceFilePath,
-        IReadOnlyList<V2TrustTemplate>? preservedTrusts = null)
+        string? sourceFilePath)
     {
         var errors = new List<string>();
         var template = new LabTemplate
@@ -125,7 +127,7 @@ internal static class TemplatesBuilderDraftMapper
         {
             Forests = MapForests(draft.Forests, errors),
             Domains = MapDomains(draft.Domains, draft.Vms, errors),
-            Trusts = CopyTrusts(preservedTrusts)
+            Trusts = MapTrusts(draft.Trusts, errors)
         };
         template.VmTemplates = MapVms(draft.Vms, errors);
 
@@ -314,15 +316,53 @@ internal static class TemplatesBuilderDraftMapper
                 MemoryMb = memoryMb,
                 CpuCount = cpuCount,
                 VhdxId = Optional(vm.VhdxId),
-                TopologyRole = vm.IsActiveDirectoryDomainController ? TemplatesBuilderRoleProjectionCatalog.ActiveDirectoryDomainControllerTopologyRole : null,
+                TopologyRole = ResolveTopologyRole(vm),
                 MembershipMode = membershipMode,
                 DomainId = V2MembershipModeCatalog.IsDomainMember(membershipMode) ? vm.DomainId.Trim() : null,
                 CredentialSlots = CreateCredentialSlots(vm.CredentialSlots),
+                RoleConfig = MapRoleConfig(vm),
                 Nics = nics.Count == 0 ? null : nics
             });
         }
 
         return vms;
+    }
+
+    // Authored non-structural roles (DNS/DHCP/File/ADCS, plus any keys a future builder version does not yet
+    // recognize) persist through the implemented role guest step. The structural DC role is NOT stored here:
+    // it lives on TopologyRole so the deploy pipeline stays the single source of truth for topology intent.
+    private static RoleStepConfig? MapRoleConfig(TemplatesBuilderVmDraft vm)
+    {
+        var roles = NormalizeAdditionalRoles(vm.AdditionalRoles);
+        if (roles.Count == 0)
+        {
+            return null;
+        }
+
+        return new RoleStepConfig
+        {
+            Enabled = true,
+            Roles = roles
+        };
+    }
+
+    private static List<string> NormalizeAdditionalRoles(IEnumerable<string>? roles)
+        => (roles ?? Array.Empty<string>())
+            .Where(role => !string.IsNullOrWhiteSpace(role))
+            .Select(role => role.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static string? ResolveTopologyRole(TemplatesBuilderVmDraft vm)
+    {
+        if (vm.IsRouter)
+        {
+            return TemplatesBuilderRoleProjectionCatalog.RouterTopologyRole;
+        }
+
+        return vm.IsActiveDirectoryDomainController
+            ? TemplatesBuilderRoleProjectionCatalog.ActiveDirectoryDomainControllerTopologyRole
+            : null;
     }
 
     private static List<VmNetworkInterfaceTemplate> MapNics(TemplatesBuilderVmDraft vm, List<string> errors)
@@ -378,16 +418,51 @@ internal static class TemplatesBuilderDraftMapper
             : slots;
     }
 
-    private static IReadOnlyList<TemplatesBuilderLabNetworkDraft> CopyLabNetworks(IEnumerable<LabNetworkTemplate>? networks)
-        => networks?
+    private static IReadOnlyList<TemplatesBuilderLabNetworkDraft> CopyLabNetworks(
+        IEnumerable<LabNetworkTemplate>? networks,
+        IEnumerable<VmTemplate>? vms)
+    {
+        var vmList = vms?.ToList() ?? [];
+        return networks?
             .Select(network => new TemplatesBuilderLabNetworkDraft(
                 network.NetworkId,
                 network.Name,
                 network.SwitchName ?? string.Empty,
                 network.SwitchType ?? string.Empty,
                 network.Subnet ?? string.Empty,
-                network.Notes ?? string.Empty))
+                network.Notes ?? string.Empty)
+            {
+                DomainId = ReconstructNetworkDomainId(network.NetworkId, vmList)
+            })
             .ToList() ?? [];
+    }
+
+    // A network's owning domain is not persisted on the network; it is recovered from the domain-member VMs
+    // whose NICs sit on the network. Empty when no domain member references it (the shared standalone switch).
+    private static string ReconstructNetworkDomainId(string? networkId, IReadOnlyList<VmTemplate> vms)
+    {
+        if (string.IsNullOrWhiteSpace(networkId))
+        {
+            return string.Empty;
+        }
+
+        foreach (var vm in vms)
+        {
+            if (!V2MembershipModeCatalog.IsDomainMember(vm.MembershipMode) || string.IsNullOrWhiteSpace(vm.DomainId))
+            {
+                continue;
+            }
+
+            var onNetwork = (vm.Nics ?? Enumerable.Empty<VmNetworkInterfaceTemplate>())
+                .Any(nic => string.Equals(nic.NetworkId, networkId, StringComparison.OrdinalIgnoreCase));
+            if (onNetwork)
+            {
+                return vm.DomainId.Trim();
+            }
+        }
+
+        return string.Empty;
+    }
 
     private static IReadOnlyList<TemplatesBuilderForestDraft> CopyForests(IEnumerable<V2ForestTemplate>? forests)
         => forests?
@@ -422,8 +497,20 @@ internal static class TemplatesBuilderDraftMapper
                     vm.CredentialSlots?.DomainJoin ?? string.Empty,
                     vm.CredentialSlots?.Dsrm ?? string.Empty,
                     vm.CredentialSlots?.ParentDomainAdmin ?? string.Empty),
-                CopyNics(vm.Nics)))
+                CopyNics(vm.Nics))
+            {
+                IsRouter = TemplatesBuilderRoleProjectionCatalog.IsRouterTopologyRole(vm.TopologyRole),
+                AdditionalRoles = CopyAdditionalRoles(vm.RoleConfig)
+            })
             .ToList();
+
+    // Round-trips the persisted role guest step back into authoring state. Unknown keys are preserved so
+    // reopening a template authored by a newer builder (or hand-edited) never silently drops a role.
+    private static IReadOnlyList<string>? CopyAdditionalRoles(RoleStepConfig? roleConfig)
+    {
+        var roles = NormalizeAdditionalRoles(roleConfig?.Roles);
+        return roles.Count > 0 ? roles : null;
+    }
 
     private static IReadOnlyList<TemplatesBuilderNicDraft> CopyNics(IEnumerable<VmNetworkInterfaceTemplate>? nics)
         => nics?
@@ -483,24 +570,54 @@ internal static class TemplatesBuilderDraftMapper
     private static bool IsActiveDirectoryDomainController(string? topologyRole)
         => TemplatesBuilderRoleProjectionCatalog.IsActiveDirectoryDomainControllerTopologyRole(topologyRole);
 
-    private static List<V2TrustTemplate>? CopyTrusts(IReadOnlyList<V2TrustTemplate>? trusts)
+    private static List<V2TrustTemplate>? MapTrusts(IReadOnlyList<TemplatesBuilderTrustDraft>? drafts, List<string> errors)
     {
-        if (trusts is not { Count: > 0 })
+        if (drafts is not { Count: > 0 })
         {
             return null;
         }
 
-        return trusts
-            .Select(trust => new V2TrustTemplate
+        var trusts = new List<V2TrustTemplate>(drafts.Count);
+        foreach (var draft in drafts)
+        {
+            if (string.IsNullOrWhiteSpace(draft.SourceDomainId) || string.IsNullOrWhiteSpace(draft.TargetDomainId))
             {
-                TrustId = trust.TrustId,
-                SourceDomainId = trust.SourceDomainId,
-                TargetDomainId = trust.TargetDomainId,
-                TrustType = trust.TrustType,
-                Direction = trust.Direction
-            })
-            .ToList();
+                errors.Add("Each trust requires a source and target domain id.");
+                continue;
+            }
+
+            trusts.Add(new V2TrustTemplate
+            {
+                TrustId = string.IsNullOrWhiteSpace(draft.TrustId) ? Guid.NewGuid().ToString("N") : draft.TrustId.Trim(),
+                SourceDomainId = draft.SourceDomainId.Trim(),
+                TargetDomainId = draft.TargetDomainId.Trim(),
+                TrustType = ParseTrustType(draft.TrustType),
+                Direction = ParseTrustDirection(draft.Direction)
+            });
+        }
+
+        return trusts;
     }
+
+    private static IReadOnlyList<TemplatesBuilderTrustDraft>? CopyTrustsToDraft(IEnumerable<V2TrustTemplate>? trusts)
+    {
+        var copied = trusts?
+            .Select(trust => new TemplatesBuilderTrustDraft(
+                trust.TrustId,
+                trust.SourceDomainId,
+                trust.TargetDomainId,
+                trust.TrustType.ToString(),
+                trust.Direction.ToString()))
+            .ToList();
+
+        return copied is { Count: > 0 } ? copied : null;
+    }
+
+    private static V2TrustType ParseTrustType(string? value)
+        => Enum.TryParse<V2TrustType>(value, ignoreCase: true, out var trustType) ? trustType : V2TrustType.External;
+
+    private static V2TrustDirection ParseTrustDirection(string? value)
+        => Enum.TryParse<V2TrustDirection>(value, ignoreCase: true, out var direction) ? direction : V2TrustDirection.Bidirectional;
 
     private static List<string>? CopyList(IEnumerable<string>? values)
     {

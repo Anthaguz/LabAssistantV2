@@ -20,10 +20,8 @@ public sealed class TemplatesBuilderDirectoryTopologyProjectionTests
         Assert.True(root.IsRootDomain);
         Assert.False(root.IsTreeRoot);
         Assert.True(root.IsSelected);
-        Assert.Contains(projection.Edges, edge =>
-            edge.EdgeKind == "ForestDomainRoot" &&
-            edge.SourceNodeId == "forest:forest-contoso" &&
-            edge.TargetNodeId == "domain:domain-contoso");
+        // The forest is now an enclosing frame, not a node, so it emits no forest->root-domain edge.
+        Assert.DoesNotContain(projection.Edges, edge => edge.EdgeKind == "ForestDomainRoot");
     }
 
     [Fact]
@@ -158,6 +156,54 @@ public sealed class TemplatesBuilderDirectoryTopologyProjectionTests
             ],
             [],
             false);
+
+    [Fact]
+    public void DirectoryTopologyProjection_EmitsOneTrustEdgeBetweenTheOwningForestNodes()
+    {
+        var draft = CreateTopologyDraft() with
+        {
+            Trusts =
+            [
+                new TemplatesBuilderTrustDraft(
+                    "trust-contoso-fabrikam",
+                    "domain-contoso",
+                    "domain-fabrikam",
+                    nameof(V2TrustType.Forest),
+                    nameof(V2TrustDirection.Bidirectional))
+            ]
+        };
+
+        var projection = TemplatesBuilderDirectoryTopologyProjector.Project(draft, BuilderForestDomainResourceKind.Domain, selectedIndex: 0);
+
+        var edge = Assert.Single(projection.TrustEdges);
+        Assert.Equal("trust:trust-contoso-fabrikam", edge.TrustEdgeId);
+        Assert.True(
+            (edge.SourceForestNodeId == "forest:forest-contoso" && edge.TargetForestNodeId == "forest:forest-fabrikam") ||
+            (edge.SourceForestNodeId == "forest:forest-fabrikam" && edge.TargetForestNodeId == "forest:forest-contoso"));
+    }
+
+    [Fact]
+    public void DirectoryTopologyProjection_SkipsTrustWhoseEndpointsDoNotResolveToTwoForests()
+    {
+        // A trust whose endpoints land in the same forest (or an unknown domain) cannot draw a frame-to-frame
+        // edge, so the projector emits nothing for it.
+        var draft = CreateTopologyDraft() with
+        {
+            Trusts =
+            [
+                new TemplatesBuilderTrustDraft(
+                    "trust-dangling",
+                    "domain-contoso",
+                    "domain-unknown",
+                    nameof(V2TrustType.Forest),
+                    nameof(V2TrustDirection.Bidirectional))
+            ]
+        };
+
+        var projection = TemplatesBuilderDirectoryTopologyProjector.Project(draft, BuilderForestDomainResourceKind.Domain, selectedIndex: 0);
+
+        Assert.Empty(projection.TrustEdges);
+    }
 
     private static IEnumerable<TemplatesBuilderDomainTopologyNodeProjection> Flatten(TemplatesBuilderDirectoryTopologyProjection projection)
         => projection.Forests.SelectMany(forest => Flatten(forest.RootNodes));

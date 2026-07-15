@@ -28,20 +28,26 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
     private readonly Action<int>? _onAddChildDomain;
     private readonly Action<int>? _onAddTree;
     private readonly Action<BuilderForestDomainResourceKind, int>? _onDelete;
+    private readonly Action<BuilderForestDomainResourceKind, int>? _onManageMachines;
     private readonly Dictionary<string, BuilderCanvasNodePosition> _pinned = new(StringComparer.Ordinal);
     private Dictionary<string, BuilderCanvasNodeViewModel> _nodeLookup = new(StringComparer.Ordinal);
+    private Dictionary<string, BuilderCanvasForestFrameViewModel> _frameLookup = new(StringComparer.Ordinal);
+    private IReadOnlyList<TemplatesBuilderTrustEdgeProjection> _trustEdgeProjections = [];
+    private List<ForestFrameGroup> _frameGroups = [];
 
     internal BuilderTopologyCanvasViewModel(
         TemplatesBuilderDirectoryTopologyProjection projection,
         Action<BuilderForestDomainResourceKind, int> onSelect,
         Action<int>? onAddChildDomain = null,
         Action<int>? onAddTree = null,
-        Action<BuilderForestDomainResourceKind, int>? onDelete = null)
+        Action<BuilderForestDomainResourceKind, int>? onDelete = null,
+        Action<BuilderForestDomainResourceKind, int>? onManageMachines = null)
     {
         _onSelect = onSelect;
         _onAddChildDomain = onAddChildDomain;
         _onAddTree = onAddTree;
         _onDelete = onDelete;
+        _onManageMachines = onManageMachines;
         BuildFrom(projection);
     }
 
@@ -50,6 +56,22 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
 
     [ObservableProperty]
     private ObservableCollection<BuilderCanvasEdgeViewModel> _edges = [];
+
+    /// <summary>
+    /// Forest trust connectors: dashed edges drawn frame-to-frame (outer edge of one forest box to the outer
+    /// edge of the other), distinct from the domain parent-child <see cref="Edges"/>. Each terminates on the
+    /// boundary of a forest frame toward the other frame's center, so a trust tracks both frames as their member
+    /// domains are dragged.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<BuilderCanvasEdgeViewModel> _trustEdges = [];
+
+    /// <summary>
+    /// The forest frames: enclosing group boxes drawn behind the domain nodes and sized to hug the domains of
+    /// each forest. A forest is a frame here, not a node, so it never appears in <see cref="Nodes"/>.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<BuilderCanvasForestFrameViewModel> _frames = [];
 
     [ObservableProperty]
     private double _canvasWidth = MinCanvasWidth;
@@ -78,6 +100,8 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         node.Y = Math.Max(0, y);
         _pinned[nodeId] = new BuilderCanvasNodePosition(node.X, node.Y);
         RecomputeEdges();
+        RecomputeFrames();
+        RecomputeTrustEdges();
         UpdateExtent();
     }
 
@@ -87,44 +111,89 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         var nodes = new List<BuilderCanvasNodeViewModel>();
         var lookup = new Dictionary<string, BuilderCanvasNodeViewModel>(StringComparer.Ordinal);
 
+        // A lab must always keep at least one directory: when only one real (selectable) forest remains, its
+        // root domain and the forest itself are not deletable - deleting them would cascade to zero domains,
+        // which strips the required router and leaves a blank canvas with no way back. Count only real forests
+        // (the unassigned-domains pseudo forest is CanSelect=false and never deletable anyway).
+        var realForestCount = projection.Forests.Count(forest => forest.CanSelect);
+        var protectLastForest = realForestCount <= 1;
+
+        var frameGroups = new List<ForestFrameGroup>();
         foreach (var forest in projection.Forests)
         {
-            var position = ResolvePosition(forest.NodeId, autoLayout);
-            var command = forest.CanSelect
-                ? new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Forest, forest.ForestIndex))
-                : null;
-            // Real forests offer +tree and delete; the unassigned-domains pseudo forest (CanSelect=false) offers neither.
+            // Domains are the nodes; add them first so the frame can be sized around their positions.
+            foreach (var root in forest.RootNodes)
+            {
+                AddDomainNode(root, autoLayout, nodes, lookup, protectLastForest);
+            }
+
+            var memberNodeIds = new List<string>();
+            foreach (var root in forest.RootNodes)
+            {
+                CollectDomainNodeIds(root, memberNodeIds);
+            }
+
+            // A forest with no domains has nothing to enclose, so it renders no frame (it reappears the moment
+            // it gains a domain).
+            if (memberNodeIds.Count == 0)
+            {
+                continue;
+            }
+
+            // Real forests offer selection, +tree, and delete; the unassigned-domains pseudo forest
+            // (CanSelect=false) is a grouping frame only and offers none of them.
             var forestIndex = forest.ForestIndex;
+            var selectCommand = forest.CanSelect
+                ? new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Forest, forestIndex))
+                : null;
             var addTreeCommand = forest.CanSelect && _onAddTree is not null
                 ? new RelayCommand(() => _onAddTree(forestIndex))
                 : null;
-            var deleteForestCommand = forest.CanSelect && _onDelete is not null
+            var deleteForestCommand = forest.CanSelect && !protectLastForest && _onDelete is not null
                 ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Forest, forestIndex))
                 : null;
-            var node = new BuilderCanvasNodeViewModel(
+            var frame = new BuilderCanvasForestFrameViewModel(
                 forest.NodeId,
-                isForest: true,
                 forest.Label,
-                subtext: "Forest",
-                tooltip: forest.Label,
                 forest.IsSelected,
-                isAccent: forest.IsSelected,
+                forest.CanSelect,
+                selectCommand,
+                addTreeCommand,
+                deleteForestCommand);
+            frameGroups.Add(new ForestFrameGroup(frame, memberNodeIds));
+        }
+
+        // The Standalone container is a peer box of the forests. It only exists when the draft has standalone
+        // machines (the projector returns null otherwise). It shares the container shape but styles gray/dashed
+        // via IsStandalone, selects the Standalone kind, and zooms to its Level 2 machine list when managed.
+        if (projection.Standalone is { } standalone)
+        {
+            var standalonePosition = ResolvePosition(standalone.NodeId, autoLayout);
+            var manageStandaloneCommand = _onManageMachines is not null
+                ? new RelayCommand(() => _onManageMachines(BuilderForestDomainResourceKind.Standalone, 0))
+                : null;
+            var machineWord = standalone.MachineCount == 1 ? "machine" : "machines";
+            var standaloneNode = new BuilderCanvasNodeViewModel(
+                standalone.NodeId,
+                isForest: true,
+                standalone.Label,
+                subtext: $"{standalone.MachineCount} {machineWord}",
+                tooltip: "Standalone machines (no domain)",
+                standalone.IsSelected,
+                isAccent: standalone.IsSelected,
                 hasMissingParent: false,
                 NodeWidth,
                 NodeHeight,
-                position.X,
-                position.Y,
-                command,
+                standalonePosition.X,
+                standalonePosition.Y,
+                new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Standalone, 0)),
                 addChildCommand: null,
-                addTreeCommand: addTreeCommand,
-                deleteCommand: deleteForestCommand);
-            nodes.Add(node);
-            lookup[node.NodeId] = node;
-
-            foreach (var root in forest.RootNodes)
-            {
-                AddDomainNode(root, autoLayout, nodes, lookup);
-            }
+                addTreeCommand: null,
+                deleteCommand: null,
+                isStandalone: true,
+                manageMachinesCommand: manageStandaloneCommand);
+            nodes.Add(standaloneNode);
+            lookup[standaloneNode.NodeId] = standaloneNode;
         }
 
         var edges = new List<BuilderCanvasEdgeViewModel>();
@@ -151,8 +220,15 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         }
 
         _nodeLookup = lookup;
+        _frameGroups = frameGroups;
+        _frameLookup = frameGroups.ToDictionary(group => group.Frame.FrameId, group => group.Frame, StringComparer.Ordinal);
+        _trustEdgeProjections = projection.TrustEdges ?? [];
         Nodes = new ObservableCollection<BuilderCanvasNodeViewModel>(nodes);
         Edges = new ObservableCollection<BuilderCanvasEdgeViewModel>(edges);
+        Frames = new ObservableCollection<BuilderCanvasForestFrameViewModel>(frameGroups.Select(group => group.Frame));
+        RecomputeFrames();
+        // Trust edges anchor on frame geometry, so they are built only after the frames have been sized above.
+        BuildTrustEdges();
         HasNodes = nodes.Count > 0;
         UpdateExtent();
     }
@@ -161,16 +237,28 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         TemplatesBuilderDomainTopologyNodeProjection domain,
         IReadOnlyDictionary<string, BuilderCanvasNodePosition> autoLayout,
         List<BuilderCanvasNodeViewModel> nodes,
-        Dictionary<string, BuilderCanvasNodeViewModel> lookup)
+        Dictionary<string, BuilderCanvasNodeViewModel> lookup,
+        bool protectLastForest)
     {
         var position = ResolvePosition(domain.NodeId, autoLayout);
-        var subtext = domain.HasMissingParent ? "Missing parent reference" : domain.RelationLabel;
+        var relationText = domain.HasMissingParent ? "Missing parent reference" : domain.RelationLabel;
+        // Surface the domain's auto-allocated switch subnet next to the relation so the CIDR is visible on the
+        // node without opening the machine list. The subnet is empty until the reconciler has homed the domain.
+        var subtext = string.IsNullOrWhiteSpace(domain.Subnet)
+            ? relationText
+            : $"{relationText} \u00b7 {domain.Subnet}";
         var domainIndex = domain.DomainIndex;
         var addChildCommand = _onAddChildDomain is not null
             ? new RelayCommand(() => _onAddChildDomain(domainIndex))
             : null;
-        var deleteCommand = _onDelete is not null
+        // The root domain of the only remaining forest is not deletable (see protectLastForest in BuildFrom);
+        // deleting it would empty the whole topology and blank the canvas.
+        var canDelete = !(domain.IsRootDomain && protectLastForest);
+        var deleteCommand = canDelete && _onDelete is not null
             ? new RelayCommand(() => _onDelete(BuilderForestDomainResourceKind.Domain, domainIndex))
+            : null;
+        var manageMachinesCommand = _onManageMachines is not null
+            ? new RelayCommand(() => _onManageMachines(BuilderForestDomainResourceKind.Domain, domainIndex))
             : null;
         var node = new BuilderCanvasNodeViewModel(
             domain.NodeId,
@@ -188,13 +276,16 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             new RelayCommand(() => _onSelect(BuilderForestDomainResourceKind.Domain, domainIndex)),
             addChildCommand: addChildCommand,
             addTreeCommand: null,
-            deleteCommand: deleteCommand);
+            deleteCommand: deleteCommand,
+            isStandalone: false,
+            manageMachinesCommand: manageMachinesCommand,
+            isRootDomain: domain.IsRootDomain);
         nodes.Add(node);
         lookup[node.NodeId] = node;
 
         foreach (var child in domain.Children)
         {
-            AddDomainNode(child, autoLayout, nodes, lookup);
+            AddDomainNode(child, autoLayout, nodes, lookup, protectLastForest);
         }
     }
 
@@ -231,6 +322,130 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Recomputes every forest frame to hug the current positions of its member domain nodes (plus the frame
+    /// padding). Called after a rebuild and after any node drag so a frame always tracks the domains it encloses.
+    /// </summary>
+    private void RecomputeFrames()
+    {
+        foreach (var group in _frameGroups)
+        {
+            if (TryComputeMemberBounds(group.MemberNodeIds, out var minX, out var minY, out var maxX, out var maxY))
+            {
+                group.Frame.X = minX - BuilderCanvasMetrics.FramePadding;
+                group.Frame.Y = minY - BuilderCanvasMetrics.FramePadding;
+                group.Frame.Width = (maxX - minX) + (BuilderCanvasMetrics.FramePadding * 2);
+                group.Frame.Height = (maxY - minY) + (BuilderCanvasMetrics.FramePadding * 2);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Builds the dashed forest-trust connectors from the projected trust edges, terminating each on the outer
+    /// boundary of its two forest frames. Called once per rebuild after the frames have been sized.
+    /// </summary>
+    private void BuildTrustEdges()
+    {
+        var trustEdges = new List<BuilderCanvasEdgeViewModel>(_trustEdgeProjections.Count);
+        foreach (var projected in _trustEdgeProjections)
+        {
+            if (!_frameLookup.TryGetValue(projected.SourceForestNodeId, out var source) ||
+                !_frameLookup.TryGetValue(projected.TargetForestNodeId, out var target))
+            {
+                continue;
+            }
+
+            var (x1, y1, x2, y2) = ComputeTrustEndpoints(source, target);
+            trustEdges.Add(new BuilderCanvasEdgeViewModel(
+                projected.TrustEdgeId,
+                projected.SourceForestNodeId,
+                projected.TargetForestNodeId,
+                "ForestTrust",
+                isForestRoot: false,
+                x1,
+                y1,
+                x2,
+                y2));
+        }
+
+        TrustEdges = new ObservableCollection<BuilderCanvasEdgeViewModel>(trustEdges);
+    }
+
+    /// <summary>
+    /// Recomputes every forest-trust edge's endpoints from the current frame geometry, so a trust follows both
+    /// frames as their member domains are dragged. Called after <see cref="RecomputeFrames"/> on a node move.
+    /// </summary>
+    private void RecomputeTrustEdges()
+    {
+        foreach (var edge in TrustEdges)
+        {
+            if (!_frameLookup.TryGetValue(edge.SourceNodeId, out var source) ||
+                !_frameLookup.TryGetValue(edge.TargetNodeId, out var target))
+            {
+                continue;
+            }
+
+            var (x1, y1, x2, y2) = ComputeTrustEndpoints(source, target);
+            edge.X1 = x1;
+            edge.Y1 = y1;
+            edge.X2 = x2;
+            edge.Y2 = y2;
+        }
+    }
+
+    // Terminates the trust line on each frame's boundary toward the other frame's center, yielding an
+    // outer-edge-to-outer-edge segment between the two green forest boxes.
+    private static (double X1, double Y1, double X2, double Y2) ComputeTrustEndpoints(
+        BuilderCanvasForestFrameViewModel source,
+        BuilderCanvasForestFrameViewModel target)
+    {
+        var sourceCenterX = source.X + (source.Width / 2);
+        var sourceCenterY = source.Y + (source.Height / 2);
+        var targetCenterX = target.X + (target.Width / 2);
+        var targetCenterY = target.Y + (target.Height / 2);
+        var (x1, y1) = BuilderCanvasGeometry.EdgePoint(source.X, source.Y, source.Width, source.Height, targetCenterX, targetCenterY);
+        var (x2, y2) = BuilderCanvasGeometry.EdgePoint(target.X, target.Y, target.Width, target.Height, sourceCenterX, sourceCenterY);
+        return (x1, y1, x2, y2);
+    }
+
+    private bool TryComputeMemberBounds(
+        IReadOnlyList<string> memberNodeIds,
+        out double minX,
+        out double minY,
+        out double maxX,
+        out double maxY)
+    {
+        minX = double.PositiveInfinity;
+        minY = double.PositiveInfinity;
+        maxX = double.NegativeInfinity;
+        maxY = double.NegativeInfinity;
+        var any = false;
+        foreach (var nodeId in memberNodeIds)
+        {
+            if (!_nodeLookup.TryGetValue(nodeId, out var node))
+            {
+                continue;
+            }
+
+            any = true;
+            minX = Math.Min(minX, node.X);
+            minY = Math.Min(minY, node.Y);
+            maxX = Math.Max(maxX, node.X + node.Width);
+            maxY = Math.Max(maxY, node.Y + node.Height);
+        }
+
+        return any;
+    }
+
+    private static void CollectDomainNodeIds(TemplatesBuilderDomainTopologyNodeProjection domain, List<string> into)
+    {
+        into.Add(domain.NodeId);
+        foreach (var child in domain.Children)
+        {
+            CollectDomainNodeIds(child, into);
+        }
+    }
+
     private void UpdateExtent()
     {
         var width = MinCanvasWidth;
@@ -241,7 +456,20 @@ public sealed partial class BuilderTopologyCanvasViewModel : ObservableObject
             height = Math.Max(height, node.Y + node.Height + Margin);
         }
 
+        // Frames extend a padding beyond their domains, so include them or a frame's right/bottom edge could
+        // fall off the scrollable extent.
+        foreach (var frame in Frames)
+        {
+            width = Math.Max(width, frame.X + frame.Width + Margin);
+            height = Math.Max(height, frame.Y + frame.Height + Margin);
+        }
+
         CanvasWidth = width;
         CanvasHeight = height;
     }
+
+    /// <summary>Pairs a forest frame with the ids of the domain nodes it encloses, so it can be re-sized on drag.</summary>
+    private readonly record struct ForestFrameGroup(
+        BuilderCanvasForestFrameViewModel Frame,
+        IReadOnlyList<string> MemberNodeIds);
 }

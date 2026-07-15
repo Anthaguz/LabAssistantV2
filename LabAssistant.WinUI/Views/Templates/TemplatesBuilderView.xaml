@@ -12,7 +12,8 @@
         <converters:BoolToUniformThicknessConverter x:Key="BoolToUniformThickness" />
         <converters:BoolToFontWeightConverter x:Key="BoolToFontWeight" />
 
-        <!-- Directory-topology canvas: forest and domain nodes positioned on a Canvas by X/Y, with drawn edges. -->
+        <!-- Directory-topology canvas: each forest is an enclosing frame drawn behind its member domain nodes,
+             domains are the draggable nodes, and edges connect parent to child/tree domains. -->
         <DataTemplate x:Key="BuilderCanvasEdgeTemplate" x:DataType="builder:BuilderCanvasEdgeViewModel">
             <Line
                 X1="{x:Bind X1, Mode=OneWay}"
@@ -20,8 +21,97 @@
                 X2="{x:Bind X2, Mode=OneWay}"
                 Y2="{x:Bind Y2, Mode=OneWay}"
                 IsHitTestVisible="False"
-                Stroke="{x:Bind IsForestRoot, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellTextSecondaryBrush|ShellBorderBrush}"
-                StrokeThickness="1.6" />
+                Stroke="{x:Bind IsForestRoot, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextSecondaryBrush}"
+                StrokeThickness="2" />
+        </DataTemplate>
+
+        <!-- Forest trust connector: a distinct dashed accent line drawn frame-to-frame between two forests
+             (outer edge of one green box to the outer edge of the other), so a trust reads as a separate concept
+             from the solid parent-child domain edges. Static style (no converter); endpoints are computed by the
+             canvas view model from the live frame geometry. -->
+        <DataTemplate x:Key="BuilderCanvasTrustEdgeTemplate" x:DataType="builder:BuilderCanvasEdgeViewModel">
+            <Line
+                X1="{x:Bind X1, Mode=OneWay}"
+                Y1="{x:Bind Y1, Mode=OneWay}"
+                X2="{x:Bind X2, Mode=OneWay}"
+                Y2="{x:Bind Y2, Mode=OneWay}"
+                IsHitTestVisible="False"
+                Stroke="{StaticResource ShellAccentBrush}"
+                StrokeDashArray="5 3"
+                StrokeThickness="2" />
+        </DataTemplate>
+
+        <!-- Forest enclosing frame: a group box auto-sized around its member domain nodes, with a header pill
+             straddling the top border. The body is not hit-testable so pointer events reach the domains inside;
+             only the pill routes forest selection and the add-tree / delete affordances. -->
+        <DataTemplate x:Key="BuilderCanvasFrameTemplate" x:DataType="builder:BuilderCanvasForestFrameViewModel">
+            <Grid>
+                <Grid.RenderTransform>
+                    <TranslateTransform X="{x:Bind X, Mode=OneWay}" Y="{x:Bind Y, Mode=OneWay}" />
+                </Grid.RenderTransform>
+                <Border
+                    Width="{x:Bind Width, Mode=OneWay}"
+                    Height="{x:Bind Height, Mode=OneWay}"
+                    Background="{StaticResource BuilderForestFrameFillBrush}"
+                    BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|BuilderForestFrameBorderBrush}"
+                    BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
+                    CornerRadius="8"
+                    IsHitTestVisible="False" />
+                <Border
+                    Margin="12,-13,0,0"
+                    Padding="8,1,6,1"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Background="{StaticResource BuilderForestPillBrush}"
+                    BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|BuilderForestFrameBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="11"
+                    PointerEntered="OnFrameHeaderPointerEntered"
+                    PointerExited="OnFrameHeaderPointerExited">
+                    <StackPanel VerticalAlignment="Center" Orientation="Horizontal" Spacing="6">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Text="&#x1F332;" />
+                        <Button
+                            Padding="2,0,2,0"
+                            VerticalAlignment="Center"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Command="{x:Bind SelectCommand}"
+                            IsEnabled="{x:Bind CanSelect}"
+                            ToolTipService.ToolTip="Select forest">
+                            <TextBlock
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Foreground="{StaticResource BuilderForestPillTextBrush}"
+                                Text="{x:Bind Label}" />
+                        </Button>
+                        <Button
+                            Padding="4,0,4,0"
+                            MinHeight="20"
+                            VerticalAlignment="Center"
+                            Command="{x:Bind AddTreeCommand}"
+                            Content="+ tree"
+                            FontSize="11"
+                            IsEnabled="{x:Bind CanAddTree}"
+                            ToolTipService.ToolTip="Add tree domain"
+                            Visibility="{x:Bind CanAddTree, Converter={StaticResource BoolToVisibility}}" />
+                        <Button
+                            Padding="4,0,4,0"
+                            MinWidth="20"
+                            MinHeight="20"
+                            VerticalAlignment="Center"
+                            Command="{x:Bind DeleteCommand}"
+                            Content="&#xE711;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="10"
+                            IsEnabled="{x:Bind CanDelete}"
+                            ToolTipService.ToolTip="Delete forest"
+                            Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="BuilderCanvasNodeTemplate" x:DataType="builder:BuilderCanvasNodeViewModel">
@@ -31,22 +121,30 @@
                 Padding="10,6,10,6"
                 AutomationProperties.Name="{x:Bind Tooltip}"
                 Background="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellBackgroundBrush|ShellContentBackgroundBrush}"
-                BorderBrush="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
-                BorderThickness="{x:Bind IsAccent, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
+                BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
+                BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
                 CornerRadius="6"
-                PointerCanceled="OnNodePointerReleased"
-                PointerCaptureLost="OnNodePointerReleased"
+                PointerCanceled="OnNodePointerCaptureLost"
+                PointerCaptureLost="OnNodePointerCaptureLost"
                 PointerEntered="OnNodePointerEntered"
                 PointerExited="OnNodePointerExited"
                 PointerMoved="OnNodePointerMoved"
                 PointerPressed="OnNodePointerPressed"
-                PointerReleased="OnNodePointerReleased"
-                ToolTipService.ToolTip="{x:Bind Tooltip}">
+                PointerReleased="OnNodePointerReleased">
+                <!-- No body tooltip: the card already shows the name + relation, and a hover tooltip here
+                     overlapped the card and its affordances. Accessibility still reads AutomationProperties.Name. -->
+                <!-- Canvas position. The hosting ItemsControl wraps each node in a ContentPresenter that sits at
+                     the Canvas origin; attached-property (Canvas.Left/Top) Style-setter bindings do not apply
+                     reliably in WinUI, so every node otherwise piled at (0,0). Positioning the template root with
+                     an x:Bind TranslateTransform is compiled-binding reliable and tracks live drag updates. -->
+                <Border.RenderTransform>
+                    <TranslateTransform X="{x:Bind X, Mode=OneWay}" Y="{x:Bind Y, Mode=OneWay}" />
+                </Border.RenderTransform>
                 <Grid>
                     <StackPanel VerticalAlignment="Center" Spacing="2">
                         <TextBlock
-                            FontWeight="{x:Bind IsAccent, Converter={StaticResource BoolToFontWeight}}"
-                            Foreground="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
+                            FontWeight="{x:Bind IsRootDomain, Converter={StaticResource BoolToFontWeight}}"
+                            Foreground="{x:Bind IsRootDomain, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
                             MaxLines="1"
                             Text="{x:Bind Label}"
                             TextTrimming="CharacterEllipsis"
@@ -60,24 +158,41 @@
                             TextWrapping="NoWrap" />
                     </StackPanel>
 
-                    <!-- Delete affordance: revealed on hover; stops pointer bubbling so it never starts a drag/selection. -->
-                    <Button
+                    <!-- Top-right action cluster, revealed on hover: manage machines (zoom to Level 2) then delete.
+                         Kept on the right edge so it never overlaps the left-aligned name or intercepts a click on
+                         it; each button stops pointer bubbling so it never starts a drag/selection. Each button
+                         hides when its command is not offered (for example the Standalone box has no delete). -->
+                    <StackPanel
                         HorizontalAlignment="Right"
                         VerticalAlignment="Top"
                         Margin="0,-2,-4,0"
-                        Padding="4,0,4,0"
-                        MinWidth="20"
-                        MinHeight="20"
-                        Command="{x:Bind DeleteCommand}"
-                        Content="&#xE711;"
-                        FontFamily="Segoe MDL2 Assets"
-                        FontSize="10"
-                        IsEnabled="{x:Bind CanDelete}"
-                        PointerPressed="OnNodeAffordancePointerPressed"
-                        ToolTipService.ToolTip="Delete"
-                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                        Orientation="Horizontal"
+                        Spacing="2">
+                        <Button
+                            Padding="4,0,4,0"
+                            MinWidth="20"
+                            MinHeight="20"
+                            Command="{x:Bind ManageMachinesCommand}"
+                            Content="&#xE740;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="10"
+                            PointerPressed="OnNodeAffordancePointerPressed"
+                            ToolTipService.ToolTip="Manage machines"
+                            Visibility="{x:Bind ShowManageMachinesAffordance, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                        <Button
+                            Padding="4,0,4,0"
+                            MinWidth="20"
+                            MinHeight="20"
+                            Command="{x:Bind DeleteCommand}"
+                            Content="&#xE711;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="10"
+                            PointerPressed="OnNodeAffordancePointerPressed"
+                            ToolTipService.ToolTip="Delete"
+                            Visibility="{x:Bind ShowDeleteAffordance, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
 
-                    <!-- Domain hover-+ (add child) affordance. -->
+                    <!-- Domain hover-+ (add child) affordance: bottom-right so it reads as "add a child below". -->
                     <Button
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
@@ -89,26 +204,198 @@
                         Content="&#xE710;"
                         FontFamily="Segoe MDL2 Assets"
                         FontSize="10"
-                        IsEnabled="{x:Bind CanAddChild}"
                         PointerPressed="OnNodeAffordancePointerPressed"
                         ToolTipService.ToolTip="Add child domain"
-                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-
-                    <!-- Forest +tree affordance. -->
-                    <Button
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Bottom"
-                        Margin="-4,0,0,-2"
-                        Padding="4,0,4,0"
-                        MinHeight="20"
-                        Command="{x:Bind AddTreeCommand}"
-                        Content="+ Tree"
-                        FontSize="10"
-                        IsEnabled="{x:Bind CanAddTree}"
-                        PointerPressed="OnNodeAffordancePointerPressed"
-                        ToolTipService.ToolTip="Add tree domain"
-                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                        Visibility="{x:Bind ShowAddChildAffordance, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- Level 2 machine card: one VM inside a domain or the Standalone container. Rendered as a fixed-width
+             tile so it wraps in the UniformGridLayout grid; inter-tile spacing comes from the layout, not a margin. -->
+        <DataTemplate x:Key="BuilderMachineCardTemplate" x:DataType="builder:BuilderMachineCardViewModel">
+            <Border
+                Padding="12,10,12,10"
+                Width="240"
+                MinHeight="64"
+                Background="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellBackgroundBrush|ShellContentBackgroundBrush}"
+                BorderBrush="{x:Bind IsSelected, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellBorderBrush}"
+                BorderThickness="{x:Bind IsSelected, Converter={StaticResource BoolToUniformThickness}, ConverterParameter=2|1}"
+                CornerRadius="6"
+                Tag="{x:Bind}"
+                Tapped="OnMachineCardTapped"
+                ToolTipService.ToolTip="{x:Bind Label}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <!-- Role glyph: a domain controller uses the directory-anchor icon, a member/standalone a plain PC. -->
+                    <TextBlock
+                        Grid.Column="0"
+                        VerticalAlignment="Center"
+                        FontFamily="Segoe MDL2 Assets"
+                        FontSize="18"
+                        Foreground="{StaticResource ShellAccentBrush}"
+                        Text="&#xE753;"
+                        Visibility="{x:Bind IsDomainController, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock
+                        Grid.Column="0"
+                        VerticalAlignment="Center"
+                        FontFamily="Segoe MDL2 Assets"
+                        FontSize="18"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="&#xE7F8;"
+                        Visibility="{x:Bind IsDomainController, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            MaxLines="1"
+                            Text="{x:Bind Label}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            MaxLines="1"
+                            Text="{x:Bind Subtext}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                    </StackPanel>
+                    <Button
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        Padding="6,2,6,2"
+                        Command="{x:Bind DeleteCommand}"
+                        Content="&#xE711;"
+                        FontFamily="Segoe MDL2 Assets"
+                        FontSize="11"
+                        IsEnabled="{x:Bind CanDelete}"
+                        PointerPressed="OnNodeAffordancePointerPressed"
+                        ToolTipService.ToolTip="Delete machine"
+                        Visibility="{x:Bind CanDelete, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- Level 2 add-computer placeholder: a dotted-outline tile the same size as a machine card that flows as
+             the trailing item in the grid. WinUI Border has no dashed brush, so the dotted outline is a Rectangle
+             overlay with a dash array; the whole tile is the add button, disabled via the placeholder IsEnabled. -->
+        <DataTemplate x:Key="BuilderAddMachinePlaceholderTemplate" x:DataType="builder:BuilderAddMachinePlaceholder">
+            <Button
+                Padding="0"
+                Width="240"
+                MinHeight="64"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                Background="Transparent"
+                BorderThickness="0"
+                Command="{x:Bind AddCommand}"
+                IsEnabled="{x:Bind IsEnabled, Mode=OneWay}"
+                ToolTipService.ToolTip="Add a computer">
+                <Grid>
+                    <Rectangle
+                        RadiusX="6"
+                        RadiusY="6"
+                        Stroke="{StaticResource ShellBorderBrush}"
+                        StrokeDashArray="4 3"
+                        StrokeThickness="1" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontWeight="SemiBold"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="{x:Bind Label}" />
+                </Grid>
+            </Button>
+        </DataTemplate>
+
+        <!-- Chooses the machine-card vs add-placeholder tile for the single Level 2 grid source. -->
+        <local:BuilderMachineGridItemTemplateSelector
+            x:Key="BuilderMachineGridItemTemplateSelector"
+            AddPlaceholderTemplate="{StaticResource BuilderAddMachinePlaceholderTemplate}"
+            MachineCardTemplate="{StaticResource BuilderMachineCardTemplate}" />
+
+        <!-- Level 2 selected-machine inspector rows. -->
+        <DataTemplate x:Key="BuilderRoleRowTemplate" x:DataType="builder:BuilderRoleRowViewModel">
+            <Border
+                Margin="0,0,0,6"
+                Padding="10"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel Spacing="8">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox
+                            Grid.Column="0"
+                            VerticalAlignment="Top"
+                            Command="{x:Bind ToggleCommand}"
+                            IsChecked="{x:Bind IsAssigned, Mode=OneWay}"
+                            IsEnabled="{x:Bind IsToggleEnabled}" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock
+                                FontWeight="SemiBold"
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                Text="{x:Bind DisplayName}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{x:Bind Description}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind HasDescription, Converter={StaticResource BoolToVisibility}}" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Border
+                                    Padding="6,2,6,2"
+                                    Background="{StaticResource ShellContentBackgroundBrush}"
+                                    BorderBrush="{StaticResource ShellAccentBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Visibility="{x:Bind ShowInstallOnlyBadge, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock
+                                        FontSize="11"
+                                        Foreground="{StaticResource ShellAccentBrush}"
+                                        Text="Install only" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="{x:Bind StatusNote}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind HasStatusNote, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                        <ToggleButton
+                            Grid.Column="2"
+                            Padding="8,3,8,3"
+                            VerticalAlignment="Top"
+                            Command="{x:Bind ToggleConfigCommand}"
+                            Content="Configure"
+                            IsChecked="{x:Bind IsConfigExpanded, Mode=OneWay}"
+                            Visibility="{x:Bind ShowConfigureButton, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+                    <Border
+                        Margin="34,0,0,0"
+                        Padding="10"
+                        Background="{StaticResource ShellContentBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Visibility="{x:Bind ShowConfigurationArea, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Configuration coming soon."
+                            TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
             </Border>
         </DataTemplate>
 
@@ -247,174 +534,68 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Spacing="{StaticResource SpacingXS}">
-                <TextBlock
-                    Foreground="{StaticResource ShellTextPrimaryBrush}"
-                    FontSize="16"
-                    FontWeight="SemiBold"
-                    Text="V2 Template Builder" />
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="{x:Bind ViewModel.ContextText, Mode=OneWay}"
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    Text="{x:Bind ViewModel.ReferenceText, Mode=OneWay}"
-                    TextWrapping="Wrap" />
-            </StackPanel>
-
-            <Grid Grid.Row="1" ColumnSpacing="10">
+            <Grid Grid.Row="0" ColumnSpacing="12" VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="190" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        FontSize="13"
+                        FontWeight="SemiBold"
+                        Text="V2 Template Builder" />
+                    <TextBox
+                        MinWidth="220"
+                        PlaceholderText="Template name"
+                        Text="{x:Bind ViewModel.TemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="{x:Bind ViewModel.BuilderBreadcrumbText, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel
+                    Grid.Column="2"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    VerticalAlignment="Center">
+                    <Border
+                        Padding="8,4"
+                        Background="{StaticResource ShellBackgroundBrush}"
+                        BorderBrush="{StaticResource ShellBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12">
+                        <TextBlock
+                            Foreground="{x:Bind ViewModel.ValidationChipIsOk, Mode=OneWay, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellCriticalBrush}"
+                            Text="{x:Bind ViewModel.ValidationChipText, Mode=OneWay}" />
+                    </Border>
+                    <Button
+                        Background="{StaticResource ShellAccentBrush}"
+                        Command="{x:Bind ViewModel.SaveCommand}"
+                        Content="Save"
+                        Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                        IsEnabled="{x:Bind ViewModel.SaveEnabled, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.SaveVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                    <Button
+                        Command="{x:Bind ViewModel.SaveAsCommand}"
+                        Content="Save As"
+                        IsEnabled="{x:Bind ViewModel.SaveAsEnabled, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.SaveAsVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                    <Button
+                        Command="{x:Bind ViewModel.BackToLibraryCommand}"
+                        Content="Back"
+                        IsEnabled="{x:Bind ViewModel.BackToLibraryEnabled, Mode=OneWay}" />
+                </StackPanel>
+            </Grid>
 
-                <Border
-                    Grid.Column="0"
-                    Padding="8"
-                    Background="{StaticResource ShellContentBackgroundBrush}"
-                    BorderBrush="{StaticResource ShellBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="{StaticResource CardCornerRadius}">
-                    <StackPanel Spacing="{StaticResource SpacingS}">
-                        <Grid
-                            ColumnSpacing="6"
-                            Visibility="{x:Bind ViewModel.IsNavigatorHeaderVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Button
-                                AutomationProperties.Name="{x:Bind ViewModel.NavigatorBackTooltip, Mode=OneWay}"
-                                Command="{x:Bind ViewModel.NavigatorBackCommand}"
-                                Content="&#xE72B;"
-                                FontFamily="Segoe MDL2 Assets"
-                                IsEnabled="{x:Bind ViewModel.NavigatorBackEnabled, Mode=OneWay}"
-                                MinWidth="28"
-                                Padding="6,2,6,2"
-                                ToolTipService.ToolTip="{x:Bind ViewModel.NavigatorBackTooltip, Mode=OneWay}" />
-                            <TextBlock
-                                Grid.Column="1"
-                                VerticalAlignment="Center"
-                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                FontWeight="SemiBold"
-                                Text="{x:Bind ViewModel.NavigatorTitle, Mode=OneWay}"
-                                TextTrimming="CharacterEllipsis" />
-                        </Grid>
-                        <ScrollViewer
-                            MaxHeight="520"
-                            HorizontalScrollBarVisibility="Disabled"
-                            VerticalScrollBarVisibility="Auto">
-                            <ItemsControl
-                                ItemTemplateSelector="{StaticResource BuilderNavRowTemplateSelector}"
-                                ItemsSource="{x:Bind ViewModel.NavigatorRows, Mode=OneWay}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Spacing="6" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </StackPanel>
-                </Border>
-
+            <Grid Grid.Row="1">
                 <ScrollViewer
-                    Grid.Column="1"
                     HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto">
                     <Grid Margin="0,0,12,0">
-                        <!-- General -->
-                        <Border
-                            Padding="8"
-                            Background="{StaticResource ShellContentBackgroundBrush}"
-                            BorderBrush="{StaticResource ShellBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Visibility="{x:Bind ViewModel.IsGeneralVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                            <StackPanel Spacing="{StaticResource SpacingS}">
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="General" />
-                                <TextBox
-                                    Header="Template Name"
-                                    PlaceholderText="Template name"
-                                    Text="{x:Bind ViewModel.TemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBox
-                                    AcceptsReturn="True"
-                                    Header="Description"
-                                    MinHeight="56"
-                                    MaxHeight="96"
-                                    Text="{x:Bind ViewModel.TemplateDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                    TextWrapping="Wrap" />
-                                <StackPanel Spacing="6">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Deployment profile" />
-                                        <TextBlock
-                                            AutomationProperties.Name="Deployment profile information"
-                                            FontFamily="Segoe MDL2 Assets"
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="&#xE946;"
-                                            ToolTipService.ToolTip="Chooses how aggressively LabAssistant should deploy this template.&#x0a;&#x0a;Conservative: takes smaller steps and waits more between operations. Best for slower hosts or when reliability matters more than speed.&#x0a;&#x0a;Balanced: recommended default pacing for most labs.&#x0a;&#x0a;Aggressive: starts more work in parallel to finish sooner. Best for powerful hosts, but can use more CPU, memory, disk, and network at once." />
-                                    </StackPanel>
-                                    <ItemsControl ItemTemplateSelector="{StaticResource BuilderNavRowTemplateSelector}" ItemsSource="{x:Bind ViewModel.DeploymentProfileRows, Mode=OneWay}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="6" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Networks -->
-                        <Border
-                            Padding="8"
-                            Background="{StaticResource ShellContentBackgroundBrush}"
-                            BorderBrush="{StaticResource ShellBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Visibility="{x:Bind ViewModel.IsNetworksVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                            <StackPanel Spacing="{StaticResource SpacingS}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Networks" />
-                                    <Button
-                                        Command="{x:Bind ViewModel.AddNetworkCommand}"
-                                        Content="Add Network"
-                                        IsEnabled="{x:Bind ViewModel.AddNetworkEnabled, Mode=OneWay}" />
-                                </StackPanel>
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ItemsControl Grid.Column="0" ItemTemplateSelector="{StaticResource BuilderNavRowTemplateSelector}" ItemsSource="{x:Bind ViewModel.NetworkRows, Mode=OneWay}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="6" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingS}">
-                                        <TextBlock
-                                            FontWeight="SemiBold"
-                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                            Text="{x:Bind ViewModel.NetworkDetailTitle, Mode=OneWay}"
-                                            Visibility="{x:Bind ViewModel.HasNetworkDetail, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                        <ItemsControl ItemTemplate="{StaticResource BuilderFieldRowTemplate}" ItemsSource="{x:Bind ViewModel.NetworkDetailRows, Mode=OneWay}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Spacing="6" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                        </ItemsControl>
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="No network selected."
-                                            TextWrapping="Wrap"
-                                            Visibility="{x:Bind ViewModel.NetworkDetailEmpty, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
 
                         <!-- Forests &amp; Domains -->
                         <Border
@@ -422,305 +603,629 @@
                             Background="{StaticResource ShellContentBackgroundBrush}"
                             BorderBrush="{StaticResource ShellBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Visibility="{x:Bind ViewModel.IsForestsDomainsVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                            CornerRadius="{StaticResource CardCornerRadius}">
                             <StackPanel Spacing="10">
                                 <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Forests &amp; Domains" />
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                    <Button
-                                        Command="{x:Bind ViewModel.AddForestCommand}"
-                                        Content="Add Forest"
-                                        IsEnabled="{x:Bind ViewModel.AddForestEnabled, Mode=OneWay}" />
-                                    <Button
-                                        Command="{x:Bind ViewModel.AddTreeCommand}"
-                                        Content="Add Tree"
-                                        IsEnabled="{x:Bind ViewModel.AddTreeEnabled, Mode=OneWay}" />
-                                </StackPanel>
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="320" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border
-                                        Grid.Column="0"
-                                        MinHeight="400"
-                                        Background="{StaticResource ShellBackgroundBrush}"
-                                        BorderBrush="{StaticResource ShellBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="4">
-                                        <ScrollViewer
-                                            HorizontalScrollBarVisibility="Auto"
-                                            HorizontalScrollMode="Auto"
-                                            VerticalScrollBarVisibility="Auto"
-                                            VerticalScrollMode="Auto"
-                                            ZoomMode="Disabled">
-                                            <Grid
-                                                x:Name="TopologyCanvasSurface"
-                                                Width="{x:Bind ViewModel.TopologyCanvas.CanvasWidth, Mode=OneWay}"
-                                                Height="{x:Bind ViewModel.TopologyCanvas.CanvasHeight, Mode=OneWay}"
-                                                Background="Transparent">
-                                                <ItemsControl ItemTemplate="{StaticResource BuilderCanvasEdgeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Edges, Mode=OneWay}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <Canvas />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                </ItemsControl>
-                                                <ItemsControl ItemTemplate="{StaticResource BuilderCanvasNodeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Nodes, Mode=OneWay}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <Canvas />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemContainerStyle>
-                                                        <Style TargetType="ContentPresenter">
-                                                            <Setter Property="Canvas.Left" Value="{Binding X}" />
-                                                            <Setter Property="Canvas.Top" Value="{Binding Y}" />
-                                                        </Style>
-                                                    </ItemsControl.ItemContainerStyle>
-                                                </ItemsControl>
-                                                <TextBlock
-                                                    Margin="16"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                    Text="No forests in this draft."
-                                                    TextWrapping="Wrap"
-                                                    Visibility="{x:Bind ViewModel.HasTopologyForests, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
-                                            </Grid>
-                                        </ScrollViewer>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingS}">
-                                        <TextBlock
-                                            FontWeight="SemiBold"
-                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                            Text="{x:Bind ViewModel.ForestDomainDetailTitle, Mode=OneWay}"
-                                            Visibility="{x:Bind ViewModel.HasForestDomainDetail, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                        <ItemsControl ItemTemplate="{StaticResource BuilderFieldRowTemplate}" ItemsSource="{x:Bind ViewModel.ForestDomainDetailRows, Mode=OneWay}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Spacing="6" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                        </ItemsControl>
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="No forest or domain selected."
-                                            TextWrapping="Wrap"
-                                            Visibility="{x:Bind ViewModel.ForestDomainDetailEmpty, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
 
-                        <!-- Credentials -->
-                        <Border
-                            Padding="8"
-                            Background="{StaticResource ShellContentBackgroundBrush}"
-                            BorderBrush="{StaticResource ShellBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Visibility="{x:Bind ViewModel.IsCredentialsVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                            <StackPanel Spacing="{StaticResource SpacingS}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Credentials" />
-                                    <Button
-                                        Command="{x:Bind ViewModel.AddCredentialSlotCommand}"
-                                        Content="Add Slot Reference"
-                                        IsEnabled="{x:Bind ViewModel.AddCredentialEnabled, Mode=OneWay}" />
-                                </StackPanel>
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ItemsControl Grid.Column="0" ItemTemplateSelector="{StaticResource BuilderNavRowTemplateSelector}" ItemsSource="{x:Bind ViewModel.CredentialRows, Mode=OneWay}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="6" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingS}">
-                                        <TextBlock
-                                            FontWeight="SemiBold"
-                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                            Text="{x:Bind ViewModel.CredentialDetailTitle, Mode=OneWay}"
-                                            Visibility="{x:Bind ViewModel.HasCredentialDetail, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                        <ItemsControl ItemTemplate="{StaticResource BuilderFieldRowTemplate}" ItemsSource="{x:Bind ViewModel.CredentialDetailRows, Mode=OneWay}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Spacing="6" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                        </ItemsControl>
-                                        <TextBlock
-                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                            Text="No credential slot selected."
-                                            TextWrapping="Wrap"
-                                            Visibility="{x:Bind ViewModel.CredentialDetailEmpty, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- VMs -->
-                        <Border
-                            Padding="8"
-                            Background="{StaticResource ShellContentBackgroundBrush}"
-                            BorderBrush="{StaticResource ShellBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Visibility="{x:Bind ViewModel.IsVmsVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                            <StackPanel Spacing="{StaticResource SpacingS}">
-                                <StackPanel Spacing="{StaticResource SpacingS}" Visibility="{x:Bind ViewModel.IsVmOverviewVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="VM Overview" />
-                                        <Button
-                                            Command="{x:Bind ViewModel.AddVmCommand}"
-                                            Content="Add VM"
-                                            IsEnabled="{x:Bind ViewModel.AddVmEnabled, Mode=OneWay}" />
-                                    </StackPanel>
-                                    <Grid ColumnSpacing="{StaticResource SpacingS}" RowSpacing="6">
+                                <!-- Level 1: directory topology (forests, domains, and the Standalone container). -->
+                                <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.IsMachineLevelVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}">
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                        Text="Hover a domain for + to add a child (or use a forest header to add a tree). Double-click a domain or the Standalone box (or use its manage icon) to add machines."
+                                        TextWrapping="Wrap" />
+                                    <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="320" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Padding="8" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="4">
-                                            <StackPanel>
-                                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Total VMs" />
-                                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="{x:Bind ViewModel.VmTotalCountText, Mode=OneWay}" />
+                                        <Border
+                                            Grid.Column="0"
+                                            MinHeight="400"
+                                            Background="{StaticResource ShellBackgroundBrush}"
+                                            BorderBrush="{StaticResource ShellBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="4">
+                                            <Grid>
+                                            <ScrollViewer
+                                                HorizontalScrollBarVisibility="Auto"
+                                                HorizontalScrollMode="Auto"
+                                                VerticalScrollBarVisibility="Auto"
+                                                VerticalScrollMode="Auto"
+                                                ZoomMode="Disabled">
+                                                <Grid
+                                                    x:Name="TopologyCanvasSurface"
+                                                    Width="{x:Bind ViewModel.TopologyCanvas.CanvasWidth, Mode=OneWay}"
+                                                    Height="{x:Bind ViewModel.TopologyCanvas.CanvasHeight, Mode=OneWay}"
+                                                    Background="Transparent">
+                                                    <ItemsControl ItemTemplate="{StaticResource BuilderCanvasFrameTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Frames, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                    <ItemsControl ItemTemplate="{StaticResource BuilderCanvasTrustEdgeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.TrustEdges, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                    <ItemsControl ItemTemplate="{StaticResource BuilderCanvasEdgeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Edges, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                    <ItemsControl ItemTemplate="{StaticResource BuilderCanvasNodeTemplate}" ItemsSource="{x:Bind ViewModel.TopologyCanvas.Nodes, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                    <TextBlock
+                                                        Margin="16"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"
+                                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                        Text="No forests in this draft."
+                                                        TextWrapping="Wrap"
+                                                        Visibility="{x:Bind ViewModel.HasTopologyForests, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                                </Grid>
+                                            </ScrollViewer>
+                                            <!-- Floating Level 1 action cluster (top-right over the canvas): global
+                                                 authoring actions that have no on-node home. New forest seeds a
+                                                 root-domain-born-with-DC forest; add standalone machine also breaks
+                                                 the cold-start where a domainless lab hides the empty Standalone box.
+                                                 Trees are added from a forest header, so no global tree button here. -->
+                                            <StackPanel
+                                                Margin="12"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Orientation="Horizontal"
+                                                Spacing="{StaticResource SpacingS}">
+                                                <Button
+                                                    Background="{StaticResource ShellAccentBrush}"
+                                                    Command="{x:Bind ViewModel.AddForestCommand}"
+                                                    Content="New forest"
+                                                    Foreground="{StaticResource ShellTopBarForegroundBrush}"
+                                                    IsEnabled="{x:Bind ViewModel.AddForestEnabled, Mode=OneWay}" />
+                                                <Button
+                                                    Command="{x:Bind ViewModel.AddStandaloneMachineCommand}"
+                                                    Content="Add standalone machine"
+                                                    IsEnabled="{x:Bind ViewModel.AddStandaloneMachineEnabled, Mode=OneWay}"
+                                                    ToolTipService.ToolTip="Add a workgroup machine (router, root CA, ...) with no domain" />
                                             </StackPanel>
+                                            </Grid>
                                         </Border>
-                                        <Border Grid.Column="1" Padding="8" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="4">
-                                            <StackPanel>
-                                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Membership" />
-                                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="{x:Bind ViewModel.VmMembershipCountsText, Mode=OneWay}" />
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingS}">
+                                            <TextBlock
+                                                FontWeight="SemiBold"
+                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                Text="{x:Bind ViewModel.ForestDomainDetailTitle, Mode=OneWay}"
+                                                Visibility="{x:Bind ViewModel.HasForestDomainDetail, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                            <ItemsControl ItemTemplate="{StaticResource BuilderFieldRowTemplate}" ItemsSource="{x:Bind ViewModel.ForestDomainDetailRows, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Spacing="6" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                            </ItemsControl>
+                                            <StackPanel
+                                                Spacing="4"
+                                                Visibility="{x:Bind ViewModel.ShowDomainSubnetEditor, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="Subnet" />
+                                                <Grid>
+                                                    <TextBox
+                                                        x:Name="DomainSubnetTextBox"
+                                                        LostFocus="OnDomainSubnetLostFocus"
+                                                        Text="{x:Bind ViewModel.DomainSubnetValue, Mode=TwoWay}" />
+                                                    <Border
+                                                        BorderBrush="{StaticResource ShellCriticalBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="4"
+                                                        IsHitTestVisible="False"
+                                                        Visibility="{x:Bind ViewModel.ShowDomainSubnetErrorOutline, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                                </Grid>
+                                                <TextBlock
+                                                    FontSize="11"
+                                                    Foreground="{StaticResource ShellCriticalBrush}"
+                                                    Text="{x:Bind ViewModel.DomainSubnetValidationMessage, Mode=OneWay}"
+                                                    TextWrapping="Wrap"
+                                                    Visibility="{x:Bind ViewModel.HasDomainSubnetValidationMessage, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                                             </StackPanel>
-                                        </Border>
-                                        <Border Grid.Column="2" Padding="8" Background="{StaticResource ShellBackgroundBrush}" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="1" CornerRadius="4">
-                                            <StackPanel>
-                                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="AD DC Roles" />
-                                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="{x:Bind ViewModel.VmAdDcCountText, Mode=OneWay}" />
+                                            <!-- Forest trust authoring: only shown when a forest is selected and the draft has
+                                                 at least two forests (see CanAuthorForestTrust). Pick another forest and add a
+                                                 forest trust, or remove one of this forest's existing trusts. -->
+                                            <StackPanel
+                                                Spacing="6"
+                                                Visibility="{x:Bind ViewModel.CanAuthorForestTrust, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                    Text="Forest trusts" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ComboBox
+                                                        MinWidth="160"
+                                                        DisplayMemberPath="Label"
+                                                        ItemsSource="{x:Bind ViewModel.ForestTrustTargets, Mode=OneWay}"
+                                                        PlaceholderText="Select forest"
+                                                        SelectedItem="{x:Bind ViewModel.SelectedForestTrustTarget, Mode=TwoWay}" />
+                                                    <Button
+                                                        Command="{x:Bind ViewModel.AddForestTrustCommand}"
+                                                        Content="Add forest trust" />
+                                                </StackPanel>
+                                                <ItemsControl ItemsSource="{x:Bind ViewModel.ForestTrustRows, Mode=OneWay}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="builder:BuilderForestTrustRowViewModel">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <TextBlock
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                    Text="{x:Bind Label}" />
+                                                                <Button Command="{x:Bind RemoveCommand}" Content="Remove" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </StackPanel>
-                                        </Border>
+                                            <StackPanel
+                                                Spacing="{StaticResource SpacingS}"
+                                                Visibility="{x:Bind ViewModel.ForestDomainDetailEmpty, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Template properties" />
+                                                <TextBox
+                                                    AcceptsReturn="True"
+                                                    Header="Description"
+                                                    MinHeight="56"
+                                                    MaxHeight="96"
+                                                    Text="{x:Bind ViewModel.TemplateDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                    TextWrapping="Wrap" />
+                                                <StackPanel Spacing="6">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Deployment profile" />
+                                                        <TextBlock
+                                                            AutomationProperties.Name="Deployment profile information"
+                                                            FontFamily="Segoe MDL2 Assets"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="&#xE946;"
+                                                            ToolTipService.ToolTip="Chooses how aggressively LabAssistant should deploy this template.&#x0a;&#x0a;Conservative: takes smaller steps and waits more between operations. Best for slower hosts or when reliability matters more than speed.&#x0a;&#x0a;Balanced: recommended default pacing for most labs.&#x0a;&#x0a;Aggressive: starts more work in parallel to finish sooner. Best for powerful hosts, but can use more CPU, memory, disk, and network at once." />
+                                                    </StackPanel>
+                                                    <ItemsControl ItemTemplateSelector="{StaticResource BuilderNavRowTemplateSelector}" ItemsSource="{x:Bind ViewModel.DeploymentProfileRows, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
                                     </Grid>
-                                    <ItemsControl ItemTemplate="{StaticResource BuilderVmOverviewRowTemplate}" ItemsSource="{x:Bind ViewModel.VmOverviewRows, Mode=OneWay}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="6" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                    <TextBlock
-                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="No VMs in this draft."
-                                        TextWrapping="Wrap"
-                                        Visibility="{x:Bind ViewModel.HasVmOverviewRows, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
                                 </StackPanel>
 
-                                <StackPanel Spacing="{StaticResource SpacingS}" Visibility="{x:Bind ViewModel.IsVmDetailVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                <!-- Level 2: machines inside the zoomed-in domain or the Standalone container. -->
+                                <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.IsMachineLevelVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                    <!-- Back affordance: only the arrow uses the symbol font; the label stays in the
+                                         default font so it no longer renders as tofu boxes. -->
+                                    <Button
+                                        HorizontalAlignment="Left"
+                                        Command="{x:Bind ViewModel.BackToTopologyCommand}"
+                                        ToolTipService.ToolTip="Back to the directory topology">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontSize="14" Glyph="&#xE72B;" />
+                                            <TextBlock Text="Back to topology" />
+                                        </StackPanel>
+                                    </Button>
                                     <TextBlock
                                         FontWeight="SemiBold"
+                                        FontSize="18"
                                         Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                        Text="{x:Bind ViewModel.VmDetailTitle, Mode=OneWay}"
-                                        Visibility="{x:Bind ViewModel.HasVmDetailTitle, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                        Text="{x:Bind ViewModel.MachineLevelTitle, Mode=OneWay}" />
                                     <TextBlock
-                                        FontWeight="SemiBold"
+                                        FontSize="12"
                                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.VmDetailCategoryLabel, Mode=OneWay}"
-                                        Visibility="{x:Bind ViewModel.HasVmDetailCategoryLabel, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock
-                                        FontWeight="SemiBold"
-                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.VmDetailNicSubhead, Mode=OneWay}"
-                                        Visibility="{x:Bind ViewModel.HasVmDetailNicSubhead, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                                    <ItemsControl ItemTemplate="{StaticResource BuilderFieldRowTemplate}" ItemsSource="{x:Bind ViewModel.VmDetailFieldRows, Mode=OneWay}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="6" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                    <TextBlock
-                                        Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.VmDetailInfoText, Mode=OneWay}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{x:Bind ViewModel.HasVmDetailInfoText, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                        Text="{x:Bind ViewModel.MachineLevelSubtitle, Mode=OneWay}"
+                                        TextWrapping="Wrap" />
+                                    <!-- Level 2 body: a wrapping tile grid of machines on the left, the selected-machine
+                                         inspector pinned in a scrollable column on the right so editing never scrolls the grid. -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="360" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="10">
+                                            <!-- Machine cards plus the trailing dotted "+ Add computer" placeholder wrap together. -->
+                                            <ItemsRepeater ItemTemplate="{StaticResource BuilderMachineGridItemTemplateSelector}" ItemsSource="{x:Bind ViewModel.MachineGridItems, Mode=OneWay}">
+                                                <ItemsRepeater.Layout>
+                                                    <UniformGridLayout
+                                                        ItemsStretch="None"
+                                                        MinColumnSpacing="10"
+                                                        MinItemWidth="240"
+                                                        MinRowSpacing="10" />
+                                                </ItemsRepeater.Layout>
+                                            </ItemsRepeater>
+                                            <TextBlock
+                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                Text="{x:Bind ViewModel.MachineLevelEmptyText, Mode=OneWay}"
+                                                TextWrapping="Wrap"
+                                                Visibility="{x:Bind ViewModel.HasMachineCards, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                        </StackPanel>
+                                        <!-- A single hairline separates the machine grid from the inspector; the inspector
+                                             itself is outline-less so the settings read as part of the same surface. -->
+                                        <Border
+                                            Grid.Column="1"
+                                            Width="1"
+                                            Margin="0,4,0,4"
+                                            Background="{StaticResource ShellBorderBrush}"
+                                            Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                        <ScrollViewer
+                                            Grid.Column="2"
+                                            VerticalScrollBarVisibility="Auto"
+                                            VerticalScrollMode="Auto">
+                                            <Grid>
+                                                <TextBlock
+                                                    HorizontalAlignment="Center"
+                                                    Margin="0,20,0,0"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="Select a machine to edit its settings."
+                                                    TextWrapping="Wrap"
+                                                    Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                    <Border
+                                        Padding="0,0,4,0"
+                                        Visibility="{x:Bind ViewModel.HasSelectedMachineInspector, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock
+                                                    FontSize="18"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                    Text="{Binding SelectedMachineInspector.MachineTitle}" />
+                                                <TextBlock
+                                                    FontSize="13"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource ShellAccentBrush}"
+                                                    Text="{Binding SelectedMachineInspector.RoleLabel}" />
+                                                <TextBlock
+                                                    FontSize="12"
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    Text="{Binding SelectedMachineInspector.Subtext}"
+                                                    TextWrapping="Wrap" />
+                                            </StackPanel>
+
+                                            <Border
+                                                Padding="10"
+                                                Background="{StaticResource ShellBackgroundBrush}"
+                                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6">
+                                                <StackPanel Spacing="8">
+                                                    <TextBlock
+                                                        FontWeight="SemiBold"
+                                                        Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                        Text="Machine settings" />
+                                                    <Grid ColumnSpacing="10" RowSpacing="8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="150" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+
+                                                        <TextBlock
+                                                            Grid.Row="0"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Name" />
+                                                        <TextBox
+                                                            Grid.Row="0"
+                                                            Grid.Column="1"
+                                                            LostFocus="OnInspectorMachineNameLostFocus"
+                                                            Text="{Binding SelectedMachineInspector.MachineNameText, Mode=OneWay}" />
+
+                                                        <TextBlock
+                                                            Grid.Row="1"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="vCPU count" />
+                                                        <TextBox
+                                                            Grid.Row="1"
+                                                            Grid.Column="1"
+                                                            LostFocus="OnInspectorMachineCpuCountLostFocus"
+                                                            Text="{Binding SelectedMachineInspector.MachineCpuCountText, Mode=OneWay}" />
+
+                                                        <TextBlock
+                                                            Grid.Row="2"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Startup memory (MB)" />
+                                                        <TextBox
+                                                            Grid.Row="2"
+                                                            Grid.Column="1"
+                                                            LostFocus="OnInspectorMachineMemoryMbLostFocus"
+                                                            Text="{Binding SelectedMachineInspector.MachineMemoryMbText, Mode=OneWay}" />
+
+                                                        <TextBlock
+                                                            Grid.Row="3"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Base disk" />
+                                                        <ComboBox
+                                                            Grid.Row="3"
+                                                            Grid.Column="1"
+                                                            DisplayMemberPath="DisplayLabel"
+                                                            ItemsSource="{Binding SelectedMachineInspector.BaseDiskOptions}"
+                                                            SelectedValue="{Binding SelectedMachineInspector.SelectedBaseDiskId, Mode=OneWay}"
+                                                            SelectedValuePath="Id"
+                                                            SelectionChanged="OnInspectorMachineBaseDiskSelectionChanged" />
+
+                                                        <TextBlock
+                                                            Grid.Row="4"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Top"
+                                                            Margin="0,6,0,0"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Host IP address"
+                                                            Visibility="{Binding SelectedMachineInspector.IsHostAddressEditable, Converter={StaticResource BoolToVisibility}}" />
+                                                        <StackPanel
+                                                            Grid.Row="4"
+                                                            Grid.Column="1"
+                                                            Spacing="4"
+                                                            Visibility="{Binding SelectedMachineInspector.IsHostAddressEditable, Converter={StaticResource BoolToVisibility}}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <TextBlock
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                    Text="{Binding SelectedMachineInspector.HostAddressFixedOctetPrefix}" />
+                                                                <Grid Width="54">
+                                                                    <TextBox
+                                                                        x:Name="InspectorHostOctetOneTextBox"
+                                                                        MinWidth="54"
+                                                                        LostFocus="OnInspectorMachineHostOctetLostFocus"
+                                                                        Text="{Binding SelectedMachineInspector.HostAddressOctetOneText, Mode=OneWay}" />
+                                                                    <Border
+                                                                        BorderBrush="{StaticResource ShellCriticalBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="4"
+                                                                        IsHitTestVisible="False"
+                                                                        Visibility="{Binding SelectedMachineInspector.ShowHostAddressErrorOutline, Converter={StaticResource BoolToVisibility}}" />
+                                                                </Grid>
+                                                                <TextBlock
+                                                                    VerticalAlignment="Center"
+                                                                    Text="."
+                                                                    Visibility="{Binding SelectedMachineInspector.HasSecondHostOctet, Converter={StaticResource BoolToVisibility}}" />
+                                                                <Grid
+                                                                    Width="54"
+                                                                    Visibility="{Binding SelectedMachineInspector.HasSecondHostOctet, Converter={StaticResource BoolToVisibility}}">
+                                                                    <TextBox
+                                                                        x:Name="InspectorHostOctetTwoTextBox"
+                                                                        MinWidth="54"
+                                                                        LostFocus="OnInspectorMachineHostOctetLostFocus"
+                                                                        Text="{Binding SelectedMachineInspector.HostAddressOctetTwoText, Mode=OneWay}" />
+                                                                    <Border
+                                                                        BorderBrush="{StaticResource ShellCriticalBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="4"
+                                                                        IsHitTestVisible="False"
+                                                                        Visibility="{Binding SelectedMachineInspector.ShowHostAddressErrorOutline, Converter={StaticResource BoolToVisibility}}" />
+                                                                </Grid>
+                                                            </StackPanel>
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                Text="{Binding SelectedMachineInspector.HostAddressSubnetCidr}" />
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{StaticResource ShellCriticalBrush}"
+                                                                Text="{Binding SelectedMachineInspector.HostAddressValidationMessage}"
+                                                                TextWrapping="Wrap"
+                                                                Visibility="{Binding SelectedMachineInspector.HasHostAddressValidationMessage, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+
+                                                        <TextBlock
+                                                            Grid.Row="5"
+                                                            Grid.Column="0"
+                                                            VerticalAlignment="Top"
+                                                            Margin="0,6,0,0"
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="Bootstrap account"
+                                                            Visibility="{Binding SelectedMachineInspector.HasBootstrapAccount, Converter={StaticResource BoolToVisibility}}" />
+                                                        <StackPanel
+                                                            Grid.Row="5"
+                                                            Grid.Column="1"
+                                                            Spacing="2"
+                                                            Visibility="{Binding SelectedMachineInspector.HasBootstrapAccount, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock
+                                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                Text="{Binding SelectedMachineInspector.BootstrapAccountText}" />
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                                Text="Local admin baked into the base disk, reused at deploy time."
+                                                                TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <TextBox
+                                                Header="Search roles and features"
+                                                PlaceholderText="Search by name or description"
+                                                Text="{Binding RoleSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                            <Border
+                                                Padding="0"
+                                                Background="{StaticResource ShellBackgroundBrush}"
+                                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6">
+                                                <StackPanel>
+                                                    <Button
+                                                        Padding="10,8,10,8"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Stretch"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Command="{Binding SelectedMachineInspector.ToggleRolesPanelCommand}">
+                                                        <Grid ColumnSpacing="8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock
+                                                                Grid.Column="0"
+                                                                VerticalAlignment="Center"
+                                                                FontFamily="Segoe MDL2 Assets"
+                                                                FontSize="12"
+                                                                Text="{Binding SelectedMachineInspector.RolesPanelChevron}" />
+                                                            <TextBlock
+                                                                Grid.Column="1"
+                                                                FontWeight="SemiBold"
+                                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                Text="Roles" />
+                                                        </Grid>
+                                                    </Button>
+                                                    <StackPanel
+                                                        Padding="10,0,10,10"
+                                                        Visibility="{Binding SelectedMachineInspector.IsRolesPanelExpanded, Converter={StaticResource BoolToVisibility}}">
+                                                        <ItemsControl ItemTemplate="{StaticResource BuilderRoleRowTemplate}" ItemsSource="{Binding SelectedMachineInspector.RoleRows}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Spacing="0" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                        </ItemsControl>
+                                                        <TextBlock
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="No roles match the search."
+                                                            TextWrapping="Wrap"
+                                                            Visibility="{Binding SelectedMachineInspector.HasRoleRows, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Border
+                                                Padding="0"
+                                                Background="{StaticResource ShellBackgroundBrush}"
+                                                BorderBrush="{StaticResource ShellBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6">
+                                                <StackPanel>
+                                                    <Button
+                                                        Padding="10,8,10,8"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Stretch"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Command="{Binding SelectedMachineInspector.ToggleFeaturesPanelCommand}">
+                                                        <Grid ColumnSpacing="8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock
+                                                                Grid.Column="0"
+                                                                VerticalAlignment="Center"
+                                                                FontFamily="Segoe MDL2 Assets"
+                                                                FontSize="12"
+                                                                Text="{Binding SelectedMachineInspector.FeaturesPanelChevron}" />
+                                                            <TextBlock
+                                                                Grid.Column="1"
+                                                                FontWeight="SemiBold"
+                                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                                Text="Features" />
+                                                        </Grid>
+                                                    </Button>
+                                                    <StackPanel
+                                                        Padding="10,0,10,10"
+                                                        Visibility="{Binding SelectedMachineInspector.IsFeaturesPanelExpanded, Converter={StaticResource BoolToVisibility}}">
+                                                        <ItemsControl ItemTemplate="{StaticResource BuilderRoleRowTemplate}" ItemsSource="{Binding SelectedMachineInspector.FeatureRows}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Spacing="0" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                        </ItemsControl>
+                                                        <TextBlock
+                                                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                            Text="No features available yet."
+                                                            TextWrapping="Wrap"
+                                                            Visibility="{Binding SelectedMachineInspector.HasFeatures, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                            </Grid>
+                                        </ScrollViewer>
+                                    </Grid>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
 
-                        <!-- Review -->
-                        <Border
-                            Padding="8"
-                            Background="{StaticResource ShellContentBackgroundBrush}"
-                            BorderBrush="{StaticResource ShellBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Visibility="{x:Bind ViewModel.IsReviewVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                            <StackPanel Spacing="6">
-                                <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Review" />
-                                <TextBlock
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    Text="{x:Bind ViewModel.ReviewSummaryText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    Foreground="{StaticResource ShellCriticalBrush}"
-                                    Text="{x:Bind ViewModel.ReviewBlockerText, Mode=OneWay}"
-                                    TextWrapping="Wrap"
-                                    Visibility="{x:Bind ViewModel.IsReviewBlockerVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                            </StackPanel>
-                        </Border>
                     </Grid>
                 </ScrollViewer>
             </Grid>
 
             <StackPanel Grid.Row="2" Spacing="6">
-                <Grid ColumnSpacing="{StaticResource SpacingS}" RowSpacing="{StaticResource SpacingS}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        Command="{x:Bind ViewModel.BackToLibraryCommand}"
-                        Content="Back"
-                        IsEnabled="{x:Bind ViewModel.BackToLibraryEnabled, Mode=OneWay}" />
-                    <StackPanel
-                        Grid.Column="1"
-                        HorizontalAlignment="Right"
-                        Orientation="Horizontal"
-                        Spacing="{StaticResource SpacingS}">
-                        <Button
-                            Command="{x:Bind ViewModel.PreviousStepCommand}"
-                            Content="Previous"
-                            IsEnabled="{x:Bind ViewModel.PreviousStepEnabled, Mode=OneWay}"
-                            ToolTipService.ToolTip="{x:Bind ViewModel.PreviousStepTooltip, Mode=OneWay}"
-                            AutomationProperties.Name="{x:Bind ViewModel.PreviousStepTooltip, Mode=OneWay}" />
-                        <Button
-                            AutomationProperties.Name="{x:Bind ViewModel.NextStepTooltip, Mode=OneWay}"
-                            Background="{StaticResource ShellAccentBrush}"
-                            Command="{x:Bind ViewModel.NextStepCommand}"
-                            Content="Next"
-                            Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                            IsEnabled="{x:Bind ViewModel.NextStepEnabled, Mode=OneWay}"
-                            ToolTipService.ToolTip="{x:Bind ViewModel.NextStepTooltip, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.NextStepVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                        <Button
-                            Command="{x:Bind ViewModel.SaveAsCommand}"
-                            Content="Save As"
-                            IsEnabled="{x:Bind ViewModel.SaveAsEnabled, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.SaveAsVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
-                        <Button
-                            Background="{StaticResource ShellAccentBrush}"
-                            Command="{x:Bind ViewModel.SaveCommand}"
-                            Content="Save"
-                            Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                            IsEnabled="{x:Bind ViewModel.SaveEnabled, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.SaveVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                <Border
+                    Padding="12,10"
+                    Background="{StaticResource ShellBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    Visibility="{x:Bind ViewModel.HasValidationIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Spacing="6">
+                        <TextBlock
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Issues" />
+                        <ScrollViewer
+                            MaxHeight="132"
+                            HorizontalScrollMode="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.ValidationIssues, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="builder:BuilderValidationIssueRow">
+                                        <Grid Margin="0,2" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="64" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                Grid.Column="0"
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Foreground="{x:Bind IsBlocker, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellCriticalBrush|ShellTextSecondaryBrush}"
+                                                Text="{x:Bind SeverityLabel}" />
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                FontSize="12"
+                                                Text="{x:Bind Message}"
+                                                TextWrapping="Wrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </StackPanel>
-                </Grid>
+                </Border>
                 <TextBlock
                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                     Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"

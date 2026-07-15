@@ -129,18 +129,86 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
     }
 
     [Fact]
-    public void DeleteDomain_ForestRoot_RemovesWholeForestAndAllItsDomainsAndVms()
+    public void DeleteDomain_ForestRootWhenAnotherForestExists_RemovesThatForestAndKeepsTheOther()
     {
+        // With more than one forest the root is deletable: deleting one forest's root removes that whole forest
+        // and its domains/VMs while the other forest survives.
         var start = SuggestedDraft();
-        var root = start.Domains[0];
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(start).Draft;
+        var firstForestId = twoForests.Forests[0].ForestId;
+        var root = twoForests.Domains.First(domain =>
+            string.Equals(domain.ForestId, firstForestId, System.StringComparison.OrdinalIgnoreCase));
 
-        var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(start, root.DomainId);
+        var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(twoForests, root.DomainId);
         var draft = result.Draft;
 
-        Assert.Empty(draft.Forests);
-        Assert.Empty(draft.Domains);
-        // Both suggested VMs belonged to the deleted forest's domain, so none may reference a removed domain.
+        Assert.Single(draft.Forests);
+        Assert.DoesNotContain(draft.Forests, forest => forest.ForestId == firstForestId);
+        Assert.DoesNotContain(draft.Domains, domain => domain.ForestId == firstForestId);
         Assert.DoesNotContain(draft.Vms, vm => vm.DomainId == root.DomainId);
+        AssertValid(draft);
+    }
+
+    [Fact]
+    public void DeleteDomain_ForestRootWithStandaloneMachines_KeepsStandaloneMachines()
+    {
+        // Regression: deleting one forest's root removes only that forest, never the standalone machines that
+        // live outside every domain. A standalone VM carries no DomainId, so the delete cascade - which is
+        // scoped to the removed forest's domains - must leave it untouched. This reproduces the reported bug
+        // where deleting the first forest's root blanked the whole canvas, standalone machines included.
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var added = TemplatesBuilderMachineAuthoring.AddStandaloneComputer(twoForests);
+        var standaloneVmId = added.Draft.Vms[added.SelectedVmIndex].VmId;
+        var reconciled = TemplatesBuilderNetworkReconciler.Reconcile(added.Draft);
+
+        var firstForestId = reconciled.Forests[0].ForestId;
+        var root = reconciled.Domains.First(domain =>
+            string.Equals(domain.ForestId, firstForestId, StringComparison.OrdinalIgnoreCase));
+
+        var afterDelete = TemplatesBuilderNetworkReconciler.Reconcile(
+            TemplatesBuilderTopologyAuthoring.DeleteDomain(reconciled, root.DomainId).Draft);
+
+        Assert.DoesNotContain(afterDelete.Forests, forest => forest.ForestId == firstForestId);
+        Assert.Contains(afterDelete.Vms, vm => vm.VmId == standaloneVmId);
+        AssertValid(afterDelete);
+    }
+
+    [Fact]
+    public void DeleteDomain_SoleForestRoot_RemovesTheForestAndKeepsStandaloneMachines()
+    {
+        // Deleting the root of the only forest is now allowed: the lab is left with just its standalone
+        // machines (a valid workgroup-only template), and Level 1 can add a forest again, so it never
+        // dead-ends. Save is separately gated on there being at least one machine.
+        var start = SuggestedDraft();
+        var standalone = new TemplatesBuilderVmDraft(
+            "vm-rootca", "rootca", "2048", "2", start.Vms[0].VhdxId, V2MembershipModeCatalog.Standalone,
+            string.Empty, false,
+            new TemplatesBuilderVmCredentialSlotDraft("slot-local", string.Empty, string.Empty, string.Empty, string.Empty),
+            []);
+        var withStandalone = start with { Vms = start.Vms.Append(standalone).ToList() };
+        var root = withStandalone.Domains[0];
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(withStandalone, root.DomainId);
+
+        Assert.Empty(result.Draft.Forests);
+        Assert.Empty(result.Draft.Domains);
+        Assert.Contains(result.Draft.Vms, vm => vm.VmId == "vm-rootca");
+        Assert.DoesNotContain(result.Draft.Vms, vm => vm.DomainId == root.DomainId);
+        // With no directory left but a workgroup machine surviving, focus lands on the Standalone container.
+        Assert.Equal(BuilderForestDomainResourceKind.Standalone, result.SelectedKind);
+    }
+
+    [Fact]
+    public void DeleteForest_SoleForest_RemovesEverythingInIt()
+    {
+        var start = SuggestedDraft();
+        var forestId = start.Forests[0].ForestId;
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteForest(start, forestId);
+
+        Assert.Empty(result.Draft.Forests);
+        Assert.Empty(result.Draft.Domains);
+        Assert.DoesNotContain(result.Draft.Vms, vm => !string.IsNullOrWhiteSpace(vm.DomainId));
     }
 
     [Fact]
@@ -216,6 +284,22 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
     }
 
     [Fact]
+    public void ApplyDomainRelationEdit_OrphanDomainRequestingChild_CoercesToTreeInsteadOfEmptyParent()
+    {
+        // A malformed/orphan domain (its forest and root are absent) has no valid parent to become a Child of.
+        // The edit must never produce a Child with an empty parent; it coerces to Tree instead.
+        var orphan = new TemplatesBuilderDomainDraft(
+            "domain-orphan", "orphan.lab", "ORPHAN", "forest-missing", nameof(V2DomainRelationKind.Tree), string.Empty);
+        var draft = new TemplatesBuilderDraftSnapshot(
+            "Orphan draft", string.Empty, "Balanced", [], [], [], [orphan], [], false);
+
+        var updated = TemplatesBuilderTopologyAuthoring.ApplyDomainRelationEdit(draft, 0, nameof(V2DomainRelationKind.Child));
+
+        Assert.Equal(nameof(V2DomainRelationKind.Tree), updated.Domains[0].RelationKind);
+        Assert.Equal(string.Empty, updated.Domains[0].ParentDomainId);
+    }
+
+    [Fact]
     public void ResolveForestName_DerivesFromRootDomainDnsNameAndFollowsRename()
     {
         var start = SuggestedDraft();
@@ -224,6 +308,83 @@ public sealed class TemplatesBuilderTopologyAuthoringTests
         var renamedRoot = start.Domains[0] with { DnsName = "renamed.lab" };
         var renamed = start with { Domains = new[] { renamedRoot }.Concat(start.Domains.Skip(1)).ToList() };
         Assert.Equal("renamed.lab", TemplatesBuilderTopologyAuthoring.ResolveForestName(renamed, renamed.Forests[0]));
+    }
+
+    [Fact]
+    public void AddForestTrust_BetweenTwoForests_CreatesForestBidirectionalTrustBetweenRoots()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var sourceRoot = twoForests.Forests[0].RootDomainId;
+        var targetRoot = twoForests.Forests[1].RootDomainId;
+
+        var result = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1);
+        var trusts = result.Draft.Trusts ?? [];
+
+        var trust = Assert.Single(trusts);
+        Assert.Equal(nameof(V2TrustType.Forest), trust.TrustType);
+        Assert.Equal(nameof(V2TrustDirection.Bidirectional), trust.Direction);
+        Assert.True(
+            (trust.SourceDomainId == sourceRoot && trust.TargetDomainId == targetRoot) ||
+            (trust.SourceDomainId == targetRoot && trust.TargetDomainId == sourceRoot));
+        Assert.Equal(BuilderForestDomainResourceKind.Forest, result.SelectedKind);
+    }
+
+    [Fact]
+    public void AddForestTrust_SameForest_IsNoOp()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+
+        var result = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 0);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
+    }
+
+    [Fact]
+    public void AddForestTrust_DuplicateUnorderedPair_IsNoOp()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var once = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+
+        // Authoring the reverse ordering is the same unordered pair and must not add a second trust.
+        var twice = TemplatesBuilderTopologyAuthoring.AddForestTrust(once, 1, 0).Draft;
+
+        Assert.Single(twice.Trusts ?? []);
+    }
+
+    [Fact]
+    public void RemoveForestTrust_RemovesTrustById()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var authored = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        var trustId = (authored.Trusts ?? [])[0].TrustId;
+
+        var result = TemplatesBuilderTopologyAuthoring.RemoveForestTrust(authored, trustId);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
+    }
+
+    [Fact]
+    public void DeleteForest_PrunesTrustsAnchoredOnThatForest()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var authored = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        var doomedForestId = authored.Forests[0].ForestId;
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteForest(authored, doomedForestId);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
+    }
+
+    [Fact]
+    public void DeleteDomain_ForestRoot_PrunesTrustsAnchoredOnThatForest()
+    {
+        var twoForests = TemplatesBuilderTopologyAuthoring.AddForest(SuggestedDraft()).Draft;
+        var authored = TemplatesBuilderTopologyAuthoring.AddForestTrust(twoForests, 0, 1).Draft;
+        var doomedRoot = authored.Forests[0].RootDomainId;
+
+        var result = TemplatesBuilderTopologyAuthoring.DeleteDomain(authored, doomedRoot);
+
+        Assert.Empty(result.Draft.Trusts ?? []);
     }
 
     private static void AssertDistinct(IEnumerable<string> values)

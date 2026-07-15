@@ -167,6 +167,11 @@ internal static class TemplatesBuilderTopologyAuthoring
             string.Equals(forest.RootDomainId, target.DomainId, StringComparison.OrdinalIgnoreCase));
         var deletingForestRoot = !string.IsNullOrWhiteSpace(owningForest.ForestId);
 
+        // Deleting a forest root removes the whole forest. This is allowed even for the only forest: a lab may
+        // legitimately hold just standalone (workgroup) machines and no directory at all, and the user can add a
+        // forest or standalone machine again from Level 1, so it never dead-ends. Save is still gated on there
+        // being at least one machine (see TemplatesBuilderDraftValidator), which is the real floor.
+
         HashSet<string> removedDomainIds;
         var remainingForests = draft.Forests.ToList();
 
@@ -203,15 +208,13 @@ internal static class TemplatesBuilderTopologyAuthoring
             IsSaveConfirmed = false
         };
 
-        return new TopologyAuthoringResult(
-            result,
-            BuilderForestDomainResourceKind.Forest,
-            result.Forests.Count > 0 ? 0 : 0);
+        return PostDeleteSelection(result);
     }
 
     /// <summary>
     /// Deletes a forest by its id (removes the forest and everything in it). Equivalent to deleting its root
-    /// domain, and a no-op when the forest has no root yet.
+    /// domain, and a no-op when the forest has no root yet. Deleting the only forest is allowed: the lab may be
+    /// left with just standalone machines (or empty), and Level 1 can always add a forest again.
     /// </summary>
     public static TopologyAuthoringResult DeleteForest(TemplatesBuilderDraftSnapshot draft, string forestId)
     {
@@ -240,7 +243,138 @@ internal static class TemplatesBuilderTopologyAuthoring
             IsSaveConfirmed = false
         };
 
-        return new TopologyAuthoringResult(result, BuilderForestDomainResourceKind.Forest, 0);
+        return PostDeleteSelection(result);
+    }
+
+    /// <summary>
+    /// Authors a forest trust between two forests, persisted frame-to-frame. The trust is anchored on the two
+    /// forests' root domain ids with type Forest and a bidirectional direction (the deploy side consumes those).
+    /// No-ops (returns the draft unchanged) when either index is out of range, the two indices are the same
+    /// forest (no self-trust), either forest has no resolvable root domain, or the unordered forest pair is
+    /// already trusted (no duplicate). Selects the source forest so the detail panel stays on it.
+    /// </summary>
+    public static TopologyAuthoringResult AddForestTrust(
+        TemplatesBuilderDraftSnapshot draft,
+        int sourceForestIndex,
+        int targetForestIndex)
+    {
+        if (sourceForestIndex < 0 || sourceForestIndex >= draft.Forests.Count ||
+            targetForestIndex < 0 || targetForestIndex >= draft.Forests.Count ||
+            sourceForestIndex == targetForestIndex)
+        {
+            return Unchanged(draft);
+        }
+
+        var sourceForest = draft.Forests[sourceForestIndex];
+        var targetForest = draft.Forests[targetForestIndex];
+        var sourceRoot = sourceForest.RootDomainId?.Trim() ?? string.Empty;
+        var targetRoot = targetForest.RootDomainId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(sourceRoot) || string.IsNullOrWhiteSpace(targetRoot))
+        {
+            return Unchanged(draft);
+        }
+
+        var existing = draft.Trusts ?? [];
+        if (existing.Any(trust => IsSameUnorderedPair(trust, sourceRoot, targetRoot)))
+        {
+            return Unchanged(draft);
+        }
+
+        var trustId = UniqueId(
+            $"trust-{sourceForest.ForestId}-{targetForest.ForestId}",
+            existing.Select(trust => trust.TrustId).Where(id => !string.IsNullOrWhiteSpace(id)).ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+        var trusts = existing
+            .Append(new TemplatesBuilderTrustDraft(
+                trustId,
+                sourceRoot,
+                targetRoot,
+                nameof(V2TrustType.Forest),
+                nameof(V2TrustDirection.Bidirectional)))
+            .ToList();
+
+        var result = draft with { Trusts = trusts, IsSaveConfirmed = false };
+        return new TopologyAuthoringResult(result, BuilderForestDomainResourceKind.Forest, sourceForestIndex);
+    }
+
+    /// <summary>
+    /// Removes the forest trust with the given id. No-op when no trust matches. Selects the first forest so the
+    /// canvas and detail panel stay on something coherent.
+    /// </summary>
+    public static TopologyAuthoringResult RemoveForestTrust(TemplatesBuilderDraftSnapshot draft, string trustId)
+    {
+        var existing = draft.Trusts ?? [];
+        if (string.IsNullOrWhiteSpace(trustId) ||
+            !existing.Any(trust => string.Equals(trust.TrustId, trustId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Unchanged(draft);
+        }
+
+        var trusts = existing
+            .Where(trust => !string.Equals(trust.TrustId, trustId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var result = draft with { Trusts = trusts, IsSaveConfirmed = false };
+        return new TopologyAuthoringResult(result, BuilderForestDomainResourceKind.Forest, draft.Forests.Count > 0 ? 0 : 0);
+    }
+
+    // Drops any forest trust whose source or target no longer names a surviving forest root domain. Called from
+    // the post-delete cleanup so deleting a forest (or its root domain) also removes the trusts anchored on it.
+    private static TemplatesBuilderDraftSnapshot PruneDanglingForestTrusts(TemplatesBuilderDraftSnapshot draft)
+    {
+        var trusts = draft.Trusts;
+        if (trusts is not { Count: > 0 })
+        {
+            return draft;
+        }
+
+        var forestRoots = draft.Forests
+            .Select(forest => forest.RootDomainId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var surviving = trusts
+            .Where(trust =>
+                forestRoots.Contains(trust.SourceDomainId?.Trim() ?? string.Empty) &&
+                forestRoots.Contains(trust.TargetDomainId?.Trim() ?? string.Empty))
+            .ToList();
+
+        return surviving.Count == trusts.Count
+            ? draft
+            : draft with { Trusts = surviving };
+    }
+
+    private static bool IsSameUnorderedPair(TemplatesBuilderTrustDraft trust, string rootA, string rootB)
+    {
+        var source = trust.SourceDomainId?.Trim() ?? string.Empty;
+        var target = trust.TargetDomainId?.Trim() ?? string.Empty;
+        return (string.Equals(source, rootA, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(target, rootB, StringComparison.OrdinalIgnoreCase)) ||
+               (string.Equals(source, rootB, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(target, rootA, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // After a delete, focus the first surviving forest; if the lab is now directory-less, focus the Standalone
+    // container when a workgroup machine survived, otherwise leave nothing meaningful selected (Forest/0 clamps
+    // to "nothing" when there are no forests). Keeps the canvas and detail panel pointed at something coherent.
+    private static TopologyAuthoringResult PostDeleteSelection(TemplatesBuilderDraftSnapshot draft)
+    {
+        // Deleting a forest (or a forest root, which takes the whole forest with it) strips that forest's root
+        // domain, so any forest trust anchored on it can no longer resolve. Prune those trusts here, folded into
+        // the single post-delete cleanup, so a delete never leaves a dangling trust behind.
+        draft = PruneDanglingForestTrusts(draft);
+
+        if (draft.Forests.Count > 0)
+        {
+            return new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Forest, 0);
+        }
+
+        var hasStandaloneMachine = draft.Vms.Any(vm =>
+            V2MembershipModeCatalog.IsStandalone(vm.MembershipMode) && !vm.IsRouter);
+        return hasStandaloneMachine
+            ? new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Standalone, 0)
+            : new TopologyAuthoringResult(draft, BuilderForestDomainResourceKind.Forest, 0);
     }
 
     /// <summary>
@@ -278,12 +412,24 @@ internal static class TemplatesBuilderTopologyAuthoring
             requested = V2DomainRelationKind.Tree;
         }
 
+        // Becoming a Child needs a valid parent. On a well-formed draft the forest root always qualifies, but a
+        // malformed/orphan domain (its forest or root is missing) has none - coerce it to Tree rather than emit a
+        // Child with an empty parent, honoring the invariant that this method never lands the draft in an invalid
+        // relation state.
+        var resolvedParent = requested == V2DomainRelationKind.Child
+            ? ResolveChildParent(draft, existing)
+            : string.Empty;
+        if (requested == V2DomainRelationKind.Child && string.IsNullOrWhiteSpace(resolvedParent))
+        {
+            requested = V2DomainRelationKind.Tree;
+        }
+
         var updated = requested == V2DomainRelationKind.Tree
             ? existing with { RelationKind = nameof(V2DomainRelationKind.Tree), ParentDomainId = string.Empty }
             : existing with
             {
                 RelationKind = nameof(V2DomainRelationKind.Child),
-                ParentDomainId = ResolveChildParent(draft, existing)
+                ParentDomainId = resolvedParent
             };
 
         return ReplaceDomain(draft, domainIndex, updated);

@@ -96,6 +96,53 @@ public sealed partial class V2PlanningCapabilityServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanAsync_TemplateWithoutAuthoredCredentialSlots_ReusesBootstrapSlotAndPlansCleanly()
+    {
+        // Credential-reuse policy: a template that authors NO credential slots (the Builder no longer authors them)
+        // must still plan a DC + domain-member lab. Every domain/DSRM/join slot falls back to the effective
+        // bootstrap slot, which resolves from the catalog LocalCredentialSlotRef ("slot-local"). With only the
+        // bootstrap slot available, planning must produce zero credential blockers.
+        var request = CreateAdCoreRequest("Balanced", ["slot-local"]);
+        foreach (var vm in request.Template.VmTemplates)
+        {
+            vm.CredentialSlots = null;
+        }
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(
+            result.Success,
+            string.Join("; ", result.Issues.Select(issue => $"{issue.Code}:{issue.Message}")));
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "credential-slot-missing");
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "credential-slot-unresolved");
+        Assert.DoesNotContain(
+            result.UnresolvedRequirements,
+            requirement => requirement.Kind == V2UnresolvedRequirementKind.CredentialSlot);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_ChildDomainWithoutAuthoredCredentialSlots_ReusesBootstrapForParentDomainAdmin()
+    {
+        // The parent-domain-admin slot (needed to promote a child/tree DC) has no catalog fallback of its own, so it
+        // must reuse the bootstrap slot too. Clearing every authored slot on a child-domain lab must still plan with
+        // zero credential blockers.
+        var request = CreateChildDomainRequest();
+        foreach (var vm in request.Template.VmTemplates)
+        {
+            vm.CredentialSlots = null;
+        }
+        request.ResolvedCredentialSlotKeys = ["slot-local"];
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(
+            result.Success,
+            string.Join("; ", result.Issues.Select(issue => $"{issue.Code}:{issue.Message}")));
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "credential-slot-missing");
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "credential-slot-unresolved");
+    }
+
+    [Fact]
     public async Task BuildPlanAsync_RouterFreeTemplate_EmitsNoRouterNodes()
     {
         var result = await _service.BuildPlanAsync(CreateSingleVmStandaloneRequest());

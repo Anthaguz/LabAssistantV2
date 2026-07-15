@@ -11,7 +11,8 @@ internal enum TemplatesBuilderResourceKind
 internal enum BuilderForestDomainResourceKind
 {
     Forest,
-    Domain
+    Domain,
+    Standalone
 }
 
 internal readonly record struct TemplatesBuilderResourceRowProjection(

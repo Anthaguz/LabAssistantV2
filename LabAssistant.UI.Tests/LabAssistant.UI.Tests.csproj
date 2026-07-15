@@ -52,9 +52,13 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderNetworkSwitchIntent.cs" Link="WinUI\TemplatesBuilderNetworkSwitchIntent.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDirectoryTopologyProjection.cs" Link="WinUI\TemplatesBuilderDirectoryTopologyProjection.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderTopologyAuthoring.cs" Link="WinUI\TemplatesBuilderTopologyAuthoring.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineProjection.cs" Link="WinUI\TemplatesBuilderMachineProjection.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineAuthoring.cs" Link="WinUI\TemplatesBuilderMachineAuthoring.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderMachineBasicsAuthoring.cs" Link="WinUI\TemplatesBuilderMachineBasicsAuthoring.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftMapper.cs" Link="WinUI\TemplatesBuilderDraftMapper.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderDraftValidator.cs" Link="WinUI\TemplatesBuilderDraftValidator.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleProjectionCatalog.cs" Link="WinUI\TemplatesBuilderRoleProjectionCatalog.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderRoleAuthoring.cs" Link="WinUI\TemplatesBuilderRoleAuthoring.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderSectionProjections.cs" Link="WinUI\TemplatesBuilderSectionProjections.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderWorkflowNavigation.cs" Link="WinUI\TemplatesBuilderWorkflowNavigation.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderValidationMerger.cs" Link="WinUI\TemplatesBuilderValidationMerger.cs" />
@@ -63,11 +67,25 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderSwitchOptionViewModel.cs" Link="WinUI\BuilderSwitchOptionViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderFieldRowViewModel.cs" Link="WinUI\BuilderFieldRowViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderNavRowViewModel.cs" Link="WinUI\BuilderNavRowViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderValidationIssueRow.cs" Link="WinUI\BuilderValidationIssueRow.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasGeometry.cs" Link="WinUI\BuilderCanvasGeometry.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasMetrics.cs" Link="WinUI\BuilderCanvasMetrics.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasNodeViewModel.cs" Link="WinUI\BuilderCanvasNodeViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasClickArbiter.cs" Link="WinUI\BuilderCanvasClickArbiter.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderLabSubnet.cs" Link="WinUI\BuilderLabSubnet.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderNetworkReconciler.cs" Link="WinUI\TemplatesBuilderNetworkReconciler.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasForestFrameViewModel.cs" Link="WinUI\BuilderCanvasForestFrameViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderCanvasEdgeViewModel.cs" Link="WinUI\BuilderCanvasEdgeViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyCanvasLayout.cs" Link="WinUI\BuilderTopologyCanvasLayout.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderTopologyCanvasViewModel.cs" Link="WinUI\BuilderTopologyCanvasViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderMachineCardViewModel.cs" Link="WinUI\BuilderMachineCardViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderAddMachinePlaceholder.cs" Link="WinUI\BuilderAddMachinePlaceholder.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderRoleRowViewModel.cs" Link="WinUI\BuilderRoleRowViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderMachineInspectorViewModel.cs" Link="WinUI\BuilderMachineInspectorViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderTrustDraft.cs" Link="WinUI\TemplatesBuilderTrustDraft.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\TemplatesBuilderTrustEdgeProjection.cs" Link="WinUI\TemplatesBuilderTrustEdgeProjection.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderForestTrustTargetViewModel.cs" Link="WinUI\BuilderForestTrustTargetViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\Builder\BuilderForestTrustRowViewModel.cs" Link="WinUI\BuilderForestTrustRowViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Templates\TemplatesBuilderViewModel.cs" Link="WinUI\TemplatesBuilderViewModel.cs" />
 
     <!-- Quick Deploy lane (runtime-independent view model, controller, host, and item models). -->

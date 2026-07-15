@@ -8,7 +8,8 @@ internal sealed class TemplateVhdxCatalogOption
         string osName,
         string osVersion,
         int generation,
-        string? signature)
+        string? signature,
+        string? bootstrapLocalUser = null)
     {
         Id = id;
         Path = path;
@@ -16,6 +17,7 @@ internal sealed class TemplateVhdxCatalogOption
         OsVersion = osVersion;
         Generation = generation;
         Signature = signature;
+        BootstrapLocalUser = bootstrapLocalUser;
     }
 
     public string Id { get; }
@@ -29,6 +31,9 @@ internal sealed class TemplateVhdxCatalogOption
     public int Generation { get; }
 
     public string? Signature { get; }
+
+    /// <summary>Gets the local bootstrap account (base-disk baked-in local admin) advertised by the catalog, if any.</summary>
+    public string? BootstrapLocalUser { get; }
 
     public string DisplayLabel => string.IsNullOrWhiteSpace(OsName) && string.IsNullOrWhiteSpace(OsVersion)
         ? $"{Id} (Gen{Generation})"

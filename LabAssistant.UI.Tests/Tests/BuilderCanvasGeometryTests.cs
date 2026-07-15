@@ -54,7 +54,7 @@ public sealed class BuilderCanvasGeometryTests
     }
 
     [Fact]
-    public void Layout_PlacesForestAboveRootAboveChildByOneRowEach()
+    public void Layout_PlacesRootDomainsOnTheTopRowWithChildrenOneRowBelow()
     {
         var projection = TemplatesBuilderDirectoryTopologyProjector.Project(
             CreateTopologyDraft(),
@@ -64,10 +64,13 @@ public sealed class BuilderCanvasGeometryTests
         var positions = BuilderTopologyCanvasLayout.Compute(projection, NodeWidth, NodeHeight, GapX, GapY, Margin, Margin);
 
         var rowHeight = NodeHeight + GapY;
-        Assert.Equal(Margin, positions["forest:forest-contoso"].Y, 6);
-        Assert.Equal(Margin + rowHeight, positions["domain:domain-contoso"].Y, 6);
-        Assert.Equal(Margin + (2 * rowHeight), positions["domain:domain-child"].Y, 6);
-        Assert.Equal(Margin + rowHeight, positions["domain:domain-tree"].Y, 6);
+        // Forests are frames, not nodes, so no forest position is emitted; the top domain row is pushed down by
+        // the frame's top allowance (padding + header pill) so the enclosing frame stays on-canvas.
+        var topRowY = Margin + BuilderCanvasMetrics.FrameTopAllowance;
+        Assert.False(positions.ContainsKey("forest:forest-contoso"));
+        Assert.Equal(topRowY, positions["domain:domain-contoso"].Y, 6);
+        Assert.Equal(topRowY + rowHeight, positions["domain:domain-child"].Y, 6);
+        Assert.Equal(topRowY, positions["domain:domain-tree"].Y, 6);
     }
 
     [Fact]
@@ -85,7 +88,7 @@ public sealed class BuilderCanvasGeometryTests
     }
 
     [Fact]
-    public void Layout_ReturnsAPositionForEveryForestAndDomainNode()
+    public void Layout_ReturnsAPositionForEveryDomainAndNoForest()
     {
         var projection = TemplatesBuilderDirectoryTopologyProjector.Project(
             CreateTopologyDraft(),
@@ -96,8 +99,6 @@ public sealed class BuilderCanvasGeometryTests
 
         foreach (var nodeId in new[]
                  {
-                     "forest:forest-contoso",
-                     "forest:forest-fabrikam",
                      "domain:domain-contoso",
                      "domain:domain-child",
                      "domain:domain-tree",
@@ -106,6 +107,10 @@ public sealed class BuilderCanvasGeometryTests
         {
             Assert.True(positions.ContainsKey(nodeId), $"missing layout position for {nodeId}");
         }
+
+        // Forests are frames sized by the canvas view model, so the layout must not position them as nodes.
+        Assert.False(positions.ContainsKey("forest:forest-contoso"));
+        Assert.False(positions.ContainsKey("forest:forest-fabrikam"));
     }
 
     private static TemplatesBuilderDraftSnapshot CreateTopologyDraft()

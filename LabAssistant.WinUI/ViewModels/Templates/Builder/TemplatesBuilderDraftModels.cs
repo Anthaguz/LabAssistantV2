@@ -37,7 +37,16 @@ internal readonly record struct TemplatesBuilderDraftSnapshot(
     IReadOnlyList<TemplatesBuilderForestDraft> Forests,
     IReadOnlyList<TemplatesBuilderDomainDraft> Domains,
     IReadOnlyList<TemplatesBuilderVmDraft> Vms,
-    bool IsSaveConfirmed);
+    bool IsSaveConfirmed)
+{
+    /// <summary>
+    /// Authored forest trusts. Init-only (not a positional ctor parameter) so it rides along on
+    /// <c>with { ... }</c> edits without threading through every snapshot reconstruction. Null means none;
+    /// consumers read <c>Trusts ?? []</c>. Any code that rebuilds the snapshot via the positional ctor
+    /// (see ApplyDraft) must copy this across explicitly, or authored trusts are silently dropped.
+    /// </summary>
+    public IReadOnlyList<TemplatesBuilderTrustDraft>? Trusts { get; init; }
+}
 
 internal readonly record struct TemplatesBuilderLabNetworkDraft(
     string NetworkId,
@@ -45,7 +54,15 @@ internal readonly record struct TemplatesBuilderLabNetworkDraft(
     string SwitchName,
     string SwitchType,
     string Subnet,
-    string Notes);
+    string Notes)
+{
+    /// <summary>
+    /// The domain this switch belongs to under the one-switch-per-domain model. In-memory only (never
+    /// persisted): reconstructed on load from the NICs that reference this network. Empty for the single
+    /// shared standalone switch that seats standalone machines.
+    /// </summary>
+    public string DomainId { get; init; }
+}
 
 internal readonly record struct TemplatesBuilderCredentialSlotDraft(
     string SlotKey,
@@ -81,7 +98,24 @@ internal readonly record struct TemplatesBuilderVmDraft(
     string DomainId,
     bool IsActiveDirectoryDomainController,
     TemplatesBuilderVmCredentialSlotDraft CredentialSlots,
-    IReadOnlyList<TemplatesBuilderNicDraft> Nics);
+    IReadOnlyList<TemplatesBuilderNicDraft> Nics)
+{
+    /// <summary>
+    /// True for the single required router VM the network model auto-creates: a standalone box that carries a
+    /// NIC on every switch (holding each switch's .1) and bridges them. Maps to the persisted
+    /// <c>TopologyRole = "Router"</c> and is reconstructed from it on load.
+    /// </summary>
+    public bool IsRouter { get; init; }
+
+    /// <summary>
+    /// Non-structural Windows roles enabled on this VM (DNS, DHCP, File Server, ADCS, ...) by catalog key.
+    /// The structural directory role (domain controller / router) is NOT stored here: it stays on
+    /// <see cref="IsActiveDirectoryDomainController"/> / <see cref="IsRouter"/> and the persisted
+    /// <c>TopologyRole</c>, which the deploy pipeline depends on. Null or empty means none. This is additive
+    /// authoring state introduced with the Level 2 machine inspector; it does not affect the deploy pipeline.
+    /// </summary>
+    public IReadOnlyList<string>? AdditionalRoles { get; init; }
+}
 
 internal readonly record struct TemplatesBuilderNicDraft(
     string NicId,

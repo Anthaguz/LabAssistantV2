@@ -339,10 +339,16 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             unresolved);
         var requiresGuestWork = DetermineGuestWorkRequirement(topologyRole, membershipMode, knownCapabilities, resolvedNics, vm);
         var bootstrapSlot = Normalize(vm.CredentialSlots?.LocalBootstrap) ?? Normalize(bootstrapProfile?.LocalCredentialSlotRef);
-        var domainAdminSlot = Normalize(vm.CredentialSlots?.DomainAdmin);
+        // Credential-reuse policy: a lab's domain admin is the promoted local Administrator baked into the VHDX, so
+        // when the template does not author distinct domain/DSRM/parent slots we reuse the effective bootstrap slot
+        // (which itself resolves from the base-disk catalog's LocalCredentialSlotRef). This keeps templates a pure
+        // topology artifact - no authored credentials - while still letting DC promotion and domain joins plan. The
+        // only credential blocker that survives is a genuinely missing base-disk bootstrap contract (bootstrapSlot
+        // null), enforced by the local-bootstrap requirement below.
+        var domainAdminSlot = Normalize(vm.CredentialSlots?.DomainAdmin) ?? bootstrapSlot;
         var domainJoinSlot = Normalize(vm.CredentialSlots?.DomainJoin) ?? domainAdminSlot;
-        var dsrmSlot = Normalize(vm.CredentialSlots?.Dsrm);
-        var parentDomainAdminSlot = Normalize(vm.CredentialSlots?.ParentDomainAdmin);
+        var dsrmSlot = Normalize(vm.CredentialSlots?.Dsrm) ?? bootstrapSlot;
+        var parentDomainAdminSlot = Normalize(vm.CredentialSlots?.ParentDomainAdmin) ?? bootstrapSlot;
 
         if (requiresGuestWork)
         {
