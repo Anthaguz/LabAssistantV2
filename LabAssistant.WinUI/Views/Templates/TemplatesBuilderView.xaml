@@ -36,26 +36,79 @@
                 CornerRadius="6"
                 PointerCanceled="OnNodePointerReleased"
                 PointerCaptureLost="OnNodePointerReleased"
+                PointerEntered="OnNodePointerEntered"
+                PointerExited="OnNodePointerExited"
                 PointerMoved="OnNodePointerMoved"
                 PointerPressed="OnNodePointerPressed"
                 PointerReleased="OnNodePointerReleased"
                 ToolTipService.ToolTip="{x:Bind Tooltip}">
-                <StackPanel VerticalAlignment="Center" Spacing="2">
-                    <TextBlock
-                        FontWeight="{x:Bind IsAccent, Converter={StaticResource BoolToFontWeight}}"
-                        Foreground="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
-                        MaxLines="1"
-                        Text="{x:Bind Label}"
-                        TextTrimming="CharacterEllipsis"
-                        TextWrapping="NoWrap" />
-                    <TextBlock
-                        FontSize="11"
-                        Foreground="{x:Bind HasMissingParent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellCriticalBrush|ShellTextSecondaryBrush}"
-                        MaxLines="1"
-                        Text="{x:Bind Subtext}"
-                        TextTrimming="CharacterEllipsis"
-                        TextWrapping="NoWrap" />
-                </StackPanel>
+                <Grid>
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock
+                            FontWeight="{x:Bind IsAccent, Converter={StaticResource BoolToFontWeight}}"
+                            Foreground="{x:Bind IsAccent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellAccentBrush|ShellTextPrimaryBrush}"
+                            MaxLines="1"
+                            Text="{x:Bind Label}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{x:Bind HasMissingParent, Converter={StaticResource BoolToResourceBrush}, ConverterParameter=ShellCriticalBrush|ShellTextSecondaryBrush}"
+                            MaxLines="1"
+                            Text="{x:Bind Subtext}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                    </StackPanel>
+
+                    <!-- Delete affordance: revealed on hover; stops pointer bubbling so it never starts a drag/selection. -->
+                    <Button
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,-2,-4,0"
+                        Padding="4,0,4,0"
+                        MinWidth="20"
+                        MinHeight="20"
+                        Command="{x:Bind DeleteCommand}"
+                        Content="&#xE711;"
+                        FontFamily="Segoe MDL2 Assets"
+                        FontSize="10"
+                        IsEnabled="{x:Bind CanDelete}"
+                        PointerPressed="OnNodeAffordancePointerPressed"
+                        ToolTipService.ToolTip="Delete"
+                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- Domain hover-+ (add child) affordance. -->
+                    <Button
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,-4,-2"
+                        Padding="4,0,4,0"
+                        MinWidth="20"
+                        MinHeight="20"
+                        Command="{x:Bind AddChildCommand}"
+                        Content="&#xE710;"
+                        FontFamily="Segoe MDL2 Assets"
+                        FontSize="10"
+                        IsEnabled="{x:Bind CanAddChild}"
+                        PointerPressed="OnNodeAffordancePointerPressed"
+                        ToolTipService.ToolTip="Add child domain"
+                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- Forest +tree affordance. -->
+                    <Button
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Margin="-4,0,0,-2"
+                        Padding="4,0,4,0"
+                        MinHeight="20"
+                        Command="{x:Bind AddTreeCommand}"
+                        Content="+ Tree"
+                        FontSize="10"
+                        IsEnabled="{x:Bind CanAddTree}"
+                        PointerPressed="OnNodeAffordancePointerPressed"
+                        ToolTipService.ToolTip="Add tree domain"
+                        Visibility="{x:Bind AffordancesRevealed, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
             </Border>
         </DataTemplate>
 
@@ -379,9 +432,9 @@
                                         Content="Add Forest"
                                         IsEnabled="{x:Bind ViewModel.AddForestEnabled, Mode=OneWay}" />
                                     <Button
-                                        Command="{x:Bind ViewModel.AddDomainCommand}"
-                                        Content="Add Domain"
-                                        IsEnabled="{x:Bind ViewModel.AddDomainEnabled, Mode=OneWay}" />
+                                        Command="{x:Bind ViewModel.AddTreeCommand}"
+                                        Content="Add Tree"
+                                        IsEnabled="{x:Bind ViewModel.AddTreeEnabled, Mode=OneWay}" />
                                 </StackPanel>
                                 <Grid ColumnSpacing="10">
                                     <Grid.ColumnDefinitions>

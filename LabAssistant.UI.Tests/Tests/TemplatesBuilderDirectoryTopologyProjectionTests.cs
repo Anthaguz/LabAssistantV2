@@ -61,6 +61,20 @@ public sealed class TemplatesBuilderDirectoryTopologyProjectionTests
     }
 
     [Fact]
+    public void DirectoryTopologyProjection_ForestLabelFollowsRootDomainDnsName()
+    {
+        var draft = CreateTopologyDraft();
+
+        var projection = TemplatesBuilderDirectoryTopologyProjector.Project(draft, BuilderForestDomainResourceKind.Forest, selectedIndex: 0);
+
+        // The forest is named for its root domain, so its label must be the root domain DNS name, not the forest id.
+        var contoso = Assert.Single(projection.Forests, forest => forest.ForestId == "forest-contoso");
+        Assert.Equal("contoso.com", contoso.Label);
+        var fabrikam = Assert.Single(projection.Forests, forest => forest.ForestId == "forest-fabrikam");
+        Assert.Equal("fabrikam.com", fabrikam.Label);
+    }
+
+    [Fact]
     public void DirectoryTopologyProjection_RendersSeparateForestsAsSeparateContainers()
     {
         var draft = CreateTopologyDraft();

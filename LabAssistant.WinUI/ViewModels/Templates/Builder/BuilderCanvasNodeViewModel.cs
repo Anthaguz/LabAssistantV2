@@ -25,7 +25,10 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
         double height,
         double x,
         double y,
-        IRelayCommand? selectCommand)
+        IRelayCommand? selectCommand,
+        IRelayCommand? addChildCommand = null,
+        IRelayCommand? addTreeCommand = null,
+        IRelayCommand? deleteCommand = null)
     {
         NodeId = nodeId;
         IsForest = isForest;
@@ -40,6 +43,9 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
         _x = x;
         _y = y;
         SelectCommand = selectCommand;
+        AddChildCommand = addChildCommand;
+        AddTreeCommand = addTreeCommand;
+        DeleteCommand = deleteCommand;
     }
 
     public string NodeId { get; }
@@ -72,8 +78,34 @@ public sealed partial class BuilderCanvasNodeViewModel : ObservableObject
     [ObservableProperty]
     private double _y;
 
+    /// <summary>
+    /// Presentation-only hover state: true while the pointer is over the node, revealing its affordance
+    /// buttons (hover-+, +tree, delete). Kept on the node so the reveal is per-node without view-tree scans;
+    /// it carries no draft meaning and is never persisted.
+    /// </summary>
+    [ObservableProperty]
+    private bool _affordancesRevealed;
+
     /// <summary>Null when the node cannot be selected (for example the unassigned-domains pseudo forest).</summary>
     public IRelayCommand? SelectCommand { get; }
+
+    /// <summary>Domain hover-+ affordance: create a child domain under this domain. Null on forest nodes.</summary>
+    public IRelayCommand? AddChildCommand { get; }
+
+    /// <summary>Forest header +tree affordance: add a tree domain to this forest. Null on domain nodes.</summary>
+    public IRelayCommand? AddTreeCommand { get; }
+
+    /// <summary>Delete affordance: remove this forest (whole tree) or this domain subtree. Null when not deletable.</summary>
+    public IRelayCommand? DeleteCommand { get; }
+
+    /// <summary>True when the domain hover-+ (add child) affordance should be offered.</summary>
+    public bool CanAddChild => AddChildCommand is not null;
+
+    /// <summary>True when the forest +tree affordance should be offered.</summary>
+    public bool CanAddTree => AddTreeCommand is not null;
+
+    /// <summary>True when the delete affordance should be offered.</summary>
+    public bool CanDelete => DeleteCommand is not null;
 
     public double CenterX => X + (Width / 2);
 
