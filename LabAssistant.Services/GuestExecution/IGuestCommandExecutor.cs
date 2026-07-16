@@ -50,4 +50,12 @@ public sealed class GuestCommandResult
     public string Output { get; init; } = string.Empty;
 
     public string Error { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Coarse classification of <see cref="Error"/> (none/transient/authentication-rejected). Set by the guest
+    /// executor at the transport boundary so callers can distinguish a deterministic credential rejection from a
+    /// transient not-ready-yet failure without re-parsing the message. Defaults to
+    /// <see cref="GuestCommandErrorCategory.None"/>.
+    /// </summary>
+    public GuestCommandErrorCategory ErrorCategory { get; init; } = GuestCommandErrorCategory.None;
 }

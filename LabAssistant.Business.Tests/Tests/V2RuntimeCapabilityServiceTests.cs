@@ -415,6 +415,97 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_GuestTransport_CredentialRejected_FailsFastWithoutExhaustingRetries()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceAttempts = 2;
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref probeAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var logger = new RecordingStructuredLogger();
+        var service = CreateService(new FakeHyperVService(), guestExecutor, logger);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+
+        // The grace window tolerates the first rejection (specialize may still be applying the password), then the
+        // loop fails fast at attempt 2 instead of grinding through all 25 retries.
+        Assert.Equal(2, probeAttempts);
+
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "dc01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("does not match this VM's base image", StringComparison.Ordinal));
+
+        Assert.Contains(
+            logger.Events,
+            e => e.Event == "GuestReadinessAttempt" &&
+                 e.Context != null &&
+                 e.Context.TryGetValue("errorCategory", out var category) &&
+                 (category as string) == "AuthenticationRejected");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GuestTransport_TransientCredentialErrorWithinGrace_RetriesThenSucceeds()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceAttempts = 5;
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref probeAttempts);
+                    if (attempt <= 2)
+                    {
+                        // A freshly cloned guest can briefly reject the (correct) password while specialize applies
+                        // it. Within the grace window this must be retried, not treated as a permanent failure.
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.True(probeAttempts >= 3, $"Expected the transport gate to retry past the early rejections, saw {probeAttempts} attempt(s).");
+        Assert.Contains("vm:vm-dc01:GuestTransportReady", result.ExecutedNodeIds);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_BaseRemoteAccessReady_ProbeTransientFailure_RetriesThenSucceeds()
     {
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
