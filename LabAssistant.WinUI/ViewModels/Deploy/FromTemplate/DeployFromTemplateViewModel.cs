@@ -1023,21 +1023,25 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
         DeploymentReadinessReport? readinessReport)
     {
-        ResultRows.Clear();
+        ReconcileResultRows(BuildResultRows(compatibilityIssues, readinessReport));
+    }
 
+    private List<DeployVmResultRow> BuildResultRows(
+        IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
+        DeploymentReadinessReport? readinessReport)
+    {
         if (_showAllVmRows && _progressByVm.Count > 0)
         {
-            foreach (var state in _progressByVm.Values.OrderBy(value => value.VmName, StringComparer.OrdinalIgnoreCase))
-            {
-                ResultRows.Add(state.ToRow());
-            }
-
-            return;
+            return _progressByVm.Values
+                .OrderBy(value => value.VmName, StringComparer.OrdinalIgnoreCase)
+                .Select(state => state.ToRow())
+                .ToList();
         }
 
+        var rows = new List<DeployVmResultRow>();
         if (ActiveTemplateDocument is null)
         {
-            return;
+            return rows;
         }
 
         var vmNames = ActiveTemplateDocument.Template.VmTemplates
@@ -1080,14 +1084,54 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
                                vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Warn);
             var summary = $"Blocking: {blockingCount} | Warnings: {warningCount}";
 
-            ResultRows.Add(new DeployVmResultRow(
+            rows.Add(new DeployVmResultRow(
                 VmName: vmName,
                 Status: status,
                 Summary: summary,
                 ProgressPercent: hasBlocking ? 100 : 80,
                 TimelineSteps: CreateReadinessTimelineSteps(vmCompatibilityIssues, vmReadinessResults, hasBlocking)));
         }
+
+        return rows;
     }
+
+    /// <summary>
+    /// Applies <paramref name="desiredRows"/> to <see cref="ResultRows"/> in place. Live per-VM progress streams
+    /// many updates per second; a wholesale <c>Clear()</c> then re-add raises a collection Reset that tears down and
+    /// recreates every ListView item container, which flickers, resets the user's scroll position, and restarts each
+    /// row's progress-bar animation. This replaces only the rows whose rendered content actually changed and grows or
+    /// shrinks the collection only when the set of VMs changes, so unchanged rows keep their containers.
+    /// </summary>
+    private void ReconcileResultRows(IReadOnlyList<DeployVmResultRow> desiredRows)
+    {
+        for (var index = 0; index < desiredRows.Count; index++)
+        {
+            var desired = desiredRows[index];
+            if (index >= ResultRows.Count)
+            {
+                ResultRows.Add(desired);
+            }
+            else if (!RenderedRowEquals(ResultRows[index], desired))
+            {
+                ResultRows[index] = desired;
+            }
+        }
+
+        for (var index = ResultRows.Count - 1; index >= desiredRows.Count; index--)
+        {
+            ResultRows.RemoveAt(index);
+        }
+    }
+
+    /// <summary>
+    /// Compares two rows by only the fields the progress row template renders, so an unchanged VM keeps its
+    /// existing item container instead of being needlessly replaced on every progress tick.
+    /// </summary>
+    private static bool RenderedRowEquals(DeployVmResultRow existing, DeployVmResultRow desired) =>
+        string.Equals(existing.VmName, desired.VmName, StringComparison.Ordinal)
+        && string.Equals(existing.Status, desired.Status, StringComparison.Ordinal)
+        && existing.ProgressPercent == desired.ProgressPercent
+        && string.Equals(existing.DisplaySummary, desired.DisplaySummary, StringComparison.Ordinal);
 
     private void RefreshReviewState(bool hasBlockingFailures)
     {
@@ -1177,12 +1221,22 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         Action<string, string?> onLogMessage,
         Action<string, DeployStepStateUpdate> onStepStateUpdated)
     {
-        foreach (var vmContext in context.VmContexts)
+        void Wire(VmDeploymentContext vmContext)
         {
             var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
             vmContext.LogCallback = message => _marshalToUi(() => onLogMessage(vmName, message));
             vmContext.StepStateEmitter = update => _marshalToUi(() => onStepStateUpdated(vmName, update));
         }
+
+        // Wire contexts that already exist (the classic path builds its per-VM contexts before wiring).
+        foreach (var vmContext in context.VmContexts)
+        {
+            Wire(vmContext);
+        }
+
+        // Wire contexts the runtime builds during execution (the V2 runtime clears and rebuilds VmContexts
+        // internally, so without this hook its step-state and log callbacks would be attached to nothing).
+        context.VmContextRegistered = Wire;
     }
 
     private bool IsActiveTemplateV2()

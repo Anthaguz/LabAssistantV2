@@ -2,6 +2,7 @@ using LabAssistant.Business.Templates;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using Xunit;
 
@@ -465,5 +466,86 @@ public sealed class DeployFromTemplateViewModelTests
         Assert.True(harness.Vm.ShouldShowConfigView);
         Assert.Equal("Idle", harness.Vm.LifecycleState);
         Assert.Empty(harness.Vm.ResultRows);
+    }
+
+    private static V2PlanBuildResult TwoVmReadyPlan() => new()
+    {
+        Success = true,
+        Context = new V2ResolvedPlanningContext
+        {
+            ResolvedDeploymentProfileName = "Default",
+            Vms =
+            [
+                new V2ResolvedVmPlanningContext { VmId = "vm1", VmName = "VM1" },
+                new V2ResolvedVmPlanningContext { VmId = "vm2", VmName = "VM2" }
+            ]
+        },
+        Nodes =
+        [
+            new V2PlanNode { NodeId = "n1", VmId = "vm1", VmName = "VM1", Kind = V2PlanNodeKind.ProvisionVm, DisplayName = "Provision VM1" },
+            new V2PlanNode { NodeId = "n2", VmId = "vm2", VmName = "VM2", Kind = V2PlanNodeKind.ProvisionVm, DisplayName = "Provision VM2" }
+        ],
+        Waves = [new V2SchedulingWave { WaveNumber = 1, DisplayName = "Wave 1", NodeIds = ["n1", "n2"], Summary = "2 nodes" }]
+    };
+
+    [Fact]
+    public async Task V2Deploy_RuntimeRegisteredVmContext_StreamsLiveProgressIntoResultRows()
+    {
+        // The V2 runtime clears and rebuilds VmContexts internally, so callbacks wired before execution must
+        // still reach the contexts it creates. Without the VmContextRegistered hook the step-state emitter is
+        // never attached and the live surface stays frozen on its seeded "Queued" rows.
+        var harness = CreateHarness();
+        harness.Host.V2PlanFactory = (_, _, _) => ReadyPlan();
+        harness.Host.OnExecuteV2 = context =>
+        {
+            context.VmContexts.Clear();
+            var vmContext = new VmDeploymentContext { VmName = "VM1", OperationId = context.OperationId };
+            context.RegisterVmContext(vmContext);
+            vmContext.EmitStepState("provision", "Provision VM1", DeployStepState.Running, "Creating VM...");
+            return Task.CompletedTask;
+        };
+        var item = harness.Host.AddTemplate("V2", V2Path, TemplateExecutionEngine.V2UnifiedPlanning);
+        harness.Vm.SelectedTemplateLibraryItem = item;
+
+        await harness.Vm.StartDeployCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(harness.Vm.ResultRows, candidate => candidate.VmName == "VM1");
+        Assert.Equal("Running", row.Status);
+        Assert.Equal("Creating VM...", row.Summary);
+        Assert.True(row.ProgressPercent > 0);
+    }
+
+    [Fact]
+    public async Task V2Deploy_ProgressTick_ReusesUnchangedVmRowInstances()
+    {
+        // A progress tick for one VM must not rebuild the whole ResultRows collection; unchanged VM rows keep
+        // their existing instances so the bound ListView does not tear down and re-animate every row each tick.
+        var harness = CreateHarness();
+        harness.Host.V2PlanFactory = (_, _, _) => TwoVmReadyPlan();
+        DeployVmResultRow? vm2AfterFirstTick = null;
+        DeployVmResultRow? vm2AfterSecondTick = null;
+        harness.Host.OnExecuteV2 = context =>
+        {
+            context.VmContexts.Clear();
+            var vm1 = new VmDeploymentContext { VmName = "VM1", OperationId = context.OperationId };
+            var vm2 = new VmDeploymentContext { VmName = "VM2", OperationId = context.OperationId };
+            context.RegisterVmContext(vm1);
+            context.RegisterVmContext(vm2);
+
+            vm1.EmitStepState("provision", "Provision VM1", DeployStepState.Running, "VM1 running");
+            vm2AfterFirstTick = harness.Vm.ResultRows.Single(candidate => candidate.VmName == "VM2");
+
+            vm1.EmitStepState("configure", "Configure VM1", DeployStepState.Running, "VM1 still running");
+            vm2AfterSecondTick = harness.Vm.ResultRows.Single(candidate => candidate.VmName == "VM2");
+
+            return Task.CompletedTask;
+        };
+        var item = harness.Host.AddTemplate("V2", V2Path, TemplateExecutionEngine.V2UnifiedPlanning);
+        harness.Vm.SelectedTemplateLibraryItem = item;
+
+        await harness.Vm.StartDeployCommand.ExecuteAsync(null);
+
+        Assert.NotNull(vm2AfterFirstTick);
+        Assert.Same(vm2AfterFirstTick, vm2AfterSecondTick);
     }
 }
