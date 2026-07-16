@@ -189,6 +189,28 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     public bool ShouldAutoOpenResultsPanel =>
         IsStarting || string.Equals(LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
 
+    // In-tab surface routing. The three flags below partition the main content area into the
+    // configuration, live-progress, and terminal-results surfaces so exactly one shows at a time.
+    // They are derived from the lifecycle-state string (compared case-insensitively) and their
+    // change notifications are raised from OnLifecycleStateChanged.
+
+    /// <summary>Gets whether the live per-VM progress surface should be shown (lifecycle state Running).</summary>
+    public bool ShouldShowProgressView =>
+        string.Equals(LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Gets whether the terminal results surface should be shown (Completed/Failed/Cancelled).</summary>
+    public bool ShouldShowResultsView =>
+        string.Equals(LifecycleState, "Completed", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(LifecycleState, "Failed", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(LifecycleState, "Cancelled", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets whether the template configuration surface should be shown. This is the default surface
+    /// for every non-running, non-terminal state (Idle/Ready/Blocked/Evaluating/Error and any other
+    /// value), so an unexpected lifecycle string never hides all three surfaces.
+    /// </summary>
+    public bool ShouldShowConfigView => !ShouldShowProgressView && !ShouldShowResultsView;
+
     public string ResultsPanelTitle => "From Template Progress / Results";
 
     // Selector / reload enablement (one-way bound).
@@ -346,6 +368,36 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
 
     [RelayCommand]
     private void ToggleResultsPanel() => _host.OnOpenResultsPanelRequested();
+
+    /// <summary>
+    /// Returns the lane to the configuration surface after a run finishes, keeping the current
+    /// template selected. Progress state is discarded and the shared <see cref="ResultRows"/>
+    /// collection is repopulated from readiness review (the config-mode projection) by clearing the
+    /// live-rows flag before <see cref="UpdateUi"/> runs.
+    /// </summary>
+    [RelayCommand]
+    private void BackToConfiguration() => ResetToConfiguration();
+
+    /// <summary>
+    /// Resets the lane so the user can start another deployment with the same template. Behaves like
+    /// <see cref="BackToConfiguration"/>: it returns to the configuration surface with a fresh state.
+    /// </summary>
+    [RelayCommand]
+    private void DeployAgain() => ResetToConfiguration();
+
+    private void ResetToConfiguration()
+    {
+        // Drop any completed run's live progress so readiness review owns ResultRows again, then
+        // clear the live-rows flag guarding that shared collection before UpdateUi repopulates it.
+        _activeDeploymentContext = null;
+        _progressByVm.Clear();
+        SetShowAllVmRows(false);
+
+        var restoredState = ActiveTemplateDocument is null ? "Idle" : "Ready";
+        SetWorkflowState(false, false, restoredState, 0, "No deployment started.");
+        SetActionStatus("No action selected.");
+        UpdateUi();
+    }
 
     /// <summary>
     /// Applies the selected V2 credential slot value using the current username and the supplied
@@ -592,7 +644,13 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         return DeployFromTemplateCredentialPanelState.WithSlots(credentialSlots, allSlotsResolved, statusMessage);
     }
 
-    partial void OnLifecycleStateChanged(string value) => OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
+    partial void OnLifecycleStateChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
+        OnPropertyChanged(nameof(ShouldShowConfigView));
+        OnPropertyChanged(nameof(ShouldShowProgressView));
+        OnPropertyChanged(nameof(ShouldShowResultsView));
+    }
 
     partial void OnIsStartingChanged(bool value) => OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
 

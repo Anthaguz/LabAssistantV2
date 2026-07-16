@@ -321,4 +321,149 @@ public sealed class DeployFromTemplateViewModelTests
 
         Assert.True(harness.ResultsPanelStateChangedCount > 0);
     }
+
+    [Theory]
+    [InlineData("Idle")]
+    [InlineData("Ready")]
+    [InlineData("Blocked")]
+    [InlineData("Evaluating")]
+    [InlineData("Warning")]
+    [InlineData("Error")]
+    public void LifecycleState_NonRunningNonTerminal_ShowsConfigSurface(string state)
+    {
+        var harness = CreateHarness();
+
+        harness.Vm.LifecycleState = state;
+
+        Assert.True(harness.Vm.ShouldShowConfigView);
+        Assert.False(harness.Vm.ShouldShowProgressView);
+        Assert.False(harness.Vm.ShouldShowResultsView);
+    }
+
+    [Fact]
+    public void LifecycleState_Running_ShowsProgressSurface()
+    {
+        var harness = CreateHarness();
+
+        harness.Vm.LifecycleState = "Running";
+
+        Assert.False(harness.Vm.ShouldShowConfigView);
+        Assert.True(harness.Vm.ShouldShowProgressView);
+        Assert.False(harness.Vm.ShouldShowResultsView);
+    }
+
+    [Theory]
+    [InlineData("Completed")]
+    [InlineData("Failed")]
+    [InlineData("Cancelled")]
+    public void LifecycleState_Terminal_ShowsResultsSurface(string state)
+    {
+        var harness = CreateHarness();
+
+        harness.Vm.LifecycleState = state;
+
+        Assert.False(harness.Vm.ShouldShowConfigView);
+        Assert.False(harness.Vm.ShouldShowProgressView);
+        Assert.True(harness.Vm.ShouldShowResultsView);
+    }
+
+    [Fact]
+    public void ViewStateFlags_AreCaseInsensitive()
+    {
+        var harness = CreateHarness();
+
+        harness.Vm.LifecycleState = "running";
+        Assert.True(harness.Vm.ShouldShowProgressView);
+
+        harness.Vm.LifecycleState = "COMPLETED";
+        Assert.True(harness.Vm.ShouldShowResultsView);
+
+        harness.Vm.LifecycleState = "ReAdY";
+        Assert.True(harness.Vm.ShouldShowConfigView);
+    }
+
+    [Fact]
+    public void LifecycleStateChange_RaisesAllViewStateFlagNotifications()
+    {
+        var harness = CreateHarness();
+        var configRaised = false;
+        var progressRaised = false;
+        var resultsRaised = false;
+        harness.Vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DeployFromTemplateViewModel.ShouldShowConfigView))
+            {
+                configRaised = true;
+            }
+            else if (e.PropertyName == nameof(DeployFromTemplateViewModel.ShouldShowProgressView))
+            {
+                progressRaised = true;
+            }
+            else if (e.PropertyName == nameof(DeployFromTemplateViewModel.ShouldShowResultsView))
+            {
+                resultsRaised = true;
+            }
+        };
+
+        harness.Vm.LifecycleState = "Running";
+
+        Assert.True(configRaised);
+        Assert.True(progressRaised);
+        Assert.True(resultsRaised);
+    }
+
+    [Fact]
+    public void DeployAgain_FromResults_RestoresConfigSurfaceAndReadinessRows()
+    {
+        var harness = CreateHarness();
+        var template = new LabTemplate { Name = "Classic", ExecutionEngine = TemplateExecutionEngine.V1Deployment };
+        template.VmTemplates.Add(new VmTemplate { Name = "VM1" });
+        harness.Host.ReadinessReport = new DeploymentReadinessReport
+        {
+            Mode = DeploymentPreflightMode.Quick,
+            Results =
+            [
+                new DeploymentReadinessCheckResult
+                {
+                    Status = DeploymentReadinessStatus.Warn,
+                    Message = "Low disk space.",
+                    AffectedVmNames = ["VM1"]
+                }
+            ]
+        };
+        var item = harness.Host.AddTemplate("Classic", ClassicPath, TemplateExecutionEngine.V1Deployment, template);
+        harness.Vm.SelectedTemplateLibraryItem = item;
+
+        // Readiness review owns the shared ResultRows collection in config mode.
+        var readinessRowCount = harness.Vm.ResultRows.Count;
+        Assert.True(readinessRowCount > 0);
+        Assert.Contains(harness.Vm.ResultRows, row => row.VmName == "VM1");
+
+        // Simulate a finished run landing on the terminal results surface.
+        harness.Vm.SetShowAllVmRows(true);
+        harness.Vm.SetWorkflowState(false, false, "Completed", 100, "Deployment completed.");
+        Assert.True(harness.Vm.ShouldShowResultsView);
+
+        harness.Vm.DeployAgainCommand.Execute(null);
+
+        Assert.True(harness.Vm.ShouldShowConfigView);
+        Assert.Equal("Ready", harness.Vm.LifecycleState);
+        Assert.Equal(readinessRowCount, harness.Vm.ResultRows.Count);
+        Assert.Contains(harness.Vm.ResultRows, row => row.VmName == "VM1");
+    }
+
+    [Fact]
+    public void BackToConfiguration_WithoutTemplate_ResetsToIdleConfigSurface()
+    {
+        var harness = CreateHarness();
+        harness.Vm.SetShowAllVmRows(true);
+        harness.Vm.SetWorkflowState(false, false, "Failed", 100, "Deployment failed.");
+        Assert.True(harness.Vm.ShouldShowResultsView);
+
+        harness.Vm.BackToConfigurationCommand.Execute(null);
+
+        Assert.True(harness.Vm.ShouldShowConfigView);
+        Assert.Equal("Idle", harness.Vm.LifecycleState);
+        Assert.Empty(harness.Vm.ResultRows);
+    }
 }
