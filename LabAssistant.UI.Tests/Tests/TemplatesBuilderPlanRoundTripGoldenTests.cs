@@ -51,6 +51,10 @@ public sealed class TemplatesBuilderPlanRoundTripGoldenTests
         var join = NodeId(plan, V2PlanNodeKind.JoinDomain, "vm-member01");
         AssertAdmittedBefore(result, domainReady, join);
         AssertAdmittedBefore(result, stabilizeDns, join);
+
+        // Prove the ordering is backed by real edges in the emitted graph, not a coincidental wave tie-break.
+        AssertDependsOn(plan, join, domainReady);
+        AssertDependsOn(plan, join, stabilizeDns);
     }
 
     [Fact]
@@ -76,6 +80,10 @@ public sealed class TemplatesBuilderPlanRoundTripGoldenTests
         var routerVmId = template.VmTemplates.Single(vm => vm.TopologyRole == "Router").VmId;
         AssertAdmittedBefore(result, NodeId(plan, V2PlanNodeKind.PrepareRouterNetwork, routerVmId), NodeId(plan, V2PlanNodeKind.EnableRouterRouting, routerVmId));
         AssertAdmittedBefore(result, NodeId(plan, V2PlanNodeKind.EnableRouterRouting, routerVmId), NodeId(plan, V2PlanNodeKind.ConfigureRouterNat, routerVmId));
+
+        // The router chain ordering is backed by real edges in the emitted graph.
+        AssertDependsOn(plan, NodeId(plan, V2PlanNodeKind.EnableRouterRouting, routerVmId), NodeId(plan, V2PlanNodeKind.PrepareRouterNetwork, routerVmId));
+        AssertDependsOn(plan, NodeId(plan, V2PlanNodeKind.ConfigureRouterNat, routerVmId), NodeId(plan, V2PlanNodeKind.EnableRouterRouting, routerVmId));
     }
 
     [Fact]
@@ -108,6 +116,16 @@ public sealed class TemplatesBuilderPlanRoundTripGoldenTests
 
         AssertAdmittedBefore(result, prepareDns, createTrust);
         AssertAdmittedBefore(result, createTrust, validateTrust);
+
+        // Prove every ordering above is enforced by real edges in the emitted graph, not scheduler luck: both
+        // forests' domain-ready gates feed the trust DNS prep, and the create/validate chain is edge-linked.
+        foreach (var domainReady in plan.Nodes.Where(node => node.Kind == V2PlanNodeKind.DomainReady))
+        {
+            AssertDependsOn(plan, prepareDns, domainReady.NodeId);
+        }
+
+        AssertDependsOn(plan, createTrust, prepareDns);
+        AssertDependsOn(plan, validateTrust, createTrust);
     }
 
     /// <summary>
@@ -291,6 +309,48 @@ public sealed class TemplatesBuilderPlanRoundTripGoldenTests
         Assert.True(admissionIndex.TryGetValue(firstNodeId, out var firstIndex), $"Node '{firstNodeId}' was never admitted.");
         Assert.True(admissionIndex.TryGetValue(secondNodeId, out var secondIndex), $"Node '{secondNodeId}' was never admitted.");
         Assert.True(firstIndex < secondIndex, $"Node '{firstNodeId}' should be admitted before '{secondNodeId}'.");
+    }
+
+    /// <summary>
+    /// Asserts the planner emitted a real dependency path from <paramref name="prerequisiteNodeId"/> to
+    /// <paramref name="dependentNodeId"/> in <see cref="V2PlanBuildResult.Dependencies"/>. This is strictly stronger
+    /// than <see cref="AssertAdmittedBefore"/>: admission order alone can be satisfied by a coincidental scheduler
+    /// wave tie-break even if the edge were dropped, whereas this proves the ordering is enforced by the graph the
+    /// planner actually built. It follows edges transitively, so it still holds if the planner later inserts an
+    /// intermediate node on the chain.
+    /// </summary>
+    private static void AssertDependsOn(V2PlanBuildResult plan, string dependentNodeId, string prerequisiteNodeId)
+    {
+        var adjacency = plan.Dependencies
+            .GroupBy(edge => edge.FromNodeId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(edge => edge.ToNodeId).ToList(), StringComparer.Ordinal);
+
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var stack = new Stack<string>();
+        stack.Push(prerequisiteNodeId);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (!visited.Add(current))
+            {
+                continue;
+            }
+
+            if (string.Equals(current, dependentNodeId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (adjacency.TryGetValue(current, out var successors))
+            {
+                foreach (var successor in successors)
+                {
+                    stack.Push(successor);
+                }
+            }
+        }
+
+        Assert.Fail($"Expected a dependency path '{prerequisiteNodeId}' -> ... -> '{dependentNodeId}' in the planned graph, but none was emitted.");
     }
 
     private static Dictionary<string, int> BuildAdmissionIndex(V2SchedulerRunResult result)
