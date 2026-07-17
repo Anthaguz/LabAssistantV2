@@ -2562,21 +2562,20 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     ? DeployStepState.Skipped
                     : DeployStepState.Failed;
 
-        var result = terminalState switch
+        // A Failed terminal state always follows a MarkFailure call (the only thing that clears IsSuccess) - either the
+        // step action called it directly or the catch block above did - and MarkFailure already emits the rich coded
+        // StepFailed via the context's StepFailedCode. Emitting StepFailed again here would double-log the failure with
+        // a context-poor payload, so Failed emits no terminal event. Succeeded emits StepCompleted; Skipped emits a
+        // single StepSkipped (MarkCancelled and the skip override do not emit, so this stays the one skip signal).
+        if (terminalState != DeployStepState.Failed)
         {
-            DeployStepState.Succeeded => "success",
-            DeployStepState.Skipped => "skipped",
-            _ => "failed"
-        };
+            var result = terminalState == DeployStepState.Skipped ? "skipped" : "success";
+            var stepCode = terminalState == DeployStepState.Skipped
+                ? LaStatus.DeployStep_StepSkipped
+                : LaStatus.DeployStep_StepCompleted;
+            EmitStepEvent(context, multiContext, stepCode, result, stepKey);
+        }
 
-        var stepCode = terminalState switch
-        {
-            DeployStepState.Succeeded => LaStatus.DeployStep_StepCompleted,
-            DeployStepState.Skipped => LaStatus.DeployStep_StepSkipped,
-            _ => LaStatus.DeployStep_StepFailed
-        };
-
-        EmitStepEvent(context, multiContext, stepCode, result, stepKey);
         context.EmitStepState(stepKey, stepLabel, terminalState, overrideMessage);
     }
 

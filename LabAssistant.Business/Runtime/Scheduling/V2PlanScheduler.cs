@@ -311,8 +311,14 @@ public sealed class V2PlanScheduler : IV2PlanScheduler
 
             var success = outcomes.All(outcome => outcome.Status == V2NodeOutcomeStatus.Completed);
 
+            var schedulerCode = success
+                ? LaStatus.DeployOrchestration_SchedulerCompleted
+                : _cancelled
+                    ? LaStatus.DeployOrchestration_SchedulerCancelled
+                    : LaStatus.DeployOrchestration_SchedulerFailed;
+
             _log.Log(
-                LaStatus.DeployOrchestration_SchedulerCompleted,
+                schedulerCode,
                 SchedulerOperation,
                 success ? "success" : _cancelled ? "cancelled" : "failed",
                 new Dictionary<string, object?>
