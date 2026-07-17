@@ -17,6 +17,22 @@ public static class StatusCodes
     /// <summary>Flags nibble (bits 24-27).</summary>
     public static StatusCodeFlags FlagsOf(uint code) => (StatusCodeFlags)((code >> 24) & 0xF);
 
+    /// <summary>The set flag names (bits 24-27), in ascending bit order. Empty when no flags are set.</summary>
+    public static IReadOnlyList<string> FlagNames(uint code)
+    {
+        var flags = FlagsOf(code);
+        if (flags == StatusCodeFlags.None)
+        {
+            return System.Array.Empty<string>();
+        }
+
+        var names = new System.Collections.Generic.List<string>(3);
+        if (flags.HasFlag(StatusCodeFlags.Retryable)) names.Add(nameof(StatusCodeFlags.Retryable));
+        if (flags.HasFlag(StatusCodeFlags.Transient)) names.Add(nameof(StatusCodeFlags.Transient));
+        if (flags.HasFlag(StatusCodeFlags.UserActionable)) names.Add(nameof(StatusCodeFlags.UserActionable));
+        return names;
+    }
+
     /// <summary>Facility byte (bits 16-23).</summary>
     public static byte FacilityOf(uint code) => (byte)((code >> 16) & 0xFF);
 

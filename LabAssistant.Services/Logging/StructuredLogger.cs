@@ -28,4 +28,7 @@ public sealed class StructuredLogger : IStructuredLogger
     {
         Log(StructuredLogEvent.Create(level, eventName, operationId, result, context));
     }
+
+    // The code-based Log(uint, ...) overload is the default interface implementation on IStructuredLogger;
+    // it composes the event and routes back through Log(StructuredLogEvent) above.
 }
