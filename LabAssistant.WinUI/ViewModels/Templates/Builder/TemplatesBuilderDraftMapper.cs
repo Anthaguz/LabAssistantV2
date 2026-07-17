@@ -23,12 +23,13 @@ internal static class TemplatesBuilderDraftMapper
             [
                 new TemplatesBuilderLabNetworkDraft("lab-core", "Core", switchName, string.Empty, "10.0.0.0/24", "Core lab network")
             ],
+            // Seed only the local bootstrap slot. Domain admin / join / DSRM are intentionally left unbound
+            // so the planner's bootstrap fallback (V2PlanningCapabilityService) reuses this one credential for
+            // every domain operation - the promoted DC's built-in Administrator keeps the base-disk password,
+            // so a default lab deploys with a SINGLE registered credential and zero authored domain secrets.
             CredentialSlots:
             [
-                new TemplatesBuilderCredentialSlotDraft("slot-local", "Local bootstrap", "local bootstrap"),
-                new TemplatesBuilderCredentialSlotDraft("slot-admin", "Domain admin", "domain administration"),
-                new TemplatesBuilderCredentialSlotDraft("slot-join", "Domain join", "domain join"),
-                new TemplatesBuilderCredentialSlotDraft("slot-dsrm", "DSRM", "domain controller recovery")
+                new TemplatesBuilderCredentialSlotDraft("slot-local", "Local bootstrap", "local bootstrap")
             ],
             Forests:
             [
@@ -49,7 +50,7 @@ internal static class TemplatesBuilderDraftMapper
                     V2MembershipModeCatalog.DomainMember,
                     "domain-contoso",
                     IsActiveDirectoryDomainController: true,
-                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", string.Empty, "slot-dsrm", string.Empty),
+                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", string.Empty, string.Empty, string.Empty, string.Empty),
                     [
                         new TemplatesBuilderNicDraft("nic-dc", "Domain", "lab-core", string.Empty, "10.0.0.10", "24", "10.0.0.1", ["10.0.0.10"])
                     ]),
@@ -62,7 +63,7 @@ internal static class TemplatesBuilderDraftMapper
                     V2MembershipModeCatalog.DomainMember,
                     "domain-contoso",
                     IsActiveDirectoryDomainController: false,
-                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", "slot-admin", "slot-join", string.Empty, string.Empty),
+                    new TemplatesBuilderVmCredentialSlotDraft("slot-local", string.Empty, string.Empty, string.Empty, string.Empty),
                     [
                         new TemplatesBuilderNicDraft("nic-member", "Domain", "lab-core", string.Empty, "10.0.0.20", "24", "10.0.0.1", ["10.0.0.10"])
                     ])
