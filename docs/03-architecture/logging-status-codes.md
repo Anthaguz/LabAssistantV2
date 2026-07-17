@@ -154,6 +154,11 @@ Every other name is derived from it and therefore cannot drift:
 - An optional friendly `title` per code is human-authored for display.
 - The generated `LaStatus.<Name>` constant is `Facility_TitlePascalCase` (falling back to the operation name when a code has no title). Because the constant name incorporates the title, the title carries part of the developer-facing identity: renaming a shipped title renames the constant and breaks references. Titles are therefore frozen on the same terms as the code (see stability rules).
 
+The dotted name is a human-friendly grouping, not a discriminator: it omits the status byte, so a success and a failure of the same operation and phase share one dotted name.
+For example "VM removed" and "VM remove failed" both render as `machines.remove.end`, and "Session created" and "Session retired" both render as `infra.powershell.session.end`.
+They are told apart by their distinct 32-bit `code` (and the severity, level, and result the code carries), never by the `event` string alone.
+Anything that must select one exact event - an alert, a filter, a metric - keys on the `code`; the dotted `event` is only for reading and coarse grouping.
+
 This replaces today's inconsistent mix of dotted (`hyperv.*`) and flat PascalCase (`CleanupStarted`) event names.
 
 ## The registry

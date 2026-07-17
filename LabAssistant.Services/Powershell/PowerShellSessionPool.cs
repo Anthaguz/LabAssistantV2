@@ -408,6 +408,10 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                 throw new InvalidOperationException("Failed to register a PowerShell session in the pool.");
             }
 
+            // Session creation is deliberately Debug (per the registry), not Info: a busy deploy grows the pool
+            // repeatedly and one Info line per created session drowns the actual deployment trace. The retirement
+            // of a dead session below is the noteworthy counterpart and is Warn. Both share the dotted event name
+            // "infra.powershell.session.end"; they are told apart by their status code, severity, and result.
             Log(
                 LaStatus.InfraPowershell_SessionCreated,
                 "created",
