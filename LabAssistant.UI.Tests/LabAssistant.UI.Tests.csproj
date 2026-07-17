@@ -116,4 +116,13 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\IDeployFromTemplateLane.cs" Link="WinUI\IDeployFromTemplateLane.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Diagnostics Logs lane (runtime-independent view model, filter option models, and log-launch seam). -->
+    <Compile Include="..\LabAssistant.WinUI\Infrastructure\ILogLocationLauncher.cs" Link="WinUI\ILogLocationLauncher.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\DiagnosticsLogsViewModel.cs" Link="WinUI\DiagnosticsLogsViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\LogLevelFilterOption.cs" Link="WinUI\LogLevelFilterOption.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\FacilityFilterOption.cs" Link="WinUI\FacilityFilterOption.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\LogContextRow.cs" Link="WinUI\LogContextRow.cs" />
+  </ItemGroup>
+
 </Project>
