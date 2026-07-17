@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Roslyn source generator that turns Diagnostics/status-codes.yaml into the LaStatus code
+    constants and the StatusCodeCatalog data. Targets netstandard2.0 (required for analyzers).
+    YamlDotNet is a single self-contained netstandard2.0 assembly with no transitive package
+    dependencies, so it bundles cleanly into the analyzer via the GetDependencyTargetPaths target
+    below. This project is referenced by LabAssistant.Services as an analyzer only
+    (ReferenceOutputAssembly=false), so it never flows into the WinUI XAML toolchain.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+    <!-- RS2008 wants an analyzer-release-tracking file; not warranted for a single build-time rule. -->
+    <NoWarn>$(NoWarn);RS2008</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+    <PackageReference Include="YamlDotNet" Version="13.7.1" GeneratePathProperty="true" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Bundle YamlDotNet.dll alongside the generator so it is available at generator load time. -->
+  <Target Name="GetDependencyTargetPaths">
+    <ItemGroup>
+      <TargetPathWithTargetPlatformMoniker Include="$(PkgYamlDotNet)\lib\netstandard2.0\YamlDotNet.dll" IncludeRuntimeDependency="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
