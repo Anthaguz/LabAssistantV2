@@ -54,11 +54,15 @@ public sealed class HyperVPowerShellDirectGuestCommandExecutor : IGuestCommandEx
             .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
+        var success = string.IsNullOrWhiteSpace(result.Error);
         return new GuestCommandResult
         {
-            Success = string.IsNullOrWhiteSpace(result.Error),
+            Success = success,
             Output = result.Output,
-            Error = result.Error
+            Error = result.Error,
+            ErrorCategory = success
+                ? GuestCommandErrorCategory.None
+                : GuestErrorClassifier.Classify(result.Error)
         };
     }
 

@@ -305,8 +305,12 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
 
             if (recycled > 0 || replaced > 0)
             {
+                // Idle-recycle churn is routine background maintenance, not a deploy event. Emitting it at Info
+                // floods the structured log (roughly one line per health-check interval) and drowns the actual
+                // deployment trace, so it is logged at Debug. A genuine problem still surfaces at Warn via the
+                // "powershell.session-pool.health-failed" event above.
                 Log(
-                    StructuredLogLevel.Info,
+                    StructuredLogLevel.Debug,
                     "powershell.session-pool.health-check",
                     "completed",
                     new Dictionary<string, object?>

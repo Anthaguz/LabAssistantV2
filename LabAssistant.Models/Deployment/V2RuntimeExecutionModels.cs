@@ -21,6 +21,16 @@ public sealed class V2RuntimeExecutionRequest
     public int GuestTransportMaxRetries { get; set; } = 90;
 
     public TimeSpan GuestTransportRetryDelay { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Number of initial guest-login attempts during which a credential rejection is tolerated as transient
+    /// before the loop fails fast. A freshly cloned VM applies its answer-file password during specialize, so
+    /// the very first PowerShell Direct hops can legitimately report "the credential is invalid" for a short
+    /// window even though the password is correct. Past this many attempts a persistent rejection is treated as
+    /// a genuine password mismatch and the loop stops instead of exhausting <see cref="GuestTransportMaxRetries"/>.
+    /// Default 9 (~90s at the default 10s retry delay).
+    /// </summary>
+    public int GuestAuthGraceAttempts { get; set; } = 9;
 }
 
 public sealed class V2BaseRemoteAccessOptions

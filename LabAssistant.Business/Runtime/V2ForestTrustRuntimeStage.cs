@@ -482,6 +482,7 @@ public sealed class V2ForestTrustRuntimeStage
         CancellationToken cancellationToken)
     {
         GuestCommandResult result = new() { Success = false, Error = "Forest trust validation was not attempted." };
+        var startTick = Environment.TickCount64;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -500,6 +501,13 @@ public sealed class V2ForestTrustRuntimeStage
                 return result;
             }
 
+            GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2ValidateForestTrust,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                result.Error);
             if (attempt < request.GuestTransportMaxRetries)
             {
                 await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);

@@ -1172,6 +1172,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         string? lastError = null;
+        var startTick = Environment.TickCount64;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1190,6 +1191,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             lastError = probeResult.Error;
+            GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2BaseRemoteAccessReady,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                lastError);
             if (attempt < request.GuestTransportMaxRetries)
             {
                 await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -1598,6 +1606,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         if (domain.RelationKind is V2DomainRelationKind.Child or V2DomainRelationKind.Tree)
         {
             string? lastDnsError = null;
+            var dnsStartTick = Environment.TickCount64;
             for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -1614,6 +1623,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 }
 
                 lastDnsError = dnsReadyResult.Error;
+                GuestReadinessLog.Attempt(
+                    context,
+                    DeploymentStepKeys.V2PromoteFirstDomainController,
+                    attempt,
+                    request.GuestTransportMaxRetries,
+                    Environment.TickCount64 - dnsStartTick,
+                    lastDnsError);
                 if (attempt < request.GuestTransportMaxRetries)
                 {
                     await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -1676,6 +1692,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         domainAdminCredential = QualifyDomainCredential(domainAdminCredential, domain.NetBiosName);
 
         string? lastError = null;
+        var startTick = Environment.TickCount64;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1692,6 +1709,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             if (!verifyResult.Success)
             {
                 lastError = verifyResult.Error;
+                GuestReadinessLog.Attempt(
+                    context,
+                    DeploymentStepKeys.V2DomainReady,
+                    attempt,
+                    request.GuestTransportMaxRetries,
+                    Environment.TickCount64 - startTick,
+                    lastError);
                 if (attempt < request.GuestTransportMaxRetries)
                 {
                     await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -1710,6 +1734,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             lastError = readyResult.Error;
+            GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2DomainReady,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                lastError);
             if (attempt < request.GuestTransportMaxRetries)
             {
                 await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -1807,6 +1838,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         domainAdminCredential = QualifyDomainCredential(domainAdminCredential, domain.NetBiosName);
 
         string? lastError = null;
+        var startTick = Environment.TickCount64;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1823,6 +1855,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             if (!verifyResult.Success)
             {
                 lastError = verifyResult.Error;
+                GuestReadinessLog.Attempt(
+                    context,
+                    DeploymentStepKeys.V2ReplicaDomainReady,
+                    attempt,
+                    request.GuestTransportMaxRetries,
+                    Environment.TickCount64 - startTick,
+                    lastError);
                 if (attempt < request.GuestTransportMaxRetries)
                 {
                     await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -1841,6 +1880,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             lastError = readyResult.Error;
+            GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2ReplicaDomainReady,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                lastError);
             if (attempt < request.GuestTransportMaxRetries)
             {
                 await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -1994,6 +2040,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         domainAdminCredential = QualifyDomainCredential(domainAdminCredential, domain.NetBiosName);
 
         string? lastError = null;
+        var startTick = Environment.TickCount64;
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -2010,6 +2057,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             if (!localResult.Success)
             {
                 lastError = localResult.Error;
+                GuestReadinessLog.Attempt(
+                    context,
+                    DeploymentStepKeys.V2JoinedDomainReady,
+                    attempt,
+                    request.GuestTransportMaxRetries,
+                    Environment.TickCount64 - startTick,
+                    lastError);
                 if (attempt < request.GuestTransportMaxRetries)
                 {
                     await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -2028,6 +2082,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             lastError = domainResult.Error;
+            GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2JoinedDomainReady,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                lastError);
             if (attempt < request.GuestTransportMaxRetries)
             {
                 await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
@@ -2057,6 +2118,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         string? lastError = null;
+        var startTick = Environment.TickCount64;
+        var graceAttempts = Math.Max(1, request.GuestAuthGraceAttempts);
         for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -2079,6 +2142,30 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             lastError = result.Error;
+            var category = GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2GuestTransportReady,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                lastError);
+
+            // A credential rejection is deterministic: the stored bootstrap password does not match this VM's base
+            // image, so retrying it for the full budget (~15 min) is pointless. Tolerate it only during the early
+            // specialize window (a fresh clone applies its answer-file password over the first attempts), then fail
+            // fast with an actionable message. PR3 will offer an in-place credential re-prompt at this point.
+            if (category == GuestCommandErrorCategory.AuthenticationRejected && attempt >= graceAttempts)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2GuestTransportReady,
+                    GuestReadinessLog.DescribeCredentialRejection(
+                        context.VmName,
+                        state.PlanVm.EffectiveBootstrapCredentialSlot,
+                        credential.Username,
+                        lastError));
+                return;
+            }
+
             if (attempt < request.GuestTransportMaxRetries)
             {
                 await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
