@@ -1,3 +1,4 @@
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
 using Xunit;
@@ -169,11 +170,33 @@ public class PowerShellSessionPoolTests
         await secondHandle.DisposeAsync();
     }
 
+    [Fact]
+    public async Task CheckoutAsync_CreatingSession_EmitsCanonicalStatusCode()
+    {
+        // Pilot for the status-code emit path: the session-created event is now emitted via a LaStatus
+        // code, so the recorded event carries the canonical code, its dotted name, and the projected level.
+        var logger = new RecordingStructuredLogger();
+        var factory = new CountingSessionFactory();
+        await using var pool = new PowerShellSessionPool(Options(4), logger, factory.Create);
+
+        var handle = await pool.CheckoutAsync();
+
+        var created = Assert.Single(
+            logger.Events,
+            e => e.Code == $"0x{LaStatus.InfraPowershell_SessionCreated:X8}");
+        Assert.Equal("infra.powershell.session.end", created.EventName);
+        Assert.Equal("created", created.Result);
+        Assert.Equal(StructuredLogLevel.Debug, created.Level);
+
+        await handle.DisposeAsync();
+    }
+
     private sealed record RecordedEvent(
         StructuredLogLevel Level,
         string EventName,
         string? Result,
-        IReadOnlyDictionary<string, object?>? Context);
+        IReadOnlyDictionary<string, object?>? Context,
+        string? Code = null);
 
     private sealed class RecordingStructuredLogger : IStructuredLogger
     {
@@ -205,7 +228,7 @@ public class PowerShellSessionPoolTests
 
             lock (_sync)
             {
-                _events.Add(new RecordedEvent(level, logEvent.Event, logEvent.Result, logEvent.Context));
+                _events.Add(new RecordedEvent(level, logEvent.Event, logEvent.Result, logEvent.Context, logEvent.Code));
             }
         }
 

@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 
 namespace LabAssistant.Services.PowerShell;
@@ -310,8 +312,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                 // deployment trace, so it is logged at Debug. A genuine problem still surfaces at Warn via the
                 // "powershell.session-pool.health-failed" event above.
                 Log(
-                    StructuredLogLevel.Debug,
-                    "powershell.session-pool.health-check",
+                    LaStatus.InfraPowershell_HealthCheck,
                     "completed",
                     new Dictionary<string, object?>
                     {
@@ -407,9 +408,12 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                 throw new InvalidOperationException("Failed to register a PowerShell session in the pool.");
             }
 
+            // Session creation is deliberately Debug (per the registry), not Info: a busy deploy grows the pool
+            // repeatedly and one Info line per created session drowns the actual deployment trace. The retirement
+            // of a dead session below is the noteworthy counterpart and is Warn. Both share the dotted event name
+            // "infra.powershell.session.end"; they are told apart by their status code, severity, and result.
             Log(
-                StructuredLogLevel.Info,
-                "powershell.session-pool.session-created",
+                LaStatus.InfraPowershell_SessionCreated,
                 "created",
                 new Dictionary<string, object?>
                 {
@@ -450,8 +454,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         if (!session.IsAlive)
         {
             Log(
-                StructuredLogLevel.Warn,
-                "powershell.session-pool.return",
+                LaStatus.InfraPowershell_SessionRetired,
                 "retired-dead",
                 new Dictionary<string, object?>
                 {
@@ -587,6 +590,18 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         IReadOnlyDictionary<string, object?>? context = null)
     {
         _structuredLogger.Log(level, eventName, _operationId, result, context);
+    }
+
+    // Code-based emit. Forwards the caller attributes so the recorded call site is the real emit
+    // site in this file, not this wrapper.
+    private void Log(
+        uint code,
+        string result,
+        IReadOnlyDictionary<string, object?>? context = null,
+        [CallerFilePath] string? callerFilePath = null,
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        _structuredLogger.Log(code, _operationId, result, context, callerFilePath, callerLineNumber);
     }
 
     private async Task WarmupOnStartupAsync()
