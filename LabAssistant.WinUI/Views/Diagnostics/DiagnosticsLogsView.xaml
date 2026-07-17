@@ -10,7 +10,7 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
         <converters:SeverityToBrushConverter x:Key="SeverityToBrush" />
 
-        <!-- Zeroes the ListView item padding so the header row and item columns line up exactly. -->
+        <!-- Matches the item padding (8,4) so the header labels align with the row cells below. -->
         <Style x:Key="LogRowItemStyle" TargetType="ListViewItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Padding" Value="8,4" />
@@ -134,8 +134,8 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!-- Column headers, aligned to the item columns below. -->
-                    <Grid Grid.Row="0" Padding="8,0,8,4" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="0,0,0,1">
+                    <!-- Column headers. Same fixed widths + ColumnSpacing + 8px left inset as the rows so the labels align. -->
+                    <Grid Grid.Row="0" Padding="8,0,8,4" ColumnSpacing="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="0,0,0,1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="150" />
                             <ColumnDefinition Width="80" />
@@ -159,6 +159,7 @@
                     <ListView
                         Grid.Row="1"
                         TabIndex="13"
+                        Padding="0"
                         ItemContainerStyle="{StaticResource LogRowItemStyle}"
                         AutomationProperties.Name="Structured logs list"
                         AutomationProperties.HelpText="Browse structured log entries and select one to review its context."
