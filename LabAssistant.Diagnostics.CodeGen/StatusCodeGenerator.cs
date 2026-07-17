@@ -91,7 +91,7 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
         var result = new List<ComposedCode>();
 
         var severities = new Dictionary<string, (byte Value, string Level)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var severity in registry.Severities)
+        foreach (var severity in registry.Severities ?? new List<SeverityDto>())
         {
             if (severity.Name is null) { errors.Add("a severity is missing 'name'."); continue; }
             if (!TryParseByte(severity.Value, out var sv) || sv > 0xF)
@@ -100,16 +100,28 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
                 continue;
             }
 
+            if (severities.ContainsKey(severity.Name))
+            {
+                errors.Add($"severity '{severity.Name}' is defined more than once.");
+                continue;
+            }
+
             severities[severity.Name] = (sv, severity.Level ?? "info");
         }
 
         var flags = new Dictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
-        foreach (var flag in registry.Flags)
+        foreach (var flag in registry.Flags ?? new List<FlagDto>())
         {
             if (flag.Name is null) { errors.Add("a flag is missing 'name'."); continue; }
             if (!TryParseByte(flag.Bit, out var fb) || fb > 0xF)
             {
                 errors.Add($"flag '{flag.Name}' has an invalid nibble bit '{flag.Bit}'.");
+                continue;
+            }
+
+            if (flags.ContainsKey(flag.Name))
+            {
+                errors.Add($"flag '{flag.Name}' is defined more than once.");
                 continue;
             }
 
@@ -120,7 +132,8 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
 
         // facility value -> (name, title, operation value -> operation name)
         var facilities = new Dictionary<byte, FacilityInfo>();
-        foreach (var facility in registry.Facilities)
+        var facilityNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var facility in registry.Facilities ?? new List<FacilityDto>())
         {
             if (facility.Name is null) { errors.Add("a facility is missing 'name'."); continue; }
             if (!TryParseByte(facility.Value, out var fv))
@@ -129,13 +142,38 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
                 continue;
             }
 
+            if (facilities.ContainsKey(fv))
+            {
+                errors.Add($"facility value 0x{fv:X2} ('{facility.Name}') is defined more than once.");
+                continue;
+            }
+
+            if (!facilityNames.Add(facility.Name))
+            {
+                errors.Add($"facility name '{facility.Name}' is defined more than once.");
+                continue;
+            }
+
             var ops = new Dictionary<byte, string>();
+            var opNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var op in facility.Operations ?? new List<OperationDto>())
             {
                 if (op.Name is null) { errors.Add($"an operation under facility '{facility.Name}' is missing 'name'."); continue; }
                 if (!TryParseByte(op.Value, out var ov))
                 {
                     errors.Add($"operation '{op.Name}' under '{facility.Name}' has an invalid value '{op.Value}'.");
+                    continue;
+                }
+
+                if (ops.ContainsKey(ov))
+                {
+                    errors.Add($"operation value 0x{ov:X2} under facility '{facility.Name}' is defined more than once.");
+                    continue;
+                }
+
+                if (!opNames.Add(op.Name))
+                {
+                    errors.Add($"operation name '{op.Name}' under facility '{facility.Name}' is defined more than once.");
                     continue;
                 }
 
@@ -148,7 +186,7 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
         var usedCodes = new Dictionary<uint, string>();
         var usedNames = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var code in registry.Codes)
+        foreach (var code in registry.Codes ?? new List<CodeDto>())
         {
             if (!TryParseByte(code.Facility, out var fv) || !facilities.TryGetValue(fv, out var facility))
             {
@@ -292,7 +330,7 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
         sb.AppendLine("    {");
         sb.AppendLine("        return new StatusFacility[]");
         sb.AppendLine("        {");
-        foreach (var facility in registry.Facilities.Where(f => f.Name != null))
+        foreach (var facility in (registry.Facilities ?? new List<FacilityDto>()).Where(f => f.Name != null))
         {
             if (!TryParseByte(facility.Value, out var fv))
             {
@@ -403,7 +441,12 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
 
     private static string Xml(string value)
     {
-        return value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+        return value
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("\r", " ")
+            .Replace("\n", " ");
     }
 
     private enum StatusCodePhaseToken { Start, Progress, End, Atomic }

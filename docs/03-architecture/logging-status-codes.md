@@ -49,7 +49,7 @@ None of the axes need more than 256 values.
 ```
 all Hyper-V machine events   (code & 0x00FF0000) == 0x00300000
 errors and worse             ((code >> 28) & 0xF) >= 0x6
-one exact event              code == 0x60410104   (guest credential rejected, fatal)
+one exact event              code == 0x64410103   (guest credential rejected, error + user-actionable)
 retryable events only        (code & 0x01000000) != 0
 ```
 
@@ -152,6 +152,7 @@ Every other name is derived from it and therefore cannot drift:
 
 - The dotted name `facility.operation[.phase]` is generated from the fields (for example `deploy.guest.transport-ready.end`).
 - An optional friendly `title` per code is human-authored for display.
+- The generated `LaStatus.<Name>` constant is `Facility_TitlePascalCase` (falling back to the operation name when a code has no title). Because the constant name incorporates the title, the title carries part of the developer-facing identity: renaming a shipped title renames the constant and breaks references. Titles are therefore frozen on the same terms as the code (see stability rules).
 
 This replaces today's inconsistent mix of dotted (`hyperv.*`) and flat PascalCase (`CleanupStarted`) event names.
 
@@ -170,8 +171,9 @@ Because code, name, message, and remediation all come from the one file, they ar
 ### Stability rules
 
 - Codes are **append-only**. Once a code ships, its number, meaning, and severity never change.
+- A shipped code's `title` is frozen too, because the generated `LaStatus` constant name is derived from it. Reword display text by shipping a new code and retiring the old one, not by editing a live title.
 - A retired event keeps its code reserved forever; the number is never reused.
-- The generator fails the build on a duplicate composed code or an out-of-range field.
+- The generator fails the build on a duplicate composed code, a duplicate facility/operation/severity/flag definition, or an out-of-range field.
 
 ### Authoring workflow
 
