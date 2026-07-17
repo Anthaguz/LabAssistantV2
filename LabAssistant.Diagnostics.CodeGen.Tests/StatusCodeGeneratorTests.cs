@@ -130,6 +130,32 @@ public sealed class StatusCodeGeneratorTests
     }
 
     [Fact]
+    public void DuplicateFlagBit_ReportsRegistryError()
+    {
+        var yaml = """
+            severities:
+              - { value: 0x3, name: Info, level: info }
+            flags:
+              - { bit: 0x4, name: UserActionable }
+              - { bit: 0x4, name: Retryable }
+            phases:
+              - atomic
+            facilities:
+              - value: 0x41
+                name: deploy.guest
+                operations:
+                  - { value: 0x01, name: bootstrap }
+            codes:
+              - { facility: 0x41, operation: 0x01, status: 0x00, severity: Info, phase: atomic, message: "ok" }
+            """;
+
+        var result = Run(yaml);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "LASTATUS001" && d.GetMessage().Contains("defined more than once"));
+        Assert.Empty(result.GeneratedTrees);
+    }
+
+    [Fact]
     public void EmptyCodesSection_DoesNotThrowAndEmitsEmptyCatalog()
     {
         // A key present-but-empty deserializes to null under YamlDotNet; the generator must not NRE.

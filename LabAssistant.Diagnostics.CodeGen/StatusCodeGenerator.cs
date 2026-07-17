@@ -91,6 +91,7 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
         var result = new List<ComposedCode>();
 
         var severities = new Dictionary<string, (byte Value, string Level)>(StringComparer.OrdinalIgnoreCase);
+        var severityValues = new HashSet<byte>();
         foreach (var severity in registry.Severities ?? new List<SeverityDto>())
         {
             if (severity.Name is null) { errors.Add("a severity is missing 'name'."); continue; }
@@ -106,10 +107,17 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
                 continue;
             }
 
+            if (!severityValues.Add(sv))
+            {
+                errors.Add($"severity value 0x{sv:X} ('{severity.Name}') is defined more than once.");
+                continue;
+            }
+
             severities[severity.Name] = (sv, severity.Level ?? "info");
         }
 
         var flags = new Dictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        var flagBitsSeen = new HashSet<byte>();
         foreach (var flag in registry.Flags ?? new List<FlagDto>())
         {
             if (flag.Name is null) { errors.Add("a flag is missing 'name'."); continue; }
@@ -122,6 +130,12 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
             if (flags.ContainsKey(flag.Name))
             {
                 errors.Add($"flag '{flag.Name}' is defined more than once.");
+                continue;
+            }
+
+            if (!flagBitsSeen.Add(fb))
+            {
+                errors.Add($"flag bit 0x{fb:X} ('{flag.Name}') is defined more than once.");
                 continue;
             }
 
