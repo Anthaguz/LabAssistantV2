@@ -1,0 +1,166 @@
+# LabAssistant logging status-code registry.
+#
+# This is the single authoritative source for every logging status code.
+# A Roslyn source generator (LabAssistant.Diagnostics.CodeGen) turns this file into:
+#   - LaStatus            : const uint code constants
+#   - StatusCodeCatalog   : the full in-memory table
+#   - StatusCodes.Describe : the code -> description resolver
+#   - facility / operation lookup tables for the log UI filter
+#
+# See docs/03-architecture/logging-status-codes.md for the frozen spec (bit layout, ranges, rules).
+#
+# A 32-bit code is  0xSS_FF_OO_CC  =  severity<<28 | flags<<24 | facility<<16 | operation<<8 | status.
+#
+# Stability rules (enforced by the generator):
+#   - Codes are append-only. Never renumber or reuse a shipped number.
+#   - Every composed code must be unique.
+#   - Every field must be in range and reference a declared facility / operation / severity.
+
+# --- Severity nibble (bits 28-31). Ordered, not a bitfield. 'level' is the legacy projection. ---
+severities:
+  - { value: 0x0, name: Success,  level: info }
+  - { value: 0x1, name: Trace,    level: debug }
+  - { value: 0x2, name: Debug,    level: debug }
+  - { value: 0x3, name: Info,     level: info }
+  - { value: 0x4, name: Notice,   level: info }
+  - { value: 0x5, name: Warning,  level: warn }
+  - { value: 0x6, name: Error,    level: error }
+  - { value: 0x7, name: Critical, level: error }
+  - { value: 0x8, name: Fatal,    level: error }
+
+# --- Flags nibble (bits 24-27). Bitwise; may be combined. ---
+flags:
+  - { bit: 0x1, name: Retryable }
+  - { bit: 0x2, name: Transient }
+  - { bit: 0x4, name: UserActionable }
+
+# --- Lifecycle phase is a separate field on the event, NOT part of the code number. ---
+phases: [start, progress, end, atomic]
+
+# --- Facilities (byte 2) and their operations (byte 1). Only what exists today is assigned. ---
+facilities:
+  - value: 0x00
+    name: infra.app
+    title: Application lifecycle
+    operations:
+      - { value: 0x01, name: startup, title: Application startup }
+
+  - value: 0x01
+    name: infra.powershell
+    title: PowerShell session pool
+    operations:
+      - { value: 0x01, name: session, title: Pooled session }
+      - { value: 0x02, name: health-check, title: Session pool health check }
+
+  - value: 0x10
+    name: assets.catalog
+    title: Base-disk catalog
+    operations:
+      - { value: 0x01, name: load, title: Load catalog }
+
+  - value: 0x30
+    name: machines
+    title: Virtual machine lifecycle
+    operations:
+      - { value: 0x01, name: provision, title: Provision VM }
+      - { value: 0x02, name: start, title: Start VM }
+      - { value: 0x03, name: remove, title: Remove VM }
+
+  - value: 0x40
+    name: deploy.orchestration
+    title: Deployment orchestration
+    operations:
+      - { value: 0x01, name: plan, title: Plan deployment }
+      - { value: 0x02, name: run, title: Run deployment }
+
+  - value: 0x41
+    name: deploy.guest
+    title: Guest configuration
+    operations:
+      - { value: 0x01, name: transport-ready, title: Guest transport readiness }
+      - { value: 0x02, name: remote-access, title: Base remote access }
+
+  - value: 0x42
+    name: deploy.domain
+    title: Active Directory
+    operations:
+      - { value: 0x01, name: promote, title: Promote domain controller }
+
+  - value: 0x45
+    name: deploy.cleanup
+    title: Deployment cleanup
+    operations:
+      - { value: 0x01, name: rollback, title: Roll back deployment }
+
+  - value: 0xE0
+    name: diag.ps_timing
+    title: PowerShell timing (raw)
+    operations:
+      - { value: 0x01, name: session, title: Session timing }
+      - { value: 0x02, name: command, title: Command timing }
+
+  - value: 0xE1
+    name: diag.debug
+    title: Debug trace (raw)
+    operations:
+      - { value: 0x01, name: trace, title: Debug trace }
+
+# --- Codes. Each entry is one full event definition; the generator composes its 32-bit number. ---
+codes:
+  # infra.app.startup
+  - { facility: 0x00, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Starting up, message: "The application is starting." }
+  - { facility: 0x00, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Ready, message: "The application started successfully." }
+
+  # infra.powershell.session
+  - { facility: 0x01, operation: 0x01, status: 0x00, severity: Debug, phase: end, title: Session created, message: "A pooled PowerShell session was created." }
+  - { facility: 0x01, operation: 0x01, status: 0x01, severity: Warning, flags: [Retryable], phase: end, title: Session retired, message: "A dead pooled PowerShell session was retired instead of reused." }
+  # infra.powershell.health-check - the high-volume noise channel; Debug so it is off by default.
+  - { facility: 0x01, operation: 0x02, status: 0x00, severity: Debug, phase: atomic, title: Health check, message: "The session pool ran a periodic health check." }
+
+  # assets.catalog.load
+  - { facility: 0x10, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Catalog loaded, message: "The base-disk catalog was loaded." }
+  - { facility: 0x10, operation: 0x01, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Catalog load failed, message: "The base-disk catalog could not be loaded.", remediation: "Verify the catalog file exists and is valid JSON." }
+
+  # machines.provision
+  - { facility: 0x30, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Provisioning VM, message: "Creating the virtual machine and its differencing disk." }
+  - { facility: 0x30, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: VM provisioned, message: "The virtual machine was provisioned." }
+  # machines.start
+  - { facility: 0x30, operation: 0x02, status: 0x00, severity: Success, phase: end, title: VM started, message: "The virtual machine was started." }
+  # machines.remove
+  - { facility: 0x30, operation: 0x03, status: 0x00, severity: Success, phase: end, title: VM removed, message: "The virtual machine was removed." }
+  - { facility: 0x30, operation: 0x03, status: 0x01, severity: Warning, flags: [Retryable], phase: end, title: VM remove failed, message: "The virtual machine could not be removed while running.", remediation: "Stop the VM before removing it." }
+
+  # deploy.orchestration
+  - { facility: 0x40, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Plan ready, message: "The deployment plan was produced." }
+  - { facility: 0x40, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Deploying, message: "The deployment is starting." }
+  - { facility: 0x40, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: Deploy succeeded, message: "The deployment completed successfully." }
+  - { facility: 0x40, operation: 0x02, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Deploy failed, message: "The deployment failed.", remediation: "Review the failed step in the log for the specific cause." }
+
+  # deploy.guest.transport-ready - fully worked; this is where the 2026-07-16 failure lived.
+  - { facility: 0x41, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Waiting for guest, message: "Waiting for PowerShell Direct to become ready on the guest." }
+  - { facility: 0x41, operation: 0x01, status: 0x01, severity: Debug, flags: [Transient, Retryable], phase: progress, title: Guest not ready yet, message: "The guest is not yet reachable; retrying." }
+  - { facility: 0x41, operation: 0x01, status: 0x02, severity: Debug, flags: [Transient, Retryable], phase: progress, title: Credential rejected (specializing), message: "The guest rejected the credential while still applying its answer file; within the grace window, retrying." }
+  - { facility: 0x41, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Guest ready, message: "PowerShell Direct became ready on the guest." }
+  - { facility: 0x41, operation: 0x01, status: 0x03, severity: Error, flags: [UserActionable], phase: end, title: Guest credential rejected, message: "The guest rejected the bootstrap credential; the registered password does not match this base image.", remediation: "Update the credential slot to match the base image's local Administrator password." }
+  - { facility: 0x41, operation: 0x01, status: 0x04, severity: Error, flags: [Retryable], phase: end, title: Guest transport timed out, message: "PowerShell Direct did not become ready before the timeout.", remediation: "The base disk may be on slow storage; retry, or move the base disk to an SSD." }
+
+  # deploy.guest.remote-access
+  - { facility: 0x41, operation: 0x02, status: 0x00, severity: Success, phase: end, title: Remote access configured, message: "Base remote access (RDP) was configured on the guest." }
+  - { facility: 0x41, operation: 0x02, status: 0x01, severity: Error, phase: end, title: Remote access failed, message: "Base remote access could not be configured on the guest." }
+
+  # deploy.domain.promote
+  - { facility: 0x42, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Promoting DC, message: "Promoting the domain controller." }
+  - { facility: 0x42, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: DC promoted, message: "The domain controller was promoted." }
+  - { facility: 0x42, operation: 0x01, status: 0x01, severity: Error, flags: [Retryable], phase: end, title: DC promotion timed out, message: "Domain controller promotion did not complete before the timeout.", remediation: "Concurrent promotions on slow storage can exceed the timeout; retry with fewer parallel DCs or faster storage." }
+
+  # deploy.cleanup.rollback
+  - { facility: 0x45, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Cleaning up, message: "Rolling back resources created by the failed deployment." }
+  - { facility: 0x45, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Cleanup complete, message: "All resources created by the failed deployment were removed." }
+  - { facility: 0x45, operation: 0x01, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Cleanup incomplete, message: "Some resources could not be removed during rollback.", remediation: "Check Hyper-V for orphaned VMs, disks, or switches and remove them manually." }
+
+  # diag.ps_timing (folded raw HyperVPowerShellTimingLogger; Debug so off by default)
+  - { facility: 0xE0, operation: 0x01, status: 0x00, severity: Debug, phase: atomic, title: Session timing, message: "PowerShell session timing sample." }
+  - { facility: 0xE0, operation: 0x02, status: 0x00, severity: Debug, phase: atomic, title: Command timing, message: "PowerShell command timing sample." }
+
+  # diag.debug (folded raw DebugLogger; Debug so off by default)
+  - { facility: 0xE1, operation: 0x01, status: 0x00, severity: Debug, phase: atomic, title: Debug trace, message: "A raw debug trace line." }
