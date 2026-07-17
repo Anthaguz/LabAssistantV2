@@ -83,6 +83,10 @@ public class ProjectDependencyGuardrailsTests
         var projectDirectory = Path.GetDirectoryName(csprojPath) ?? string.Empty;
         var references = document
             .Descendants("ProjectReference")
+            // Analyzer / source-generator references (ReferenceOutputAssembly="false") are build-time
+            // tooling only. They contribute no runtime assembly coupling, so they do not participate in
+            // the architecture dependency boundaries this guardrail protects.
+            .Where(element => !IsAnalyzerOnlyReference(element))
             .Select(element => element.Attribute("Include")?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => Path.GetFullPath(Path.Combine(projectDirectory, value!)))
@@ -90,6 +94,14 @@ public class ProjectDependencyGuardrailsTests
             .ToList();
 
         return references;
+    }
+
+    private static bool IsAnalyzerOnlyReference(XElement element)
+    {
+        var referenceOutputAssembly = element.Attribute("ReferenceOutputAssembly")?.Value
+            ?? element.Element("ReferenceOutputAssembly")?.Value;
+
+        return string.Equals(referenceOutputAssembly, "false", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FindRepoRoot()
