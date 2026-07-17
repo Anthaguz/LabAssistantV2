@@ -8,6 +8,59 @@
     x:DefaultBindMode="OneWay">
     <UserControl.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!-- Stretches per-VM rows to the full list width and removes default item padding. -->
+        <Style x:Key="StretchListViewItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+
+        <!-- Per-VM live row shared by the PROGRESS and RESULTS surfaces, modeled on the Quick Deploy right panel. -->
+        <DataTemplate x:Key="DeployVmProgressRowTemplate" x:DataType="deployModels:DeployVmResultRow">
+            <Border
+                Margin="0,0,0,8"
+                Padding="10,8"
+                Background="{StaticResource ShellBackgroundBrush}"
+                BorderBrush="{StaticResource ShellBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CardCornerRadius}">
+                <Grid RowSpacing="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="{x:Bind VmName}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="{x:Bind Status}" />
+                    </Grid>
+                    <ProgressBar
+                        Grid.Row="1"
+                        Height="6"
+                        Minimum="0"
+                        Maximum="100"
+                        AutomationProperties.Name="Virtual machine progress"
+                        AutomationProperties.HelpText="Shows the completion percentage for the current virtual machine."
+                        Value="{x:Bind ProgressPercent}" />
+                    <TextBlock
+                        Grid.Row="2"
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Text="{x:Bind DisplaySummary}"
+                        TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
     <Border
         Padding="{StaticResource CardPadding}"
@@ -15,7 +68,18 @@
         BorderBrush="{StaticResource ShellBorderBrush}"
         BorderThickness="1"
         CornerRadius="{StaticResource CardCornerRadius}">
-        <Grid RowSpacing="10">
+        <Grid>
+
+            <!--
+                Main content is one of three mutually exclusive surfaces routed by the lane's lifecycle
+                state: CONFIG (template selection and review), PROGRESS (live per-VM deploy feedback),
+                and RESULTS (terminal per-VM outcome). Exactly one is visible at a time.
+            -->
+
+            <!-- CONFIG surface. -->
+            <Grid
+                RowSpacing="10"
+                Visibility="{x:Bind ViewModel.ShouldShowConfigView, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -52,74 +116,6 @@
                 VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="10">
-                    <Border
-                        Padding="10"
-                        Background="{StaticResource ShellContentBackgroundBrush}"
-                        BorderBrush="{StaticResource ShellBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{StaticResource CardCornerRadius}">
-                        <Grid ColumnSpacing="12">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                Grid.Column="0"
-                                VerticalAlignment="Center"
-                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                FontWeight="SemiBold"
-                                Text="{x:Bind ViewModel.LifecycleState, Mode=OneWay}" />
-                            <ProgressBar
-                                Grid.Column="1"
-                                Height="12"
-                                Minimum="0"
-                                Maximum="100"
-                                Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}"
-                                VerticalAlignment="Center" />
-                            <TextBlock
-                                Grid.Column="2"
-                                VerticalAlignment="Center"
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="{x:Bind ViewModel.ProgressSummary, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                            <StackPanel
-                                Grid.Column="3"
-                                HorizontalAlignment="Right"
-                                Spacing="{StaticResource SpacingXS}">
-                                <Button
-                                    Command="{x:Bind ViewModel.ToggleResultsPanelCommand}"
-                                    Content="{x:Bind ViewModel.ResultsPanelButtonText, Mode=OneWay}"
-                                    IsEnabled="{x:Bind ViewModel.CanToggleResultsPanel, Mode=OneWay}" />
-                                <TextBlock
-                                    HorizontalAlignment="Right"
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    FontSize="12"
-                                    Text="{x:Bind ViewModel.ResultsPanelSummaryText, Mode=OneWay}" />
-                            </StackPanel>
-                            <TextBlock
-                                Grid.Row="1"
-                                Grid.Column="0"
-                                Grid.ColumnSpan="4"
-                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                Text="{x:Bind ViewModel.ReadinessSummaryText, Mode=OneWay}" />
-                            <TextBlock
-                                Grid.Row="2"
-                                Grid.Column="0"
-                                Grid.ColumnSpan="4"
-                                Foreground="{StaticResource ShellWarnBrush}"
-                                FontWeight="SemiBold"
-                                Text="{x:Bind ViewModel.GlobalIssuesBadgeText, Mode=OneWay}"
-                                Visibility="Collapsed" />
-                        </Grid>
-                    </Border>
-
                     <Border
                         Padding="10"
                         Background="{StaticResource ShellContentBackgroundBrush}"
@@ -427,6 +423,117 @@
                     </Border>
                 </StackPanel>
             </ScrollViewer>
+            </Grid>
+
+            <!-- PROGRESS surface: live per-VM deployment feedback while a run is in flight. -->
+            <Grid
+                RowSpacing="10"
+                Visibility="{x:Bind ViewModel.ShouldShowProgressView, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    Grid.Row="0"
+                    Padding="10"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    AutomationProperties.LandmarkType="Custom"
+                    AutomationProperties.LocalizedLandmarkType="Deployment status summary">
+                    <StackPanel Spacing="{StaticResource SpacingS}">
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            Text="Deploying from template. Live per-VM progress and step details."
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            AutomationProperties.LiveSetting="Polite"
+                            Text="{x:Bind ViewModel.LifecycleState, Mode=OneWay}" />
+                        <ProgressBar
+                            Height="8"
+                            Minimum="0"
+                            Maximum="100"
+                            AutomationProperties.Name="Overall deployment progress"
+                            AutomationProperties.HelpText="Shows total deployment completion percentage."
+                            Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}" />
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            AutomationProperties.LiveSetting="Polite"
+                            Text="{x:Bind ViewModel.ProgressSummary, Mode=OneWay}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <ListView
+                    Grid.Row="1"
+                    ItemContainerStyle="{StaticResource StretchListViewItemStyle}"
+                    ItemTemplate="{StaticResource DeployVmProgressRowTemplate}"
+                    ItemsSource="{x:Bind ViewModel.ResultRows, Mode=OneWay}"
+                    SelectionMode="None"
+                    AutomationProperties.Name="Virtual machine deployment progress list"
+                    AutomationProperties.HelpText="Shows the current deploy progress for each virtual machine." />
+            </Grid>
+
+            <!-- RESULTS surface: terminal per-VM outcome with return actions. -->
+            <Grid
+                RowSpacing="10"
+                Visibility="{x:Bind ViewModel.ShouldShowResultsView, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    Grid.Row="0"
+                    Padding="10"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    AutomationProperties.LandmarkType="Custom"
+                    AutomationProperties.LocalizedLandmarkType="Deployment results summary">
+                    <StackPanel Spacing="{StaticResource SpacingS}">
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            AutomationProperties.LiveSetting="Polite"
+                            Text="{x:Bind ViewModel.LifecycleState, Mode=OneWay}" />
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            AutomationProperties.LiveSetting="Polite"
+                            Text="{x:Bind ViewModel.ProgressSummary, Mode=OneWay}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <ListView
+                    Grid.Row="1"
+                    ItemContainerStyle="{StaticResource StretchListViewItemStyle}"
+                    ItemTemplate="{StaticResource DeployVmProgressRowTemplate}"
+                    ItemsSource="{x:Bind ViewModel.ResultRows, Mode=OneWay}"
+                    SelectionMode="None"
+                    AutomationProperties.Name="Virtual machine deployment results list"
+                    AutomationProperties.HelpText="Shows the terminal deploy outcome for each virtual machine." />
+
+                <StackPanel
+                    Grid.Row="2"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="{StaticResource SpacingS}">
+                    <Button
+                        Command="{x:Bind ViewModel.BackToConfigurationCommand}"
+                        Content="Back to configuration" />
+                    <Button
+                        Command="{x:Bind ViewModel.DeployAgainCommand}"
+                        Content="Deploy again"
+                        Style="{StaticResource AccentButtonStyle}" />
+                </StackPanel>
+            </Grid>
 
         </Grid>
     </Border>

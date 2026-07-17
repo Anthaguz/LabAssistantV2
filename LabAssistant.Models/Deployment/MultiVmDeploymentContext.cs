@@ -21,6 +21,27 @@ public class MultiVmDeploymentContext
     public List<VmDeploymentContext> VmContexts { get; set; } = new();
 
     /// <summary>
+    /// Optional hook invoked once for each per-VM runtime context as it is registered on
+    /// <see cref="VmContexts"/>. Runtimes that build their own per-VM contexts internally (for example the
+    /// V2 runtime) create those contexts after the caller has wired progress callbacks, so a caller that only
+    /// iterated <see cref="VmContexts"/> up front would attach its log and step-state callbacks to nothing.
+    /// Callers set this hook to attach those callbacks to every context the runtime creates, keeping live
+    /// per-VM progress flowing for both the classic and V2 execution paths.
+    /// </summary>
+    public Action<VmDeploymentContext>? VmContextRegistered { get; set; }
+
+    /// <summary>
+    /// Registers a per-VM runtime context on <see cref="VmContexts"/> and invokes <see cref="VmContextRegistered"/>
+    /// so any caller-supplied progress wiring is applied to it. Runtimes should use this instead of adding to
+    /// <see cref="VmContexts"/> directly so live progress callbacks reach contexts built during execution.
+    /// </summary>
+    public void RegisterVmContext(VmDeploymentContext context)
+    {
+        VmContexts.Add(context);
+        VmContextRegistered?.Invoke(context);
+    }
+
+    /// <summary>
     /// Runtime state for managed V2 forest trusts that may require cleanup if the deployment fails or is cancelled.
     /// </summary>
     public List<V2TrustRuntimeContext> V2TrustContexts { get; } = new();

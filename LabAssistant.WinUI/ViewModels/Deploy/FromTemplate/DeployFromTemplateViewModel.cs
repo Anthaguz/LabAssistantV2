@@ -189,6 +189,28 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     public bool ShouldAutoOpenResultsPanel =>
         IsStarting || string.Equals(LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
 
+    // In-tab surface routing. The three flags below partition the main content area into the
+    // configuration, live-progress, and terminal-results surfaces so exactly one shows at a time.
+    // They are derived from the lifecycle-state string (compared case-insensitively) and their
+    // change notifications are raised from OnLifecycleStateChanged.
+
+    /// <summary>Gets whether the live per-VM progress surface should be shown (lifecycle state Running).</summary>
+    public bool ShouldShowProgressView =>
+        string.Equals(LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Gets whether the terminal results surface should be shown (Completed/Failed/Cancelled).</summary>
+    public bool ShouldShowResultsView =>
+        string.Equals(LifecycleState, "Completed", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(LifecycleState, "Failed", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(LifecycleState, "Cancelled", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets whether the template configuration surface should be shown. This is the default surface
+    /// for every non-running, non-terminal state (Idle/Ready/Blocked/Evaluating/Error and any other
+    /// value), so an unexpected lifecycle string never hides all three surfaces.
+    /// </summary>
+    public bool ShouldShowConfigView => !ShouldShowProgressView && !ShouldShowResultsView;
+
     public string ResultsPanelTitle => "From Template Progress / Results";
 
     // Selector / reload enablement (one-way bound).
@@ -346,6 +368,36 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
 
     [RelayCommand]
     private void ToggleResultsPanel() => _host.OnOpenResultsPanelRequested();
+
+    /// <summary>
+    /// Returns the lane to the configuration surface after a run finishes, keeping the current
+    /// template selected. Progress state is discarded and the shared <see cref="ResultRows"/>
+    /// collection is repopulated from readiness review (the config-mode projection) by clearing the
+    /// live-rows flag before <see cref="UpdateUi"/> runs.
+    /// </summary>
+    [RelayCommand]
+    private void BackToConfiguration() => ResetToConfiguration();
+
+    /// <summary>
+    /// Resets the lane so the user can start another deployment with the same template. Behaves like
+    /// <see cref="BackToConfiguration"/>: it returns to the configuration surface with a fresh state.
+    /// </summary>
+    [RelayCommand]
+    private void DeployAgain() => ResetToConfiguration();
+
+    private void ResetToConfiguration()
+    {
+        // Drop any completed run's live progress so readiness review owns ResultRows again, then
+        // clear the live-rows flag guarding that shared collection before UpdateUi repopulates it.
+        _activeDeploymentContext = null;
+        _progressByVm.Clear();
+        SetShowAllVmRows(false);
+
+        var restoredState = ActiveTemplateDocument is null ? "Idle" : "Ready";
+        SetWorkflowState(false, false, restoredState, 0, "No deployment started.");
+        SetActionStatus("No action selected.");
+        UpdateUi();
+    }
 
     /// <summary>
     /// Applies the selected V2 credential slot value using the current username and the supplied
@@ -592,7 +644,13 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         return DeployFromTemplateCredentialPanelState.WithSlots(credentialSlots, allSlotsResolved, statusMessage);
     }
 
-    partial void OnLifecycleStateChanged(string value) => OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
+    partial void OnLifecycleStateChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
+        OnPropertyChanged(nameof(ShouldShowConfigView));
+        OnPropertyChanged(nameof(ShouldShowProgressView));
+        OnPropertyChanged(nameof(ShouldShowResultsView));
+    }
 
     partial void OnIsStartingChanged(bool value) => OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
 
@@ -965,21 +1023,25 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
         DeploymentReadinessReport? readinessReport)
     {
-        ResultRows.Clear();
+        ReconcileResultRows(BuildResultRows(compatibilityIssues, readinessReport));
+    }
 
+    private List<DeployVmResultRow> BuildResultRows(
+        IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
+        DeploymentReadinessReport? readinessReport)
+    {
         if (_showAllVmRows && _progressByVm.Count > 0)
         {
-            foreach (var state in _progressByVm.Values.OrderBy(value => value.VmName, StringComparer.OrdinalIgnoreCase))
-            {
-                ResultRows.Add(state.ToRow());
-            }
-
-            return;
+            return _progressByVm.Values
+                .OrderBy(value => value.VmName, StringComparer.OrdinalIgnoreCase)
+                .Select(state => state.ToRow())
+                .ToList();
         }
 
+        var rows = new List<DeployVmResultRow>();
         if (ActiveTemplateDocument is null)
         {
-            return;
+            return rows;
         }
 
         var vmNames = ActiveTemplateDocument.Template.VmTemplates
@@ -1022,14 +1084,54 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
                                vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Warn);
             var summary = $"Blocking: {blockingCount} | Warnings: {warningCount}";
 
-            ResultRows.Add(new DeployVmResultRow(
+            rows.Add(new DeployVmResultRow(
                 VmName: vmName,
                 Status: status,
                 Summary: summary,
                 ProgressPercent: hasBlocking ? 100 : 80,
                 TimelineSteps: CreateReadinessTimelineSteps(vmCompatibilityIssues, vmReadinessResults, hasBlocking)));
         }
+
+        return rows;
     }
+
+    /// <summary>
+    /// Applies <paramref name="desiredRows"/> to <see cref="ResultRows"/> in place. Live per-VM progress streams
+    /// many updates per second; a wholesale <c>Clear()</c> then re-add raises a collection Reset that tears down and
+    /// recreates every ListView item container, which flickers, resets the user's scroll position, and restarts each
+    /// row's progress-bar animation. This replaces only the rows whose rendered content actually changed and grows or
+    /// shrinks the collection only when the set of VMs changes, so unchanged rows keep their containers.
+    /// </summary>
+    private void ReconcileResultRows(IReadOnlyList<DeployVmResultRow> desiredRows)
+    {
+        for (var index = 0; index < desiredRows.Count; index++)
+        {
+            var desired = desiredRows[index];
+            if (index >= ResultRows.Count)
+            {
+                ResultRows.Add(desired);
+            }
+            else if (!RenderedRowEquals(ResultRows[index], desired))
+            {
+                ResultRows[index] = desired;
+            }
+        }
+
+        for (var index = ResultRows.Count - 1; index >= desiredRows.Count; index--)
+        {
+            ResultRows.RemoveAt(index);
+        }
+    }
+
+    /// <summary>
+    /// Compares two rows by only the fields the progress row template renders, so an unchanged VM keeps its
+    /// existing item container instead of being needlessly replaced on every progress tick.
+    /// </summary>
+    private static bool RenderedRowEquals(DeployVmResultRow existing, DeployVmResultRow desired) =>
+        string.Equals(existing.VmName, desired.VmName, StringComparison.Ordinal)
+        && string.Equals(existing.Status, desired.Status, StringComparison.Ordinal)
+        && existing.ProgressPercent == desired.ProgressPercent
+        && string.Equals(existing.DisplaySummary, desired.DisplaySummary, StringComparison.Ordinal);
 
     private void RefreshReviewState(bool hasBlockingFailures)
     {
@@ -1119,12 +1221,22 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         Action<string, string?> onLogMessage,
         Action<string, DeployStepStateUpdate> onStepStateUpdated)
     {
-        foreach (var vmContext in context.VmContexts)
+        void Wire(VmDeploymentContext vmContext)
         {
             var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
             vmContext.LogCallback = message => _marshalToUi(() => onLogMessage(vmName, message));
             vmContext.StepStateEmitter = update => _marshalToUi(() => onStepStateUpdated(vmName, update));
         }
+
+        // Wire contexts that already exist (the classic path builds its per-VM contexts before wiring).
+        foreach (var vmContext in context.VmContexts)
+        {
+            Wire(vmContext);
+        }
+
+        // Wire contexts the runtime builds during execution (the V2 runtime clears and rebuilds VmContexts
+        // internally, so without this hook its step-state and log callbacks would be attached to nothing).
+        context.VmContextRegistered = Wire;
     }
 
     private bool IsActiveTemplateV2()

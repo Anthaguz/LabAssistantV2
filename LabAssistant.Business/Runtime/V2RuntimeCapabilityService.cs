@@ -2736,7 +2736,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 }
             };
 
-            multiContext.VmContexts.Add(context);
+            multiContext.RegisterVmContext(context);
             nodesByVmId.TryGetValue(vm.VmId, out var nodes);
             states.Add(new RuntimeVmState(
                 context,
