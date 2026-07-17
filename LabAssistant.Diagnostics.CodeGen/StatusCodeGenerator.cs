@@ -127,6 +127,15 @@ public sealed class StatusCodeGenerator : IIncrementalGenerator
                 continue;
             }
 
+            // Flags are OR-combined into the composed code's flags nibble, so each must occupy exactly one bit.
+            // A non-single-bit value (0, or a multi-bit mask like 0x3) would decode as several unrelated flags,
+            // silently making HasFlag return true for a flag that was never assigned.
+            if (fb == 0 || (fb & (fb - 1)) != 0)
+            {
+                errors.Add($"flag '{flag.Name}' has a non-single-bit value '{flag.Bit}'; each flag must be exactly one of 0x1, 0x2, 0x4, 0x8.");
+                continue;
+            }
+
             if (flags.ContainsKey(flag.Name))
             {
                 errors.Add($"flag '{flag.Name}' is defined more than once.");

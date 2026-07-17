@@ -156,6 +156,60 @@ public sealed class StatusCodeGeneratorTests
     }
 
     [Fact]
+    public void OverlappingFlagBit_ReportsRegistryError()
+    {
+        // 0x3 is a two-bit mask overlapping the single-bit 0x1 flag. Both pass the uniqueness check, but OR-ing
+        // 0x3 into the flags nibble would silently decode as Retryable too, so the generator must reject it.
+        var yaml = """
+            severities:
+              - { value: 0x3, name: Info, level: info }
+            flags:
+              - { bit: 0x1, name: Retryable }
+              - { bit: 0x3, name: Overlapping }
+            phases:
+              - atomic
+            facilities:
+              - value: 0x41
+                name: deploy.guest
+                operations:
+                  - { value: 0x01, name: bootstrap }
+            codes:
+              - { facility: 0x41, operation: 0x01, status: 0x00, severity: Info, phase: atomic, message: "ok" }
+            """;
+
+        var result = Run(yaml);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "LASTATUS001" && d.GetMessage().Contains("non-single-bit"));
+        Assert.Empty(result.GeneratedTrees);
+    }
+
+    [Fact]
+    public void ZeroFlagBit_ReportsRegistryError()
+    {
+        // 0x0 sets no bit, so a code carrying it would be indistinguishable from having no flag; reject it.
+        var yaml = """
+            severities:
+              - { value: 0x3, name: Info, level: info }
+            flags:
+              - { bit: 0x0, name: Nothing }
+            phases:
+              - atomic
+            facilities:
+              - value: 0x41
+                name: deploy.guest
+                operations:
+                  - { value: 0x01, name: bootstrap }
+            codes:
+              - { facility: 0x41, operation: 0x01, status: 0x00, severity: Info, phase: atomic, message: "ok" }
+            """;
+
+        var result = Run(yaml);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "LASTATUS001" && d.GetMessage().Contains("non-single-bit"));
+        Assert.Empty(result.GeneratedTrees);
+    }
+
+    [Fact]
     public void EmptyCodesSection_DoesNotThrowAndEmitsEmptyCatalog()
     {
         // A key present-but-empty deserializes to null under YamlDotNet; the generator must not NRE.
