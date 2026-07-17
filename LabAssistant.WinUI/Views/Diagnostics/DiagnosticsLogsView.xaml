@@ -2,7 +2,22 @@
     x:Class="LabAssistant.WinUI.Views.Diagnostics.DiagnosticsLogsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:logging="using:LabAssistant.Services.Logging">
+    xmlns:converters="using:LabAssistant.WinUI.Converters"
+    xmlns:diagnostics="using:LabAssistant.WinUI.ViewModels.Diagnostics"
+    xmlns:logging="using:LabAssistant.Services.Logging"
+    x:DefaultBindMode="OneWay">
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+        <converters:SeverityToBrushConverter x:Key="SeverityToBrush" />
+
+        <!-- Matches the item padding (8,4) so the header labels align with the row cells below. -->
+        <Style x:Key="LogRowItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+    </UserControl.Resources>
+
     <Border
         Padding="{StaticResource CardPadding}"
         Background="{StaticResource ShellBackgroundBrush}"
@@ -10,138 +25,319 @@
         BorderThickness="1"
         CornerRadius="{StaticResource CardCornerRadius}"
         AutomationProperties.LandmarkType="Main">
-        <Grid ColumnSpacing="12" XYFocusKeyboardNavigation="Enabled">
+        <Grid RowSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="2*" />
-            </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="{StaticResource SpacingS}" AutomationProperties.LandmarkType="Form">
+            <!-- Header + filter toolbar -->
+            <StackPanel Grid.Row="0" Spacing="{StaticResource SpacingS}" AutomationProperties.LandmarkType="Form">
                 <TextBlock
                     Foreground="{StaticResource ShellTextPrimaryBrush}"
                     FontSize="16"
                     FontWeight="SemiBold"
                     Text="Structured Logs" />
-                <StackPanel Spacing="{StaticResource SpacingS}">
-                    <Grid ColumnSpacing="{StaticResource SpacingS}" RowSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <TextBox Grid.Row="0" Grid.Column="0" Width="180" TabIndex="0" AutomationProperties.Name="Filter by operation ID" AutomationProperties.HelpText="Filter logs by operation identifier." PlaceholderText="OperationId" Text="{x:Bind ViewModel.OperationIdQuery, Mode=TwoWay}" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Width="120" TabIndex="1" AutomationProperties.Name="Filter by log level" AutomationProperties.HelpText="Filter logs by severity level." PlaceholderText="Level" Text="{x:Bind ViewModel.LevelQuery, Mode=TwoWay}" />
-                        <TextBox Grid.Row="0" Grid.Column="2" Width="180" TabIndex="2" AutomationProperties.Name="Filter by event" AutomationProperties.HelpText="Filter logs by event name." PlaceholderText="Event" Text="{x:Bind ViewModel.EventQuery, Mode=TwoWay}" />
-                        <TextBox Grid.Row="0" Grid.Column="3" Width="220" TabIndex="3" AutomationProperties.Name="Filter by text search" AutomationProperties.HelpText="Filter logs by free-text search." PlaceholderText="Text search" Text="{x:Bind ViewModel.TextSearchQuery, Mode=TwoWay}" />
-
-                        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
-                            <CheckBox VerticalAlignment="Center" TabIndex="4" AutomationProperties.Name="Enable start date filter" AutomationProperties.HelpText="Turn on filtering from a start date." Content="Start" IsChecked="{x:Bind ViewModel.UseStartDateFilter, Mode=TwoWay}" />
-                            <DatePicker TabIndex="5" AutomationProperties.Name="Start date" AutomationProperties.HelpText="Choose the start date for log filtering." Date="{x:Bind ViewModel.StartDate, Mode=TwoWay}" />
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                            <CheckBox VerticalAlignment="Center" TabIndex="6" AutomationProperties.Name="Enable end date filter" AutomationProperties.HelpText="Turn on filtering to an end date." Content="End" IsChecked="{x:Bind ViewModel.UseEndDateFilter, Mode=TwoWay}" />
-                            <DatePicker TabIndex="7" AutomationProperties.Name="End date" AutomationProperties.HelpText="Choose the end date for log filtering." Date="{x:Bind ViewModel.EndDate, Mode=TwoWay}" />
-                        </StackPanel>
-                        <Button Grid.Row="1" Grid.Column="2" TabIndex="8" AccessKey="A" AutomationProperties.Name="Apply log filters" AutomationProperties.HelpText="Apply the current log filters." Content="Apply filters" Command="{x:Bind ViewModel.ApplyFiltersCommand}" />
-                        <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                            <Button TabIndex="9" AccessKey="C" AutomationProperties.Name="Clear log filters" AutomationProperties.HelpText="Clear all log filters." Content="Clear filters" Command="{x:Bind ViewModel.ClearFiltersCommand}" />
-                            <Button TabIndex="10" AccessKey="R" AutomationProperties.Name="Reload logs" AutomationProperties.HelpText="Reload the structured logs list." Content="Reload" Command="{x:Bind ViewModel.ReloadCommand}" />
-                            <Button TabIndex="11" AccessKey="J" AutomationProperties.Name="Open raw JSONL log file" AutomationProperties.HelpText="Open the raw JSONL log file." Content="Open raw JSONL" Command="{x:Bind ViewModel.OpenRawJsonlCommand}" />
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-                <TextBlock
-                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                    AutomationProperties.LiveSetting="Polite"
-                    Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
-                    TextWrapping="Wrap" />
-            </StackPanel>
-
-            <ListView
-                Grid.Row="1"
-                Grid.Column="0"
-                TabIndex="12"
-                AutomationProperties.Name="Structured logs list"
-                AutomationProperties.HelpText="Browse structured log entries and select one to review its context."
-                ItemsSource="{x:Bind ViewModel.Entries, Mode=OneWay}"
-                SelectedItem="{x:Bind ViewModel.SelectedEntry, Mode=TwoWay}"
-                XYFocusKeyboardNavigation="Enabled">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="logging:StructuredLogViewerEntry">
-                        <Grid Padding="6">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Foreground="{StaticResource ShellTextPrimaryBrush}" Text="{x:Bind TimestampText}" />
-                            <TextBlock Grid.Column="1" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind Level}" />
-                            <TextBlock Grid.Column="2" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind Event}" />
-                            <TextBlock Grid.Column="3" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind OperationId}" />
-                            <TextBlock Grid.Column="4" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind Result}" />
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-
-            <Border
-                Grid.Row="1"
-                Grid.Column="1"
-                Padding="8"
-                Background="{StaticResource ShellContentBackgroundBrush}"
-                BorderBrush="{StaticResource ShellBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="{StaticResource CardCornerRadius}"
-                AutomationProperties.LandmarkType="Form">
-                <Grid RowSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
+                <Grid ColumnSpacing="{StaticResource SpacingS}" RowSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBox Grid.Row="0" Grid.Column="0" Width="180" TabIndex="0" AutomationProperties.Name="Filter by operation ID" AutomationProperties.HelpText="Filter logs by operation identifier." PlaceholderText="OperationId" Text="{x:Bind ViewModel.OperationIdQuery, Mode=TwoWay}" />
+                    <TextBox Grid.Row="0" Grid.Column="1" Width="180" TabIndex="1" AutomationProperties.Name="Filter by event" AutomationProperties.HelpText="Filter logs by event name." PlaceholderText="Event" Text="{x:Bind ViewModel.EventQuery, Mode=TwoWay}" />
+                    <TextBox Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="2" Width="260" TabIndex="2" AutomationProperties.Name="Filter by text search" AutomationProperties.HelpText="Filter logs by free-text search." PlaceholderText="Text search" Text="{x:Bind ViewModel.TextSearchQuery, Mode=TwoWay}" />
+
+                    <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                        <ComboBox
+                            Width="180"
+                            TabIndex="3"
+                            Header="Minimum level"
+                            AutomationProperties.Name="Minimum log level"
+                            AutomationProperties.HelpText="Only show entries at or above this level."
+                            ItemsSource="{x:Bind ViewModel.LevelOptions}"
+                            SelectedItem="{x:Bind ViewModel.SelectedLevelOption, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="diagnostics:LogLevelFilterOption">
+                                    <TextBlock Text="{x:Bind Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <DropDownButton
+                            VerticalAlignment="Bottom"
+                            TabIndex="4"
+                            AutomationProperties.Name="Facility filter"
+                            AutomationProperties.HelpText="Choose which facilities to show.">
+                            <TextBlock Text="{x:Bind ViewModel.FacilityFilterSummary}" />
+                            <DropDownButton.Flyout>
+                                <Flyout>
+                                    <ScrollViewer MaxHeight="360" MinWidth="240">
+                                        <ItemsControl ItemsSource="{x:Bind ViewModel.Facilities}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="diagnostics:FacilityFilterOption">
+                                                    <CheckBox
+                                                        Margin="0,2"
+                                                        Content="{x:Bind Label}"
+                                                        IsChecked="{x:Bind IsSelected, Mode=TwoWay}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Flyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom">
+                        <CheckBox VerticalAlignment="Center" TabIndex="5" AutomationProperties.Name="Enable start date filter" AutomationProperties.HelpText="Turn on filtering from a start date." Content="Start" IsChecked="{x:Bind ViewModel.UseStartDateFilter, Mode=TwoWay}" />
+                        <DatePicker TabIndex="6" AutomationProperties.Name="Start date" AutomationProperties.HelpText="Choose the start date for log filtering." Date="{x:Bind ViewModel.StartDate, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom">
+                        <CheckBox VerticalAlignment="Center" TabIndex="7" AutomationProperties.Name="Enable end date filter" AutomationProperties.HelpText="Turn on filtering to an end date." Content="End" IsChecked="{x:Bind ViewModel.UseEndDateFilter, Mode=TwoWay}" />
+                        <DatePicker TabIndex="8" AutomationProperties.Name="End date" AutomationProperties.HelpText="Choose the end date for log filtering." Date="{x:Bind ViewModel.EndDate, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="3" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="{StaticResource SpacingS}" VerticalAlignment="Bottom">
+                        <Button TabIndex="9" AccessKey="A" AutomationProperties.Name="Apply log filters" AutomationProperties.HelpText="Apply the current log filters." Content="Apply filters" Command="{x:Bind ViewModel.ApplyFiltersCommand}" />
+                        <Button TabIndex="10" AccessKey="C" AutomationProperties.Name="Clear log filters" AutomationProperties.HelpText="Clear all log filters." Content="Clear filters" Command="{x:Bind ViewModel.ClearFiltersCommand}" />
+                        <Button TabIndex="11" AccessKey="R" AutomationProperties.Name="Reload logs" AutomationProperties.HelpText="Reload the structured logs list." Content="Reload" Command="{x:Bind ViewModel.ReloadCommand}" />
+                        <Button TabIndex="12" AccessKey="J" AutomationProperties.Name="Open raw JSONL log file" AutomationProperties.HelpText="Open the raw JSONL log file." Content="Open raw JSONL" Command="{x:Bind ViewModel.OpenRawJsonlCommand}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="1"
+                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                AutomationProperties.LiveSetting="Polite"
+                Text="{x:Bind ViewModel.StatusText}"
+                TextWrapping="Wrap" />
+
+            <!-- Log grid + draggable splitter + Selected Context panel -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition x:Name="PanelColumn" Width="380" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock
-                        Grid.Row="0"
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Selected Context" />
-                    <ScrollViewer
+                    <!-- Column headers. Same fixed widths + ColumnSpacing + 8px left inset as the rows so the labels align. -->
+                    <Grid Grid.Row="0" Padding="8,0,8,4" ColumnSpacing="8" BorderBrush="{StaticResource ShellBorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="52" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Time" />
+                        <TextBlock Grid.Column="1" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Severity" />
+                        <TextBlock Grid.Column="2" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Facility" />
+                        <TextBlock Grid.Column="3" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Operation" />
+                        <TextBlock Grid.Column="4" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Phase" />
+                        <TextBlock Grid.Column="5" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="St" />
+                        <TextBlock Grid.Column="6" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="Code" />
+                        <TextBlock Grid.Column="7" Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" Text="OperationId" />
+                    </Grid>
+
+                    <ListView
                         Grid.Row="1"
-                        MaxHeight="88"
-                        VerticalScrollBarVisibility="Auto">
+                        TabIndex="13"
+                        Padding="0"
+                        ItemContainerStyle="{StaticResource LogRowItemStyle}"
+                        AutomationProperties.Name="Structured logs list"
+                        AutomationProperties.HelpText="Browse structured log entries and select one to review its context."
+                        ItemsSource="{x:Bind ViewModel.Entries}"
+                        SelectedItem="{x:Bind ViewModel.SelectedEntry, Mode=TwoWay}"
+                        XYFocusKeyboardNavigation="Enabled">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="logging:StructuredLogViewerEntry">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="80" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="52" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Foreground="{StaticResource ShellTextPrimaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind TimestampText}" />
+                                    <TextBlock Grid.Column="1" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{x:Bind Severity, Converter={StaticResource SeverityToBrush}}" Text="{x:Bind Severity}" />
+                                    <TextBlock Grid.Column="2" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind Facility}" />
+                                    <TextBlock Grid.Column="3" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind Operation}" />
+                                    <TextBlock Grid.Column="4" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind Phase}" />
+                                    <TextBlock Grid.Column="5" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind StatusByteText}" />
+                                    <TextBlock Grid.Column="6" FontFamily="Consolas" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind Code}" />
+                                    <TextBlock Grid.Column="7" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind OperationId}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+
+                <!-- Draggable splitter between the grid and the Selected Context panel. -->
+                <Border
+                    Grid.Column="1"
+                    Width="8"
+                    Background="Transparent"
+                    ManipulationMode="TranslateX"
+                    ManipulationDelta="OnSplitterManipulationDelta"
+                    AutomationProperties.Name="Resize Selected Context panel">
+                    <Rectangle Width="1" Fill="{StaticResource ShellBorderBrush}" HorizontalAlignment="Center" />
+                </Border>
+
+                <!-- Selected Context panel -->
+                <Border
+                    Grid.Column="2"
+                    Padding="12"
+                    Background="{StaticResource ShellContentBackgroundBrush}"
+                    BorderBrush="{StaticResource ShellBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    AutomationProperties.LandmarkType="Form">
+                    <Grid>
                         <TextBlock
                             Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            AutomationProperties.LiveSetting="Polite"
-                            Text="{x:Bind ViewModel.SelectedEnvelopeText, Mode=OneWay}"
-                            TextWrapping="WrapWholeWords" />
-                    </ScrollViewer>
-                    <TextBox
-                        Grid.Row="2"
-                        TabIndex="13"
-                        AcceptsReturn="True"
-                        AutomationProperties.Name="Selected log context"
-                        AutomationProperties.HelpText="Read the detailed context for the selected log entry."
-                        IsReadOnly="True"
-                        TextWrapping="NoWrap"
-                        VerticalAlignment="Stretch"
-                        FontFamily="Consolas"
-                        Text="{x:Bind ViewModel.SelectedContextText, Mode=OneWay}"
-                        ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollBarVisibility="Auto" />
-                </Grid>
-            </Border>
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Text="Select a log entry to see its details."
+                            TextWrapping="Wrap"
+                            Visibility="{x:Bind ViewModel.HasSelection, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}" />
+
+                        <ScrollViewer
+                            VerticalScrollBarVisibility="Auto"
+                            Visibility="{x:Bind ViewModel.HasSelection, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Spacing="{StaticResource SpacingS}">
+                                <!-- Title + severity/code chips -->
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    FontSize="15"
+                                    FontWeight="SemiBold"
+                                    Text="{x:Bind ViewModel.SelectedTitle}"
+                                    TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border
+                                        Padding="8,2"
+                                        CornerRadius="10"
+                                        Background="{x:Bind ViewModel.SelectedSeverity, Converter={StaticResource SeverityToBrush}}">
+                                        <TextBlock Foreground="White" FontWeight="SemiBold" FontSize="12" Text="{x:Bind ViewModel.SelectedSeverity}" />
+                                    </Border>
+                                    <Button
+                                        Padding="8,2"
+                                        Click="OnCopyCodeClicked"
+                                        Command="{x:Bind ViewModel.CopyCodeCommand}"
+                                        ToolTipService.ToolTip="Copy code to clipboard"
+                                        AutomationProperties.Name="Copy status code"
+                                        Visibility="{x:Bind ViewModel.HasCode, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontSize="12" Glyph="&#xE8C8;" />
+                                            <TextBlock FontFamily="Consolas" Text="{x:Bind ViewModel.SelectedCode}" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                                <!-- Plain-language message -->
+                                <TextBlock
+                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind ViewModel.SelectedMessage}"
+                                    TextWrapping="Wrap" />
+
+                                <!-- Remediation, when present -->
+                                <Border
+                                    Padding="10"
+                                    Background="{StaticResource ShellBackgroundBrush}"
+                                    BorderBrush="{StaticResource ShellBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource CardCornerRadius}"
+                                    Visibility="{x:Bind ViewModel.HasRemediation, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" Text="Remediation" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                            IsTextSelectionEnabled="True"
+                                            Text="{x:Bind ViewModel.SelectedRemediation}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Resolved facets -->
+                                <Grid ColumnSpacing="8" RowSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Facility" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Foreground="{StaticResource ShellTextPrimaryBrush}" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedFacilityText}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Operation" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Foreground="{StaticResource ShellTextPrimaryBrush}" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedOperationText}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Phase" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Foreground="{StaticResource ShellTextPrimaryBrush}" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedPhaseText}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Thread" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Foreground="{StaticResource ShellTextPrimaryBrush}" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedThreadText}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Callsite" />
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Foreground="{StaticResource ShellTextPrimaryBrush}" IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.SelectedCallsite}" TextWrapping="Wrap" />
+                                </Grid>
+
+                                <!-- Selectable context key/value table -->
+                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" Text="Context" />
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedContextRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="diagnostics:LogContextRow">
+                                            <Grid ColumnSpacing="8" Margin="0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="120" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Foreground="{StaticResource ShellTextSecondaryBrush}" IsTextSelectionEnabled="True" Text="{x:Bind Key}" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="1" Foreground="{StaticResource ShellTextPrimaryBrush}" IsTextSelectionEnabled="True" Text="{x:Bind Value}" TextWrapping="Wrap" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Raw JSON (collapsed) -->
+                                <Expander Header="Raw JSON" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                    <TextBox
+                                        AcceptsReturn="True"
+                                        IsReadOnly="True"
+                                        FontFamily="Consolas"
+                                        TextWrapping="NoWrap"
+                                        AutomationProperties.Name="Selected log raw JSON"
+                                        Text="{x:Bind ViewModel.SelectedRawJson}"
+                                        ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                        ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

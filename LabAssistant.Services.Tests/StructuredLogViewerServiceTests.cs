@@ -1,5 +1,6 @@
 using System.Text.Json;
 using LabAssistant.Models.Configuration;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using Xunit;
 
@@ -65,7 +66,7 @@ public class StructuredLogViewerServiceTests
             var filter = new StructuredLogViewerFilter
             {
                 OperationId = "op-b",
-                Level = "error",
+                MinimumLevel = StatusLevelRank.Error,
                 Event = "Step",
                 TextSearch = "timeout",
                 StartUtc = new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero),
@@ -77,6 +78,120 @@ public class StructuredLogViewerServiceTests
             Assert.Single(result.Entries);
             Assert.Equal("StepFailed", result.Entries[0].Event);
             Assert.Equal("op-b", result.Entries[0].OperationId);
+        }
+        finally
+        {
+            CleanupTempRoot(root);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_ResolvesCodeFields_FromRegistry()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var service = CreateService(root, logFolderOverride: null);
+            var filePath = service.GetStructuredLogFilePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+            var codeEvent = StructuredLogEvent.Create(LaStatus.Hyperv_VMStarted, "op-hv", "success");
+            await File.WriteAllLinesAsync(filePath, new[] { Serialize(codeEvent) });
+
+            var result = await service.LoadAsync(new StructuredLogViewerFilter());
+
+            var entry = Assert.Single(result.Entries);
+            var descriptor = StatusCodes.Describe(LaStatus.Hyperv_VMStarted)!;
+            Assert.Equal($"0x{LaStatus.Hyperv_VMStarted:X8}", entry.Code);
+            Assert.Equal(LaStatus.Hyperv_VMStarted, entry.CodeValue);
+            Assert.Equal(StatusCodes.FacilityOf(LaStatus.Hyperv_VMStarted), entry.FacilityByte);
+            Assert.Equal(descriptor.FacilityName, entry.Facility);
+            Assert.Equal(descriptor.OperationName, entry.Operation);
+            Assert.Equal(descriptor.Severity.ToString(), entry.Severity);
+            Assert.Equal(descriptor.Message, entry.Message);
+            Assert.Equal($"0x{descriptor.Status:X2}", entry.StatusByteText);
+            Assert.NotNull(entry.Thread);
+        }
+        finally
+        {
+            CleanupTempRoot(root);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_FiltersByFacility_AndMinimumLevel()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var service = CreateService(root, logFolderOverride: null);
+            var filePath = service.GetStructuredLogFilePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+            await File.WriteAllLinesAsync(filePath, new[]
+            {
+                Serialize(StructuredLogEvent.Create(LaStatus.Hyperv_VMStarted, "op-1", "success")),
+                Serialize(StructuredLogEvent.Create(LaStatus.Hyperv_VMStopFailed, "op-2", "failed")),
+                Serialize(StructuredLogEvent.Create(LaStatus.Machines_MachineDeleteFailed, "op-3", "failed"))
+            });
+
+            var hypervByte = StatusCodes.FacilityOf(LaStatus.Hyperv_VMStarted);
+
+            // Facility filter: only Hyper-V events survive.
+            var byFacility = await service.LoadAsync(new StructuredLogViewerFilter
+            {
+                Facilities = new[] { hypervByte }
+            });
+            Assert.Equal(2, byFacility.Entries.Count);
+            Assert.All(byFacility.Entries, e => Assert.Equal(hypervByte, e.FacilityByte));
+
+            // Minimum-level filter: only Error-rank events survive (the started/success one drops out).
+            var byLevel = await service.LoadAsync(new StructuredLogViewerFilter
+            {
+                MinimumLevel = StatusLevelRank.Error
+            });
+            Assert.Equal(2, byLevel.Entries.Count);
+            Assert.All(byLevel.Entries, e => Assert.Equal(StatusLevelRank.Error, e.LevelRank));
+
+            // Combined: Hyper-V facility AND Error rank narrows to the single stop-failed event.
+            var combined = await service.LoadAsync(new StructuredLogViewerFilter
+            {
+                Facilities = new[] { hypervByte },
+                MinimumLevel = StatusLevelRank.Error
+            });
+            var only = Assert.Single(combined.Entries);
+            Assert.Equal("op-2", only.OperationId);
+        }
+        finally
+        {
+            CleanupTempRoot(root);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_FacilityFilter_HidesLegacyCodelessEntries()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var service = CreateService(root, logFolderOverride: null);
+            var filePath = service.GetStructuredLogFilePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+            await File.WriteAllLinesAsync(filePath, new[]
+            {
+                Serialize(StructuredLogEvent.Create(LaStatus.Hyperv_VMStarted, "op-1", "success")),
+                """{"ts":"2026-03-01T10:00:00Z","level":"info","event":"LegacyEvent","operationId":"op-legacy","result":"ok","context":{}}"""
+            });
+
+            var hypervByte = StatusCodes.FacilityOf(LaStatus.Hyperv_VMStarted);
+            var result = await service.LoadAsync(new StructuredLogViewerFilter
+            {
+                Facilities = new[] { hypervByte }
+            });
+
+            var only = Assert.Single(result.Entries);
+            Assert.Equal("op-1", only.OperationId);
         }
         finally
         {
@@ -104,6 +219,8 @@ public class StructuredLogViewerServiceTests
             CleanupTempRoot(root);
         }
     }
+
+    private static string Serialize(StructuredLogEvent evt) => JsonSerializer.Serialize(evt);
 
     private static StructuredLogViewerService CreateService(string root, string? logFolderOverride)
     {
