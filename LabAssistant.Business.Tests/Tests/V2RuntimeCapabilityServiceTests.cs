@@ -459,7 +459,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         Assert.Contains(
             logger.Events,
-            e => e.Event == "GuestReadinessAttempt" &&
+            e => e.Code == $"0x{LabAssistant.Services.Diagnostics.LaStatus.DeployGuest_ReadinessAttemptCredentialRejected:X8}" &&
                  e.Context != null &&
                  e.Context.TryGetValue("errorCategory", out var category) &&
                  (category as string) == "AuthenticationRejected");

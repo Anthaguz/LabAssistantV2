@@ -71,7 +71,13 @@ namespace LabAssistant.Models.Deployment
         public List<string> Logs { get; } = new();
         public PowerShellHandle? PowerShellHandle { get; set; }
         public Action<string>? LogCallback { get; set; }
-        public Action<string, string, string?, IReadOnlyDictionary<string, object?>?>? StructuredEventEmitter { get; set; }
+        public Action<uint, string?, IReadOnlyDictionary<string, object?>?>? StructuredEventEmitter { get; set; }
+
+        // The deploy.step "failed" status codes. Business sets these when it wires the emitter,
+        // because the generated LaStatus registry lives in LabAssistant.Services, which
+        // LabAssistant.Models must not reference. MarkFailure only emits when the code is set.
+        public uint StepFailedCode { get; set; }
+        public uint StepFailedNonBlockingCode { get; set; }
         public Action<DeployStepStateUpdate>? StepStateEmitter { get; set; }
         public Action? OnBlockingFailure { get; set; }
         public Func<bool>? ShouldAbort { get; set; }
@@ -139,11 +145,13 @@ namespace LabAssistant.Models.Deployment
                 {
                     Logs.Add(message);
                 }
-                StructuredEventEmitter?.Invoke(
-                    "StepFailed",
-                    "warn",
-                    "non_blocking_failed",
-                    BuildStepFailedContext(stepKey, message, extraContext));
+                if (StepFailedNonBlockingCode != 0)
+                {
+                    StructuredEventEmitter?.Invoke(
+                        StepFailedNonBlockingCode,
+                        "non_blocking_failed",
+                        BuildStepFailedContext(stepKey, message, extraContext));
+                }
                 return;
             }
 
@@ -155,11 +163,13 @@ namespace LabAssistant.Models.Deployment
             {
                 Logs.Add(message);
             }
-            StructuredEventEmitter?.Invoke(
-                "StepFailed",
-                "error",
-                "failed",
-                FailureMetadata);
+            if (StepFailedCode != 0)
+            {
+                StructuredEventEmitter?.Invoke(
+                    StepFailedCode,
+                    "failed",
+                    FailureMetadata);
+            }
             OnBlockingFailure?.Invoke();
         }
 

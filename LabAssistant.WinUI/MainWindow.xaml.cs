@@ -1,3 +1,4 @@
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Shell;
 using LabAssistant.WinUI.ViewModels;
@@ -119,12 +120,12 @@ public sealed partial class MainWindow : Window
                 CapabilityFrame.Navigate(typeof(Views.Shell.ShellBlankPage));
             }
 
-            _structuredLogger.Log(StructuredLogLevel.Info, "shell.window_closed_teardown", operationId, "ok", context);
+            _structuredLogger.Log(LaStatus.ShellUi_WindowTeardownComplete, operationId, "ok", context);
         }
         catch (Exception ex)
         {
             context["error"] = ex.Message;
-            _structuredLogger.Log(StructuredLogLevel.Warn, "shell.window_closed_teardown", operationId, "failed", context);
+            _structuredLogger.Log(LaStatus.ShellUi_WindowTeardownError, operationId, "failed", context);
         }
     }
 

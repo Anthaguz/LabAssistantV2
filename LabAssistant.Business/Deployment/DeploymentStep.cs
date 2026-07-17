@@ -30,7 +30,7 @@ public abstract class DeploymentStep
         if (!context.IsSuccess && context.PerVmFailFast) return;
         context.EmitStepState(stepKey, stepLabel, DeployStepState.Pending);
         context.EmitStepState(stepKey, stepLabel, DeployStepState.Running);
-        EmitStepEvent(context, "StepStarted", "info", null, stepKey);
+        EmitStepEvent(context, LaStatus.DeployStep_StepStarted, null, stepKey);
         try
         {
             await HandleAsync(context);
@@ -39,8 +39,7 @@ public abstract class DeploymentStep
         {
             EmitStepEvent(
                 context,
-                "StepFailed",
-                "error",
+                LaStatus.DeployStep_StepFailedException,
                 "exception",
                 stepKey,
                     RuntimeErrorMetadataNormalizer.Merge(
@@ -54,13 +53,20 @@ public abstract class DeploymentStep
             : context.IsSuccess
                 ? DeployStepState.Succeeded
                 : DeployStepState.Failed;
-        var stepResult = terminalState switch
+
+        // A Failed terminal state always follows a MarkFailure call (the only thing that clears IsSuccess), which
+        // already emits the rich coded failure event via StepFailedCode; an exception path emits StepFailedException
+        // and rethrows before reaching here. So Failed emits no terminal log event - this avoids a duplicate,
+        // context-poor StepFailed and keeps the code's severity coherent with the outcome. Both Succeeded and
+        // Skipped terminal states emit StepCompleted with the outcome carried in the result field; a step that is
+        // explicitly skipped (for example a guest step) additionally emits its own rich StepSkipped event with the
+        // skip reason, so StepSkipped stays a single, reason-bearing signal rather than being duplicated here.
+        if (terminalState != DeployStepState.Failed)
         {
-            DeployStepState.Succeeded => "success",
-            DeployStepState.Skipped => "skipped",
-            _ => "failed"
-        };
-        EmitStepEvent(context, "StepCompleted", "info", stepResult, stepKey);
+            var stepResult = terminalState == DeployStepState.Skipped ? "skipped" : "success";
+            EmitStepEvent(context, LaStatus.DeployStep_StepCompleted, stepResult, stepKey);
+        }
+
         context.EmitStepState(stepKey, stepLabel, terminalState, overrideMessage);
         if (context.ShouldAbort?.Invoke() == true)
         {
@@ -77,8 +83,7 @@ public abstract class DeploymentStep
 
     protected static void EmitStepEvent(
         VmDeploymentContext context,
-        string eventName,
-        string level,
+        uint code,
         string? result,
         string stepKey,
         IReadOnlyDictionary<string, object?>? extraContext = null)
@@ -101,6 +106,6 @@ public abstract class DeploymentStep
             }
         }
 
-        context.StructuredEventEmitter.Invoke(eventName, level, result, payload);
+        context.StructuredEventEmitter.Invoke(code, result, payload);
     }
 }

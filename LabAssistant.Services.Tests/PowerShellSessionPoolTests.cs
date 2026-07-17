@@ -160,7 +160,7 @@ public class PowerShellSessionPoolTests
         var secondHandle = await pool.CheckoutAsync();
 
         var retired = Assert.Single(logger.Events, e =>
-            e.EventName == "powershell.session-pool.checkout"
+            e.Code == $"0x{LaStatus.InfraPowershell_DeadSessionRetiredOnCheckout:X8}"
             && e.Result == "retired-dead");
         Assert.Equal(StructuredLogLevel.Warn, retired.Level);
         Assert.NotNull(retired.Context);

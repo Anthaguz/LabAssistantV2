@@ -1,6 +1,7 @@
 using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.PowerShell;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.PowerShell;
 using Xunit;
@@ -115,7 +116,7 @@ public class MilestoneUScenarioMatrixTests
         var handle = new PowerShellHandle();
         var resolver = new SingleSessionResolver(handle, new FakeSession());
         var hyperV = new FakeHyperVService { CreateVhdDifferencingResult = false };
-        var events = new List<(string EventName, IReadOnlyDictionary<string, object?>? Context)>();
+        var events = new List<(uint Code, IReadOnlyDictionary<string, object?>? Context)>();
         var context = new VmDeploymentContext
         {
             VmId = Guid.NewGuid(),
@@ -123,7 +124,8 @@ public class MilestoneUScenarioMatrixTests
             BaseVhdPath = @"D:\Base\bad.vhdx",
             VhdPath = @"D:\Labs\VM1\VM1.vhdx",
             PowerShellHandle = handle,
-            StructuredEventEmitter = (eventName, _, _, extra) => events.Add((eventName, extra))
+            StepFailedCode = LaStatus.DeployStep_StepFailed,
+            StructuredEventEmitter = (code, _, extra) => events.Add((code, extra))
         };
 
         var step = new CreateVhdStep(resolver, _ => hyperV);
@@ -134,7 +136,7 @@ public class MilestoneUScenarioMatrixTests
         Assert.Contains(context.BaseVhdPath, context.FailureMessage);
         Assert.DoesNotContain(Environment.NewLine, context.FailureMessage);
 
-        var stepFailed = Assert.Single(events, e => e.EventName == "StepFailed");
+        var stepFailed = Assert.Single(events, e => e.Code == LaStatus.DeployStep_StepFailed);
         Assert.Equal(context.BaseVhdPath, stepFailed.Context?["parentVhdPath"]?.ToString());
         Assert.Equal(context.VhdPath, stepFailed.Context?["targetVhdPath"]?.ToString());
     }

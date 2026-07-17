@@ -1,4 +1,5 @@
 using LabAssistant.Models.Deployment;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.GuestExecution;
 
 namespace LabAssistant.Business.Runtime;
@@ -43,8 +44,9 @@ internal static class GuestReadinessLog
             + (summary.Length == 0 ? string.Empty : $": {summary}"));
 
         context.StructuredEventEmitter?.Invoke(
-            "GuestReadinessAttempt",
-            category == GuestCommandErrorCategory.AuthenticationRejected ? "warn" : "debug",
+            category == GuestCommandErrorCategory.AuthenticationRejected
+                ? LaStatus.DeployGuest_ReadinessAttemptCredentialRejected
+                : LaStatus.DeployGuest_ReadinessAttemptNotReady,
             "retrying",
             new Dictionary<string, object?>
             {

@@ -2,6 +2,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
 using LabAssistant.Models.Validation;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 
 namespace LabAssistant.Business.Templates;
@@ -111,8 +112,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
                 .ToList();
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "TemplateLibraryLoaded",
+                LaStatus.Template_TemplateLibraryLoaded,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -131,8 +131,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "TemplateLibraryLoaded",
+                LaStatus.Template_TemplateLibraryLoadFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -227,8 +226,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
             {
                 var message = "Save blocked. " + string.Join(" ", validation.Errors);
                 _structuredLogger.Log(
-                    StructuredLogLevel.Warn,
-                    "TemplateSaved",
+                    LaStatus.Template_TemplateNotSavedValidationFailed,
                     operationId,
                     "validation_failed",
                     new Dictionary<string, object?>
@@ -289,8 +287,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
             }
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "TemplateSaved",
+                LaStatus.Template_TemplateSaved,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -312,8 +309,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "TemplateSaved",
+                LaStatus.Template_TemplateSaveFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -365,8 +361,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
             File.Delete(filePath);
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "TemplateDeleted",
+                LaStatus.Template_TemplateDeleted,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -385,8 +380,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "TemplateDeleted",
+                LaStatus.Template_TemplateDeleteFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -448,8 +442,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
             var importedPath = _templateStore.SaveToFolder(folder, template.Name, template);
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "TemplateImported",
+                LaStatus.Template_TemplateImported,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -471,8 +464,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "TemplateImported",
+                LaStatus.Template_TemplateImportFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -520,8 +512,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
             File.Copy(sourceFilePath, destinationFilePath, overwrite: true);
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "TemplateExported",
+                LaStatus.Template_TemplateExported,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -541,8 +532,7 @@ public sealed class TemplatesCapabilityService : ITemplatesCapabilityService
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "TemplateExported",
+                LaStatus.Template_TemplateExportFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>

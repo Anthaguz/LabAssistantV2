@@ -1,6 +1,7 @@
 using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Diagnostics;
 using Xunit;
 
 namespace LabAssistant.Business.Tests.Tests;
@@ -20,9 +21,9 @@ public class MilestoneWScenarioMatrixTests
             ConfigureNetworkInformation = true
         };
 
-        var events = new List<(string EventName, string? Result, IReadOnlyDictionary<string, object?> Context)>();
-        vm.StructuredEventEmitter = (eventName, _, result, payload) =>
-            events.Add((eventName, result, payload ?? new Dictionary<string, object?>()));
+        var events = new List<(uint Code, string? Result, IReadOnlyDictionary<string, object?> Context)>();
+        vm.StructuredEventEmitter = (code, result, payload) =>
+            events.Add((code, result, payload ?? new Dictionary<string, object?>()));
 
         await new SetTimeZoneStep().ExecuteAsync(vm);
         await new InstallSoftwareStep().ExecuteAsync(vm);
@@ -42,7 +43,7 @@ public class MilestoneWScenarioMatrixTests
             o.Result == GuestStepOutcomeResults.Skipped &&
             o.SkipReason == GuestStepSkipReasons.NotImplemented);
 
-        var skippedEvents = events.Where(e => e.EventName == "StepSkipped").ToList();
+        var skippedEvents = events.Where(e => e.Code == LaStatus.DeployStep_StepSkipped).ToList();
         Assert.Equal(2, skippedEvents.Count);
         Assert.All(skippedEvents, e => Assert.Equal("skipped", e.Result));
         Assert.Contains(skippedEvents, e =>

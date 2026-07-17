@@ -93,6 +93,8 @@ facilities:
       - { value: 0x01, name: library-load, title: Load template library }
       - { value: 0x02, name: save, title: Save template }
       - { value: 0x03, name: delete, title: Delete template }
+      - { value: 0x04, name: import, title: Import template }
+      - { value: 0x05, name: export, title: Export template }
 
   - value: 0x20
     name: hyperv
@@ -163,6 +165,7 @@ facilities:
     operations:
       - { value: 0x01, name: ensure, title: Ensure switch }
       - { value: 0x02, name: cleanup, title: Clean up switch }
+      - { value: 0x03, name: create, title: Create switch }
 
   - value: 0x45
     name: deploy.cleanup
@@ -179,6 +182,7 @@ facilities:
       - { value: 0x01, name: cleanup, title: Clean up trust }
       - { value: 0x02, name: dns-prep, title: Prepare DNS }
       - { value: 0x03, name: create, title: Create trust }
+      - { value: 0x04, name: validate, title: Validate trust }
 
   - value: 0x50
     name: shell.ui
@@ -322,6 +326,10 @@ codes:
   - { facility: 0x13, operation: 0x02, status: 0x02, severity: Error, flags: [UserActionable], phase: end, title: Template save failed, message: "A template could not be saved.", remediation: "Verify the template path is writable." }
   - { facility: 0x13, operation: 0x03, status: 0x00, severity: Success, phase: end, title: Template deleted, message: "A template was deleted." }
   - { facility: 0x13, operation: 0x03, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Template delete failed, message: "A template could not be deleted." }
+  - { facility: 0x13, operation: 0x04, status: 0x00, severity: Success, phase: end, title: Template imported, message: "A template was imported into the library." }
+  - { facility: 0x13, operation: 0x04, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Template import failed, message: "A template could not be imported.", remediation: "Verify the source file is a valid template." }
+  - { facility: 0x13, operation: 0x05, status: 0x00, severity: Success, phase: end, title: Template exported, message: "A template was exported." }
+  - { facility: 0x13, operation: 0x05, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Template export failed, message: "A template could not be exported.", remediation: "Verify the destination path is writable." }
 
   # --- hyperv primitives (Info on success, Error on failure) ---
   - { facility: 0x20, operation: 0x01, status: 0x00, severity: Success, phase: end, title: VM created, message: "The virtual machine was created." }
@@ -414,6 +422,8 @@ codes:
   - { facility: 0x44, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: Switch cleaned up, message: "A virtual switch created for the deployment was cleaned up." }
   - { facility: 0x44, operation: 0x02, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Switch cleanup failed, message: "A virtual switch created for the deployment could not be cleaned up.", remediation: "Check Hyper-V for an orphaned switch and remove it manually." }
   - { facility: 0x44, operation: 0x02, status: 0x02, severity: Error, flags: [UserActionable], phase: end, title: Switch cleanup failed (exception), message: "Cleaning up a deployment virtual switch threw an exception.", remediation: "Check Hyper-V for an orphaned switch and remove it manually." }
+  - { facility: 0x44, operation: 0x03, status: 0x00, severity: Info,    phase: start, title: Creating switch, message: "Creating a virtual switch for the deployment." }
+  - { facility: 0x44, operation: 0x03, status: 0x00, severity: Success, phase: end,   title: Switch created, message: "A virtual switch was created for the deployment." }
 
   # --- deploy.cleanup (vm / step) ---
   - { facility: 0x45, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Cleaning up VM, message: "Rolling back resources created for a virtual machine." }
@@ -434,6 +444,9 @@ codes:
   - { facility: 0x46, operation: 0x03, status: 0x00, severity: Info,    phase: start, title: Creating forest trust, message: "Creating a forest trust between domains." }
   - { facility: 0x46, operation: 0x03, status: 0x00, severity: Success, phase: end,   title: Forest trust created, message: "A forest trust between domains was created." }
   - { facility: 0x46, operation: 0x03, status: 0x01, severity: Error,   phase: end,   title: Forest trust creation failed, message: "A forest trust between domains could not be created." }
+  - { facility: 0x46, operation: 0x04, status: 0x00, severity: Info,    phase: start, title: Validating forest trust, message: "Validating a forest trust between domains." }
+  - { facility: 0x46, operation: 0x04, status: 0x00, severity: Success, phase: end,   title: Forest trust validated, message: "A forest trust between domains was validated." }
+  - { facility: 0x46, operation: 0x04, status: 0x01, severity: Error,   phase: end,   title: Forest trust validation failed, message: "A forest trust between domains could not be validated." }
 
   # --- shell.ui ---
   - { facility: 0x50, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Window teardown complete, message: "A capability panel was torn down when its window closed." }

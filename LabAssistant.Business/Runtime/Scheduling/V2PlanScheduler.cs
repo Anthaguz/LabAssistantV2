@@ -1,4 +1,5 @@
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 
 namespace LabAssistant.Business.Runtime.Scheduling;
@@ -88,8 +89,7 @@ public sealed class V2PlanScheduler : IV2PlanScheduler
         public async Task<V2SchedulerRunResult> RunAsync()
         {
             _log.Log(
-                StructuredLogLevel.Info,
-                "V2SchedulerStarted",
+                LaStatus.DeployOrchestration_SchedulerStarted,
                 SchedulerOperation,
                 "started",
                 new Dictionary<string, object?>
@@ -262,8 +262,7 @@ public sealed class V2PlanScheduler : IV2PlanScheduler
             }
 
             _log.Log(
-                StructuredLogLevel.Info,
-                "V2SchedulerCleanupStarted",
+                LaStatus.DeployOrchestration_SchedulerCleanupStarted,
                 SchedulerOperation,
                 _cancelled ? "cancelled" : "failed",
                 new Dictionary<string, object?>
@@ -287,8 +286,7 @@ public sealed class V2PlanScheduler : IV2PlanScheduler
                 catch (Exception ex)
                 {
                     _log.Log(
-                        StructuredLogLevel.Warn,
-                        "V2SchedulerCleanupNodeFailed",
+                        LaStatus.DeployOrchestration_SchedulerCleanupNodeFailed,
                         SchedulerOperation,
                         "error",
                         new Dictionary<string, object?>
@@ -314,8 +312,7 @@ public sealed class V2PlanScheduler : IV2PlanScheduler
             var success = outcomes.All(outcome => outcome.Status == V2NodeOutcomeStatus.Completed);
 
             _log.Log(
-                StructuredLogLevel.Info,
-                "V2SchedulerCompleted",
+                LaStatus.DeployOrchestration_SchedulerCompleted,
                 SchedulerOperation,
                 success ? "success" : _cancelled ? "cancelled" : "failed",
                 new Dictionary<string, object?>

@@ -2,6 +2,7 @@ using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.PowerShell;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.GuestExecution;
 using LabAssistant.Services.Logging;
 
@@ -142,14 +143,14 @@ public sealed class V2ForestTrustRuntimeStage
 
             multiContext.MarkCleanupInProgress();
             trustState.CleanupAttempted = true;
-            EmitTrustEvent("ForestTrustCleanupStarted", multiContext, trust, "cleanup", "started");
+            EmitTrustEvent(LaStatus.DeployForestTrust_CleaningUpForestTrust, multiContext, trust, "cleanup", "started");
 
             var sourceCredentialAvailable = request.CredentialSlotValues.TryGetValue(trust.SourceDomainAdminCredentialSlot ?? string.Empty, out var sourceCredential);
             var targetCredentialAvailable = request.CredentialSlotValues.TryGetValue(trust.TargetDomainAdminCredentialSlot ?? string.Empty, out var targetCredential);
             if (!sourceCredentialAvailable || !targetCredentialAvailable)
             {
                 trustState.CleanupResidual = true;
-                EmitTrustEvent("ForestTrustCleanupCompleted", multiContext, trust, "cleanup", "failed", "error", "Missing source or target domain-admin credential material for trust cleanup.");
+                EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustCleanupFailed, multiContext, trust, "cleanup", "failed", "Missing source or target domain-admin credential material for trust cleanup.");
                 continue;
             }
 
@@ -169,12 +170,11 @@ public sealed class V2ForestTrustRuntimeStage
                 " ",
                 new[] { sourceResult.Error, targetResult.Error }.Where(value => !string.IsNullOrWhiteSpace(value)));
             EmitTrustEvent(
-                "ForestTrustCleanupCompleted",
+                trustState.CleanupResidual ? LaStatus.DeployForestTrust_ForestTrustCleanupFailed : LaStatus.DeployForestTrust_ForestTrustCleanedUp,
                 multiContext,
                 trust,
                 "cleanup",
                 trustState.CleanupResidual ? "failed" : "success",
-                trustState.CleanupResidual ? "error" : "info",
                 string.IsNullOrWhiteSpace(error) ? null : error);
         }
     }
@@ -277,7 +277,7 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
-        EmitTrustEvent("ForestTrustDnsPreparationStarted", multiContext, trust, "dns-prep", "started");
+        EmitTrustEvent(LaStatus.DeployForestTrust_PreparingDNSForForestTrust, multiContext, trust, "dns-prep", "started");
         var sourceCredential = ResolveCredential(
             request.CredentialSlotValues,
             trust.SourceDomainAdminCredentialSlot,
@@ -292,7 +292,7 @@ public sealed class V2ForestTrustRuntimeStage
             "target domain-admin");
         if (sourceCredential is null || targetCredential is null)
         {
-            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "warn", "Missing source or target domain-admin credential material.");
+            EmitTrustEvent(LaStatus.DeployForestTrust_DNSPreparationFailed, multiContext, trust, "dns-prep", "failed", "Missing source or target domain-admin credential material.");
             return;
         }
 
@@ -309,7 +309,7 @@ public sealed class V2ForestTrustRuntimeStage
             context.MarkFailure(
                 DeploymentStepKeys.V2PrepareForestTrustDns,
                 $"Trust '{trust.TrustId}' could not resolve source and target domain-controller DNS server IPs.");
-            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "error", "Domain-controller DNS server IPs could not be resolved.");
+            EmitTrustEvent(LaStatus.DeployForestTrust_DNSPreparationFailed, multiContext, trust, "dns-prep", "failed", "Domain-controller DNS server IPs could not be resolved.");
             return;
         }
 
@@ -324,7 +324,7 @@ public sealed class V2ForestTrustRuntimeStage
             context.MarkFailure(
                 DeploymentStepKeys.V2PrepareForestTrustDns,
                 $"Failed to prepare source-side DNS forwarding for trust '{trust.TrustId}'. {sourceResult.Error}".Trim());
-            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "error", sourceResult.Error);
+            EmitTrustEvent(LaStatus.DeployForestTrust_DNSPreparationFailed, multiContext, trust, "dns-prep", "failed", sourceResult.Error);
             return;
         }
 
@@ -339,11 +339,11 @@ public sealed class V2ForestTrustRuntimeStage
             context.MarkFailure(
                 DeploymentStepKeys.V2PrepareForestTrustDns,
                 $"Failed to prepare target-side DNS forwarding for trust '{trust.TrustId}'. {targetResult.Error}".Trim());
-            EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "failed", "error", targetResult.Error);
+            EmitTrustEvent(LaStatus.DeployForestTrust_DNSPreparationFailed, multiContext, trust, "dns-prep", "failed", targetResult.Error);
             return;
         }
 
-        EmitTrustEvent("ForestTrustDnsPreparationCompleted", multiContext, trust, "dns-prep", "success");
+        EmitTrustEvent(LaStatus.DeployForestTrust_DNSPreparedForForestTrust, multiContext, trust, "dns-prep", "success");
     }
 
     private async Task CreateForestTrustAsync(
@@ -359,7 +359,7 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
-        EmitTrustEvent("ForestTrustCreationStarted", multiContext, trust, "create", "started");
+        EmitTrustEvent(LaStatus.DeployForestTrust_CreatingForestTrust, multiContext, trust, "create", "started");
         var sourceCredential = ResolveCredential(
             request.CredentialSlotValues,
             trust.SourceDomainAdminCredentialSlot,
@@ -374,7 +374,7 @@ public sealed class V2ForestTrustRuntimeStage
             "target domain-admin");
         if (sourceCredential is null || targetCredential is null)
         {
-            EmitTrustEvent("ForestTrustCreationCompleted", multiContext, trust, "create", "failed", "warn", "Missing source or target domain-admin credential material.");
+            EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustCreationFailed, multiContext, trust, "create", "failed", "Missing source or target domain-admin credential material.");
             return;
         }
 
@@ -393,11 +393,11 @@ public sealed class V2ForestTrustRuntimeStage
             context.MarkFailure(
                 DeploymentStepKeys.V2CreateForestTrust,
                 $"Failed to create forest trust '{trust.TrustId}'. {result.Error}".Trim());
-            EmitTrustEvent("ForestTrustCreationCompleted", multiContext, trust, "create", "failed", "error", result.Error);
+            EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustCreationFailed, multiContext, trust, "create", "failed", result.Error);
             return;
         }
 
-        EmitTrustEvent("ForestTrustCreationCompleted", multiContext, trust, "create", "success");
+        EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustCreated, multiContext, trust, "create", "success");
     }
 
     private async Task ValidateForestTrustAsync(
@@ -413,7 +413,7 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
-        EmitTrustEvent("ForestTrustValidationStarted", multiContext, trust, "validate", "started");
+        EmitTrustEvent(LaStatus.DeployForestTrust_ValidatingForestTrust, multiContext, trust, "validate", "started");
         var sourceCredential = ResolveCredential(
             request.CredentialSlotValues,
             trust.SourceDomainAdminCredentialSlot,
@@ -428,7 +428,7 @@ public sealed class V2ForestTrustRuntimeStage
             "target domain-admin");
         if (sourceCredential is null || targetCredential is null)
         {
-            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "warn", "Missing source or target domain-admin credential material.");
+            EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustValidationFailed, multiContext, trust, "validate", "failed", "Missing source or target domain-admin credential material.");
             return;
         }
 
@@ -447,7 +447,7 @@ public sealed class V2ForestTrustRuntimeStage
             context.MarkFailure(
                 DeploymentStepKeys.V2ValidateForestTrust,
                 $"Source-side validation failed for forest trust '{trust.TrustId}'. {sourceValidated.Error}".Trim());
-            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", sourceValidated.Error);
+            EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustValidationFailed, multiContext, trust, "validate", "failed", sourceValidated.Error);
             return;
         }
 
@@ -463,12 +463,12 @@ public sealed class V2ForestTrustRuntimeStage
             context.MarkFailure(
                 DeploymentStepKeys.V2ValidateForestTrust,
                 $"Target-side validation failed for forest trust '{trust.TrustId}'. {targetValidated.Error}".Trim());
-            EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "failed", "error", targetValidated.Error);
+            EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustValidationFailed, multiContext, trust, "validate", "failed", targetValidated.Error);
             return;
         }
 
         MarkTrustReady(multiContext, trust.TrustId);
-        EmitTrustEvent("ForestTrustValidationCompleted", multiContext, trust, "validate", "success");
+        EmitTrustEvent(LaStatus.DeployForestTrust_ForestTrustValidated, multiContext, trust, "validate", "success");
     }
 
     // AD trust objects replicate asynchronously, so validation is retried up to the shared
@@ -538,7 +538,7 @@ public sealed class V2ForestTrustRuntimeStage
 
         context.EmitStepState(stepKey, stepLabel, DeployStepState.Pending);
         context.EmitStepState(stepKey, stepLabel, DeployStepState.Running);
-        EmitStepEvent(context, multiContext, "StepStarted", "info", null, stepKey);
+        EmitStepEvent(context, multiContext, LaStatus.DeployStep_StepStarted, null, stepKey);
 
         try
         {
@@ -575,7 +575,7 @@ public sealed class V2ForestTrustRuntimeStage
             _ => "failed"
         };
 
-        EmitStepEvent(context, multiContext, "StepCompleted", "info", result, stepKey);
+        EmitStepEvent(context, multiContext, LaStatus.DeployStep_StepCompleted, result, stepKey);
         context.EmitStepState(stepKey, stepLabel, terminalState, overrideMessage);
     }
 
@@ -684,12 +684,11 @@ public sealed class V2ForestTrustRuntimeStage
     }
 
     private void EmitTrustEvent(
-        string eventName,
+        uint code,
         MultiVmDeploymentContext multiContext,
         V2ResolvedTrustPlanningContext trust,
         string phase,
         string result,
-        string level = "info",
         string? error = null)
     {
         var context = new Dictionary<string, object?>
@@ -709,14 +708,13 @@ public sealed class V2ForestTrustRuntimeStage
             context["error"] = error;
         }
 
-        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
+        _structuredLogger.Log(code, multiContext.OperationId, result, context);
     }
 
     private void EmitStepEvent(
         VmDeploymentContext context,
         MultiVmDeploymentContext multiContext,
-        string eventName,
-        string level,
+        uint code,
         string? result,
         string stepKey)
     {
@@ -729,7 +727,7 @@ public sealed class V2ForestTrustRuntimeStage
             ["stepKey"] = stepKey
         };
 
-        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, payload);
+        _structuredLogger.Log(code, multiContext.OperationId, result, payload);
     }
 
     private static string GetTrustStepKey(string phase) => phase switch
@@ -739,14 +737,6 @@ public sealed class V2ForestTrustRuntimeStage
         "validate" => DeploymentStepKeys.V2ValidateForestTrust,
         "cleanup" => DeploymentStepKeys.V2CleanupForestTrust,
         _ => phase
-    };
-
-    private static StructuredLogLevel ParseLevel(string level) => level switch
-    {
-        "error" => StructuredLogLevel.Error,
-        "warn" => StructuredLogLevel.Warn,
-        "debug" => StructuredLogLevel.Debug,
-        _ => StructuredLogLevel.Info
     };
 }
 

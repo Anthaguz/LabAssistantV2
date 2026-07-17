@@ -1,3 +1,4 @@
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 
@@ -27,11 +28,10 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
     {
         cancellationToken.ThrowIfCancellationRequested();
         var operationId = Guid.NewGuid().ToString("N");
-        var eventName = isRefresh ? "SwitchRefreshCompleted" : "SwitchListLoaded";
+        var loadedCode = isRefresh ? LaStatus.NetworkSwitch_SwitchesRefreshed : LaStatus.NetworkSwitch_SwitchesListed;
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            isRefresh ? "SwitchRefreshRequested" : "SwitchListRequested",
+            isRefresh ? LaStatus.NetworkSwitch_RefreshingSwitches : LaStatus.NetworkSwitch_ListingSwitches,
             operationId,
             "started");
 
@@ -41,8 +41,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             var mapped = items.Select(MapRecord).ToList();
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                eventName,
+                loadedCode,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -59,8 +58,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Warn,
-                isRefresh ? "SwitchRefreshFailed" : "SwitchListFailed",
+                isRefresh ? LaStatus.NetworkSwitch_SwitchRefreshFailed : LaStatus.NetworkSwitch_SwitchListFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -87,8 +85,9 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         var result = ValidateCore(draft, inventory);
 
         _structuredLogger.Log(
-            string.Equals(result.Severity, "Pass", StringComparison.OrdinalIgnoreCase) ? StructuredLogLevel.Info : StructuredLogLevel.Warn,
-            "SwitchValidationEvaluated",
+            string.Equals(result.Severity, "Pass", StringComparison.OrdinalIgnoreCase)
+                ? LaStatus.NetworkSwitch_SwitchValid
+                : LaStatus.NetworkSwitch_SwitchValidationBlocked,
             operationId,
             result.Severity.ToLowerInvariant(),
             new Dictionary<string, object?>
@@ -113,8 +112,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         var operationId = Guid.NewGuid().ToString("N");
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "SwitchAttachedVmListRequested",
+            LaStatus.NetworkSwitch_ListingAttachedVMs,
             operationId,
             "started",
             new Dictionary<string, object?>
@@ -126,8 +124,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         {
             var attachedVmNames = await _machineAdminService.GetAttachedVmNamesForSwitchAsync(switchName);
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "SwitchAttachedVmListLoaded",
+                LaStatus.NetworkSwitch_AttachedVMsListed,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -141,8 +138,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Warn,
-                "SwitchAttachedVmListFailed",
+                LaStatus.NetworkSwitch_AttachedVMListFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -161,8 +157,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         var operationId = Guid.NewGuid().ToString("N");
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            draft.IsNew ? "SwitchCreateStarted" : "SwitchUpdateStarted",
+            draft.IsNew ? LaStatus.NetworkSwitch_CreatingSwitch : LaStatus.NetworkSwitch_UpdatingSwitch,
             operationId,
             "started",
             new Dictionary<string, object?>
@@ -183,7 +178,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                     validation.Summary,
                     validation.Details,
                     draft,
-                    draft.IsNew ? "SwitchCreateFailed" : "SwitchUpdateFailed");
+                    draft.IsNew ? LaStatus.NetworkSwitch_SwitchCreateFailed : LaStatus.NetworkSwitch_SwitchUpdateFailed);
             }
 
             HyperVMachineActionResult actionResult;
@@ -217,12 +212,11 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                     summarizedError,
                     [summarizedError],
                     draft,
-                    draft.IsNew ? "SwitchCreateFailed" : "SwitchUpdateFailed");
+                    draft.IsNew ? LaStatus.NetworkSwitch_SwitchCreateFailed : LaStatus.NetworkSwitch_SwitchUpdateFailed);
             }
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                draft.IsNew ? "SwitchCreated" : "SwitchUpdated",
+                draft.IsNew ? LaStatus.NetworkSwitch_SwitchCreated : LaStatus.NetworkSwitch_SwitchUpdated,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -251,7 +245,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                 ex.Message,
                 [ex.Message],
                 draft,
-                draft.IsNew ? "SwitchCreateFailed" : "SwitchUpdateFailed");
+                draft.IsNew ? LaStatus.NetworkSwitch_SwitchCreateFailed : LaStatus.NetworkSwitch_SwitchUpdateFailed);
         }
     }
 
@@ -287,8 +281,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                     .ToList();
 
                 _structuredLogger.Log(
-                    StructuredLogLevel.Warn,
-                    "SwitchDeleteBlocked",
+                    LaStatus.NetworkSwitch_SwitchDeleteBlocked,
                     operationId,
                     "blocked",
                     new Dictionary<string, object?>
@@ -342,8 +335,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         var operationId = Guid.NewGuid().ToString("N");
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "SwitchDeleteStarted",
+            LaStatus.NetworkSwitch_DeletingSwitch,
             operationId,
             "started",
             new Dictionary<string, object?>
@@ -357,8 +349,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             if (!assessment.Exists || !assessment.CanDelete)
             {
                 _structuredLogger.Log(
-                    StructuredLogLevel.Warn,
-                    "SwitchDeleteBlocked",
+                    LaStatus.NetworkSwitch_SwitchDeleteBlocked,
                     operationId,
                     "blocked",
                     new Dictionary<string, object?>
@@ -380,8 +371,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             if (!result.Success)
             {
                 _structuredLogger.Log(
-                    StructuredLogLevel.Warn,
-                    "SwitchDeleteFailed",
+                    LaStatus.NetworkSwitch_SwitchDeleteFailed,
                     operationId,
                     "failed",
                     new Dictionary<string, object?>
@@ -400,8 +390,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
             }
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "SwitchDeleted",
+                LaStatus.NetworkSwitch_SwitchDeleted,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -421,8 +410,7 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Warn,
-                "SwitchDeleteFailed",
+                LaStatus.NetworkSwitch_SwitchDeleteFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -525,11 +513,12 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
         string userMessage,
         IReadOnlyList<string> errors,
         AssetsSwitchDraft draft,
-        string eventName)
+        uint code,
+        [System.Runtime.CompilerServices.CallerFilePath] string? callerFilePath = null,
+        [System.Runtime.CompilerServices.CallerLineNumber] int callerLineNumber = 0)
     {
         _structuredLogger.Log(
-            StructuredLogLevel.Warn,
-            eventName,
+            code,
             operationId,
             "failed",
             new Dictionary<string, object?>
@@ -537,7 +526,9 @@ public sealed class AssetsSwitchesCapabilityService : IAssetsSwitchesCapabilityS
                 ["switchName"] = draft.Name,
                 ["switchType"] = draft.SwitchType,
                 ["errorCount"] = errors.Count
-            });
+            },
+            callerFilePath,
+            callerLineNumber);
 
         return new AssetsSwitchOperationResult
         {

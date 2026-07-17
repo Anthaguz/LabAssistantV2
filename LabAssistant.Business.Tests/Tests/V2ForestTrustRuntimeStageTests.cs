@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using LabAssistant.Business.Runtime;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.GuestExecution;
 using Xunit;
 
@@ -53,7 +54,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.True(trustContext.TrustReady);
         Assert.False(trustContext.CleanupAttempted);
         Assert.Contains(logger.Events, item =>
-            item.Event == "ForestTrustCreationCompleted" &&
+            item.Code == $"0x{LaStatus.DeployForestTrust_ForestTrustCreated:X8}" &&
             item.OperationId == multiContext.OperationId &&
             item.Result == "success" &&
             item.Context != null &&

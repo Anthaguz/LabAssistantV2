@@ -1,5 +1,6 @@
 ﻿using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using System.Collections.Generic;
 
@@ -49,8 +50,7 @@ namespace LabAssistant.Business.Deployment
             context.RecordGuestStepOutcome(GuestStepKey, GuestStepDisplayName, GuestStepOutcomeResults.Skipped, skipReason, message);
             EmitStepEvent(
                 context,
-                "StepSkipped",
-                "info",
+                LaStatus.DeployStep_StepSkipped,
                 "skipped",
                 GuestStepKey,
                 new Dictionary<string, object?>

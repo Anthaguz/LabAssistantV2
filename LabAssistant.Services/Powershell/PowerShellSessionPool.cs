@@ -124,8 +124,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         if (created > 0)
         {
             Log(
-                StructuredLogLevel.Info,
-                "powershell.session-pool.warmup",
+                LaStatus.InfraPowershell_WarmingUpSessionPool,
                 "created",
                 new Dictionary<string, object?>
                 {
@@ -169,8 +168,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                             : "mark-failed";
 
                     Log(
-                        StructuredLogLevel.Warn,
-                        "powershell.session-pool.checkout",
+                        LaStatus.InfraPowershell_DeadSessionRetiredOnCheckout,
                         "retired-dead",
                         new Dictionary<string, object?>
                         {
@@ -184,8 +182,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                 }
 
                 Log(
-                    StructuredLogLevel.Debug,
-                    "powershell.session-pool.checkout",
+                    LaStatus.InfraPowershell_SessionReused,
                     "reused",
                     new Dictionary<string, object?>
                     {
@@ -200,8 +197,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
             if (createdSession is not null)
             {
                 Log(
-                    StructuredLogLevel.Info,
-                    "powershell.session-pool.checkout",
+                    LaStatus.InfraPowershell_SessionCreatedOnCheckout,
                     "created",
                     new Dictionary<string, object?>
                     {
@@ -221,8 +217,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
             _disposedSessions.TryRemove(overflowSession, out _);
 
             Log(
-                StructuredLogLevel.Warn,
-                "powershell.session-pool.checkout",
+                LaStatus.InfraPowershell_SessionPoolOverflow,
                 "overflow",
                 new Dictionary<string, object?>
                 {
@@ -289,8 +284,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
                 }
 
                 Log(
-                    StructuredLogLevel.Warn,
-                    "powershell.session-pool.health-failed",
+                    LaStatus.InfraPowershell_SessionReplaced,
                     "replacing",
                     new Dictionary<string, object?>
                     {
@@ -470,8 +464,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         if (TryEnqueueAvailable(session))
         {
             Log(
-                StructuredLogLevel.Debug,
-                "powershell.session-pool.return",
+                LaStatus.InfraPowershell_SessionReturned,
                 "returned",
                 new Dictionary<string, object?>
                 {
@@ -583,15 +576,6 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         ObjectDisposedException.ThrowIf(_disposed == 1, this);
     }
 
-    private void Log(
-        StructuredLogLevel level,
-        string eventName,
-        string result,
-        IReadOnlyDictionary<string, object?>? context = null)
-    {
-        _structuredLogger.Log(level, eventName, _operationId, result, context);
-    }
-
     // Code-based emit. Forwards the caller attributes so the recorded call site is the real emit
     // site in this file, not this wrapper.
     private void Log(
@@ -621,8 +605,7 @@ public sealed class PowerShellSessionPool : IPowerShellSessionPool
         catch (Exception ex)
         {
             Log(
-                StructuredLogLevel.Error,
-                "powershell.session-pool.warmup-failed",
+                LaStatus.InfraPowershell_PoolWarmupFailed,
                 "failed",
                 new Dictionary<string, object?>
                 {
