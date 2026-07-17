@@ -97,8 +97,8 @@ public partial class App : Application
             StartupCrashLogger.MarkPhase("OnLaunched", "before settings load");
             settingsStore.LoadOrCreate();
             StartupCrashLogger.MarkPhase("OnLaunched", "after settings load");
-            DebugLogger.SetLogFolder(settingsStore.Settings.LogFolder);
-            StartupCrashLogger.MarkPhase("OnLaunched", "after DebugLogger.SetLogFolder");
+            DebugLogger.ConfigureStructuredSink(Services.GetRequiredService<IStructuredLogger>());
+            StartupCrashLogger.MarkPhase("OnLaunched", "after DebugLogger.ConfigureStructuredSink");
 
             StartupCrashLogger.MarkPhase("OnLaunched", "before MainWindow ctor");
             _window = new MainWindow();

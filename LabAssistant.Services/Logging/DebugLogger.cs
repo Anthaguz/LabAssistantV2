@@ -1,32 +1,33 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
+using LabAssistant.Services.Diagnostics;
 
 namespace LabAssistant.Services.Logging
 {
+    /// <summary>
+    /// Ambient diagnostic tracer. Historically this wrote free-form lines to a separate <c>log.txt</c>; it now
+    /// forwards every trace into the single structured logging pipeline as a coded <c>diag.debug.trace</c> event
+    /// so all diagnostics live in one place and can be filtered by status code. The thread id, call site, and the
+    /// original free-form message are preserved as structured fields.
+    /// </summary>
+    /// <remarks>
+    /// This is a static, dependency-injection-free seam because it is called from a large number of legacy static
+    /// and instance sites. <see cref="ConfigureStructuredSink"/> wires it to the application's structured logger at
+    /// startup. Until it is wired (early startup, or unit tests that do not opt in) traces are silently dropped,
+    /// which matches the previous behavior of a not-yet-configured log folder.
+    /// </remarks>
     public static class DebugLogger
     {
-        private static readonly object _lock = new();
-        private static string? _logFolder;
-        private static long _maxActiveFileBytes = DebugLoggingDefaults.MaxActiveFileBytes;
-        private static int _retainedHistoryFiles = DebugLoggingDefaults.RetainedHistoryFiles;
+        private static IStructuredLogger? _structuredLogger;
 
-        private static string LogFilePath
+        /// <summary>
+        /// Wires the ambient tracer to the application's structured logging pipeline. Call once at startup.
+        /// </summary>
+        public static void ConfigureStructuredSink(IStructuredLogger structuredLogger)
         {
-            get
-            {
-                if (string.IsNullOrWhiteSpace(_logFolder))
-                {
-                    throw new InvalidOperationException("DebugLogger log folder not configured.");
-                }
-
-                return Path.Combine(_logFolder, DebugLoggingDefaults.DebugLogFileName);
-            }
-        }
-
-        public static void SetLogFolder(string logFolder)
-        {
-            _logFolder = logFolder;
+            _structuredLogger = structuredLogger ?? throw new ArgumentNullException(nameof(structuredLogger));
         }
 
         public static void Log(
@@ -35,27 +36,7 @@ namespace LabAssistant.Services.Logging
             [CallerMemberName] string member = "",
             [CallerLineNumber] int line = 0)
         {
-            try
-            {
-                string directory = Path.GetDirectoryName(LogFilePath)!;
-                if (!Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                int threadId = Environment.CurrentManagedThreadId;
-                string logLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [Thread {threadId}] [{Path.GetFileName(file)}:{line}] {member}() {message}";
-
-                lock (_lock)
-                {
-                    var bytesToAppend = System.Text.Encoding.UTF8.GetByteCount(logLine + Environment.NewLine);
-                    FileLogRotation.RotateIfNeeded(LogFilePath, bytesToAppend, _maxActiveFileBytes, _retainedHistoryFiles);
-                    File.AppendAllText(LogFilePath, logLine + Environment.NewLine);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"DebugLogger failed: {ex.Message}");
-            }
+            EmitCoded(LaStatus.DiagDebug_DebugTrace, result: null, message: message, extraContext: null, file: file, member: member, line: line);
         }
 
         // Method to log both error and output obtained from powershell
@@ -71,22 +52,63 @@ namespace LabAssistant.Services.Logging
             }
         }
 
-        internal static void ConfigureRotationForTests(long maxActiveFileBytes, int retainedHistoryFiles)
+        /// <summary>
+        /// Emits an ambient diagnostic event under the given status code, preserving the caller's thread and call
+        /// site. Shared by <see cref="Log(string, string, string, int)"/> and the raw timing tracer so both land in
+        /// the structured pipeline with the same shape. The caller attributes are forwarded explicitly so the
+        /// recorded call site is the real emit site, not this helper.
+        /// </summary>
+        internal static void EmitCoded(
+            uint code,
+            string? result,
+            string? message,
+            IReadOnlyDictionary<string, object?>? extraContext,
+            [CallerFilePath] string file = "",
+            [CallerMemberName] string member = "",
+            [CallerLineNumber] int line = 0)
         {
-            lock (_lock)
+            var logger = _structuredLogger;
+            if (logger is null)
             {
-                _maxActiveFileBytes = maxActiveFileBytes;
-                _retainedHistoryFiles = retainedHistoryFiles;
+                return;
+            }
+
+            try
+            {
+                var context = new Dictionary<string, object?>();
+                if (!string.IsNullOrEmpty(message))
+                {
+                    context["message"] = message;
+                }
+                if (!string.IsNullOrEmpty(member))
+                {
+                    context["member"] = member;
+                }
+                if (extraContext is not null)
+                {
+                    foreach (var pair in extraContext)
+                    {
+                        context[pair.Key] = pair.Value;
+                    }
+                }
+
+                var callsite = $"{Path.GetFileName(file)}:{line}";
+                logger.Log(StructuredLogEvent.Create(
+                    code,
+                    StructuredLoggingDefaults.AmbientOperationId,
+                    result: result,
+                    context: context.Count == 0 ? null : context,
+                    callsite: callsite));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"DebugLogger failed: {ex.Message}");
             }
         }
 
-        internal static void ResetRotationForTests()
+        internal static void ResetForTests()
         {
-            lock (_lock)
-            {
-                _maxActiveFileBytes = DebugLoggingDefaults.MaxActiveFileBytes;
-                _retainedHistoryFiles = DebugLoggingDefaults.RetainedHistoryFiles;
-            }
+            _structuredLogger = null;
         }
     }
 }

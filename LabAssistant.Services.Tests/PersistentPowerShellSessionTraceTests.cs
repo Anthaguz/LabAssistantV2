@@ -1,3 +1,4 @@
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
 using Xunit;
@@ -51,33 +52,35 @@ public class PersistentPowerShellSessionTraceTests
     [Fact]
     public void Log_WritesToDebugLoggerOnlyWhenEnabled()
     {
-        var directory = Path.Combine(Path.GetTempPath(), $"labassistant-ps-trace-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        var activeLog = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
-
+        var logger = new CollectingStructuredLogger();
         try
         {
-            DebugLogger.SetLogFolder(directory);
+            DebugLogger.ConfigureStructuredSink(logger);
+
             PersistentPowerShellSessionTrace.SetEnabledForTests(false);
             PersistentPowerShellSessionTrace.Log("suppressed");
 
-            Assert.False(File.Exists(activeLog));
+            Assert.Empty(logger.Events);
 
             PersistentPowerShellSessionTrace.SetEnabledForTests(true);
             PersistentPowerShellSessionTrace.Log("visible");
 
-            Assert.True(File.Exists(activeLog));
-            var content = File.ReadAllText(activeLog);
-            Assert.Contains("[PowerShellWrapperTrace] visible", content, StringComparison.Ordinal);
-            Assert.DoesNotContain("suppressed", content, StringComparison.Ordinal);
+            var e = Assert.Single(logger.Events);
+            Assert.Equal($"0x{LaStatus.DiagDebug_DebugTrace:X8}", e.Code);
+            Assert.Equal("[PowerShellWrapperTrace] visible", e.Context!["message"]);
+            Assert.DoesNotContain(logger.Events, x => ((string?)x.Context!["message"])!.Contains("suppressed"));
         }
         finally
         {
             PersistentPowerShellSessionTrace.SetEnabledForTests(null);
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
+            ResetDebugLoggerSink();
         }
+    }
+
+    private static void ResetDebugLoggerSink()
+    {
+        var method = typeof(DebugLogger).GetMethod("ResetForTests", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(null, System.Array.Empty<object>());
     }
 }

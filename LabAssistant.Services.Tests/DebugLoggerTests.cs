@@ -1,4 +1,5 @@
 using System.Reflection;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using Xunit;
 
@@ -15,102 +16,85 @@ public class DebugLoggerTests
     private static readonly object DebugLoggerTestLock = new();
 
     [Fact]
-    public void DebugLogger_Log_RotatesAndRetainsBoundedHistory()
+    public void Log_ForwardsCodedDiagDebugEvent_PreservingMessageThreadAndCallsite()
     {
         lock (DebugLoggerTestLock)
         {
-            var directory = Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(directory);
-
+            var logger = new CollectingStructuredLogger();
             try
             {
-                DebugLogger.SetLogFolder(directory);
-                InvokeRotationHook("ConfigureRotationForTests", 1L, 2);
+                DebugLogger.ConfigureStructuredSink(logger);
 
-                for (var i = 0; i < 5; i++)
-                {
-                    DebugLogger.Log(new string((char)('a' + (i % 26)), 80));
-                }
+                DebugLogger.Log("hello-trace");
 
-                DebugLogger.SetLogFolder(Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-sink-{Guid.NewGuid():N}"));
-
-                var active = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
-                var rotated1 = Path.Combine(directory, "log.1.txt");
-                var rotated2 = Path.Combine(directory, "log.2.txt");
-                var rotated3 = Path.Combine(directory, "log.3.txt");
-
-                Assert.True(File.Exists(active));
-                Assert.True(File.Exists(rotated1));
-                Assert.True(File.Exists(rotated2));
-                Assert.False(File.Exists(rotated3));
-
-                var activeContent = File.ReadAllText(active);
-                Assert.Contains("[", activeContent, StringComparison.Ordinal);
-                Assert.Contains("()", activeContent, StringComparison.Ordinal);
+                var e = Assert.Single(logger.Events);
+                Assert.Equal($"0x{LaStatus.DiagDebug_DebugTrace:X8}", e.Code);
+                Assert.Equal("diag.debug.trace", e.Event);
+                Assert.Equal("debug", e.Level);
+                Assert.Equal(StructuredLoggingDefaults.AmbientOperationId, e.OperationId);
+                Assert.NotNull(e.Context);
+                Assert.Equal("hello-trace", e.Context!["message"]);
+                Assert.True(e.Context!.ContainsKey("member"));
+                Assert.NotNull(e.Thread);
+                Assert.NotNull(e.Callsite);
             }
             finally
             {
-                InvokeResetHook();
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
+                ResetSink();
             }
         }
     }
 
     [Fact]
-    public void DebugLogger_Log_ContinuesWritingToActiveFile_AfterRotation()
+    public void Log_IsSilentNoOp_WhenSinkNotConfigured()
     {
         lock (DebugLoggerTestLock)
         {
-            var directory = Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-active-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(directory);
-
+            var logger = new CollectingStructuredLogger();
             try
             {
-                DebugLogger.SetLogFolder(directory);
-                InvokeRotationHook("ConfigureRotationForTests", 1L, 1);
+                DebugLogger.ConfigureStructuredSink(logger);
+                ResetSink();
 
-                DebugLogger.Log(new string('x', 10));
-                DebugLogger.Log("marker-after-rotation");
+                DebugLogger.Log("dropped");
 
-                DebugLogger.SetLogFolder(Path.Combine(Path.GetTempPath(), $"labassistant-debuglog-sink-{Guid.NewGuid():N}"));
-
-                var active = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
-                var rotated1 = Path.Combine(directory, "log.1.txt");
-
-                Assert.True(File.Exists(active));
-                Assert.True(File.Exists(rotated1));
-
-                var activeContent = File.ReadAllText(active);
-                var rotatedContent = File.ReadAllText(rotated1);
-
-                Assert.Contains("marker-after-rotation", activeContent, StringComparison.Ordinal);
-                Assert.DoesNotContain("marker-after-rotation", rotatedContent, StringComparison.Ordinal);
+                Assert.Empty(logger.Events);
             }
             finally
             {
-                InvokeResetHook();
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
+                ResetSink();
             }
         }
     }
 
-    private static void InvokeRotationHook(string methodName, long maxActiveFileBytes, int retainedHistoryFiles)
+    [Fact]
+    public void LogPowerShellOutput_ForwardsOutputAndErrorAsSeparateTraces()
     {
-        var method = typeof(DebugLogger).GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
-        Assert.NotNull(method);
-        method!.Invoke(null, new object[] { maxActiveFileBytes, retainedHistoryFiles });
+        lock (DebugLoggerTestLock)
+        {
+            var logger = new CollectingStructuredLogger();
+            try
+            {
+                DebugLogger.ConfigureStructuredSink(logger);
+
+                DebugLogger.LogPowerShellOutput("Get-VM", output: "ok", error: "boom");
+
+                Assert.Equal(2, logger.Events.Count);
+                Assert.All(logger.Events, e => Assert.Equal($"0x{LaStatus.DiagDebug_DebugTrace:X8}", e.Code));
+                Assert.Contains(logger.Events, e => ((string?)e.Context!["message"])!.Contains("ok"));
+                Assert.Contains(logger.Events, e => ((string?)e.Context!["message"])!.Contains("boom"));
+            }
+            finally
+            {
+                ResetSink();
+            }
+        }
     }
 
-    private static void InvokeResetHook()
+    private static void ResetSink()
     {
-        var method = typeof(DebugLogger).GetMethod("ResetRotationForTests", BindingFlags.Static | BindingFlags.NonPublic);
+        var method = typeof(DebugLogger).GetMethod("ResetForTests", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);
-        method!.Invoke(null, Array.Empty<object>());
+        method!.Invoke(null, System.Array.Empty<object>());
     }
 }

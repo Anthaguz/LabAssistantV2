@@ -24,7 +24,7 @@ Current v1 structured event shape:
 Transition note:
 
 - Structured JSONL is the canonical diagnostics path moving forward.
-- Legacy `DebugLogger` text logs remain available as supplemental/transitional diagnostics.
+- The ambient `DebugLogger` and the raw PowerShell timing tracer now forward into structured JSONL as coded `diag.debug` / `diag.ps_timing` events; the separate `log.txt` file is retired.
 - Migration to broader coverage is incremental, but emitted event names/fields must converge to this contract.
 
 ## Identifier Model
