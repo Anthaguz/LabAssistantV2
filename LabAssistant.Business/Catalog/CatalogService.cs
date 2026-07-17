@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Validation;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 
@@ -35,8 +36,7 @@ public sealed class CatalogService
         {
             var result = _catalogStore.Load(CatalogPath);
             _structuredLogger.Log(
-                result.Errors.Count > 0 ? StructuredLogLevel.Warn : StructuredLogLevel.Info,
-                "CatalogLoaded",
+                result.Errors.Count > 0 ? LaStatus.AssetsCatalog_CatalogLoadedWithErrors : LaStatus.AssetsCatalog_CatalogLoaded,
                 operationId,
                 result.Errors.Count > 0 ? "failed" : "success",
                 new Dictionary<string, object?>
@@ -50,8 +50,7 @@ public sealed class CatalogService
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "CatalogLoaded",
+                LaStatus.AssetsCatalog_CatalogLoadFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -86,8 +85,7 @@ public sealed class CatalogService
         catch (Exception ex)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "CatalogSaved",
+                LaStatus.AssetsCatalog_CatalogSaveFailed,
                 operationId,
                 "failed",
                 new Dictionary<string, object?>
@@ -104,8 +102,7 @@ public sealed class CatalogService
     private void EmitCatalogSaveLog(string operationId, IReadOnlyCollection<VhdxCatalogItem> itemList, VhdxCatalogSaveResult result)
     {
         _structuredLogger.Log(
-            result.Errors.Count > 0 ? StructuredLogLevel.Warn : StructuredLogLevel.Info,
-            "CatalogSaved",
+            result.Errors.Count > 0 ? LaStatus.AssetsCatalog_CatalogSavedWithErrors : LaStatus.AssetsCatalog_CatalogSaved,
             operationId,
             result.Errors.Count > 0 ? "failed" : "success",
             new Dictionary<string, object?>

@@ -1,4 +1,6 @@
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
+using System.Runtime.CompilerServices;
 
 namespace LabAssistant.Services.PowerShell;
 
@@ -71,8 +73,7 @@ public sealed class PowerShellSessionPoolHealthMonitor : IAsyncDisposable
         }
 
         Log(
-            StructuredLogLevel.Info,
-            "powershell.session-pool.monitor.started",
+            LaStatus.InfraPowershell_HealthMonitorStarted,
             "started",
             new Dictionary<string, object?>
             {
@@ -119,7 +120,7 @@ public sealed class PowerShellSessionPoolHealthMonitor : IAsyncDisposable
             cancellationTokenSource.Dispose();
         }
 
-        Log(StructuredLogLevel.Info, "powershell.session-pool.monitor.stopped", "stopped");
+        Log(LaStatus.InfraPowershell_HealthMonitorStopped, "stopped");
     }
 
     /// <summary>
@@ -150,8 +151,7 @@ public sealed class PowerShellSessionPoolHealthMonitor : IAsyncDisposable
                 catch (Exception ex)
                 {
                     Log(
-                        StructuredLogLevel.Error,
-                        "powershell.session-pool.monitor.health-check-failed",
+                        LaStatus.InfraPowershell_MonitorHealthCheckFailed,
                         "failed",
                         new Dictionary<string, object?>
                         {
@@ -167,11 +167,12 @@ public sealed class PowerShellSessionPoolHealthMonitor : IAsyncDisposable
     }
 
     private void Log(
-        StructuredLogLevel level,
-        string eventName,
+        uint code,
         string result,
-        IReadOnlyDictionary<string, object?>? context = null)
+        IReadOnlyDictionary<string, object?>? context = null,
+        [CallerFilePath] string? callerFilePath = null,
+        [CallerLineNumber] int callerLineNumber = 0)
     {
-        _structuredLogger.Log(level, eventName, _operationId, result, context);
+        _structuredLogger.Log(code, _operationId, result, context, callerFilePath, callerLineNumber);
     }
 }

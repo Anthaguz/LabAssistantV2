@@ -1,5 +1,6 @@
 using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Services.Diagnostics;
 using Xunit;
 
 namespace LabAssistant.Business.Tests;
@@ -15,8 +16,8 @@ public class GuestStepExecutionSelectionTests
         context.ConfigureTimeZone = false;
 
         var events = new List<RecordedStepEvent>();
-        context.StructuredEventEmitter = (eventName, level, result, payload) =>
-            events.Add(new RecordedStepEvent(eventName, level, result, payload ?? new Dictionary<string, object?>()));
+        context.StructuredEventEmitter = (code, result, payload) =>
+            events.Add(new RecordedStepEvent(code, result, payload ?? new Dictionary<string, object?>()));
 
         await step.ExecuteAsync(context);
 
@@ -25,7 +26,7 @@ public class GuestStepExecutionSelectionTests
         Assert.Equal(GuestStepOutcomeResults.Skipped, outcome.Result);
         Assert.Equal(GuestStepSkipReasons.NotSelected, outcome.SkipReason);
 
-        var skippedEvent = Assert.Single(events.Where(e => e.EventName == "StepSkipped"));
+        var skippedEvent = Assert.Single(events.Where(e => e.Code == LaStatus.DeployStep_StepSkipped));
         Assert.Equal("skipped", skippedEvent.Result);
         Assert.Equal(DeploymentStepKeys.SetTimeZone, skippedEvent.Context["stepKey"]?.ToString());
         Assert.Equal(GuestStepSkipReasons.NotSelected, skippedEvent.Context["skipReason"]?.ToString());
@@ -40,8 +41,8 @@ public class GuestStepExecutionSelectionTests
         context.InstallSoftware = true;
 
         var events = new List<RecordedStepEvent>();
-        context.StructuredEventEmitter = (eventName, level, result, payload) =>
-            events.Add(new RecordedStepEvent(eventName, level, result, payload ?? new Dictionary<string, object?>()));
+        context.StructuredEventEmitter = (code, result, payload) =>
+            events.Add(new RecordedStepEvent(code, result, payload ?? new Dictionary<string, object?>()));
 
         await step.ExecuteAsync(context);
 
@@ -50,7 +51,7 @@ public class GuestStepExecutionSelectionTests
         Assert.Equal(GuestStepOutcomeResults.Executed, outcome.Result);
         Assert.Null(outcome.SkipReason);
         Assert.Contains(context.Logs, log => log.Contains("Software installed in Guest OS.", StringComparison.Ordinal));
-        Assert.DoesNotContain(events, e => e.EventName == "StepSkipped");
+        Assert.DoesNotContain(events, e => e.Code == LaStatus.DeployStep_StepSkipped);
     }
 
     [Fact]
@@ -62,8 +63,8 @@ public class GuestStepExecutionSelectionTests
         context.ConfigureNetworkInformation = true;
 
         var events = new List<RecordedStepEvent>();
-        context.StructuredEventEmitter = (eventName, level, result, payload) =>
-            events.Add(new RecordedStepEvent(eventName, level, result, payload ?? new Dictionary<string, object?>()));
+        context.StructuredEventEmitter = (code, result, payload) =>
+            events.Add(new RecordedStepEvent(code, result, payload ?? new Dictionary<string, object?>()));
 
         await step.ExecuteAsync(context);
 
@@ -72,7 +73,7 @@ public class GuestStepExecutionSelectionTests
         Assert.Equal(GuestStepOutcomeResults.Skipped, outcome.Result);
         Assert.Equal(GuestStepSkipReasons.NotImplemented, outcome.SkipReason);
 
-        var skippedEvent = Assert.Single(events.Where(e => e.EventName == "StepSkipped"));
+        var skippedEvent = Assert.Single(events.Where(e => e.Code == LaStatus.DeployStep_StepSkipped));
         Assert.Equal("skipped", skippedEvent.Result);
         Assert.Equal(GuestStepSkipReasons.NotImplemented, skippedEvent.Context["skipReason"]?.ToString());
     }
@@ -105,8 +106,7 @@ public class GuestStepExecutionSelectionTests
     }
 
     private sealed record RecordedStepEvent(
-        string EventName,
-        string Level,
+        uint Code,
         string? Result,
         IReadOnlyDictionary<string, object?> Context);
 }

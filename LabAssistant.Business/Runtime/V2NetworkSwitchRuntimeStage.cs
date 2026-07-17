@@ -1,5 +1,6 @@
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 
@@ -101,7 +102,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
             multiContext.MarkCleanupInProgress();
             switchState.CleanupAttempted = true;
             EmitDeployEvent(
-                "V2NetworkSwitchCleanupStarted",
+                LaStatus.DeployNetwork_CleaningUpSwitch,
                 multiContext,
                 "started",
                 extra: new Dictionary<string, object?>
@@ -116,7 +117,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
                 if (result.Success)
                 {
                     EmitDeployEvent(
-                        "V2NetworkSwitchCleanupCompleted",
+                        LaStatus.DeployNetwork_SwitchCleanedUp,
                         multiContext,
                         "success",
                         extra: new Dictionary<string, object?>
@@ -129,10 +130,9 @@ internal sealed class V2NetworkSwitchRuntimeStage
 
                 switchState.CleanupResidual = true;
                 EmitDeployEvent(
-                    "V2NetworkSwitchCleanupFailed",
+                    LaStatus.DeployNetwork_SwitchCleanupFailed,
                     multiContext,
                     "failed",
-                    "error",
                     MergeDictionaries(
                         new Dictionary<string, object?>
                         {
@@ -146,10 +146,9 @@ internal sealed class V2NetworkSwitchRuntimeStage
             {
                 switchState.CleanupResidual = true;
                 EmitDeployEvent(
-                    "V2NetworkSwitchCleanupFailed",
+                    LaStatus.DeployNetwork_SwitchCleanupFailedException,
                     multiContext,
                     "exception",
-                    "error",
                     new Dictionary<string, object?>
                     {
                         ["switchName"] = switchState.SwitchName,
@@ -218,7 +217,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
             ["networkIds"] = requirement.NetworkIds,
             ["affectedVmIds"] = requirement.AffectedVmIds
         };
-        EmitDeployEvent("V2NetworkSwitchEnsureStarted", multiContext, "started", extra: logContext);
+        EmitDeployEvent(LaStatus.DeployNetwork_EnsuringSwitch, multiContext, "started", extra: logContext);
 
         if (_machineAdminService is null)
         {
@@ -252,7 +251,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
                 }
 
                 switchState.Ready = true;
-                EmitDeployEvent("V2NetworkSwitchReused", multiContext, "success", extra: logContext);
+                EmitDeployEvent(LaStatus.DeployNetwork_SwitchEnsured, multiContext, "success", extra: logContext);
                 return true;
             }
 
@@ -267,7 +266,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
                     "external_adapter_missing");
             }
 
-            EmitDeployEvent("V2NetworkSwitchCreateStarted", multiContext, "started", extra: logContext);
+            EmitDeployEvent(LaStatus.DeployNetwork_CreatingSwitch, multiContext, "started", extra: logContext);
             var createResult = await _machineAdminService.CreateVirtualSwitchAsync(new HyperVVirtualSwitchCreateRequest
             {
                 Name = requirement.SwitchName,
@@ -288,7 +287,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
 
             switchState.CreatedByDeployment = true;
             switchState.Ready = true;
-            EmitDeployEvent("V2NetworkSwitchCreated", multiContext, "success", extra: logContext);
+            EmitDeployEvent(LaStatus.DeployNetwork_SwitchCreated, multiContext, "success", extra: logContext);
             return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -329,7 +328,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
             }
         }
 
-        EmitDeployEvent("V2NetworkSwitchEnsureFailed", multiContext, result, "error", context);
+        EmitDeployEvent(LaStatus.DeployNetwork_EnsureSwitchFailed, multiContext, result, context);
 
         var stateByVmId = affectedVmStates.ToDictionary(state => state.VmId, StringComparer.OrdinalIgnoreCase);
         var targetStates = requirement.AffectedVmIds
@@ -353,10 +352,9 @@ internal sealed class V2NetworkSwitchRuntimeStage
     }
 
     private void EmitDeployEvent(
-        string eventName,
+        uint code,
         MultiVmDeploymentContext multiContext,
         string? result,
-        string level = "info",
         IReadOnlyDictionary<string, object?>? extra = null)
     {
         var context = new Dictionary<string, object?>
@@ -374,7 +372,7 @@ internal sealed class V2NetworkSwitchRuntimeStage
             }
         }
 
-        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
+        _structuredLogger.Log(code, multiContext.OperationId, result, context);
     }
 
     private static IReadOnlyDictionary<string, object?> MergeDictionaries(
@@ -398,14 +396,6 @@ internal sealed class V2NetworkSwitchRuntimeStage
     private static bool SwitchTypeMatches(string? actual, string expected)
         => V2SwitchTypeCatalog.TryNormalize(actual, out var normalizedActual) &&
            string.Equals(normalizedActual, expected, StringComparison.OrdinalIgnoreCase);
-
-    private static StructuredLogLevel ParseLevel(string level) => level switch
-    {
-        "error" => StructuredLogLevel.Error,
-        "warn" => StructuredLogLevel.Warn,
-        "debug" => StructuredLogLevel.Debug,
-        _ => StructuredLogLevel.Info
-    };
 }
 
 internal sealed record V2NetworkSwitchAffectedVmState(string VmId, VmDeploymentContext Context);

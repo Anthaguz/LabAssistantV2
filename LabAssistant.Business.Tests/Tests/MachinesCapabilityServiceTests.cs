@@ -1,6 +1,7 @@
 using LabAssistant.Business.Machines;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using System.Net.Sockets;
@@ -46,8 +47,8 @@ public class MachinesCapabilityServiceTests
         Assert.Equal("LabAssistant", result.Single(vm => vm.VmName == "LabVm01").OriginLabel);
         Assert.Equal("External/Unknown", result.Single(vm => vm.VmName == "ExternalVm").OriginLabel);
 
-        Assert.Contains(logger.Events, e => e.Event == "MachineInventoryLoadStarted");
-        Assert.Contains(logger.Events, e => e.Event == "MachineInventoryLoadCompleted");
+        Assert.Contains(logger.Events, e => e.Code == $"0x{LaStatus.Machines_LoadingMachineInventory:X8}");
+        Assert.Contains(logger.Events, e => e.Code == $"0x{LaStatus.Machines_MachineInventoryLoaded:X8}");
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public class MachinesCapabilityServiceTests
         Assert.False(result.Success);
         Assert.Contains("Failed to delete", result.UserMessage);
 
-        var failedEvent = Assert.Single(logger.Events, e => e.Event == "MachineDeleteFailed");
+        var failedEvent = Assert.Single(logger.Events, e => e.Code == $"0x{LaStatus.Machines_MachineDeleteFailed:X8}");
         Assert.Equal("vm_and_storage", failedEvent.Context?["deleteScope"]?.ToString());
         Assert.Equal("0x80070005", failedEvent.Context?["hresult"]?.ToString());
     }
@@ -240,7 +241,7 @@ public class MachinesCapabilityServiceTests
         Assert.NotNull(adminService.LastEditRequest);
         Assert.Equal(4, adminService.LastEditRequest!.ProcessorCount);
         Assert.Single(adminService.LastEditRequest.NetworkAdapterAssignments);
-        var started = Assert.Single(logger.Events, e => e.Event == "MachineEditApplyStarted");
+        var started = Assert.Single(logger.Events, e => e.Code == $"0x{LaStatus.Machines_ApplyingMachineEdits:X8}");
         Assert.Contains("cpuCount", (object[]?)started.Context?["changedFields"] ?? Array.Empty<object>());
     }
 

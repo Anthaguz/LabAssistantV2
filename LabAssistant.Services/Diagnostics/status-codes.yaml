@@ -51,12 +51,69 @@ facilities:
     operations:
       - { value: 0x01, name: session, title: Pooled session }
       - { value: 0x02, name: health-check, title: Session pool health check }
+      - { value: 0x03, name: checkout, title: Session checkout }
+      - { value: 0x04, name: warmup, title: Pool warmup }
+      - { value: 0x05, name: return, title: Session return }
+      - { value: 0x06, name: monitor, title: Health monitor }
 
   - value: 0x10
     name: assets.catalog
     title: Base-disk catalog
     operations:
       - { value: 0x01, name: load, title: Load catalog }
+      - { value: 0x02, name: save, title: Save catalog }
+
+  - value: 0x11
+    name: assets.basedisk
+    title: Base-disk assets
+    operations:
+      - { value: 0x01, name: list-load, title: Load base-disk list }
+      - { value: 0x02, name: refresh, title: Refresh base disks }
+      - { value: 0x03, name: register, title: Register base disk }
+      - { value: 0x04, name: metadata-update, title: Update base-disk metadata }
+      - { value: 0x05, name: validate, title: Validate base disk }
+      - { value: 0x06, name: remove, title: Remove base disk }
+
+  - value: 0x12
+    name: network.switch
+    title: Virtual switch management
+    operations:
+      - { value: 0x01, name: list, title: List switches }
+      - { value: 0x02, name: refresh, title: Refresh switches }
+      - { value: 0x03, name: validate, title: Validate switch }
+      - { value: 0x04, name: attached-vm-list, title: List attached VMs }
+      - { value: 0x05, name: create, title: Create switch }
+      - { value: 0x06, name: update, title: Update switch }
+      - { value: 0x07, name: delete, title: Delete switch }
+
+  - value: 0x13
+    name: template
+    title: Template library
+    operations:
+      - { value: 0x01, name: library-load, title: Load template library }
+      - { value: 0x02, name: save, title: Save template }
+      - { value: 0x03, name: delete, title: Delete template }
+      - { value: 0x04, name: import, title: Import template }
+      - { value: 0x05, name: export, title: Export template }
+
+  - value: 0x20
+    name: hyperv
+    title: Hyper-V primitives
+    operations:
+      - { value: 0x01, name: create-vm, title: Create VM }
+      - { value: 0x02, name: start-vm, title: Start VM }
+      - { value: 0x03, name: stop-vm, title: Stop VM }
+      - { value: 0x04, name: remove-vm, title: Remove VM }
+      - { value: 0x05, name: vm-exists, title: Check VM exists }
+      - { value: 0x06, name: is-vm-running, title: Check VM running }
+      - { value: 0x07, name: create-vhd-differencing, title: Create differencing disk }
+      - { value: 0x08, name: create-vhd-fixed, title: Create fixed disk }
+      - { value: 0x09, name: disable-checkpoints, title: Disable checkpoints }
+      - { value: 0x0A, name: enable-guest-services, title: Enable guest services }
+      - { value: 0x0B, name: get-switch-names, title: List virtual switches }
+      - { value: 0x0C, name: get-vm-network-adapters, title: List VM network adapters }
+      - { value: 0x0D, name: add-switch-to-vm, title: Attach switch to VM }
+      - { value: 0x0E, name: add-switches-to-vm, title: Attach switches to VM }
 
   - value: 0x30
     name: machines
@@ -65,6 +122,13 @@ facilities:
       - { value: 0x01, name: provision, title: Provision VM }
       - { value: 0x02, name: start, title: Start VM }
       - { value: 0x03, name: remove, title: Remove VM }
+      - { value: 0x10, name: inventory-load, title: Load machine inventory }
+      - { value: 0x11, name: edit-load, title: Load machine editor }
+      - { value: 0x12, name: edit-apply, title: Apply machine edits }
+      - { value: 0x13, name: action, title: Machine action }
+      - { value: 0x14, name: connection, title: Machine connection }
+      - { value: 0x15, name: delete, title: Delete machine }
+      - { value: 0x16, name: rdp-readiness, title: RDP readiness }
 
   - value: 0x40
     name: deploy.orchestration
@@ -72,6 +136,8 @@ facilities:
     operations:
       - { value: 0x01, name: plan, title: Plan deployment }
       - { value: 0x02, name: run, title: Run deployment }
+      - { value: 0x03, name: vm, title: VM deployment }
+      - { value: 0x04, name: schedule, title: Graph scheduler }
 
   - value: 0x41
     name: deploy.guest
@@ -79,6 +145,7 @@ facilities:
     operations:
       - { value: 0x01, name: transport-ready, title: Guest transport readiness }
       - { value: 0x02, name: remote-access, title: Base remote access }
+      - { value: 0x03, name: readiness-attempt, title: Readiness attempt }
 
   - value: 0x42
     name: deploy.domain
@@ -86,11 +153,42 @@ facilities:
     operations:
       - { value: 0x01, name: promote, title: Promote domain controller }
 
+  - value: 0x43
+    name: deploy.step
+    title: Deployment step
+    operations:
+      - { value: 0x01, name: run, title: Execute step }
+
+  - value: 0x44
+    name: deploy.network
+    title: Deployment networking
+    operations:
+      - { value: 0x01, name: ensure, title: Ensure switch }
+      - { value: 0x02, name: cleanup, title: Clean up switch }
+      - { value: 0x03, name: create, title: Create switch }
+
   - value: 0x45
     name: deploy.cleanup
     title: Deployment cleanup
     operations:
       - { value: 0x01, name: rollback, title: Roll back deployment }
+      - { value: 0x02, name: vm, title: VM cleanup }
+      - { value: 0x03, name: step, title: Cleanup step }
+
+  - value: 0x46
+    name: deploy.forest-trust
+    title: Forest trust
+    operations:
+      - { value: 0x01, name: cleanup, title: Clean up trust }
+      - { value: 0x02, name: dns-prep, title: Prepare DNS }
+      - { value: 0x03, name: create, title: Create trust }
+      - { value: 0x04, name: validate, title: Validate trust }
+
+  - value: 0x50
+    name: shell.ui
+    title: Shell UI
+    operations:
+      - { value: 0x01, name: window-teardown, title: Window teardown }
 
   - value: 0xE0
     name: diag.ps_timing
@@ -157,6 +255,202 @@ codes:
   - { facility: 0x45, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Cleaning up, message: "Rolling back resources created by the failed deployment." }
   - { facility: 0x45, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Cleanup complete, message: "All resources created by the failed deployment were removed." }
   - { facility: 0x45, operation: 0x01, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Cleanup incomplete, message: "Some resources could not be removed during rollback.", remediation: "Check Hyper-V for orphaned VMs, disks, or switches and remove them manually." }
+
+  # ============================================================================
+  # Backfill (PR-D): codes for every previously string-named structured event.
+  # ============================================================================
+
+  # --- infra.powershell.checkout / warmup / return / monitor + health-check.replacing ---
+  - { facility: 0x01, operation: 0x02, status: 0x01, severity: Warning, phase: end, title: Session replaced, message: "The pool replaced an unhealthy session." }
+  - { facility: 0x01, operation: 0x03, status: 0x00, severity: Debug, phase: progress, title: Session reused, message: "A pooled session was reused on checkout." }
+  - { facility: 0x01, operation: 0x03, status: 0x01, severity: Info,  phase: progress, title: Session created on checkout, message: "A new session was created to satisfy a checkout." }
+  - { facility: 0x01, operation: 0x03, status: 0x02, severity: Warning, phase: progress, title: Session pool overflow, message: "The session pool exceeded its soft cap under load.", remediation: "Benign under short bursts; review the pool size if it recurs." }
+  - { facility: 0x01, operation: 0x03, status: 0x03, severity: Warning, flags: [Retryable], phase: end, title: Dead session retired on checkout, message: "A dead pooled session was retired during checkout instead of reused." }
+  - { facility: 0x01, operation: 0x04, status: 0x00, severity: Info,  phase: progress, title: Warming up session pool, message: "The session pool is pre-creating sessions." }
+  - { facility: 0x01, operation: 0x04, status: 0x01, severity: Error, phase: end, title: Pool warmup failed, message: "The session pool could not pre-create its sessions.", remediation: "Deploys may start more slowly; check the PowerShell subsystem." }
+  - { facility: 0x01, operation: 0x05, status: 0x00, severity: Debug, phase: end, title: Session returned, message: "A pooled session was returned to the pool." }
+  - { facility: 0x01, operation: 0x06, status: 0x00, severity: Info,    phase: start, title: Health monitor started, message: "The session pool health monitor started." }
+  - { facility: 0x01, operation: 0x06, status: 0x00, severity: Success, phase: end,   title: Health monitor stopped, message: "The session pool health monitor stopped." }
+  - { facility: 0x01, operation: 0x06, status: 0x01, severity: Error,   phase: end, title: Monitor health check failed, message: "A scheduled session pool health check threw." }
+
+  # --- assets.catalog (load warn variant + save) ---
+  - { facility: 0x10, operation: 0x01, status: 0x02, severity: Warning, phase: end, title: Catalog loaded with errors, message: "The base-disk catalog was loaded but some entries were invalid and skipped." }
+  - { facility: 0x10, operation: 0x02, status: 0x00, severity: Success, phase: end, title: Catalog saved, message: "The base-disk catalog was saved." }
+  - { facility: 0x10, operation: 0x02, status: 0x01, severity: Warning, phase: end, title: Catalog saved with errors, message: "The base-disk catalog was saved but reported validation errors." }
+  - { facility: 0x10, operation: 0x02, status: 0x02, severity: Error, flags: [UserActionable], phase: end, title: Catalog save failed, message: "The base-disk catalog could not be saved.", remediation: "Verify the catalog path is writable and valid." }
+
+  # --- assets.basedisk ---
+  - { facility: 0x11, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Base-disk list loaded, message: "The base-disk list was loaded." }
+  - { facility: 0x11, operation: 0x01, status: 0x01, severity: Warning, phase: end, title: Base-disk list loaded with errors, message: "The base-disk list loaded with some invalid entries." }
+  - { facility: 0x11, operation: 0x02, status: 0x00, severity: Success, phase: end, title: Base disks refreshed, message: "The base-disk list was refreshed." }
+  - { facility: 0x11, operation: 0x02, status: 0x01, severity: Warning, phase: end, title: Base disks refreshed with errors, message: "The base-disk list refreshed with some invalid entries." }
+  - { facility: 0x11, operation: 0x03, status: 0x00, severity: Success, phase: end, title: Base disk registered, message: "A base disk was registered in the catalog." }
+  - { facility: 0x11, operation: 0x03, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Base disk registration reported errors, message: "The base disk was registered but validation reported errors." }
+  - { facility: 0x11, operation: 0x04, status: 0x00, severity: Success, phase: end, title: Base-disk metadata updated, message: "Base-disk metadata was updated." }
+  - { facility: 0x11, operation: 0x04, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Base-disk metadata update reported errors, message: "Base-disk metadata was updated but validation reported errors." }
+  - { facility: 0x11, operation: 0x05, status: 0x00, severity: Success, phase: end, title: Base disk valid, message: "The base disk passed validation." }
+  - { facility: 0x11, operation: 0x05, status: 0x01, severity: Warning, phase: end, title: Base disk validation warnings, message: "The base disk validated with warnings." }
+  - { facility: 0x11, operation: 0x05, status: 0x02, severity: Warning, flags: [UserActionable], phase: end, title: Base disk validation blocked, message: "The base disk failed a blocking validation rule.", remediation: "Resolve the reported validation issue before using this disk." }
+  - { facility: 0x11, operation: 0x06, status: 0x00, severity: Success, phase: end, title: Base disk removed, message: "A base disk was removed from the catalog." }
+  - { facility: 0x11, operation: 0x06, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Base disk remove failed, message: "A base disk could not be removed from the catalog." }
+
+  # --- network.switch ---
+  - { facility: 0x12, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Listing switches, message: "Requesting the virtual switch list." }
+  - { facility: 0x12, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Switches listed, message: "The virtual switch list was loaded." }
+  - { facility: 0x12, operation: 0x01, status: 0x01, severity: Warning, phase: end,   title: Switch list failed, message: "The virtual switch list could not be loaded." }
+  - { facility: 0x12, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Refreshing switches, message: "Refreshing the virtual switch list." }
+  - { facility: 0x12, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: Switches refreshed, message: "The virtual switch list was refreshed." }
+  - { facility: 0x12, operation: 0x02, status: 0x01, severity: Warning, phase: end,   title: Switch refresh failed, message: "The virtual switch list could not be refreshed." }
+  - { facility: 0x12, operation: 0x03, status: 0x00, severity: Success, phase: end, title: Switch valid, message: "The virtual switch passed validation." }
+  - { facility: 0x12, operation: 0x03, status: 0x01, severity: Warning, phase: end, title: Switch validation failed, message: "The virtual switch failed validation." }
+  - { facility: 0x12, operation: 0x03, status: 0x02, severity: Warning, flags: [UserActionable], phase: end, title: Switch validation blocked, message: "The virtual switch failed a blocking validation rule." }
+  - { facility: 0x12, operation: 0x04, status: 0x00, severity: Info,    phase: start, title: Listing attached VMs, message: "Requesting the VMs attached to a switch." }
+  - { facility: 0x12, operation: 0x04, status: 0x00, severity: Success, phase: end,   title: Attached VMs listed, message: "The VMs attached to a switch were loaded." }
+  - { facility: 0x12, operation: 0x04, status: 0x01, severity: Warning, phase: end,   title: Attached VM list failed, message: "The VMs attached to a switch could not be loaded." }
+  - { facility: 0x12, operation: 0x05, status: 0x00, severity: Info,    phase: start, title: Creating switch, message: "Creating a virtual switch." }
+  - { facility: 0x12, operation: 0x05, status: 0x00, severity: Success, phase: end,   title: Switch created, message: "A virtual switch was created." }
+  - { facility: 0x12, operation: 0x05, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Switch create failed, message: "A virtual switch could not be created." }
+  - { facility: 0x12, operation: 0x06, status: 0x00, severity: Info,    phase: start, title: Updating switch, message: "Updating a virtual switch." }
+  - { facility: 0x12, operation: 0x06, status: 0x00, severity: Success, phase: end,   title: Switch updated, message: "A virtual switch was updated." }
+  - { facility: 0x12, operation: 0x06, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Switch update failed, message: "A virtual switch could not be updated." }
+  - { facility: 0x12, operation: 0x07, status: 0x00, severity: Info,    phase: start, title: Deleting switch, message: "Deleting a virtual switch." }
+  - { facility: 0x12, operation: 0x07, status: 0x00, severity: Success, phase: end,   title: Switch deleted, message: "A virtual switch was deleted." }
+  - { facility: 0x12, operation: 0x07, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Switch delete failed, message: "A virtual switch could not be deleted." }
+  - { facility: 0x12, operation: 0x07, status: 0x02, severity: Warning, flags: [UserActionable], phase: end, title: Switch delete blocked, message: "A virtual switch was not deleted because VMs are still attached.", remediation: "Detach the listed VMs before deleting the switch." }
+
+  # --- template ---
+  - { facility: 0x13, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Template library loaded, message: "The template library was loaded." }
+  - { facility: 0x13, operation: 0x01, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Template library load failed, message: "The template library could not be loaded.", remediation: "Verify the template folder exists and its files are valid." }
+  - { facility: 0x13, operation: 0x02, status: 0x00, severity: Success, phase: end, title: Template saved, message: "A template was saved." }
+  - { facility: 0x13, operation: 0x02, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Template not saved (validation failed), message: "The template was not saved because it failed validation.", remediation: "Fix the reported validation issues and save again." }
+  - { facility: 0x13, operation: 0x02, status: 0x02, severity: Error, flags: [UserActionable], phase: end, title: Template save failed, message: "A template could not be saved.", remediation: "Verify the template path is writable." }
+  - { facility: 0x13, operation: 0x03, status: 0x00, severity: Success, phase: end, title: Template deleted, message: "A template was deleted." }
+  - { facility: 0x13, operation: 0x03, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Template delete failed, message: "A template could not be deleted." }
+  - { facility: 0x13, operation: 0x04, status: 0x00, severity: Success, phase: end, title: Template imported, message: "A template was imported into the library." }
+  - { facility: 0x13, operation: 0x04, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Template import failed, message: "A template could not be imported.", remediation: "Verify the source file is a valid template." }
+  - { facility: 0x13, operation: 0x05, status: 0x00, severity: Success, phase: end, title: Template exported, message: "A template was exported." }
+  - { facility: 0x13, operation: 0x05, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Template export failed, message: "A template could not be exported.", remediation: "Verify the destination path is writable." }
+
+  # --- hyperv primitives (Info on success, Error on failure) ---
+  - { facility: 0x20, operation: 0x01, status: 0x00, severity: Success, phase: end, title: VM created, message: "The virtual machine was created." }
+  - { facility: 0x20, operation: 0x01, status: 0x01, severity: Error, phase: end, title: VM create failed, message: "The virtual machine could not be created." }
+  - { facility: 0x20, operation: 0x02, status: 0x00, severity: Success, phase: end, title: VM started, message: "The virtual machine was started." }
+  - { facility: 0x20, operation: 0x02, status: 0x01, severity: Error, phase: end, title: VM start failed, message: "The virtual machine could not be started." }
+  - { facility: 0x20, operation: 0x03, status: 0x00, severity: Success, phase: end, title: VM stopped, message: "The virtual machine was stopped." }
+  - { facility: 0x20, operation: 0x03, status: 0x01, severity: Error, phase: end, title: VM stop failed, message: "The virtual machine could not be stopped." }
+  - { facility: 0x20, operation: 0x04, status: 0x00, severity: Success, phase: end, title: VM removed, message: "The virtual machine was removed." }
+  - { facility: 0x20, operation: 0x04, status: 0x01, severity: Error, phase: end, title: VM remove failed, message: "The virtual machine could not be removed." }
+  - { facility: 0x20, operation: 0x05, status: 0x00, severity: Success, phase: end, title: VM existence checked, message: "Checked whether the virtual machine exists." }
+  - { facility: 0x20, operation: 0x05, status: 0x01, severity: Error, phase: end, title: VM existence check failed, message: "Could not check whether the virtual machine exists." }
+  - { facility: 0x20, operation: 0x06, status: 0x00, severity: Success, phase: end, title: VM running state checked, message: "Checked whether the virtual machine is running." }
+  - { facility: 0x20, operation: 0x06, status: 0x01, severity: Error, phase: end, title: VM running check failed, message: "Could not check whether the virtual machine is running." }
+  - { facility: 0x20, operation: 0x07, status: 0x00, severity: Success, phase: end, title: Differencing disk created, message: "A differencing disk was created." }
+  - { facility: 0x20, operation: 0x07, status: 0x01, severity: Error, phase: end, title: Differencing disk create failed, message: "A differencing disk could not be created." }
+  - { facility: 0x20, operation: 0x08, status: 0x00, severity: Success, phase: end, title: Fixed disk created, message: "A fixed disk was created." }
+  - { facility: 0x20, operation: 0x08, status: 0x01, severity: Error, phase: end, title: Fixed disk create failed, message: "A fixed disk could not be created." }
+  - { facility: 0x20, operation: 0x09, status: 0x00, severity: Success, phase: end, title: Checkpoints disabled, message: "Automatic checkpoints were disabled on the virtual machine." }
+  - { facility: 0x20, operation: 0x09, status: 0x01, severity: Error, phase: end, title: Disable checkpoints failed, message: "Automatic checkpoints could not be disabled." }
+  - { facility: 0x20, operation: 0x0A, status: 0x00, severity: Success, phase: end, title: Guest services enabled, message: "Integration guest services were enabled on the virtual machine." }
+  - { facility: 0x20, operation: 0x0A, status: 0x01, severity: Error, phase: end, title: Enable guest services failed, message: "Integration guest services could not be enabled." }
+  - { facility: 0x20, operation: 0x0B, status: 0x00, severity: Success, phase: end, title: Virtual switches listed, message: "The Hyper-V virtual switch names were listed." }
+  - { facility: 0x20, operation: 0x0B, status: 0x01, severity: Error, phase: end, title: List virtual switches failed, message: "The Hyper-V virtual switch names could not be listed." }
+  - { facility: 0x20, operation: 0x0C, status: 0x00, severity: Success, phase: end, title: VM network adapters listed, message: "The virtual machine network adapters were listed." }
+  - { facility: 0x20, operation: 0x0C, status: 0x01, severity: Error, phase: end, title: List VM network adapters failed, message: "The virtual machine network adapters could not be listed." }
+  - { facility: 0x20, operation: 0x0C, status: 0x02, severity: Warning, phase: atomic, title: VM network adapter parse warning, message: "A virtual machine network adapter entry could not be parsed and was skipped." }
+  - { facility: 0x20, operation: 0x0D, status: 0x00, severity: Success, phase: end, title: Switch attached to VM, message: "A virtual switch was attached to the virtual machine." }
+  - { facility: 0x20, operation: 0x0D, status: 0x01, severity: Error, phase: end, title: Attach switch to VM failed, message: "A virtual switch could not be attached to the virtual machine." }
+  - { facility: 0x20, operation: 0x0E, status: 0x00, severity: Success, phase: end, title: Switches attached to VM, message: "Virtual switches were attached to the virtual machine." }
+  - { facility: 0x20, operation: 0x0E, status: 0x01, severity: Error, phase: end, title: Attach switches to VM failed, message: "Virtual switches could not be attached to the virtual machine." }
+
+  # --- machines capability (inventory / edit / action / connection / delete / rdp) ---
+  - { facility: 0x30, operation: 0x10, status: 0x00, severity: Info,    phase: start, title: Loading machine inventory, message: "Loading the virtual machine inventory." }
+  - { facility: 0x30, operation: 0x10, status: 0x00, severity: Success, phase: end,   title: Machine inventory loaded, message: "The virtual machine inventory was loaded." }
+  - { facility: 0x30, operation: 0x10, status: 0x01, severity: Error,   phase: end,   title: Machine inventory load failed, message: "The virtual machine inventory could not be loaded." }
+  - { facility: 0x30, operation: 0x11, status: 0x00, severity: Info,    phase: start, title: Loading machine editor, message: "Loading a virtual machine for editing." }
+  - { facility: 0x30, operation: 0x11, status: 0x00, severity: Success, phase: end,   title: Machine editor loaded, message: "The virtual machine was loaded for editing." }
+  - { facility: 0x30, operation: 0x11, status: 0x01, severity: Warning, phase: end,   title: Machine to edit not found, message: "The virtual machine to edit could not be found." }
+  - { facility: 0x30, operation: 0x11, status: 0x02, severity: Error,   phase: end,   title: Machine editor load failed, message: "The virtual machine could not be loaded for editing." }
+  - { facility: 0x30, operation: 0x12, status: 0x00, severity: Info,    phase: start, title: Applying machine edits, message: "Applying edits to the virtual machine." }
+  - { facility: 0x30, operation: 0x12, status: 0x00, severity: Success, phase: end,   title: Machine edits applied, message: "Edits to the virtual machine were applied." }
+  - { facility: 0x30, operation: 0x12, status: 0x01, severity: Error,   phase: end,   title: Machine edits apply failed, message: "Edits to the virtual machine could not be applied." }
+  - { facility: 0x30, operation: 0x13, status: 0x00, severity: Info,    phase: start, title: Running machine action, message: "Running a virtual machine action." }
+  - { facility: 0x30, operation: 0x13, status: 0x00, severity: Success, phase: end,   title: Machine action completed, message: "The virtual machine action completed." }
+  - { facility: 0x30, operation: 0x13, status: 0x01, severity: Error,   phase: end,   title: Machine action failed, message: "The virtual machine action failed." }
+  - { facility: 0x30, operation: 0x14, status: 0x00, severity: Info,    phase: start, title: Starting machine connection, message: "Starting a connection to the virtual machine." }
+  - { facility: 0x30, operation: 0x14, status: 0x00, severity: Success, phase: end,   title: Machine connection completed, message: "The connection to the virtual machine completed." }
+  - { facility: 0x30, operation: 0x14, status: 0x01, severity: Error,   phase: end,   title: Machine connection failed, message: "The connection to the virtual machine failed." }
+  - { facility: 0x30, operation: 0x15, status: 0x00, severity: Info,    phase: start, title: Deleting machine, message: "Deleting a virtual machine." }
+  - { facility: 0x30, operation: 0x15, status: 0x00, severity: Success, phase: end,   title: Machine deleted, message: "The virtual machine was deleted." }
+  - { facility: 0x30, operation: 0x15, status: 0x01, severity: Error,   phase: end,   title: Machine delete failed, message: "The virtual machine could not be deleted." }
+  - { facility: 0x30, operation: 0x16, status: 0x00, severity: Debug, phase: atomic, title: RDP ready, message: "The virtual machine is reachable over RDP." }
+  - { facility: 0x30, operation: 0x16, status: 0x01, severity: Debug, flags: [Transient], phase: atomic, title: RDP not ready yet, message: "The virtual machine is not yet reachable over RDP." }
+  - { facility: 0x30, operation: 0x16, status: 0x02, severity: Warning, phase: atomic, title: RDP readiness check failed, message: "An RDP readiness check threw." }
+
+  # --- deploy.orchestration (lab run / vm / scheduler) ---
+  - { facility: 0x40, operation: 0x02, status: 0x02, severity: Warning, phase: end, title: Deployment cancelled, message: "The deployment was cancelled." }
+  - { facility: 0x40, operation: 0x02, status: 0x03, severity: Critical, flags: [UserActionable], phase: end, title: Deployment failed with residuals, message: "The deployment failed and some resources could not be cleaned up.", remediation: "Check Hyper-V for orphaned VMs, disks, or switches and remove them manually." }
+  - { facility: 0x40, operation: 0x02, status: 0x04, severity: Warning, flags: [UserActionable], phase: end, title: Deployment cancelled with residuals, message: "The deployment was cancelled and some resources could not be cleaned up.", remediation: "Check Hyper-V for orphaned VMs, disks, or switches and remove them manually." }
+  - { facility: 0x40, operation: 0x03, status: 0x00, severity: Info,    phase: start, title: Deploying VM, message: "Starting deployment of a virtual machine." }
+  - { facility: 0x40, operation: 0x03, status: 0x00, severity: Success, phase: end,   title: VM deployed, message: "A virtual machine finished deploying." }
+  - { facility: 0x40, operation: 0x03, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: VM deploy failed, message: "A virtual machine failed to deploy.", remediation: "Review the failed step for this VM in the log." }
+  - { facility: 0x40, operation: 0x03, status: 0x02, severity: Warning, phase: end, title: VM deploy cancelled, message: "A virtual machine deployment was cancelled." }
+  - { facility: 0x40, operation: 0x03, status: 0x03, severity: Critical, flags: [UserActionable], phase: end, title: VM deploy failed with residuals, message: "A virtual machine failed to deploy and some resources could not be cleaned up.", remediation: "Check Hyper-V for orphaned VMs, disks, or switches and remove them manually." }
+  - { facility: 0x40, operation: 0x04, status: 0x00, severity: Info,    phase: start, title: Scheduler started, message: "The deployment graph scheduler started." }
+  - { facility: 0x40, operation: 0x04, status: 0x00, severity: Success, phase: end,   title: Scheduler completed, message: "The deployment graph scheduler completed." }
+  - { facility: 0x40, operation: 0x04, status: 0x01, severity: Error,   phase: end,   title: Scheduler failed, message: "The deployment graph scheduler failed." }
+  - { facility: 0x40, operation: 0x04, status: 0x02, severity: Warning, phase: end,   title: Scheduler cancelled, message: "The deployment graph scheduler was cancelled." }
+  - { facility: 0x40, operation: 0x04, status: 0x03, severity: Warning, phase: progress, title: Scheduler cleanup started, message: "The scheduler began cleaning up after a node failure or cancellation." }
+  - { facility: 0x40, operation: 0x04, status: 0x04, severity: Warning, phase: progress, title: Scheduler cleanup node failed, message: "A node failed during scheduler cleanup." }
+
+  # --- deploy.guest.readiness-attempt ---
+  - { facility: 0x41, operation: 0x03, status: 0x00, severity: Debug, flags: [Transient, Retryable], phase: progress, title: Readiness attempt not ready, message: "A guest readiness attempt reported the guest is not ready yet; retrying." }
+  - { facility: 0x41, operation: 0x03, status: 0x01, severity: Warning, flags: [Retryable], phase: progress, title: Readiness attempt credential rejected, message: "A guest readiness attempt was rejected with an invalid credential; retrying within the grace window." }
+
+  # --- deploy.step ---
+  - { facility: 0x43, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Step started, message: "A deployment step started." }
+  - { facility: 0x43, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Step completed, message: "A deployment step completed." }
+  - { facility: 0x43, operation: 0x01, status: 0x01, severity: Info,    phase: end,   title: Step skipped, message: "A deployment step was skipped." }
+  - { facility: 0x43, operation: 0x01, status: 0x02, severity: Error, flags: [UserActionable], phase: end, title: Step failed, message: "A deployment step failed.", remediation: "Review the step error detail in the log." }
+  - { facility: 0x43, operation: 0x01, status: 0x03, severity: Error, flags: [UserActionable], phase: end, title: Step failed (exception), message: "A deployment step threw an exception.", remediation: "Review the exception detail in the log." }
+  - { facility: 0x43, operation: 0x01, status: 0x04, severity: Warning, phase: end, title: Step failed (non-blocking), message: "A non-blocking deployment step failed; the deployment continued." }
+
+  # --- deploy.network ---
+  - { facility: 0x44, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Ensuring switch, message: "Ensuring a virtual switch exists for the deployment." }
+  - { facility: 0x44, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Switch ensured, message: "The virtual switch for the deployment is present." }
+  - { facility: 0x44, operation: 0x01, status: 0x01, severity: Error,   phase: end,   title: Ensure switch failed, message: "The virtual switch for the deployment could not be ensured." }
+  - { facility: 0x44, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Cleaning up switch, message: "Cleaning up a virtual switch created for the deployment." }
+  - { facility: 0x44, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: Switch cleaned up, message: "A virtual switch created for the deployment was cleaned up." }
+  - { facility: 0x44, operation: 0x02, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Switch cleanup failed, message: "A virtual switch created for the deployment could not be cleaned up.", remediation: "Check Hyper-V for an orphaned switch and remove it manually." }
+  - { facility: 0x44, operation: 0x02, status: 0x02, severity: Error, flags: [UserActionable], phase: end, title: Switch cleanup failed (exception), message: "Cleaning up a deployment virtual switch threw an exception.", remediation: "Check Hyper-V for an orphaned switch and remove it manually." }
+  - { facility: 0x44, operation: 0x03, status: 0x00, severity: Info,    phase: start, title: Creating switch, message: "Creating a virtual switch for the deployment." }
+  - { facility: 0x44, operation: 0x03, status: 0x00, severity: Success, phase: end,   title: Switch created, message: "A virtual switch was created for the deployment." }
+
+  # --- deploy.cleanup (vm / step) ---
+  - { facility: 0x45, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Cleaning up VM, message: "Rolling back resources created for a virtual machine." }
+  - { facility: 0x45, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: VM cleanup complete, message: "All resources created for a virtual machine were removed." }
+  - { facility: 0x45, operation: 0x02, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: VM cleanup left residuals, message: "Some resources created for a virtual machine could not be removed.", remediation: "Check Hyper-V for orphaned VMs, disks, or switches and remove them manually." }
+  - { facility: 0x45, operation: 0x02, status: 0x02, severity: Error, flags: [UserActionable], phase: end, title: VM cleanup residuals detected, message: "Residual resources were detected after cleaning up a virtual machine.", remediation: "Check Hyper-V for orphaned VMs, disks, or switches and remove them manually." }
+  - { facility: 0x45, operation: 0x03, status: 0x00, severity: Success, phase: end, title: Cleanup step completed, message: "A cleanup step completed." }
+  - { facility: 0x45, operation: 0x03, status: 0x01, severity: Info,  phase: end, title: Cleanup step skipped, message: "A cleanup step was skipped." }
+  - { facility: 0x45, operation: 0x03, status: 0x02, severity: Error, phase: end, title: Cleanup step failed, message: "A cleanup step failed." }
+
+  # --- deploy.forest-trust ---
+  - { facility: 0x46, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Cleaning up forest trust, message: "Cleaning up a forest trust created for the deployment." }
+  - { facility: 0x46, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Forest trust cleaned up, message: "A forest trust created for the deployment was cleaned up." }
+  - { facility: 0x46, operation: 0x01, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Forest trust cleanup failed, message: "A forest trust could not be cleaned up.", remediation: "Check the domain controllers for a leftover trust and remove it manually." }
+  - { facility: 0x46, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Preparing DNS for forest trust, message: "Preparing DNS forwarding for a forest trust." }
+  - { facility: 0x46, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: DNS prepared for forest trust, message: "DNS forwarding for the forest trust was prepared." }
+  - { facility: 0x46, operation: 0x02, status: 0x01, severity: Error,   phase: end,   title: DNS preparation failed, message: "DNS forwarding for the forest trust could not be prepared." }
+  - { facility: 0x46, operation: 0x03, status: 0x00, severity: Info,    phase: start, title: Creating forest trust, message: "Creating a forest trust between domains." }
+  - { facility: 0x46, operation: 0x03, status: 0x00, severity: Success, phase: end,   title: Forest trust created, message: "A forest trust between domains was created." }
+  - { facility: 0x46, operation: 0x03, status: 0x01, severity: Error,   phase: end,   title: Forest trust creation failed, message: "A forest trust between domains could not be created." }
+  - { facility: 0x46, operation: 0x04, status: 0x00, severity: Info,    phase: start, title: Validating forest trust, message: "Validating a forest trust between domains." }
+  - { facility: 0x46, operation: 0x04, status: 0x00, severity: Success, phase: end,   title: Forest trust validated, message: "A forest trust between domains was validated." }
+  - { facility: 0x46, operation: 0x04, status: 0x01, severity: Error,   phase: end,   title: Forest trust validation failed, message: "A forest trust between domains could not be validated." }
+
+  # --- shell.ui ---
+  - { facility: 0x50, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Window teardown complete, message: "A capability panel was torn down when its window closed." }
+  - { facility: 0x50, operation: 0x01, status: 0x01, severity: Warning, phase: end, title: Window teardown error, message: "A capability panel failed to tear down cleanly when its window closed." }
 
   # diag.ps_timing (folded raw HyperVPowerShellTimingLogger; Debug so off by default)
   - { facility: 0xE0, operation: 0x01, status: 0x00, severity: Debug, phase: atomic, title: Session timing, message: "PowerShell session timing sample." }

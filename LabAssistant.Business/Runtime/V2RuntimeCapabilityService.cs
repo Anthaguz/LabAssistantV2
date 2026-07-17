@@ -5,6 +5,7 @@ using LabAssistant.Business.Runtime.Scheduling;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.GuestExecution;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
@@ -88,8 +89,10 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         var states = BuildRuntimeStates(request, multiContext);
         foreach (var state in states)
         {
-            state.Context.StructuredEventEmitter = (eventName, level, result, extraContext) =>
-                EmitVmScopedEvent(eventName, level, multiContext, state.Context, result, extraContext);
+            state.Context.StructuredEventEmitter = (code, result, extraContext) =>
+                EmitVmScopedEvent(code, multiContext, state.Context, result, extraContext);
+            state.Context.StepFailedCode = LaStatus.DeployStep_StepFailed;
+            state.Context.StepFailedNonBlockingCode = LaStatus.DeployStep_StepFailedNonBlocking;
         }
 
         // Executors run concurrently (graph scheduler dispatch and legacy Task.WhenAll fan-out both mutate this),
@@ -138,7 +141,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         using var cancellationRegistration = cancellationToken.Register(multiContext.RequestUserCancellation);
 
         multiContext.MarkRunning();
-        EmitDeployEvent("DeployLabStarted", multiContext, "started");
+        EmitDeployEvent(LaStatus.DeployOrchestration_Deploying, multiContext, "started");
 
         try
         {
@@ -2529,7 +2532,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         context.EmitStepState(stepKey, stepLabel, DeployStepState.Pending);
         context.EmitStepState(stepKey, stepLabel, DeployStepState.Running);
-        EmitStepEvent(context, multiContext, "StepStarted", "info", null, stepKey);
+        EmitStepEvent(context, multiContext, LaStatus.DeployStep_StepStarted, null, stepKey);
 
         try
         {
@@ -2559,14 +2562,20 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     ? DeployStepState.Skipped
                     : DeployStepState.Failed;
 
-        var result = terminalState switch
+        // A Failed terminal state always follows a MarkFailure call (the only thing that clears IsSuccess) - either the
+        // step action called it directly or the catch block above did - and MarkFailure already emits the rich coded
+        // StepFailed via the context's StepFailedCode. Emitting StepFailed again here would double-log the failure with
+        // a context-poor payload, so Failed emits no terminal event. Succeeded emits StepCompleted; Skipped emits a
+        // single StepSkipped (MarkCancelled and the skip override do not emit, so this stays the one skip signal).
+        if (terminalState != DeployStepState.Failed)
         {
-            DeployStepState.Succeeded => "success",
-            DeployStepState.Skipped => "skipped",
-            _ => "failed"
-        };
+            var result = terminalState == DeployStepState.Skipped ? "skipped" : "success";
+            var stepCode = terminalState == DeployStepState.Skipped
+                ? LaStatus.DeployStep_StepSkipped
+                : LaStatus.DeployStep_StepCompleted;
+            EmitStepEvent(context, multiContext, stepCode, result, stepKey);
+        }
 
-        EmitStepEvent(context, multiContext, "StepCompleted", "info", result, stepKey);
         context.EmitStepState(stepKey, stepLabel, terminalState, overrideMessage);
     }
 
@@ -2588,13 +2597,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         multiContext.MarkCleanupInProgress();
-        EmitVmScopedEvent("CleanupStarted", "info", multiContext, state.Context, "started");
+        EmitVmScopedEvent(LaStatus.DeployCleanup_CleaningUpVM, multiContext, state.Context, "started");
         var cleanupResult = await _cleanupOrchestrator.CleanupAsync(state.Context, state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory));
         state.Context.CleanupResult = cleanupResult;
         multiContext.CleanupResults.Add(cleanupResult);
         EmitVmScopedEvent(
-            "CleanupCompleted",
-            cleanupResult.HasResiduals ? "warn" : "info",
+            cleanupResult.HasResiduals ? LaStatus.DeployCleanup_VMCleanupLeftResiduals : LaStatus.DeployCleanup_VMCleanupComplete,
             multiContext,
             state.Context,
             cleanupResult.HasResiduals ? "completed_with_residuals" : "completed");
@@ -2790,10 +2798,9 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     }
 
     private void EmitDeployEvent(
-        string eventName,
+        uint code,
         MultiVmDeploymentContext multiContext,
         string? result,
-        string level = "info",
         IReadOnlyDictionary<string, object?>? extra = null)
     {
         var context = new Dictionary<string, object?>
@@ -2811,39 +2818,25 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
         }
 
-        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
+        _structuredLogger.Log(code, multiContext.OperationId, result, context);
     }
 
     private void EmitDeployTerminalEvent(MultiVmDeploymentContext multiContext)
     {
-        var eventName = multiContext.OperationState switch
+        var (code, result) = multiContext.OperationState switch
         {
-            DeploymentOperationState.Completed => "DeployLabCompleted",
-            DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "DeployLabCancelled",
-            _ => "DeployLabFailed"
+            DeploymentOperationState.Completed => (LaStatus.DeployOrchestration_DeploySucceeded, "success"),
+            DeploymentOperationState.Cancelled => (LaStatus.DeployOrchestration_DeploymentCancelled, "cancelled"),
+            DeploymentOperationState.CancelledWithResiduals => (LaStatus.DeployOrchestration_DeploymentCancelledWithResiduals, "cancelled_with_residuals"),
+            DeploymentOperationState.FailedWithResiduals => (LaStatus.DeployOrchestration_DeploymentFailedWithResiduals, "failed_with_residuals"),
+            _ => (LaStatus.DeployOrchestration_DeployFailed, "failed")
         };
 
-        var result = multiContext.OperationState switch
-        {
-            DeploymentOperationState.Completed => "success",
-            DeploymentOperationState.Cancelled => "cancelled",
-            DeploymentOperationState.CancelledWithResiduals => "cancelled_with_residuals",
-            DeploymentOperationState.FailedWithResiduals => "failed_with_residuals",
-            _ => "failed"
-        };
-
-        EmitDeployEvent(
-            eventName,
-            multiContext,
-            result,
-            multiContext.OperationState is DeploymentOperationState.Failed
-                or DeploymentOperationState.FailedWithResiduals
-                or DeploymentOperationState.CancelledWithResiduals ? "error" : "info");
+        EmitDeployEvent(code, multiContext, result);
     }
 
     private void EmitVmScopedEvent(
-        string eventName,
-        string level,
+        uint code,
         MultiVmDeploymentContext multiContext,
         VmDeploymentContext vmContext,
         string? result,
@@ -2865,31 +2858,31 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
         }
 
-        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
+        _structuredLogger.Log(code, multiContext.OperationId, result, context);
     }
 
     private void EmitVmTerminalEvent(MultiVmDeploymentContext multiContext, VmDeploymentContext vmContext)
     {
-        var (eventName, result, level) = vmContext.WasCancelled
-            ? ("VmDeployFailed", "cancelled", "warn")
+        var (code, result) = vmContext.WasCancelled
+            ? (LaStatus.DeployOrchestration_VMDeployCancelled, "cancelled")
             : vmContext.IsSuccess
-                ? ("VmDeployCompleted", "success", "info")
-                : ("VmDeployFailed", vmContext.CleanupResult?.HasResiduals == true ? "failed_with_residuals" : "failed", "error");
+                ? (LaStatus.DeployOrchestration_VMDeployed, "success")
+                : vmContext.CleanupResult?.HasResiduals == true
+                    ? (LaStatus.DeployOrchestration_VMDeployFailedWithResiduals, "failed_with_residuals")
+                    : (LaStatus.DeployOrchestration_VMDeployFailed, "failed");
 
-        EmitVmScopedEvent(eventName, level, multiContext, vmContext, result);
+        EmitVmScopedEvent(code, multiContext, vmContext, result);
     }
 
     private void EmitStepEvent(
         VmDeploymentContext context,
         MultiVmDeploymentContext multiContext,
-        string eventName,
-        string level,
+        uint code,
         string? result,
         string stepKey)
     {
         EmitVmScopedEvent(
-            eventName,
-            level,
+            code,
             multiContext,
             context,
             result,
@@ -2898,14 +2891,6 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 ["stepKey"] = stepKey
             });
     }
-
-    private static StructuredLogLevel ParseLevel(string level) => level switch
-    {
-        "error" => StructuredLogLevel.Error,
-        "warn" => StructuredLogLevel.Warn,
-        "debug" => StructuredLogLevel.Debug,
-        _ => StructuredLogLevel.Info
-    };
 
     private sealed class RuntimeVmState : IDisposable
     {

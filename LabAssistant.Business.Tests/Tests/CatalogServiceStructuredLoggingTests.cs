@@ -1,6 +1,7 @@
 using LabAssistant.Business.Catalog;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using Xunit;
 
@@ -8,10 +9,12 @@ namespace LabAssistant.Business.Tests;
 
 public class CatalogServiceStructuredLoggingTests
 {
-    private static readonly HashSet<string> CanonicalCatalogEvents =
+    private static readonly HashSet<string> CanonicalCatalogCodes =
     [
-        "CatalogLoaded",
-        "CatalogSaved"
+        $"0x{LaStatus.AssetsCatalog_CatalogLoaded:X8}",
+        $"0x{LaStatus.AssetsCatalog_CatalogLoadedWithErrors:X8}",
+        $"0x{LaStatus.AssetsCatalog_CatalogSaved:X8}",
+        $"0x{LaStatus.AssetsCatalog_CatalogSavedWithErrors:X8}"
     ];
 
     [Fact]
@@ -26,14 +29,14 @@ public class CatalogServiceStructuredLoggingTests
 
         Assert.Single(result.Items);
         var logEvent = Assert.Single(logger.Events);
-        Assert.Equal("CatalogLoaded", logEvent.Event);
+        Assert.Equal($"0x{LaStatus.AssetsCatalog_CatalogLoaded:X8}", logEvent.Code);
         Assert.Equal("success", logEvent.Result);
         Assert.False(string.IsNullOrWhiteSpace(logEvent.OperationId));
         Assert.Equal("info", logEvent.Level);
         Assert.False(string.IsNullOrWhiteSpace(logEvent.Ts));
         Assert.True(DateTimeOffset.TryParse(logEvent.Ts, out var parsedTs));
         Assert.Equal(TimeSpan.Zero, parsedTs.Offset);
-        Assert.Contains(logEvent.Event, CanonicalCatalogEvents);
+        Assert.Contains(logEvent.Code, CanonicalCatalogCodes);
         Assert.Equal(1, GetInt(logEvent, "itemCount"));
         Assert.Equal(0, GetInt(logEvent, "errorCount"));
         Assert.Equal(@"C:\catalog\vhdx-catalog.json", GetString(logEvent, "resourcePath"));
@@ -52,12 +55,12 @@ public class CatalogServiceStructuredLoggingTests
 
         Assert.False(result.IsValid);
         var logEvent = Assert.Single(logger.Events);
-        Assert.Equal("CatalogSaved", logEvent.Event);
+        Assert.Equal($"0x{LaStatus.AssetsCatalog_CatalogSavedWithErrors:X8}", logEvent.Code);
         Assert.Equal("failed", logEvent.Result);
         Assert.Equal("warn", logEvent.Level);
         Assert.False(string.IsNullOrWhiteSpace(logEvent.OperationId));
         Assert.False(string.IsNullOrWhiteSpace(logEvent.Ts));
-        Assert.Contains(logEvent.Event, CanonicalCatalogEvents);
+        Assert.Contains(logEvent.Code, CanonicalCatalogCodes);
         Assert.Equal(1, GetInt(logEvent, "itemCount"));
         Assert.Equal(1, GetInt(logEvent, "errorCount"));
         AssertContextKeysAreNonSensitive(logEvent);

@@ -3,6 +3,7 @@ using System.Text.Json;
 using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.PowerShell;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
@@ -25,16 +26,16 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
 
         await coordinator.DeployAllAsync(multi);
 
-        Assert.Contains(logger.Events, e => e.Event == "DeployLabStarted" && e.OperationId == "op-deploy-success");
-        Assert.Contains(logger.Events, e => e.Event == "VmDeployStarted" && e.OperationId == "op-deploy-success");
-        Assert.Contains(logger.Events, e => e.Event == "StepStarted" && e.OperationId == "op-deploy-success");
-        Assert.Contains(logger.Events, e => e.Event == "StepCompleted" && e.OperationId == "op-deploy-success");
-        Assert.Contains(logger.Events, e => e.Event == "VmDeployCompleted" && e.OperationId == "op-deploy-success");
-        Assert.Contains(logger.Events, e => e.Event == "DeployLabCompleted" && e.OperationId == "op-deploy-success");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployOrchestration_Deploying) && e.OperationId == "op-deploy-success");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployOrchestration_DeployingVM) && e.OperationId == "op-deploy-success");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployStep_StepStarted) && e.OperationId == "op-deploy-success");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployStep_StepCompleted) && e.OperationId == "op-deploy-success");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployOrchestration_VMDeployed) && e.OperationId == "op-deploy-success");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployOrchestration_DeploySucceeded) && e.OperationId == "op-deploy-success");
 
         Assert.All(logger.Events, e => Assert.Equal("op-deploy-success", e.OperationId));
         Assert.All(logger.Events, AssertHasRequiredFields);
-        var stepStarted = logger.Events.First(e => e.Event == "StepStarted");
+        var stepStarted = logger.Events.First(e => e.Code == Hex(LaStatus.DeployStep_StepStarted));
         Assert.Equal("vm1", stepStarted.Context?["vmName"]?.ToString());
         Assert.False(string.IsNullOrWhiteSpace(stepStarted.Context?["stepKey"]?.ToString()));
     }
@@ -77,13 +78,13 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
 
         await coordinator.DeployAllAsync(multi);
 
-        Assert.Contains(logger.Events, e => e.Event == "StepFailed" && e.OperationId == "op-deploy-fail");
-        Assert.Contains(logger.Events, e => e.Event == "CleanupStarted" && e.OperationId == "op-deploy-fail");
-        Assert.Contains(logger.Events, e => e.Event == "CleanupStepCompleted" && e.OperationId == "op-deploy-fail");
-        Assert.Contains(logger.Events, e => e.Event == "CleanupCompleted" && e.OperationId == "op-deploy-fail");
-        Assert.Contains(logger.Events, e => e.Event == "DeployLabFailed" && e.OperationId == "op-deploy-fail");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployStep_StepFailed) && e.OperationId == "op-deploy-fail");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployCleanup_CleaningUpVM) && e.OperationId == "op-deploy-fail");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployCleanup_CleanupStepCompleted) && e.OperationId == "op-deploy-fail");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployCleanup_VMCleanupComplete) && e.OperationId == "op-deploy-fail");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployOrchestration_DeployFailed) && e.OperationId == "op-deploy-fail");
 
-        var stepFailed = logger.Events.First(e => e.Event == "StepFailed");
+        var stepFailed = logger.Events.First(e => e.Code == Hex(LaStatus.DeployStep_StepFailed));
         Assert.Equal(@"C:\vm\vm1", stepFailed.Context?["vmPath"]?.ToString());
         Assert.Equal(@"C:\vm\vm1\vm1.vhdx", stepFailed.Context?["targetVhdPath"]?.ToString());
         Assert.Equal(@"D:\base\parent.vhdx", stepFailed.Context?["parentVhdPath"]?.ToString());
@@ -91,7 +92,7 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         Assert.Equal("0x80070005", stepFailed.Context?["hresult"]?.ToString());
         Assert.Equal("OperationFailed", stepFailed.Context?["errorCode"]?.ToString());
 
-        var vmFailed = logger.Events.First(e => e.Event == "VmDeployFailed");
+        var vmFailed = logger.Events.First(e => e.Code == Hex(LaStatus.DeployOrchestration_VMDeployFailed));
         Assert.Equal(@"C:\vm\vm1", vmFailed.Context?["vmPath"]?.ToString());
         Assert.Equal(@"C:\vm\vm1\vm1.vhdx", vmFailed.Context?["targetVhdPath"]?.ToString());
         Assert.Equal(@"D:\base\parent.vhdx", vmFailed.Context?["parentVhdPath"]?.ToString());
@@ -99,7 +100,7 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         Assert.Equal("0x80070005", vmFailed.Context?["hresult"]?.ToString());
         Assert.Equal("OperationFailed", vmFailed.Context?["errorCode"]?.ToString());
 
-        var deployFailed = logger.Events.First(e => e.Event == "DeployLabFailed");
+        var deployFailed = logger.Events.First(e => e.Code == Hex(LaStatus.DeployOrchestration_DeployFailed));
         Assert.Equal("vm1", deployFailed.Context?["failedVmName"]?.ToString());
         Assert.Equal(@"C:\vm\vm1", deployFailed.Context?["vmPath"]?.ToString());
         Assert.Equal(@"C:\vm\vm1\vm1.vhdx", deployFailed.Context?["targetVhdPath"]?.ToString());
@@ -152,10 +153,10 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         release.SetResult(true);
         await deployTask;
 
-        Assert.Contains(logger.Events, e => e.Event == "CleanupStarted" && e.OperationId == "op-deploy-cancel");
-        Assert.Contains(logger.Events, e => e.Event == "CleanupStepFailed" && e.OperationId == "op-deploy-cancel");
-        Assert.Contains(logger.Events, e => e.Event == "CleanupResidualsDetected" && e.OperationId == "op-deploy-cancel");
-        Assert.Contains(logger.Events, e => e.Event == "DeployLabCancelled" && e.OperationId == "op-deploy-cancel" && e.Result == "cancelled_with_residuals");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployCleanup_CleaningUpVM) && e.OperationId == "op-deploy-cancel");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployCleanup_CleanupStepFailed) && e.OperationId == "op-deploy-cancel");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployCleanup_VMCleanupResidualsDetected) && e.OperationId == "op-deploy-cancel");
+        Assert.Contains(logger.Events, e => e.Code == Hex(LaStatus.DeployOrchestration_DeploymentCancelledWithResiduals) && e.OperationId == "op-deploy-cancel" && e.Result == "cancelled_with_residuals");
     }
 
     [Fact]
@@ -274,37 +275,46 @@ public class MultiVmDeploymentCoordinatorStructuredLoggingTests
         Assert.True(vm2Updates[0].Sequence < vm2Updates[1].Sequence && vm2Updates[1].Sequence < vm2Updates[2].Sequence);
     }
 
+    private static string Hex(uint code) => $"0x{code:X8}";
+
     private static void AssertHasRequiredFields(StructuredLogEvent logEvent)
     {
         Assert.False(string.IsNullOrWhiteSpace(logEvent.Ts));
         Assert.False(string.IsNullOrWhiteSpace(logEvent.Level));
         Assert.False(string.IsNullOrWhiteSpace(logEvent.Event));
         Assert.False(string.IsNullOrWhiteSpace(logEvent.OperationId));
+        Assert.False(string.IsNullOrWhiteSpace(logEvent.Code));
 
         var parsedTs = DateTimeOffset.Parse(logEvent.Ts);
         Assert.Equal(TimeSpan.Zero, parsedTs.Offset);
 
         Assert.Contains(logEvent.Level, new[] { "debug", "info", "warn", "error" });
-        Assert.Contains(logEvent.Event, CanonicalEventNames);
+        Assert.Contains(logEvent.Code, CanonicalCodes);
     }
 
-    private static readonly HashSet<string> CanonicalEventNames =
+    private static readonly HashSet<string> CanonicalCodes =
     [
-        "DeployLabStarted",
-        "DeployLabCompleted",
-        "DeployLabFailed",
-        "DeployLabCancelled",
-        "VmDeployStarted",
-        "VmDeployCompleted",
-        "VmDeployFailed",
-        "StepStarted",
-        "StepCompleted",
-        "StepFailed",
-        "CleanupStarted",
-        "CleanupStepCompleted",
-        "CleanupStepFailed",
-        "CleanupCompleted",
-        "CleanupResidualsDetected"
+        Hex(LaStatus.DeployOrchestration_Deploying),
+        Hex(LaStatus.DeployOrchestration_DeploySucceeded),
+        Hex(LaStatus.DeployOrchestration_DeployFailed),
+        Hex(LaStatus.DeployOrchestration_DeploymentCancelled),
+        Hex(LaStatus.DeployOrchestration_DeploymentCancelledWithResiduals),
+        Hex(LaStatus.DeployOrchestration_DeploymentFailedWithResiduals),
+        Hex(LaStatus.DeployOrchestration_DeployingVM),
+        Hex(LaStatus.DeployOrchestration_VMDeployed),
+        Hex(LaStatus.DeployOrchestration_VMDeployFailed),
+        Hex(LaStatus.DeployOrchestration_VMDeployFailedWithResiduals),
+        Hex(LaStatus.DeployOrchestration_VMDeployCancelled),
+        Hex(LaStatus.DeployStep_StepStarted),
+        Hex(LaStatus.DeployStep_StepCompleted),
+        Hex(LaStatus.DeployStep_StepFailed),
+        Hex(LaStatus.DeployCleanup_CleaningUpVM),
+        Hex(LaStatus.DeployCleanup_CleanupStepCompleted),
+        Hex(LaStatus.DeployCleanup_CleanupStepFailed),
+        Hex(LaStatus.DeployCleanup_CleanupStepSkipped),
+        Hex(LaStatus.DeployCleanup_VMCleanupComplete),
+        Hex(LaStatus.DeployCleanup_VMCleanupLeftResiduals),
+        Hex(LaStatus.DeployCleanup_VMCleanupResidualsDetected)
     ];
 
     private static MultiVmDeploymentCoordinator CreateCoordinator(

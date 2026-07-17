@@ -1,6 +1,7 @@
 using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.PowerShell;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.PowerShell;
 using Xunit;
@@ -27,9 +28,10 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
             BaseVhdPath = @"D:\Base\bad.vhdx",
             VhdPath = @"D:\Labs\VM1\VM1.vhdx",
             PowerShellHandle = handle,
-            StructuredEventEmitter = (eventName, level, result, extra) =>
+            StepFailedCode = LaStatus.DeployStep_StepFailed,
+            StructuredEventEmitter = (code, result, extra) =>
             {
-                events.Add(new RecordedStructuredEvent(eventName, level, result, extra));
+                events.Add(new RecordedStructuredEvent(code, result, extra));
             }
         };
 
@@ -40,7 +42,7 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
         Assert.Contains(context.BaseVhdPath, context.FailureMessage);
         Assert.Contains(context.VmName, context.FailureMessage);
 
-        var stepFailed = Assert.Single(events.Where(e => e.EventName == "StepFailed"));
+        var stepFailed = Assert.Single(events.Where(e => e.Code == LaStatus.DeployStep_StepFailed));
         Assert.Equal("failed", stepFailed.Result);
         Assert.Equal(DeploymentStepKeys.CreateVhd, stepFailed.Extra?["stepKey"]?.ToString());
         Assert.Equal(context.BaseVhdPath, stepFailed.Extra?["parentVhdPath"]?.ToString());
@@ -70,9 +72,10 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
             MemoryMb = 2048,
             CpuCount = 2,
             PowerShellHandle = handle,
-            StructuredEventEmitter = (eventName, level, result, extra) =>
+            StepFailedCode = LaStatus.DeployStep_StepFailed,
+            StructuredEventEmitter = (code, result, extra) =>
             {
-                events.Add(new RecordedStructuredEvent(eventName, level, result, extra));
+                events.Add(new RecordedStructuredEvent(code, result, extra));
             }
         };
 
@@ -83,7 +86,7 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
         Assert.Contains(context.VmPath, context.FailureMessage);
         Assert.Contains(context.VhdPath, context.FailureMessage);
 
-        var stepFailed = Assert.Single(events.Where(e => e.EventName == "StepFailed"));
+        var stepFailed = Assert.Single(events.Where(e => e.Code == LaStatus.DeployStep_StepFailed));
         Assert.Equal(context.VmPath, stepFailed.Extra?["vmPath"]?.ToString());
         Assert.Equal(context.VhdPath, stepFailed.Extra?["targetVhdPath"]?.ToString());
         Assert.Equal("VirtualizationException", stepFailed.Extra?["exceptionType"]?.ToString());
@@ -91,8 +94,7 @@ public class RuntimeFailureDiagnosticsEnrichmentTests
     }
 
     private sealed record RecordedStructuredEvent(
-        string EventName,
-        string Level,
+        uint Code,
         string? Result,
         IReadOnlyDictionary<string, object?>? Extra);
 

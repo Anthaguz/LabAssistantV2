@@ -5,6 +5,7 @@ using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Templates;
 using LabAssistant.Models.Validation;
 using LabAssistant.Services.HyperV;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 
 namespace LabAssistant.Business.Assets;
@@ -36,11 +37,12 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
         cancellationToken.ThrowIfCancellationRequested();
         var operationId = Guid.NewGuid().ToString("N");
         var result = _catalogService.LoadCatalog(operationId);
-        var eventName = isRefresh ? "BaseDiskRefreshCompleted" : "BaseDiskListLoaded";
+        var loadCode = isRefresh
+            ? (result.Errors.Count > 0 ? LaStatus.AssetsBasedisk_BaseDisksRefreshedWithErrors : LaStatus.AssetsBasedisk_BaseDisksRefreshed)
+            : (result.Errors.Count > 0 ? LaStatus.AssetsBasedisk_BaseDiskListLoadedWithErrors : LaStatus.AssetsBasedisk_BaseDiskListLoaded);
 
         _structuredLogger.Log(
-            result.Errors.Count > 0 ? StructuredLogLevel.Warn : StructuredLogLevel.Info,
-            eventName,
+            loadCode,
             operationId,
             result.Errors.Count > 0 ? "failed" : "success",
             new Dictionary<string, object?>
@@ -100,10 +102,11 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
         }
 
         var saveResult = _catalogService.SaveCatalog(workingItems, [normalized], operationId);
-        var eventName = existing is null ? "BaseDiskRegistered" : "BaseDiskMetadataUpdated";
+        var registerCode = existing is null
+            ? (saveResult.Errors.Count > 0 ? LaStatus.AssetsBasedisk_BaseDiskRegistrationReportedErrors : LaStatus.AssetsBasedisk_BaseDiskRegistered)
+            : (saveResult.Errors.Count > 0 ? LaStatus.AssetsBasedisk_BaseDiskMetadataUpdateReportedErrors : LaStatus.AssetsBasedisk_BaseDiskMetadataUpdated);
         _structuredLogger.Log(
-            saveResult.Errors.Count > 0 ? StructuredLogLevel.Warn : StructuredLogLevel.Info,
-            eventName,
+            registerCode,
             operationId,
             saveResult.Errors.Count > 0 ? "failed" : "success",
             new Dictionary<string, object?>
@@ -140,8 +143,9 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
         var result = await ValidateCoreAsync(item, cancellationToken);
 
         _structuredLogger.Log(
-            string.Equals(result.Severity, "Pass", StringComparison.Ordinal) ? StructuredLogLevel.Info : StructuredLogLevel.Warn,
-            "BaseDiskValidationEvaluated",
+            string.Equals(result.Severity, "Pass", StringComparison.Ordinal)
+                ? LaStatus.AssetsBasedisk_BaseDiskValid
+                : LaStatus.AssetsBasedisk_BaseDiskValidationBlocked,
             operationId,
             result.Severity.ToLowerInvariant(),
             new Dictionary<string, object?>
@@ -230,8 +234,7 @@ public sealed class AssetsBaseDisksCapabilityService : IAssetsBaseDisksCapabilit
 
         var saveResult = _catalogService.SaveCatalog(remainingItems, [], operationId);
         _structuredLogger.Log(
-            saveResult.Errors.Count > 0 ? StructuredLogLevel.Warn : StructuredLogLevel.Info,
-            saveResult.Errors.Count > 0 ? "BaseDiskRemoveFailed" : "BaseDiskRemoved",
+            saveResult.Errors.Count > 0 ? LaStatus.AssetsBasedisk_BaseDiskRemoveFailed : LaStatus.AssetsBasedisk_BaseDiskRemoved,
             operationId,
             saveResult.Errors.Count > 0 ? "failed" : "success",
             new Dictionary<string, object?>

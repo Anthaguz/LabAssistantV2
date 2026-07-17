@@ -2,6 +2,7 @@ using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace LabAssistant.Services.HyperV;
@@ -187,8 +188,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
             // result so callers fail later with explicit runtime diagnostics, but record why here so
             // the malformed payload is diagnosable instead of being silently swallowed.
             LogStructured(
-                StructuredLogLevel.Warn,
-                "get_vm_network_adapters_parse",
+                LaStatus.Hyperv_VMNetworkAdapterParseWarning,
                 Guid.NewGuid().ToString("N"),
                 "failure",
                 new Dictionary<string, object?>
@@ -291,8 +291,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         }
 
         LogStructured(
-            succeeded ? StructuredLogLevel.Info : StructuredLogLevel.Error,
-            commandName,
+            ResolveHyperVCode(commandName, succeeded),
             operationId,
             succeeded ? "success" : "failure",
             context);
@@ -301,14 +300,36 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     }
 
     private void LogStructured(
-        StructuredLogLevel level,
-        string commandName,
+        uint code,
         string operationId,
         string result,
-        IReadOnlyDictionary<string, object?> context)
+        IReadOnlyDictionary<string, object?> context,
+        [CallerFilePath] string? callerFilePath = null,
+        [CallerLineNumber] int callerLineNumber = 0)
     {
-        _structuredLogger.Log(level, $"hyperv.{commandName}", operationId, result, context);
+        _structuredLogger.Log(code, operationId, result, context, callerFilePath, callerLineNumber);
     }
+
+    // Maps the internal Hyper-V command name to its status code. Kept as an explicit switch so a new
+    // command must consciously register its success/failure codes rather than silently logging uncoded.
+    private static uint ResolveHyperVCode(string commandName, bool succeeded) => commandName switch
+    {
+        "create_vm" => succeeded ? LaStatus.Hyperv_VMCreated : LaStatus.Hyperv_VMCreateFailed,
+        "start_vm" => succeeded ? LaStatus.Hyperv_VMStarted : LaStatus.Hyperv_VMStartFailed,
+        "stop_vm" => succeeded ? LaStatus.Hyperv_VMStopped : LaStatus.Hyperv_VMStopFailed,
+        "remove_vm" => succeeded ? LaStatus.Hyperv_VMRemoved : LaStatus.Hyperv_VMRemoveFailed,
+        "vm_exists" => succeeded ? LaStatus.Hyperv_VMExistenceChecked : LaStatus.Hyperv_VMExistenceCheckFailed,
+        "is_vm_running" => succeeded ? LaStatus.Hyperv_VMRunningStateChecked : LaStatus.Hyperv_VMRunningCheckFailed,
+        "create_vhd_differencing" => succeeded ? LaStatus.Hyperv_DifferencingDiskCreated : LaStatus.Hyperv_DifferencingDiskCreateFailed,
+        "create_vhd_fixed" => succeeded ? LaStatus.Hyperv_FixedDiskCreated : LaStatus.Hyperv_FixedDiskCreateFailed,
+        "disable_vm_checkpoints" => succeeded ? LaStatus.Hyperv_CheckpointsDisabled : LaStatus.Hyperv_DisableCheckpointsFailed,
+        "enable_guest_services" => succeeded ? LaStatus.Hyperv_GuestServicesEnabled : LaStatus.Hyperv_EnableGuestServicesFailed,
+        "get_virtual_switch_names" => succeeded ? LaStatus.Hyperv_VirtualSwitchesListed : LaStatus.Hyperv_ListVirtualSwitchesFailed,
+        "get_vm_network_adapters" => succeeded ? LaStatus.Hyperv_VMNetworkAdaptersListed : LaStatus.Hyperv_ListVMNetworkAdaptersFailed,
+        "add_virtual_switch_to_vm" => succeeded ? LaStatus.Hyperv_SwitchAttachedToVM : LaStatus.Hyperv_AttachSwitchToVMFailed,
+        "add_virtual_switches_to_vm" => succeeded ? LaStatus.Hyperv_SwitchesAttachedToVM : LaStatus.Hyperv_AttachSwitchesToVMFailed,
+        _ => throw new ArgumentOutOfRangeException(nameof(commandName), commandName, "No status code registered for this Hyper-V command.")
+    };
 
     private static HyperVVmNetworkAdapterInfo MapVmNetworkAdapter(JsonElement element)
     {

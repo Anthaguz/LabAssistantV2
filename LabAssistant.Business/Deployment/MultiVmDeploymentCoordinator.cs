@@ -1,5 +1,6 @@
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.PowerShell;
+using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.HyperV;
 using LabAssistant.Services.Logging;
 using LabAssistant.Services.PowerShell;
@@ -36,7 +37,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
     {
         EnsureOperationId(multiContext);
         multiContext.MarkRunning();
-        EmitDeployEvent("DeployLabStarted", multiContext, "started");
+        EmitDeployEvent(LaStatus.DeployOrchestration_Deploying, multiContext, "started");
         var cleanupResultsLock = new object();
 
         var tasks = multiContext.VmContexts.Select(context => Task.Run(async () =>
@@ -52,9 +53,11 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             _sessionResolver.RegisterSession(handle, session);
             context.PowerShellHandle = handle;
             context.OperationId = multiContext.OperationId;
-            context.StructuredEventEmitter = (eventName, level, result, extraContext) =>
-                EmitVmScopedEvent(eventName, level, multiContext, context, result, extraContext);
-            EmitVmScopedEvent("VmDeployStarted", "info", multiContext, context, "started");
+            context.StructuredEventEmitter = (code, result, extraContext) =>
+                EmitVmScopedEvent(code, multiContext, context, result, extraContext);
+            context.StepFailedCode = LaStatus.DeployStep_StepFailed;
+            context.StepFailedNonBlockingCode = LaStatus.DeployStep_StepFailedNonBlocking;
+            EmitVmScopedEvent(LaStatus.DeployOrchestration_DeployingVM, multiContext, context, "started");
             HyperVPowerShellTimingLogger.LogWorkflowSessionCreated(context.VmName, sessionCreationStopwatch.ElapsedMilliseconds);
 
             context.OnBlockingFailure = () =>
@@ -80,7 +83,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
                 }
 
                 multiContext.MarkCleanupInProgress();
-                EmitVmScopedEvent("CleanupStarted", "info", multiContext, context, "started");
+                EmitVmScopedEvent(LaStatus.DeployCleanup_CleaningUpVM, multiContext, context, "started");
                 var cleanupResult = await _cleanupOrchestrator.CleanupAsync(context, hyperV);
                 context.CleanupResult = cleanupResult;
                 EmitCleanupStepEvents(multiContext, context, cleanupResult);
@@ -91,8 +94,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
                 }
 
                 EmitVmScopedEvent(
-                    "CleanupCompleted",
-                    cleanupResult.HasResiduals ? "warn" : "info",
+                    cleanupResult.HasResiduals ? LaStatus.DeployCleanup_VMCleanupLeftResiduals : LaStatus.DeployCleanup_VMCleanupComplete,
                     multiContext,
                     context,
                     cleanupResult.HasResiduals ? "completed_with_residuals" : "completed",
@@ -105,8 +107,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
                 if (cleanupResult.HasResiduals)
                 {
                     EmitVmScopedEvent(
-                        "CleanupResidualsDetected",
-                        "error",
+                        LaStatus.DeployCleanup_VMCleanupResidualsDetected,
                         multiContext,
                         context,
                         "residuals_detected",
@@ -152,7 +153,7 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
         }
     }
 
-    private void EmitDeployEvent(string eventName, MultiVmDeploymentContext multiContext, string? result, string level = "info", IReadOnlyDictionary<string, object?>? extra = null)
+    private void EmitDeployEvent(uint code, MultiVmDeploymentContext multiContext, string? result, IReadOnlyDictionary<string, object?>? extra = null)
     {
         var context = new Dictionary<string, object?>
         {
@@ -168,38 +169,29 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             }
         }
 
-        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
+        _structuredLogger.Log(code, multiContext.OperationId, result, context);
     }
 
     private void EmitDeployTerminalEvent(MultiVmDeploymentContext multiContext)
     {
-        var eventName = multiContext.OperationState switch
+        var (code, result) = multiContext.OperationState switch
         {
-            DeploymentOperationState.Completed => "DeployLabCompleted",
-            DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "DeployLabCancelled",
-            _ => "DeployLabFailed"
-        };
-
-        var result = multiContext.OperationState switch
-        {
-            DeploymentOperationState.Completed => "success",
-            DeploymentOperationState.Cancelled => "cancelled",
-            DeploymentOperationState.CancelledWithResiduals => "cancelled_with_residuals",
-            DeploymentOperationState.FailedWithResiduals => "failed_with_residuals",
-            _ => "failed"
+            DeploymentOperationState.Completed => (LaStatus.DeployOrchestration_DeploySucceeded, "success"),
+            DeploymentOperationState.Cancelled => (LaStatus.DeployOrchestration_DeploymentCancelled, "cancelled"),
+            DeploymentOperationState.CancelledWithResiduals => (LaStatus.DeployOrchestration_DeploymentCancelledWithResiduals, "cancelled_with_residuals"),
+            DeploymentOperationState.FailedWithResiduals => (LaStatus.DeployOrchestration_DeploymentFailedWithResiduals, "failed_with_residuals"),
+            _ => (LaStatus.DeployOrchestration_DeployFailed, "failed")
         };
 
         EmitDeployEvent(
-            eventName,
+            code,
             multiContext,
             result,
-            multiContext.OperationState is DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals or DeploymentOperationState.CancelledWithResiduals ? "error" : "info",
             BuildDeployTerminalContext(multiContext));
     }
 
     private void EmitVmScopedEvent(
-        string eventName,
-        string level,
+        uint code,
         MultiVmDeploymentContext multiContext,
         VmDeploymentContext vmContext,
         string? result,
@@ -214,20 +206,21 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
             }
         }
 
-        _structuredLogger.Log(ParseLevel(level), eventName, multiContext.OperationId, result, context);
+        _structuredLogger.Log(code, multiContext.OperationId, result, context);
     }
 
     private void EmitVmTerminalEvent(MultiVmDeploymentContext multiContext, VmDeploymentContext vmContext)
     {
-        var (eventName, result, level) = vmContext.WasCancelled
-            ? ("VmDeployFailed", "cancelled", "warn")
+        var (code, result) = vmContext.WasCancelled
+            ? (LaStatus.DeployOrchestration_VMDeployCancelled, "cancelled")
             : vmContext.IsSuccess
-                ? ("VmDeployCompleted", "success", "info")
-                : ("VmDeployFailed", vmContext.CleanupResult?.HasResiduals == true ? "failed_with_residuals" : "failed", "error");
+                ? (LaStatus.DeployOrchestration_VMDeployed, "success")
+                : vmContext.CleanupResult?.HasResiduals == true
+                    ? (LaStatus.DeployOrchestration_VMDeployFailedWithResiduals, "failed_with_residuals")
+                    : (LaStatus.DeployOrchestration_VMDeployFailed, "failed");
 
         EmitVmScopedEvent(
-            eventName,
-            level,
+            code,
             multiContext,
             vmContext,
             result,
@@ -253,21 +246,15 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
     {
         foreach (var step in cleanupResult.StepResults)
         {
-            var eventName = step.Status switch
+            var code = step.Status switch
             {
-                CleanupStepStatus.Failed => "CleanupStepFailed",
-                _ => "CleanupStepCompleted"
-            };
-            var level = step.Status switch
-            {
-                CleanupStepStatus.Failed => "error",
-                CleanupStepStatus.Skipped => "debug",
-                _ => "info"
+                CleanupStepStatus.Failed => LaStatus.DeployCleanup_CleanupStepFailed,
+                CleanupStepStatus.Skipped => LaStatus.DeployCleanup_CleanupStepSkipped,
+                _ => LaStatus.DeployCleanup_CleanupStepCompleted
             };
 
             EmitVmScopedEvent(
-                eventName,
-                level,
+                code,
                 multiContext,
                 vmContext,
                 step.Status.ToString().ToLowerInvariant(),
@@ -315,18 +302,6 @@ public class MultiVmDeploymentCoordinator : IDeploymentCoordinator
         }
 
         return context;
-    }
-
-    private static StructuredLogLevel ParseLevel(string level)
-    {
-        return level switch
-        {
-            "debug" => StructuredLogLevel.Debug,
-            "info" => StructuredLogLevel.Info,
-            "warn" => StructuredLogLevel.Warn,
-            "error" => StructuredLogLevel.Error,
-            _ => StructuredLogLevel.Info
-        };
     }
 
     private static void MergeNormalizedErrorMetadata(

@@ -39,8 +39,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         var operationId = Guid.NewGuid().ToString("N");
         var stopwatch = Stopwatch.StartNew();
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "MachineInventoryLoadStarted",
+            LaStatus.Machines_LoadingMachineInventory,
             operationId,
             "started");
 
@@ -51,8 +50,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             var mapped = vms.Select(vm => MapToInventoryItem(vm, vmBasePath)).ToList();
 
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "MachineInventoryLoadCompleted",
+                LaStatus.Machines_MachineInventoryLoaded,
                 operationId,
                 "success",
                 new Dictionary<string, object?>
@@ -67,8 +65,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         {
             stopwatch.Stop();
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "MachineInventoryLoadFailed",
+                LaStatus.Machines_MachineInventoryLoadFailed,
                 operationId,
                 "failed",
                 MergeFailureContext(
@@ -84,8 +81,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         var stopwatch = Stopwatch.StartNew();
         var context = BuildVmContext(vm, "load_edit_snapshot");
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "MachineEditLoadStarted",
+            LaStatus.Machines_LoadingMachineEditor,
             operationId,
             "started",
             context);
@@ -96,8 +92,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             if (snapshot is null)
             {
                 _structuredLogger.Log(
-                    StructuredLogLevel.Warn,
-                    "MachineEditLoadCompleted",
+                    LaStatus.Machines_MachineToEditNotFound,
                     operationId,
                     "not_found",
                     AddDuration(context, stopwatch.ElapsedMilliseconds));
@@ -106,8 +101,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
 
             var mapped = MapEditSnapshot(snapshot);
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "MachineEditLoadCompleted",
+                LaStatus.Machines_MachineEditorLoaded,
                 operationId,
                 "success",
                 AddDuration(context, stopwatch.ElapsedMilliseconds));
@@ -117,8 +111,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         {
             stopwatch.Stop();
             _structuredLogger.Log(
-                StructuredLogLevel.Error,
-                "MachineEditLoadFailed",
+                LaStatus.Machines_MachineEditorLoadFailed,
                 operationId,
                 "failed",
                 MergeFailureContext(
@@ -211,22 +204,46 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
 
     public Task<MachineOperationResult> StartVmAsync(MachineInventoryItem vm)
     {
-        return ExecuteVmActionAsync(vm, "start", "MachineAction", _machineAdminService.StartVmAsync);
+        return ExecuteVmActionAsync(
+            vm,
+            "start",
+            LaStatus.Machines_RunningMachineAction,
+            LaStatus.Machines_MachineActionCompleted,
+            LaStatus.Machines_MachineActionFailed,
+            _machineAdminService.StartVmAsync);
     }
 
     public Task<MachineOperationResult> StopVmAsync(MachineInventoryItem vm)
     {
-        return ExecuteVmActionAsync(vm, "stop", "MachineAction", _machineAdminService.StopVmAsync);
+        return ExecuteVmActionAsync(
+            vm,
+            "stop",
+            LaStatus.Machines_RunningMachineAction,
+            LaStatus.Machines_MachineActionCompleted,
+            LaStatus.Machines_MachineActionFailed,
+            _machineAdminService.StopVmAsync);
     }
 
     public Task<MachineOperationResult> RestartVmAsync(MachineInventoryItem vm)
     {
-        return ExecuteVmActionAsync(vm, "restart", "MachineAction", _machineAdminService.RestartVmAsync);
+        return ExecuteVmActionAsync(
+            vm,
+            "restart",
+            LaStatus.Machines_RunningMachineAction,
+            LaStatus.Machines_MachineActionCompleted,
+            LaStatus.Machines_MachineActionFailed,
+            _machineAdminService.RestartVmAsync);
     }
 
     public Task<MachineOperationResult> OpenConsoleAsync(MachineInventoryItem vm)
     {
-        return ExecuteVmActionAsync(vm, "open_console", "MachineConnectionAction", _machineAdminService.OpenConsoleAsync);
+        return ExecuteVmActionAsync(
+            vm,
+            "open_console",
+            LaStatus.Machines_StartingMachineConnection,
+            LaStatus.Machines_MachineConnectionCompleted,
+            LaStatus.Machines_MachineConnectionFailed,
+            _machineAdminService.OpenConsoleAsync);
     }
 
     public async Task<MachineRdpReadinessResult> EvaluateRdpReadinessAsync(
@@ -239,6 +256,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         if (!string.Equals(vm.State, "Running", StringComparison.OrdinalIgnoreCase))
         {
             return LogReadinessResult(
+                LaStatus.Machines_RDPNotReadyYet,
                 operationId,
                 context,
                 MachineRdpReadinessState.NotReady,
@@ -253,6 +271,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             if (candidateIpv4s.Count == 0)
             {
                 return LogReadinessResult(
+                    LaStatus.Machines_RDPNotReadyYet,
                     operationId,
                     context,
                     MachineRdpReadinessState.NotReady,
@@ -273,6 +292,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             if (reachableIpv4 is null)
             {
                 return LogReadinessResult(
+                    LaStatus.Machines_RDPNotReadyYet,
                     operationId,
                     context,
                     MachineRdpReadinessState.NotReady,
@@ -282,6 +302,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             }
 
             return LogReadinessResult(
+                LaStatus.Machines_RDPReady,
                 operationId,
                 context,
                 MachineRdpReadinessState.Ready,
@@ -292,6 +313,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return LogReadinessResult(
+                LaStatus.Machines_RDPNotReadyYet,
                 operationId,
                 context,
                 MachineRdpReadinessState.Unknown,
@@ -310,6 +332,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
                 : $"RDP readiness check failed: {firstLine}";
 
             var result = LogReadinessResult(
+                LaStatus.Machines_RDPNotReadyYet,
                 operationId,
                 context,
                 MachineRdpReadinessState.Unknown,
@@ -317,8 +340,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
                 userMessage);
 
             _structuredLogger.Log(
-                StructuredLogLevel.Warn,
-                "MachineRdpReadinessCheckFailed",
+                LaStatus.Machines_RDPReadinessCheckFailed,
                 operationId,
                 "failed",
                 RuntimeErrorMetadataNormalizer.FromException(ex));
@@ -335,8 +357,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         context["targetIpv4"] = targetIpv4;
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "MachineConnectionActionStarted",
+            LaStatus.Machines_StartingMachineConnection,
             operationId,
             "started",
             context);
@@ -345,8 +366,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         if (actionResult.Success)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "MachineConnectionActionCompleted",
+                LaStatus.Machines_MachineConnectionCompleted,
                 operationId,
                 "success",
                 context);
@@ -361,8 +381,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
 
         var failureContext = MergeFailureContext(context, actionResult);
         _structuredLogger.Log(
-            StructuredLogLevel.Error,
-            "MachineConnectionActionFailed",
+            LaStatus.Machines_MachineConnectionFailed,
             operationId,
             "failed",
             failureContext);
@@ -384,8 +403,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         context["networkAdapterCount"] = draft.NetworkAdapters.Count;
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "MachineEditApplyStarted",
+            LaStatus.Machines_ApplyingMachineEdits,
             operationId,
             "started",
             context);
@@ -412,8 +430,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         if (result.Success)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "MachineEditApplyCompleted",
+                LaStatus.Machines_MachineEditsApplied,
                 operationId,
                 "success",
                 context);
@@ -428,8 +445,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
 
         var failureContext = MergeFailureContext(context, result);
         _structuredLogger.Log(
-            StructuredLogLevel.Error,
-            "MachineEditApplyFailed",
+            LaStatus.Machines_MachineEditsApplyFailed,
             operationId,
             "failed",
             failureContext);
@@ -466,8 +482,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         context["diskPaths"] = vm.DiskPaths.ToArray();
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "MachineDeleteStarted",
+            LaStatus.Machines_DeletingMachine,
             operationId,
             "started",
             context);
@@ -478,8 +493,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         if (actionResult.Success)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                "MachineDeleteCompleted",
+                LaStatus.Machines_MachineDeleted,
                 operationId,
                 "success",
                 context);
@@ -496,8 +510,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
 
         var failureContext = MergeFailureContext(context, actionResult);
         _structuredLogger.Log(
-            StructuredLogLevel.Error,
-            "MachineDeleteFailed",
+            LaStatus.Machines_MachineDeleteFailed,
             operationId,
             "failed",
             failureContext);
@@ -514,28 +527,34 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
     private async Task<MachineOperationResult> ExecuteVmActionAsync(
         MachineInventoryItem vm,
         string actionName,
-        string eventPrefix,
-        Func<string, Task<HyperVMachineActionResult>> action)
+        uint startedCode,
+        uint completedCode,
+        uint failedCode,
+        Func<string, Task<HyperVMachineActionResult>> action,
+        [System.Runtime.CompilerServices.CallerFilePath] string? callerFilePath = null,
+        [System.Runtime.CompilerServices.CallerLineNumber] int callerLineNumber = 0)
     {
         var operationId = Guid.NewGuid().ToString("N");
         var context = BuildVmContext(vm, actionName);
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            $"{eventPrefix}Started",
+            startedCode,
             operationId,
             "started",
-            context);
+            context,
+            callerFilePath: callerFilePath,
+            callerLineNumber: callerLineNumber);
 
         var actionResult = await action(vm.VmName);
         if (actionResult.Success)
         {
             _structuredLogger.Log(
-                StructuredLogLevel.Info,
-                $"{eventPrefix}Completed",
+                completedCode,
                 operationId,
                 "success",
-                context);
+                context,
+                callerFilePath: callerFilePath,
+                callerLineNumber: callerLineNumber);
 
             return new MachineOperationResult
             {
@@ -547,11 +566,12 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
 
         var failureContext = MergeFailureContext(context, actionResult);
         _structuredLogger.Log(
-            StructuredLogLevel.Error,
-            $"{eventPrefix}Failed",
+            failedCode,
             operationId,
             "failed",
-            failureContext);
+            failureContext,
+            callerFilePath: callerFilePath,
+            callerLineNumber: callerLineNumber);
 
         return new MachineOperationResult
         {
@@ -721,23 +741,27 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
     }
 
     private MachineRdpReadinessResult LogReadinessResult(
+        uint code,
         string operationId,
         Dictionary<string, object?> context,
         MachineRdpReadinessState state,
         string reasonCode,
         string message,
-        string? targetIpv4 = null)
+        string? targetIpv4 = null,
+        [System.Runtime.CompilerServices.CallerFilePath] string? callerFilePath = null,
+        [System.Runtime.CompilerServices.CallerLineNumber] int callerLineNumber = 0)
     {
         context["readinessState"] = state.ToString();
         context["readinessReasonCode"] = reasonCode;
         context["targetIpv4"] = targetIpv4;
 
         _structuredLogger.Log(
-            StructuredLogLevel.Info,
-            "MachineRdpReadinessEvaluated",
+            code,
             operationId,
             state == MachineRdpReadinessState.Ready ? "ready" : "not_ready",
-            context);
+            context,
+            callerFilePath: callerFilePath,
+            callerLineNumber: callerLineNumber);
 
         return new MachineRdpReadinessResult
         {
