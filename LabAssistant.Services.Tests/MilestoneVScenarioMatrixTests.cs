@@ -42,7 +42,7 @@ public class MilestoneVScenarioMatrixTests
     }
 
     [Fact]
-    public void StructuredAndDebugLogRotation_PreserveActiveFiles_AndBoundHistory()
+    public void StructuredLogRotation_PreservesActiveFile_AndBoundsHistory()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"labassistant-v-matrix-logs-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
@@ -68,22 +68,9 @@ public class MilestoneVScenarioMatrixTests
             {
                 using var _ = JsonDocument.Parse(line);
             }
-
-            DebugLogger.SetLogFolder(directory);
-            ConfigureDebugLoggerRotationForTests(1, 2);
-            for (var i = 0; i < 5; i++)
-            {
-                DebugLogger.Log(new string((char)('a' + i), 20));
-            }
-
-            Assert.True(File.Exists(Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName)));
-            Assert.True(File.Exists(Path.Combine(directory, "log.1.txt")));
-            Assert.True(File.Exists(Path.Combine(directory, "log.2.txt")));
-            Assert.False(File.Exists(Path.Combine(directory, "log.3.txt")));
         }
         finally
         {
-            ResetDebugLoggerRotationForTests();
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);
@@ -116,33 +103,28 @@ public class MilestoneVScenarioMatrixTests
     public void WrapperTraceVerbosity_DefaultLowNoise_AndEnabledTraceLogging()
     {
         var previous = Environment.GetEnvironmentVariable(PersistentPowerShellSessionTrace.EnvironmentVariableName);
-        var directory = Path.Combine(Path.GetTempPath(), $"labassistant-v-matrix-trace-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        var activeLog = Path.Combine(directory, DebugLoggingDefaults.DebugLogFileName);
+        var logger = new CollectingStructuredLogger();
 
         try
         {
-            DebugLogger.SetLogFolder(directory);
+            DebugLogger.ConfigureStructuredSink(logger);
             PersistentPowerShellSessionTrace.SetEnabledForTests(null);
             Environment.SetEnvironmentVariable(PersistentPowerShellSessionTrace.EnvironmentVariableName, null);
             PersistentPowerShellSessionTrace.Log("should-not-appear");
-            Assert.False(File.Exists(activeLog));
+            Assert.Empty(logger.Events);
 
             Environment.SetEnvironmentVariable(PersistentPowerShellSessionTrace.EnvironmentVariableName, "1");
             PersistentPowerShellSessionTrace.Log("trace-on");
-            Assert.True(File.Exists(activeLog));
-            var content = File.ReadAllText(activeLog);
-            Assert.Contains("[PowerShellWrapperTrace] trace-on", content, StringComparison.Ordinal);
-            Assert.DoesNotContain("should-not-appear", content, StringComparison.Ordinal);
+            var e = Assert.Single(logger.Events);
+            Assert.Equal($"0x{LaStatus.DiagDebug_DebugTrace:X8}", e.Code);
+            Assert.Equal("[PowerShellWrapperTrace] trace-on", e.Context!["message"]);
+            Assert.DoesNotContain(logger.Events, x => ((string?)x.Context!["message"])!.Contains("should-not-appear"));
         }
         finally
         {
             PersistentPowerShellSessionTrace.SetEnabledForTests(null);
             Environment.SetEnvironmentVariable(PersistentPowerShellSessionTrace.EnvironmentVariableName, previous);
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
+            ResetDebugLoggerSink();
         }
     }
 
@@ -154,16 +136,9 @@ public class MilestoneVScenarioMatrixTests
         return Path.Combine(directory, $"{fileNameWithoutExtension}.{index}{extension}");
     }
 
-    private static void ConfigureDebugLoggerRotationForTests(long maxBytes, int retainedHistoryFiles)
+    private static void ResetDebugLoggerSink()
     {
-        var method = typeof(DebugLogger).GetMethod("ConfigureRotationForTests", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
-        Assert.NotNull(method);
-        method!.Invoke(null, new object[] { maxBytes, retainedHistoryFiles });
-    }
-
-    private static void ResetDebugLoggerRotationForTests()
-    {
-        var method = typeof(DebugLogger).GetMethod("ResetRotationForTests", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        var method = typeof(DebugLogger).GetMethod("ResetForTests", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(null, Array.Empty<object>());
     }

@@ -91,7 +91,7 @@ Hyper-V execution-pattern authority is defined in `docs/03-architecture/hyperv-p
   - If a concern mixes both categories, treat it as shared integration that needs a narrower seam decision; do not silently centralize capability semantics in `MainWindow` and do not duplicate shell container mechanics inside each capability.
 - **Logging**
   - Structured JSONL logging (`structured-events.jsonl`) is the canonical diagnostics path.
-  - Legacy `DebugLogger` text logs remain supplemental/transitional.
+  - The ambient `DebugLogger` and the raw PowerShell timing tracer forward into structured JSONL as coded `diag.debug` / `diag.ps_timing` events; the separate `log.txt` file is retired.
   - Runtime failure events now include known artifact/path context when available (for example `parentVhdPath`, `targetVhdPath`, `vmPath`) to speed diagnosis.
 - **Configuration**
   - App settings and storage paths are persisted locally and used by UI/Business/Data/Services.

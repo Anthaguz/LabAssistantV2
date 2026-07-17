@@ -142,7 +142,8 @@ New facilities are appended within their range; numbers are never reused or renu
 | 0xE0 | diag.ps_timing      | Diagnostics   |
 | 0xE1 | diag.debug          | Diagnostics   |
 
-The two diagnostics facilities (`0xE0`, `0xE1`) are where the raw `log.txt` loggers fold in (see the fold-in migration).
+The two diagnostics facilities (`0xE0`, `0xE1`) are where the raw `log.txt` loggers were folded in.
+`DebugLogger` now emits `diag.debug` events and `HyperVPowerShellTimingLogger` emits `diag.ps_timing` events, both through the structured pipeline; the separate `log.txt` file is retired.
 They default to `Debug` severity so they are off in the log view unless explicitly enabled.
 
 ## Naming
