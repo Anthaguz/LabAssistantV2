@@ -9,6 +9,7 @@
     <UserControl.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
         <converters:SeverityToBrushConverter x:Key="SeverityToBrush" />
+        <converters:OperationIdDisplayConverter x:Key="OperationIdDisplay" />
 
         <!-- Matches the item padding (8,4) so the header labels align with the row cells below. -->
         <Style x:Key="LogRowItemStyle" TargetType="ListViewItem">
@@ -186,7 +187,7 @@
                                     <TextBlock Grid.Column="4" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind Phase}" />
                                     <TextBlock Grid.Column="5" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind StatusByteText}" />
                                     <TextBlock Grid.Column="6" FontFamily="Consolas" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind Code}" />
-                                    <TextBlock Grid.Column="7" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind OperationId}" />
+                                    <TextBlock Grid.Column="7" Foreground="{StaticResource ShellTextSecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{x:Bind OperationId, Converter={StaticResource OperationIdDisplay}}" />
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>

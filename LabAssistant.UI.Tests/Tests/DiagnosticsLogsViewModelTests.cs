@@ -166,6 +166,31 @@ public sealed class DiagnosticsLogsViewModelTests
         Assert.False(vm.HasSelection);
     }
 
+    [Fact]
+    public void OperationIdDisplay_MapsAmbientSentinel_ToPlaceholder()
+    {
+        Assert.Equal("(background)", OperationIdDisplay.ToDisplay(StructuredLoggingDefaults.AmbientOperationId));
+    }
+
+    [Fact]
+    public void OperationIdDisplay_PassesThroughRealIds_AndNull()
+    {
+        Assert.Equal("op-abc", OperationIdDisplay.ToDisplay("op-abc"));
+        Assert.Equal(string.Empty, OperationIdDisplay.ToDisplay(null));
+    }
+
+    [Fact]
+    public void SelectedSummary_UsesAmbientPlaceholder_ForBackgroundTraces()
+    {
+        var service = new FakeLogViewerService();
+        var vm = new DiagnosticsLogsViewModel(service, new FakeLauncher());
+
+        vm.SelectedEntry = AmbientEntry();
+
+        Assert.Contains("(background)", vm.SelectedSummary);
+        Assert.DoesNotContain("ambient", vm.SelectedSummary);
+    }
+
     private static StructuredLogViewerEntry CodedEntry() => new()
     {
         TimestampText = "2026-07-17 07:46:07.001",
@@ -199,6 +224,17 @@ public sealed class DiagnosticsLogsViewModelTests
         Result = "started",
         ContextJson = "{}",
         LevelRank = StatusLevelRank.Info
+    };
+
+    private static StructuredLogViewerEntry AmbientEntry() => new()
+    {
+        TimestampText = "2026-07-17 07:10:00.000",
+        Level = "debug",
+        Event = "diag.ps-timing.session",
+        OperationId = StructuredLoggingDefaults.AmbientOperationId,
+        Result = "atomic",
+        ContextJson = "{}",
+        LevelRank = StatusLevelRank.Debug
     };
 
     private sealed class FakeLogViewerService : IStructuredLogViewerService
