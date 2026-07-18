@@ -123,6 +123,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\LogLevelFilterOption.cs" Link="WinUI\LogLevelFilterOption.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\FacilityFilterOption.cs" Link="WinUI\FacilityFilterOption.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\LogContextRow.cs" Link="WinUI\LogContextRow.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\OperationIdDisplay.cs" Link="WinUI\OperationIdDisplay.cs" />
   </ItemGroup>
 
 </Project>

@@ -126,7 +126,7 @@ public sealed partial class DiagnosticsLogsViewModel : ViewModelBase
 
     /// <summary>A one-line summary of the selected entry for the panel header.</summary>
     public string SelectedSummary => SelectedEntry is { } entry
-        ? $"{entry.TimestampText} - {entry.OperationId}"
+        ? $"{entry.TimestampText} - {OperationIdDisplay.ToDisplay(entry.OperationId)}"
         : "Select a log entry.";
 
     /// <summary>The friendly title for the selected entry, resolved from the code registry when available.</summary>
