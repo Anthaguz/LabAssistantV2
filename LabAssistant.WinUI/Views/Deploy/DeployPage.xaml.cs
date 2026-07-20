@@ -188,7 +188,8 @@ public sealed partial class DeployPage : Page, ICapabilityPage
                 },
                 () => _shellHost?.RightPanel.Toggle()),
             action => DispatcherQueue.TryEnqueue(() => action()),
-            _templatesShellAdapter.ItemsSource);
+            _templatesShellAdapter.ItemsSource,
+            PromptForGuestCredentialAsync);
         _fromTemplateLane.ResultsPanelStateChanged += OnFromTemplateResultsPanelStateChanged;
         FromTemplateViewHost.ViewModel = _fromTemplateLane;
 
@@ -368,6 +369,97 @@ public sealed partial class DeployPage : Page, ICapabilityPage
         };
 
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
+
+    /// <summary>
+    /// Shows the interactive re-prompt when a running guest rejects its bootstrap credential during a From-Template
+    /// deploy. Runs on the UI thread (the view model marshals the runtime request here) and returns the corrected
+    /// credential, or a cancellation, so the runtime can retry PowerShell Direct in place against the still-running VM.
+    /// </summary>
+    private async Task<GuestCredentialPromptResponse> PromptForGuestCredentialAsync(
+        GuestCredentialPromptRequest request,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        var expectedUser = string.IsNullOrWhiteSpace(request.ExpectedUsername) ? "Administrator" : request.ExpectedUsername.Trim();
+
+        var usernameBox = new TextBox
+        {
+            Header = "Username",
+            Text = expectedUser,
+            IsSpellCheckEnabled = false
+        };
+        var passwordBox = new PasswordBox
+        {
+            Header = "Password",
+            PlaceholderText = "Enter the guest's local password"
+        };
+        var rememberCheck = new CheckBox
+        {
+            Content = $"Remember for credential slot '{request.CredentialSlotKey}'",
+            IsChecked = true
+        };
+
+        var panel = new StackPanel { Spacing = 12 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = $"'{request.VmName}' rejected the sign-in for '{expectedUser}'. The stored password does not match this running guest. Enter the correct credential to retry without rebuilding the VM.",
+            TextWrapping = TextWrapping.WrapWholeWords
+        });
+        if (!string.IsNullOrWhiteSpace(request.GuestError))
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = request.GuestError,
+                TextWrapping = TextWrapping.WrapWholeWords,
+                Opacity = 0.7,
+                FontSize = 12,
+                IsTextSelectionEnabled = true
+            });
+        }
+        panel.Children.Add(usernameBox);
+        panel.Children.Add(passwordBox);
+        panel.Children.Add(rememberCheck);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = _shellHost?.XamlRoot,
+            Title = "Guest credential rejected",
+            PrimaryButtonText = "Retry",
+            CloseButtonText = "Cancel deploy",
+            DefaultButton = ContentDialogButton.Primary,
+            Content = panel
+        };
+
+        // Keep Retry disabled until both fields are filled so we never retry with an obviously empty credential.
+        void UpdateRetryEnabled()
+        {
+            dialog.IsPrimaryButtonEnabled =
+                !string.IsNullOrWhiteSpace(usernameBox.Text) &&
+                !string.IsNullOrEmpty(passwordBox.Password);
+        }
+
+        usernameBox.TextChanged += (_, _) => UpdateRetryEnabled();
+        passwordBox.PasswordChanged += (_, _) => UpdateRetryEnabled();
+        UpdateRetryEnabled();
+
+        // Close the dialog if the deploy is cancelled from outside (e.g. a global Cancel) so the worker awaiting
+        // this prompt is released instead of blocking until the user manually dismisses the modal.
+        using var cancellationRegistration = cancellationToken.Register(
+            () => DispatcherQueue.TryEnqueue(dialog.Hide));
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return GuestCredentialPromptResponse.Cancel();
+        }
+
+        return new GuestCredentialPromptResponse
+        {
+            Cancelled = false,
+            Username = usernameBox.Text.Trim(),
+            Password = passwordBox.Password,
+            RememberForSlot = rememberCheck.IsChecked == true
+        };
     }
 
     private void OnRightPanelStateChanged()
