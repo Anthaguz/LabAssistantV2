@@ -44,7 +44,7 @@
 
 | Call site | Pattern | Current direction |
 | --- | --- | --- |
-| `MultiVmDeploymentCoordinator` + `HyperVService` + deploy cleanup orchestration | Workflow session | Canonical. One persistent session per VM workflow. |
+| `V2RuntimeCapabilityService` + `HyperVService` + deploy cleanup orchestration | Workflow session | Canonical. One persistent session per VM workflow. |
 | `PowerShellHyperVVhdxProbe` | Query execution | Converged. Uses reusable query execution seam. |
 | `HyperVMachineAdminService.ListHostVmsAsync` | Query execution | Converged. |
 | `HyperVMachineAdminService.GetVmEditSnapshotAsync` | Query execution | Converged. |

@@ -125,8 +125,6 @@ public sealed partial class DeployPage : Page, ICapabilityPage
         var machinesCapabilityService = services.GetRequiredService<IMachinesCapabilityService>();
         var assetsSwitchesCapabilityService = services.GetRequiredService<IAssetsSwitchesCapabilityService>();
         var deploymentPreflightService = services.GetRequiredService<IDeploymentPreflightService>();
-        var deploymentCoordinator = services.GetRequiredService<IDeploymentCoordinator>();
-        var deploymentOutcomeSummaryBuilder = services.GetRequiredService<IDeploymentOutcomeSummaryBuilder>();
         var settingsStore = services.GetRequiredService<IAppSettingsStore>();
         var localCredentialSlotStore = services.GetRequiredService<ILocalCredentialSlotStore>();
         var vhdxCatalogStore = services.GetRequiredService<IVhdxCatalogStore>();
@@ -180,12 +178,6 @@ public sealed partial class DeployPage : Page, ICapabilityPage
                 localCredentialSlotStore,
                 RefreshOverviewSummary,
                 OnLaneResultsPanelStateChanged,
-                (deploymentContext, mode) => deploymentPreflightService.RunAsync(deploymentContext, mode),
-                async deploymentContext =>
-                {
-                    await deploymentCoordinator.DeployAllAsync(deploymentContext);
-                    return deploymentOutcomeSummaryBuilder.Build(deploymentContext);
-                },
                 () => _shellHost?.RightPanel.Toggle()),
             action => DispatcherQueue.TryEnqueue(() => action()),
             _templatesShellAdapter.ItemsSource,

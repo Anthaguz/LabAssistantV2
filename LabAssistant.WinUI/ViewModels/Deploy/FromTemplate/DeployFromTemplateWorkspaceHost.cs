@@ -20,8 +20,6 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     private readonly ILocalCredentialSlotStore _localCredentialSlotStore;
     private readonly Action _refreshSharedUiState;
     private readonly Action _refreshResultsPanelState;
-    private readonly Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> _runReadinessAsync;
-    private readonly Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> _deployAllAsync;
     private readonly Action _onOpenResultsPanelRequested;
 
     public DeployFromTemplateWorkspaceHost(
@@ -33,8 +31,6 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         ILocalCredentialSlotStore localCredentialSlotStore,
         Action refreshSharedUiState,
         Action refreshResultsPanelState,
-        Func<MultiVmDeploymentContext, DeploymentPreflightMode, Task<DeploymentReadinessReport>> runReadinessAsync,
-        Func<MultiVmDeploymentContext, Task<DeploymentOutcomeSummary>> deployAllAsync,
         Action onOpenResultsPanelRequested)
     {
         _referenceDataService = referenceDataService;
@@ -45,8 +41,6 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         _localCredentialSlotStore = localCredentialSlotStore;
         _refreshSharedUiState = refreshSharedUiState;
         _refreshResultsPanelState = refreshResultsPanelState;
-        _runReadinessAsync = runReadinessAsync;
-        _deployAllAsync = deployAllAsync;
         _onOpenResultsPanelRequested = onOpenResultsPanelRequested;
     }
 
@@ -88,8 +82,6 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     public Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText) =>
         _templatesShellAdapter.ShowTemplateEditorAsync(document, statusText);
 
-    public Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode) => _runReadinessAsync(context, mode);
-
     public Task<V2PlanBuildResult> BuildV2PlanAsync(
         LabTemplate template,
         IReadOnlyCollection<string> resolvedCredentialSlotKeys,
@@ -110,8 +102,6 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     public void RefreshSharedUiState() => _refreshSharedUiState();
 
     public void RefreshResultsPanelState() => _refreshResultsPanelState();
-
-    public Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context) => _deployAllAsync(context);
 
     public async Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
         LabTemplate template,
