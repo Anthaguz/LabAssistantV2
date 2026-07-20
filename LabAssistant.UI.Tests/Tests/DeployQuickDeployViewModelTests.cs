@@ -4,6 +4,7 @@ using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Models.Templates;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using LabAssistant.WinUI.ViewModels.Templates;
@@ -34,9 +35,9 @@ public sealed class DeployQuickDeployViewModelTests
 
         public required FakePreflightService Preflight { get; init; }
 
-        public required FakeDeploymentCoordinator Coordinator { get; init; }
+        public required FakeV2PlanningCapabilityService Planning { get; init; }
 
-        public required FakeOutcomeSummaryBuilder Outcome { get; init; }
+        public required FakeV2RuntimeCapabilityService Runtime { get; init; }
 
         public List<string> RemovePrompts { get; } = [];
 
@@ -74,8 +75,8 @@ public sealed class DeployQuickDeployViewModelTests
             new FakeHyperVMachineAdminService(switches));
 
         var preflight = new FakePreflightService();
-        var coordinator = new FakeDeploymentCoordinator();
-        var outcome = new FakeOutcomeSummaryBuilder();
+        var planning = new FakeV2PlanningCapabilityService();
+        var runtime = new FakeV2RuntimeCapabilityService();
 
         Harness harness = null!;
         var vm = new DeployQuickDeployViewModel(
@@ -87,8 +88,8 @@ public sealed class DeployQuickDeployViewModelTests
                 return Task.CompletedTask;
             },
             preflight,
-            coordinator,
-            outcome,
+            planning,
+            runtime,
             action => action(),
             vmName =>
             {
@@ -102,8 +103,8 @@ public sealed class DeployQuickDeployViewModelTests
         {
             Vm = vm,
             Preflight = preflight,
-            Coordinator = coordinator,
-            Outcome = outcome
+            Planning = planning,
+            Runtime = runtime
         };
 
         return harness;
@@ -329,24 +330,24 @@ public sealed class DeployQuickDeployViewModelTests
         await ActivateReadyVmAsync(harness);
 
         var release = new TaskCompletionSource();
-        harness.Coordinator.OnDeploy = _ => release.Task;
+        harness.Runtime.OnExecute = _ => release.Task;
 
         var deployTask = harness.Vm.StartDeployCommand.ExecuteAsync(null);
-        await WaitUntilAsync(() => harness.Coordinator.LastContext is not null);
-        Assert.NotNull(harness.Coordinator.LastContext);
-        Assert.False(harness.Coordinator.LastContext!.IsCancellationRequested);
+        await WaitUntilAsync(() => harness.Runtime.LastContext is not null);
+        Assert.NotNull(harness.Runtime.LastContext);
+        Assert.False(harness.Runtime.LastContext!.IsCancellationRequested);
 
         await harness.Vm.CleanupAsync();
 
-        Assert.True(harness.Coordinator.LastContext!.UserCancellationRequested);
-        Assert.True(harness.Coordinator.LastContext!.IsCancellationRequested);
+        Assert.True(harness.Runtime.LastContext!.UserCancellationRequested);
+        Assert.True(harness.Runtime.LastContext!.IsCancellationRequested);
 
         release.SetResult();
         await deployTask;
     }
 
     [Fact]
-    public async Task StartDeploy_BlockedReadiness_DoesNotInvokeCoordinator()
+    public async Task StartDeploy_BlockedReadiness_DoesNotInvokeRuntime()
     {
         var harness = CreateHarness();
         harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
@@ -360,26 +361,43 @@ public sealed class DeployQuickDeployViewModelTests
 
         await harness.Vm.StartDeployCommand.ExecuteAsync(null);
 
-        Assert.Equal(0, harness.Coordinator.CallCount);
+        Assert.Equal(0, harness.Planning.CallCount);
+        Assert.Equal(0, harness.Runtime.CallCount);
         Assert.Equal("Blocked", harness.Vm.LifecycleState);
     }
 
     [Fact]
-    public async Task StartDeploy_Succeeds_ProjectsOutcomeRows()
+    public async Task StartDeploy_BuildsStandaloneV2Plan()
     {
         var harness = CreateHarness();
-        harness.Outcome.Summary = new DeploymentOutcomeSummary
+        harness.Planning.Result = FakeV2PlanningCapabilityService.StandalonePlan("Quick VM 1");
+        await ActivateReadyVmAsync(harness);
+
+        await harness.Vm.StartDeployCommand.ExecuteAsync(null);
+
+        var request = Assert.IsType<V2PlanBuildRequest>(harness.Planning.LastRequest);
+        Assert.Equal(TemplateExecutionEngine.V2UnifiedPlanning, request.Template.ExecutionEngine);
+        Assert.Equal("2.0.0", request.Template.SchemaVersion);
+        Assert.All(
+            request.Template.VmTemplates,
+            vm => Assert.Equal(V2MembershipModeCatalog.Standalone, vm.MembershipMode));
+    }
+
+    [Fact]
+    public async Task StartDeploy_PlanBlocked_SurfacesBlockersAndDoesNotExecute()
+    {
+        var harness = CreateHarness();
+        harness.Planning.Result = new V2PlanBuildResult
         {
-            OperationState = DeploymentOperationState.Completed,
-            TotalVmCount = 1,
-            SucceededVmCount = 1,
-            VmOutcomes =
+            Success = false,
+            Issues =
             [
-                new VmDeploymentOutcomeSummary
+                new V2PlanIssue
                 {
+                    Severity = V2PlanIssueSeverity.Blocking,
                     VmName = "Quick VM 1",
-                    Status = VmDeploymentOutcomeStatus.Succeeded,
-                    Cleanup = new VmCleanupOutcomeSummary { CleanupRan = false }
+                    Message = "Base disk is missing a bootstrap profile.",
+                    SuggestedAction = "Register a bootstrap profile."
                 }
             ]
         };
@@ -387,12 +405,29 @@ public sealed class DeployQuickDeployViewModelTests
 
         await harness.Vm.StartDeployCommand.ExecuteAsync(null);
 
-        Assert.Equal(1, harness.Coordinator.CallCount);
+        Assert.Equal(1, harness.Planning.CallCount);
+        Assert.Equal(0, harness.Runtime.CallCount);
+        Assert.Equal("Blocked", harness.Vm.LifecycleState);
+        var issue = Assert.Single(harness.Vm.IssueRows);
+        Assert.Equal("Block", issue.Severity);
+        Assert.Contains("bootstrap profile", issue.Message);
+    }
+
+    [Fact]
+    public async Task StartDeploy_Succeeds_ProjectsLiveRows()
+    {
+        var harness = CreateHarness();
+        harness.Planning.Result = FakeV2PlanningCapabilityService.StandalonePlan("Quick VM 1");
+        harness.Runtime.Result = new V2RuntimeExecutionResult { Success = true };
+        await ActivateReadyVmAsync(harness);
+
+        await harness.Vm.StartDeployCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, harness.Runtime.CallCount);
         Assert.Equal("Completed", harness.Vm.LifecycleState);
         Assert.Equal(100, harness.Vm.ProgressPercent);
         var row = Assert.Single(harness.Vm.ResultRows);
         Assert.Equal("Quick VM 1", row.VmName);
-        Assert.Equal("Succeeded", row.Status);
     }
 
     [Fact]

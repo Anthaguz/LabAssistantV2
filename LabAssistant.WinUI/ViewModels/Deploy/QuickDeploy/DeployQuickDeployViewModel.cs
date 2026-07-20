@@ -4,6 +4,8 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business.Deployment;
+using LabAssistant.Business.Planning;
+using LabAssistant.Business.Runtime;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
@@ -32,8 +34,8 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     private readonly DeployResolveSuggestionsService _resolveSuggestionsService;
     private readonly Func<TemplateEditorDocument, string, Task> _showTemplateEditorAsync;
     private readonly IDeploymentPreflightService _deploymentPreflightService;
-    private readonly IDeploymentCoordinator _deploymentCoordinator;
-    private readonly IDeploymentOutcomeSummaryBuilder _deploymentOutcomeSummaryBuilder;
+    private readonly IV2PlanningCapabilityService _v2PlanningCapabilityService;
+    private readonly IV2RuntimeCapabilityService _v2RuntimeCapabilityService;
     private readonly Action<Action> _marshalToUi;
     private readonly Func<string, Task<bool>> _confirmRemoveVmAsync;
     private readonly Action _requestResultsPanelToggle;
@@ -41,6 +43,11 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
     private readonly List<DeployCompatibilityIssue> _compatibilityIssues = [];
     private readonly Dictionary<string, DeployVmProgressState> _progressByVm = new(StringComparer.OrdinalIgnoreCase);
+
+    // Blocking rows produced by the V2 planner or runtime for the current deploy attempt. They live outside the
+    // readiness-derived issue set so a terminal plan/runtime block stays visible on the results surface, and are
+    // re-appended by RefreshIssueRows rather than being rebuilt from readiness state.
+    private readonly List<DeployIssueRow> _deployBlockerRows = [];
 
     private IReadOnlyList<string> _availableSwitches = Array.Empty<string>();
     private IReadOnlyList<TemplateVhdxCatalogOption> _availableVhdxCatalogOptions = Array.Empty<TemplateVhdxCatalogOption>();
@@ -54,8 +61,8 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         DeployResolveSuggestionsService resolveSuggestionsService,
         Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync,
         IDeploymentPreflightService deploymentPreflightService,
-        IDeploymentCoordinator deploymentCoordinator,
-        IDeploymentOutcomeSummaryBuilder deploymentOutcomeSummaryBuilder,
+        IV2PlanningCapabilityService v2PlanningCapabilityService,
+        IV2RuntimeCapabilityService v2RuntimeCapabilityService,
         Action<Action> marshalToUi,
         Func<string, Task<bool>> confirmRemoveVmAsync,
         Action requestResultsPanelToggle,
@@ -65,8 +72,8 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         _resolveSuggestionsService = resolveSuggestionsService;
         _showTemplateEditorAsync = showTemplateEditorAsync;
         _deploymentPreflightService = deploymentPreflightService;
-        _deploymentCoordinator = deploymentCoordinator;
-        _deploymentOutcomeSummaryBuilder = deploymentOutcomeSummaryBuilder;
+        _v2PlanningCapabilityService = v2PlanningCapabilityService;
+        _v2RuntimeCapabilityService = v2RuntimeCapabilityService;
         _marshalToUi = marshalToUi;
         _confirmRemoveVmAsync = confirmRemoveVmAsync;
         _requestResultsPanelToggle = requestResultsPanelToggle;
@@ -455,6 +462,7 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         ReadinessReport = readinessReport;
         ReadinessSummaryText = readinessSummaryText;
         IsEvaluatingReadiness = false;
+        _deployBlockerRows.Clear();
         RefreshIssueRows();
         RefreshResultRows();
         RefreshCommandStates();
@@ -466,6 +474,7 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         ReadinessReport = null;
         ReadinessSummaryText = readinessSummaryText;
         IsEvaluatingReadiness = false;
+        _deployBlockerRows.Clear();
         RefreshIssueRows();
         RefreshResultRows();
         RefreshCommandStates();
@@ -474,15 +483,17 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     public void SetReadinessEvaluationFailed(string readinessSummaryText) =>
         ClearReadinessState(readinessSummaryText);
 
-    public void InitializeProgressRows(
-        MultiVmDeploymentContext context,
-        Func<VmDeploymentContext, IReadOnlyList<DeployTimelineStepDefinition>> expectedStepsFactory)
+    /// <summary>
+    /// Seeds per-VM live-progress rows from a built V2 plan. The V2 runtime rebuilds its per-VM contexts during
+    /// execution, so unlike the classic path the timeline must come from the plan nodes rather than pre-built
+    /// contexts. Shared with the From-Template lane through <see cref="DeployV2ProgressPlan"/>.
+    /// </summary>
+    public void InitializeProgressRows(V2PlanBuildResult plan)
     {
         _progressByVm.Clear();
-        foreach (var vmContext in context.VmContexts)
+        foreach (var state in DeployV2ProgressPlan.BuildProgressStates(plan))
         {
-            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
-            _progressByVm[vmName] = new DeployVmProgressState(vmName, expectedStepsFactory(vmContext));
+            _progressByVm[state.VmName] = state;
         }
 
         RefreshResultRows();
@@ -510,35 +521,43 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         RefreshResultRows();
     }
 
-    public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)
+    /// <summary>
+    /// Projects the V2 planner's blocking issues into the deploy blocker rows so a plan that fails to build surfaces
+    /// its blockers to the user instead of silently doing nothing. These persist across UI refreshes on the terminal
+    /// blocked surface.
+    /// </summary>
+    public void ApplyPlanBlockers(IReadOnlyList<V2PlanIssue> blockers)
     {
-        ResultRows.Clear();
-        foreach (var vmOutcome in summary.VmOutcomes)
+        _deployBlockerRows.Clear();
+        foreach (var blocker in blockers)
         {
-            if (_progressByVm.TryGetValue(vmOutcome.VmName, out var liveState))
-            {
-                liveState.MarkCompleted(vmOutcome.Status.ToString(), BuildCleanupSummary(vmOutcome));
-                ResultRows.Add(liveState.ToRow());
-            }
-            else
-            {
-                ResultRows.Add(new DeployVmResultRow(
-                    VmName: vmOutcome.VmName,
-                    Status: vmOutcome.Status.ToString(),
-                    Summary: BuildCleanupSummary(vmOutcome),
-                    ProgressPercent: 100,
-                    TimelineSteps: CreateOutcomeTimelineSteps(vmOutcome)));
-            }
+            _deployBlockerRows.Add(new DeployIssueRow(
+                Scope: string.IsNullOrWhiteSpace(blocker.VmName) ? "Global" : blocker.VmName!,
+                Severity: "Block",
+                Message: string.IsNullOrWhiteSpace(blocker.SuggestedAction)
+                    ? blocker.Message
+                    : $"{blocker.Message} {blocker.SuggestedAction}".Trim()));
         }
 
-        IssueRows.Clear();
-        foreach (var residual in summary.Residuals)
+        RefreshIssueRows();
+    }
+
+    /// <summary>
+    /// Projects the terminal V2 runtime result. Per-VM rows are already driven by the live step-state stream during
+    /// execution, so this only surfaces any blocking messages the runtime returned.
+    /// </summary>
+    public void ApplyV2ExecutionResult(V2RuntimeExecutionResult result)
+    {
+        _deployBlockerRows.Clear();
+        foreach (var message in result.BlockingMessages)
         {
-            IssueRows.Add(new DeployIssueRow(
-                Scope: residual.VmName,
-                Severity: "Warn",
-                Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
+            _deployBlockerRows.Add(new DeployIssueRow(
+                Scope: "Global",
+                Severity: "Block",
+                Message: message));
         }
+
+        RefreshIssueRows();
     }
 
     // IDeployQuickDeployWorkspaceControllerHost.
@@ -554,6 +573,8 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     void IDeployQuickDeployWorkspaceControllerHost.SetActionStatus(string statusText) => SetActionStatus(statusText);
 
     LabTemplate IDeployQuickDeployWorkspaceControllerHost.BuildTemplate() => BuildTemplate();
+
+    LabTemplate IDeployQuickDeployWorkspaceControllerHost.BuildV2Template() => BuildV2Template();
 
     async Task IDeployQuickDeployWorkspaceControllerHost.EnsureReferenceDataAsync(bool forceRefresh)
     {
@@ -574,13 +595,40 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
     void IDeployQuickDeployWorkspaceControllerHost.UpdateUi() => UpdateUi();
 
-    async Task<DeploymentOutcomeSummary> IDeployQuickDeployWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context)
+    async Task<V2PlanBuildResult> IDeployQuickDeployWorkspaceControllerHost.BuildV2PlanAsync(LabTemplate template)
+    {
+        await _referenceDataService.EnsureAsync(forceRefresh: false);
+        return await _v2PlanningCapabilityService.BuildPlanAsync(new V2PlanBuildRequest
+        {
+            Template = template,
+            CatalogItems = _referenceDataService.CatalogItems,
+            AvailableSwitchNames = _referenceDataService.AvailableSwitches,
+            AvailableSwitches = _referenceDataService.AvailableSwitchInfo,
+            // Quick Deploy authors bare standalone VMs with no credential slots, so nothing is pre-resolved.
+            ResolvedCredentialSlotKeys = Array.Empty<string>(),
+            ExternalSwitchAdapterMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            DefaultDeploymentProfile = "Balanced"
+        });
+    }
+
+    async Task<V2RuntimeExecutionResult> IDeployQuickDeployWorkspaceControllerHost.ExecuteV2DeployAsync(
+        LabTemplate template,
+        V2PlanBuildResult plan,
+        MultiVmDeploymentContext context)
     {
         _activeDeploymentContext = context;
         try
         {
-            await _deploymentCoordinator.DeployAllAsync(context);
-            return _deploymentOutcomeSummaryBuilder.Build(context);
+            return await _v2RuntimeCapabilityService.ExecuteAsync(new V2RuntimeExecutionRequest
+            {
+                Template = template,
+                Plan = plan,
+                Settings = _referenceDataService.DeploymentSettings,
+                // Standalone VMs perform no guest work, so no credential slot values are required.
+                CredentialSlotValues = new Dictionary<string, V2RuntimeCredential>(StringComparer.OrdinalIgnoreCase),
+                BaseRemoteAccessOptions = new V2BaseRemoteAccessOptions(),
+                DeploymentContext = context
+            });
         }
         finally
         {
@@ -601,6 +649,26 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         Description = "Generated quick deploy input.",
         VmTemplates = VmEntries.Select(CloneVmTemplate).ToList()
     };
+
+    /// <summary>
+    /// Builds the V2-engine variant of the Quick Deploy template for planning and execution. Quick Deploy runs on
+    /// the unified V2 graph engine, so this stamps the engine + schema and marks every VM Standalone: the planner
+    /// then emits provisioning-only nodes (no domain-join progression, no guest work, no credential slots) that
+    /// preserve the fast single-VM UX. The classic <see cref="BuildTemplate"/> shape is retained for the
+    /// engine-agnostic readiness preflight, which is routed through the CoR-shaped context builder.
+    /// </summary>
+    private LabTemplate BuildV2Template()
+    {
+        var template = BuildTemplate();
+        template.ExecutionEngine = TemplateExecutionEngine.V2UnifiedPlanning;
+        template.SchemaVersion = "2.0.0";
+        foreach (var vm in template.VmTemplates)
+        {
+            vm.MembershipMode = V2MembershipModeCatalog.Standalone;
+        }
+
+        return template;
+    }
 
     private void EnsureSeeded()
     {
@@ -1230,23 +1298,27 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
                 Message: FormatIssueMessage(issue.Message, issue.Guidance)));
         }
 
-        if (ReadinessReport is null)
+        if (ReadinessReport is not null)
         {
-            return;
+            foreach (var result in ReadinessReport.Results.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
+            {
+                var scope = result.AffectedVmNames.Count > 0
+                    ? string.Join(", ", result.AffectedVmNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+                    : "Global";
+                IssueRows.Add(new DeployIssueRow(
+                    Scope: scope,
+                    Severity: result.Status == DeploymentReadinessStatus.Fail ? "Block" : "Warn",
+                    Message: FormatIssueMessage(result.Message, result.ActionableGuidance)));
+            }
         }
 
-        foreach (var result in ReadinessReport.Results.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
+        // Deploy-time blockers (V2 plan build failures or runtime blocking messages) are surfaced last so they stay
+        // visible on the terminal blocked/failed surface, independent of the readiness-derived rows above.
+        foreach (var blockerRow in _deployBlockerRows)
         {
-            var scope = result.AffectedVmNames.Count > 0
-                ? string.Join(", ", result.AffectedVmNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
-                : "Global";
-            IssueRows.Add(new DeployIssueRow(
-                Scope: scope,
-                Severity: result.Status == DeploymentReadinessStatus.Fail ? "Block" : "Warn",
-                Message: FormatIssueMessage(result.Message, result.ActionableGuidance)));
+            IssueRows.Add(blockerRow);
         }
     }
-
     private List<(bool IsBlocking, string Message)> GetDraftIssues()
     {
         if (SelectedVmEntry is null)
@@ -1400,55 +1472,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         }
 
         return steps;
-    }
-
-    private static IReadOnlyList<DeployTimelineStepRow> CreateOutcomeTimelineSteps(VmDeploymentOutcomeSummary vmOutcome)
-    {
-        var outcomeState = vmOutcome.Status switch
-        {
-            VmDeploymentOutcomeStatus.Succeeded => DeployTimelineStepState.Succeeded,
-            VmDeploymentOutcomeStatus.Failed => DeployTimelineStepState.Failed,
-            VmDeploymentOutcomeStatus.Cancelled => DeployTimelineStepState.Skipped,
-            _ => DeployTimelineStepState.Pending
-        };
-
-        var rows = new List<DeployTimelineStepRow>
-        {
-            new("Deploy VM", outcomeState)
-        };
-
-        if (vmOutcome.Cleanup.CleanupRan)
-        {
-            var cleanupState = vmOutcome.Cleanup.Status switch
-            {
-                VmCleanupOutcomeStatus.Succeeded => DeployTimelineStepState.Succeeded,
-                VmCleanupOutcomeStatus.Residuals => DeployTimelineStepState.Failed,
-                _ => DeployTimelineStepState.Skipped
-            };
-
-            if (cleanupState != DeployTimelineStepState.Skipped)
-            {
-                rows.Add(new("Cleanup", cleanupState));
-            }
-        }
-
-        return rows;
-    }
-
-    private static string BuildCleanupSummary(VmDeploymentOutcomeSummary vmOutcome)
-    {
-        var cleanup = vmOutcome.Cleanup;
-        if (!cleanup.CleanupRan)
-        {
-            return "Completed";
-        }
-
-        return cleanup.Status switch
-        {
-            VmCleanupOutcomeStatus.Succeeded => "Cleanup completed",
-            VmCleanupOutcomeStatus.Residuals => $"Cleanup completed with residuals ({cleanup.ResidualCount}). Manual cleanup may be required.",
-            _ => "Cleanup not needed"
-        };
     }
 
     private static string? NormalizeValue(string? value) =>

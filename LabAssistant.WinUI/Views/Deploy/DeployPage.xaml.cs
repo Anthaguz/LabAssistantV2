@@ -161,8 +161,8 @@ public sealed partial class DeployPage : Page, ICapabilityPage
             resolveSuggestionsService,
             templateEditorLauncher.ShowEditorAsync,
             deploymentPreflightService,
-            deploymentCoordinator,
-            deploymentOutcomeSummaryBuilder,
+            v2PlanningCapabilityService,
+            v2RuntimeCapabilityService,
             action => DispatcherQueue.TryEnqueue(() => action()),
             ShowRemoveVmEntryConfirmationDialogAsync,
             () => _shellHost?.RightPanel.Toggle());
