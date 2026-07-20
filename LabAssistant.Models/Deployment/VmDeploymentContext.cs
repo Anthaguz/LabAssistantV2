@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using LabAssistant.Models.PowerShell;
 using LabAssistant.Models.Templates;
 
@@ -81,6 +82,16 @@ namespace LabAssistant.Models.Deployment
         public Action<DeployStepStateUpdate>? StepStateEmitter { get; set; }
         public Action? OnBlockingFailure { get; set; }
         public Func<bool>? ShouldAbort { get; set; }
+
+        /// <summary>
+        /// Optional interactive seam invoked when a running guest deterministically rejects its sign-in credential.
+        /// When set, the deploy runtime asks the caller (the UI) to supply a corrected credential so it can retry in
+        /// place against the still-running VM instead of failing the deployment or forcing a re-provision. When null
+        /// (headless runs, tests), the runtime fails fast with an actionable message. The password is injected out of
+        /// band and never appears in the request, so wiring this to a dialog cannot leak a secret.
+        /// </summary>
+        public Func<GuestCredentialPromptRequest, CancellationToken, Task<GuestCredentialPromptResponse>>? RequestGuestCredential { get; set; }
+
         public string OperationId { get; set; } = string.Empty;
 
         private readonly Dictionary<string, (DeployStepState State, string? Message)> _stepTerminalOverrides = new(StringComparer.OrdinalIgnoreCase);
@@ -245,6 +256,7 @@ namespace LabAssistant.Models.Deployment
             PowerShellHandle = null;
             StructuredEventEmitter = null;
             StepStateEmitter = null;
+            RequestGuestCredential = null;
             OperationId = string.Empty;
             _stepTerminalOverrides.Clear();
             Interlocked.Exchange(ref _stepStateSequence, 0);

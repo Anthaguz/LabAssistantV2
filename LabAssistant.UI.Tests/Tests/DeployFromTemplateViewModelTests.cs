@@ -548,4 +548,65 @@ public sealed class DeployFromTemplateViewModelTests
         Assert.NotNull(vm2AfterFirstTick);
         Assert.Same(vm2AfterFirstTick, vm2AfterSecondTick);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GuestCredentialPrompt_WhenPromptWiredAndRemembered_PersistsCorrectedSlot()
+    {
+        var host = new FakeFromTemplateCompositionHost();
+        GuestCredentialPromptRequest? seenRequest = null;
+        System.Threading.Tasks.Task<GuestCredentialPromptResponse> Prompt(
+            GuestCredentialPromptRequest request, System.Threading.CancellationToken _)
+        {
+            seenRequest = request;
+            return System.Threading.Tasks.Task.FromResult(new GuestCredentialPromptResponse
+            {
+                Cancelled = false,
+                Username = "Administrator",
+                Password = "Corrected!",
+                RememberForSlot = true
+            });
+        }
+
+        var vm = new DeployFromTemplateViewModel(host, action => action(), host.Templates, Prompt);
+
+        // The runtime builds per-VM contexts during execution and registers them; the VM wires callbacks via this seam.
+        var multi = new MultiVmDeploymentContext();
+        ((IDeployFromTemplateWorkspaceControllerHost)vm).AttachProgressCallbacks(multi, (_, _) => { }, (_, _) => { });
+
+        var context = new VmDeploymentContext { VmName = "dc01" };
+        multi.RegisterVmContext(context);
+
+        Assert.NotNull(context.RequestGuestCredential);
+        var response = await context.RequestGuestCredential!(
+            new GuestCredentialPromptRequest
+            {
+                VmName = "dc01",
+                CredentialSlotKey = "slot-local",
+                ExpectedUsername = "Administrator"
+            },
+            System.Threading.CancellationToken.None);
+
+        Assert.False(response.Cancelled);
+        Assert.Equal("Corrected!", response.Password);
+        Assert.NotNull(seenRequest);
+        Assert.Equal("slot-local", seenRequest!.CredentialSlotKey);
+        // "Remember" persists the corrected credential to the slot store so future deploys reuse it.
+        Assert.Contains(host.Upserts, u => u.SlotKey == "slot-local" && u.Password == "Corrected!");
+    }
+
+    [Fact]
+    public void GuestCredentialPrompt_WhenNoPromptWired_LeavesContextUnwiredForFailFast()
+    {
+        var host = new FakeFromTemplateCompositionHost();
+        // No prompt delegate: the runtime must keep its fail-fast behavior (context callback stays null).
+        var vm = new DeployFromTemplateViewModel(host, action => action(), host.Templates);
+
+        var multi = new MultiVmDeploymentContext();
+        ((IDeployFromTemplateWorkspaceControllerHost)vm).AttachProgressCallbacks(multi, (_, _) => { }, (_, _) => { });
+
+        var context = new VmDeploymentContext { VmName = "dc01" };
+        multi.RegisterVmContext(context);
+
+        Assert.Null(context.RequestGuestCredential);
+    }
 }

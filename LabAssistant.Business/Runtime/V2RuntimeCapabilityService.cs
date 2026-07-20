@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using LabAssistant.Business.Deployment;
@@ -28,6 +30,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private readonly IStructuredLogger _structuredLogger;
     private readonly IV2PlanScheduler _scheduler;
     private readonly bool _useGraphScheduler;
+
+    // One credential coordinator per deployment run, keyed by that run's mutable credential-slot dictionary so it is
+    // shared across the run's VMs and collected with the run. The service itself is a singleton, so this must not be a
+    // plain field.
+    private readonly ConditionalWeakTable<IReadOnlyDictionary<string, V2RuntimeCredential>, RuntimeCredentialCoordinator>
+        _credentialCoordinators = new();
 
     /// <summary>Environment variable that force-enables the graph scheduler for manual real-hardware trials.</summary>
     private const string GraphSchedulerEnvVariable = "LABASSISTANT_V2_USE_GRAPH_SCHEDULER";
@@ -86,6 +94,20 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         InitializeDeploymentContext(multiContext, request.Settings);
+
+        // Back the resolved credential slots with a single mutable, thread-safe dictionary so an interactive
+        // in-place credential correction (see WaitForGuestTransportAsync) becomes visible to every VM that later
+        // resolves the same slot. Every resolve site reads request.CredentialSlotValues, so replacing it here with a
+        // ConcurrentDictionary (which is itself an IReadOnlyDictionary) propagates a correction with no extra plumbing.
+        var mutableCredentialSlotValues = new ConcurrentDictionary<string, V2RuntimeCredential>(
+            request.CredentialSlotValues, StringComparer.OrdinalIgnoreCase);
+        request.CredentialSlotValues = mutableCredentialSlotValues;
+        // Keyed by the per-run credential dictionary instance so the coordinator (and its per-slot prompt gates) is
+        // shared by every VM in this run without threading it through the deep node-dispatch call chain, and is
+        // garbage-collected with the run. WaitForGuestTransportAsync looks it up via request.CredentialSlotValues.
+        _credentialCoordinators.AddOrUpdate(
+            mutableCredentialSlotValues, new RuntimeCredentialCoordinator(mutableCredentialSlotValues));
+
         var states = BuildRuntimeStates(request, multiContext);
         foreach (var state in states)
         {
@@ -2109,9 +2131,10 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         VmDeploymentContext context,
         CancellationToken cancellationToken)
     {
+        var slotKey = state.PlanVm.EffectiveBootstrapCredentialSlot;
         var credential = ResolveCredential(
             request.CredentialSlotValues,
-            state.PlanVm.EffectiveBootstrapCredentialSlot,
+            slotKey,
             context,
             DeploymentStepKeys.V2GuestTransportReady,
             "bootstrap");
@@ -2120,11 +2143,21 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        // slotKey is guaranteed non-empty here: ResolveCredential fails the step and returns null otherwise.
+        var credentialCoordinator = GetCredentialCoordinator(request.CredentialSlotValues);
+
         string? lastError = null;
         var startTick = Environment.TickCount64;
         var graceAttempts = Math.Max(1, request.GuestAuthGraceAttempts);
-        for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+        var attempt = 0;
+        while (true)
         {
+            attempt++;
+            if (attempt > request.GuestTransportMaxRetries)
+            {
+                break;
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             if (context.ShouldAbort?.Invoke() == true)
             {
@@ -2155,18 +2188,45 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             // A credential rejection is deterministic: the stored bootstrap password does not match this VM's base
             // image, so retrying it for the full budget (~15 min) is pointless. Tolerate it only during the early
-            // specialize window (a fresh clone applies its answer-file password over the first attempts), then fail
-            // fast with an actionable message. PR3 will offer an in-place credential re-prompt at this point.
+            // specialize window (a fresh clone applies its answer-file password over the first attempts). Past that,
+            // offer an interactive re-prompt so the user can correct the credential and we retry in place against the
+            // still-running VM (no ~18-min re-provision); a correction also propagates to later VMs on the same slot.
+            // When the user cancels, or no prompt is wired (headless runs, tests), fail fast with an actionable message.
             if (category == GuestCommandErrorCategory.AuthenticationRejected && attempt >= graceAttempts)
             {
-                context.MarkFailure(
-                    DeploymentStepKeys.V2GuestTransportReady,
-                    GuestReadinessLog.DescribeCredentialRejection(
-                        context.VmName,
-                        state.PlanVm.EffectiveBootstrapCredentialSlot,
-                        credential.Username,
-                        lastError));
-                return;
+                var corrected = await credentialCoordinator.RepromptAsync(
+                    context,
+                    slotKey!,
+                    new GuestCredentialPromptRequest
+                    {
+                        VmName = context.VmName,
+                        CredentialSlotKey = slotKey!,
+                        ExpectedUsername = credential.Username,
+                        GuestError = GuestReadinessLog.SummarizeError(lastError)
+                    },
+                    credential,
+                    cancellationToken);
+
+                if (corrected is null)
+                {
+                    context.MarkFailure(
+                        DeploymentStepKeys.V2GuestTransportReady,
+                        GuestReadinessLog.DescribeCredentialRejection(
+                            context.VmName,
+                            slotKey,
+                            credential.Username,
+                            lastError));
+                    return;
+                }
+
+                // Retry in place with the corrected credential: reset the attempt budget and the specialize grace
+                // window so the new credential gets a fresh set of attempts against the already-running VM.
+                credential = corrected;
+                attempt = 0;
+                startTick = Environment.TickCount64;
+                context.LogCallback?.Invoke(
+                    $"Retrying guest sign-in on '{context.VmName}' with the updated credential.");
+                continue;
             }
 
             if (attempt < request.GuestTransportMaxRetries)
@@ -2178,6 +2238,22 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         context.MarkFailure(
             DeploymentStepKeys.V2GuestTransportReady,
             $"PowerShell Direct did not become ready on '{context.VmName}'. Last error: {lastError ?? "unknown"}");
+    }
+
+    private RuntimeCredentialCoordinator GetCredentialCoordinator(
+        IReadOnlyDictionary<string, V2RuntimeCredential> slotValues)
+    {
+        if (_credentialCoordinators.TryGetValue(slotValues, out var coordinator))
+        {
+            return coordinator;
+        }
+
+        // WaitForGuestTransportAsync is only reached through ExecuteAsync, which always registers a coordinator, so
+        // this is a defensive fallback rather than an expected path. A coordinator over the live dictionary still
+        // corrects credentials in place; it just cannot dedup a prompt across VMs without the shared instance.
+        var mutable = slotValues as ConcurrentDictionary<string, V2RuntimeCredential>
+            ?? new ConcurrentDictionary<string, V2RuntimeCredential>(slotValues, StringComparer.OrdinalIgnoreCase);
+        return _credentialCoordinators.GetValue(slotValues, _ => new RuntimeCredentialCoordinator(mutable));
     }
 
     private async Task<IReadOnlyList<RuntimeRouterAdapter>> EnsureRouterAdapterInventoryAsync(

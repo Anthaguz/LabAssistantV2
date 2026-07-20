@@ -506,6 +506,108 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_GuestTransport_PromptSuppliesGoodCredential_RetriesInPlaceAndSucceeds()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceAttempts = 1;
+
+        // Wire the interactive re-prompt onto every runtime-built VM context (production wires this from the UI).
+        var promptCount = 0;
+        request.DeploymentContext = new MultiVmDeploymentContext
+        {
+            VmContextRegistered = ctx => ctx.RequestGuestCredential = (_, _) =>
+            {
+                Interlocked.Increment(ref promptCount);
+                return Task.FromResult(new GuestCredentialPromptResponse
+                {
+                    Cancelled = false,
+                    Username = "Administrator",
+                    Password = "Corrected!"
+                });
+            }
+        };
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, credential, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref probeAttempts);
+                    // The stored bootstrap password is rejected; only the corrected password authenticates.
+                    if (credential.Password != "Corrected!")
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, promptCount);
+        // The still-running VM is retried in place with the corrected credential (no re-provision).
+        Assert.Contains("vm:vm-dc01:GuestTransportReady", result.ExecutedNodeIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GuestTransport_PromptCancelled_FailsFast()
+    {
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceAttempts = 1;
+
+        request.DeploymentContext = new MultiVmDeploymentContext
+        {
+            VmContextRegistered = ctx => ctx.RequestGuestCredential =
+                (_, _) => Task.FromResult(GuestCredentialPromptResponse.Cancel())
+        };
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref probeAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        // Grace tolerates the first rejection, the prompt is offered at attempt 1, and cancelling fails fast.
+        Assert.Equal(1, probeAttempts);
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "dc01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("does not match this VM's base image", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_BaseRemoteAccessReady_ProbeTransientFailure_RetriesThenSucceeds()
     {
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -33,6 +34,11 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
 {
     private readonly IDeployFromTemplateCompositionHost _host;
     private readonly Action<Action> _marshalToUi;
+    private readonly Func<GuestCredentialPromptRequest, CancellationToken, Task<GuestCredentialPromptResponse>>? _requestGuestCredential;
+
+    // Serializes interactive guest-credential dialogs across parallel VM deployments (WinUI permits one open
+    // ContentDialog at a time). Static so it also holds across any second lane instance.
+    private static readonly SemaphoreSlim _guestCredentialPromptGate = new(1, 1);
     private readonly DeployFromTemplateWorkspaceController _controller;
     private readonly DeployV2ReviewWorkspaceController _v2ReviewController;
 
@@ -54,13 +60,19 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     /// <param name="host">The DI-backed integration seam for templates, reference data, planning, and runtime.</param>
     /// <param name="marshalToUi">Marshals a callback onto the UI thread; injected so progress callbacks stay testable.</param>
     /// <param name="templateItemsSource">The shared template-library items source bound to the selector.</param>
+    /// <param name="requestGuestCredential">
+    /// Optional interactive prompt invoked when a running guest rejects its bootstrap credential during deployment.
+    /// When supplied, the deploy retries in place with a corrected credential; when null, the runtime fails fast.
+    /// </param>
     public DeployFromTemplateViewModel(
         IDeployFromTemplateCompositionHost host,
         Action<Action> marshalToUi,
-        object? templateItemsSource)
+        object? templateItemsSource,
+        Func<GuestCredentialPromptRequest, CancellationToken, Task<GuestCredentialPromptResponse>>? requestGuestCredential = null)
     {
         _host = host;
         _marshalToUi = marshalToUi;
+        _requestGuestCredential = requestGuestCredential;
         TemplateItems = templateItemsSource;
         V2Review = new DeployV2ReviewWorkspaceViewModel();
         _controller = new DeployFromTemplateWorkspaceController(this, this);
@@ -1226,6 +1238,13 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
             var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
             vmContext.LogCallback = message => _marshalToUi(() => onLogMessage(vmName, message));
             vmContext.StepStateEmitter = update => _marshalToUi(() => onStepStateUpdated(vmName, update));
+
+            // Only wire the interactive credential re-prompt when a prompt is available. Leaving it null when there is
+            // no prompt (tests, headless) keeps the runtime on its fail-fast path for a rejected credential.
+            if (_requestGuestCredential is not null)
+            {
+                vmContext.RequestGuestCredential = RequestGuestCredentialOnUiThread;
+            }
         }
 
         // Wire contexts that already exist (the classic path builds its per-VM contexts before wiring).
@@ -1237,6 +1256,78 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         // Wire contexts the runtime builds during execution (the V2 runtime clears and rebuilds VmContexts
         // internally, so without this hook its step-state and log callbacks would be attached to nothing).
         context.VmContextRegistered = Wire;
+    }
+
+    /// <summary>
+    /// Bridges the runtime's guest-credential prompt request onto the UI thread. The runtime awaits the returned task
+    /// from a worker thread, so the dialog is shown via the UI marshaller and the result flows back through a
+    /// completion source. A corrected credential is persisted to the credential slot store when the user chose to
+    /// remember it, so future deployments reuse it.
+    /// </summary>
+    private Task<GuestCredentialPromptResponse> RequestGuestCredentialOnUiThread(
+        GuestCredentialPromptRequest request,
+        CancellationToken cancellationToken)
+    {
+        var prompt = _requestGuestCredential;
+        if (prompt is null)
+        {
+            return Task.FromResult(GuestCredentialPromptResponse.Cancel());
+        }
+
+        var completion = new TaskCompletionSource<GuestCredentialPromptResponse>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Link the result to the deploy's cancellation so the awaiting runtime worker (which holds the coordinator's
+        // per-slot gate) is always released, even if the marshalled continuation below never runs because the UI
+        // dispatcher is tearing down. Disposed once the prompt resolves so the registration does not linger.
+        var cancellationRegistration = cancellationToken.Register(
+            () => completion.TrySetResult(GuestCredentialPromptResponse.Cancel()));
+        completion.Task.ContinueWith(
+            _ => cancellationRegistration.Dispose(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        _marshalToUi(async () =>
+        {
+            // WinUI allows only one ContentDialog open at a time. VMs deploy in parallel and can each reject a
+            // credential for a DIFFERENT slot, so the coordinator's per-slot single-flight does not prevent two
+            // prompts overlapping. Serialize the actual dialog display here so a second prompt waits for the first
+            // to close instead of throwing. WaitAsync yields the UI thread, so this cannot deadlock.
+            try
+            {
+                await _guestCredentialPromptGate.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                completion.TrySetResult(GuestCredentialPromptResponse.Cancel());
+                return;
+            }
+
+            try
+            {
+                var response = await prompt(request, cancellationToken);
+                if (!response.Cancelled &&
+                    response.RememberForSlot &&
+                    !string.IsNullOrWhiteSpace(request.CredentialSlotKey) &&
+                    !string.IsNullOrWhiteSpace(response.Username))
+                {
+                    _host.UpsertLocalCredentialSlot(request.CredentialSlotKey, response.Username, response.Password);
+                }
+
+                completion.TrySetResult(response);
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+            finally
+            {
+                _guestCredentialPromptGate.Release();
+            }
+        });
+
+        return completion.Task;
     }
 
     private bool IsActiveTemplateV2()
