@@ -1,9 +1,5 @@
 using LabAssistant.Business.Deployment;
 using LabAssistant.Models.Deployment;
-using LabAssistant.Models.PowerShell;
-using LabAssistant.Services.Diagnostics;
-using LabAssistant.Services.HyperV;
-using LabAssistant.Services.PowerShell;
 using Xunit;
 
 namespace LabAssistant.Business.Tests.Tests;
@@ -110,37 +106,6 @@ public class MilestoneUScenarioMatrixTests
         Assert.All(report.Results, r => Assert.Equal(DeploymentReadinessStatus.Warn, r.Status));
     }
 
-    [Fact]
-    public async Task RuntimeDiagnostics_CreateVhdFailure_EmitsPathContext_AndConciseMessage()
-    {
-        var handle = new PowerShellHandle();
-        var resolver = new SingleSessionResolver(handle, new FakeSession());
-        var hyperV = new FakeHyperVService { CreateVhdDifferencingResult = false };
-        var events = new List<(uint Code, IReadOnlyDictionary<string, object?>? Context)>();
-        var context = new VmDeploymentContext
-        {
-            VmId = Guid.NewGuid(),
-            VmName = "VM1",
-            BaseVhdPath = @"D:\Base\bad.vhdx",
-            VhdPath = @"D:\Labs\VM1\VM1.vhdx",
-            PowerShellHandle = handle,
-            StepFailedCode = LaStatus.DeployStep_StepFailed,
-            StructuredEventEmitter = (code, _, extra) => events.Add((code, extra))
-        };
-
-        var step = new CreateVhdStep(resolver, _ => hyperV);
-        await step.ExecuteAsync(context);
-
-        Assert.False(context.IsSuccess);
-        Assert.NotNull(context.FailureMessage);
-        Assert.Contains(context.BaseVhdPath, context.FailureMessage);
-        Assert.DoesNotContain(Environment.NewLine, context.FailureMessage);
-
-        var stepFailed = Assert.Single(events, e => e.Code == LaStatus.DeployStep_StepFailed);
-        Assert.Equal(context.BaseVhdPath, stepFailed.Context?["parentVhdPath"]?.ToString());
-        Assert.Equal(context.VhdPath, stepFailed.Context?["targetVhdPath"]?.ToString());
-    }
-
     private static DeploymentReadinessCheckResult Result(
         DeploymentReadinessStatus status,
         DeploymentReadinessCategory category,
@@ -171,36 +136,5 @@ public class MilestoneUScenarioMatrixTests
         public bool SupportsMode(DeploymentPreflightMode mode) => mode == supportedMode;
         public Task<IReadOnlyList<DeploymentReadinessCheckResult>> ExecuteAsync(MultiVmDeploymentContext deploymentContext, DeploymentPreflightMode mode, CancellationToken cancellationToken = default)
             => Task.FromResult(execute(deploymentContext));
-    }
-
-    private sealed class SingleSessionResolver(PowerShellHandle handle, IPersistentPowerShellSession session) : ISessionResolver
-    {
-        public IPersistentPowerShellSession Resolve(PowerShellHandle requestHandle)
-            => requestHandle.SessionId == handle.SessionId ? session : throw new KeyNotFoundException();
-        public void RegisterSession(PowerShellHandle handle, IPersistentPowerShellSession session) { }
-        public void RemoveSession(PowerShellHandle handle) { }
-    }
-
-    private sealed class FakeSession : IPersistentPowerShellSession
-    {
-        public Task<(string Output, string Error)> ExecuteAsync(string command) => Task.FromResult((string.Empty, string.Empty));
-        public void Dispose() { }
-    }
-
-    private sealed class FakeHyperVService : IHyperVService
-    {
-        public bool CreateVhdDifferencingResult { get; set; } = true;
-        public Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName) => Task.FromResult(true);
-        public Task<bool> CreateVhdDifferencingAsync(string parentDiskPath, string vhdPath) => Task.FromResult(CreateVhdDifferencingResult);
-        public Task<bool> CreateVhdFixedSizeAsync(string vhdPath, long sizeBytes) => Task.FromResult(true);
-        public Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount) => Task.FromResult(true);
-        public Task<bool> DisableVmCheckpointsAsync(string vmName) => Task.FromResult(true);
-        public Task<bool> EnableGuestServicesAsync(string vmName) => Task.FromResult(true);
-        public Task<List<string>> GetVirtualSwitchNamesAsync() => Task.FromResult(new List<string>());
-        public Task<bool> IsVmRunningAsync(string vmName) => Task.FromResult(false);
-        public Task<bool> RemoveVmAsync(string vmName) => Task.FromResult(true);
-        public Task<bool> StartVmAsync(string vmName) => Task.FromResult(true);
-        public Task<bool> StopVmAsync(string vmName) => Task.FromResult(true);
-        public Task<bool> VmExistsAsync(string vmName) => Task.FromResult(false);
     }
 }

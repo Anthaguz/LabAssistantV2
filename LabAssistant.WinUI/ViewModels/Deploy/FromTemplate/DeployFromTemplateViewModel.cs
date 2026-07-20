@@ -20,16 +20,15 @@ namespace LabAssistant.WinUI.ViewModels.Deploy;
 /// <summary>
 /// Full MVVM view model for the Deploy From Template lane. It absorbs the former imperative
 /// workspace and composition layers into a single runtime-independent view model that binds through
-/// x:Bind. Workflow orchestration (readiness sequencing, deploy start, per-VM progress) is preserved
-/// on <see cref="DeployFromTemplateWorkspaceController"/> and the V2 review flow on
-/// <see cref="DeployV2ReviewWorkspaceController"/>, for which this view model is the state owner and
-/// the <see cref="IDeployFromTemplateWorkspaceControllerHost"/> / <see cref="IDeployFromTemplateV2ReviewHost"/>.
-/// UI-thread marshalling, the DI-backed integration host, and the results-panel toggle are injected
-/// seams so the type is unit-testable without a WinUI dispatcher.
+/// x:Bind. Only V2 (graph-scheduled) templates deploy here; the legacy chain-of-responsibility engine
+/// has been retired, so a legacy (V1) template surfaces a blocked notice directing the user to re-create
+/// it in the Builder. Workflow orchestration for the V2 review flow is preserved on
+/// <see cref="DeployV2ReviewWorkspaceController"/>, for which this view model is the state owner and the
+/// <see cref="IDeployFromTemplateV2ReviewHost"/>. UI-thread marshalling, the DI-backed integration host,
+/// and the results-panel toggle are injected seams so the type is unit-testable without a WinUI dispatcher.
 /// </summary>
 internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     IDeployFromTemplateLane,
-    IDeployFromTemplateWorkspaceControllerHost,
     IDeployFromTemplateV2ReviewHost
 {
     private readonly IDeployFromTemplateCompositionHost _host;
@@ -39,7 +38,6 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     // Serializes interactive guest-credential dialogs across parallel VM deployments (WinUI permits one open
     // ContentDialog at a time). Static so it also holds across any second lane instance.
     private static readonly SemaphoreSlim _guestCredentialPromptGate = new(1, 1);
-    private readonly DeployFromTemplateWorkspaceController _controller;
     private readonly DeployV2ReviewWorkspaceController _v2ReviewController;
 
     private readonly List<DeployCompatibilityIssue> _compatibilityIssues = [];
@@ -75,7 +73,6 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         _requestGuestCredential = requestGuestCredential;
         TemplateItems = templateItemsSource;
         V2Review = new DeployV2ReviewWorkspaceViewModel();
-        _controller = new DeployFromTemplateWorkspaceController(this, this);
         _v2ReviewController = new DeployV2ReviewWorkspaceController(
             V2Review,
             new DeployV2ReviewProjectionService(),
@@ -351,7 +348,7 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     private bool CanOpenTemplateEditor => SelectedTemplateLibraryItem is not null && !IsStarting;
 
     [RelayCommand(CanExecute = nameof(CanStartDeploy))]
-    private Task StartDeploy() => IsActiveTemplateV2() ? StartV2DeployAsync() : _controller.StartDeployAsync();
+    private Task StartDeploy() => IsActiveTemplateV2() ? StartV2DeployAsync() : ShowLegacyTemplateBlockedAsync();
 
     private bool CanStartDeploy
     {
@@ -372,10 +369,39 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
                 return V2Review.CanStartDeploy;
             }
 
-            var hasBlockingFailures = _compatibilityIssues.Any(issue => issue.IsBlocking) ||
-                                      (_readinessReport?.HasBlockingFailures ?? false);
-            return !hasBlockingFailures;
+            // Legacy (non-V2) templates can no longer be deployed; they must be re-created in the Builder.
+            return false;
         }
+    }
+
+    /// <summary>
+    /// Message shown when a legacy (pre-V2) template is selected. Legacy templates are no longer deployable;
+    /// the user must re-create them in the Builder, which authors V2 templates.
+    /// </summary>
+    private const string LegacyTemplateNotice =
+        "This template uses the legacy deployment format and can no longer be deployed. Open it in the Builder to re-create it.";
+
+    private Task ShowLegacyTemplateBlockedAsync()
+    {
+        ShowLegacyTemplateBlocked();
+        return Task.CompletedTask;
+    }
+
+    private void ShowLegacyTemplateBlocked()
+    {
+        _readinessReport = null;
+        _compatibilityIssues.Clear();
+        V2Review.Hide();
+        SetShowAllVmRows(false);
+        ClearResultRows();
+        SetWorkflowState(
+            isEvaluatingReadiness: false,
+            isStarting: false,
+            lifecycleState: "Blocked",
+            progressPercent: 0,
+            progressSummary: LegacyTemplateNotice);
+        SetActionStatus(LegacyTemplateNotice);
+        UpdateUi();
     }
 
     [RelayCommand]
@@ -450,19 +476,6 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
 
     public void ClearResultRows() => ResultRows.Clear();
 
-    public void InitializeProgressRows(MultiVmDeploymentContext context)
-    {
-        _progressByVm.Clear();
-
-        foreach (var vmContext in context.VmContexts)
-        {
-            var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
-            _progressByVm[vmName] = new DeployVmProgressState(vmName, BuildExpectedDeploySteps(vmContext));
-        }
-
-        RefreshResultRows(compatibilityIssues: [], readinessReport: null);
-    }
-
     public void InitializeProgressRows(V2PlanBuildResult plan)
     {
         _progressByVm.Clear();
@@ -496,93 +509,6 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         state.ApplyStepStateUpdate(update);
         RefreshResultRows(compatibilityIssues: [], readinessReport: null);
     }
-
-    public void ApplyOutcomeSummary(DeploymentOutcomeSummary summary)
-    {
-        ResultRows.Clear();
-
-        foreach (var vmOutcome in summary.VmOutcomes)
-        {
-            if (_progressByVm.TryGetValue(vmOutcome.VmName, out var liveState))
-            {
-                liveState.MarkCompleted(vmOutcome.Status.ToString(), BuildCleanupSummary(vmOutcome));
-                ResultRows.Add(liveState.ToRow());
-            }
-            else
-            {
-                ResultRows.Add(new DeployVmResultRow(
-                    VmName: vmOutcome.VmName,
-                    Status: vmOutcome.Status.ToString(),
-                    Summary: BuildCleanupSummary(vmOutcome),
-                    ProgressPercent: 100,
-                    TimelineSteps: CreateOutcomeTimelineSteps(vmOutcome)));
-            }
-        }
-
-        var issueRows = new List<DeployIssueRow>();
-        foreach (var residual in summary.Residuals)
-        {
-            issueRows.Add(new DeployIssueRow(
-                Scope: residual.VmName,
-                Severity: "Warn",
-                Message: $"{residual.ResourceType} '{residual.Identifier}' residual. Suggested action: {residual.SuggestedAction}"));
-        }
-
-        ReplaceIssueRows(issueRows);
-    }
-
-    // IDeployFromTemplateWorkspaceControllerHost.
-    AppSettings IDeployFromTemplateWorkspaceControllerHost.DeploymentSettings => _host.DeploymentSettings;
-
-    IReadOnlyList<string> IDeployFromTemplateWorkspaceControllerHost.AvailableSwitches => _host.AvailableSwitches;
-
-    IReadOnlyList<V2AvailableSwitchInfo> IDeployFromTemplateWorkspaceControllerHost.AvailableSwitchInfo => _host.AvailableSwitchInfo;
-
-    IReadOnlyList<VhdxCatalogItem> IDeployFromTemplateWorkspaceControllerHost.LoadCatalogItems() => _host.LoadCatalogItems();
-
-    Task IDeployFromTemplateWorkspaceControllerHost.EnsureReferenceDataAsync(bool forceRefresh) => _host.EnsureReferenceDataAsync(forceRefresh);
-
-    Task<DeploymentReadinessReport> IDeployFromTemplateWorkspaceControllerHost.RunReadinessAsync(
-        MultiVmDeploymentContext context,
-        DeploymentPreflightMode mode) => _host.RunReadinessAsync(context, mode);
-
-    void IDeployFromTemplateWorkspaceControllerHost.ReplaceCompatibilityIssues(IReadOnlyList<DeployCompatibilityIssue> issues)
-    {
-        _compatibilityIssues.Clear();
-        _compatibilityIssues.AddRange(issues);
-        UpdateUi();
-    }
-
-    DeploymentReadinessReport? IDeployFromTemplateWorkspaceControllerHost.CurrentReadinessReport
-    {
-        get => _readinessReport;
-        set
-        {
-            _readinessReport = value;
-            UpdateUi();
-        }
-    }
-
-    async Task<DeploymentOutcomeSummary> IDeployFromTemplateWorkspaceControllerHost.DeployAllAsync(MultiVmDeploymentContext context)
-    {
-        _activeDeploymentContext = context;
-        try
-        {
-            return await _host.DeployAllAsync(context);
-        }
-        finally
-        {
-            _activeDeploymentContext = null;
-        }
-    }
-
-    void IDeployFromTemplateWorkspaceControllerHost.AttachProgressCallbacks(
-        MultiVmDeploymentContext context,
-        Action<string, string?> onLogMessage,
-        Action<string, DeployStepStateUpdate> onStepStateUpdated) =>
-        WireProgressCallbacks(context, onLogMessage, onStepStateUpdated);
-
-    void IDeployFromTemplateWorkspaceControllerHost.ApplyWorkspaceState() => UpdateUi();
 
     // IDeployFromTemplateV2ReviewHost.
     Task IDeployFromTemplateV2ReviewHost.EnsureReferenceDataAsync(bool forceRefresh) => _host.EnsureReferenceDataAsync(forceRefresh);
@@ -675,7 +601,7 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     }
 
     private Task EvaluateReadinessAsync(DeploymentPreflightMode mode) =>
-        IsActiveTemplateV2() ? EvaluateV2PlanAsync() : _controller.EvaluateReadinessAsync(mode);
+        IsActiveTemplateV2() ? EvaluateV2PlanAsync() : ShowLegacyTemplateBlockedAsync();
 
     private async Task HandleTemplateSelectionChangedAsync()
     {
@@ -938,18 +864,11 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
             return;
         }
 
-        var failCount = _compatibilityIssues.Count(issue => issue.IsBlocking) +
-                        (_readinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Fail) ?? 0);
-        var warnCount = _compatibilityIssues.Count(issue => !issue.IsBlocking) +
-                        (_readinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn) ?? 0);
-        var passCount = _readinessReport?.Results.Count(result => result.Status == DeploymentReadinessStatus.Pass) ?? 0;
-        var deployState = hasBlockingFailures ? "Blocked" : "Ready";
-        SetReadinessSummary(
-            $"{deployState}. Pass={passCount}, Warn={warnCount}, Fail={failCount}. " +
-            $"Template: {activeTemplateDocument.Template.Name} ({activeTemplateDocument.Template.VmTemplates.Count} VMs).");
-
-        RefreshResultRows(_compatibilityIssues, _readinessReport);
-        UpdateIssueRows();
+        // Legacy (non-V2) templates use the retired deployment format and can no longer be deployed.
+        // Surface the re-create-in-Builder notice instead of a readiness summary.
+        SetReadinessSummary(LegacyTemplateNotice);
+        ReplaceIssueRows([new DeployIssueRow("Global", "Block", LegacyTemplateNotice)]);
+        RefreshResultRows([], null);
         RefreshCommandStates();
         RaiseResultsPanelStateChanged();
     }
@@ -1221,7 +1140,10 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         }
     }
 
-    private void WireProgressCallbacks(
+    // Wires per-VM progress callbacks (log + step-state) and the interactive guest-credential re-prompt onto
+    // the deployment context. Internal rather than private so runtime-independent tests can exercise the
+    // credential-prompt wiring seam directly (the WinUI source is compiled into the test assembly).
+    internal void WireProgressCallbacks(
         MultiVmDeploymentContext context,
         Action<string, string?> onLogMessage,
         Action<string, DeployStepStateUpdate> onStepStateUpdated)
@@ -1350,44 +1272,6 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
 
     private void RaiseResultsPanelStateChanged() => ResultsPanelStateChanged?.Invoke(this, EventArgs.Empty);
 
-    private static IReadOnlyList<DeployTimelineStepDefinition> BuildExpectedDeploySteps(VmDeploymentContext context)
-    {
-        var steps = new List<DeployTimelineStepDefinition>
-        {
-            new(DeploymentStepKeys.CheckHyperV, "Check Hyper-V"),
-            new(DeploymentStepKeys.CreateVmFolder, "Create VM folder"),
-            new(DeploymentStepKeys.CreateVhd, "Create differencing disk"),
-            new(DeploymentStepKeys.CreateVm, "Create VM"),
-            new(DeploymentStepKeys.AddNicToVm, "Add network adapter"),
-            new(DeploymentStepKeys.ConfigureVm, "Configure VM"),
-            new(DeploymentStepKeys.EnableGuestServices, "Enable guest services"),
-            new(DeploymentStepKeys.DisableVmCheckpoints, "Disable VM checkpoints"),
-            new(DeploymentStepKeys.StartVm, "Start VM")
-        };
-
-        if (context.ConfigureTimeZone)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.SetTimeZone, "Set Time Zone"));
-        }
-
-        if (context.InstallSoftware)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallSoftware, "Install Software"));
-        }
-
-        if (context.InstallRole)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallRole, "Install Role"));
-        }
-
-        if (context.ConfigureNetworkInformation)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.ConfigureNetworkInformation, "Configure Network Information"));
-        }
-
-        return steps;
-    }
-
     private static IReadOnlyList<DeployTimelineStepRow> CreateReadinessTimelineSteps(
         IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
         IReadOnlyList<DeploymentReadinessCheckResult> readinessResults,
@@ -1412,54 +1296,5 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         }
 
         return rows;
-    }
-
-    private static IReadOnlyList<DeployTimelineStepRow> CreateOutcomeTimelineSteps(VmDeploymentOutcomeSummary vmOutcome)
-    {
-        var outcomeState = vmOutcome.Status switch
-        {
-            VmDeploymentOutcomeStatus.Succeeded => DeployTimelineStepState.Succeeded,
-            VmDeploymentOutcomeStatus.Failed => DeployTimelineStepState.Failed,
-            VmDeploymentOutcomeStatus.Cancelled => DeployTimelineStepState.Skipped,
-            _ => DeployTimelineStepState.Pending
-        };
-
-        var rows = new List<DeployTimelineStepRow>
-        {
-            new("Deploy VM", outcomeState)
-        };
-
-        if (vmOutcome.Cleanup.CleanupRan)
-        {
-            var cleanupState = vmOutcome.Cleanup.Status switch
-            {
-                VmCleanupOutcomeStatus.Succeeded => DeployTimelineStepState.Succeeded,
-                VmCleanupOutcomeStatus.Residuals => DeployTimelineStepState.Failed,
-                _ => DeployTimelineStepState.Skipped
-            };
-
-            if (cleanupState != DeployTimelineStepState.Skipped)
-            {
-                rows.Add(new("Cleanup", cleanupState));
-            }
-        }
-
-        return rows;
-    }
-
-    private static string BuildCleanupSummary(VmDeploymentOutcomeSummary vmOutcome)
-    {
-        var cleanup = vmOutcome.Cleanup;
-        if (!cleanup.CleanupRan)
-        {
-            return "Completed";
-        }
-
-        return cleanup.Status switch
-        {
-            VmCleanupOutcomeStatus.Succeeded => "Cleanup completed",
-            VmCleanupOutcomeStatus.Residuals => $"Cleanup completed with residuals ({cleanup.ResidualCount}). Manual cleanup may be required.",
-            _ => "Cleanup not needed"
-        };
     }
 }

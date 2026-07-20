@@ -24,10 +24,6 @@ internal sealed class FakeFromTemplateCompositionHost : IDeployFromTemplateCompo
 
     public List<LocalCredentialSlotDefinition> SlotDefinitions { get; } = [];
 
-    public DeploymentReadinessReport ReadinessReport { get; set; } = new() { Mode = DeploymentPreflightMode.Quick };
-
-    public DeploymentOutcomeSummary OutcomeSummary { get; set; } = new();
-
     public V2RuntimeExecutionResult V2Result { get; set; } = new() { Success = true };
 
     public int ResolveSuggestionsResult { get; set; }
@@ -49,11 +45,7 @@ internal sealed class FakeFromTemplateCompositionHost : IDeployFromTemplateCompo
 
     public IReadOnlyDictionary<string, string>? LastExternalSwitchAdapterMappings { get; private set; }
 
-    public MultiVmDeploymentContext? LastDeployContext { get; private set; }
-
     public MultiVmDeploymentContext? LastV2DeployContext { get; private set; }
-
-    public Func<MultiVmDeploymentContext, Task>? OnDeployAll { get; set; }
 
     public Func<MultiVmDeploymentContext, Task>? OnExecuteV2 { get; set; }
 
@@ -114,9 +106,6 @@ internal sealed class FakeFromTemplateCompositionHost : IDeployFromTemplateCompo
         return Task.CompletedTask;
     }
 
-    public Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode) =>
-        Task.FromResult(ReadinessReport);
-
     public Task<V2PlanBuildResult> BuildV2PlanAsync(
         LabTemplate template,
         IReadOnlyCollection<string> resolvedCredentialSlotKeys,
@@ -133,17 +122,6 @@ internal sealed class FakeFromTemplateCompositionHost : IDeployFromTemplateCompo
     public void RefreshResultsPanelState() => RefreshResultsPanelCount++;
 
     public void OnOpenResultsPanelRequested() => OpenResultsPanelCount++;
-
-    public async Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context)
-    {
-        LastDeployContext = context;
-        if (OnDeployAll is not null)
-        {
-            await OnDeployAll(context);
-        }
-
-        return OutcomeSummary;
-    }
 
     public async Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
         LabTemplate template,

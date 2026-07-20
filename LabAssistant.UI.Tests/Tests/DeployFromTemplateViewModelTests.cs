@@ -86,34 +86,20 @@ public sealed class DeployFromTemplateViewModelTests
     }
 
     [Fact]
-    public void SelectingClassicTemplate_LoadsDocumentAndEnablesReadyDeploy()
+    public void SelectingClassicTemplate_ShowsLegacyBlockedNotice_AndDisablesDeploy()
     {
         var harness = CreateHarness();
         var item = harness.Host.AddTemplate("Classic", ClassicPath, TemplateExecutionEngine.V1Deployment);
 
         harness.Vm.SelectedTemplateLibraryItem = item;
 
+        // Legacy (V1) templates can no longer be deployed; the lane surfaces a re-create-in-Builder notice
+        // and blocks deploy, but the template still loads and can be opened in the editor.
         Assert.NotNull(harness.Vm.ActiveTemplateDocument);
-        Assert.Equal("Review Readiness", harness.Vm.EvaluateButtonText);
-        Assert.True(harness.Vm.StartDeployCommand.CanExecute(null));
-        Assert.True(harness.Vm.OpenTemplateEditorCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void ClassicReadinessWithBlockingFailure_DisablesStartDeploy()
-    {
-        var harness = CreateHarness();
-        harness.Host.ReadinessReport = new DeploymentReadinessReport
-        {
-            Mode = DeploymentPreflightMode.Quick,
-            Results = [new DeploymentReadinessCheckResult { Status = DeploymentReadinessStatus.Fail, Message = "Host memory insufficient." }]
-        };
-        var item = harness.Host.AddTemplate("Classic", ClassicPath, TemplateExecutionEngine.V1Deployment);
-
-        harness.Vm.SelectedTemplateLibraryItem = item;
-
         Assert.Equal("Blocked", harness.Vm.LifecycleState);
         Assert.False(harness.Vm.StartDeployCommand.CanExecute(null));
+        Assert.True(harness.Vm.OpenTemplateEditorCommand.CanExecute(null));
+        Assert.Contains(harness.Vm.IssueRows, row => row.Message.Contains("legacy deployment format", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -143,7 +129,8 @@ public sealed class DeployFromTemplateViewModelTests
         await harness.Vm.ResolveSuggestionsCommand.ExecuteAsync(null);
 
         Assert.Equal(1, harness.Host.ResolveSuggestionsCallCount);
-        Assert.Equal("Readiness passed with no issues.", harness.Vm.ActionStatusText);
+        // Re-evaluation of a legacy template lands on the re-create-in-Builder notice.
+        Assert.Contains("legacy deployment format", harness.Vm.ActionStatusText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -259,25 +246,6 @@ public sealed class DeployFromTemplateViewModelTests
 
         Assert.False(harness.Vm.V2Review.BaseRemoteAccess.DisableFirewall);
         Assert.True(harness.Vm.V2Review.BaseRemoteAccess.DisableRdpNla);
-    }
-
-    [Fact]
-    public async Task CleanupAsync_CancelsInFlightClassicDeploy()
-    {
-        var harness = CreateHarness();
-        var gate = new TaskCompletionSource();
-        harness.Host.OnDeployAll = _ => gate.Task;
-        var item = harness.Host.AddTemplate("Classic", ClassicPath, TemplateExecutionEngine.V1Deployment);
-        harness.Vm.SelectedTemplateLibraryItem = item;
-
-        var deployTask = harness.Vm.StartDeployCommand.ExecuteAsync(null);
-
-        Assert.NotNull(harness.Host.LastDeployContext);
-        await harness.Vm.CleanupAsync();
-        Assert.True(harness.Host.LastDeployContext!.IsCancellationRequested);
-
-        gate.SetResult();
-        await deployTask;
     }
 
     [Fact]
@@ -414,31 +382,15 @@ public sealed class DeployFromTemplateViewModelTests
     }
 
     [Fact]
-    public void DeployAgain_FromResults_RestoresConfigSurfaceAndReadinessRows()
+    public void DeployAgain_FromResults_RestoresConfigSurfaceForSelectedTemplate()
     {
         var harness = CreateHarness();
-        var template = new LabTemplate { Name = "Classic", ExecutionEngine = TemplateExecutionEngine.V1Deployment };
-        template.VmTemplates.Add(new VmTemplate { Name = "VM1" });
-        harness.Host.ReadinessReport = new DeploymentReadinessReport
-        {
-            Mode = DeploymentPreflightMode.Quick,
-            Results =
-            [
-                new DeploymentReadinessCheckResult
-                {
-                    Status = DeploymentReadinessStatus.Warn,
-                    Message = "Low disk space.",
-                    AffectedVmNames = ["VM1"]
-                }
-            ]
-        };
-        var item = harness.Host.AddTemplate("Classic", ClassicPath, TemplateExecutionEngine.V1Deployment, template);
+        harness.Host.V2PlanFactory = (_, _, _) => ReadyPlan();
+        var item = harness.Host.AddTemplate("V2", V2Path, TemplateExecutionEngine.V2UnifiedPlanning);
         harness.Vm.SelectedTemplateLibraryItem = item;
 
-        // Readiness review owns the shared ResultRows collection in config mode.
-        var readinessRowCount = harness.Vm.ResultRows.Count;
-        Assert.True(readinessRowCount > 0);
-        Assert.Contains(harness.Vm.ResultRows, row => row.VmName == "VM1");
+        Assert.True(harness.Vm.ShouldShowConfigView);
+        Assert.True(harness.Vm.V2Review.IsVisible);
 
         // Simulate a finished run landing on the terminal results surface.
         harness.Vm.SetShowAllVmRows(true);
@@ -449,8 +401,7 @@ public sealed class DeployFromTemplateViewModelTests
 
         Assert.True(harness.Vm.ShouldShowConfigView);
         Assert.Equal("Ready", harness.Vm.LifecycleState);
-        Assert.Equal(readinessRowCount, harness.Vm.ResultRows.Count);
-        Assert.Contains(harness.Vm.ResultRows, row => row.VmName == "VM1");
+        Assert.True(harness.Vm.V2Review.IsVisible);
     }
 
     [Fact]
@@ -571,7 +522,7 @@ public sealed class DeployFromTemplateViewModelTests
 
         // The runtime builds per-VM contexts during execution and registers them; the VM wires callbacks via this seam.
         var multi = new MultiVmDeploymentContext();
-        ((IDeployFromTemplateWorkspaceControllerHost)vm).AttachProgressCallbacks(multi, (_, _) => { }, (_, _) => { });
+        vm.WireProgressCallbacks(multi, (_, _) => { }, (_, _) => { });
 
         var context = new VmDeploymentContext { VmName = "dc01" };
         multi.RegisterVmContext(context);
@@ -602,7 +553,7 @@ public sealed class DeployFromTemplateViewModelTests
         var vm = new DeployFromTemplateViewModel(host, action => action(), host.Templates);
 
         var multi = new MultiVmDeploymentContext();
-        ((IDeployFromTemplateWorkspaceControllerHost)vm).AttachProgressCallbacks(multi, (_, _) => { }, (_, _) => { });
+        vm.WireProgressCallbacks(multi, (_, _) => { }, (_, _) => { });
 
         var context = new VmDeploymentContext { VmName = "dc01" };
         multi.RegisterVmContext(context);

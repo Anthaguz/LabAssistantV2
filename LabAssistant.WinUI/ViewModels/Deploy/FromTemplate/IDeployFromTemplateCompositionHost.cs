@@ -38,8 +38,6 @@ internal interface IDeployFromTemplateCompositionHost
 
     Task ShowTemplateEditorAsync(TemplateEditorDocument document, string statusText);
 
-    Task<DeploymentReadinessReport> RunReadinessAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
-
     Task<V2PlanBuildResult> BuildV2PlanAsync(
         LabTemplate template,
         IReadOnlyCollection<string> resolvedCredentialSlotKeys,
@@ -50,8 +48,6 @@ internal interface IDeployFromTemplateCompositionHost
     void RefreshResultsPanelState();
 
     void OnOpenResultsPanelRequested();
-
-    Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context);
 
     Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
         LabTemplate template,

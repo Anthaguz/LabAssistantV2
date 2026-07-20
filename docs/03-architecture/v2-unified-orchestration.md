@@ -212,15 +212,16 @@ Router readiness in the current runtime slice means:
 
 ## V1 / V2 Coexistence
 
-- V1 templates remain on the current engine
-- V2 templates route to the new planner by schema version
-- V2 must not silently fall back to V1
+- The legacy chain-of-responsibility deploy engine has been retired.
+- V2 templates route to the graph planner/executor by schema version.
+- V1 (legacy) templates can no longer be deployed: the Deploy-from-Template lane surfaces a legacy-blocked notice directing the user to re-create the template in the Builder.
+- V2 must not silently fall back to V1.
 
 ## Guest Execution Baseline
 
 - Hyper-V PowerShell Direct is the baseline guest execution transport
 - host-side Hyper-V execution and guest-side PowerShell Direct execution are separate seams, even when scheduled inside one graph
-- V2 uses an explicit graph planner/executor rather than a classic chain-of-responsibility pipeline; the old pipeline semantics are preserved by explicit nodes and dependencies
+- V2 uses an explicit graph planner/executor; the retired chain-of-responsibility pipeline's semantics are preserved by explicit nodes and dependencies
 
 ## Open Questions / TBDs
 
