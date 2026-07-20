@@ -56,15 +56,18 @@ internal sealed class DeployQuickDeployWorkspaceController
                 return;
             }
 
-            var template = _host.BuildTemplate();
-            var deployContext = DeployContextBuilder.Build(
-                template,
-                _host.DeploymentSettings,
-                _host.LoadCatalogItems(),
-                _host.AvailableSwitches);
-            PrepareDeployExecution(deployContext.MultiVmContext);
-            var summary = await _host.DeployAllAsync(deployContext.MultiVmContext);
-            ApplyDeploySummary(summary);
+            var template = _host.BuildV2Template();
+            var plan = await _host.BuildV2PlanAsync(template);
+            if (!plan.Success)
+            {
+                SetPlanBlocked(plan);
+                return;
+            }
+
+            var deploymentContext = new MultiVmDeploymentContext();
+            PrepareDeployExecution(plan, deploymentContext);
+            var result = await _host.ExecuteV2DeployAsync(template, plan, deploymentContext);
+            ApplyDeployResult(result, deploymentContext);
         }
         catch (Exception ex)
         {
@@ -212,13 +215,15 @@ internal sealed class DeployQuickDeployWorkspaceController
     }
 
     /// <summary>
-    /// Prepares progress rows and callback wiring for a concrete deploy execution without routing that ownership back through the shell.
+    /// Prepares progress rows and callback wiring for a concrete V2 deploy execution. The timeline is seeded from
+    /// the plan nodes (the V2 runtime rebuilds its per-VM contexts during execution) and callbacks are wired so
+    /// contexts the runtime registers at run time still stream their progress into the workspace rows.
     /// </summary>
-    private void PrepareDeployExecution(MultiVmDeploymentContext context)
+    private void PrepareDeployExecution(V2PlanBuildResult plan, MultiVmDeploymentContext context)
     {
-        _workspace.InitializeProgressRows(context, BuildExpectedDeploySteps);
+        _workspace.InitializeProgressRows(plan);
         AttachProgressCallbacks(context);
-        _workspace.SetWorkflowState("Running", 40, $"Deploying {context.VmContexts.Count} VM(s)...");
+        _workspace.SetWorkflowState("Running", 40, $"Deploying {_workspace.LiveProgressVmCount} VM(s)...");
         _host.SetActionStatus("Starting quick deploy...");
         _host.UpdateUi();
     }
@@ -234,23 +239,52 @@ internal sealed class DeployQuickDeployWorkspaceController
     }
 
     /// <summary>
-    /// Applies the finished deployment summary to workspace-owned rows and workflow state.
+    /// Applies the blocked state when the V2 planner rejects the template before any Hyper-V work starts, surfacing
+    /// the plan's blocking issues so the user can correct the input.
     /// </summary>
-    private void ApplyDeploySummary(DeploymentOutcomeSummary summary)
+    private void SetPlanBlocked(V2PlanBuildResult plan)
     {
-        _workspace.ApplyOutcomeSummary(summary);
+        var blockingIssues = plan.Issues
+            .Where(issue => issue.Severity == V2PlanIssueSeverity.Blocking)
+            .ToList();
+        _workspace.ApplyPlanBlockers(blockingIssues);
+
+        var firstBlocker = blockingIssues.FirstOrDefault()?.Message;
         _workspace.SetWorkflowState(
-            lifecycleState: summary.OperationState switch
-            {
-                DeploymentOperationState.Completed => "Completed",
-                DeploymentOperationState.Cancelled or DeploymentOperationState.CancelledWithResiduals => "Cancelled",
-                DeploymentOperationState.Failed or DeploymentOperationState.FailedWithResiduals => "Failed",
-                _ => "Completed"
-            },
-            progressPercent: 100,
-            progressSummary: $"Completed. Success={summary.SucceededVmCount}, Failed={summary.FailedVmCount}, Cancelled={summary.CancelledVmCount}.");
+            "Blocked",
+            35,
+            firstBlocker is null ? "Deployment blocked by the deployment plan." : firstBlocker);
         _host.SetActionStatus(
-            $"Deployment finished: {summary.OperationState}. Total={summary.TotalVmCount}, Succeeded={summary.SucceededVmCount}, Failed={summary.FailedVmCount}.");
+            blockingIssues.Count > 0
+                ? $"Deploy blocked by {blockingIssues.Count} plan issue(s). Resolve them first."
+                : "Deploy blocked: the deployment plan could not be built.");
+        _host.UpdateUi();
+    }
+
+    /// <summary>
+    /// Applies the finished V2 execution result to workspace-owned rows and workflow state. Per-VM rows already
+    /// reflect the live step states streamed during execution; this projects the terminal lifecycle and any
+    /// blocking messages the runtime returned.
+    /// </summary>
+    private void ApplyDeployResult(V2RuntimeExecutionResult result, MultiVmDeploymentContext context)
+    {
+        var lifecycleState = result.Success
+            ? "Completed"
+            : context.IsCancellationRequested ? "Cancelled" : "Failed";
+        var progressSummary = result.Success
+            ? "V2 deployment completed."
+            : result.BlockingMessages.Count > 0
+                ? string.Join(" ", result.BlockingMessages)
+                : context.IsCancellationRequested
+                    ? "V2 deployment cancelled."
+                    : "V2 deployment finished with failures.";
+
+        _workspace.ApplyV2ExecutionResult(result);
+        _workspace.SetWorkflowState(lifecycleState, 100, progressSummary);
+        _host.SetActionStatus(
+            result.Success
+                ? "Deployment finished successfully."
+                : $"Deployment finished: {lifecycleState}.");
         _host.UpdateUi();
     }
 
@@ -275,7 +309,7 @@ internal sealed class DeployQuickDeployWorkspaceController
 
     private void AttachProgressCallbacks(MultiVmDeploymentContext context)
     {
-        foreach (var vmContext in context.VmContexts)
+        void Wire(VmDeploymentContext vmContext)
         {
             var vmName = string.IsNullOrWhiteSpace(vmContext.VmName) ? "Unnamed-VM" : vmContext.VmName.Trim();
             vmContext.LogCallback = message => _host.EnqueueUiUpdate(() =>
@@ -289,43 +323,15 @@ internal sealed class DeployQuickDeployWorkspaceController
                 _host.UpdateUi();
             });
         }
-    }
 
-    private static IReadOnlyList<DeployTimelineStepDefinition> BuildExpectedDeploySteps(VmDeploymentContext context)
-    {
-        var steps = new List<DeployTimelineStepDefinition>
+        // Wire any contexts that already exist, plus those the V2 runtime rebuilds during execution: it clears and
+        // repopulates VmContexts under the shared deployment context, so without this hook its step-state and log
+        // callbacks would attach to nothing.
+        foreach (var vmContext in context.VmContexts)
         {
-            new(DeploymentStepKeys.CheckHyperV, "Check Hyper-V"),
-            new(DeploymentStepKeys.CreateVmFolder, "Create VM folder"),
-            new(DeploymentStepKeys.CreateVhd, "Create differencing disk"),
-            new(DeploymentStepKeys.CreateVm, "Create VM"),
-            new(DeploymentStepKeys.AddNicToVm, "Add network adapter"),
-            new(DeploymentStepKeys.ConfigureVm, "Configure VM"),
-            new(DeploymentStepKeys.EnableGuestServices, "Enable guest services"),
-            new(DeploymentStepKeys.DisableVmCheckpoints, "Disable VM checkpoints"),
-            new(DeploymentStepKeys.StartVm, "Start VM")
-        };
-
-        if (context.ConfigureTimeZone)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.SetTimeZone, "Set Time Zone"));
+            Wire(vmContext);
         }
 
-        if (context.InstallSoftware)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallSoftware, "Install Software"));
-        }
-
-        if (context.InstallRole)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.InstallRole, "Install Role"));
-        }
-
-        if (context.ConfigureNetworkInformation)
-        {
-            steps.Add(new DeployTimelineStepDefinition(DeploymentStepKeys.ConfigureNetworkInformation, "Configure Network Information"));
-        }
-
-        return steps;
+        context.VmContextRegistered = Wire;
     }
 }

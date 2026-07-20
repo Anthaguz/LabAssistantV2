@@ -103,6 +103,7 @@
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployTimelineStepState.cs" Link="WinUI\DeployTimelineStepState.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployTimelineStepDefinition.cs" Link="WinUI\DeployTimelineStepDefinition.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployVmProgressState.cs" Link="WinUI\DeployVmProgressState.cs" />
+    <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployV2ProgressPlan.cs" Link="WinUI\DeployV2ProgressPlan.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployIssueRow.cs" Link="WinUI\DeployIssueRow.cs" />
 
     <!-- From Template lane (runtime-independent view model, controllers, host seams, and projections). -->

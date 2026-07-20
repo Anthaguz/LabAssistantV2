@@ -1,9 +1,12 @@
 using LabAssistant.Business.Deployment;
 using LabAssistant.Business.Machines;
+using LabAssistant.Business.Planning;
+using LabAssistant.Business.Runtime;
 using LabAssistant.Business.Templates;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Models.Templates;
 using LabAssistant.Services.HyperV;
 
 namespace LabAssistant.UI.Tests.Tests;
@@ -237,31 +240,82 @@ internal sealed class FakePreflightService : IDeploymentPreflightService
 }
 
 /// <summary>
-/// Deployment coordinator fake. <see cref="OnDeploy"/> lets a test block the run to observe
-/// navigate-away cancellation, and it captures the context passed by the workflow.
+/// V2 planning fake. Returns a configurable <see cref="V2PlanBuildResult"/> and records the request the
+/// workflow composed so tests can assert the Quick Deploy template was authored as a standalone V2 plan.
 /// </summary>
-internal sealed class FakeDeploymentCoordinator : IDeploymentCoordinator
+internal sealed class FakeV2PlanningCapabilityService : IV2PlanningCapabilityService
 {
     public int CallCount { get; private set; }
 
-    public MultiVmDeploymentContext? LastContext { get; private set; }
+    public V2PlanBuildRequest? LastRequest { get; private set; }
 
-    public Func<MultiVmDeploymentContext, Task>? OnDeploy { get; set; }
+    public V2PlanBuildResult Result { get; set; } = new() { Success = true };
 
-    public Task DeployAllAsync(MultiVmDeploymentContext multiContext)
+    public Task<V2PlanBuildResult> BuildPlanAsync(V2PlanBuildRequest request, CancellationToken cancellationToken = default)
     {
         CallCount++;
-        LastContext = multiContext;
-        return OnDeploy?.Invoke(multiContext) ?? Task.CompletedTask;
+        LastRequest = request;
+        return Task.FromResult(Result);
+    }
+
+    /// <summary>
+    /// Builds a minimal provisioning-only standalone plan (one ProvisionVm + StartVm node per VM name) that
+    /// mirrors what the real planner emits for a bare Quick Deploy VM, so progress rows seed correctly.
+    /// </summary>
+    public static V2PlanBuildResult StandalonePlan(params string[] vmNames)
+    {
+        var nodes = new List<V2PlanNode>();
+        foreach (var vmName in vmNames)
+        {
+            nodes.Add(new V2PlanNode
+            {
+                NodeId = $"{vmName}:provision",
+                VmName = vmName,
+                Kind = V2PlanNodeKind.ProvisionVm,
+                DisplayName = "Provision VM"
+            });
+            nodes.Add(new V2PlanNode
+            {
+                NodeId = $"{vmName}:start",
+                VmName = vmName,
+                Kind = V2PlanNodeKind.StartVm,
+                DisplayName = "Start VM"
+            });
+        }
+
+        return new V2PlanBuildResult { Success = true, Nodes = nodes };
     }
 }
 
 /// <summary>
-/// Outcome summary builder fake returning a fixed summary.
+/// V2 runtime fake. <see cref="OnExecute"/> lets a test block the run to observe navigate-away cancellation;
+/// it captures the request and deployment context and returns a configurable result.
 /// </summary>
-internal sealed class FakeOutcomeSummaryBuilder : IDeploymentOutcomeSummaryBuilder
+internal sealed class FakeV2RuntimeCapabilityService : IV2RuntimeCapabilityService
 {
-    public DeploymentOutcomeSummary Summary { get; set; } = new();
+    public int CallCount { get; private set; }
 
-    public DeploymentOutcomeSummary Build(MultiVmDeploymentContext multiVmContext) => Summary;
+    public V2RuntimeExecutionRequest? LastRequest { get; private set; }
+
+    public MultiVmDeploymentContext? LastContext { get; private set; }
+
+    public Func<V2RuntimeExecutionRequest, Task>? OnExecute { get; set; }
+
+    public V2RuntimeExecutionResult Result { get; set; } = new() { Success = true };
+
+    public async Task<V2RuntimeExecutionResult> ExecuteAsync(
+        V2RuntimeExecutionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        LastRequest = request;
+        LastContext = request.DeploymentContext;
+
+        if (OnExecute is not null)
+        {
+            await OnExecute(request);
+        }
+
+        return Result;
+    }
 }

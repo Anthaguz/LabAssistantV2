@@ -24,6 +24,14 @@ internal interface IDeployQuickDeployWorkspaceControllerHost
 
     LabTemplate BuildTemplate();
 
+    /// <summary>
+    /// Builds the V2-engine variant of the current Quick Deploy template used for planning and execution. It carries
+    /// the same VM basics as <see cref="BuildTemplate"/> but is stamped as a Standalone V2 unified-planning template
+    /// so the graph planner emits provisioning-only work. The classic shape stays for the engine-agnostic readiness
+    /// preflight, which the CoR-shaped context builder rejects for V2 templates.
+    /// </summary>
+    LabTemplate BuildV2Template();
+
     Task EnsureReferenceDataAsync(bool forceRefresh);
 
     Task<DeploymentReadinessReport> RunReadinessChecksAsync(MultiVmDeploymentContext context, DeploymentPreflightMode mode);
@@ -35,5 +43,19 @@ internal interface IDeployQuickDeployWorkspaceControllerHost
 
     void UpdateUi();
 
-    Task<DeploymentOutcomeSummary> DeployAllAsync(MultiVmDeploymentContext context);
+    /// <summary>
+    /// Builds the V2 deployment plan for the current Quick Deploy template. Quick Deploy authors bare standalone
+    /// VMs, so the plan is provisioning-only (no guest work, no credential slots), but it runs through the same
+    /// unified V2 planner the From-Template lane uses.
+    /// </summary>
+    Task<V2PlanBuildResult> BuildV2PlanAsync(LabTemplate template);
+
+    /// <summary>
+    /// Executes the built V2 plan on the graph runtime for Quick Deploy. The supplied deployment context is the
+    /// cancellation and per-VM callback anchor; the runtime rebuilds its per-VM contexts under it during execution.
+    /// </summary>
+    Task<V2RuntimeExecutionResult> ExecuteV2DeployAsync(
+        LabTemplate template,
+        V2PlanBuildResult plan,
+        MultiVmDeploymentContext context);
 }
