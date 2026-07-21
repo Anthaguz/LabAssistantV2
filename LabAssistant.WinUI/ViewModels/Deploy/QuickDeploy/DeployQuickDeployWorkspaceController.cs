@@ -130,11 +130,16 @@ internal sealed class DeployQuickDeployWorkspaceController
             // readiness report and must not be counted twice.
             var mergedIssues = DeployReadinessProjection.Merge(deployContext.CompatibilityIssues, readinessReport);
             var (blockingCount, warningCount) = DeployReadinessProjection.Count(mergedIssues);
+
+            // F34: use human-friendly readiness copy that names the first blocking reason instead of an
+            // opaque "Blocked" label, so the user learns what to fix without hunting the issue list.
+            var firstBlockingReason = mergedIssues.FirstOrDefault(issue => issue.IsBlocking)?.Message;
+            var moreBlockers = blockingCount > 1 ? $" (+{blockingCount - 1} more)" : string.Empty;
             var readinessSummaryText = blockingCount > 0
-                ? $"Readiness blocked ({blockingCount} fail, {warningCount} warn)."
+                ? $"Not ready to deploy: {firstBlockingReason}{moreBlockers}"
                 : warningCount > 0
-                    ? $"Readiness passed with warnings ({warningCount})."
-                    : "Readiness passed.";
+                    ? $"Machines are ready to deploy. {warningCount} warning(s) to review."
+                    : "Machines are ready to deploy.";
 
             _workspace.ApplyReadinessResult(
                 deployContext.CompatibilityIssues,
@@ -145,16 +150,16 @@ internal sealed class DeployQuickDeployWorkspaceController
                 lifecycleState: blockingCount > 0 ? "Blocked" : warningCount > 0 ? "Warning" : "Ready",
                 progressPercent: blockingCount > 0 ? 0 : 100,
                 progressSummary: blockingCount > 0
-                    ? "Readiness blocked."
+                    ? $"Not ready to deploy: {firstBlockingReason}{moreBlockers}"
                     : warningCount > 0
-                        ? "Readiness passed with warnings."
-                        : "Readiness passed.");
+                        ? "Ready to deploy, with warnings to review."
+                        : "Machines are ready to deploy.");
             _host.SetActionStatus(
                 blockingCount > 0
-                    ? "Deploy blocked by readiness failures. Resolve blocking items first."
+                    ? $"Deploy blocked: {firstBlockingReason} Resolve blocking items first."
                     : warningCount > 0
-                        ? $"Readiness passed with {warningCount} warning(s)."
-                        : "Readiness passed with no issues.");
+                        ? $"Ready to deploy. {warningCount} warning(s) to review."
+                        : "Machines are ready to deploy.");
         }
         catch (Exception ex)
         {
