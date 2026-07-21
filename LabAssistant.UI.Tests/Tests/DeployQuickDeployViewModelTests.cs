@@ -465,7 +465,13 @@ public sealed class DeployQuickDeployViewModelTests
     [Fact]
     public async Task Readiness_DuplicateBaseDiskProblem_CountsOnceAndSurfacesReason()
     {
-        var harness = CreateHarness();
+        // Two catalog disks so the F26 single-disk auto-select does not fire: the VM stays disk-less,
+        // so the compatibility builder raises a blocking base-disk issue that overlaps the readiness one.
+        var harness = CreateHarness(catalog:
+        [
+            new VhdxCatalogItem { Id = "base-1", Path = @"C:\Base\base-1.vhdx", OsName = "Windows Server", OsVersion = "2022", Generation = 2 },
+            new VhdxCatalogItem { Id = "base-2", Path = @"C:\Base\base-2.vhdx", OsName = "Windows Server", OsVersion = "2025", Generation = 2 }
+        ]);
         harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
         {
             Status = DeploymentReadinessStatus.Fail,
@@ -530,6 +536,118 @@ public sealed class DeployQuickDeployViewModelTests
 
         Assert.Contains(blockingMessages, message => message.Contains("Time zone is not configured"));
         Assert.Contains(blockingMessages, message => message.Contains("No role is selected"));
+    }
+
+    /// <summary>
+    /// F26: when the catalog holds exactly one base disk, the default disk-less VM auto-selects it so the
+    /// user is not blocked by a missing base disk on first run, and the base-disk hint stays hidden.
+    /// </summary>
+    [Fact]
+    public void Activate_SingleCatalogDisk_AutoSelectsItAndHidesHint()
+    {
+        var harness = CreateHarness();
+
+        harness.Vm.ApplyShellState(isActive: true);
+
+        Assert.IsType<TemplateVhdxCatalogOption>(harness.Vm.SelectedVhdxCatalogItem);
+        Assert.False(harness.Vm.ShowBaseDiskHint);
+    }
+
+    /// <summary>
+    /// F26: when the catalog holds more than one base disk there is no safe auto-selection, so the VM stays
+    /// disk-less and the hint points the user at the selector.
+    /// </summary>
+    [Fact]
+    public void Activate_MultipleCatalogDisks_ShowsBaseDiskHint()
+    {
+        var harness = CreateHarness(catalog:
+        [
+            new VhdxCatalogItem { Id = "base-1", Path = @"C:\Base\base-1.vhdx", OsName = "Windows Server", OsVersion = "2022", Generation = 2 },
+            new VhdxCatalogItem { Id = "base-2", Path = @"C:\Base\base-2.vhdx", OsName = "Windows Server", OsVersion = "2025", Generation = 2 }
+        ]);
+
+        harness.Vm.ApplyShellState(isActive: true);
+
+        Assert.IsNotType<TemplateVhdxCatalogOption>(harness.Vm.SelectedVhdxCatalogItem);
+        Assert.True(harness.Vm.ShowBaseDiskHint);
+        Assert.Equal("Select a base disk to continue.", harness.Vm.BaseDiskHintText);
+    }
+
+    /// <summary>
+    /// F27: a destination-folder collision reported by readiness for the selected VM surfaces as inline
+    /// validation on the Name field instead of only appearing in the readiness list.
+    /// </summary>
+    [Fact]
+    public async Task NameValidation_FolderCollision_SurfacesInlineOnNameField()
+    {
+        var harness = CreateHarness();
+        harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
+        {
+            Status = DeploymentReadinessStatus.Fail,
+            Category = DeploymentReadinessCategory.DestinationPathStorage,
+            Code = "DST.VM_PATH.CONFLICT_DIR_EXISTS",
+            Message = "VM destination folder 'C:\\Labs\\Quick VM 1' already exists.",
+            ActionableGuidance = "Use a different VM destination folder or remove the existing folder if it is safe to do so.",
+            AffectedVmNames = ["Quick VM 1"]
+        });
+
+        harness.Vm.ApplyShellState(isActive: true);
+        await harness.Vm.EvaluateCommand.ExecuteAsync(null);
+
+        Assert.True(harness.Vm.HasEditorNameError);
+        Assert.Contains("already exists", harness.Vm.EditorNameValidationText);
+    }
+
+    /// <summary>
+    /// F27: a VM name that collides with another entry is flagged inline on the Name field.
+    /// </summary>
+    [Fact]
+    public void NameValidation_DuplicateName_FlagsNameField()
+    {
+        var harness = CreateHarness();
+        harness.Vm.ApplyShellState(isActive: true);
+
+        harness.Vm.AddVmCommand.Execute(null);
+        harness.Vm.EditorVmNameDraft = "Quick VM 1";
+
+        Assert.True(harness.Vm.HasEditorNameError);
+        Assert.Contains("already uses this name", harness.Vm.EditorNameValidationText);
+    }
+
+    /// <summary>
+    /// F34: a fully ready draft yields human-friendly readiness copy rather than the opaque "Readiness
+    /// passed." label.
+    /// </summary>
+    [Fact]
+    public async Task Readiness_Ready_UsesHumanFriendlyCopy()
+    {
+        var harness = CreateHarness();
+
+        await ActivateReadyVmAsync(harness);
+
+        Assert.Equal("Machines are ready to deploy.", harness.Vm.ReadinessSummaryText);
+    }
+
+    /// <summary>
+    /// F34: when readiness is blocked the summary names the first blocking reason instead of a bare
+    /// "Blocked" label.
+    /// </summary>
+    [Fact]
+    public async Task Readiness_Blocked_NamesFirstReason()
+    {
+        var harness = CreateHarness();
+        harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
+        {
+            Status = DeploymentReadinessStatus.Fail,
+            Category = DeploymentReadinessCategory.Environment,
+            Message = "Hyper-V is not available.",
+            ActionableGuidance = "Enable the Hyper-V role."
+        });
+
+        await ActivateReadyVmAsync(harness);
+
+        Assert.StartsWith("Not ready to deploy:", harness.Vm.ReadinessSummaryText);
+        Assert.Contains("Hyper-V is not available.", harness.Vm.ReadinessSummaryText);
     }
 
     private static void CompleteVmSteps(DeployQuickDeployViewModel vm, string vmName)

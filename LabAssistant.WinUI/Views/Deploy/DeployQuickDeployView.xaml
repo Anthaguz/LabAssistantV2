@@ -65,16 +65,12 @@
                     <StackPanel
                         Grid.Column="3"
                         HorizontalAlignment="Right"
-                        Spacing="{StaticResource SpacingXS}">
+                        VerticalAlignment="Center">
                         <Button
+                            HorizontalAlignment="Right"
                             Command="{x:Bind ViewModel.ToggleResultsPanelCommand}"
                             Content="{x:Bind ViewModel.ResultsPanelButtonText}"
                             IsEnabled="{x:Bind ViewModel.CanToggleResultsPanel}" />
-                        <TextBlock
-                            HorizontalAlignment="Right"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            FontSize="12"
-                            Text="{x:Bind ViewModel.ResultsPanelSummaryText}" />
                     </StackPanel>
                     <TextBlock
                         Grid.Row="2"
@@ -125,7 +121,7 @@
                             Grid.Row="0"
                             Foreground="{StaticResource ShellTextPrimaryBrush}"
                             FontWeight="SemiBold"
-                            Text="VM Entries" />
+                            Text="Virtual Machines" />
                         <ListView
                             Grid.Row="1"
                             ItemsSource="{x:Bind ViewModel.VmEntryRows}"
@@ -165,16 +161,16 @@
 
                                         <Border
                                             Grid.Column="1"
-                                            Padding="8,3"
-                                            Background="{StaticResource ShellContentBackgroundBrush}"
-                                            BorderBrush="{StaticResource ShellBorderBrush}"
+                                            Padding="10,3"
+                                            Background="Transparent"
+                                            BorderBrush="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
                                             BorderThickness="1"
                                             CornerRadius="{StaticResource PillCornerRadius}"
                                             VerticalAlignment="Center"
                                             Visibility="{x:Bind HasIssueBadge, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
                                             <TextBlock
                                                 Foreground="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
-                                                FontSize="12"
+                                                FontSize="11"
                                                 FontWeight="SemiBold"
                                                 Text="{x:Bind IssueBadgeText, Mode=OneWay}" />
                                         </Border>
@@ -245,7 +241,6 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="140" />
@@ -257,10 +252,25 @@
                                     Grid.Column="0"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     Text="Name" />
-                                <TextBox
-                                    Grid.Row="0"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.EditorVmNameDraft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+                                    <TextBox
+                                        Text="{x:Bind ViewModel.EditorVmNameDraft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <StackPanel
+                                        Orientation="Horizontal"
+                                        Spacing="6"
+                                        Visibility="{x:Bind ViewModel.HasEditorNameError, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                        <FontIcon
+                                            VerticalAlignment="Center"
+                                            FontSize="12"
+                                            Foreground="{StaticResource ShellCriticalBrush}"
+                                            Glyph="&#xEA39;" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellCriticalBrush}"
+                                            FontSize="12"
+                                            Text="{x:Bind ViewModel.EditorNameValidationText, Mode=OneWay}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
 
                                 <TextBlock
                                     Grid.Row="1"
@@ -287,13 +297,29 @@
                                     Grid.Column="0"
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     Text="Base disk" />
-                                <ComboBox
-                                    Grid.Row="3"
-                                    Grid.Column="1"
-                                    HorizontalAlignment="Stretch"
-                                    AutomationProperties.Name="Base disk"
-                                    ItemsSource="{x:Bind ViewModel.VhdxCatalogItems}"
-                                    SelectedItem="{x:Bind ViewModel.SelectedVhdxCatalogItem, Mode=TwoWay}" />
+                                <StackPanel Grid.Row="3" Grid.Column="1" Spacing="4">
+                                    <ComboBox
+                                        HorizontalAlignment="Stretch"
+                                        AutomationProperties.Name="Base disk"
+                                        ItemsSource="{x:Bind ViewModel.VhdxCatalogItems}"
+                                        SelectedItem="{x:Bind ViewModel.SelectedVhdxCatalogItem, Mode=TwoWay}" />
+                                    <StackPanel
+                                        Orientation="Horizontal"
+                                        Spacing="6"
+                                        Visibility="{x:Bind ViewModel.ShowBaseDiskHint, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                        <FontIcon
+                                            VerticalAlignment="Center"
+                                            FontSize="12"
+                                            Foreground="{StaticResource ShellAccentBrush}"
+                                            Glyph="&#xE946;" />
+                                        <TextBlock
+                                            Foreground="{StaticResource ShellAccentBrush}"
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind ViewModel.BaseDiskHintText, Mode=OneWay}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
 
                                 <TextBlock
                                     Grid.Row="4"
@@ -336,15 +362,6 @@
                                         Text="{x:Bind ViewModel.SwitchGuidanceText}"
                                         TextWrapping="Wrap" />
                                 </StackPanel>
-
-                                <TextBlock
-                                    Grid.Row="5"
-                                    Grid.Column="0"
-                                    Grid.ColumnSpan="2"
-                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                    FontSize="12"
-                                    Text="{x:Bind ViewModel.VhdxGuidanceText}"
-                                    TextWrapping="Wrap" />
                             </Grid>
                         </ScrollViewer>
 
@@ -380,6 +397,7 @@
                             Content="Open in Templates Editor" />
                         <Button
                             Command="{x:Bind ViewModel.StartDeployCommand}"
+                            Style="{StaticResource AccentButtonStyle}"
                             Content="Start Deploy" />
                     </StackPanel>
                     <TextBlock

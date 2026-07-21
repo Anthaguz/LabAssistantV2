@@ -144,8 +144,21 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     [ObservableProperty]
     private string _switchGuidanceText = "Switch selection is optional.";
 
+    // F26: a clear inline hint that points the user at the base-disk selector when a VM still has no
+    // base disk chosen. Deliberately separate from the removed low-signal "helper label".
     [ObservableProperty]
-    private string _vhdxGuidanceText = "Catalog-backed selection is preferred.";
+    private bool _showBaseDiskHint;
+
+    [ObservableProperty]
+    private string _baseDiskHintText = "Select a base disk to continue.";
+
+    // F27: inline validation state for the Name field so a name/folder collision (or an empty/duplicate
+    // name) is surfaced right on the textbox instead of only in the readiness list.
+    [ObservableProperty]
+    private bool _hasEditorNameError;
+
+    [ObservableProperty]
+    private string _editorNameValidationText = string.Empty;
 
     [ObservableProperty]
     private string _resultsPanelButtonText = "Open Progress / Results";
@@ -619,7 +632,39 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         _availableVhdxCatalogOptions = _referenceDataService.VhdxCatalogOptions;
         RebuildVhdxCatalogItems();
         LoadEditorDraftFromSelection();
+        TryAutoSelectSingleBaseDisk();
         UpdateUi();
+    }
+
+    /// <summary>
+    /// F26: when the catalog holds exactly one base disk and the selected VM has none chosen yet, pick it
+    /// automatically. This is trivially safe because there is no ambiguity, and it removes the most common
+    /// first-run blocker (the default VM starting with no base disk).
+    /// </summary>
+    private void TryAutoSelectSingleBaseDisk()
+    {
+        if (_availableVhdxCatalogOptions.Count != 1)
+        {
+            return;
+        }
+
+        var entry = SelectedVmEntry;
+        if (entry is null)
+        {
+            return;
+        }
+
+        var entryHasDisk = !string.IsNullOrWhiteSpace(entry.VhdxId) || !string.IsNullOrWhiteSpace(entry.VhdPath);
+        if (entryHasDisk || SelectedVhdxCatalogItem is TemplateVhdxCatalogOption)
+        {
+            return;
+        }
+
+        var single = VhdxCatalogItems.OfType<TemplateVhdxCatalogOption>().FirstOrDefault();
+        if (single is not null)
+        {
+            SelectedVhdxCatalogItem = single;
+        }
     }
 
     Task<DeploymentReadinessReport> IDeployQuickDeployWorkspaceControllerHost.RunReadinessChecksAsync(
@@ -1147,13 +1192,97 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
                 : "Switch selection is optional.";
 
         var selectedOption = SelectedVhdxCatalogItem as TemplateVhdxCatalogOption;
-        VhdxGuidanceText = selectedOption is not null
-            ? $"Selected: {selectedOption.DisplayLabel} ({selectedOption.Id})."
-            : _availableVhdxCatalogOptions.Count == 0
-                ? "No VHDX catalog entries available. Import base disks in Assets first."
-                : "Select a base disk from catalog.";
+        var hasSelectedEntry = SelectedVmEntry is not null;
+
+        // F26: nudge the user to pick a base disk while one is still missing on the selected VM.
+        ShowBaseDiskHint = hasSelectedEntry && selectedOption is null;
+        BaseDiskHintText = _availableVhdxCatalogOptions.Count == 0
+            ? "No base disks in the catalog. Import one in Assets first."
+            : "Select a base disk to continue.";
+
+        UpdateEditorNameValidation();
 
         EditorIssueSummaryText = BuildEditorIssueSummaryText();
+    }
+
+    /// <summary>
+    /// F27: computes inline validation for the Name field. Surfaces an empty name, a duplicate name that
+    /// collides with another VM entry, and a destination-folder collision reported by readiness for the
+    /// selected VM (the case where a folder already matches the VM name and blocks the deploy).
+    /// </summary>
+    private void UpdateEditorNameValidation()
+    {
+        var selectedEntry = SelectedVmEntry;
+        if (selectedEntry is null)
+        {
+            HasEditorNameError = false;
+            EditorNameValidationText = string.Empty;
+            return;
+        }
+
+        var name = EditorVmNameDraft.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            HasEditorNameError = true;
+            EditorNameValidationText = "VM name is required.";
+            return;
+        }
+
+        var duplicateName = VmEntries
+            .Where(entry => !ReferenceEquals(entry, selectedEntry))
+            .Any(entry => string.Equals(entry.Name?.Trim(), name, StringComparison.OrdinalIgnoreCase));
+        if (duplicateName)
+        {
+            HasEditorNameError = true;
+            EditorNameValidationText = "Another VM entry already uses this name.";
+            return;
+        }
+
+        var folderCollision = FindDestinationFolderCollision(name);
+        if (folderCollision is not null)
+        {
+            HasEditorNameError = true;
+            EditorNameValidationText = folderCollision;
+            return;
+        }
+
+        HasEditorNameError = false;
+        EditorNameValidationText = string.Empty;
+    }
+
+    /// <summary>
+    /// Returns the readiness message for a destination-folder collision scoped to <paramref name="vmName"/>,
+    /// or null when there is none. A collision is a blocking destination-path readiness failure whose code
+    /// marks an already-existing folder for that VM.
+    /// </summary>
+    private string? FindDestinationFolderCollision(string vmName)
+    {
+        var results = ReadinessReport?.Results;
+        if (results is null)
+        {
+            return null;
+        }
+
+        foreach (var result in results)
+        {
+            if (result.Status != DeploymentReadinessStatus.Fail ||
+                result.Category != DeploymentReadinessCategory.DestinationPathStorage)
+            {
+                continue;
+            }
+
+            if (!(result.Code?.Contains("CONFLICT_DIR_EXISTS", StringComparison.OrdinalIgnoreCase) ?? false))
+            {
+                continue;
+            }
+
+            if (result.AffectedVmNames.Any(affected => string.Equals(affected?.Trim(), vmName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return FormatIssueMessage(result.Message, result.ActionableGuidance);
+            }
+        }
+
+        return null;
     }
 
     private string BuildEditorIssueSummaryText()
