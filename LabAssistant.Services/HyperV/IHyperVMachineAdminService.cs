@@ -22,7 +22,20 @@ public interface IHyperVMachineAdminService
 
     Task<HyperVMachineActionResult> StopVmAsync(string vmName);
 
+    /// <summary>
+    /// Hard power-off (Stop-VM -TurnOff), pulling virtual power without waiting for the guest OS to
+    /// shut down gracefully. Distinct from <see cref="StopVmAsync"/>, which requests a guest
+    /// shutdown. Use only when a graceful shutdown is not possible or not desired.
+    /// </summary>
+    Task<HyperVMachineActionResult> TurnOffVmAsync(string vmName);
+
     Task<HyperVMachineActionResult> RestartVmAsync(string vmName);
+
+    /// <summary>
+    /// Renames an existing Hyper-V virtual machine (Rename-VM). The caller is responsible for
+    /// validating <paramref name="newName"/> before invoking this seam.
+    /// </summary>
+    Task<HyperVMachineActionResult> RenameVmAsync(string currentName, string newName);
 
     Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName);
 

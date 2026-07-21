@@ -20,7 +20,18 @@ public interface IMachinesCapabilityService
 
     Task<MachineOperationResult> StopVmAsync(MachineInventoryItem vm);
 
+    /// <summary>
+    /// Hard power-off distinct from the graceful guest shutdown in <see cref="StopVmAsync"/> (F09).
+    /// </summary>
+    Task<MachineOperationResult> TurnOffVmAsync(MachineInventoryItem vm);
+
     Task<MachineOperationResult> RestartVmAsync(MachineInventoryItem vm);
+
+    /// <summary>
+    /// Renames the virtual machine after validating <paramref name="newName"/> (F08). Validation
+    /// failures return an unsuccessful result without contacting Hyper-V.
+    /// </summary>
+    Task<MachineOperationResult> RenameVmAsync(MachineInventoryItem vm, string newName);
 
     Task<MachineOperationResult> OpenConsoleAsync(MachineInventoryItem vm);
 

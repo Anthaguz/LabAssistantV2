@@ -1352,7 +1352,13 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         public Task<HyperVMachineActionResult> StopVmAsync(string vmName) =>
             Task.FromResult(new HyperVMachineActionResult { Success = true });
 
+        public Task<HyperVMachineActionResult> TurnOffVmAsync(string vmName) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
         public Task<HyperVMachineActionResult> RestartVmAsync(string vmName) =>
+            Task.FromResult(new HyperVMachineActionResult { Success = true });
+
+        public Task<HyperVMachineActionResult> RenameVmAsync(string currentName, string newName) =>
             Task.FromResult(new HyperVMachineActionResult { Success = true });
 
         public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName) =>

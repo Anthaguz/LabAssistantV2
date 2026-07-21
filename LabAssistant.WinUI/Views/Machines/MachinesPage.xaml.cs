@@ -88,6 +88,9 @@ public sealed partial class MachinesPage : Page, IMachinesCapabilityShellBridge
     public Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope) =>
         MachinesDeleteDialogs.ShowDeleteConfirmationDialogAsync(_shellHost?.XamlRoot ?? XamlRoot, vm, preview, effectiveScope);
 
+    public Task<string?> ShowRenameDialogAsync(MachineInventoryItem vm) =>
+        MachinesRenameDialog.ShowAsync(_shellHost?.XamlRoot ?? XamlRoot, vm);
+
     private void EnsureRdpReadinessTimer()
     {
         if (_rdpReadinessTimer is not null)

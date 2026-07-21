@@ -326,6 +326,86 @@ public class MachinesCapabilityServiceTests
         Assert.Equal(MachineDeletionPolicyMode.AlwaysDeleteDisksForDifferencingOnly.ToString(), settings.Settings.MachineDeletionPolicy);
     }
 
+    [Fact]
+    public async Task TurnOffVmAsync_InvokesHardTurnOffAndEmitsStructuredLogs()
+    {
+        var adminService = new FakeMachineAdminService();
+        var logger = new RecordingStructuredLogger();
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeCatalogStore(),
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"),
+            logger);
+        var vm = new MachineInventoryItem { VmId = "vm-1", VmName = "LabVm01", State = "Running", OriginLabel = "LabAssistant" };
+
+        var result = await service.TurnOffVmAsync(vm);
+
+        Assert.True(result.Success);
+        Assert.Equal("Turned off 'LabVm01'.", result.UserMessage);
+        Assert.Equal("LabVm01", Assert.Single(adminService.TurnOffCalls));
+        Assert.Contains(logger.Events, e => e.Code == $"0x{LaStatus.Machines_MachineActionCompleted:X8}");
+    }
+
+    [Fact]
+    public async Task RenameVmAsync_WithValidName_CallsAdminServiceWithNormalizedName()
+    {
+        var adminService = new FakeMachineAdminService();
+        var logger = new RecordingStructuredLogger();
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeCatalogStore(),
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"),
+            logger);
+        var vm = new MachineInventoryItem { VmId = "vm-1", VmName = "LabVm01", State = "Off", OriginLabel = "LabAssistant" };
+
+        var result = await service.RenameVmAsync(vm, "  LabVm02  ");
+
+        Assert.True(result.Success);
+        Assert.Equal("Renamed 'LabVm01' to 'LabVm02'.", result.UserMessage);
+        var call = Assert.Single(adminService.RenameCalls);
+        Assert.Equal("LabVm01", call.CurrentName);
+        Assert.Equal("LabVm02", call.NewName);
+    }
+
+    [Fact]
+    public async Task RenameVmAsync_WithInvalidName_DoesNotCallAdminServiceAndReturnsFailure()
+    {
+        var adminService = new FakeMachineAdminService();
+        var logger = new RecordingStructuredLogger();
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeCatalogStore(),
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"),
+            logger);
+        var vm = new MachineInventoryItem { VmId = "vm-1", VmName = "LabVm01", State = "Off", OriginLabel = "LabAssistant" };
+
+        var result = await service.RenameVmAsync(vm, "   ");
+
+        Assert.False(result.Success);
+        Assert.Empty(adminService.RenameCalls);
+        Assert.Equal("Enter a name for the virtual machine.", result.UserMessage);
+        Assert.Contains(logger.Events, e => e.Code == $"0x{LaStatus.Machines_MachineActionFailed:X8}");
+    }
+
+    [Fact]
+    public async Task RenameVmAsync_WhenAdminServiceFails_ReturnsFailureMessage()
+    {
+        var adminService = new FakeMachineAdminService
+        {
+            RenameResult = new HyperVMachineActionResult { Success = false, ErrorMessage = "rename failed" }
+        };
+        var service = new MachinesCapabilityService(
+            adminService,
+            new FakeCatalogStore(),
+            new FakeSettingsStore(@"D:\LabAssistant\VMs"));
+        var vm = new MachineInventoryItem { VmId = "vm-1", VmName = "LabVm01", State = "Off", OriginLabel = "LabAssistant" };
+
+        var result = await service.RenameVmAsync(vm, "LabVm02");
+
+        Assert.False(result.Success);
+        Assert.Contains("Failed to rename 'LabVm01'", result.UserMessage);
+    }
+
     private sealed class FakeMachineAdminService : IHyperVMachineAdminService
     {
         public IReadOnlyList<HyperVHostMachineVmInfo> Inventory { get; set; } = Array.Empty<HyperVHostMachineVmInfo>();
@@ -337,6 +417,12 @@ public class MachinesCapabilityServiceTests
 
         public HyperVMachineActionResult ActionResult { get; set; } = new() { Success = true };
 
+        public HyperVMachineActionResult RenameResult { get; set; } = new() { Success = true };
+
+        public List<(string CurrentName, string NewName)> RenameCalls { get; } = new();
+
+        public List<string> TurnOffCalls { get; } = new();
+
         public HyperVMachineActionResult DeleteResult { get; set; } = new() { Success = true };
 
         public Task<IReadOnlyList<HyperVHostMachineVmInfo>> ListHostVmsAsync() => Task.FromResult(Inventory);
@@ -345,7 +431,19 @@ public class MachinesCapabilityServiceTests
 
         public Task<HyperVMachineActionResult> StopVmAsync(string vmName) => Task.FromResult(ActionResult);
 
+        public Task<HyperVMachineActionResult> TurnOffVmAsync(string vmName)
+        {
+            TurnOffCalls.Add(vmName);
+            return Task.FromResult(ActionResult);
+        }
+
         public Task<HyperVMachineActionResult> RestartVmAsync(string vmName) => Task.FromResult(ActionResult);
+
+        public Task<HyperVMachineActionResult> RenameVmAsync(string currentName, string newName)
+        {
+            RenameCalls.Add((currentName, newName));
+            return Task.FromResult(RenameResult);
+        }
 
         public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName) => Task.FromResult(ActionResult);
 

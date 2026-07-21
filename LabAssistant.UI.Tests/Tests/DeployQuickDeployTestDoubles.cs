@@ -113,7 +113,11 @@ internal sealed class FakeMachinesCapabilityService : IMachinesCapabilityService
 
     public Task<MachineOperationResult> StopVmAsync(MachineInventoryItem vm) => throw new NotSupportedException();
 
+    public Task<MachineOperationResult> TurnOffVmAsync(MachineInventoryItem vm) => throw new NotSupportedException();
+
     public Task<MachineOperationResult> RestartVmAsync(MachineInventoryItem vm) => throw new NotSupportedException();
+
+    public Task<MachineOperationResult> RenameVmAsync(MachineInventoryItem vm, string newName) => throw new NotSupportedException();
 
     public Task<MachineOperationResult> OpenConsoleAsync(MachineInventoryItem vm) => throw new NotSupportedException();
 
@@ -202,7 +206,11 @@ internal sealed class FakeHyperVMachineAdminService : IHyperVMachineAdminService
 
     public Task<HyperVMachineActionResult> StopVmAsync(string vmName) => throw new NotSupportedException();
 
+    public Task<HyperVMachineActionResult> TurnOffVmAsync(string vmName) => throw new NotSupportedException();
+
     public Task<HyperVMachineActionResult> RestartVmAsync(string vmName) => throw new NotSupportedException();
+
+    public Task<HyperVMachineActionResult> RenameVmAsync(string currentName, string newName) => throw new NotSupportedException();
 
     public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName) => throw new NotSupportedException();
 

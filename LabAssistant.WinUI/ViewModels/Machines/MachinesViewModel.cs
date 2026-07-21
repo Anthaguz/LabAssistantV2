@@ -163,6 +163,13 @@ public partial class MachinesViewModel : ViewModelBase
 
     public bool IsDynamicMemoryEditorEnabled => IsDynamicMemory;
 
+    /// <summary>
+    /// Controls visibility of the minimum/maximum/buffer memory editors (F16). Those fields only
+    /// apply when dynamic memory is on; with it off the guest uses a fixed startup allocation, so
+    /// only the Startup field is shown.
+    /// </summary>
+    public bool ShowDynamicMemoryFields => IsDynamicMemory;
+
     public double DynamicMemoryPanelOpacity => IsDynamicMemory ? 1.0 : 0.65;
 
     public string SelectedVmNameText => SelectedDetail is null ? "Name: (none)" : $"Name: {SelectedDetail.VmName}";
@@ -327,6 +334,15 @@ public partial class MachinesViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private Task TurnOffVmAsync()
+    {
+        return RunSelectedMachineOperationAsync(
+            "Turning off VM...",
+            (vm, _) => _machinesService.TurnOffVmAsync(vm),
+            refreshInventory: true);
+    }
+
+    [RelayCommand]
     private Task RestartVmAsync()
     {
         return RunSelectedMachineOperationAsync(
@@ -370,6 +386,36 @@ public partial class MachinesViewModel : ViewModelBase
             "Opening RDP...",
             (selectedVm, _) => _machinesService.OpenRdpAsync(selectedVm, _selectedRdpReadiness.TargetIpv4!),
             refreshInventory: false);
+    }
+
+    [RelayCommand]
+    private async Task RenameVmAsync()
+    {
+        if (!TryGetSelectedInventoryItem(out var vm))
+        {
+            StatusMessage = DefaultStatusMessage;
+            return;
+        }
+
+        if (_shellBridge is null)
+        {
+            StatusMessage = "Rename UI is unavailable.";
+            return;
+        }
+
+        var newName = await _shellBridge.ShowRenameDialogAsync(vm);
+        if (newName is null)
+        {
+            StatusMessage = "Rename cancelled.";
+            return;
+        }
+
+        // Business validates the name authoritatively and refuses to contact Hyper-V when invalid;
+        // the VM id is stable across a rename, so selection is preserved by the inventory refresh.
+        await RunSelectedMachineOperationAsync(
+            "Renaming VM...",
+            (selectedVm, _) => _machinesService.RenameVmAsync(selectedVm, newName),
+            refreshInventory: true);
     }
 
     [RelayCommand]
@@ -494,6 +540,7 @@ public partial class MachinesViewModel : ViewModelBase
     partial void OnIsDynamicMemoryChanged(bool value)
     {
         OnPropertyChanged(nameof(IsDynamicMemoryEditorEnabled));
+        OnPropertyChanged(nameof(ShowDynamicMemoryFields));
         OnPropertyChanged(nameof(DynamicMemoryPanelOpacity));
         RefreshDraftFromEditors();
     }
