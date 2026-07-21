@@ -24,19 +24,9 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Image
-                    x:Name="ShellBrandingImage"
-                    Grid.Column="0"
-                    Width="24"
-                    Height="24"
-                    Margin="0,0,8,0"
-                    VerticalAlignment="Center"
-                    AutomationProperties.Name="LabAssistant application icon"
-                    Visibility="Collapsed" />
-
                 <Button
                     x:Name="HamburgerButton"
-                    Grid.Column="1"
+                    Grid.Column="0"
                     Width="36"
                     Height="32"
                     Click="HamburgerButton_Click"
@@ -45,13 +35,23 @@
                     Foreground="{StaticResource ShellTopBarForegroundBrush}"
                     ToolTipService.ToolTip="Toggle navigation pane" />
 
+                <Image
+                    x:Name="ShellBrandingImage"
+                    Grid.Column="1"
+                    Width="24"
+                    Height="24"
+                    Margin="8,0,0,0"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="LabAssistant application icon"
+                    Visibility="Collapsed" />
+
                 <TextBlock
                     x:Name="CurrentRouteTextBlock"
                     Grid.Column="2"
                     Margin="12,0,0,0"
                     VerticalAlignment="Center"
                     Foreground="{StaticResource ShellTopBarForegroundBrush}"
-                    Text="Machines / Overview" />
+                    Text="Machines" />
 
                 <Button
                     x:Name="ThemeToggleButton"
