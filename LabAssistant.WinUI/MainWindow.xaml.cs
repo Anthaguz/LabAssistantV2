@@ -1,3 +1,4 @@
+using LabAssistant.Models.Configuration;
 using LabAssistant.Services.Diagnostics;
 using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Shell;
@@ -33,7 +34,8 @@ public sealed partial class MainWindow : Window
             RootLayout,
             ThemeToggleButton,
             ShellBrandingImage,
-            () => WindowNative.GetWindowHandle(this));
+            () => WindowNative.GetWindowHandle(this),
+            App.Services.GetRequiredService<IAppSettingsStore>());
         _dialogService = new ShellDialogService(
             () => WindowNative.GetWindowHandle(this),
             () => RootLayout.XamlRoot);

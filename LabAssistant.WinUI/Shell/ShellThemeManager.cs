@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LabAssistant.Models.Configuration;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -14,31 +15,37 @@ internal sealed class ShellThemeManager
     private readonly Button _themeToggleButton;
     private readonly Image _shellBrandingImage;
     private readonly Func<nint> _getWindowHandle;
-    private ElementTheme _theme = ElementTheme.Light;
+    private readonly ShellThemeState _themeState;
 
     public ShellThemeManager(
         FrameworkElement rootLayout,
         Button themeToggleButton,
         Image shellBrandingImage,
-        Func<nint> getWindowHandle)
+        Func<nint> getWindowHandle,
+        IAppSettingsStore settingsStore)
     {
         _rootLayout = rootLayout;
         _themeToggleButton = themeToggleButton;
         _shellBrandingImage = shellBrandingImage;
         _getWindowHandle = getWindowHandle;
+        _themeState = new ShellThemeState(settingsStore);
     }
 
     public void ToggleTheme()
     {
-        _theme = _theme == ElementTheme.Light ? ElementTheme.Dark : ElementTheme.Light;
+        _themeState.Toggle();
         ApplyTheme();
     }
 
     public void ApplyTheme()
     {
-        _themeToggleButton.Content = _theme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
-        _rootLayout.RequestedTheme = _theme;
+        var elementTheme = ToElementTheme(_themeState.Theme);
+        _themeToggleButton.Content = elementTheme == ElementTheme.Light ? "Switch to dark" : "Switch to light";
+        _rootLayout.RequestedTheme = elementTheme;
     }
+
+    private static ElementTheme ToElementTheme(AppTheme theme) =>
+        theme == AppTheme.Dark ? ElementTheme.Dark : ElementTheme.Light;
 
     public void InitializeShellBranding()
     {

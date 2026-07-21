@@ -109,6 +109,8 @@ public class CatalogServiceStructuredLoggingTests
         public void SetLogFolder(string path) => Settings.LogFolder = path;
         public void SetVmBasePath(string path) => Settings.VmBasePath = path;
         public void SetDifferencingDiskBasePath(string path) => Settings.DifferencingDiskBasePath = path;
+
+        public void SetTheme(AppTheme theme) => Settings.Theme = theme;
     }
 
     private sealed class RecordingStructuredLogger : IStructuredLogger

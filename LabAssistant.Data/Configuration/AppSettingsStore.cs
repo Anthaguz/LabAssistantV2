@@ -105,6 +105,12 @@ public sealed class AppSettingsStore : IAppSettingsStore
         Save();
     }
 
+    public void SetTheme(AppTheme theme)
+    {
+        Settings.Theme = theme;
+        Save();
+    }
+
     private AppSettings GetDefaultSettings()
     {
         return new AppSettings

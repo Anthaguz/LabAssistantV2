@@ -14,4 +14,5 @@ public interface IAppSettingsStore
     void SetLogFolder(string path);
     void SetVmBasePath(string path);
     void SetDifferencingDiskBasePath(string path);
+    void SetTheme(AppTheme theme);
 }
