@@ -125,10 +125,11 @@ internal sealed class DeployQuickDeployWorkspaceController
                 _host.AvailableSwitches);
             var readinessReport = await _host.RunReadinessChecksAsync(deployContext.MultiVmContext, mode);
 
-            var blockingCount = deployContext.CompatibilityIssues.Count(issue => issue.IsBlocking) +
-                                readinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Fail);
-            var warningCount = deployContext.CompatibilityIssues.Count(issue => !issue.IsBlocking) +
-                               readinessReport.Results.Count(result => result.Status == DeploymentReadinessStatus.Warn);
+            // Count de-duplicated issues so the summary matches the real number of problems: a single
+            // concern (for example a missing base disk) is reported by both the compatibility list and the
+            // readiness report and must not be counted twice.
+            var mergedIssues = DeployReadinessProjection.Merge(deployContext.CompatibilityIssues, readinessReport);
+            var (blockingCount, warningCount) = DeployReadinessProjection.Count(mergedIssues);
             var readinessSummaryText = blockingCount > 0
                 ? $"Readiness blocked ({blockingCount} fail, {warningCount} warn)."
                 : warningCount > 0
@@ -142,7 +143,7 @@ internal sealed class DeployQuickDeployWorkspaceController
 
             _workspace.SetWorkflowState(
                 lifecycleState: blockingCount > 0 ? "Blocked" : warningCount > 0 ? "Warning" : "Ready",
-                progressPercent: blockingCount > 0 ? 35 : warningCount > 0 ? 45 : 55,
+                progressPercent: blockingCount > 0 ? 0 : 100,
                 progressSummary: blockingCount > 0
                     ? "Readiness blocked."
                     : warningCount > 0
@@ -210,7 +211,7 @@ internal sealed class DeployQuickDeployWorkspaceController
     private void BeginDeployWorkflow()
     {
         _workspace.SetShowAllVmRows(true);
-        _workspace.SetWorkflowState("Running", 15, "Preparing deployment...");
+        _workspace.SetWorkflowState("Running", 0, "Preparing deployment...");
         _host.UpdateUi();
     }
 
@@ -233,7 +234,7 @@ internal sealed class DeployQuickDeployWorkspaceController
     /// </summary>
     private void SetDeployBlocked()
     {
-        _workspace.SetWorkflowState("Blocked", 35, "Deployment blocked by readiness failures.");
+        _workspace.SetWorkflowState("Blocked", 0, "Deployment blocked by readiness failures.");
         _host.SetActionStatus("Deploy blocked by readiness failures. Resolve blocking items first.");
         _host.UpdateUi();
     }
@@ -252,7 +253,7 @@ internal sealed class DeployQuickDeployWorkspaceController
         var firstBlocker = blockingIssues.FirstOrDefault()?.Message;
         _workspace.SetWorkflowState(
             "Blocked",
-            35,
+            0,
             firstBlocker is null ? "Deployment blocked by the deployment plan." : firstBlocker);
         _host.SetActionStatus(
             blockingIssues.Count > 0

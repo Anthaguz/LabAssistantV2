@@ -6,7 +6,8 @@ internal sealed record DeployCompatibilityIssue(
     string VmName,
     bool IsBlocking,
     string Message,
-    string Guidance);
+    string Guidance,
+    DeploymentReadinessCategory Category = DeploymentReadinessCategory.TemplateConfig);
 
 internal sealed record DeployDiskResolution(
     string EffectiveBasePath,

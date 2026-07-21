@@ -259,7 +259,7 @@ public sealed class DeployQuickDeployViewModelTests
         Assert.Equal("Ready", harness.Vm.LifecycleState);
         Assert.False(harness.Vm.HasBlockingFailures);
         Assert.True(harness.Vm.CanStartDeploy);
-        Assert.Equal(55, harness.Vm.ProgressPercent);
+        Assert.Equal(100, harness.Vm.ProgressPercent);
     }
 
     [Fact]
@@ -299,7 +299,7 @@ public sealed class DeployQuickDeployViewModelTests
         Assert.Equal("Warning", harness.Vm.LifecycleState);
         Assert.False(harness.Vm.HasBlockingFailures);
         Assert.True(harness.Vm.CanStartDeploy);
-        Assert.Equal(45, harness.Vm.ProgressPercent);
+        Assert.Equal(100, harness.Vm.ProgressPercent);
     }
 
     [Fact]
@@ -428,6 +428,125 @@ public sealed class DeployQuickDeployViewModelTests
         Assert.Equal(100, harness.Vm.ProgressPercent);
         var row = Assert.Single(harness.Vm.ResultRows);
         Assert.Equal("Quick VM 1", row.VmName);
+    }
+
+    /// <summary>
+    /// F32 regression: the overall/aggregate deployment progress must reflect real per-VM state - 0 when
+    /// nothing has run, moving upward as VMs complete, and pinned to 100 on terminal completion - instead
+    /// of resting on a fixed stage constant while the run is in flight.
+    /// </summary>
+    [Fact]
+    public void OverallProgress_AggregatesPerVmProgress_AndCompletes()
+    {
+        var harness = CreateHarness();
+        var vm = harness.Vm;
+        vm.ApplyShellState(isActive: true);
+
+        vm.InitializeProgressRows(FakeV2PlanningCapabilityService.StandalonePlan("vm-a", "vm-b"));
+        vm.SetWorkflowState("Running", 0, "Deploying...");
+        Assert.Equal(0, vm.ProgressPercent);
+
+        CompleteVmSteps(vm, "vm-a");
+        var afterFirst = vm.ProgressPercent;
+        Assert.InRange(afterFirst, 1, 99);
+
+        CompleteVmSteps(vm, "vm-b");
+        Assert.True(vm.ProgressPercent > afterFirst, "Aggregate progress must advance as more VMs complete.");
+
+        vm.SetWorkflowState("Completed", 100, "Done.");
+        Assert.Equal(100, vm.ProgressPercent);
+    }
+
+    /// <summary>
+    /// F33 regression: a single underlying problem (a missing base disk) is reported by both the
+    /// compatibility list and the readiness report. The merged projection must count it once and surface
+    /// the actual reason text rather than a bare, doubled "Blocking: 2" number.
+    /// </summary>
+    [Fact]
+    public async Task Readiness_DuplicateBaseDiskProblem_CountsOnceAndSurfacesReason()
+    {
+        var harness = CreateHarness();
+        harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
+        {
+            Status = DeploymentReadinessStatus.Fail,
+            Category = DeploymentReadinessCategory.VhdxBaseDisk,
+            Code = "VHDX.MISSING_REFERENCE",
+            Message = "Base VHDX reference is missing for VM 'Quick VM 1'.",
+            ActionableGuidance = "Select a valid base VHDX for this VM before deploying.",
+            AffectedVmNames = ["Quick VM 1"]
+        });
+
+        // Activate without selecting a base disk so the compatibility builder also raises a blocking
+        // base-disk issue for the same VM - the exact overlap that used to be double-counted.
+        harness.Vm.ApplyShellState(isActive: true);
+        await harness.Vm.EvaluateCommand.ExecuteAsync(null);
+
+        var blockingRows = harness.Vm.IssueRows.Where(row => row.Severity == "Block").ToList();
+        Assert.Single(blockingRows);
+
+        var vmRow = harness.Vm.ResultRows.Single(row => row.VmName == "Quick VM 1");
+        Assert.Equal("Blocked", vmRow.Status);
+        Assert.StartsWith("Blocked:", vmRow.Summary);
+        Assert.Contains("Base VHDX reference is missing", vmRow.Summary);
+        Assert.DoesNotContain("Blocking: 2", vmRow.Summary);
+    }
+
+    /// <summary>
+    /// F33 guard: the cross-source de-duplication must not collapse two genuinely distinct readiness
+    /// failures that happen to share a (scope, category, severity) tuple. A single VM legitimately raises
+    /// several guest-configuration gaps in the same category, and each carries its own reason the user
+    /// must see, so both rows must survive and both must be counted.
+    /// </summary>
+    [Fact]
+    public async Task Readiness_DistinctSameCategoryFailures_AreAllPreserved()
+    {
+        var harness = CreateHarness();
+        harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
+        {
+            Status = DeploymentReadinessStatus.Fail,
+            Category = DeploymentReadinessCategory.TemplateConfig,
+            Code = "GST.TIMEZONE.MISSING_CONFIG",
+            Message = "Time zone is not configured for VM 'Quick VM 1'.",
+            ActionableGuidance = "Pick a time zone for this VM before deploying.",
+            AffectedVmNames = ["Quick VM 1"]
+        });
+        harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
+        {
+            Status = DeploymentReadinessStatus.Fail,
+            Category = DeploymentReadinessCategory.TemplateConfig,
+            Code = "GST.ROLE.MISSING_SELECTION",
+            Message = "No role is selected for VM 'Quick VM 1'.",
+            ActionableGuidance = "Choose at least one role for this VM before deploying.",
+            AffectedVmNames = ["Quick VM 1"]
+        });
+
+        harness.Vm.ApplyShellState(isActive: true);
+        await harness.Vm.EvaluateCommand.ExecuteAsync(null);
+
+        var blockingMessages = harness.Vm.IssueRows
+            .Where(row => row.Severity == "Block")
+            .Select(row => row.Message)
+            .ToList();
+
+        Assert.Contains(blockingMessages, message => message.Contains("Time zone is not configured"));
+        Assert.Contains(blockingMessages, message => message.Contains("No role is selected"));
+    }
+
+    private static void CompleteVmSteps(DeployQuickDeployViewModel vm, string vmName)
+    {
+        foreach (var stepKey in new[] { DeploymentStepKeys.V2ProvisionVm, DeploymentStepKeys.V2StartVm })
+        {
+            vm.ApplyProgressUpdate(vmName, new DeployStepStateUpdate(
+                OperationId: "op",
+                VmId: Guid.NewGuid(),
+                VmName: vmName,
+                StepKey: stepKey,
+                StepLabel: stepKey,
+                State: DeployStepState.Succeeded,
+                Message: null,
+                TimestampUtc: DateTimeOffset.UtcNow,
+                Sequence: 0));
+        }
     }
 
     [Fact]
