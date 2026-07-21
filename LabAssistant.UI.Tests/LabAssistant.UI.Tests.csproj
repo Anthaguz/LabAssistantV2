@@ -125,4 +125,11 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Diagnostics\OperationIdDisplay.cs" Link="WinUI\OperationIdDisplay.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Machines capability (runtime-independent view model, list item, and shell seam). -->
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\MachinesViewModel.cs" Link="WinUI\MachinesViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\MachineListItem.cs" Link="WinUI\MachineListItem.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\IMachinesCapabilityShellBridge.cs" Link="WinUI\IMachinesCapabilityShellBridge.cs" />
+  </ItemGroup>
+
 </Project>
