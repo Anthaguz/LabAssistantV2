@@ -34,6 +34,7 @@
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployContextTypes.cs" Link="WinUI\DeployContextTypes.cs" />
     <Compile Include="..\LabAssistant.WinUI\Models\Deploy\DeployV2ReviewModels.cs" Link="WinUI\DeployV2ReviewModels.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\DeployContextBuilder.cs" Link="WinUI\DeployContextBuilder.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\DeployReadinessProjection.cs" Link="WinUI\DeployReadinessProjection.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployV2ReviewProjectionService.cs" Link="WinUI\DeployV2ReviewProjectionService.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployV2ReviewWorkspaceController.cs" Link="WinUI\DeployV2ReviewWorkspaceController.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Deploy\FromTemplate\DeployV2ReviewWorkspaceViewModel.cs" Link="WinUI\DeployV2ReviewWorkspaceViewModel.cs" />

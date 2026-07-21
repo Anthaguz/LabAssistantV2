@@ -97,7 +97,7 @@ internal static class DeployContextBuilder
                                     !string.Equals(vmTemplate.VhdxSignature, idMatch.Signature, StringComparison.OrdinalIgnoreCase);
             if (pathConflict || signatureConflict)
             {
-                issues.Add(new DeployCompatibilityIssue(string.Empty, true, "Disk identity conflict detected. Resolve in Templates editor.", "Select one catalog-backed identity and save template."));
+                issues.Add(new DeployCompatibilityIssue(string.Empty, true, "Disk identity conflict detected. Resolve in Templates editor.", "Select one catalog-backed identity and save template.", DeploymentReadinessCategory.VhdxBaseDisk));
                 return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
             }
 
@@ -106,13 +106,13 @@ internal static class DeployContextBuilder
 
         if (!string.IsNullOrWhiteSpace(vmTemplate.VhdxId))
         {
-            issues.Add(new DeployCompatibilityIssue(string.Empty, true, $"Catalog entry '{vmTemplate.VhdxId}' is missing.", "Open in Templates editor and select a valid catalog disk."));
+            issues.Add(new DeployCompatibilityIssue(string.Empty, true, $"Catalog entry '{vmTemplate.VhdxId}' is missing.", "Open in Templates editor and select a valid catalog disk.", DeploymentReadinessCategory.VhdxBaseDisk));
             return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
         }
 
         if (signatureMatches.Count > 1)
         {
-            issues.Add(new DeployCompatibilityIssue(string.Empty, true, "Disk signature maps to multiple catalog entries.", "Resolve ambiguous disk selection in Templates editor."));
+            issues.Add(new DeployCompatibilityIssue(string.Empty, true, "Disk signature maps to multiple catalog entries.", "Resolve ambiguous disk selection in Templates editor.", DeploymentReadinessCategory.VhdxBaseDisk));
             return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
         }
 
@@ -124,17 +124,17 @@ internal static class DeployContextBuilder
 
         if (pathMatch is not null)
         {
-            issues.Add(new DeployCompatibilityIssue(string.Empty, false, "Using legacy path-based disk match.", "Use resolve suggestions or Templates editor to normalize to catalog id."));
+            issues.Add(new DeployCompatibilityIssue(string.Empty, false, "Using legacy path-based disk match.", "Use resolve suggestions or Templates editor to normalize to catalog id.", DeploymentReadinessCategory.VhdxBaseDisk));
             return new DeployDiskResolution(pathMatch.Path, pathMatch.Id, pathMatch.Signature, issues);
         }
 
         if (!string.IsNullOrWhiteSpace(vmTemplate.VhdPath))
         {
-            issues.Add(new DeployCompatibilityIssue(string.Empty, true, "Disk path does not match catalog entries.", "Open in Templates editor and choose a valid catalog base disk."));
+            issues.Add(new DeployCompatibilityIssue(string.Empty, true, "Disk path does not match catalog entries.", "Open in Templates editor and choose a valid catalog base disk.", DeploymentReadinessCategory.VhdxBaseDisk));
             return new DeployDiskResolution(vmTemplate.VhdPath, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
         }
 
-        issues.Add(new DeployCompatibilityIssue(string.Empty, true, "No disk identity configured.", "Open in Templates editor and select a base disk."));
+        issues.Add(new DeployCompatibilityIssue(string.Empty, true, "No disk identity configured.", "Open in Templates editor and select a base disk.", DeploymentReadinessCategory.VhdxBaseDisk));
         return new DeployDiskResolution(string.Empty, vmTemplate.VhdxId, vmTemplate.VhdxSignature, issues);
     }
 
@@ -153,7 +153,7 @@ internal static class DeployContextBuilder
 
         if (switches.Count == 0)
         {
-            issues.Add(new DeployCompatibilityIssue(string.Empty, false, "No switch assigned.", "Assign a switch in Quick Deploy VM properties (or Templates editor) if networking is required."));
+            issues.Add(new DeployCompatibilityIssue(string.Empty, false, "No switch assigned.", "Assign a switch in Quick Deploy VM properties (or Templates editor) if networking is required.", DeploymentReadinessCategory.NetworkSwitch));
             return new DeploySwitchResolution(Array.Empty<string>(), issues);
         }
 
@@ -173,7 +173,7 @@ internal static class DeployContextBuilder
 
         if (missing.Count > 0)
         {
-            issues.Add(new DeployCompatibilityIssue(string.Empty, true, $"Assigned switch mapping missing ({string.Join(", ", missing)}).", "Update switch mapping in Quick Deploy VM properties (or Templates editor)."));
+            issues.Add(new DeployCompatibilityIssue(string.Empty, true, $"Assigned switch mapping missing ({string.Join(", ", missing)}).", "Update switch mapping in Quick Deploy VM properties (or Templates editor).", DeploymentReadinessCategory.NetworkSwitch));
         }
 
         return new DeploySwitchResolution(available, issues);

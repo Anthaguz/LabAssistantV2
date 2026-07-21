@@ -441,9 +441,44 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     public void SetWorkflowState(string lifecycleState, int progressPercent, string progressSummary)
     {
         LifecycleState = lifecycleState;
-        ProgressPercent = progressPercent;
+        ProgressPercent = ResolveWorkflowProgress(lifecycleState, progressPercent);
         ProgressSummary = progressSummary;
     }
+
+    /// <summary>
+    /// Resolves the overall progress value shown by both the readiness bar and the right-panel overall
+    /// deployment bar. While VMs are actively deploying the bar reflects the real per-VM aggregate so it
+    /// moves as VMs complete instead of resting on a fixed stage constant (the previous behavior left it
+    /// stuck near the middle for the entire run). Pre-deploy and terminal states keep the caller's value.
+    /// </summary>
+    private int ResolveWorkflowProgress(string lifecycleState, int fallbackPercent) =>
+        IsLiveDeployState(lifecycleState) && _progressByVm.Count > 0
+            ? ComputeVmAggregateProgress()
+            : fallbackPercent;
+
+    private void RefreshLiveDeployProgress()
+    {
+        if (_progressByVm.Count == 0 || !IsLiveDeployState(LifecycleState))
+        {
+            return;
+        }
+
+        ProgressPercent = ComputeVmAggregateProgress();
+    }
+
+    private int ComputeVmAggregateProgress()
+    {
+        if (_progressByVm.Count == 0)
+        {
+            return 0;
+        }
+
+        var average = _progressByVm.Values.Average(state => state.ProgressPercent);
+        return (int)Math.Round(average, MidpointRounding.AwayFromZero);
+    }
+
+    private static bool IsLiveDeployState(string lifecycleState) =>
+        string.Equals(lifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
 
     public void ResetProgressState()
     {
@@ -519,6 +554,7 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
         state.ApplyStepStateUpdate(update);
         RefreshResultRows();
+        RefreshLiveDeployProgress();
     }
 
     /// <summary>
@@ -1232,46 +1268,27 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var compatibilityByVm = _compatibilityIssues
-            .Where(issue => !string.IsNullOrWhiteSpace(issue.VmName))
-            .GroupBy(issue => issue.VmName, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
-
-        var readinessByVm = (ReadinessReport?.Results ?? [])
-            .SelectMany(result => result.AffectedVmNames.Select(vmName => (vmName, result)))
-            .Where(tuple => !string.IsNullOrWhiteSpace(tuple.vmName))
-            .GroupBy(tuple => tuple.vmName, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Select(item => item.result).ToList(), StringComparer.OrdinalIgnoreCase);
+        var mergedIssues = DeployReadinessProjection.Merge(_compatibilityIssues, ReadinessReport);
 
         foreach (var vmName in vmNames)
         {
-            compatibilityByVm.TryGetValue(vmName, out var vmCompatibilityIssues);
-            readinessByVm.TryGetValue(vmName, out var vmReadinessResults);
-
-            vmCompatibilityIssues ??= [];
-            vmReadinessResults ??= [];
-
-            var hasBlocking = vmCompatibilityIssues.Any(issue => issue.IsBlocking) ||
-                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Fail);
-            var hasWarnings = vmCompatibilityIssues.Any(issue => !issue.IsBlocking) ||
-                              vmReadinessResults.Any(result => result.Status == DeploymentReadinessStatus.Warn);
-            if (!hasBlocking && !hasWarnings)
+            var vmIssues = mergedIssues
+                .Where(issue => DeployReadinessProjection.ScopeMatches(issue, vmName))
+                .ToList();
+            var blocking = vmIssues.Where(issue => issue.IsBlocking).ToList();
+            var warnings = vmIssues.Where(issue => !issue.IsBlocking).ToList();
+            if (blocking.Count == 0 && warnings.Count == 0)
             {
                 continue;
             }
 
-            var status = hasBlocking ? "Blocked" : "Warning";
-            var blockingCount = vmCompatibilityIssues.Count(issue => issue.IsBlocking) +
-                                vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Fail);
-            var warningCount = vmCompatibilityIssues.Count(issue => !issue.IsBlocking) +
-                               vmReadinessResults.Count(result => result.Status == DeploymentReadinessStatus.Warn);
-
+            var hasBlocking = blocking.Count > 0;
             ResultRows.Add(new DeployVmResultRow(
                 VmName: vmName,
-                Status: status,
-                Summary: $"Blocking: {blockingCount} | Warnings: {warningCount}",
+                Status: hasBlocking ? "Blocked" : "Warning",
+                Summary: FormatIssueReasonSummary(blocking, warnings),
                 ProgressPercent: hasBlocking ? 100 : 80,
-                TimelineSteps: CreateReadinessTimelineSteps(vmCompatibilityIssues, vmReadinessResults, hasBlocking)));
+                TimelineSteps: CreateReadinessTimelineSteps(blocking, warnings)));
         }
 
         var hasReadinessData = ReadinessReport is not null || _compatibilityIssues.Count > 0;
@@ -1286,30 +1303,35 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         }
     }
 
+    /// <summary>
+    /// Builds a per-VM result-row summary that names the actual blocking or warning reason(s) instead of
+    /// a bare count. Blocking reasons take precedence; the reasons come from the de-duplicated merged
+    /// issue list so the text matches the real number of problems.
+    /// </summary>
+    private static string FormatIssueReasonSummary(
+        IReadOnlyList<DeployMergedIssue> blocking,
+        IReadOnlyList<DeployMergedIssue> warnings)
+    {
+        if (blocking.Count > 0)
+        {
+            return $"Blocked: {string.Join(" ", blocking.Select(issue => issue.Message))}";
+        }
+
+        return $"Warning: {string.Join(" ", warnings.Select(issue => issue.Message))}";
+    }
+
     private void RefreshIssueRows()
     {
         IssueRows.Clear();
 
-        foreach (var issue in _compatibilityIssues)
+        // Compatibility issues and the readiness report describe the same reality; merge them so a single
+        // problem is not listed (or counted) twice.
+        foreach (var issue in DeployReadinessProjection.Merge(_compatibilityIssues, ReadinessReport))
         {
             IssueRows.Add(new DeployIssueRow(
-                Scope: string.IsNullOrWhiteSpace(issue.VmName) ? "Global" : issue.VmName.Trim(),
+                Scope: issue.Scope,
                 Severity: issue.IsBlocking ? "Block" : "Warn",
                 Message: FormatIssueMessage(issue.Message, issue.Guidance)));
-        }
-
-        if (ReadinessReport is not null)
-        {
-            foreach (var result in ReadinessReport.Results.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
-            {
-                var scope = result.AffectedVmNames.Count > 0
-                    ? string.Join(", ", result.AffectedVmNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
-                    : "Global";
-                IssueRows.Add(new DeployIssueRow(
-                    Scope: scope,
-                    Severity: result.Status == DeploymentReadinessStatus.Fail ? "Block" : "Warn",
-                    Message: FormatIssueMessage(result.Message, result.ActionableGuidance)));
-            }
         }
 
         // Deploy-time blockers (V2 plan build failures or runtime blocking messages) are surfaced last so they stay
@@ -1445,30 +1467,20 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         string.IsNullOrWhiteSpace(guidance) ? message.Trim() : $"{message} {guidance}".Trim();
 
     private static IReadOnlyList<DeployTimelineStepRow> CreateReadinessTimelineSteps(
-        IReadOnlyList<DeployCompatibilityIssue> compatibilityIssues,
-        IReadOnlyList<DeploymentReadinessCheckResult> readinessResults,
-        bool hasBlocking)
+        IReadOnlyList<DeployMergedIssue> blocking,
+        IReadOnlyList<DeployMergedIssue> warnings)
     {
-        var state = hasBlocking ? DeployTimelineStepState.Failed : DeployTimelineStepState.Succeeded;
+        var hasBlocking = blocking.Count > 0;
         var steps = new List<DeployTimelineStepRow>
         {
-            new("Readiness evaluation", state)
+            new("Readiness evaluation", hasBlocking ? DeployTimelineStepState.Failed : DeployTimelineStepState.Succeeded)
         };
 
-        foreach (var issue in compatibilityIssues)
+        foreach (var issue in blocking.Concat(warnings))
         {
             steps.Add(new DeployTimelineStepRow(
-                $"{issue.Message} {issue.Guidance}".Trim(),
+                FormatIssueMessage(issue.Message, issue.Guidance),
                 issue.IsBlocking ? DeployTimelineStepState.Failed : DeployTimelineStepState.Pending));
-        }
-
-        foreach (var readinessResult in readinessResults.Where(result => result.Status is DeploymentReadinessStatus.Fail or DeploymentReadinessStatus.Warn))
-        {
-            steps.Add(new DeployTimelineStepRow(
-                $"{readinessResult.Message} {readinessResult.ActionableGuidance}".Trim(),
-                readinessResult.Status == DeploymentReadinessStatus.Fail
-                    ? DeployTimelineStepState.Failed
-                    : DeployTimelineStepState.Pending));
         }
 
         return steps;
