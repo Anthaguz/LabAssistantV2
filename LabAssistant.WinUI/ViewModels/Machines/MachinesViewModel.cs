@@ -132,6 +132,31 @@ public partial class MachinesViewModel : ViewModelBase
 
     public bool CanOpenRdp => CanRunMachineActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
 
+    /// <summary>
+    /// Human-readable tooltip for the RDP action. When the button is disabled (for example the VM
+    /// is not running) this explains why, so the reason is discoverable on hover instead of via a
+    /// stray always-on label (F22).
+    /// </summary>
+    public string RdpActionTooltip
+    {
+        get
+        {
+            if (SelectedMachine is null)
+            {
+                return "Select a running VM to connect over RDP.";
+            }
+
+            return _selectedRdpReadiness.State switch
+            {
+                MachineRdpReadinessState.Ready => "Open a Remote Desktop connection to the selected VM.",
+                MachineRdpReadinessState.Checking => "Checking RDP readiness...",
+                MachineRdpReadinessState.NotReady when _selectedRdpReadiness.ReasonCode == MachineRdpReadinessReasonCodes.VmNotRunning
+                    => "The VM must be running to connect over RDP.",
+                _ => _selectedRdpReadiness.Message
+            };
+        }
+    }
+
     public bool CanSaveChanges => SelectedMachine is not null && HasDirtyEdits && !IsLoading && !_isMachineEditLoading;
 
     public bool CanEditMachine => SelectedMachine is not null && !IsLoading && !_isMachineEditLoading;
@@ -875,6 +900,7 @@ public partial class MachinesViewModel : ViewModelBase
         RdpReadinessText = readiness.State == MachineRdpReadinessState.Ready || readiness.State == MachineRdpReadinessState.Unknown
             ? readiness.Message
             : $"{readiness.Message} ({readiness.ReasonCode})";
+        OnPropertyChanged(nameof(RdpActionTooltip));
         RaiseComputedStateChanged();
     }
 
@@ -886,6 +912,7 @@ public partial class MachinesViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanRefresh));
         OnPropertyChanged(nameof(CanRunMachineActions));
         OnPropertyChanged(nameof(CanOpenRdp));
+        OnPropertyChanged(nameof(RdpActionTooltip));
         OnPropertyChanged(nameof(CanSaveChanges));
         OnPropertyChanged(nameof(CanEditMachine));
         UpdateShellPollingState();

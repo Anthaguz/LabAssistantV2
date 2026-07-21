@@ -6,6 +6,27 @@
     xmlns:converters="using:LabAssistant.WinUI.Converters">
     <UserControl.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!--
+            Local action-button affordance styles (F21). Scoped to this view so the global palette
+            and theme dictionaries are untouched; they only compose existing shell palette brushes.
+        -->
+        <Style x:Key="MachineActionIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{StaticResource ShellTextPrimaryBrush}" />
+        </Style>
+        <Style x:Key="MachinePrimaryActionIconButtonStyle" TargetType="Button" BasedOn="{StaticResource MachineActionIconButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource ShellAccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style x:Key="MachineDestructiveActionIconButtonStyle" TargetType="Button" BasedOn="{StaticResource MachineActionIconButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource ShellCriticalBrush}" />
+        </Style>
+
         <Style x:Key="InlineCardBorderStyle" TargetType="Border">
             <Setter Property="Padding" Value="{StaticResource CardPadding}" />
             <Setter Property="Background" Value="{StaticResource ShellBackgroundBrush}" />
@@ -182,37 +203,93 @@
                         <StackPanel Spacing="{StaticResource SpacingXS}">
                             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Power" />
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                <Button TabIndex="6" AccessKey="T" AutomationProperties.Name="Start virtual machine" AutomationProperties.HelpText="Start the selected virtual machine." IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}" Command="{x:Bind ViewModel.StartVmCommand}" Content="Start VM" />
-                                <Button TabIndex="7" AccessKey="O" AutomationProperties.Name="Stop virtual machine" AutomationProperties.HelpText="Stop the selected virtual machine." IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}" Command="{x:Bind ViewModel.StopVmCommand}" Content="Stop VM" />
-                                <Button TabIndex="8" AccessKey="E" AutomationProperties.Name="Restart virtual machine" AutomationProperties.HelpText="Restart the selected virtual machine." IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}" Command="{x:Bind ViewModel.RestartVmCommand}" Content="Restart VM" />
-                            </StackPanel>
-                        </StackPanel>
-                        <StackPanel Spacing="{StaticResource SpacingXS}">
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Remote access" />
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                <Button TabIndex="9" AccessKey="C" AutomationProperties.Name="Open console" AutomationProperties.HelpText="Open the console for the selected virtual machine." IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}" Command="{x:Bind ViewModel.OpenConsoleCommand}" Content="Open Console" />
-                                <Button TabIndex="10" AccessKey="P" AutomationProperties.Name="Open Remote Desktop" AutomationProperties.HelpText="Open a Remote Desktop connection for the selected virtual machine when available." IsEnabled="{x:Bind ViewModel.CanOpenRdp, Mode=OneWay}" Command="{x:Bind ViewModel.OpenRdpCommand}" Content="Open RDP" />
-                            </StackPanel>
-                        </StackPanel>
-                        <StackPanel Spacing="{StaticResource SpacingXS}">
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Delete" />
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                <Button
-                                    Padding="12,6"
-                                    TabIndex="11"
-                                    AccessKey="D"
-                                    AutomationProperties.Name="Delete virtual machine"
-                                    AutomationProperties.HelpText="Delete the selected virtual machine."
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.DeleteVmCommand}"
-                                    Foreground="{StaticResource ShellWarnBrush}"
-                                    Content="Delete VM" />
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="{x:Bind ViewModel.RdpReadinessText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" TextWrapping="Wrap" />
+                                <Button
+                                    Style="{StaticResource MachinePrimaryActionIconButtonStyle}"
+                                    TabIndex="6"
+                                    AccessKey="T"
+                                    AutomationProperties.Name="Start virtual machine"
+                                    AutomationProperties.HelpText="Start the selected virtual machine."
+                                    ToolTipService.ToolTip="Start VM"
+                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.StartVmCommand}">
+                                    <FontIcon FontSize="16" Glyph="&#xE768;" />
+                                </Button>
+                                <Button
+                                    Style="{StaticResource MachineActionIconButtonStyle}"
+                                    TabIndex="7"
+                                    AccessKey="O"
+                                    AutomationProperties.Name="Stop virtual machine"
+                                    AutomationProperties.HelpText="Stop the selected virtual machine."
+                                    ToolTipService.ToolTip="Stop VM"
+                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.StopVmCommand}">
+                                    <FontIcon FontSize="16" Glyph="&#xE71A;" />
+                                </Button>
+                                <Button
+                                    Style="{StaticResource MachineActionIconButtonStyle}"
+                                    TabIndex="8"
+                                    AccessKey="E"
+                                    AutomationProperties.Name="Restart virtual machine"
+                                    AutomationProperties.HelpText="Restart the selected virtual machine."
+                                    ToolTipService.ToolTip="Restart VM"
+                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.RestartVmCommand}">
+                                    <FontIcon FontSize="16" Glyph="&#xE72C;" />
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Spacing="{StaticResource SpacingXS}">
+                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Remote access" />
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                                <Button
+                                    Style="{StaticResource MachineActionIconButtonStyle}"
+                                    TabIndex="9"
+                                    AccessKey="C"
+                                    AutomationProperties.Name="Open console"
+                                    AutomationProperties.HelpText="Open the console for the selected virtual machine."
+                                    ToolTipService.ToolTip="Open console"
+                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.OpenConsoleCommand}">
+                                    <FontIcon FontSize="16" Glyph="&#xE756;" />
+                                </Button>
+                                <!--
+                                    The RDP reason lives on a wrapper Grid so the tooltip still surfaces
+                                    while the button itself is disabled (a disabled button is not
+                                    hit-testable and would otherwise swallow the hover) (F22).
+                                -->
+                                <Grid Background="Transparent" ToolTipService.ToolTip="{x:Bind ViewModel.RdpActionTooltip, Mode=OneWay}">
+                                    <Button
+                                        Style="{StaticResource MachineActionIconButtonStyle}"
+                                        TabIndex="10"
+                                        AccessKey="P"
+                                        AutomationProperties.Name="Open Remote Desktop"
+                                        AutomationProperties.HelpText="Open a Remote Desktop connection for the selected virtual machine when available."
+                                        IsEnabled="{x:Bind ViewModel.CanOpenRdp, Mode=OneWay}"
+                                        Command="{x:Bind ViewModel.OpenRdpCommand}">
+                                        <FontIcon FontSize="16" Glyph="&#xE8AF;" />
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Spacing="{StaticResource SpacingXS}">
+                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Delete" />
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                                <Button
+                                    Style="{StaticResource MachineDestructiveActionIconButtonStyle}"
+                                    TabIndex="11"
+                                    AccessKey="D"
+                                    AutomationProperties.Name="Delete virtual machine"
+                                    AutomationProperties.HelpText="Delete the selected virtual machine."
+                                    ToolTipService.ToolTip="Delete VM"
+                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.DeleteVmCommand}">
+                                    <FontIcon FontSize="16" Glyph="&#xE74D;" />
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" TextWrapping="Wrap" />
                 </StackPanel>
             </ScrollViewer>
         </Border>
