@@ -142,13 +142,7 @@ public partial class MachinesViewModel : ViewModelBase
 
     public string SelectedVmNameText => SelectedDetail is null ? "Name: (none)" : $"Name: {SelectedDetail.VmName}";
 
-    public string SelectedVmStateText => SelectedDetail is null ? "State: -" : $"State: {SelectedDetail.State}";
-
     public string SelectedVmOriginText => SelectedDetail is null ? "Origin: -" : $"Origin: {SelectedDetail.OriginLabel}";
-
-    public string SelectedVmIdText => SelectedDetail is null ? "VM Id: -" : $"VM Id: {SelectedDetail.VmId}";
-
-    public string SelectedVmPathText => SelectedDetail is null ? "Path: -" : $"Path: {SelectedDetail.VmPath}";
 
     public string MinimumMemoryText
     {
@@ -467,10 +461,7 @@ public partial class MachinesViewModel : ViewModelBase
     partial void OnSelectedDetailChanged(MachineDetailState? value)
     {
         OnPropertyChanged(nameof(SelectedVmNameText));
-        OnPropertyChanged(nameof(SelectedVmStateText));
         OnPropertyChanged(nameof(SelectedVmOriginText));
-        OnPropertyChanged(nameof(SelectedVmIdText));
-        OnPropertyChanged(nameof(SelectedVmPathText));
     }
 
     partial void OnStartupMemoryChanged(string value) => RefreshDraftFromEditors();
