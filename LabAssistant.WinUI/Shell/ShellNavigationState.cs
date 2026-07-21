@@ -32,6 +32,16 @@ internal sealed class ShellNavigationState
     public string ActiveRouteKey { get; private set; }
 
     /// <summary>
+    /// Human-readable breadcrumb for the active route. A capability with a single subview (for
+    /// example Machines) has no distinct sub-page, so its breadcrumb is just the capability name;
+    /// appending the placeholder "/ Overview" segment would imply a sub-page that does not exist.
+    /// Capabilities with real sibling subviews render "Capability / Subview".
+    /// </summary>
+    public string BreadcrumbText => ActiveCapability.Subviews.Count > 1
+        ? $"{ActiveCapability.DisplayName} / {ActiveSubview.DisplayName}"
+        : ActiveCapability.DisplayName;
+
+    /// <summary>
     /// Resolves the capability page type registered for a capability key. Every capability the
     /// shell knows about (<see cref="ShellViewModel.Capabilities"/>) must have an entry here;
     /// a miss means a capability was added without registering its page, so this throws instead

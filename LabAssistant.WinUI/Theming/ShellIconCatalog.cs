@@ -16,8 +16,8 @@ public static class ShellIconCatalog
 {
     private static readonly IReadOnlyDictionary<string, string> TokenToGlyph = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        [ShellIconToken.Machines] = "\uE8A7",
-        [ShellIconToken.Deploy] = "\uE80F",
+        [ShellIconToken.Machines] = "\uE80F",
+        [ShellIconToken.Deploy] = "\uE8A7",
         [ShellIconToken.Templates] = "\uE8A5",
         [ShellIconToken.Assets] = "\uED43",
         [ShellIconToken.Diagnostics] = "\uE9D9",

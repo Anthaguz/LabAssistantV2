@@ -146,6 +146,34 @@ public sealed class ShellNavigationStateTests
     }
 
     [Fact]
+    public void BreadcrumbText_SingleSubviewCapability_ShowsCapabilityNameOnly()
+    {
+        // Machines has a single subview and no distinct sub-page, so the breadcrumb must not
+        // append the placeholder "/ Overview" segment.
+        var state = CreateState();
+
+        Assert.Equal("Machines", state.BreadcrumbText);
+    }
+
+    [Fact]
+    public void BreadcrumbText_MultiSubviewCapability_ShowsCapabilityAndSubview()
+    {
+        var state = CreateState();
+        state.TryChangeRoute(ShellRouteKeys.DeployQuickDeploy);
+
+        Assert.Equal("Deploy / Quick Deploy", state.BreadcrumbText);
+    }
+
+    [Fact]
+    public void BreadcrumbText_SettingsSingleSubview_ShowsCapabilityNameOnly()
+    {
+        var state = CreateState();
+        state.TryChangeRoute(ShellRouteKeys.SettingsMachines);
+
+        Assert.Equal("Settings", state.BreadcrumbText);
+    }
+
+    [Fact]
     public void ReportActiveSubview_SameRouteAlreadyActive_IsNoOp()
     {
         var state = CreateState();

@@ -136,7 +136,7 @@ internal sealed class ShellNavigationCoordinator
     /// </summary>
     private void ApplyHeaderAndPanels()
     {
-        _currentRouteTextBlock.Text = $"{_state.ActiveCapability.DisplayName} / {_state.ActiveSubview.DisplayName}";
+        _currentRouteTextBlock.Text = _state.BreadcrumbText;
         _contentTitleTextBlock.Text = _state.ActiveCapability.DisplayName;
         _contentDescriptionTextBlock.Text = GetContentDescription();
         _applyRightPanelState();
