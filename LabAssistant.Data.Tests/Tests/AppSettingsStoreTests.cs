@@ -54,6 +54,24 @@ public class AppSettingsStoreTests
         Assert.True(File.Exists(reloaded.SettingsPath));
     }
 
+    [Fact]
+    public void SetTheme_PersistsAndRoundTripsAcrossReload()
+    {
+        var appRoot = BuildTempRoot();
+        var store = new AppSettingsStore(new AppPaths(appRoot));
+        store.LoadOrCreate();
+
+        // Default is Light for a fresh install.
+        Assert.Equal(LabAssistant.Models.Configuration.AppTheme.Light, store.Settings.Theme);
+
+        store.SetTheme(LabAssistant.Models.Configuration.AppTheme.Dark);
+
+        var reloaded = new AppSettingsStore(new AppPaths(appRoot));
+        reloaded.LoadOrCreate();
+
+        Assert.Equal(LabAssistant.Models.Configuration.AppTheme.Dark, reloaded.Settings.Theme);
+    }
+
     private static string BuildTempRoot()
     {
         var folder = Path.Combine(Path.GetTempPath(), "LabAssistantTests", Guid.NewGuid().ToString("N"));

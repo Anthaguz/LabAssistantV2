@@ -246,5 +246,10 @@ public sealed class TemplatesCapabilityServiceTests
         {
             Settings.DifferencingDiskBasePath = path;
         }
+
+        public void SetTheme(AppTheme theme)
+        {
+            Settings.Theme = theme;
+        }
     }
 }

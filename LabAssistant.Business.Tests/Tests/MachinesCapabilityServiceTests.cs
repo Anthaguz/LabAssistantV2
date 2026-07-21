@@ -432,5 +432,7 @@ public class MachinesCapabilityServiceTests
         }
 
         public void SetDifferencingDiskBasePath(string path) { }
+
+        public void SetTheme(AppTheme theme) { }
     }
 }

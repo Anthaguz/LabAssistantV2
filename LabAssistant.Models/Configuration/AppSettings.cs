@@ -22,4 +22,12 @@ public class AppSettings
     public List<string> NonBlockingOptionalSteps { get; set; } = new();
 
     public string MachineDeletionPolicy { get; set; } = "AskEveryTime";
+
+    /// <summary>
+    /// User-selected colour theme. Serialized as its string name so the settings file stays
+    /// human-readable and stable across enum reordering. Defaults to <see cref="AppTheme.Light"/>,
+    /// which also covers older settings files written before this field existed.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public AppTheme Theme { get; set; } = AppTheme.Light;
 }

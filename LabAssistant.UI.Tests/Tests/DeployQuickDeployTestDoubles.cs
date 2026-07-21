@@ -55,6 +55,10 @@ internal sealed class FakeAppSettingsStore : IAppSettingsStore
     public void SetDifferencingDiskBasePath(string path)
     {
     }
+
+    public void SetTheme(AppTheme theme)
+    {
+    }
 }
 
 /// <summary>
