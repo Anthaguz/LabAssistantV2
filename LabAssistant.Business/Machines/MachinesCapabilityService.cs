@@ -224,6 +224,17 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             _machineAdminService.StopVmAsync);
     }
 
+    public Task<MachineOperationResult> TurnOffVmAsync(MachineInventoryItem vm)
+    {
+        return ExecuteVmActionAsync(
+            vm,
+            "turn_off",
+            LaStatus.Machines_RunningMachineAction,
+            LaStatus.Machines_MachineActionCompleted,
+            LaStatus.Machines_MachineActionFailed,
+            _machineAdminService.TurnOffVmAsync);
+    }
+
     public Task<MachineOperationResult> RestartVmAsync(MachineInventoryItem vm)
     {
         return ExecuteVmActionAsync(
@@ -233,6 +244,73 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
             LaStatus.Machines_MachineActionCompleted,
             LaStatus.Machines_MachineActionFailed,
             _machineAdminService.RestartVmAsync);
+    }
+
+    public async Task<MachineOperationResult> RenameVmAsync(MachineInventoryItem vm, string newName)
+    {
+        var operationId = Guid.NewGuid().ToString("N");
+        var validation = MachineNameValidator.Validate(newName, vm.VmName);
+        if (!validation.IsValid)
+        {
+            var validationContext = BuildVmContext(vm, "rename");
+            validationContext["newName"] = newName;
+            validationContext["validationError"] = validation.ErrorMessage;
+            _structuredLogger.Log(
+                LaStatus.Machines_MachineActionFailed,
+                operationId,
+                "failed",
+                validationContext);
+
+            return new MachineOperationResult
+            {
+                Success = false,
+                OperationId = operationId,
+                UserMessage = validation.ErrorMessage ?? $"Failed to rename '{vm.VmName}'.",
+                ErrorContext = validationContext
+            };
+        }
+
+        var normalizedName = validation.NormalizedName;
+        var context = BuildVmContext(vm, "rename");
+        context["newName"] = normalizedName;
+
+        _structuredLogger.Log(
+            LaStatus.Machines_RunningMachineAction,
+            operationId,
+            "started",
+            context);
+
+        var actionResult = await _machineAdminService.RenameVmAsync(vm.VmName, normalizedName);
+        if (actionResult.Success)
+        {
+            _structuredLogger.Log(
+                LaStatus.Machines_MachineActionCompleted,
+                operationId,
+                "success",
+                context);
+
+            return new MachineOperationResult
+            {
+                Success = true,
+                OperationId = operationId,
+                UserMessage = $"Renamed '{vm.VmName}' to '{normalizedName}'."
+            };
+        }
+
+        var failureContext = MergeFailureContext(context, actionResult);
+        _structuredLogger.Log(
+            LaStatus.Machines_MachineActionFailed,
+            operationId,
+            "failed",
+            failureContext);
+
+        return new MachineOperationResult
+        {
+            Success = false,
+            OperationId = operationId,
+            UserMessage = BuildActionFailureMessage("rename", vm.VmName, actionResult.ErrorMessage),
+            ErrorContext = failureContext
+        };
     }
 
     public Task<MachineOperationResult> OpenConsoleAsync(MachineInventoryItem vm)
@@ -672,6 +750,7 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         {
             "start" => $"Started '{vmName}'.",
             "stop" => $"Stopped '{vmName}'.",
+            "turn_off" => $"Turned off '{vmName}'.",
             "restart" => $"Restarted '{vmName}'.",
             "open_console" => $"Opened Hyper-V Console for '{vmName}'.",
             "apply_edit" => $"Applied edits for '{vmName}'.",
@@ -685,7 +764,9 @@ public sealed class MachinesCapabilityService : IMachinesCapabilityService
         {
             "start" => $"Failed to start '{vmName}'.",
             "stop" => $"Failed to stop '{vmName}'.",
+            "turn_off" => $"Failed to turn off '{vmName}'.",
             "restart" => $"Failed to restart '{vmName}'.",
+            "rename" => $"Failed to rename '{vmName}'.",
             "open_console" => $"Failed to open Hyper-V Console for '{vmName}'.",
             "open_rdp" => $"Failed to open RDP for '{vmName}'.",
             "apply_edit" => $"Failed to apply edits for '{vmName}'.",

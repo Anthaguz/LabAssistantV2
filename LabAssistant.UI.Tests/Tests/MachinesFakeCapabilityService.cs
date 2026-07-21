@@ -19,6 +19,10 @@ internal sealed class MachinesFakeCapabilityService : IMachinesCapabilityService
 
     public List<(string VmName, string Action)> ActionCalls { get; } = new();
 
+    public List<(string VmName, string NewName)> RenameCalls { get; } = new();
+
+    public MachineOperationResult RenameResult { get; set; } = new() { Success = true, OperationId = "op", UserMessage = "renamed" };
+
     public MachineOperationResult ApplyEditResult { get; set; } = new() { Success = true, OperationId = "op", UserMessage = "applied" };
 
     public Task<IReadOnlyList<MachineInventoryItem>> LoadInventoryAsync()
@@ -42,7 +46,15 @@ internal sealed class MachinesFakeCapabilityService : IMachinesCapabilityService
 
     public Task<MachineOperationResult> StopVmAsync(MachineInventoryItem vm) => RecordAction(vm, "stop");
 
+    public Task<MachineOperationResult> TurnOffVmAsync(MachineInventoryItem vm) => RecordAction(vm, "turn_off");
+
     public Task<MachineOperationResult> RestartVmAsync(MachineInventoryItem vm) => RecordAction(vm, "restart");
+
+    public Task<MachineOperationResult> RenameVmAsync(MachineInventoryItem vm, string newName)
+    {
+        RenameCalls.Add((vm.VmName, newName));
+        return Task.FromResult(RenameResult);
+    }
 
     public Task<MachineOperationResult> OpenConsoleAsync(MachineInventoryItem vm) => RecordAction(vm, "open_console");
 

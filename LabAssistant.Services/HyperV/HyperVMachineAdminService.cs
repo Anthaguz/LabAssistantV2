@@ -78,10 +78,23 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         return ExecuteCommandAsync("machines_stop_vm", script);
     }
 
+    public Task<HyperVMachineActionResult> TurnOffVmAsync(string vmName)
+    {
+        // -TurnOff pulls virtual power immediately; -Force suppresses the confirmation prompt.
+        var script = $"Stop-VM -Name {Quote(vmName)} -TurnOff -Force -ErrorAction Stop";
+        return ExecuteCommandAsync("machines_turn_off_vm", script);
+    }
+
     public Task<HyperVMachineActionResult> RestartVmAsync(string vmName)
     {
         var script = $"Restart-VM -Name {Quote(vmName)} -Force -ErrorAction Stop";
         return ExecuteCommandAsync("machines_restart_vm", script);
+    }
+
+    public Task<HyperVMachineActionResult> RenameVmAsync(string currentName, string newName)
+    {
+        var script = $"Rename-VM -Name {Quote(currentName)} -NewName {Quote(newName)} -ErrorAction Stop";
+        return ExecuteCommandAsync("machines_rename_vm", script);
     }
 
     public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName)

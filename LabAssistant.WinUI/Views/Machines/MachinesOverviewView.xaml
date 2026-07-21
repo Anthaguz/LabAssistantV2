@@ -175,24 +175,85 @@
                         AutomationProperties.HelpText="Turn dynamic memory on or off for the selected virtual machine."
                         IsEnabled="{x:Bind ViewModel.CanEditMachine, Mode=OneWay}"
                         IsOn="{x:Bind ViewModel.IsDynamicMemory, Mode=TwoWay}" />
-
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                        <Button
-                            Padding="12,6"
-                            TabIndex="5"
-                            AccessKey="S"
-                            AutomationProperties.Name="Save virtual machine changes"
-                            AutomationProperties.HelpText="Save pending edits for the selected virtual machine."
-                            IsEnabled="{x:Bind ViewModel.CanSaveChanges, Mode=OneWay}"
-                            Command="{x:Bind ViewModel.SaveChangesCommand}"
-                            Content="Save Changes" />
-                        <TextBlock
-                            VerticalAlignment="Center"
-                            Foreground="{StaticResource ShellWarnBrush}"
-                            AutomationProperties.LiveSetting="Polite"
+
+                    <!--
+                        Minimum/maximum/buffer only apply to dynamic memory, so they are shown only
+                        while it is on (F16). With dynamic memory off the guest uses a fixed Startup
+                        allocation and these fields would be meaningless.
+                    -->
+                    <StackPanel
+                        Spacing="10"
+                        Visibility="{x:Bind ViewModel.ShowDynamicMemoryFields, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                        <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="MinMemoryLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Minimum Memory (MB)" />
+                            <TextBox
+                                Grid.Column="1"
+                                Width="140"
+                                HorizontalAlignment="Left"
+                                TabIndex="5"
+                                AutomationProperties.Name="Minimum memory in megabytes"
+                                AutomationProperties.HelpText="Edit the minimum dynamic memory for the selected virtual machine."
+                                AutomationProperties.LabeledBy="{Binding ElementName=MinMemoryLabel}"
+                                IsEnabled="{x:Bind ViewModel.CanEditMachine, Mode=OneWay}"
+                                Text="{x:Bind ViewModel.MinMemory, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="MaxMemoryLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Maximum Memory (MB)" />
+                            <TextBox
+                                Grid.Column="1"
+                                Width="140"
+                                HorizontalAlignment="Left"
+                                TabIndex="6"
+                                AutomationProperties.Name="Maximum memory in megabytes"
+                                AutomationProperties.HelpText="Edit the maximum dynamic memory for the selected virtual machine."
+                                AutomationProperties.LabeledBy="{Binding ElementName=MaxMemoryLabel}"
+                                IsEnabled="{x:Bind ViewModel.CanEditMachine, Mode=OneWay}"
+                                Text="{x:Bind ViewModel.MaxMemory, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="MemoryBufferLabel" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextSecondaryBrush}" Text="Memory Buffer (%)" />
+                            <TextBox
+                                Grid.Column="1"
+                                Width="90"
+                                HorizontalAlignment="Left"
+                                TabIndex="7"
+                                AutomationProperties.Name="Memory buffer percent"
+                                AutomationProperties.HelpText="Edit the dynamic memory buffer percentage for the selected virtual machine."
+                                AutomationProperties.LabeledBy="{Binding ElementName=MemoryBufferLabel}"
+                                IsEnabled="{x:Bind ViewModel.CanEditMachine, Mode=OneWay}"
+                                Text="{x:Bind ViewModel.MemoryBuffer, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <Button
+                            Padding="12,6"
+                            TabIndex="8"
+                            AccessKey="S"
+                            AutomationProperties.Name="Save virtual machine changes"
+                            AutomationProperties.HelpText="Save pending edits for the selected virtual machine."
+                            IsEnabled="{x:Bind ViewModel.CanSaveChanges, Mode=OneWay}"
+                            Command="{x:Bind ViewModel.SaveChangesCommand}"
+                            Content="Save Changes" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Foreground="{StaticResource ShellWarnBrush}"
+                            AutomationProperties.LiveSetting="Polite"
                             Visibility="{x:Bind ViewModel.HasDirtyEdits, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
                             Text="Unsaved changes" />
-                    </StackPanel>
+                    </StackPanel>
 
                     <TextBlock
                         Margin="0,8,0,0"
@@ -205,7 +266,7 @@
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                                 <Button
                                     Style="{StaticResource MachinePrimaryActionIconButtonStyle}"
-                                    TabIndex="6"
+                                    TabIndex="9"
                                     AccessKey="T"
                                     AutomationProperties.Name="Start virtual machine"
                                     AutomationProperties.HelpText="Start the selected virtual machine."
@@ -216,18 +277,29 @@
                                 </Button>
                                 <Button
                                     Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="7"
+                                    TabIndex="10"
                                     AccessKey="O"
-                                    AutomationProperties.Name="Stop virtual machine"
-                                    AutomationProperties.HelpText="Stop the selected virtual machine."
-                                    ToolTipService.ToolTip="Stop VM"
+                                    AutomationProperties.Name="Shut down virtual machine"
+                                    AutomationProperties.HelpText="Request a graceful guest shutdown of the selected virtual machine."
+                                    ToolTipService.ToolTip="Shut down (guest OS)"
                                     IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
                                     Command="{x:Bind ViewModel.StopVmCommand}">
+                                    <FontIcon FontSize="16" Glyph="&#xE7E8;" />
+                                </Button>
+                                <Button
+                                    Style="{StaticResource MachineActionIconButtonStyle}"
+                                    TabIndex="11"
+                                    AccessKey="F"
+                                    AutomationProperties.Name="Turn off virtual machine"
+                                    AutomationProperties.HelpText="Hard power-off the selected virtual machine without waiting for the guest to shut down."
+                                    ToolTipService.ToolTip="Turn off (hard power-off)"
+                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.TurnOffVmCommand}">
                                     <FontIcon FontSize="16" Glyph="&#xE71A;" />
                                 </Button>
                                 <Button
                                     Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="8"
+                                    TabIndex="12"
                                     AccessKey="E"
                                     AutomationProperties.Name="Restart virtual machine"
                                     AutomationProperties.HelpText="Restart the selected virtual machine."
@@ -243,7 +315,7 @@
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                                 <Button
                                     Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="9"
+                                    TabIndex="13"
                                     AccessKey="C"
                                     AutomationProperties.Name="Open console"
                                     AutomationProperties.HelpText="Open the console for the selected virtual machine."
@@ -260,7 +332,7 @@
                                 <Grid Background="Transparent" ToolTipService.ToolTip="{x:Bind ViewModel.RdpActionTooltip, Mode=OneWay}">
                                     <Button
                                         Style="{StaticResource MachineActionIconButtonStyle}"
-                                        TabIndex="10"
+                                        TabIndex="14"
                                         AccessKey="P"
                                         AutomationProperties.Name="Open Remote Desktop"
                                         AutomationProperties.HelpText="Open a Remote Desktop connection for the selected virtual machine when available."
@@ -272,11 +344,22 @@
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Spacing="{StaticResource SpacingXS}">
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Delete" />
+                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Manage" />
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                                 <Button
+                                    Style="{StaticResource MachineActionIconButtonStyle}"
+                                    TabIndex="15"
+                                    AccessKey="N"
+                                    AutomationProperties.Name="Rename virtual machine"
+                                    AutomationProperties.HelpText="Rename the selected virtual machine."
+                                    ToolTipService.ToolTip="Rename VM"
+                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.RenameVmCommand}">
+                                    <FontIcon FontSize="16" Glyph="&#xE8AC;" />
+                                </Button>
+                                <Button
                                     Style="{StaticResource MachineDestructiveActionIconButtonStyle}"
-                                    TabIndex="11"
+                                    TabIndex="16"
                                     AccessKey="D"
                                     AutomationProperties.Name="Delete virtual machine"
                                     AutomationProperties.HelpText="Delete the selected virtual machine."

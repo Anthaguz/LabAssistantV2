@@ -261,7 +261,9 @@ public sealed class AssetsSwitchesCapabilityServiceTests
 
         public Task<HyperVMachineActionResult> StartVmAsync(string vmName) => Task.FromResult(new HyperVMachineActionResult());
         public Task<HyperVMachineActionResult> StopVmAsync(string vmName) => Task.FromResult(new HyperVMachineActionResult());
+        public Task<HyperVMachineActionResult> TurnOffVmAsync(string vmName) => Task.FromResult(new HyperVMachineActionResult());
         public Task<HyperVMachineActionResult> RestartVmAsync(string vmName) => Task.FromResult(new HyperVMachineActionResult());
+        public Task<HyperVMachineActionResult> RenameVmAsync(string currentName, string newName) => Task.FromResult(new HyperVMachineActionResult());
         public Task<HyperVMachineActionResult> OpenConsoleAsync(string vmName) => Task.FromResult(new HyperVMachineActionResult());
         public Task<IReadOnlyList<string>> GetVmIpAddressesAsync(string vmName) => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
         public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4) => Task.FromResult(new HyperVMachineActionResult());
