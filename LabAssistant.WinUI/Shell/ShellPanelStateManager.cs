@@ -18,7 +18,6 @@ internal sealed class ShellPanelStateManager : IShellRightPanel
 
     private readonly FrameworkElement _insightsPanel;
     private readonly ColumnDefinition _shellRightPanelColumn;
-    private readonly Button _insightsToggleButton;
     private readonly TextBlock _rightPanelTitleTextBlock;
     private readonly ContentControl _rightPanelContentHost;
     private readonly Func<double> _getRootLayoutWidth;
@@ -38,14 +37,12 @@ internal sealed class ShellPanelStateManager : IShellRightPanel
     public ShellPanelStateManager(
         FrameworkElement insightsPanel,
         ColumnDefinition shellRightPanelColumn,
-        Button insightsToggleButton,
         TextBlock rightPanelTitleTextBlock,
         ContentControl rightPanelContentHost,
         Func<double> getRootLayoutWidth)
     {
         _insightsPanel = insightsPanel;
         _shellRightPanelColumn = shellRightPanelColumn;
-        _insightsToggleButton = insightsToggleButton;
         _rightPanelTitleTextBlock = rightPanelTitleTextBlock;
         _rightPanelContentHost = rightPanelContentHost;
         _getRootLayoutWidth = getRootLayoutWidth;
@@ -123,9 +120,6 @@ internal sealed class ShellPanelStateManager : IShellRightPanel
         var showPanel = HasOwner && _isShellRightPanelOpen && !_isShellRightPanelInCompactFallback;
         _insightsPanel.Visibility = showPanel ? Visibility.Visible : Visibility.Collapsed;
         _shellRightPanelColumn.Width = showPanel ? new GridLength(ShellRightPanelExpandedWidth) : new GridLength(0);
-        _insightsToggleButton.IsEnabled = HasOwner && !_isShellRightPanelInCompactFallback;
-        _insightsToggleButton.Opacity = _insightsToggleButton.IsEnabled ? 1.0 : 0.45;
-        ToolTipService.SetToolTip(_insightsToggleButton, "Toggle progress and results panel");
         _rightPanelTitleTextBlock.Text = _title;
         _isShown = showPanel;
 

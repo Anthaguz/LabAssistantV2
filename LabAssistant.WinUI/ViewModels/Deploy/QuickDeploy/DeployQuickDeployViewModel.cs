@@ -137,9 +137,26 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     [ObservableProperty]
     private string _globalIssuesBadgeText = "Blocking: 0 | Warnings: 0";
 
+    // F38: compact readiness badge next to the Progress / Results toggle. Replaces the repeated
+    // "Not ready to deploy: <reason>" sentences that used to echo across the VM row and VM Properties
+    // header. The single authoritative readiness line stays in the banner (ReadinessDisplayText).
     [ObservableProperty]
-    private string _editorIssueSummaryText =
-        "Changes validate while you edit. Row signals show which VM needs attention.";
+    private int _blockingIssueCount;
+
+    [ObservableProperty]
+    private int _warningIssueCount;
+
+    [ObservableProperty]
+    private int _readinessBadgeCount;
+
+    [ObservableProperty]
+    private bool _hasReadinessIssues;
+
+    [ObservableProperty]
+    private string _readinessBadgeText = string.Empty;
+
+    [ObservableProperty]
+    private string _readinessBadgeTooltip = string.Empty;
 
     [ObservableProperty]
     private string _switchGuidanceText = "Switch selection is optional.";
@@ -1189,6 +1206,16 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         var warningIssueCount = IssueRows.Count - blockingIssueCount;
         GlobalIssuesBadgeText = $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}";
 
+        // F38: drive the compact readiness badge from the same merged issue rows. The badge shows the
+        // combined count and its tooltip names the first reason, so the not-ready detail lives in one
+        // authoritative banner line plus this badge rather than being echoed in several places.
+        BlockingIssueCount = blockingIssueCount;
+        WarningIssueCount = warningIssueCount;
+        ReadinessBadgeCount = blockingIssueCount + warningIssueCount;
+        HasReadinessIssues = ReadinessBadgeCount > 0;
+        ReadinessBadgeText = ReadinessBadgeCount > 0 ? ReadinessBadgeCount.ToString(CultureInfo.InvariantCulture) : string.Empty;
+        ReadinessBadgeTooltip = BuildReadinessBadgeTooltip(blockingIssueCount, warningIssueCount);
+
         var hasEntries = VmEntries.Count > 0;
         var shouldShowInlineGuidance = hasEntries && !IsStarting && LiveProgressVmCount == 0;
         ReadinessDisplayText = shouldShowInlineGuidance
@@ -1211,8 +1238,28 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
             : "Select a base disk to continue.";
 
         UpdateEditorNameValidation();
+    }
 
-        EditorIssueSummaryText = BuildEditorIssueSummaryText();
+    /// <summary>
+    /// Builds the readiness badge tooltip (and screen-reader name): the combined count with the first
+    /// blocking reason, or the first warning when there are no blockers. Empty when nothing is wrong.
+    /// </summary>
+    private string BuildReadinessBadgeTooltip(int blockingIssueCount, int warningIssueCount)
+    {
+        var total = blockingIssueCount + warningIssueCount;
+        if (total == 0)
+        {
+            return string.Empty;
+        }
+
+        var firstReason = (IssueRows.FirstOrDefault(issue => string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase))
+            ?? IssueRows.FirstOrDefault())?.Message;
+        var counts = blockingIssueCount > 0
+            ? $"{blockingIssueCount} blocking, {warningIssueCount} warning(s)"
+            : $"{warningIssueCount} warning(s)";
+        return string.IsNullOrWhiteSpace(firstReason)
+            ? $"Readiness issues: {counts}."
+            : $"Readiness issues: {counts}. First: {firstReason}";
     }
 
     /// <summary>
@@ -1293,31 +1340,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         }
 
         return null;
-    }
-
-    private string BuildEditorIssueSummaryText()
-    {
-        if (SelectedVmEntry is null)
-        {
-            return "Select a VM entry to review its properties and resolve any issues inline.";
-        }
-
-        var draftIssues = GetDraftIssues();
-        if (draftIssues.Count > 0)
-        {
-            var blockingCount = draftIssues.Count(issue => issue.IsBlocking);
-            return blockingCount > 0
-                ? $"Blocking issues in this VM: {string.Join(" ", draftIssues.Where(issue => issue.IsBlocking).Select(issue => issue.Message))}"
-                : $"Warnings in this VM: {string.Join(" ", draftIssues.Select(issue => issue.Message))}";
-        }
-
-        var selectedRow = FindRow(SelectedVmEntry);
-        if (selectedRow is not null && selectedRow.HasIssueSummary)
-        {
-            return $"{selectedRow.IssueBadgeText}: {selectedRow.IssueSummary}";
-        }
-
-        return "Ready. Changes validate while you edit. Row signals show which VM needs attention.";
     }
 
     private void UpdateVmEntryRowBadges()
@@ -1557,9 +1579,11 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var selectedSwitch in selectedSwitches ?? Array.Empty<string>())
         {
+            // Switches are optional, so a blank/unselected switch row means "no switch" and must never
+            // block deploy. Skip it here; Auto-fix (DeployResolveSuggestionsService) prunes the dangling
+            // empty selector. Only a non-blank name that is unavailable or duplicated is a real blocker.
             if (string.IsNullOrWhiteSpace(selectedSwitch))
             {
-                issues.Add((true, "Each switch row must have a selected host switch or be removed."));
                 continue;
             }
 

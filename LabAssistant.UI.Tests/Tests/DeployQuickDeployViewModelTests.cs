@@ -262,6 +262,103 @@ public sealed class DeployQuickDeployViewModelTests
     }
 
     [Fact]
+    public async Task Evaluate_BlankSwitchRow_DoesNotBlockDeploy()
+    {
+        var harness = CreateHarness();
+        var vm = harness.Vm;
+        vm.ApplyShellState(isActive: true);
+
+        var catalogOption = vm.VhdxCatalogItems.OfType<TemplateVhdxCatalogOption>().First();
+        vm.SelectedVhdxCatalogItem = catalogOption;
+
+        // Add a switch row but leave it unselected. Switches are optional, so a blank row is treated as
+        // "no switch" - a soft warning at most, never a blocker that gates deploy.
+        vm.AddSwitchRowCommand.Execute(null);
+
+        await vm.EvaluateCommand.ExecuteAsync(null);
+
+        Assert.False(vm.HasBlockingFailures);
+        Assert.True(vm.CanStartDeploy);
+        Assert.DoesNotContain(vm.IssueRows, row => row.Message.Contains("switch row"));
+        Assert.DoesNotContain(vm.IssueRows, row => row.Severity == "Block");
+    }
+
+    [Fact]
+    public async Task ResolveSuggestions_WithBlankSwitchRow_PrunesAndReportsCount()
+    {
+        var harness = CreateHarness();
+        harness.Vm.ApplyShellState(isActive: true);
+
+        var entry = harness.Vm.SelectedVmEntry!;
+        entry.SwitchName = string.Empty;
+        entry.SwitchNames = [string.Empty];
+
+        await harness.Vm.ResolveSuggestionsCommand.ExecuteAsync(null);
+
+        Assert.Equal("Auto-fixed 1 reference(s).", harness.Vm.StatusText);
+
+        // The dangling blank selector is pruned so no empty switch row survives to deploy.
+        var repaired = harness.Vm.VmEntries[0];
+        Assert.Null(repaired.SwitchNames);
+        Assert.Null(repaired.SwitchName);
+    }
+
+    [Fact]
+    public async Task Evaluate_BlockingFailure_PopulatesReadinessBadge()
+    {
+        var harness = CreateHarness();
+        harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
+        {
+            Status = DeploymentReadinessStatus.Fail,
+            Category = DeploymentReadinessCategory.Environment,
+            Message = "Hyper-V is not available.",
+            ActionableGuidance = "Enable the Hyper-V role."
+        });
+
+        await ActivateReadyVmAsync(harness);
+
+        Assert.True(harness.Vm.HasReadinessIssues);
+        Assert.True(harness.Vm.BlockingIssueCount >= 1);
+        Assert.Equal(harness.Vm.BlockingIssueCount + harness.Vm.WarningIssueCount, harness.Vm.ReadinessBadgeCount);
+        Assert.Equal(harness.Vm.ReadinessBadgeCount.ToString(), harness.Vm.ReadinessBadgeText);
+        Assert.Contains("Hyper-V is not available.", harness.Vm.ReadinessBadgeTooltip);
+    }
+
+    [Fact]
+    public async Task Evaluate_ReadyVm_HidesReadinessBadge()
+    {
+        var harness = CreateHarness();
+
+        await ActivateReadyVmAsync(harness);
+
+        Assert.False(harness.Vm.HasReadinessIssues);
+        Assert.Equal(0, harness.Vm.ReadinessBadgeCount);
+        Assert.Equal(string.Empty, harness.Vm.ReadinessBadgeText);
+        Assert.Equal(string.Empty, harness.Vm.ReadinessBadgeTooltip);
+    }
+
+    [Fact]
+    public async Task Evaluate_WarningOnly_CountsWarningInReadinessBadge()
+    {
+        var harness = CreateHarness();
+        harness.Preflight.Results.Add(new DeploymentReadinessCheckResult
+        {
+            Status = DeploymentReadinessStatus.Warn,
+            Category = DeploymentReadinessCategory.DestinationPathStorage,
+            Message = "Destination volume is low on space.",
+            ActionableGuidance = "Free up disk space."
+        });
+
+        await ActivateReadyVmAsync(harness);
+
+        Assert.True(harness.Vm.HasReadinessIssues);
+        Assert.Equal(0, harness.Vm.BlockingIssueCount);
+        Assert.True(harness.Vm.WarningIssueCount >= 1);
+        Assert.Equal(harness.Vm.WarningIssueCount, harness.Vm.ReadinessBadgeCount);
+        Assert.Contains("Destination volume is low on space.", harness.Vm.ReadinessBadgeTooltip);
+    }
+
+    [Fact]
     public void CommandCanExecute_ReflectsEntryPresence()
     {
         var harness = CreateHarness();

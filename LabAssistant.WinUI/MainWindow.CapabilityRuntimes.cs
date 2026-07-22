@@ -18,7 +18,6 @@ public sealed partial class MainWindow
     private void ConfigureShellIcons()
     {
         HamburgerButton.Content = CreateIconGlyph(ShellIconToken.Menu);
-        InsightsToggleButton.Content = CreateIconGlyph(ShellIconToken.Insights);
     }
 
     private TextBlock CreateIconGlyph(string token)

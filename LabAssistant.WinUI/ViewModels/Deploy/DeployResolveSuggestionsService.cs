@@ -22,19 +22,27 @@ internal sealed class DeployResolveSuggestionsService
         var applied = 0;
         foreach (var vm in template.VmTemplates)
         {
-            var switchNames = vm.SwitchNames?.Where(name => !string.IsNullOrWhiteSpace(name)).ToList() ?? [];
-            if (switchNames.Count == 0 && !string.IsNullOrWhiteSpace(vm.SwitchName))
-            {
-                switchNames.Add(vm.SwitchName);
-            }
+            // Build the requested switch selection, preferring the multi-switch list and falling back to
+            // the legacy single SwitchName. Blank entries are intentionally kept here so a blank/unselected
+            // switch row is pruned and counted below: switches are optional, so a dangling empty selector
+            // should be cleared as a visible fix rather than dismissed as "no stale references found."
+            var requested = vm.SwitchNames is { Count: > 0 }
+                ? vm.SwitchNames.ToList()
+                : string.IsNullOrWhiteSpace(vm.SwitchName)
+                    ? new List<string>()
+                    : new List<string> { vm.SwitchName };
 
-            if (switchNames.Count > 0)
+            if (requested.Count > 0)
             {
-                var normalized = switchNames
+                var normalized = requested
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Where(name => normalizedSwitches.Contains(name, StringComparer.OrdinalIgnoreCase))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
-                if (normalized.Count != switchNames.Count)
+
+                // Anything the normalization dropped is a fix: blank rows, stale (unavailable) names, or
+                // duplicates. Comparing against the full requested count captures all three.
+                if (normalized.Count != requested.Count)
                 {
                     applied++;
                 }

@@ -43,7 +43,6 @@ public sealed partial class MainWindow : Window
         _shellPanelStateManager = new ShellPanelStateManager(
             InsightsPanel,
             ShellRightPanelColumn,
-            InsightsToggleButton,
             RightPanelTitleTextBlock,
             RightPanelContentHost,
             () => RootLayout.ActualWidth);
@@ -143,8 +142,6 @@ public sealed partial class MainWindow : Window
 
     private void GlobalNavigationView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args) =>
         _navigationCoordinator.HandleNavigationItemInvoked(args);
-
-    private void InsightsButton_Click(object sender, RoutedEventArgs e) => _shellPanelStateManager.TogglePanel();
 
     private void CloseRightPanelButton_Click(object sender, RoutedEventArgs e) => _shellPanelStateManager.ClosePanel();
 
