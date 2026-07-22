@@ -384,22 +384,35 @@
                 BorderThickness="1"
                 CornerRadius="{StaticResource CardCornerRadius}">
                 <StackPanel Spacing="{StaticResource SpacingS}">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                    <Grid ColumnSpacing="{StaticResource SpacingS}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Spacing="{StaticResource SpacingS}">
+                            <Button
+                                Command="{x:Bind ViewModel.EvaluateCommand}"
+                                Content="Evaluate"
+                                Visibility="Collapsed" />
+                            <Button
+                                Command="{x:Bind ViewModel.ResolveSuggestionsCommand}"
+                                Content="Auto-fix selections"
+                                ToolTipService.ToolTip="Repairs stale switch and base-disk references on the VM entries against what is currently available on the host and in the catalog." />
+                            <HyperlinkButton
+                                Command="{x:Bind ViewModel.OpenTemplateEditorCommand}"
+                                Content="Save as template..."
+                                ToolTipService.ToolTip="Saves the current VM entries as a reusable template in the Templates editor." />
+                        </StackPanel>
                         <Button
-                            Command="{x:Bind ViewModel.EvaluateCommand}"
-                            Content="Evaluate"
-                            Visibility="Collapsed" />
-                        <Button
-                            Command="{x:Bind ViewModel.ResolveSuggestionsCommand}"
-                            Content="Resolve Suggestions" />
-                        <Button
-                            Command="{x:Bind ViewModel.OpenTemplateEditorCommand}"
-                            Content="Open in Templates Editor" />
-                        <Button
+                            Grid.Column="1"
                             Command="{x:Bind ViewModel.StartDeployCommand}"
                             Style="{StaticResource AccentButtonStyle}"
                             Content="Start Deploy" />
-                    </StackPanel>
+                    </Grid>
                     <TextBlock
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                         Text="{x:Bind ViewModel.StatusText}"

@@ -317,15 +317,25 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
             template,
             _referenceDataService.CatalogItems,
             _referenceDataService.AvailableSwitches);
-        if (applied > 0)
+
+        // Nothing was stale, so skip the readiness re-run and leave the outcome on the status line. The
+        // enablement gate cannot cheaply pre-compute this (the switch/catalog reference data is loaded
+        // asynchronously and is empty/stale at CanExecute time), so the button stays enabled and the
+        // result is reported here instead.
+        if (applied == 0)
         {
-            ReplaceVmEntriesFromTemplate(template);
+            StatusText = "No stale references found.";
+            return;
         }
 
-        StatusText = applied == 0
-            ? "No auto-resolve suggestions available for the current quick deploy configuration."
-            : $"Applied {applied} auto-resolve suggestion(s). Re-evaluating readiness...";
+        ReplaceVmEntriesFromTemplate(template);
+
+        // Re-evaluate against the repaired entries, then restore the auto-fix outcome as the action
+        // status: EvaluateReadinessAsync overwrites StatusText with its own readiness summary, which would
+        // otherwise hide what the button just did. The readiness verdict still surfaces via the lifecycle
+        // badges and readiness panel.
         await _controller.EvaluateReadinessAsync(DeploymentPreflightMode.Full);
+        StatusText = $"Auto-fixed {applied} reference(s).";
     }
 
     [RelayCommand(CanExecute = nameof(CanOpenTemplateEditor))]
