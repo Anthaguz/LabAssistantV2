@@ -81,7 +81,6 @@ public sealed class DeployQuickDeployViewModelTests
         Harness harness = null!;
         var vm = new DeployQuickDeployViewModel(
             referenceData,
-            new DeployResolveSuggestionsService(),
             (_, _) =>
             {
                 harness.TemplateEditorCount++;
@@ -231,34 +230,58 @@ public sealed class DeployQuickDeployViewModelTests
     }
 
     [Fact]
-    public async Task ResolveSuggestions_WithNoStaleReferences_ReportsNothingToFix()
+    public async Task RowsRebuild_WhenSelectionChangesDuringCollectionChanged_DoesNotThrow()
     {
+        // F41 regression: a rows-rebuild that removes the selected row lets the ListView push a new
+        // SelectedVmEntryRow synchronously, mid-CollectionChanged. Before the fix that re-entered
+        // RefreshVmEntryRows and mutated VmEntryRows during the dispatch, throwing
+        // "Cannot change ObservableCollection during a CollectionChanged event". Here we emulate that
+        // framework selection push and additionally grow the entry set during the same event so a nested
+        // rebuild would need to Insert a row, which is exactly the throwing case.
         var harness = CreateHarness();
-        await ActivateReadyVmAsync(harness);
+        var vm = harness.Vm;
+        vm.ApplyShellState(isActive: true);
 
-        await harness.Vm.ResolveSuggestionsCommand.ExecuteAsync(null);
+        vm.AddVmCommand.Execute(null);
+        vm.AddSwitchRowCommand.Execute(null);
+        vm.SwitchRows[0].SelectedSwitch = SwitchName;
 
-        Assert.Equal("No stale references found.", harness.Vm.StatusText);
-    }
+        var rowToRemove = vm.VmEntryRows[1];
+        vm.SelectedVmEntryRow = rowToRemove;
 
-    [Fact]
-    public async Task ResolveSuggestions_WithStaleSwitchReference_AutoFixesAndReportsCount()
-    {
-        var harness = CreateHarness();
-        harness.Vm.ApplyShellState(isActive: true);
+        var spareEntry = new VmTemplate { Name = "Spare", MemoryMb = 2048, CpuCount = 2 };
+        var handledOnce = false;
 
-        var entry = harness.Vm.SelectedVmEntry!;
-        entry.SwitchName = "Ghost-Switch";
-        entry.SwitchNames = ["Ghost-Switch"];
+        void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (handledOnce || e.Action != NotifyCollectionChangedAction.Remove || e.OldItems is null ||
+                !e.OldItems.Contains(rowToRemove))
+            {
+                return;
+            }
 
-        await harness.Vm.ResolveSuggestionsCommand.ExecuteAsync(null);
+            handledOnce = true;
 
-        Assert.Equal("Auto-fixed 1 reference(s).", harness.Vm.StatusText);
+            // Emulate the ListView reconciling SelectedItem while the removed row is still being
+            // dispatched, and a concurrent entry-set growth so a nested rebuild would Insert mid-event.
+            vm.VmEntries.Add(spareEntry);
+            vm.SelectedVmEntryRow = vm.VmEntryRows.FirstOrDefault();
+        }
 
-        // The stale switch reference is dropped because it is not among the host's available switches.
-        var repaired = harness.Vm.VmEntries[0];
-        Assert.Null(repaired.SwitchNames);
-        Assert.Null(repaired.SwitchName);
+        vm.VmEntryRows.CollectionChanged += OnRowsChanged;
+        Exception? exception;
+        try
+        {
+            exception = await Record.ExceptionAsync(() => vm.RemoveVmRowCommand.ExecuteAsync(rowToRemove));
+        }
+        finally
+        {
+            vm.VmEntryRows.CollectionChanged -= OnRowsChanged;
+        }
+
+        Assert.Null(exception);
+        Assert.Equal(vm.VmEntries.Count, vm.VmEntryRows.Count);
+        Assert.True(vm.VmEntryRows.Select(row => row.VmEntry).SequenceEqual(vm.VmEntries));
     }
 
     [Fact]
@@ -284,26 +307,6 @@ public sealed class DeployQuickDeployViewModelTests
     }
 
     [Fact]
-    public async Task ResolveSuggestions_WithBlankSwitchRow_PrunesAndReportsCount()
-    {
-        var harness = CreateHarness();
-        harness.Vm.ApplyShellState(isActive: true);
-
-        var entry = harness.Vm.SelectedVmEntry!;
-        entry.SwitchName = string.Empty;
-        entry.SwitchNames = [string.Empty];
-
-        await harness.Vm.ResolveSuggestionsCommand.ExecuteAsync(null);
-
-        Assert.Equal("Auto-fixed 1 reference(s).", harness.Vm.StatusText);
-
-        // The dangling blank selector is pruned so no empty switch row survives to deploy.
-        var repaired = harness.Vm.VmEntries[0];
-        Assert.Null(repaired.SwitchNames);
-        Assert.Null(repaired.SwitchName);
-    }
-
-    [Fact]
     public async Task Evaluate_BlockingFailure_PopulatesReadinessBadge()
     {
         var harness = CreateHarness();
@@ -320,7 +323,6 @@ public sealed class DeployQuickDeployViewModelTests
         Assert.True(harness.Vm.HasReadinessIssues);
         Assert.True(harness.Vm.BlockingIssueCount >= 1);
         Assert.Equal(harness.Vm.BlockingIssueCount + harness.Vm.WarningIssueCount, harness.Vm.ReadinessBadgeCount);
-        Assert.Equal(harness.Vm.ReadinessBadgeCount.ToString(), harness.Vm.ReadinessBadgeText);
         Assert.Contains("Hyper-V is not available.", harness.Vm.ReadinessBadgeTooltip);
     }
 
@@ -333,7 +335,6 @@ public sealed class DeployQuickDeployViewModelTests
 
         Assert.False(harness.Vm.HasReadinessIssues);
         Assert.Equal(0, harness.Vm.ReadinessBadgeCount);
-        Assert.Equal(string.Empty, harness.Vm.ReadinessBadgeText);
         Assert.Equal(string.Empty, harness.Vm.ReadinessBadgeTooltip);
     }
 
@@ -365,14 +366,12 @@ public sealed class DeployQuickDeployViewModelTests
 
         Assert.True(harness.Vm.CanAddVm);
         Assert.False(harness.Vm.CanRemoveVm);
-        Assert.False(harness.Vm.CanResolveSuggestions);
         Assert.False(harness.Vm.CanOpenTemplateEditor);
         Assert.False(harness.Vm.CanStartDeploy);
 
         harness.Vm.AddVmCommand.Execute(null);
 
         Assert.True(harness.Vm.CanRemoveVm);
-        Assert.True(harness.Vm.CanResolveSuggestions);
         Assert.True(harness.Vm.CanOpenTemplateEditor);
         Assert.True(harness.Vm.CanStartDeploy);
     }
