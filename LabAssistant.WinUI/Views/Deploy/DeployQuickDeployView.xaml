@@ -55,37 +55,28 @@
                         Minimum="0"
                         Maximum="100"
                         Value="{x:Bind ViewModel.ProgressPercent}"
-                        VerticalAlignment="Center" />
+                        VerticalAlignment="Center"
+                        Visibility="{x:Bind ViewModel.HasActiveProgress, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock
                         Grid.Column="2"
                         VerticalAlignment="Center"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
                         Text="{x:Bind ViewModel.ProgressSummary}"
-                        TextWrapping="Wrap" />
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.HasActiveProgress, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel
                         Grid.Column="3"
                         HorizontalAlignment="Right"
                         Orientation="Horizontal"
                         Spacing="8"
                         VerticalAlignment="Center">
-                        <Border
-                            MinWidth="22"
-                            Height="22"
-                            Padding="6,0"
-                            Background="{StaticResource ShellCriticalBrush}"
-                            CornerRadius="11"
+                        <InfoBadge
                             VerticalAlignment="Center"
+                            Background="{StaticResource ShellCriticalBrush}"
+                            Value="{x:Bind ViewModel.ReadinessBadgeCount, Mode=OneWay}"
                             AutomationProperties.Name="{x:Bind ViewModel.ReadinessBadgeTooltip, Mode=OneWay}"
                             ToolTipService.ToolTip="{x:Bind ViewModel.ReadinessBadgeTooltip, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.HasReadinessIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Foreground="White"
-                                FontSize="12"
-                                FontWeight="SemiBold"
-                                Text="{x:Bind ViewModel.ReadinessBadgeText, Mode=OneWay}" />
-                        </Border>
+                            Visibility="{x:Bind ViewModel.HasReadinessIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                         <Button
                             HorizontalAlignment="Right"
                             Command="{x:Bind ViewModel.ToggleResultsPanelCommand}"
@@ -105,7 +96,8 @@
                         Grid.Column="0"
                         Grid.ColumnSpan="4"
                         Foreground="{StaticResource ShellTextSecondaryBrush}"
-                        Text="{x:Bind ViewModel.ReadinessDisplayText}" />
+                        Text="{x:Bind ViewModel.ReadinessDisplayText}"
+                        Visibility="{x:Bind ViewModel.ShowReadinessSummaryLine, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
             </Border>
 
@@ -154,52 +146,52 @@
                             </ListView.ItemsPanel>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="deployModels:DeployQuickDeployVmEntryRow">
-                                    <Grid Padding="6,4" ColumnSpacing="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" Spacing="2">
-                                            <TextBlock
-                                                Foreground="{StaticResource ShellTextPrimaryBrush}"
-                                                FontWeight="SemiBold"
-                                                Text="{x:Bind DisplayName, Mode=OneWay}" />
-                                            <TextBlock
-                                                Foreground="{StaticResource ShellTextSecondaryBrush}"
-                                                FontSize="12"
-                                                Text="{x:Bind SecondaryText, Mode=OneWay}"
-                                                TextWrapping="Wrap" />
-                                        </StackPanel>
-
+                                    <Grid ToolTipService.ToolTip="{x:Bind IssueTooltip, Mode=OneWay}">
+                                        <!-- Severity outline + leading accent bar, shown only when the entry
+                                             has a blocking/warning issue. Overlaid on the content so toggling
+                                             visibility never shifts the row layout. -->
                                         <Border
-                                            Grid.Column="1"
-                                            Padding="10,3"
-                                            Background="Transparent"
                                             BorderBrush="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
                                             BorderThickness="1"
                                             CornerRadius="{StaticResource PillCornerRadius}"
-                                            VerticalAlignment="Center"
-                                            ToolTipService.ToolTip="{x:Bind IssueSummary, Mode=OneWay}"
-                                            Visibility="{x:Bind HasIssueBadge, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock
-                                                Foreground="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
-                                                FontSize="11"
-                                                FontWeight="SemiBold"
-                                                Text="{x:Bind IssueBadgeText, Mode=OneWay}" />
-                                        </Border>
+                                            Visibility="{x:Bind HasIssueBadge, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                        <Border
+                                            Width="4"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Stretch"
+                                            Background="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
+                                            CornerRadius="2,0,0,2"
+                                            Visibility="{x:Bind HasIssueBadge, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
 
-                                        <Button
-                                            Grid.Column="2"
-                                            Click="OnRemoveVmRowClick"
-                                            Width="32"
-                                            Height="32"
-                                            Padding="0"
-                                            ToolTipService.ToolTip="Remove VM"
-                                            VerticalAlignment="Center">
-                                            <FontIcon Glyph="&#xE74D;" />
-                                        </Button>
+                                        <Grid Padding="12,4,6,4" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock
+                                                    Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                                    FontWeight="SemiBold"
+                                                    Text="{x:Bind DisplayName, Mode=OneWay}" />
+                                                <TextBlock
+                                                    Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                                    FontSize="12"
+                                                    Text="{x:Bind SecondaryText, Mode=OneWay}"
+                                                    TextWrapping="Wrap" />
+                                            </StackPanel>
+
+                                            <Button
+                                                Grid.Column="1"
+                                                Click="OnRemoveVmRowClick"
+                                                Width="32"
+                                                Height="32"
+                                                Padding="0"
+                                                ToolTipService.ToolTip="Remove VM"
+                                                VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE74D;" />
+                                            </Button>
+                                        </Grid>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
@@ -406,10 +398,6 @@
                                 Command="{x:Bind ViewModel.EvaluateCommand}"
                                 Content="Evaluate"
                                 Visibility="Collapsed" />
-                            <Button
-                                Command="{x:Bind ViewModel.ResolveSuggestionsCommand}"
-                                Content="Auto-fix selections"
-                                ToolTipService.ToolTip="Repairs stale switch and base-disk references on the VM entries against what is currently available on the host and in the catalog." />
                             <HyperlinkButton
                                 Command="{x:Bind ViewModel.OpenTemplateEditorCommand}"
                                 Content="Save as template..."

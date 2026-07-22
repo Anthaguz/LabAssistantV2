@@ -13,7 +13,6 @@ public sealed class DeployQuickDeployVmEntryRow : INotifyPropertyChanged
 {
     private string _displayName;
     private string _secondaryText;
-    private string _issueBadgeText = string.Empty;
     private string _issueSummary = string.Empty;
     private string _issueSeverity = "None";
     private bool _hasIssueBadge;
@@ -40,17 +39,21 @@ public sealed class DeployQuickDeployVmEntryRow : INotifyPropertyChanged
         set => SetProperty(ref _secondaryText, value);
     }
 
-    public string IssueBadgeText
-    {
-        get => _issueBadgeText;
-        set => SetProperty(ref _issueBadgeText, value);
-    }
-
     public string IssueSummary
     {
         get => _issueSummary;
-        set => SetProperty(ref _issueSummary, value);
+        set
+        {
+            SetProperty(ref _issueSummary, value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IssueTooltip)));
+        }
     }
+
+    /// <summary>
+    /// Reason text surfaced as the row tooltip, or null when the row has no issue so no empty
+    /// tooltip attaches to a healthy row.
+    /// </summary>
+    public string? IssueTooltip => _hasIssueSummary ? _issueSummary : null;
 
     /// <summary>
     /// Severity token consumed by the view brush converter. One of "Critical", "Warning", or "None".
@@ -70,7 +73,11 @@ public sealed class DeployQuickDeployVmEntryRow : INotifyPropertyChanged
     public bool HasIssueSummary
     {
         get => _hasIssueSummary;
-        set => SetProperty(ref _hasIssueSummary, value);
+        set
+        {
+            SetProperty(ref _hasIssueSummary, value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IssueTooltip)));
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

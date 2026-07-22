@@ -31,7 +31,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     private const string VhdxPlaceholder = "(Select base disk)";
 
     private readonly DeployReferenceDataService _referenceDataService;
-    private readonly DeployResolveSuggestionsService _resolveSuggestionsService;
     private readonly Func<TemplateEditorDocument, string, Task> _showTemplateEditorAsync;
     private readonly IDeploymentPreflightService _deploymentPreflightService;
     private readonly IV2PlanningCapabilityService _v2PlanningCapabilityService;
@@ -58,7 +57,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
     public DeployQuickDeployViewModel(
         DeployReferenceDataService referenceDataService,
-        DeployResolveSuggestionsService resolveSuggestionsService,
         Func<TemplateEditorDocument, string, Task> showTemplateEditorAsync,
         IDeploymentPreflightService deploymentPreflightService,
         IV2PlanningCapabilityService v2PlanningCapabilityService,
@@ -69,7 +67,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         int autoEvaluateDelayMs = 350)
     {
         _referenceDataService = referenceDataService;
-        _resolveSuggestionsService = resolveSuggestionsService;
         _showTemplateEditorAsync = showTemplateEditorAsync;
         _deploymentPreflightService = deploymentPreflightService;
         _v2PlanningCapabilityService = v2PlanningCapabilityService;
@@ -153,9 +150,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     private bool _hasReadinessIssues;
 
     [ObservableProperty]
-    private string _readinessBadgeText = string.Empty;
-
-    [ObservableProperty]
     private string _readinessBadgeTooltip = string.Empty;
 
     [ObservableProperty]
@@ -208,6 +202,32 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
     public int LiveProgressVmCount => _progressByVm.Count;
 
+    /// <summary>
+    /// True while a deploy is actively running (starting or executing). The readiness banner's progress
+    /// bar and progress summary are live-deploy affordances gated on this, so an idle/blocked lane shows
+    /// only the single authoritative readiness line instead of echoing the reason as a progress summary.
+    /// </summary>
+    public bool HasActiveProgress =>
+        IsStarting || string.Equals(LifecycleState, "Running", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Inverse of <see cref="HasActiveProgress"/>: the idle-state readiness line is shown only when a
+    /// deploy is not actively running, so the banner never renders both the readiness line and the live
+    /// progress summary at once.
+    /// </summary>
+    public bool ShowReadinessSummaryLine => !HasActiveProgress;
+
+    /// <summary>
+    /// Progress summary projected into the live-progress right panel. While a deploy is active or has
+    /// per-VM progress/results, this mirrors the real progress/result summary; otherwise it stays a
+    /// neutral placeholder so the panel does not restate the "Not ready to deploy" readiness reason that
+    /// already lives once in the in-tab readiness banner.
+    /// </summary>
+    public string RightPanelProgressSummary =>
+        HasActiveProgress || LiveProgressVmCount > 0
+            ? ProgressSummary
+            : "Deployment progress and per-VM steps appear here during and after deploy.";
+
     public bool HasBlockingFailures =>
         _compatibilityIssues.Any(issue => issue.IsBlocking) || (ReadinessReport?.HasBlockingFailures ?? false);
 
@@ -217,8 +237,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     public bool CanRemoveVm => SelectedVmEntry is not null && !IsEvaluatingReadiness && !IsStarting;
 
     public bool CanApplyVmChanges => CanRemoveVm;
-
-    public bool CanResolveSuggestions => VmEntries.Count > 0 && !IsEvaluatingReadiness && !IsStarting;
 
     public bool CanOpenTemplateEditor => VmEntries.Count > 0 && !IsStarting;
 
@@ -319,42 +337,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         await _controller.EvaluateReadinessAsync(DeploymentPreflightMode.Full);
     }
 
-    [RelayCommand(CanExecute = nameof(CanResolveSuggestions))]
-    private async Task ResolveSuggestions()
-    {
-        if (VmEntries.Count == 0)
-        {
-            StatusText = "Add at least one VM entry first.";
-            return;
-        }
-
-        var template = BuildTemplate();
-        await ((IDeployQuickDeployWorkspaceControllerHost)this).EnsureReferenceDataAsync(forceRefresh: false);
-        var applied = _resolveSuggestionsService.Apply(
-            template,
-            _referenceDataService.CatalogItems,
-            _referenceDataService.AvailableSwitches);
-
-        // Nothing was stale, so skip the readiness re-run and leave the outcome on the status line. The
-        // enablement gate cannot cheaply pre-compute this (the switch/catalog reference data is loaded
-        // asynchronously and is empty/stale at CanExecute time), so the button stays enabled and the
-        // result is reported here instead.
-        if (applied == 0)
-        {
-            StatusText = "No stale references found.";
-            return;
-        }
-
-        ReplaceVmEntriesFromTemplate(template);
-
-        // Re-evaluate against the repaired entries, then restore the auto-fix outcome as the action
-        // status: EvaluateReadinessAsync overwrites StatusText with its own readiness summary, which would
-        // otherwise hide what the button just did. The readiness verdict still surfaces via the lifecycle
-        // badges and readiness panel.
-        await _controller.EvaluateReadinessAsync(DeploymentPreflightMode.Full);
-        StatusText = $"Auto-fixed {applied} reference(s).";
-    }
-
     [RelayCommand(CanExecute = nameof(CanOpenTemplateEditor))]
     private async Task OpenTemplateEditor()
     {
@@ -436,7 +418,15 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         UpdateUi();
     }
 
-    partial void OnLifecycleStateChanged(string value) => OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
+    partial void OnLifecycleStateChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShouldAutoOpenResultsPanel));
+        OnPropertyChanged(nameof(HasActiveProgress));
+        OnPropertyChanged(nameof(ShowReadinessSummaryLine));
+        OnPropertyChanged(nameof(RightPanelProgressSummary));
+    }
+
+    partial void OnProgressSummaryChanged(string value) => OnPropertyChanged(nameof(RightPanelProgressSummary));
 
     private void OnEditorDraftChanged()
     {
@@ -463,13 +453,22 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     public void BeginStarting()
     {
         IsStarting = true;
+        RaiseActiveProgressChanged();
         RefreshCommandStates();
     }
 
     public void EndStarting()
     {
         IsStarting = false;
+        RaiseActiveProgressChanged();
         RefreshCommandStates();
+    }
+
+    private void RaiseActiveProgressChanged()
+    {
+        OnPropertyChanged(nameof(HasActiveProgress));
+        OnPropertyChanged(nameof(ShowReadinessSummaryLine));
+        OnPropertyChanged(nameof(RightPanelProgressSummary));
     }
 
     public void BeginReadinessEvaluation()
@@ -822,9 +821,24 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         }
 
         VmEntries.Remove(vmEntry);
-        RefreshVmEntryRows();
-        SetSelectedRow(VmEntryRows.FirstOrDefault());
-        LoadEditorDraftFromSelection();
+
+        // Hold the editor-sync guard across the row rebuild and the follow-up selection so that when
+        // RefreshVmEntryRows removes the currently selected row, the ListView pushing a replacement
+        // SelectedVmEntryRow synchronously cannot re-enter UpdateUi (and thus mutate VmEntryRows again)
+        // while we are still inside that CollectionChanged dispatch. UpdateUi runs once, afterwards.
+        var previousSync = IsSynchronizingEditorDraft;
+        IsSynchronizingEditorDraft = true;
+        try
+        {
+            RefreshVmEntryRows();
+            SetSelectedRow(VmEntryRows.FirstOrDefault());
+            LoadEditorDraftFromSelection();
+        }
+        finally
+        {
+            IsSynchronizingEditorDraft = previousSync;
+        }
+
         ClearReadinessState(
             VmEntries.Count == 0
                 ? "Add at least one VM entry to evaluate readiness."
@@ -835,23 +849,11 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         UpdateUi();
     }
 
-    private void ReplaceVmEntriesFromTemplate(LabTemplate template)
-    {
-        VmEntries.Clear();
-        foreach (var vmTemplate in template.VmTemplates)
-        {
-            VmEntries.Add(CloneVmTemplate(vmTemplate));
-        }
-
-        RefreshVmEntryRows();
-        SetSelectedRow(FindRow(SelectedVmEntry) ?? VmEntryRows.FirstOrDefault());
-        LoadEditorDraftFromSelection();
-        NotifySharedUiStateChanged();
-        UpdateUi();
-    }
-
     private void SetSelectedRow(DeployQuickDeployVmEntryRow? row)
     {
+        // Save/restore rather than hard-clearing so this stays safe when a caller already holds the
+        // editor-sync guard across a wider rebuild-and-select sequence (see RemoveVmEntryAsync).
+        var previousSync = IsSynchronizingEditorDraft;
         IsSynchronizingEditorDraft = true;
         try
         {
@@ -859,43 +861,65 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         }
         finally
         {
-            IsSynchronizingEditorDraft = false;
+            IsSynchronizingEditorDraft = previousSync;
         }
     }
 
     private DeployQuickDeployVmEntryRow? FindRow(VmTemplate? vmEntry) =>
         vmEntry is null ? null : VmEntryRows.FirstOrDefault(row => ReferenceEquals(row.VmEntry, vmEntry));
 
+    private bool _isRefreshingVmEntryRows;
+
     private void RefreshVmEntryRows()
     {
-        var existingByVm = VmEntryRows.ToDictionary(row => row.VmEntry);
-        foreach (var staleRow in VmEntryRows.Where(row => !VmEntries.Contains(row.VmEntry)).ToList())
+        // Re-entrancy guard: a nested rebuild of VmEntryRows is never valid. If a mutation here triggers
+        // a synchronous selection change that loops back into RefreshVmEntryRows (via the ListView
+        // pushing SelectedVmEntryRow -> UpdateUi -> UpdateVmEntryRowBadges), the nested call would try to
+        // Insert/Remove while the outer call is still inside a CollectionChanged dispatch, which throws
+        // "Cannot change ObservableCollection during a CollectionChanged event". Bail out instead; the
+        // outer pass leaves the collection consistent.
+        if (_isRefreshingVmEntryRows)
         {
-            VmEntryRows.Remove(staleRow);
+            return;
         }
 
-        for (var index = 0; index < VmEntries.Count; index++)
+        _isRefreshingVmEntryRows = true;
+        try
         {
-            var vmEntry = VmEntries[index];
-            if (!existingByVm.TryGetValue(vmEntry, out var row))
+            var existingByVm = VmEntryRows.ToDictionary(row => row.VmEntry);
+            foreach (var staleRow in VmEntryRows.Where(row => !VmEntries.Contains(row.VmEntry)).ToList())
             {
-                row = new DeployQuickDeployVmEntryRow(vmEntry);
-                VmEntryRows.Insert(index, row);
-                existingByVm[vmEntry] = row;
+                VmEntryRows.Remove(staleRow);
             }
-            else
+
+            for (var index = 0; index < VmEntries.Count; index++)
             {
-                var currentIndex = VmEntryRows.IndexOf(row);
-                if (currentIndex != index)
+                var vmEntry = VmEntries[index];
+                if (!existingByVm.TryGetValue(vmEntry, out var row))
                 {
-                    VmEntryRows.Move(currentIndex, index);
+                    row = new DeployQuickDeployVmEntryRow(vmEntry);
+                    VmEntryRows.Insert(index, row);
+                    existingByVm[vmEntry] = row;
+                }
+                else
+                {
+                    var currentIndex = VmEntryRows.IndexOf(row);
+                    if (currentIndex != index)
+                    {
+                        VmEntryRows.Move(currentIndex, index);
+                    }
                 }
             }
+        }
+        finally
+        {
+            _isRefreshingVmEntryRows = false;
         }
     }
 
     private void LoadEditorDraftFromSelection()
     {
+        var previousSync = IsSynchronizingEditorDraft;
         IsSynchronizingEditorDraft = true;
         try
         {
@@ -924,7 +948,7 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         }
         finally
         {
-            IsSynchronizingEditorDraft = false;
+            IsSynchronizingEditorDraft = previousSync;
         }
     }
 
@@ -1190,7 +1214,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         AddVmCommand.NotifyCanExecuteChanged();
         RemoveVmCommand.NotifyCanExecuteChanged();
         ApplyVmChangesCommand.NotifyCanExecuteChanged();
-        ResolveSuggestionsCommand.NotifyCanExecuteChanged();
         OpenTemplateEditorCommand.NotifyCanExecuteChanged();
         StartDeployCommand.NotifyCanExecuteChanged();
         AddSwitchRowCommand.NotifyCanExecuteChanged();
@@ -1213,7 +1236,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         WarningIssueCount = warningIssueCount;
         ReadinessBadgeCount = blockingIssueCount + warningIssueCount;
         HasReadinessIssues = ReadinessBadgeCount > 0;
-        ReadinessBadgeText = ReadinessBadgeCount > 0 ? ReadinessBadgeCount.ToString(CultureInfo.InvariantCulture) : string.Empty;
         ReadinessBadgeTooltip = BuildReadinessBadgeTooltip(blockingIssueCount, warningIssueCount);
 
         var hasEntries = VmEntries.Count > 0;
@@ -1385,7 +1407,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
 
             if (blockingMessages.Count > 0)
             {
-                row.IssueBadgeText = "Blocked";
                 row.IssueSummary = blockingMessages[0];
                 row.IssueSeverity = "Critical";
                 row.HasIssueBadge = true;
@@ -1393,7 +1414,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
             }
             else if (warningMessages.Count > 0)
             {
-                row.IssueBadgeText = "Warning";
                 row.IssueSummary = warningMessages[0];
                 row.IssueSeverity = "Warning";
                 row.HasIssueBadge = true;
@@ -1401,7 +1421,6 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
             }
             else
             {
-                row.IssueBadgeText = string.Empty;
                 row.IssueSummary = string.Empty;
                 row.IssueSeverity = "None";
                 row.HasIssueBadge = false;
@@ -1580,8 +1599,8 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         foreach (var selectedSwitch in selectedSwitches ?? Array.Empty<string>())
         {
             // Switches are optional, so a blank/unselected switch row means "no switch" and must never
-            // block deploy. Skip it here; Auto-fix (DeployResolveSuggestionsService) prunes the dangling
-            // empty selector. Only a non-blank name that is unavailable or duplicated is a real blocker.
+            // block deploy. Skip it here; a blank selector is simply ignored. Only a non-blank name that
+            // is unavailable or duplicated is a real blocker.
             if (string.IsNullOrWhiteSpace(selectedSwitch))
             {
                 continue;

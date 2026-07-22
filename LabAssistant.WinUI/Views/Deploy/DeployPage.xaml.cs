@@ -156,7 +156,6 @@ public sealed partial class DeployPage : Page, ICapabilityPage
 
         _quickDeployLane = new DeployQuickDeployViewModel(
             referenceDataService,
-            resolveSuggestionsService,
             templateEditorLauncher.ShowEditorAsync,
             deploymentPreflightService,
             v2PlanningCapabilityService,
@@ -309,7 +308,7 @@ public sealed partial class DeployPage : Page, ICapabilityPage
             _quickDeployRightPanel.ViewModel.UpdateState(
                 _quickDeployLane.LifecycleState,
                 _quickDeployLane.ProgressPercent,
-                _quickDeployLane.ProgressSummary,
+                _quickDeployLane.RightPanelProgressSummary,
                 _quickDeployLane.ResultRows.ToList());
         }
 
