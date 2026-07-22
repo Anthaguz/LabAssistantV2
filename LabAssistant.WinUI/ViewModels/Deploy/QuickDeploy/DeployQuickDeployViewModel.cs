@@ -134,9 +134,10 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     [ObservableProperty]
     private string _globalIssuesBadgeText = "Blocking: 0 | Warnings: 0";
 
-    // F38: compact readiness badge next to the Progress / Results toggle. Replaces the repeated
-    // "Not ready to deploy: <reason>" sentences that used to echo across the VM row and VM Properties
-    // header. The single authoritative readiness line stays in the banner (ReadinessDisplayText).
+    // F38/F47: readiness badges next to the Progress / Results toggle. These counts feed two separate
+    // InfoBadges (red blocking, amber warning). They replace the repeated "Not ready to deploy: <reason>"
+    // sentences that used to echo across the VM row and VM Properties header. The single authoritative
+    // readiness line stays in the banner (ReadinessDisplayText).
     [ObservableProperty]
     private int _blockingIssueCount;
 
@@ -144,13 +145,22 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     private int _warningIssueCount;
 
     [ObservableProperty]
-    private int _readinessBadgeCount;
-
-    [ObservableProperty]
     private bool _hasReadinessIssues;
 
+    // F47: the readiness badge is split into a red blocking badge and an amber warning badge so a
+    // non-blocking warning (for example "no switch selected") no longer inflates the red error count.
+    // Each badge gates on its own count and carries its own per-severity tooltip.
     [ObservableProperty]
-    private string _readinessBadgeTooltip = string.Empty;
+    private bool _hasBlockingIssues;
+
+    [ObservableProperty]
+    private bool _hasWarningIssues;
+
+    [ObservableProperty]
+    private string _blockingBadgeTooltip = string.Empty;
+
+    [ObservableProperty]
+    private string _warningBadgeTooltip = string.Empty;
 
     [ObservableProperty]
     private string _switchGuidanceText = "Switch selection is optional.";
@@ -1229,14 +1239,16 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         var warningIssueCount = IssueRows.Count - blockingIssueCount;
         GlobalIssuesBadgeText = $"Blocking: {blockingIssueCount} | Warnings: {warningIssueCount}";
 
-        // F38: drive the compact readiness badge from the same merged issue rows. The badge shows the
-        // combined count and its tooltip names the first reason, so the not-ready detail lives in one
-        // authoritative banner line plus this badge rather than being echoed in several places.
+        // F38/F47: drive the split readiness badges from the same merged issue rows. Blocking issues
+        // feed the red badge and warnings feed the amber badge, each with its own count, visibility gate,
+        // and per-severity tooltip that names the first reason for that severity.
         BlockingIssueCount = blockingIssueCount;
         WarningIssueCount = warningIssueCount;
-        ReadinessBadgeCount = blockingIssueCount + warningIssueCount;
-        HasReadinessIssues = ReadinessBadgeCount > 0;
-        ReadinessBadgeTooltip = BuildReadinessBadgeTooltip(blockingIssueCount, warningIssueCount);
+        HasReadinessIssues = blockingIssueCount + warningIssueCount > 0;
+        HasBlockingIssues = blockingIssueCount > 0;
+        HasWarningIssues = warningIssueCount > 0;
+        BlockingBadgeTooltip = BuildSeverityBadgeTooltip(isBlocking: true, blockingIssueCount);
+        WarningBadgeTooltip = BuildSeverityBadgeTooltip(isBlocking: false, warningIssueCount);
 
         var hasEntries = VmEntries.Count > 0;
         var shouldShowInlineGuidance = hasEntries && !IsStarting && LiveProgressVmCount == 0;
@@ -1263,25 +1275,26 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
     }
 
     /// <summary>
-    /// Builds the readiness badge tooltip (and screen-reader name): the combined count with the first
-    /// blocking reason, or the first warning when there are no blockers. Empty when nothing is wrong.
+    /// F47: builds the tooltip (and screen-reader name) for one severity badge. Blocking badges name the
+    /// first blocking reason; warning badges name the first non-blocking reason. Empty when the count is
+    /// zero so the badge is hidden anyway.
     /// </summary>
-    private string BuildReadinessBadgeTooltip(int blockingIssueCount, int warningIssueCount)
+    private string BuildSeverityBadgeTooltip(bool isBlocking, int count)
     {
-        var total = blockingIssueCount + warningIssueCount;
-        if (total == 0)
+        if (count == 0)
         {
             return string.Empty;
         }
 
-        var firstReason = (IssueRows.FirstOrDefault(issue => string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase))
-            ?? IssueRows.FirstOrDefault())?.Message;
-        var counts = blockingIssueCount > 0
-            ? $"{blockingIssueCount} blocking, {warningIssueCount} warning(s)"
-            : $"{warningIssueCount} warning(s)";
+        var firstReason = IssueRows
+            .FirstOrDefault(issue => string.Equals(issue.Severity, "Block", StringComparison.OrdinalIgnoreCase) == isBlocking)?
+            .Message;
+        var label = isBlocking
+            ? $"{count} blocking issue(s)"
+            : $"{count} warning(s)";
         return string.IsNullOrWhiteSpace(firstReason)
-            ? $"Readiness issues: {counts}."
-            : $"Readiness issues: {counts}. First: {firstReason}";
+            ? $"{label}."
+            : $"{label}. First: {firstReason}";
     }
 
     /// <summary>

@@ -71,12 +71,19 @@
                         Spacing="8"
                         VerticalAlignment="Center">
                         <InfoBadge
+                            Style="{StaticResource CriticalValueInfoBadgeStyle}"
                             VerticalAlignment="Center"
-                            Background="{StaticResource ShellCriticalBrush}"
-                            Value="{x:Bind ViewModel.ReadinessBadgeCount, Mode=OneWay}"
-                            AutomationProperties.Name="{x:Bind ViewModel.ReadinessBadgeTooltip, Mode=OneWay}"
-                            ToolTipService.ToolTip="{x:Bind ViewModel.ReadinessBadgeTooltip, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.HasReadinessIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                            Value="{x:Bind ViewModel.BlockingIssueCount, Mode=OneWay}"
+                            AutomationProperties.Name="{x:Bind ViewModel.BlockingBadgeTooltip, Mode=OneWay}"
+                            ToolTipService.ToolTip="{x:Bind ViewModel.BlockingBadgeTooltip, Mode=OneWay}"
+                            Visibility="{x:Bind ViewModel.HasBlockingIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                        <InfoBadge
+                            Style="{StaticResource CautionValueInfoBadgeStyle}"
+                            VerticalAlignment="Center"
+                            Value="{x:Bind ViewModel.WarningIssueCount, Mode=OneWay}"
+                            AutomationProperties.Name="{x:Bind ViewModel.WarningBadgeTooltip, Mode=OneWay}"
+                            ToolTipService.ToolTip="{x:Bind ViewModel.WarningBadgeTooltip, Mode=OneWay}"
+                            Visibility="{x:Bind ViewModel.HasWarningIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                         <Button
                             HorizontalAlignment="Right"
                             Command="{x:Bind ViewModel.ToggleResultsPanelCommand}"
@@ -153,7 +160,7 @@
                                         <Border
                                             BorderBrush="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
                                             BorderThickness="1"
-                                            CornerRadius="{StaticResource PillCornerRadius}"
+                                            CornerRadius="{StaticResource CardCornerRadius}"
                                             Visibility="{x:Bind HasIssueBadge, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                                         <Border
                                             Width="4"

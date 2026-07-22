@@ -321,9 +321,10 @@ public sealed class DeployQuickDeployViewModelTests
         await ActivateReadyVmAsync(harness);
 
         Assert.True(harness.Vm.HasReadinessIssues);
+        Assert.True(harness.Vm.HasBlockingIssues);
         Assert.True(harness.Vm.BlockingIssueCount >= 1);
-        Assert.Equal(harness.Vm.BlockingIssueCount + harness.Vm.WarningIssueCount, harness.Vm.ReadinessBadgeCount);
-        Assert.Contains("Hyper-V is not available.", harness.Vm.ReadinessBadgeTooltip);
+        Assert.Equal(harness.Vm.WarningIssueCount > 0, harness.Vm.HasWarningIssues);
+        Assert.Contains("Hyper-V is not available.", harness.Vm.BlockingBadgeTooltip);
     }
 
     [Fact]
@@ -334,8 +335,12 @@ public sealed class DeployQuickDeployViewModelTests
         await ActivateReadyVmAsync(harness);
 
         Assert.False(harness.Vm.HasReadinessIssues);
-        Assert.Equal(0, harness.Vm.ReadinessBadgeCount);
-        Assert.Equal(string.Empty, harness.Vm.ReadinessBadgeTooltip);
+        Assert.False(harness.Vm.HasBlockingIssues);
+        Assert.False(harness.Vm.HasWarningIssues);
+        Assert.Equal(0, harness.Vm.BlockingIssueCount);
+        Assert.Equal(0, harness.Vm.WarningIssueCount);
+        Assert.Equal(string.Empty, harness.Vm.BlockingBadgeTooltip);
+        Assert.Equal(string.Empty, harness.Vm.WarningBadgeTooltip);
     }
 
     [Fact]
@@ -353,10 +358,12 @@ public sealed class DeployQuickDeployViewModelTests
         await ActivateReadyVmAsync(harness);
 
         Assert.True(harness.Vm.HasReadinessIssues);
+        Assert.False(harness.Vm.HasBlockingIssues);
         Assert.Equal(0, harness.Vm.BlockingIssueCount);
+        Assert.True(harness.Vm.HasWarningIssues);
         Assert.True(harness.Vm.WarningIssueCount >= 1);
-        Assert.Equal(harness.Vm.WarningIssueCount, harness.Vm.ReadinessBadgeCount);
-        Assert.Contains("Destination volume is low on space.", harness.Vm.ReadinessBadgeTooltip);
+        Assert.Equal(string.Empty, harness.Vm.BlockingBadgeTooltip);
+        Assert.Contains("Destination volume is low on space.", harness.Vm.WarningBadgeTooltip);
     }
 
     [Fact]
