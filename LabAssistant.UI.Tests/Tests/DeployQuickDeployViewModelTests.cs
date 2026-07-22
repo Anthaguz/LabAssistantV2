@@ -231,6 +231,37 @@ public sealed class DeployQuickDeployViewModelTests
     }
 
     [Fact]
+    public async Task ResolveSuggestions_WithNoStaleReferences_ReportsNothingToFix()
+    {
+        var harness = CreateHarness();
+        await ActivateReadyVmAsync(harness);
+
+        await harness.Vm.ResolveSuggestionsCommand.ExecuteAsync(null);
+
+        Assert.Equal("No stale references found.", harness.Vm.StatusText);
+    }
+
+    [Fact]
+    public async Task ResolveSuggestions_WithStaleSwitchReference_AutoFixesAndReportsCount()
+    {
+        var harness = CreateHarness();
+        harness.Vm.ApplyShellState(isActive: true);
+
+        var entry = harness.Vm.SelectedVmEntry!;
+        entry.SwitchName = "Ghost-Switch";
+        entry.SwitchNames = ["Ghost-Switch"];
+
+        await harness.Vm.ResolveSuggestionsCommand.ExecuteAsync(null);
+
+        Assert.Equal("Auto-fixed 1 reference(s).", harness.Vm.StatusText);
+
+        // The stale switch reference is dropped because it is not among the host's available switches.
+        var repaired = harness.Vm.VmEntries[0];
+        Assert.Null(repaired.SwitchNames);
+        Assert.Null(repaired.SwitchName);
+    }
+
+    [Fact]
     public void CommandCanExecute_ReflectsEntryPresence()
     {
         var harness = CreateHarness();
