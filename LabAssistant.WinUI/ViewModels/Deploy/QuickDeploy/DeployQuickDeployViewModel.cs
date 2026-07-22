@@ -1557,9 +1557,11 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var selectedSwitch in selectedSwitches ?? Array.Empty<string>())
         {
+            // Switches are optional, so a blank/unselected switch row means "no switch" and must never
+            // block deploy. Skip it here; Auto-fix (DeployResolveSuggestionsService) prunes the dangling
+            // empty selector. Only a non-blank name that is unavailable or duplicated is a real blocker.
             if (string.IsNullOrWhiteSpace(selectedSwitch))
             {
-                issues.Add((true, "Each switch row must have a selected host switch or be removed."));
                 continue;
             }
 
