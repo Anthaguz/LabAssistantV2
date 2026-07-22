@@ -65,7 +65,27 @@
                     <StackPanel
                         Grid.Column="3"
                         HorizontalAlignment="Right"
+                        Orientation="Horizontal"
+                        Spacing="8"
                         VerticalAlignment="Center">
+                        <Border
+                            MinWidth="22"
+                            Height="22"
+                            Padding="6,0"
+                            Background="{StaticResource ShellCriticalBrush}"
+                            CornerRadius="11"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="{x:Bind ViewModel.ReadinessBadgeTooltip, Mode=OneWay}"
+                            ToolTipService.ToolTip="{x:Bind ViewModel.ReadinessBadgeTooltip, Mode=OneWay}"
+                            Visibility="{x:Bind ViewModel.HasReadinessIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="White"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Text="{x:Bind ViewModel.ReadinessBadgeText, Mode=OneWay}" />
+                        </Border>
                         <Button
                             HorizontalAlignment="Right"
                             Command="{x:Bind ViewModel.ToggleResultsPanelCommand}"
@@ -151,12 +171,6 @@
                                                 FontSize="12"
                                                 Text="{x:Bind SecondaryText, Mode=OneWay}"
                                                 TextWrapping="Wrap" />
-                                            <TextBlock
-                                                Foreground="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
-                                                FontSize="12"
-                                                Text="{x:Bind IssueSummary, Mode=OneWay}"
-                                                TextWrapping="Wrap"
-                                                Visibility="{x:Bind HasIssueSummary, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                                         </StackPanel>
 
                                         <Border
@@ -167,6 +181,7 @@
                                             BorderThickness="1"
                                             CornerRadius="{StaticResource PillCornerRadius}"
                                             VerticalAlignment="Center"
+                                            ToolTipService.ToolTip="{x:Bind IssueSummary, Mode=OneWay}"
                                             Visibility="{x:Bind HasIssueBadge, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
                                             <TextBlock
                                                 Foreground="{x:Bind IssueSeverity, Mode=OneWay, Converter={StaticResource SeverityToBrush}}"
@@ -216,7 +231,6 @@
                     <Grid RowSpacing="{StaticResource SpacingS}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
@@ -227,13 +241,7 @@
                             FontWeight="SemiBold"
                             Text="VM Properties" />
 
-                        <TextBlock
-                            Grid.Row="1"
-                            Foreground="{StaticResource ShellTextSecondaryBrush}"
-                            Text="{x:Bind ViewModel.EditorIssueSummaryText}"
-                            TextWrapping="Wrap" />
-
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <Grid RowSpacing="{StaticResource SpacingS}" ColumnSpacing="{StaticResource SpacingS}">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -366,7 +374,7 @@
                         </ScrollViewer>
 
                         <Button
-                            Grid.Row="3"
+                            Grid.Row="2"
                             Command="{x:Bind ViewModel.ApplyVmChangesCommand}"
                             Content="Apply VM Changes"
                             HorizontalAlignment="Left"
