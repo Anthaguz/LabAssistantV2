@@ -9,6 +9,16 @@
     <UserControl.Resources>
         <converters:SeverityToBrushConverter x:Key="SeverityToBrush" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+        <!-- Warning badge uses a light amber fill with dark text so it reads as clearly yellow
+             and stays distinct from the red critical badge. Based on the caution style so the
+             value-text layout is preserved while Background/Foreground override the dark orange fill. -->
+        <Style
+            x:Key="WarningValueInfoBadgeStyle"
+            BasedOn="{StaticResource CautionValueInfoBadgeStyle}"
+            TargetType="InfoBadge">
+            <Setter Property="Background" Value="{ThemeResource ShellWarnBadgeBrush}" />
+            <Setter Property="Foreground" Value="{ThemeResource ShellWarnBadgeForegroundBrush}" />
+        </Style>
     </UserControl.Resources>
     <Border
         Padding="{StaticResource CardPadding}"
@@ -78,7 +88,7 @@
                             ToolTipService.ToolTip="{x:Bind ViewModel.BlockingBadgeTooltip, Mode=OneWay}"
                             Visibility="{x:Bind ViewModel.HasBlockingIssues, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                         <InfoBadge
-                            Style="{StaticResource CautionValueInfoBadgeStyle}"
+                            Style="{StaticResource WarningValueInfoBadgeStyle}"
                             VerticalAlignment="Center"
                             Value="{x:Bind ViewModel.WarningIssueCount, Mode=OneWay}"
                             AutomationProperties.Name="{x:Bind ViewModel.WarningBadgeTooltip, Mode=OneWay}"
