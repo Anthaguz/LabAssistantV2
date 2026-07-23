@@ -318,6 +318,11 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         StatusText = $"Added VM entry '{entry.Name}'.";
         NotifySharedUiStateChanged();
         UpdateUi();
+
+        // Changing the VM set invalidates the prior readiness report, so re-schedule evaluation to mirror
+        // the field-edit path. Without this the badges and right panel would stay stuck on the cleared idle
+        // state until the next editor edit. ScheduleAutoEvaluate is debounced and guarded, so it is safe here.
+        _controller.ScheduleAutoEvaluate();
     }
 
     [RelayCommand(CanExecute = nameof(CanRemoveVm))]
@@ -857,6 +862,14 @@ internal sealed partial class DeployQuickDeployViewModel : ViewModelBase, IDeplo
         SetActionStatus($"Removed VM entry '{vmName}'.");
         NotifySharedUiStateChanged();
         UpdateUi();
+
+        // Removing a VM invalidates the prior readiness report, so re-schedule evaluation for the remaining
+        // set to mirror the field-edit path. When no entries remain there is nothing to evaluate, so leave the
+        // "Add at least one VM entry to evaluate readiness." idle state in place.
+        if (VmEntries.Count > 0)
+        {
+            _controller.ScheduleAutoEvaluate();
+        }
     }
 
     private void SetSelectedRow(DeployQuickDeployVmEntryRow? row)
