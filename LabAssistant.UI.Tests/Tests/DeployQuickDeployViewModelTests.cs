@@ -474,7 +474,7 @@ public sealed class DeployQuickDeployViewModelTests
         harness.Vm.AddVmCommand.Execute(null);
 
         await WaitUntilAsync(() =>
-            harness.Preflight.CallCount > baselineCallCount && harness.Vm.ReadinessReport is not null);
+            harness.Preflight.CallCount > baselineCallCount && harness.Vm.LifecycleState == "Blocked");
 
         Assert.True(harness.Preflight.CallCount > baselineCallCount);
         Assert.NotNull(harness.Vm.ReadinessReport);
