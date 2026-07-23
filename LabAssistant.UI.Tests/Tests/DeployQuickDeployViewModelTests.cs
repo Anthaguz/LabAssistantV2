@@ -458,6 +458,80 @@ public sealed class DeployQuickDeployViewModelTests
     }
 
     [Fact]
+    public async Task AddVm_AfterEvaluation_ReschedulesReadinessForNewVmSet()
+    {
+        // F49 regression: adding a VM used to clear the readiness report without re-scheduling an
+        // evaluation, so the badges and right panel stayed stuck on the idle state permanently. Adding a
+        // bare VM must now re-evaluate; the new default entry has no base disk so it correctly blocks.
+        var harness = CreateHarness(autoEvaluateDelayMs: 30);
+        await ActivateReadyVmAsync(harness);
+        await WaitUntilAsync(() => harness.Vm.LifecycleState == "Ready");
+
+        // Let any activation-scheduled debounce settle so the baseline count is stable before the add.
+        await Task.Delay(120);
+        var baselineCallCount = harness.Preflight.CallCount;
+
+        harness.Vm.AddVmCommand.Execute(null);
+
+        await WaitUntilAsync(() =>
+            harness.Preflight.CallCount > baselineCallCount && harness.Vm.ReadinessReport is not null);
+
+        Assert.True(harness.Preflight.CallCount > baselineCallCount);
+        Assert.NotNull(harness.Vm.ReadinessReport);
+        Assert.Equal("Blocked", harness.Vm.LifecycleState);
+        Assert.Contains(harness.Vm.IssueRows, row => row.Severity == "Block");
+    }
+
+    [Fact]
+    public async Task RemoveVm_LeavingEntries_ReschedulesReadinessForRemainingSet()
+    {
+        // F49 regression: removing a VM must re-evaluate the remaining set. Start blocked (two VMs, one
+        // bare) then remove the bare VM so readiness recovers to Ready for the lone configured VM.
+        var harness = CreateHarness(autoEvaluateDelayMs: 30);
+        await ActivateReadyVmAsync(harness);
+        harness.Vm.AddVmCommand.Execute(null);
+        await WaitUntilAsync(() => harness.Vm.LifecycleState == "Blocked");
+        await Task.Delay(120);
+
+        var baselineCallCount = harness.Preflight.CallCount;
+        var bareRow = harness.Vm.VmEntryRows[1];
+
+        await harness.Vm.RemoveVmRowCommand.ExecuteAsync(bareRow);
+
+        await WaitUntilAsync(() =>
+            harness.Preflight.CallCount > baselineCallCount && harness.Vm.LifecycleState == "Ready");
+
+        Assert.True(harness.Preflight.CallCount > baselineCallCount);
+        Assert.Single(harness.Vm.VmEntries);
+        Assert.NotNull(harness.Vm.ReadinessReport);
+        Assert.Equal("Ready", harness.Vm.LifecycleState);
+    }
+
+    [Fact]
+    public async Task RemoveVm_RemovingLastEntry_DoesNotRescheduleAndStaysIdle()
+    {
+        // F49 boundary: removing the final VM leaves nothing to evaluate, so no readiness pass is scheduled
+        // and the lane rests on the "add at least one VM" idle prompt.
+        var harness = CreateHarness(autoEvaluateDelayMs: 30);
+        harness.Vm.ApplyShellState(isActive: true);
+
+        // The activation schedule evaluates the seeded default entry once; let it settle first.
+        await WaitUntilAsync(() => harness.Vm.ReadinessReport is not null);
+        await Task.Delay(120);
+        var baselineCallCount = harness.Preflight.CallCount;
+
+        await harness.Vm.RemoveVmRowCommand.ExecuteAsync(harness.Vm.VmEntryRows[0]);
+
+        // Wait past the debounce window to confirm no evaluation is scheduled for the now-empty set.
+        await Task.Delay(120);
+
+        Assert.Equal(baselineCallCount, harness.Preflight.CallCount);
+        Assert.Empty(harness.Vm.VmEntries);
+        Assert.Null(harness.Vm.ReadinessReport);
+        Assert.Equal("Add at least one VM entry to evaluate readiness.", harness.Vm.ReadinessSummaryText);
+    }
+
+    [Fact]
     public async Task StartDeploy_ThenNavigateAwayCleanup_CancelsInFlightRun()
     {
         var harness = CreateHarness();
