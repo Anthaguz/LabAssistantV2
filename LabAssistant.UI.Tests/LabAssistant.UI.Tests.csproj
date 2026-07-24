@@ -132,6 +132,7 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\MachinesViewModel.cs" Link="WinUI\MachinesViewModel.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\MachineListItem.cs" Link="WinUI\MachineListItem.cs" />
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\IMachinesCapabilityShellBridge.cs" Link="WinUI\IMachinesCapabilityShellBridge.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\MachineBulkDeleteCandidate.cs" Link="WinUI\MachineBulkDeleteCandidate.cs" />
   </ItemGroup>
 
 </Project>

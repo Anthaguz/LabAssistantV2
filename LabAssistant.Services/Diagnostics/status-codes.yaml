@@ -129,6 +129,7 @@ facilities:
       - { value: 0x14, name: connection, title: Machine connection }
       - { value: 0x15, name: delete, title: Delete machine }
       - { value: 0x16, name: rdp-readiness, title: RDP readiness }
+      - { value: 0x17, name: bulk-action, title: Bulk machine action }
 
   - value: 0x40
     name: deploy.orchestration
@@ -385,6 +386,9 @@ codes:
   - { facility: 0x30, operation: 0x16, status: 0x00, severity: Debug, phase: atomic, title: RDP ready, message: "The virtual machine is reachable over RDP." }
   - { facility: 0x30, operation: 0x16, status: 0x01, severity: Debug, flags: [Transient], phase: atomic, title: RDP not ready yet, message: "The virtual machine is not yet reachable over RDP." }
   - { facility: 0x30, operation: 0x16, status: 0x02, severity: Warning, phase: atomic, title: RDP readiness check failed, message: "An RDP readiness check threw." }
+  - { facility: 0x30, operation: 0x17, status: 0x00, severity: Info,    phase: start, title: Running bulk machine action, message: "Running a bulk action across the selected virtual machines." }
+  - { facility: 0x30, operation: 0x17, status: 0x00, severity: Success, phase: end,   title: Bulk machine action completed, message: "The bulk machine action completed for all selected virtual machines." }
+  - { facility: 0x30, operation: 0x17, status: 0x01, severity: Warning, phase: end,   title: Bulk machine action partially failed, message: "The bulk machine action completed but one or more virtual machines failed." }
 
   # --- deploy.orchestration (lab run / vm / scheduler) ---
   - { facility: 0x40, operation: 0x02, status: 0x02, severity: Warning, phase: end, title: Deployment cancelled, message: "The deployment was cancelled." }

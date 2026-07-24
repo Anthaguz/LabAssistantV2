@@ -110,6 +110,12 @@ public sealed class MachinesViewModelActionTests
     {
         public string? RenameResult { get; set; }
 
+        public MachineDeleteScope? BulkDeleteScopeResult { get; set; }
+
+        public IReadOnlyList<MachineBulkDeleteCandidate>? CapturedBulkDeleteCandidates { get; private set; }
+
+        public int BulkDeleteDialogCallCount { get; private set; }
+
         public bool IsMachinesOverviewActive => true;
 
         public void UpdateReadinessPollingState() { }
@@ -119,6 +125,13 @@ public sealed class MachinesViewModelActionTests
 
         public Task<bool> ShowDeleteConfirmationDialogAsync(MachineInventoryItem vm, MachineDeletePreview preview, MachineDeleteScope effectiveScope)
             => Task.FromResult(false);
+
+        public Task<MachineDeleteScope?> ShowBulkDeleteScopeDialogAsync(IReadOnlyList<MachineBulkDeleteCandidate> candidates)
+        {
+            BulkDeleteDialogCallCount++;
+            CapturedBulkDeleteCandidates = candidates;
+            return Task.FromResult(BulkDeleteScopeResult);
+        }
 
         public Task<string?> ShowRenameDialogAsync(MachineInventoryItem vm)
             => Task.FromResult(RenameResult);
