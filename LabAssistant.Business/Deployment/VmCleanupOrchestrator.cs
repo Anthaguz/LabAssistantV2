@@ -17,12 +17,50 @@ public sealed class VmCleanupOrchestrator : IVmCleanupOrchestrator
     {
         var result = new VmCleanupResult { VmName = context.VmName };
 
-        await StopVmAsync(context, hyperVService, result);
-        await RemoveVmRegistrationAsync(context, hyperVService, result);
-        RemoveVmDirectory(context, result);
-        RemoveDifferencingDisk(context, result);
+        // Each step is isolated: a single step throwing (for example a Hyper-V query fault) must never abort
+        // the remaining steps, or a partial failure would orphan VMs/disks/directories. Order is preserved and
+        // best-effort continues on failure; unexpected throws are captured as residuals for manual remediation.
+        await RunStepAsync(() => StopVmAsync(context, hyperVService, result), CleanupStepName.StopVm, context.VmName, result);
+        await RunStepAsync(() => RemoveVmRegistrationAsync(context, hyperVService, result), CleanupStepName.RemoveVmRegistration, context.VmName, result);
+        RunStep(() => RemoveVmDirectory(context, result), CleanupStepName.RemoveVmDirectory, context.VmPath, result);
+        RunStep(() => RemoveDifferencingDisk(context, result), CleanupStepName.RemoveDifferencingDisk, context.VhdPath, result);
 
         return result;
+    }
+
+    private static async Task RunStepAsync(Func<Task> step, CleanupStepName stepName, string target, VmCleanupResult result)
+    {
+        try
+        {
+            await step();
+        }
+        catch (Exception ex)
+        {
+            RecordStepException(stepName, target, ex, result);
+        }
+    }
+
+    private static void RunStep(Action step, CleanupStepName stepName, string target, VmCleanupResult result)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception ex)
+        {
+            RecordStepException(stepName, target, ex, result);
+        }
+    }
+
+    private static void RecordStepException(CleanupStepName stepName, string target, Exception ex, VmCleanupResult result)
+    {
+        result.StepResults.Add(Failed(stepName, target, $"Cleanup step threw: {ex.Message}"));
+        result.Residuals.Add(new CleanupResidual
+        {
+            ResourceType = stepName.ToString(),
+            Identifier = target,
+            SuggestedAction = $"Verify and clean up '{target}' manually; cleanup step {stepName} failed unexpectedly: {ex.Message}"
+        });
     }
 
     private static async Task StopVmAsync(VmDeploymentContext context, IHyperVService hyperVService, VmCleanupResult result)

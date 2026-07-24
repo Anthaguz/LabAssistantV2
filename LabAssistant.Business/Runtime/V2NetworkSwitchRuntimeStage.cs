@@ -94,11 +94,9 @@ internal sealed class V2NetworkSwitchRuntimeStage
 
         foreach (var switchState in switchStates.Where(state => state.CreatedByDeployment))
         {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                break;
-            }
-
+            // Cleanup deliberately does NOT honor the user cancellation token: it usually runs *because* the
+            // operation was cancelled, so aborting here would orphan every switch created before the cancel.
+            // Cleanup always runs to completion; failures are recorded as residuals, never skipped.
             multiContext.MarkCleanupInProgress();
             switchState.CleanupAttempted = true;
             EmitDeployEvent(

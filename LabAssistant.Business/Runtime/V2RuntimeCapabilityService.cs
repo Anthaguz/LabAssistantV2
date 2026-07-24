@@ -303,9 +303,45 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
         }
 
-        await _forestTrustRuntimeStage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
-        await CleanupFailedOrCancelledVmsAsync(multiContext, states);
-        await _networkSwitchRuntimeStage.CleanupCreatedAsync(multiContext, switchStates, cancellationToken);
+        // Terminal cleanup must be exception-isolated: each stage owns different resources (trust objects,
+        // VMs/disks, switches), so one stage throwing must never skip the others or the run would orphan
+        // whatever the skipped stages were responsible for. Each stage already records its own residuals;
+        // an unexpected throw here is logged and swallowed so the remaining stages still run.
+        await RunTerminalCleanupStageAsync(
+            "forestTrust",
+            () => _forestTrustRuntimeStage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates),
+            multiContext);
+        await RunTerminalCleanupStageAsync(
+            "vms",
+            () => CleanupFailedOrCancelledVmsAsync(multiContext, states),
+            multiContext);
+        await RunTerminalCleanupStageAsync(
+            "networkSwitch",
+            () => _networkSwitchRuntimeStage.CleanupCreatedAsync(multiContext, switchStates, cancellationToken),
+            multiContext);
+    }
+
+    private async Task RunTerminalCleanupStageAsync(string stageName, Func<Task> stage, MultiVmDeploymentContext multiContext)
+    {
+        try
+        {
+            await stage();
+        }
+        catch (Exception ex)
+        {
+            // Never let a cleanup-stage fault propagate; that would abort the remaining cleanup stages and
+            // orphan their resources, violating the zero-orphan invariant.
+            EmitDeployEvent(
+                LaStatus.DeployOrchestration_DeploymentFailedWithResiduals,
+                multiContext,
+                "cleanup_stage_exception",
+                new Dictionary<string, object?>
+                {
+                    ["cleanupStage"] = stageName,
+                    ["exceptionType"] = ex.GetType().Name,
+                    ["error"] = ex.Message
+                });
+        }
     }
 
     /// <summary>Node kinds executed against a single VM via <see cref="ExecutePlanNodeAsync"/>.</summary>
@@ -1034,13 +1070,18 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     private async Task ProvisionVmAsync(RuntimeVmState state, VmDeploymentContext context)
     {
         var hyperV = state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory);
+
+        // Set each created-flag eagerly, BEFORE its risky create call. If the call throws or returns false
+        // after partially creating the resource, cleanup must still consider it. The cleanup orchestrator
+        // guards every step with an existence check, so a flag set for a resource that was never actually
+        // created is harmless: that step simply finds nothing and is skipped.
+        context.VmFolderCreated = true;
         if (!Directory.Exists(context.VmPath))
         {
             Directory.CreateDirectory(context.VmPath);
         }
 
-        context.VmFolderCreated = true;
-
+        context.DifferencingDiskCreated = true;
         if (!await hyperV.CreateVhdDifferencingAsync(context.BaseVhdPath, context.VhdPath))
         {
             context.MarkFailure(
@@ -1054,8 +1095,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        context.DifferencingDiskCreated = true;
-
+        context.VmRegistered = true;
         if (!await hyperV.CreateVmAsync(context.VmName, context.VmPath, context.VhdPath, context.MemoryMb, context.CpuCount))
         {
             context.MarkFailure(
@@ -1068,8 +1108,6 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 }));
             return;
         }
-
-        context.VmRegistered = true;
 
         if (!await hyperV.AddVirtualSwitchesToVmAsync(context.VmName, context.VirtualSwitchNames))
         {
@@ -2661,7 +2699,25 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     {
         foreach (var state in states)
         {
-            await CleanupSingleVmAsync(state, multiContext);
+            try
+            {
+                await CleanupSingleVmAsync(state, multiContext);
+            }
+            catch (Exception ex)
+            {
+                // Isolate per-VM cleanup: one VM's cleanup faulting (for example a Hyper-V session failure)
+                // must never abort cleanup of the remaining VMs, or those VMs/disks would be orphaned.
+                EmitVmScopedEvent(
+                    LaStatus.DeployCleanup_VMCleanupLeftResiduals,
+                    multiContext,
+                    state.Context,
+                    "cleanup_exception",
+                    new Dictionary<string, object?>
+                    {
+                        ["exceptionType"] = ex.GetType().Name,
+                        ["error"] = ex.Message
+                    });
+            }
         }
     }
 
@@ -2753,6 +2809,50 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             .Select(state => new V2NetworkSwitchAffectedVmState(state.PlanVm.VmId, state.Context))
             .ToArray();
 
+    /// <summary>
+    /// Builds the VM folder path from a template-supplied name while guaranteeing the result stays inside
+    /// <paramref name="vmBasePath"/>. The name is reduced to a single sanitized path segment (invalid file-name
+    /// characters and separators removed) and the resolved full path is asserted to be contained under the base,
+    /// so a hostile or malformed template name can never traverse out and cause create/delete outside the base.
+    /// </summary>
+    private static string BuildContainedVmPath(string vmBasePath, string vmName)
+    {
+        var safeSegment = SanitizeVmFolderSegment(vmName);
+        var basePathFull = Path.GetFullPath(vmBasePath);
+        var combined = Path.GetFullPath(Path.Combine(basePathFull, safeSegment));
+
+        var baseWithSeparator = basePathFull.EndsWith(Path.DirectorySeparatorChar)
+            ? basePathFull
+            : basePathFull + Path.DirectorySeparatorChar;
+
+        if (!combined.StartsWith(baseWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to deploy VM '{vmName}': the resolved path '{combined}' escapes the VM base path '{basePathFull}'.");
+        }
+
+        return combined;
+    }
+
+    private static string SanitizeVmFolderSegment(string vmName)
+    {
+        var candidate = vmName.Trim();
+        foreach (var invalid in Path.GetInvalidFileNameChars())
+        {
+            candidate = candidate.Replace(invalid, '_');
+        }
+
+        // Guard separators explicitly (they are in the invalid set on Windows, but be robust across runtimes)
+        // and reject the traversal segments so the name is always a single, non-escaping folder segment.
+        candidate = candidate.Replace('\\', '_').Replace('/', '_').Trim().TrimEnd('.', ' ');
+        if (string.IsNullOrWhiteSpace(candidate) || candidate == "." || candidate == "..")
+        {
+            candidate = "Unnamed-VM";
+        }
+
+        return candidate;
+    }
+
     private static List<RuntimeVmState> BuildRuntimeStates(V2RuntimeExecutionRequest request, MultiVmDeploymentContext multiContext)
     {
         var planVmById = request.Plan.Context.Vms.ToDictionary(vm => vm.VmId, StringComparer.OrdinalIgnoreCase);
@@ -2772,8 +2872,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             }
 
             var vmName = string.IsNullOrWhiteSpace(vm.Name) ? "Unnamed-VM" : vm.Name.Trim();
-            var vmPath = Path.Combine(request.Settings.VmBasePath, vmName);
-            var vhdPath = Path.Combine(vmPath, $"{vmName}.vhdx");
+            var vmPath = BuildContainedVmPath(request.Settings.VmBasePath, vmName);
+            var vhdPath = Path.Combine(vmPath, $"{Path.GetFileName(vmPath)}.vhdx");
             var switches = planVm.Nics
                 .Select(nic => nic.EffectiveSwitchName)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
