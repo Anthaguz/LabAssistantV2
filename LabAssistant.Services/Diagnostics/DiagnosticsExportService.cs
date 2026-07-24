@@ -186,13 +186,22 @@ public sealed class DiagnosticsExportService : IDiagnosticsExportService
             return true;
         }
 
-        using var doc = JsonDocument.Parse(line);
-        if (!doc.RootElement.TryGetProperty("operationId", out var opIdElement))
+        try
         {
+            using var doc = JsonDocument.Parse(line);
+            if (!doc.RootElement.TryGetProperty("operationId", out var opIdElement))
+            {
+                return false;
+            }
+
+            return string.Equals(opIdElement.GetString(), operationId, StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            // A single malformed JSONL line must not abort the whole diagnostics export. When filtering by
+            // operation, an unparseable line cannot be attributed to the operation, so it is excluded.
             return false;
         }
-
-        return string.Equals(opIdElement.GetString(), operationId, StringComparison.Ordinal);
     }
 
     private static void AddJsonEntry(ZipArchive archive, string entryName, object payload, DiagnosticsExportResult result)

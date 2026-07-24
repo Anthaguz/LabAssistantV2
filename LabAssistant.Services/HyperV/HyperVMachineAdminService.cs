@@ -101,10 +101,14 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
     {
         try
         {
-            var psi = new ProcessStartInfo("vmconnect.exe", $"localhost \"{vmName}\"")
+            // Pass arguments through ArgumentList so a VM name containing quotes or spaces cannot break
+            // out of the argument string and inject additional process arguments.
+            var psi = new ProcessStartInfo("vmconnect.exe")
             {
                 UseShellExecute = true
             };
+            psi.ArgumentList.Add("localhost");
+            psi.ArgumentList.Add(vmName);
 
             Process.Start(psi);
             return Task.FromResult(new HyperVMachineActionResult { Success = true });
@@ -481,12 +485,23 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 
     public Task<HyperVMachineActionResult> OpenRdpAsync(string targetIpv4)
     {
+        // Validate before launching so an unvalidated/hostile value can never reach the mstsc argument line.
+        if (string.IsNullOrWhiteSpace(targetIpv4) || !IPAddress.TryParse(targetIpv4.Trim(), out var parsedAddress))
+        {
+            return Task.FromResult(new HyperVMachineActionResult
+            {
+                Success = false,
+                ErrorMessage = "A valid IP address is required to open a remote desktop session."
+            });
+        }
+
         try
         {
-            var psi = new ProcessStartInfo("mstsc.exe", $"/v:{targetIpv4}")
+            var psi = new ProcessStartInfo("mstsc.exe")
             {
                 UseShellExecute = true
             };
+            psi.ArgumentList.Add($"/v:{parsedAddress}");
 
             Process.Start(psi);
             return Task.FromResult(new HyperVMachineActionResult { Success = true });
@@ -504,6 +519,18 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 
     public Task<HyperVMachineActionResult> ApplyVmEditAsync(string vmName, HyperVMachineEditRequest request)
     {
+        // Validate before touching Hyper-V so invalid input yields an actionable message instead of a raw
+        // Set-VM* error, and so a zero/negative value can never be written to the VM configuration.
+        var validationError = ValidateEditRequest(request);
+        if (validationError is not null)
+        {
+            return Task.FromResult(new HyperVMachineActionResult
+            {
+                Success = false,
+                ErrorMessage = validationError
+            });
+        }
+
         var lines = new List<string>
         {
             $"Set-VMProcessor -VMName {Quote(vmName)} -Count {request.ProcessorCount} -ErrorAction Stop"
@@ -528,6 +555,40 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
 
         var script = string.Join(Environment.NewLine, lines);
         return ExecuteCommandAsync("machines_apply_vm_edit", script);
+    }
+
+    private static string? ValidateEditRequest(HyperVMachineEditRequest request)
+    {
+        if (request.ProcessorCount < 1)
+        {
+            return "Processor count must be at least 1.";
+        }
+
+        if (request.StartupMemoryBytes <= 0)
+        {
+            return "Startup memory must be greater than zero.";
+        }
+
+        if (request.DynamicMemoryEnabled)
+        {
+            if (request.MinimumMemoryBytes <= 0 || request.MaximumMemoryBytes <= 0)
+            {
+                return "Dynamic memory minimum and maximum must be greater than zero.";
+            }
+
+            if (request.MinimumMemoryBytes > request.MaximumMemoryBytes)
+            {
+                return "Dynamic memory minimum cannot exceed the maximum.";
+            }
+
+            if (request.StartupMemoryBytes < request.MinimumMemoryBytes ||
+                request.StartupMemoryBytes > request.MaximumMemoryBytes)
+            {
+                return "Startup memory must fall between the dynamic minimum and maximum.";
+            }
+        }
+
+        return null;
     }
 
     private async Task<HyperVMachineActionResult> DeleteVmAndStorageAsync(string vmName)
@@ -600,7 +661,7 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
                     continue;
                 }
 
-                Directory.Delete(folderPath, recursive: true);
+                DeleteDirectoryWithoutFollowingReparsePoints(folderPath);
                 deletedVmFolderPath ??= folderPath;
             }
             catch (Exception ex)
@@ -912,6 +973,56 @@ public sealed class HyperVMachineAdminService : IHyperVMachineAdminService
         }
 
         return Path.GetFullPath(path).Trim();
+    }
+
+    /// <summary>
+    /// Recursively deletes a directory without ever traversing into reparse points (junctions/symlinks).
+    /// A reparse point is unlinked rather than followed, so cleanup can never cascade into a target that
+    /// lives outside the VM folder. This protects the zero-orphan/no-collateral-damage invariant when a
+    /// VM directory has been tampered with to point elsewhere.
+    /// </summary>
+    private static void DeleteDirectoryWithoutFollowingReparsePoints(string directoryPath)
+    {
+        var info = new DirectoryInfo(directoryPath);
+        if (!info.Exists)
+        {
+            return;
+        }
+
+        // If the directory itself is a reparse point, remove only the link.
+        if (info.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            info.Delete(recursive: false);
+            return;
+        }
+
+        foreach (var entry in info.EnumerateFileSystemInfos())
+        {
+            if (entry is DirectoryInfo subDirectory)
+            {
+                if (subDirectory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    // Unlink the junction/symlink without descending into its target.
+                    subDirectory.Delete(recursive: false);
+                }
+                else
+                {
+                    DeleteDirectoryWithoutFollowingReparsePoints(subDirectory.FullName);
+                }
+            }
+            else
+            {
+                // Clear read-only so deletion cannot be blocked by attribute flags.
+                if (entry.Attributes.HasFlag(FileAttributes.ReadOnly))
+                {
+                    entry.Attributes &= ~FileAttributes.ReadOnly;
+                }
+
+                entry.Delete();
+            }
+        }
+
+        info.Delete(recursive: false);
     }
 
     private static string NormalizeDirectoryPath(string? path)

@@ -29,12 +29,20 @@ public class SessionResolver : ISessionResolver, IDisposable
     public void RemoveSession(PowerShellHandle handle)
     {
         DebugLogger.Log($"Removing PowerShell session for handle: {handle.SessionId}");
-        _sessions.TryRemove(handle.SessionId, out _);
+        // Dispose on removal so the backing PowerShell process is torn down rather than orphaned.
+        if (_sessions.TryRemove(handle.SessionId, out var session))
+        {
+            session.Dispose();
+        }
     }
 
     public void Dispose()
     {
         foreach (var session in _sessions.Values)
+        {
             session.Dispose();
+        }
+
+        _sessions.Clear();
     }
 }
