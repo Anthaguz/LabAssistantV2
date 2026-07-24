@@ -4,6 +4,8 @@ using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LabAssistant.Business.Machines;
+using LabAssistant.Services.Diagnostics;
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Infrastructure;
 
 namespace LabAssistant.WinUI.ViewModels.Machines;
@@ -58,8 +60,14 @@ public partial class MachinesViewModel : ViewModelBase
     private const string UnknownRdpMessage = "RDP readiness unknown.";
 
     private readonly IMachinesCapabilityService _machinesService;
+    private readonly IStructuredLogger _structuredLogger;
     private readonly Dictionary<string, MachineInventoryItem> _inventoryByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, MachineRdpReadinessResult> _rdpReadinessByVmKey = new(StringComparer.OrdinalIgnoreCase);
+
+    // Source of truth for the current multi-selection (F07). Ordered to match how the user built the
+    // selection so batch summaries and dialogs list VMs predictably. The single-select detail/edit
+    // pane keys off SelectedMachine, which mirrors this list only when exactly one VM is selected.
+    private readonly List<MachineListItem> _selectedMachines = new();
 
     private IMachinesCapabilityShellBridge? _shellBridge;
     private MachineEditSnapshot? _loadedEditSnapshot;
@@ -68,14 +76,23 @@ public partial class MachinesViewModel : ViewModelBase
     private MachineRdpReadinessResult _selectedRdpReadiness = CreateUnknownReadiness(UnknownRdpMessage);
     private bool _isSyncingEditFields;
     private bool _suppressSelectionChanged;
+    private bool _isUpdatingSelection;
     private bool _isMachineEditLoading;
     private bool _isRdpRefreshRunning;
     private bool _isPropertyChangedHooked;
     private int _selectionRevision;
 
-    public MachinesViewModel(IMachinesCapabilityService machinesService)
+    /// <summary>
+    /// Raised after the machine list is rebuilt (for example following an inventory refresh) so the
+    /// view can re-apply the current multi-selection to its ListView. The view owns the ListView, so
+    /// the view model cannot select rows directly; it surfaces the intent and the view reconciles.
+    /// </summary>
+    internal event Action? SelectionReapplyRequested;
+
+    public MachinesViewModel(IMachinesCapabilityService machinesService, IStructuredLogger? structuredLogger = null)
     {
         _machinesService = machinesService;
+        _structuredLogger = structuredLogger ?? NullStructuredLogger.Instance;
         EnsurePropertyChangedSubscription();
     }
 
@@ -120,17 +137,45 @@ public partial class MachinesViewModel : ViewModelBase
 
     public ObservableCollection<MachineNetworkAdapterEditorItem> NetworkAdapters { get; } = new();
 
-    public bool HasSelection => SelectedMachine is not null && SelectedDetail is not null;
+    /// <summary>Current multi-selection (F07). Empty when nothing is selected.</summary>
+    public IReadOnlyList<MachineListItem> SelectedMachines => _selectedMachines;
 
-    public bool ShowSelectionHint => !HasSelection;
+    /// <summary>Number of virtual machines currently selected.</summary>
+    public int SelectedCount => _selectedMachines.Count;
+
+    /// <summary>True when at least one VM is selected; gates the bulk action group.</summary>
+    public bool HasAnySelection => _selectedMachines.Count >= 1;
+
+    /// <summary>True when exactly one VM is selected; gates the single-VM-only controls.</summary>
+    public bool HasSingleSelection => _selectedMachines.Count == 1;
+
+    /// <summary>Count label shown alongside the bulk actions, for example "3 selected".</summary>
+    public string SelectionSummaryText => $"{SelectedCount} selected";
+
+    public bool HasSelection => HasSingleSelection && SelectedDetail is not null;
+
+    public bool ShowSelectionHint => !HasAnySelection;
+
+    /// <summary>Bulk action group visibility: shown whenever at least one VM is selected.</summary>
+    public bool ShowBulkActions => HasAnySelection;
+
+    /// <summary>Single-VM-only controls (edit form, rename, console, RDP) visibility.</summary>
+    public bool ShowSingleMachineControls => HasSingleSelection;
 
     public bool ShowEmptyState => !IsLoading && !HasInventory;
 
     public bool CanRefresh => !IsLoading;
 
-    public bool CanRunMachineActions => SelectedMachine is not null && !IsLoading && !_isMachineEditLoading;
+    /// <summary>
+    /// Bulk-capable power/delete actions are enabled whenever at least one VM is selected and the
+    /// view model is not busy loading inventory or a single VM's edit snapshot.
+    /// </summary>
+    public bool CanRunBulkActions => HasAnySelection && !IsLoading && !_isMachineEditLoading;
 
-    public bool CanOpenRdp => CanRunMachineActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
+    /// <summary>Single-VM-only actions (open console, rename) require exactly one selected VM.</summary>
+    public bool CanRunSingleMachineActions => HasSingleSelection && !IsLoading && !_isMachineEditLoading;
+
+    public bool CanOpenRdp => CanRunSingleMachineActions && _selectedRdpReadiness.State == MachineRdpReadinessState.Ready;
 
     /// <summary>
     /// Human-readable tooltip for the RDP action. When the button is disabled (for example the VM
@@ -318,37 +363,41 @@ public partial class MachinesViewModel : ViewModelBase
     [RelayCommand]
     private Task StartVmAsync()
     {
-        return RunSelectedMachineOperationAsync(
-            "Starting VM...",
-            (vm, _) => _machinesService.StartVmAsync(vm),
-            refreshInventory: true);
+        return RunBulkMachineOperationAsync(
+            "start",
+            "Starting selected VM(s)...",
+            "Started",
+            (vm, _) => _machinesService.StartVmAsync(vm));
     }
 
     [RelayCommand]
     private Task StopVmAsync()
     {
-        return RunSelectedMachineOperationAsync(
-            "Stopping VM...",
-            (vm, _) => _machinesService.StopVmAsync(vm),
-            refreshInventory: true);
+        return RunBulkMachineOperationAsync(
+            "shut_down",
+            "Shutting down selected VM(s)...",
+            "Shut down",
+            (vm, _) => _machinesService.StopVmAsync(vm));
     }
 
     [RelayCommand]
     private Task TurnOffVmAsync()
     {
-        return RunSelectedMachineOperationAsync(
-            "Turning off VM...",
-            (vm, _) => _machinesService.TurnOffVmAsync(vm),
-            refreshInventory: true);
+        return RunBulkMachineOperationAsync(
+            "turn_off",
+            "Turning off selected VM(s)...",
+            "Turned off",
+            (vm, _) => _machinesService.TurnOffVmAsync(vm));
     }
 
     [RelayCommand]
     private Task RestartVmAsync()
     {
-        return RunSelectedMachineOperationAsync(
-            "Restarting VM...",
-            (vm, _) => _machinesService.RestartVmAsync(vm),
-            refreshInventory: true);
+        return RunBulkMachineOperationAsync(
+            "restart",
+            "Restarting selected VM(s)...",
+            "Restarted",
+            (vm, _) => _machinesService.RestartVmAsync(vm));
     }
 
     [RelayCommand]
@@ -421,21 +470,10 @@ public partial class MachinesViewModel : ViewModelBase
     [RelayCommand]
     private async Task DeleteVmAsync()
     {
-        if (!TryGetSelectedInventoryItem(out var vm))
+        var candidates = GetSelectedInventoryItems();
+        if (candidates.Count == 0)
         {
             StatusMessage = DefaultStatusMessage;
-            return;
-        }
-
-        MachineDeletePreview preview;
-        try
-        {
-            preview = await _machinesService.GetDeletePreviewAsync(vm);
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = ex.Message;
-            StatusMessage = $"Failed to evaluate delete policy/classification. {ex.Message}";
             return;
         }
 
@@ -445,31 +483,39 @@ public partial class MachinesViewModel : ViewModelBase
             return;
         }
 
-        MachineDeleteScope? selectedScope;
-        var policyCanAutoSelectScope = preview.PolicyMode != MachineDeletionPolicyMode.AskEveryTime &&
-            preview.DefaultScope == MachineDeleteScope.VmAndStorage &&
-            preview.SafeForAutomaticStorageDeletion;
-
-        if (policyCanAutoSelectScope)
+        List<MachineBulkDeleteCandidate> deleteCandidates;
+        try
         {
-            var confirmed = await _shellBridge.ShowDeleteConfirmationDialogAsync(vm, preview, preview.DefaultScope);
-            selectedScope = confirmed ? preview.DefaultScope : null;
+            deleteCandidates = new List<MachineBulkDeleteCandidate>(candidates.Count);
+            foreach (var vm in candidates)
+            {
+                var preview = await _machinesService.GetDeletePreviewAsync(vm);
+                deleteCandidates.Add(new MachineBulkDeleteCandidate(vm, preview));
+            }
         }
-        else
+        catch (Exception ex)
         {
-            selectedScope = await _shellBridge.ShowDeleteScopeDialogAsync(vm, preview);
+            ErrorMessage = ex.Message;
+            StatusMessage = $"Failed to evaluate delete policy/classification. {ex.Message}";
+            return;
         }
 
+        // One confirmation covers the whole batch with a single scope choice. "VM only" never
+        // deletes storage; "VM + storage" is an explicit override that deletes storage for every
+        // selected VM even where the policy flagged it unsafe for automatic storage deletion.
+        var selectedScope = await _shellBridge.ShowBulkDeleteScopeDialogAsync(deleteCandidates);
         if (selectedScope is null)
         {
             StatusMessage = "Delete cancelled.";
             return;
         }
 
-        await RunSelectedMachineOperationAsync(
-            "Deleting VM...",
-            (selectedVm, _) => _machinesService.DeleteVmAsync(selectedVm, selectedScope.Value),
-            refreshInventory: true,
+        var scope = selectedScope.Value;
+        await RunBulkMachineOperationAsync(
+            "delete",
+            $"Deleting {candidates.Count} VM(s)...",
+            "Deleted",
+            (vm, _) => _machinesService.DeleteVmAsync(vm, scope),
             clearSelectionOnSuccess: true);
     }
 
@@ -523,8 +569,58 @@ public partial class MachinesViewModel : ViewModelBase
             return;
         }
 
+        // A direct set (programmatic single-select, e.g. from tests or future callers) is treated as
+        // selecting exactly that one VM so the multi-selection stays consistent. Selection pushed via
+        // UpdateSelection sets _isUpdatingSelection so it owns the list itself and is not overwritten.
+        if (!_isUpdatingSelection)
+        {
+            _selectedMachines.Clear();
+            if (value is not null)
+            {
+                _selectedMachines.Add(value);
+            }
+
+            RaiseSelectionStateChanged();
+        }
+
         ApplySelectionState(value, updateNoSelectionStatus: true);
         _ = LoadSelectedMachineStateAsync(value, ++_selectionRevision, LifecycleToken);
+    }
+
+    /// <summary>
+    /// Replaces the current selection with <paramref name="items"/> (F07). The view calls this from
+    /// its ListView SelectionChanged handler so all selection logic stays here and is unit-testable
+    /// without a live ListView. The single-VM detail/edit pane is driven only when exactly one VM is
+    /// selected; otherwise the detail is cleared while the bulk actions operate on the full set.
+    /// </summary>
+    public void UpdateSelection(IReadOnlyList<MachineListItem> items)
+    {
+        _isUpdatingSelection = true;
+        try
+        {
+            _selectedMachines.Clear();
+            if (items is not null)
+            {
+                foreach (var item in items)
+                {
+                    if (item is not null && !_selectedMachines.Contains(item))
+                    {
+                        _selectedMachines.Add(item);
+                    }
+                }
+            }
+
+            var detailSelection = _selectedMachines.Count == 1 ? _selectedMachines[0] : null;
+            SetSelectedMachineSilently(detailSelection);
+            ApplySelectionState(detailSelection, updateNoSelectionStatus: true);
+            _ = LoadSelectedMachineStateAsync(detailSelection, ++_selectionRevision, LifecycleToken);
+        }
+        finally
+        {
+            _isUpdatingSelection = false;
+        }
+
+        RaiseSelectionStateChanged();
     }
 
     partial void OnCpuCountChanged(string value) => RefreshDraftFromEditors();
@@ -608,7 +704,12 @@ public partial class MachinesViewModel : ViewModelBase
             return;
         }
 
-        var selectedVmKey = SelectedMachine is null ? null : GetVmKey(SelectedMachine);
+        // Preserve the full multi-selection across the rebuild by VM key, since the refresh replaces
+        // every MachineListItem instance (F07). The single-VM detail pane is only driven when exactly
+        // one VM remains selected.
+        var selectedKeys = _selectedMachines
+            .Select(GetVmKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         await ExecuteWithLoadingAsync(async (ct) =>
         {
             StatusMessage = "Loading host VM inventory...";
@@ -629,12 +730,18 @@ public partial class MachinesViewModel : ViewModelBase
 
             SyncRdpReadinessCache();
 
-            var nextSelection = selectedVmKey is null
-                ? null
-                : Machines.FirstOrDefault(machine => string.Equals(GetVmKey(machine), selectedVmKey, StringComparison.OrdinalIgnoreCase));
+            var remappedSelection = selectedKeys.Count == 0
+                ? new List<MachineListItem>()
+                : Machines.Where(machine => selectedKeys.Contains(GetVmKey(machine))).ToList();
 
+            _selectedMachines.Clear();
+            _selectedMachines.AddRange(remappedSelection);
+
+            var nextSelection = remappedSelection.Count == 1 ? remappedSelection[0] : null;
             SetSelectedMachineSilently(nextSelection);
             ApplySelectionState(nextSelection, updateNoSelectionStatus: false);
+            RaiseSelectionStateChanged();
+            SelectionReapplyRequested?.Invoke();
 
             StatusMessage = HasInventory
                 ? $"Loaded {Machines.Count} VM(s)."
@@ -652,8 +759,7 @@ public partial class MachinesViewModel : ViewModelBase
     private async Task RunSelectedMachineOperationAsync(
         string pendingMessage,
         Func<MachineInventoryItem, CancellationToken, Task<MachineOperationResult>> operation,
-        bool refreshInventory,
-        bool clearSelectionOnSuccess = false)
+        bool refreshInventory)
     {
         if (!TryGetSelectedInventoryItem(out var vm))
         {
@@ -669,12 +775,6 @@ public partial class MachinesViewModel : ViewModelBase
             if (!result.Success)
             {
                 return;
-            }
-
-            if (clearSelectionOnSuccess)
-            {
-                SetSelectedMachineSilently(null);
-                ApplySelectionState(null, updateNoSelectionStatus: false);
             }
 
             if (refreshInventory)
@@ -693,7 +793,182 @@ public partial class MachinesViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadSelectedMachineStateAsync(MachineListItem? selectedMachine, int revision, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Runs <paramref name="operation"/> across every selected VM (F07). Each per-VM op is isolated
+    /// in its own try/catch so one failure never aborts the batch, mirroring the orphan-proof cleanup
+    /// ethos of the single-op flow. Cancellation is honored at VM boundaries, the inventory is
+    /// refreshed once at the end, and a single batch operationId ties the start/summary structured
+    /// events together. The end-of-run status line summarizes successes and per-VM failures.
+    /// </summary>
+    private async Task RunBulkMachineOperationAsync(
+        string actionKey,
+        string pendingMessage,
+        string pastTenseVerb,
+        Func<MachineInventoryItem, CancellationToken, Task<MachineOperationResult>> operation,
+        bool clearSelectionOnSuccess = false)
+    {
+        var candidates = GetSelectedInventoryItems();
+        if (candidates.Count == 0)
+        {
+            StatusMessage = DefaultStatusMessage;
+            return;
+        }
+
+        var batchOperationId = Guid.NewGuid().ToString("N");
+        _structuredLogger.Log(
+            LaStatus.Machines_RunningBulkMachineAction,
+            batchOperationId,
+            "started",
+            new Dictionary<string, object?>
+            {
+                ["action"] = actionKey,
+                ["vmCount"] = candidates.Count
+            });
+
+        var successCount = 0;
+        var failures = new List<(string VmName, string Reason)>();
+        var cancelled = false;
+
+        await ExecuteWithLoadingAsync(async (ct) =>
+        {
+            StatusMessage = pendingMessage;
+
+            foreach (var vm in candidates)
+            {
+                // Stop at the next VM boundary on cancellation rather than mid-op, so an in-flight
+                // Hyper-V action is allowed to finish and the batch summary still reports honestly.
+                if (ct.IsCancellationRequested)
+                {
+                    cancelled = true;
+                    break;
+                }
+
+                try
+                {
+                    var result = await operation(vm, ct);
+                    if (result.Success)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        failures.Add((vm.VmName, string.IsNullOrWhiteSpace(result.UserMessage) ? "Operation failed." : result.UserMessage));
+                    }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    cancelled = true;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    failures.Add((vm.VmName, ex.Message));
+                    _structuredLogger.Log(
+                        LaStatus.Machines_MachineActionFailed,
+                        batchOperationId,
+                        "failed",
+                        new Dictionary<string, object?>
+                        {
+                            ["action"] = actionKey,
+                            ["vmName"] = vm.VmName,
+                            ["vmId"] = vm.VmId,
+                            ["errorMessage"] = ex.Message,
+                            ["exceptionType"] = ex.GetType().FullName
+                        });
+                }
+            }
+
+            if (clearSelectionOnSuccess && failures.Count == 0 && !cancelled)
+            {
+                ClearSelection();
+            }
+
+            await RefreshInventoryCoreAsync(forceRefresh: true, ct);
+            if (SelectedMachine is not null)
+            {
+                await RefreshRdpReadinessAsync(selectedOnly: true, ct);
+            }
+        }, LifecycleToken);
+
+        StatusMessage = BuildBulkSummary(pastTenseVerb, candidates.Count, successCount, failures, cancelled);
+
+        var failureContext = new Dictionary<string, object?>
+        {
+            ["action"] = actionKey,
+            ["vmCount"] = candidates.Count,
+            ["successCount"] = successCount,
+            ["failureCount"] = failures.Count,
+            ["cancelled"] = cancelled
+        };
+
+        if (failures.Count > 0)
+        {
+            failureContext["failedVms"] = string.Join("; ", failures.Select(f => $"{f.VmName} - {f.Reason}"));
+        }
+
+        _structuredLogger.Log(
+            failures.Count > 0 ? LaStatus.Machines_BulkMachineActionPartiallyFailed : LaStatus.Machines_BulkMachineActionCompleted,
+            batchOperationId,
+            failures.Count > 0 ? "partial_failure" : "success",
+            failureContext);
+    }
+
+    private static string BuildBulkSummary(
+        string pastTenseVerb,
+        int total,
+        int successCount,
+        IReadOnlyList<(string VmName, string Reason)> failures,
+        bool cancelled)
+    {
+        var summary = $"{pastTenseVerb} {successCount} of {total}.";
+        if (failures.Count > 0)
+        {
+            summary += " Failed: " + string.Join("; ", failures.Select(f => $"{f.VmName} - {f.Reason}")) + ".";
+        }
+
+        if (cancelled)
+        {
+            summary += " Cancelled before all VMs were processed.";
+        }
+
+        return summary;
+    }
+
+    private List<MachineInventoryItem> GetSelectedInventoryItems()
+    {
+        var items = new List<MachineInventoryItem>(_selectedMachines.Count);
+        foreach (var machine in _selectedMachines)
+        {
+            if (TryGetInventoryItem(machine, out var vm))
+            {
+                items.Add(vm);
+            }
+        }
+
+        return items;
+    }
+
+    private void ClearSelection()
+    {
+        _selectedMachines.Clear();
+        SetSelectedMachineSilently(null);
+        ApplySelectionState(null, updateNoSelectionStatus: false);
+        RaiseSelectionStateChanged();
+    }
+
+    private void RaiseSelectionStateChanged()
+    {
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(HasAnySelection));
+        OnPropertyChanged(nameof(HasSingleSelection));
+        OnPropertyChanged(nameof(SelectionSummaryText));
+        OnPropertyChanged(nameof(SelectedMachines));
+        OnPropertyChanged(nameof(ShowBulkActions));
+        OnPropertyChanged(nameof(ShowSingleMachineControls));
+        RaiseComputedStateChanged();
+    }
+
+    private async Task LoadSelectedMachineStateAsync(MachineListItem? selectedMachine, int revision, CancellationToken cancellationToken)
     {
         if (selectedMachine is null || !TryGetInventoryItem(selectedMachine, out var vm))
         {
@@ -957,7 +1232,8 @@ public partial class MachinesViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowSelectionHint));
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(CanRefresh));
-        OnPropertyChanged(nameof(CanRunMachineActions));
+        OnPropertyChanged(nameof(CanRunBulkActions));
+        OnPropertyChanged(nameof(CanRunSingleMachineActions));
         OnPropertyChanged(nameof(CanOpenRdp));
         OnPropertyChanged(nameof(RdpActionTooltip));
         OnPropertyChanged(nameof(CanSaveChanges));
@@ -977,6 +1253,7 @@ public partial class MachinesViewModel : ViewModelBase
         _availableSwitches = Array.Empty<string>();
         LastRdpReadinessRefreshUtc = DateTimeOffset.MinValue;
         LastOnDemandRdpRefreshUtc = DateTimeOffset.MinValue;
+        _selectedMachines.Clear();
         SetSelectedMachineSilently(null);
         SelectedDetail = null;
         Machines = new ObservableCollection<MachineListItem>();
@@ -987,6 +1264,7 @@ public partial class MachinesViewModel : ViewModelBase
         StatusMessage = statusMessage;
         SetSelectedRdpReadiness(CreateUnknownReadiness(UnknownRdpMessage));
         ClearEditFields();
+        RaiseSelectionStateChanged();
     }
 
     private void SetSelectedMachineSilently(MachineListItem? machine)

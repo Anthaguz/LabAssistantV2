@@ -19,7 +19,21 @@ internal sealed class MachinesFakeCapabilityService : IMachinesCapabilityService
 
     public List<(string VmName, string Action)> ActionCalls { get; } = new();
 
+    public List<(string VmName, MachineDeleteScope Scope)> DeleteCalls { get; } = new();
+
     public List<(string VmName, string NewName)> RenameCalls { get; } = new();
+
+    /// <summary>Per-VM exceptions thrown by power/delete ops, keyed by VM name, to exercise
+    /// per-VM failure isolation in the bulk runner.</summary>
+    public Dictionary<string, string> ActionExceptionsByVmName { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Per-VM value for <see cref="MachineDeletePreview.SafeForAutomaticStorageDeletion"/>
+    /// returned by <see cref="GetDeletePreviewAsync"/>; VMs absent from the map default to false.</summary>
+    public Dictionary<string, bool> SafeForAutomaticStorageDeletionByVmName { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Invoked at the start of every power/delete op, before any configured failure, so a
+    /// test can request cancellation at a deterministic VM boundary.</summary>
+    public Action<MachineInventoryItem, string>? OnActionInvoked { get; set; }
 
     public MachineOperationResult RenameResult { get; set; } = new() { Success = true, OperationId = "op", UserMessage = "renamed" };
 
@@ -40,7 +54,11 @@ internal sealed class MachinesFakeCapabilityService : IMachinesCapabilityService
     public Task SetDeletionPolicyAsync(MachineDeletionPolicyMode mode) => Task.CompletedTask;
 
     public Task<MachineDeletePreview> GetDeletePreviewAsync(MachineInventoryItem vm)
-        => Task.FromResult(new MachineDeletePreview());
+        => Task.FromResult(new MachineDeletePreview
+        {
+            SafeForAutomaticStorageDeletion =
+                SafeForAutomaticStorageDeletionByVmName.TryGetValue(vm.VmName, out var safe) && safe
+        });
 
     public Task<MachineOperationResult> StartVmAsync(MachineInventoryItem vm) => RecordAction(vm, "start");
 
@@ -79,10 +97,27 @@ internal sealed class MachinesFakeCapabilityService : IMachinesCapabilityService
         return Task.FromResult(ApplyEditResult);
     }
 
-    public Task<MachineOperationResult> DeleteVmAsync(MachineInventoryItem vm, MachineDeleteScope scope) => RecordAction(vm, "delete");
+    public Task<MachineOperationResult> DeleteVmAsync(MachineInventoryItem vm, MachineDeleteScope scope)
+    {
+        OnActionInvoked?.Invoke(vm, "delete");
+        DeleteCalls.Add((vm.VmName, scope));
+        if (ActionExceptionsByVmName.TryGetValue(vm.VmName, out var reason))
+        {
+            throw new InvalidOperationException(reason);
+        }
+
+        ActionCalls.Add((vm.VmName, "delete"));
+        return Task.FromResult(new MachineOperationResult { Success = true, OperationId = "op", UserMessage = "delete" });
+    }
 
     private Task<MachineOperationResult> RecordAction(MachineInventoryItem vm, string action)
     {
+        OnActionInvoked?.Invoke(vm, action);
+        if (ActionExceptionsByVmName.TryGetValue(vm.VmName, out var reason))
+        {
+            throw new InvalidOperationException(reason);
+        }
+
         ActionCalls.Add((vm.VmName, action));
         return Task.FromResult(new MachineOperationResult { Success = true, OperationId = "op", UserMessage = action });
     }

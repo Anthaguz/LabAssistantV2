@@ -86,13 +86,15 @@
                 </Grid>
 
                 <ListView
-                    Grid.Row="1"
-                    TabIndex="1"
-                    AutomationProperties.Name="Virtual machines list"
-                    AutomationProperties.HelpText="Browse and select a virtual machine to review details and actions."
-                    ItemsSource="{x:Bind ViewModel.Machines, Mode=OneWay}"
-                    SelectedItem="{x:Bind ViewModel.SelectedMachine, Mode=TwoWay}"
-                    XYFocusKeyboardNavigation="Enabled">
+                    x:Name="MachinesListView"
+                    Grid.Row="1"
+                    TabIndex="1"
+                    SelectionMode="Extended"
+                    AutomationProperties.Name="Virtual machines list"
+                    AutomationProperties.HelpText="Browse and select virtual machines. Use Ctrl or Shift click to select several for a bulk action."
+                    ItemsSource="{x:Bind ViewModel.Machines, Mode=OneWay}"
+                    SelectionChanged="OnMachinesSelectionChanged"
+                    XYFocusKeyboardNavigation="Enabled">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:MachineListItem">
                             <Grid Padding="6" ColumnSpacing="{StaticResource SpacingS}">
@@ -122,15 +124,28 @@
                         FontSize="16"
                         FontWeight="SemiBold"
                         Text="VM Details" />
-
-                    <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" Text="{x:Bind ViewModel.SelectedVmNameText, Mode=OneWay}" />
-                    <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedVmOriginText, Mode=OneWay}" />
-
-                    <TextBlock
-                        Margin="0,8,0,0"
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Basic Edit" />
+
+                    <!--
+                        Selection-driven panels (F07). The hint shows when nothing is selected; the
+                        single-VM section (details, edit form, console/RDP, rename) shows only for a
+                        single selection; the bulk action group shows whenever one or more are selected.
+                    -->
+                    <TextBlock
+                        Foreground="{StaticResource ShellTextSecondaryBrush}"
+                        Visibility="{x:Bind ViewModel.ShowSelectionHint, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
+                        Text="Select one or more VMs. Use Ctrl or Shift click for a bulk action." />
+
+                    <StackPanel
+                        Spacing="10"
+                        Visibility="{x:Bind ViewModel.ShowSingleMachineControls, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Foreground="{StaticResource ShellTextPrimaryBrush}" Text="{x:Bind ViewModel.SelectedVmNameText, Mode=OneWay}" />
+                        <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedVmOriginText, Mode=OneWay}" />
+
+                        <TextBlock
+                            Margin="0,8,0,0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Basic Edit" />
 
                     <Grid ColumnSpacing="{StaticResource SpacingS}" XYFocusKeyboardNavigation="Enabled">
                         <Grid.ColumnDefinitions>
@@ -255,125 +270,143 @@
                             Text="Unsaved changes" />
                     </StackPanel>
 
-                    <TextBlock
-                        Margin="0,8,0,0"
-                        Foreground="{StaticResource ShellTextPrimaryBrush}"
-                        FontWeight="SemiBold"
-                        Text="Actions" />
-                    <StackPanel Spacing="{StaticResource SpacingS}">
-                        <StackPanel Spacing="{StaticResource SpacingXS}">
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Power" />
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                <Button
-                                    Style="{StaticResource MachinePrimaryActionIconButtonStyle}"
-                                    TabIndex="9"
-                                    AccessKey="T"
-                                    AutomationProperties.Name="Start virtual machine"
-                                    AutomationProperties.HelpText="Start the selected virtual machine."
-                                    ToolTipService.ToolTip="Start VM"
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.StartVmCommand}">
-                                    <FontIcon FontSize="16" Glyph="&#xE768;" />
-                                </Button>
-                                <Button
-                                    Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="10"
-                                    AccessKey="O"
-                                    AutomationProperties.Name="Shut down virtual machine"
-                                    AutomationProperties.HelpText="Request a graceful guest shutdown of the selected virtual machine."
-                                    ToolTipService.ToolTip="Shut down (guest OS)"
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.StopVmCommand}">
-                                    <FontIcon FontSize="16" Glyph="&#xE7E8;" />
-                                </Button>
-                                <Button
-                                    Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="11"
-                                    AccessKey="F"
-                                    AutomationProperties.Name="Turn off virtual machine"
-                                    AutomationProperties.HelpText="Hard power-off the selected virtual machine without waiting for the guest to shut down."
-                                    ToolTipService.ToolTip="Turn off (hard power-off)"
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.TurnOffVmCommand}">
-                                    <FontIcon FontSize="16" Glyph="&#xE71A;" />
-                                </Button>
-                                <Button
-                                    Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="12"
-                                    AccessKey="E"
-                                    AutomationProperties.Name="Restart virtual machine"
-                                    AutomationProperties.HelpText="Restart the selected virtual machine."
-                                    ToolTipService.ToolTip="Restart VM"
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.RestartVmCommand}">
-                                    <FontIcon FontSize="16" Glyph="&#xE72C;" />
-                                </Button>
-                            </StackPanel>
-                        </StackPanel>
-                        <StackPanel Spacing="{StaticResource SpacingXS}">
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Remote access" />
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                <Button
-                                    Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="13"
-                                    AccessKey="C"
-                                    AutomationProperties.Name="Open console"
-                                    AutomationProperties.HelpText="Open the console for the selected virtual machine."
-                                    ToolTipService.ToolTip="Open console"
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.OpenConsoleCommand}">
-                                    <FontIcon FontSize="16" Glyph="&#xE756;" />
-                                </Button>
-                                <!--
-                                    The RDP reason lives on a wrapper Grid so the tooltip still surfaces
-                                    while the button itself is disabled (a disabled button is not
-                                    hit-testable and would otherwise swallow the hover) (F22).
-                                -->
-                                <Grid Background="Transparent" ToolTipService.ToolTip="{x:Bind ViewModel.RdpActionTooltip, Mode=OneWay}">
+                        <TextBlock
+                            Margin="0,8,0,0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Actions" />
+                        <StackPanel Spacing="{StaticResource SpacingS}">
+                            <StackPanel Spacing="{StaticResource SpacingXS}">
+                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Remote access" />
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                                     <Button
                                         Style="{StaticResource MachineActionIconButtonStyle}"
-                                        TabIndex="14"
-                                        AccessKey="P"
-                                        AutomationProperties.Name="Open Remote Desktop"
-                                        AutomationProperties.HelpText="Open a Remote Desktop connection for the selected virtual machine when available."
-                                        IsEnabled="{x:Bind ViewModel.CanOpenRdp, Mode=OneWay}"
-                                        Command="{x:Bind ViewModel.OpenRdpCommand}">
-                                        <FontIcon FontSize="16" Glyph="&#xE8AF;" />
+                                        TabIndex="13"
+                                        AccessKey="C"
+                                        AutomationProperties.Name="Open console"
+                                        AutomationProperties.HelpText="Open the console for the selected virtual machine."
+                                        ToolTipService.ToolTip="Open console"
+                                        IsEnabled="{x:Bind ViewModel.CanRunSingleMachineActions, Mode=OneWay}"
+                                        Command="{x:Bind ViewModel.OpenConsoleCommand}">
+                                        <FontIcon FontSize="16" Glyph="&#xE756;" />
                                     </Button>
-                                </Grid>
+                                    <!--
+                                        The RDP reason lives on a wrapper Grid so the tooltip still surfaces
+                                        while the button itself is disabled (a disabled button is not
+                                        hit-testable and would otherwise swallow the hover) (F22).
+                                    -->
+                                    <Grid Background="Transparent" ToolTipService.ToolTip="{x:Bind ViewModel.RdpActionTooltip, Mode=OneWay}">
+                                        <Button
+                                            Style="{StaticResource MachineActionIconButtonStyle}"
+                                            TabIndex="14"
+                                            AccessKey="P"
+                                            AutomationProperties.Name="Open Remote Desktop"
+                                            AutomationProperties.HelpText="Open a Remote Desktop connection for the selected virtual machine when available."
+                                            IsEnabled="{x:Bind ViewModel.CanOpenRdp, Mode=OneWay}"
+                                            Command="{x:Bind ViewModel.OpenRdpCommand}">
+                                            <FontIcon FontSize="16" Glyph="&#xE8AF;" />
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
-                        <StackPanel Spacing="{StaticResource SpacingXS}">
-                            <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Manage" />
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
-                                <Button
-                                    Style="{StaticResource MachineActionIconButtonStyle}"
-                                    TabIndex="15"
-                                    AccessKey="N"
-                                    AutomationProperties.Name="Rename virtual machine"
-                                    AutomationProperties.HelpText="Rename the selected virtual machine."
-                                    ToolTipService.ToolTip="Rename VM"
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.RenameVmCommand}">
-                                    <FontIcon FontSize="16" Glyph="&#xE8AC;" />
-                                </Button>
-                                <Button
-                                    Style="{StaticResource MachineDestructiveActionIconButtonStyle}"
-                                    TabIndex="16"
-                                    AccessKey="D"
-                                    AutomationProperties.Name="Delete virtual machine"
-                                    AutomationProperties.HelpText="Delete the selected virtual machine."
-                                    ToolTipService.ToolTip="Delete VM"
-                                    IsEnabled="{x:Bind ViewModel.CanRunMachineActions, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.DeleteVmCommand}">
-                                    <FontIcon FontSize="16" Glyph="&#xE74D;" />
-                                </Button>
+                            <StackPanel Spacing="{StaticResource SpacingXS}">
+                                <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" FontSize="12" Text="Manage" />
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                                    <Button
+                                        Style="{StaticResource MachineActionIconButtonStyle}"
+                                        TabIndex="15"
+                                        AccessKey="N"
+                                        AutomationProperties.Name="Rename virtual machine"
+                                        AutomationProperties.HelpText="Rename the selected virtual machine."
+                                        ToolTipService.ToolTip="Rename VM"
+                                        IsEnabled="{x:Bind ViewModel.CanRunSingleMachineActions, Mode=OneWay}"
+                                        Command="{x:Bind ViewModel.RenameVmCommand}">
+                                        <FontIcon FontSize="16" Glyph="&#xE8AC;" />
+                                    </Button>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
 
+                    <!--
+                        Bulk actions (F07). Visible whenever one or more VMs are selected; each action
+                        runs across the whole selection. The Power group and Delete are bulk-capable,
+                        so they intentionally stay available for a single selection too.
+                    -->
+                    <StackPanel
+                        Spacing="{StaticResource SpacingS}"
+                        Visibility="{x:Bind ViewModel.ShowBulkActions, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock
+                            Margin="0,8,0,0"
+                            Foreground="{StaticResource ShellTextPrimaryBrush}"
+                            FontWeight="SemiBold"
+                            Text="Actions" />
+                        <TextBlock
+                            Foreground="{StaticResource ShellTextSecondaryBrush}"
+                            FontSize="12"
+                            AutomationProperties.LiveSetting="Polite"
+                            Text="{x:Bind ViewModel.SelectionSummaryText, Mode=OneWay}" />
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <Button
+                                Style="{StaticResource MachinePrimaryActionIconButtonStyle}"
+                                TabIndex="9"
+                                AccessKey="T"
+                                AutomationProperties.Name="Start virtual machines"
+                                AutomationProperties.HelpText="Start every selected virtual machine."
+                                ToolTipService.ToolTip="Start"
+                                IsEnabled="{x:Bind ViewModel.CanRunBulkActions, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.StartVmCommand}">
+                                <FontIcon FontSize="16" Glyph="&#xE768;" />
+                            </Button>
+                            <Button
+                                Style="{StaticResource MachineActionIconButtonStyle}"
+                                TabIndex="10"
+                                AccessKey="O"
+                                AutomationProperties.Name="Shut down virtual machines"
+                                AutomationProperties.HelpText="Request a graceful guest shutdown of every selected virtual machine."
+                                ToolTipService.ToolTip="Shut down (guest OS)"
+                                IsEnabled="{x:Bind ViewModel.CanRunBulkActions, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.StopVmCommand}">
+                                <FontIcon FontSize="16" Glyph="&#xE7E8;" />
+                            </Button>
+                            <Button
+                                Style="{StaticResource MachineActionIconButtonStyle}"
+                                TabIndex="11"
+                                AccessKey="F"
+                                AutomationProperties.Name="Turn off virtual machines"
+                                AutomationProperties.HelpText="Hard power-off every selected virtual machine without waiting for the guest to shut down."
+                                ToolTipService.ToolTip="Turn off (hard power-off)"
+                                IsEnabled="{x:Bind ViewModel.CanRunBulkActions, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.TurnOffVmCommand}">
+                                <FontIcon FontSize="16" Glyph="&#xE71A;" />
+                            </Button>
+                            <Button
+                                Style="{StaticResource MachineActionIconButtonStyle}"
+                                TabIndex="12"
+                                AccessKey="E"
+                                AutomationProperties.Name="Restart virtual machines"
+                                AutomationProperties.HelpText="Restart every selected virtual machine."
+                                ToolTipService.ToolTip="Restart"
+                                IsEnabled="{x:Bind ViewModel.CanRunBulkActions, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.RestartVmCommand}">
+                                <FontIcon FontSize="16" Glyph="&#xE72C;" />
+                            </Button>
+                            <Button
+                                Style="{StaticResource MachineDestructiveActionIconButtonStyle}"
+                                TabIndex="16"
+                                AccessKey="D"
+                                AutomationProperties.Name="Delete virtual machines"
+                                AutomationProperties.HelpText="Delete every selected virtual machine."
+                                ToolTipService.ToolTip="Delete"
+                                IsEnabled="{x:Bind ViewModel.CanRunBulkActions, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.DeleteVmCommand}">
+                                <FontIcon FontSize="16" Glyph="&#xE74D;" />
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+
                     <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" TextWrapping="Wrap" />
-                </StackPanel>
+                </StackPanel>
             </ScrollViewer>
         </Border>
     </Grid>
