@@ -21,7 +21,10 @@ public class PowerShellExecutor : IPowerShellExecutor
         var psi = new ProcessStartInfo
         {
             FileName = "powershell.exe", // ensures PS 5.1 is used
-            Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{EscapeScript(script)}\"",
+            // -EncodedCommand takes a Base64 UTF-16LE payload, so the script is passed verbatim without any
+            // quoting/escaping surface. This preserves newlines and prevents argument-boundary or subexpression
+            // injection that string escaping cannot reliably contain.
+            Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {EncodeScript(script)}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -44,13 +47,12 @@ public class PowerShellExecutor : IPowerShellExecutor
     }
 
     /// <summary>
-    /// Escapes double quotes and newlines for embedding in the -Command argument.
+    /// Encodes the script as a Base64 UTF-16LE payload for PowerShell's -EncodedCommand switch. This is the
+    /// injection-safe transport (no quoting concerns, newlines preserved) also used by the persistent session.
     /// </summary>
-    private static string EscapeScript(string script)
+    private static string EncodeScript(string script)
     {
-        return script
-            .Replace("\"", "`\"")
-            .Replace("\r", "")
-            .Replace("\n", "; ");
+        var bytes = Encoding.Unicode.GetBytes(script);
+        return Convert.ToBase64String(bytes);
     }
 }

@@ -102,6 +102,10 @@ public partial class App : Application
 
             StartupCrashLogger.MarkPhase("OnLaunched", "before MainWindow ctor");
             _window = new MainWindow();
+            // Dispose the root container when the main window closes so singletons (structured log sinks,
+            // stores, the PowerShell session pool and its live processes) flush and shut down cleanly instead
+            // of being torn down abruptly by process exit.
+            _window.Closed += OnMainWindowClosed;
             StartupCrashLogger.MarkPhase("OnLaunched", "after MainWindow ctor");
             _window.Activate();
             StartupCrashLogger.MarkPhase("OnLaunched", "after MainWindow.Activate");
@@ -110,6 +114,23 @@ public partial class App : Application
         {
             StartupCrashLogger.LogException("App.OnLaunched", ex);
             throw;
+        }
+    }
+
+    private void OnMainWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (_window is not null)
+        {
+            _window.Closed -= OnMainWindowClosed;
+        }
+
+        try
+        {
+            Services?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            StartupCrashLogger.LogException("App.OnMainWindowClosed", ex);
         }
     }
 }

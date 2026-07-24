@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LabAssistant.Data.IO;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
 using LabAssistant.Models.Validation;
@@ -130,7 +131,7 @@ public class LabTemplateStore : ILabTemplateStore
     {
         template = NormalizeForSave(template);
         var json = JsonSerializer.Serialize(template, SaveOptions);
-        File.WriteAllText(filePath, json);
+        SafeFileWriter.WriteAllText(filePath, json);
     }
 
     public string SaveToFolder(string folderPath, string templateName, LabTemplate template)
@@ -147,11 +148,34 @@ public class LabTemplateStore : ILabTemplateStore
         return filePath;
     }
 
+    private static readonly HashSet<string> ReservedDeviceNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
+    private const int MaxTemplateFileBaseLength = 120;
+
     private static string SanitizeFileName(string value)
     {
         var invalidChars = Path.GetInvalidFileNameChars();
-        var sanitized = new string(value.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
-        return string.IsNullOrWhiteSpace(sanitized) ? "lab-template" : sanitized;
+        var sanitized = new string((value ?? string.Empty).Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
+
+        // Windows ignores trailing dots/spaces in file names; strip them so the on-disk name is predictable.
+        sanitized = sanitized.Trim().TrimEnd('.', ' ');
+
+        if (sanitized.Length > MaxTemplateFileBaseLength)
+        {
+            sanitized = sanitized.Substring(0, MaxTemplateFileBaseLength).TrimEnd('.', ' ');
+        }
+
+        if (string.IsNullOrWhiteSpace(sanitized) || ReservedDeviceNames.Contains(sanitized))
+        {
+            return "lab-template";
+        }
+
+        return sanitized;
     }
 
     private static string GetTemplateFileName(string templateName, string folderPath)
@@ -275,35 +299,12 @@ public class LabTemplateStore : ILabTemplateStore
             var vm = normalized.VmTemplates[i];
             vm.GuestNetworkConfig = NormalizeGuestNetworkPlaceholder(vm.GuestNetworkConfig);
             NormalizeSwitchAssignments(vm);
-            if (!string.IsNullOrWhiteSpace(vm.VmId))
+            if (string.IsNullOrWhiteSpace(vm.VmId))
             {
-                continue;
+                // Assign a stable id in place. Mutating avoids re-listing every field on a reconstructed
+                // instance, which would silently drop any VmTemplate property added later.
+                vm.VmId = Guid.NewGuid().ToString("N");
             }
-
-            normalized.VmTemplates[i] = new VmTemplate
-            {
-                VmId = Guid.NewGuid().ToString("N"),
-                Name = vm.Name,
-                MemoryMb = vm.MemoryMb,
-                CpuCount = vm.CpuCount,
-                VhdxId = vm.VhdxId,
-                VhdPath = vm.VhdPath,
-                VhdxSignature = vm.VhdxSignature,
-                SwitchName = vm.SwitchName,
-                SwitchNames = vm.SwitchNames?.ToList(),
-                TimeZoneConfig = Clone(vm.TimeZoneConfig),
-                SoftwareConfig = Clone(vm.SoftwareConfig),
-                RoleConfig = Clone(vm.RoleConfig),
-                GuestNetworkConfig = Clone(vm.GuestNetworkConfig),
-                TopologyRole = vm.TopologyRole,
-                MembershipMode = vm.MembershipMode,
-                DomainId = vm.DomainId,
-                CapabilityRoles = vm.CapabilityRoles?.ToList(),
-                DependsOn = vm.DependsOn?.ToList(),
-                CredentialSlots = Clone(vm.CredentialSlots),
-                BootstrapProfileRef = vm.BootstrapProfileRef,
-                Nics = vm.Nics?.Select(Clone).ToList()
-            };
         }
 
         return normalized;

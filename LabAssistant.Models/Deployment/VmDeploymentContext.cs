@@ -9,7 +9,7 @@ namespace LabAssistant.Models.Deployment
 {
     public class VmDeploymentContext
     {
-        public Guid VmId;
+        public Guid VmId { get; set; }
         //Vm Base information
         public string VmPath { get; set; } = string.Empty;
         public string VmName { get; set; } = string.Empty;
@@ -228,6 +228,12 @@ namespace LabAssistant.Models.Deployment
             });
         }
 
+        /// <summary>
+        /// Clears per-operation runtime state (results, logs, failure markers, and all runtime wiring
+        /// delegates/emitters) so the context can be safely reused for a new operation, while preserving
+        /// the VM configuration (name, paths, memory, cpu, switch, step toggles). Runtime wiring is cleared
+        /// to prevent stale callbacks or abort delegates from a prior operation bleeding into the next one.
+        /// </summary>
         public void ResetForNewOperation()
         {
             IsSuccess = true;
@@ -256,6 +262,11 @@ namespace LabAssistant.Models.Deployment
             PowerShellHandle = null;
             StructuredEventEmitter = null;
             StepStateEmitter = null;
+            LogCallback = null;
+            OnBlockingFailure = null;
+            ShouldAbort = null;
+            StepFailedCode = 0;
+            StepFailedNonBlockingCode = 0;
             RequestGuestCredential = null;
             OperationId = string.Empty;
             _stepTerminalOverrides.Clear();

@@ -1,3 +1,4 @@
+using LabAssistant.WinUI.Infrastructure;
 using LabAssistant.WinUI.ViewModels.Machines;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -14,7 +15,7 @@ public sealed partial class MachinesOverviewView : UserControl
         ViewModel = App.Services.GetRequiredService<MachinesViewModel>();
         DataContext = ViewModel;
         InitializeComponent();
-        Loaded += async (_, _) => await ViewModel.InitializeAsync();
-        Unloaded += async (_, _) => await ViewModel.CleanupAsync();
+        Loaded += (_, _) => ViewLifecycle.Run(() => ViewModel.InitializeAsync(), "MachinesOverviewView.Initialize");
+        Unloaded += (_, _) => ViewLifecycle.Run(() => ViewModel.CleanupAsync(), "MachinesOverviewView.Cleanup");
     }
 }

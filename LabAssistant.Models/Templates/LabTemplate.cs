@@ -8,7 +8,7 @@ namespace LabAssistant.Models.Templates;
 /// </summary>
 public class LabTemplate
 {
-    public const string CurrentSchemaVersion = "1.0.0";
+    public const string CurrentSchemaVersion = TemplateSchemaVersionCatalog.V1SchemaVersion;
     public const string SupportedTemplateType = "lab-template";
 
     /// <summary>
@@ -27,9 +27,23 @@ public class LabTemplate
     public string? Description { get; set; }
 
     /// <summary>
-    /// Canonical schema version for compatibility checks (required).
+    /// Canonical schema version for compatibility checks (required). Deserialization prefers this
+    /// canonical key over the legacy "version" alias regardless of JSON key order.
     /// </summary>
-    public string SchemaVersion { get; set; } = CurrentSchemaVersion;
+    [JsonPropertyName("schemaVersion")]
+    public string SchemaVersion
+    {
+        get => _schemaVersion;
+        set
+        {
+            _schemaVersion = value;
+            _schemaVersionFromCanonicalKey = true;
+        }
+    }
+
+    private string _schemaVersion = CurrentSchemaVersion;
+
+    private bool _schemaVersionFromCanonicalKey;
 
     /// <summary>
     /// User-controlled revision number for template content (required).
@@ -89,6 +103,8 @@ public class LabTemplate
 
     /// <summary>
     /// Legacy JSON compatibility hook. Reads legacy "version" values without writing them back.
+    /// The canonical "schemaVersion" key always wins, regardless of which key appears first in the
+    /// JSON, so a file carrying both keys can never be silently downgraded by key ordering.
     /// </summary>
     [JsonPropertyName("version")]
     public string? LegacyVersion
@@ -96,9 +112,9 @@ public class LabTemplate
         get => null;
         set
         {
-            if (!string.IsNullOrWhiteSpace(value))
+            if (!_schemaVersionFromCanonicalKey && !string.IsNullOrWhiteSpace(value))
             {
-                SchemaVersion = value;
+                _schemaVersion = value;
             }
         }
     }

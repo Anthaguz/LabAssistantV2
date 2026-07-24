@@ -1,12 +1,17 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using LabAssistant.Data.Catalog;
+using LabAssistant.Data.IO;
 using LabAssistant.Models.Configuration;
 
 namespace LabAssistant.Data.Configuration;
 
 public sealed class AppSettingsStore : IAppSettingsStore
 {
+    private static readonly JsonSerializerOptions SaveOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions LoadOptions = new() { PropertyNameCaseInsensitive = true };
+
     private readonly IAppPaths _paths;
     private readonly string _appRoot;
     private readonly string _appConfigFolder;
@@ -37,8 +42,18 @@ public sealed class AppSettingsStore : IAppSettingsStore
 
             if (File.Exists(_settingsFilePath))
             {
-                string json = File.ReadAllText(_settingsFilePath);
-                Settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                if (TryLoadSettingsFile(out var loaded))
+                {
+                    Settings = loaded;
+                }
+                else
+                {
+                    // The file exists but could not be read/parsed. Preserve it for recovery instead of
+                    // silently overwriting the user's real settings, then fall back to defaults.
+                    QuarantineCorruptSettingsFile();
+                    Settings = GetDefaultSettings();
+                    Save();
+                }
             }
             else
             {
@@ -52,10 +67,50 @@ public sealed class AppSettingsStore : IAppSettingsStore
         }
         catch (Exception)
         {
+            // Last-resort environmental failure (e.g. cannot create the config directory). Use in-memory
+            // defaults but do NOT Save() over any on-disk settings file that may still be intact.
             Settings = GetDefaultSettings();
             EnsureAllConfiguredDirectoriesExist();
             EnsureCatalogFileExists();
-            Save();
+        }
+    }
+
+    private bool TryLoadSettingsFile(out AppSettings settings)
+    {
+        try
+        {
+            var json = File.ReadAllText(_settingsFilePath);
+            var parsed = JsonSerializer.Deserialize<AppSettings>(json, LoadOptions);
+            if (parsed is null)
+            {
+                settings = new AppSettings();
+                return false;
+            }
+
+            settings = parsed;
+            return true;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            settings = new AppSettings();
+            return false;
+        }
+    }
+
+    private void QuarantineCorruptSettingsFile()
+    {
+        try
+        {
+            if (File.Exists(_settingsFilePath))
+            {
+                var quarantinePath = $"{_settingsFilePath}.corrupt-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+                File.Move(_settingsFilePath, quarantinePath);
+            }
+        }
+        catch
+        {
+            // Best-effort preservation. If the corrupt file cannot be moved, the subsequent Save()
+            // will overwrite it; there is nothing further we can do without a logging seam here.
         }
     }
 
@@ -66,8 +121,8 @@ public sealed class AppSettingsStore : IAppSettingsStore
 
     public void Save()
     {
-        var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(_settingsFilePath, json);
+        var json = JsonSerializer.Serialize(Settings, SaveOptions);
+        SafeFileWriter.WriteAllText(_settingsFilePath, json);
     }
 
     public void ResetToDefault()

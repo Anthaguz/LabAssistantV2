@@ -65,7 +65,7 @@ public static class TemplateSchemaCompatibilityGate
                 TemplateSchemaCompatibilityStatus.Block,
                 null,
                 null,
-                $"Template schemaVersion '{schemaVersion}' is invalid. Use semantic version format like '{LabTemplate.CurrentSchemaVersion}'.");
+                $"Template schemaVersion '{schemaVersion}' is invalid. Use semantic version format like '{currentSchemaVersion}'.");
         }
 
         if (sourceVersion.Major > currentMajor)
@@ -91,7 +91,7 @@ public static class TemplateSchemaCompatibilityGate
             return new TemplateSchemaCompatibilityDecision(
                 TemplateSchemaCompatibilityStatus.AllowWithUpcast,
                 sourceVersion,
-                $"Template schemaVersion '{sourceVersion}' is previous major and will be migrated to current schema '{LabTemplate.CurrentSchemaVersion}'.",
+                $"Template schemaVersion '{sourceVersion}' is previous major and will be migrated to current schema '{currentSchemaVersion}'.",
                 null);
         }
 

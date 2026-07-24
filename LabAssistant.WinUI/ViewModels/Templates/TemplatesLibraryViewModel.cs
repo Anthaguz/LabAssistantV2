@@ -227,6 +227,14 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
                 await _host.ShowTemplateInEditorAsync(document, "New template draft created.");
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Benign navigate-away cancellation; nothing to surface.
+        }
+        catch (Exception ex)
+        {
+            SetFailure($"Failed to create template draft. {ex.Message}");
+        }
         finally
         {
             IsLoading = false;
@@ -245,6 +253,14 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
             {
                 await _host.CreateTemplateBuilderDraftAsync();
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Benign navigate-away cancellation; nothing to surface.
+        }
+        catch (Exception ex)
+        {
+            SetFailure($"Failed to create Builder draft. {ex.Message}");
         }
         finally
         {
@@ -321,6 +337,14 @@ public partial class TemplatesLibraryViewModel : ViewModelBase
                 _selectedTemplateFilePath = null;
                 await ReloadLibraryAsync(forceRefresh: true);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Benign navigate-away cancellation; nothing to surface.
+        }
+        catch (Exception ex)
+        {
+            SetFailure($"Failed to delete template. {ex.Message}");
         }
         finally
         {

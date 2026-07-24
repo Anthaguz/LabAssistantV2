@@ -1,5 +1,7 @@
 namespace LabAssistant.Models.Templates;
 
+using System.Text.Json.Serialization;
+
 public class V2DirectoryTopologyTemplate
 {
     public List<V2ForestTemplate>? Forests { get; set; }
@@ -16,6 +18,9 @@ public class V2ForestTemplate
     public string RootDomainId { get; set; } = string.Empty;
 }
 
+// Persisted inside LabTemplate.DirectoryTopology. Serialized as its string name so that inserting or
+// reordering enum members never silently reinterprets the meaning of an already-saved template.
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum V2DomainRelationKind
 {
     Root = 0,
@@ -40,6 +45,7 @@ public class V2DomainTemplate
     public string FirstDomainControllerVmId { get; set; } = string.Empty;
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum V2TrustType
 {
     External = 0,
@@ -47,6 +53,7 @@ public enum V2TrustType
     Realm = 2
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum V2TrustDirection
 {
     Inbound = 0,

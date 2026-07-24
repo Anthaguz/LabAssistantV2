@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LabAssistant.Data.IO;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Validation;
 
@@ -50,7 +51,7 @@ public class VhdxCatalogStore : IVhdxCatalogStore
             };
 
             var json = JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(catalogPath, json);
+            SafeFileWriter.WriteAllText(catalogPath, json);
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -86,7 +87,7 @@ public class VhdxCatalogStore : IVhdxCatalogStore
 
             var document = new VhdxCatalogDocument();
             var json = JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(catalogPath, json);
+            SafeFileWriter.WriteAllText(catalogPath, json);
         }
         catch (UnauthorizedAccessException)
         {
