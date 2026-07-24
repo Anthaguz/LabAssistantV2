@@ -224,6 +224,15 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
             SetError(null);
             await LoadInventoryAsync(forceRefresh: true, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // Lifecycle cancellation on navigate-away; nothing to surface to the user.
+        }
+        catch (Exception ex)
+        {
+            SetError($"Remove failed. {ex.Message}");
+            StatusMessage = "Base disk removal failed unexpectedly. See the error details.";
+        }
         finally
         {
             _isRemoving = false;
@@ -242,11 +251,24 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
             return;
         }
 
-        var validation = await _capabilityService.ValidateAsync(draft, LifecycleToken);
-        ApplyValidation(validation);
-        StatusMessage = string.Equals(validation.Severity, "Pass", StringComparison.OrdinalIgnoreCase)
-            ? "Validation passed. The base disk is ready to use."
-            : "Validation blocked. Review the details and correct the metadata or path before saving.";
+        try
+        {
+            var validation = await _capabilityService.ValidateAsync(draft, LifecycleToken);
+            ApplyValidation(validation);
+            StatusMessage = string.Equals(validation.Severity, "Pass", StringComparison.OrdinalIgnoreCase)
+                ? "Validation passed. The base disk is ready to use."
+                : "Validation blocked. Review the details and correct the metadata or path before saving.";
+        }
+        catch (OperationCanceledException)
+        {
+            // Lifecycle cancellation on navigate-away; nothing to surface to the user.
+        }
+        catch (Exception ex)
+        {
+            SetError($"Validation failed. {ex.Message}");
+            StatusMessage = "Validation failed unexpectedly. See the error details.";
+        }
+
         NotifyStateChanged();
     }
 
@@ -413,6 +435,15 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
                 IsNew = false
             }, cancellationToken);
             ApplyValidation(validation);
+        }
+        catch (OperationCanceledException)
+        {
+            // Lifecycle cancellation on navigate-away; nothing to surface to the user.
+        }
+        catch (Exception ex)
+        {
+            SetError($"Save failed. {ex.Message}");
+            StatusMessage = "Base disk metadata save failed unexpectedly. See the error details.";
         }
         finally
         {

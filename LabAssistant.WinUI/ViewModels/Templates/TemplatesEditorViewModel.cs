@@ -195,6 +195,12 @@ public partial class TemplatesEditorViewModel : ViewModelBase
                 }
             }
         }
+        catch (Exception ex)
+        {
+            // Surface save failures to the user instead of letting the async command fault reach the
+            // dispatcher, where it would crash the app with no feedback.
+            SetStatus($"Save failed: {ex.Message}");
+        }
         finally
         {
             IsLoading = false;
@@ -213,12 +219,19 @@ public partial class TemplatesEditorViewModel : ViewModelBase
             return;
         }
 
-        if (TryApplyEditorFieldsToDocument(showSuccessStatus: false))
+        try
         {
-            var result = await _templatesCapabilityService.ValidateAsync(_activeDocument);
-            SetStatus(result.IsValid
-                ? "Template validation passed."
-                : "Validation failed: " + string.Join(" ", result.Errors));
+            if (TryApplyEditorFieldsToDocument(showSuccessStatus: false))
+            {
+                var result = await _templatesCapabilityService.ValidateAsync(_activeDocument);
+                SetStatus(result.IsValid
+                    ? "Template validation passed."
+                    : "Validation failed: " + string.Join(" ", result.Errors));
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Validation failed: {ex.Message}");
         }
 
         RecomputeDraft(null);

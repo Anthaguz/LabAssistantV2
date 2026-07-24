@@ -51,6 +51,21 @@ public abstract partial class ViewModelBase : ObservableObject, IAsyncDisposable
     public virtual Task CleanupAsync()
     {
         CancelLifecycleOperations();
+
+        // A ViewModel can be navigated away from and later navigated back to (reused). Re-arm a fresh
+        // lifecycle token so subsequent operations are cancellable again; without this the token would stay
+        // CancellationToken.None forever and every later operation on a reused ViewModel would run
+        // non-cancellable. Never re-arm once terminally disposed.
+        if (Volatile.Read(ref _disposed) == 0)
+        {
+            var fresh = new CancellationTokenSource();
+            if (Interlocked.CompareExchange(ref _lifecycleCts, fresh, null) is not null)
+            {
+                // Another thread already re-armed; discard ours so it is not leaked undisposed.
+                fresh.Dispose();
+            }
+        }
+
         return Task.CompletedTask;
     }
 

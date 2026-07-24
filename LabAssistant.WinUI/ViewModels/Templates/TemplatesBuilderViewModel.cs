@@ -1016,6 +1016,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                 }
             }
         }
+        catch (Exception ex)
+        {
+            SetStatus($"Save failed: {ex.Message}");
+        }
         finally
         {
             IsLoading = false;
@@ -1073,6 +1077,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                     await _host.ReloadLibraryAsync(forceRefresh: true);
                 }
             }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Save As failed: {ex.Message}");
         }
         finally
         {

@@ -100,6 +100,14 @@ public sealed partial class DeployPage : Page, ICapabilityPage
             _fromTemplateLane.ResultsPanelStateChanged -= OnFromTemplateResultsPanelStateChanged;
         }
 
+        // Navigate-away must cancel any in-flight deploy so the runtime tears down the resources it created
+        // instead of orphaning VMs/disks/switches. The lane's CleanupAsync requests user cancellation
+        // synchronously (before its first await), so firing it here guarantees cancellation even though the
+        // child views' Unloaded handlers may run after we detach the view models below (nulling the view host
+        // clears the child's reference, so its own Unloaded cleanup would otherwise be a no-op).
+        _ = _quickDeployLane?.CleanupAsync();
+        _ = _fromTemplateLane?.CleanupAsync();
+
         QuickDeployViewHost.ViewModel = null;
         FromTemplateViewHost.ViewModel = null;
         if (_shellHost is not null)

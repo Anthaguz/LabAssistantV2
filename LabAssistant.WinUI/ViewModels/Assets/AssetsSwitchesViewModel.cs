@@ -212,6 +212,15 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
             SetError(null);
             await LoadInventoryAsync(forceRefresh: true, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // Lifecycle cancellation on navigate-away; nothing to surface to the user.
+        }
+        catch (Exception ex)
+        {
+            SetError($"Delete failed. {ex.Message}");
+            StatusMessage = "Virtual switch delete failed unexpectedly. See the error details.";
+        }
         finally
         {
             _isDeleting = false;
@@ -356,6 +365,15 @@ public partial class AssetsSwitchesViewModel : ViewModelBase
                 var selected = Switches.FirstOrDefault(row => string.Equals(row.Name, result.Item.Name, StringComparison.OrdinalIgnoreCase));
                 SetSelectedSwitch(selected);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Lifecycle cancellation on navigate-away; nothing to surface to the user.
+        }
+        catch (Exception ex)
+        {
+            SetError($"Switch save failed. {ex.Message}");
+            StatusMessage = "Virtual switch save failed unexpectedly. See the error details.";
         }
         finally
         {

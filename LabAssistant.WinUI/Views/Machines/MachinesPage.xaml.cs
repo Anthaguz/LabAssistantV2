@@ -1,4 +1,5 @@
 using LabAssistant.Business.Machines;
+using LabAssistant.WinUI.Infrastructure;
 using LabAssistant.WinUI.Shell;
 using LabAssistant.WinUI.ViewModels.Machines;
 using Microsoft.UI.Dispatching;
@@ -100,6 +101,8 @@ public sealed partial class MachinesPage : Page, IMachinesCapabilityShellBridge
 
         _rdpReadinessTimer = DispatcherQueue.CreateTimer();
         _rdpReadinessTimer.Interval = TimeSpan.FromMinutes(5);
-        _rdpReadinessTimer.Tick += async (_, _) => await _viewModel.RefreshRdpReadinessAsync(selectedOnly: false);
+        _rdpReadinessTimer.Tick += (_, _) => ViewLifecycle.Run(
+            () => _viewModel.RefreshRdpReadinessAsync(selectedOnly: false),
+            "MachinesPage.RefreshRdpReadiness");
     }
 }

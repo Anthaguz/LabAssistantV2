@@ -1,3 +1,4 @@
+using LabAssistant.WinUI.Infrastructure;
 using LabAssistant.WinUI.ViewModels.Assets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -17,13 +18,13 @@ public sealed partial class AssetsBaseDisksView : UserControl
         Unloaded += OnUnloaded;
     }
 
-    private async void OnLoaded(object sender, RoutedEventArgs e)
+    private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        await ViewModel.InitializeAsync();
+        ViewLifecycle.Run(() => ViewModel.InitializeAsync(), "AssetsBaseDisksView.Initialize");
     }
 
-    private async void OnUnloaded(object sender, RoutedEventArgs e)
+    private void OnUnloaded(object sender, RoutedEventArgs e)
     {
-        await ViewModel.CleanupAsync();
+        ViewLifecycle.Run(() => ViewModel.CleanupAsync(), "AssetsBaseDisksView.Cleanup");
     }
 }

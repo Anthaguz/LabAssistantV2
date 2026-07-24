@@ -1,3 +1,4 @@
+using LabAssistant.WinUI.Infrastructure;
 using LabAssistant.WinUI.ViewModels.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
@@ -18,7 +19,7 @@ public sealed partial class DiagnosticsOverviewView : UserControl
         ViewModel = App.Services.GetRequiredService<DiagnosticsOverviewViewModel>();
         DataContext = ViewModel;
         InitializeComponent();
-        Loaded += async (_, _) => await ViewModel.InitializeAsync();
-        Unloaded += async (_, _) => await ViewModel.CleanupAsync();
+        Loaded += (_, _) => ViewLifecycle.Run(() => ViewModel.InitializeAsync(), "DiagnosticsOverviewView.Initialize");
+        Unloaded += (_, _) => ViewLifecycle.Run(() => ViewModel.CleanupAsync(), "DiagnosticsOverviewView.Cleanup");
     }
 }
