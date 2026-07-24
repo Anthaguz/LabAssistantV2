@@ -69,6 +69,31 @@ public class VmCleanupOrchestratorTests
     }
 
     [Fact]
+    public async Task Cleanup_SkipsVmRegistration_WhenEagerFlagSetButVmNeverCreated()
+    {
+        // Provisioning sets VmRegistered eagerly before CreateVmAsync. When creation fails the VM does not
+        // exist, yet Remove-VM against a missing VM reports failure. Cleanup must recognise the VM is gone
+        // and skip cleanly instead of surfacing a spurious "remove manually" residual.
+        var fs = new FakeDeploymentFileSystem();
+        var hyperv = new FakeHyperVService
+        {
+            VmExists = false,
+            VmRunning = false,
+            RemoveVmSuccess = false
+        };
+        var context = CreateContext();
+        context.VmRegistered = true;
+
+        var orchestrator = new VmCleanupOrchestrator(fs);
+        var result = await orchestrator.CleanupAsync(context, hyperv);
+
+        var registrationStep = Assert.Single(result.StepResults, s => s.Step == CleanupStepName.RemoveVmRegistration);
+        Assert.Equal(CleanupStepStatus.Skipped, registrationStep.Status);
+        Assert.DoesNotContain(result.Residuals, r => r.ResourceType == "vm-registration");
+        Assert.False(result.HasResiduals);
+    }
+
+    [Fact]
     public async Task Cleanup_PreservesDeterministicOrder()
     {
         var fs = new FakeDeploymentFileSystem

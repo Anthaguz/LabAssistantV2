@@ -109,6 +109,17 @@ public sealed class VmCleanupOrchestrator : IVmCleanupOrchestrator
             return;
         }
 
+        // RemoveVmAsync reports failure whenever Remove-VM emits any error, which includes the benign
+        // "VM not found" case. That case is reachable because the provisioning path sets VmRegistered
+        // eagerly (before CreateVmAsync) so cleanup still runs on a mid-registration failure. Re-check
+        // existence here so a VM that was never actually registered is reported as Skipped rather than
+        // surfacing a spurious "remove manually" residual for a VM that does not exist.
+        if (!await hyperVService.VmExistsAsync(context.VmName))
+        {
+            result.StepResults.Add(Skipped(CleanupStepName.RemoveVmRegistration, context.VmName, "VM registration not found; remove skipped."));
+            return;
+        }
+
         result.StepResults.Add(Failed(CleanupStepName.RemoveVmRegistration, context.VmName, "Failed to remove VM registration."));
         result.Residuals.Add(new CleanupResidual
         {

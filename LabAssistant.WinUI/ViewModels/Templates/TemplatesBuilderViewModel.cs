@@ -1016,6 +1016,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Benign navigate-away cancellation; nothing to surface.
+        }
         catch (Exception ex)
         {
             SetStatus($"Save failed: {ex.Message}");
@@ -1077,6 +1081,10 @@ public partial class TemplatesBuilderViewModel : ViewModelBase
                     await _host.ReloadLibraryAsync(forceRefresh: true);
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Benign navigate-away cancellation; nothing to surface.
         }
         catch (Exception ex)
         {

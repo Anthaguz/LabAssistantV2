@@ -195,6 +195,10 @@ public partial class TemplatesEditorViewModel : ViewModelBase
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Benign navigate-away cancellation; nothing to surface.
+        }
         catch (Exception ex)
         {
             // Surface save failures to the user instead of letting the async command fault reach the
@@ -228,6 +232,10 @@ public partial class TemplatesEditorViewModel : ViewModelBase
                     ? "Template validation passed."
                     : "Validation failed: " + string.Join(" ", result.Errors));
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Benign navigate-away cancellation; nothing to surface.
         }
         catch (Exception ex)
         {

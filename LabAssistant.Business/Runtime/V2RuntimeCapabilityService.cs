@@ -1072,9 +1072,10 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         var hyperV = state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory);
 
         // Set each created-flag eagerly, BEFORE its risky create call. If the call throws or returns false
-        // after partially creating the resource, cleanup must still consider it. The cleanup orchestrator
-        // guards every step with an existence check, so a flag set for a resource that was never actually
-        // created is harmless: that step simply finds nothing and is skipped.
+        // after partially creating the resource, cleanup must still consider it. Each cleanup step confirms
+        // the resource's real existence (filesystem check, or VmExistsAsync for the VM steps) before acting,
+        // so a flag set for a resource that was never actually created resolves to a Skipped step rather than
+        // a spurious residual.
         context.VmFolderCreated = true;
         if (!Directory.Exists(context.VmPath))
         {
