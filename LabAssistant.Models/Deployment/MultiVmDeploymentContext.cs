@@ -5,10 +5,13 @@ namespace LabAssistant.Models.Deployment;
 
 /// <summary>
 /// Tracks VM, trust, cancellation, and cleanup state for one multi-VM deployment operation.
+/// Owns the operation-scoped <see cref="CancellationTokenSource"/>; dispose it once the operation
+/// (including cleanup) has reached a terminal state to release the underlying wait handle.
 /// </summary>
-public class MultiVmDeploymentContext
+public class MultiVmDeploymentContext : IDisposable
 {
     private readonly CancellationTokenSource _operationCancellation = new();
+    private bool _disposed;
 
     /// <summary>
     /// Stable identifier propagated through logs and runtime workflow state for this operation.
@@ -77,14 +80,16 @@ public class MultiVmDeploymentContext
     public event EventHandler<DeploymentOperationStateChangedEventArgs>? OperationStateChanged;
 
     /// <summary>
-    /// Indicates whether this operation has requested cancellation.
+    /// Indicates whether this operation has requested cancellation. A disposed context reports
+    /// cancellation requested so any late observers stop rather than touch a disposed token source.
     /// </summary>
-    public bool IsCancellationRequested => _operationCancellation.IsCancellationRequested;
+    public bool IsCancellationRequested => _disposed || _operationCancellation.IsCancellationRequested;
 
     /// <summary>
-    /// Cancellation token shared across runtime workflow steps.
+    /// Cancellation token shared across runtime workflow steps. Returns an already-cancelled token
+    /// once the context has been disposed.
     /// </summary>
-    public CancellationToken CancellationToken => _operationCancellation.Token;
+    public CancellationToken CancellationToken => _disposed ? new CancellationToken(true) : _operationCancellation.Token;
 
     /// <summary>
     /// Marks the deployment operation as running.
@@ -103,12 +108,25 @@ public class MultiVmDeploymentContext
 
     /// <summary>
     /// Requests cancellation without changing whether the request came from the user.
+    /// Safe to call after disposal (no-op) so late UI cleanup cannot throw.
     /// </summary>
     public void RequestCancellation()
     {
-        if (!_operationCancellation.IsCancellationRequested)
+        if (_disposed)
         {
-            _operationCancellation.Cancel();
+            return;
+        }
+
+        try
+        {
+            if (!_operationCancellation.IsCancellationRequested)
+            {
+                _operationCancellation.Cancel();
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Raced with Dispose; cancellation is moot at this point.
         }
     }
 
@@ -150,6 +168,21 @@ public class MultiVmDeploymentContext
 
         OperationState = state;
         OperationStateChanged?.Invoke(this, new DeploymentOperationStateChangedEventArgs(state));
+    }
+
+    /// <summary>
+    /// Disposes the operation-scoped cancellation token source. Idempotent.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _operationCancellation.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
 

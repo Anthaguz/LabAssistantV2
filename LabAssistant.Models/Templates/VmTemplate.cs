@@ -9,9 +9,9 @@ namespace LabAssistant.Models.Templates;
 public class VmTemplate
 {
     /// <summary>
-    /// Immutable VM entry identifier for traceability (required).
+    /// VM entry identifier for traceability (required). Assigned once when missing and otherwise stable.
     /// </summary>
-    public string VmId { get; init; } = Guid.NewGuid().ToString("N");
+    public string VmId { get; set; } = Guid.NewGuid().ToString("N");
 
     /// <summary>
     /// VM name (required).

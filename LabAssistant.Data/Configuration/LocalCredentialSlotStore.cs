@@ -1,10 +1,23 @@
 using System.Text;
 using System.Text.Json;
 using System.Runtime.InteropServices;
+using LabAssistant.Data.IO;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 
 namespace LabAssistant.Data.Configuration;
+
+/// <summary>
+/// Raised when the credential slot store exists on disk but cannot be read or parsed. Callers that read
+/// credentials degrade to an empty set, but write paths surface this so a corrupt/locked file is never
+/// silently overwritten (which would destroy every stored credential).
+/// </summary>
+public sealed class CredentialSlotStoreException : Exception
+{
+    public CredentialSlotStoreException(string message, Exception inner) : base(message, inner)
+    {
+    }
+}
 
 public sealed class LocalCredentialSlotStore : ILocalCredentialSlotStore
 {
@@ -59,7 +72,9 @@ public sealed class LocalCredentialSlotStore : ILocalCredentialSlotStore
 
         var normalizedSlotKey = slotKey.Trim();
         var normalizedUsername = username.Trim();
-        var records = LoadRecords().ToList();
+        // Read via the throwing path so a corrupt/locked store aborts the upsert instead of silently
+        // dropping every previously stored credential by writing back only this one record.
+        var records = ReadRecordsOrThrow().ToList();
         var existingIndex = records.FindIndex(candidate =>
             string.Equals(candidate.SlotKey, normalizedSlotKey, StringComparison.OrdinalIgnoreCase));
         var updated = new LocalCredentialSlotRecord
@@ -83,6 +98,19 @@ public sealed class LocalCredentialSlotStore : ILocalCredentialSlotStore
 
     private IReadOnlyList<LocalCredentialSlotRecord> LoadRecords()
     {
+        // Read paths degrade gracefully to an empty set when the store is missing or unreadable.
+        try
+        {
+            return ReadRecordsOrThrow();
+        }
+        catch (CredentialSlotStoreException)
+        {
+            return Array.Empty<LocalCredentialSlotRecord>();
+        }
+    }
+
+    private List<LocalCredentialSlotRecord> ReadRecordsOrThrow()
+    {
         var directory = Path.GetDirectoryName(_slotsFilePath);
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
         {
@@ -91,34 +119,36 @@ public sealed class LocalCredentialSlotStore : ILocalCredentialSlotStore
 
         if (!File.Exists(_slotsFilePath))
         {
-            return Array.Empty<LocalCredentialSlotRecord>();
+            return new List<LocalCredentialSlotRecord>();
+        }
+
+        string json;
+        try
+        {
+            json = File.ReadAllText(_slotsFilePath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new CredentialSlotStoreException("Unable to read the credential store.", ex);
         }
 
         try
         {
-            var json = File.ReadAllText(_slotsFilePath);
-            var records = JsonSerializer.Deserialize<List<LocalCredentialSlotRecord>>(json);
-            return records ?? [];
+            return JsonSerializer.Deserialize<List<LocalCredentialSlotRecord>>(json) ?? new List<LocalCredentialSlotRecord>();
         }
-        catch
+        catch (Exception ex) when (ex is JsonException or FormatException)
         {
-            return Array.Empty<LocalCredentialSlotRecord>();
+            throw new CredentialSlotStoreException("The credential store is corrupt.", ex);
         }
     }
 
     private void SaveRecords(IReadOnlyList<LocalCredentialSlotRecord> records)
     {
-        var directory = Path.GetDirectoryName(_slotsFilePath);
-        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
         var ordered = records
             .OrderBy(record => record.SlotKey, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var json = JsonSerializer.Serialize(ordered, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(_slotsFilePath, json);
+        SafeFileWriter.WriteAllText(_slotsFilePath, json);
     }
 
     private static string Protect(string password)
