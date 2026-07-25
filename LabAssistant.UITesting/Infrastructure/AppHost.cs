@@ -78,6 +78,23 @@ public sealed class AppHost : IDisposable
                 $"App main window was not available for automation within {timeout.TotalSeconds:0}s.");
         }
 
+        // Maximize so the shell renders in its wide layout with the navigation pane
+        // expanded (labels visible). In the narrow default size the NavigationView
+        // collapses to icon-only and nav items can't be addressed by name, which made
+        // navigation flaky. Best-effort: never fail the launch just because maximize did.
+        try
+        {
+            if (window.Patterns.Window.IsSupported)
+            {
+                window.Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Maximized);
+                System.Threading.Thread.Sleep(500);
+            }
+        }
+        catch
+        {
+            // A non-maximizable window still works; nav lookups retry regardless.
+        }
+
         return new AppHost(application, automation, window, weLaunchedIt);
     }
 

@@ -71,9 +71,13 @@ public sealed class CatalogSeeder
 
         foreach (var item in items.ToList())
         {
+            // Ownership is decided ONLY by the harness tag prefix. The seeded catalog id has its
+            // hyphens stripped to satisfy the app's id format, so it never carries the "LAT-" prefix;
+            // the backing file path does (LAT-<runId>-base.vhdx), which is the reliable, tag-based
+            // signal. We deliberately do NOT fall back to any OsName/"lat" heuristic, because this
+            // path can delete the backing VHDX and a fuzzy match could destroy a real user's disk.
             bool owned = tagger.IsHarnessOwned(item.Id)
-                || (!string.IsNullOrEmpty(item.Path) && tagger.IsHarnessOwned(Path.GetFileName(item.Path)))
-                || (item.Id.StartsWith("lat", StringComparison.OrdinalIgnoreCase) && item.OsName.StartsWith("LAT ", StringComparison.OrdinalIgnoreCase));
+                || (!string.IsNullOrEmpty(item.Path) && tagger.IsHarnessOwned(Path.GetFileName(item.Path)));
 
             if (!owned)
             {
