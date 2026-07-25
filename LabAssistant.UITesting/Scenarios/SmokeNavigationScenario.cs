@@ -16,7 +16,11 @@ public sealed class SmokeNavigationScenario : IScenario
 {
     public string Name => "smoke-navigation";
 
-    public void Run(RunContext context)
+    public string Capability => "Shell";
+
+    public ScenarioRequirements Requirements => ScenarioRequirements.None;
+
+    public void Run(ScenarioContext context)
     {
         var nav = new ShellNav(context.Host);
 
@@ -73,7 +77,7 @@ public sealed class SmokeNavigationScenario : IScenario
     /// a bug (an unhandled error surfaced to the user). Hidden popup hosts (combo
     /// dropdowns, light-dismiss layers) are ignored via the offscreen check.
     /// </summary>
-    private void CheckForUnexpectedDialog(RunContext context, string capability)
+    private void CheckForUnexpectedDialog(ScenarioContext context, string capability)
     {
         var dialog = context.Host.MainWindow.FindFirstDescendant(cf =>
             cf.ByClassName("ContentDialog"));

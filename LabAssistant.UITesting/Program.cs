@@ -52,8 +52,8 @@ internal static class Program
             new SmokeNavigationScenario()
         };
 
-        var runner = new ScenarioRunner(exePath, config, repoRoot);
-        var recorder = runner.Run(scenarios);
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
         return recorder.HasFailures ? 2 : 0;
     }
 
@@ -66,8 +66,13 @@ internal static class Program
         var config = HarnessConfig.Load(testEnvPath);
         string exePath = config.ResolveAppExePath(repoRoot);
 
-        var runner = new DeployProofRunner(exePath, config, repoRoot);
-        var recorder = runner.Run();
+        var scenarios = new List<IScenario>
+        {
+            new QuickDeploySingleVmScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
         return recorder.HasFailures ? 2 : 0;
     }
 
