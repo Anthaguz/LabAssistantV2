@@ -27,7 +27,10 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
 
     public async Task<bool> CreateVmAsync(string vmName, string vmPath, string vhdPath, int memoryMb, int cpuCount)
     {
-        var script = $"New-VM -Name {PowerShellCommandBuilder.Quote(vmName)} -MemoryStartupBytes {memoryMb}MB -Generation 2 -BootDevice VHD -VHDPath {PowerShellCommandBuilder.Quote(vhdPath)} -Path {PowerShellCommandBuilder.Quote(vmPath)}";
+        // New-VM defaults ProcessorCount to 1, so the requested cpuCount must be applied
+        // explicitly with Set-VMProcessor or every deployed VM silently gets a single vCPU.
+        var effectiveCpuCount = cpuCount < 1 ? 1 : cpuCount;
+        var script = $"New-VM -Name {PowerShellCommandBuilder.Quote(vmName)} -MemoryStartupBytes {memoryMb}MB -Generation 2 -BootDevice VHD -VHDPath {PowerShellCommandBuilder.Quote(vhdPath)} -Path {PowerShellCommandBuilder.Quote(vmPath)} -ErrorAction Stop; Set-VMProcessor -VMName {PowerShellCommandBuilder.Quote(vmName)} -Count {effectiveCpuCount} -ErrorAction Stop";
         var (output, error) = await ExecuteMeasuredAsync("create_vm", script, vmName);
         DebugLogger.LogPowerShellOutput(script, output, error);
         return CaptureFailureMetadataAndReturnSuccess(error);
