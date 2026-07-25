@@ -152,6 +152,7 @@
                             FontWeight="SemiBold"
                             Text="Virtual Machines" />
                         <ListView
+                            x:Name="QuickDeployVmEntriesListView"
                             Grid.Row="1"
                             ItemsSource="{x:Bind ViewModel.VmEntryRows}"
                             SelectedItem="{x:Bind ViewModel.SelectedVmEntryRow, Mode=TwoWay}"
@@ -215,6 +216,7 @@
                         </ListView>
                         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
                             <Button
+                                x:Name="QuickDeployAddVmButton"
                                 Command="{x:Bind ViewModel.AddVmCommand}"
                                 HorizontalAlignment="Left"
                                 Padding="12,6"
@@ -271,6 +273,7 @@
                                     Text="Name" />
                                 <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
                                     <TextBox
+                                        x:Name="QuickDeployVmNameTextBox"
                                         Text="{x:Bind ViewModel.EditorVmNameDraft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     <StackPanel
                                         Orientation="Horizontal"
@@ -295,6 +298,7 @@
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     Text="Memory (MB)" />
                                 <TextBox
+                                    x:Name="QuickDeployVmMemoryTextBox"
                                     Grid.Row="1"
                                     Grid.Column="1"
                                     Text="{x:Bind ViewModel.EditorVmMemoryDraft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -305,6 +309,7 @@
                                     Foreground="{StaticResource ShellTextSecondaryBrush}"
                                     Text="CPU" />
                                 <TextBox
+                                    x:Name="QuickDeployVmCpuTextBox"
                                     Grid.Row="2"
                                     Grid.Column="1"
                                     Text="{x:Bind ViewModel.EditorVmCpuDraft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -316,6 +321,7 @@
                                     Text="Base disk" />
                                 <StackPanel Grid.Row="3" Grid.Column="1" Spacing="4">
                                     <ComboBox
+                                        x:Name="QuickDeployBaseDiskComboBox"
                                         HorizontalAlignment="Stretch"
                                         AutomationProperties.Name="Base disk"
                                         ItemsSource="{x:Bind ViewModel.VhdxCatalogItems}"
@@ -370,6 +376,7 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                     <Button
+                                        x:Name="QuickDeployAddSwitchButton"
                                         Command="{x:Bind ViewModel.AddSwitchRowCommand}"
                                         HorizontalAlignment="Left"
                                         Content="+ Add Switch" />
@@ -421,6 +428,7 @@
                                 ToolTipService.ToolTip="Saves the current VM entries as a reusable template in the Templates editor." />
                         </StackPanel>
                         <Button
+                            x:Name="QuickDeployStartButton"
                             Grid.Column="1"
                             Command="{x:Bind ViewModel.StartDeployCommand}"
                             Style="{StaticResource AccentButtonStyle}"

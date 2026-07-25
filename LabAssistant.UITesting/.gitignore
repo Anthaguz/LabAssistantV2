@@ -1,0 +1,15 @@
+# UI automation harness - ignore large binaries and per-run output.
+
+# Large test binaries live on disk, referenced by path from Fixtures/testenv.json.
+# Never commit them.
+*.iso
+*.vhd
+*.vhdx
+*.avhdx
+
+# Per-run findings, screenshots, logs.
+runs/
+
+# Build output (covered by repo root ignore too, kept here for clarity).
+bin/
+obj/
