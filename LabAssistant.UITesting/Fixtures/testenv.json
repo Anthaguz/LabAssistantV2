@@ -1,0 +1,19 @@
+{
+  "resourceProviderMode": "discover-existing",
+  "runTagPrefix": "LAT",
+  "app": {
+    "//": "Absolute path to the built LabAssistant.exe to drive. Leave empty to auto-locate the newest Debug build under the repo.",
+    "exePath": ""
+  },
+  "discoverExisting": {
+    "//": "In discover-existing mode the harness borrows whatever the app already has. These optional hints let you force a specific choice; empty = auto-pick the first suitable one.",
+    "preferredBaseDiskName": "",
+    "preferredSwitchName": ""
+  },
+  "dedicated": {
+    "//": "Reserved for the future dedicated-sandbox mode. Point these at git-ignored fixtures on disk.",
+    "baseDiskPath": "",
+    "isoPath": "",
+    "switchName": "LAT-switch"
+  }
+}
