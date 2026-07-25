@@ -18,6 +18,10 @@ internal sealed class DeployQuickDeployWorkspaceController
     private readonly int _autoEvaluateDelayMs;
     private int _autoEvaluateNonce;
 
+    // Poll interval used to wait for an in-flight readiness pass to finish before running a coalesced
+    // follow-up pass. Small so the follow-up starts promptly once the current pass clears.
+    private const int EvaluationDrainPollMs = 15;
+
     public DeployQuickDeployWorkspaceController(
         DeployQuickDeployViewModel workspace,
         IDeployQuickDeployWorkspaceControllerHost host,
@@ -191,11 +195,24 @@ internal sealed class DeployQuickDeployWorkspaceController
     {
         await Task.Delay(_autoEvaluateDelayMs);
 
-        // Only the newest scheduled pass may continue, and only while the workflow is idle enough
-        // to safely reconcile the draft back into workspace state before calling the current residual readiness bridge.
-        if (nonce != _autoEvaluateNonce || _workspace.IsStarting || _workspace.IsEvaluatingReadiness)
+        // A superseded pass bails so a burst of edits collapses to a single evaluation.
+        if (nonce != _autoEvaluateNonce || _workspace.IsStarting)
         {
             return;
+        }
+
+        // Coalesce rather than drop: if a readiness pass is already running, wait for it to finish and
+        // then run this (still-newest) pass. Dropping here would leave readiness stuck on the pre-change
+        // result - e.g. a VM added, or a field edited, while an earlier pass was in flight would never be
+        // re-evaluated, so the badges and right panel would reflect the stale prior state. If a newer pass
+        // is scheduled while we wait, this one steps aside and lets that newest pass take over.
+        while (_workspace.IsEvaluatingReadiness)
+        {
+            await Task.Delay(EvaluationDrainPollMs);
+            if (nonce != _autoEvaluateNonce || _workspace.IsStarting)
+            {
+                return;
+            }
         }
 
         if (!_host.TryApplyVmFields(showSuccessStatus: false, showValidationErrors: false))

@@ -24,6 +24,19 @@ public sealed class DeployQuickDeployViewModelTests
     private const string SwitchName = "Lab-A";
     private const string CatalogId = "base-1";
     private const string CatalogPath = @"C:\Base\base-1.vhdx";
+    private const string SecondCatalogId = "base-2";
+    private const string SecondCatalogPath = @"C:\Base\base-2.vhdx";
+
+    // A catalog with two base disks so the F26 "auto-select the single base disk" convenience
+    // (TryAutoSelectSingleBaseDisk, which only fires when exactly one disk exists) does not engage. A
+    // newly added VM then stays genuinely diskless, which is the bare-entry state these tests intend to
+    // exercise. With a single-disk catalog the added VM would auto-inherit that disk and only lack a
+    // switch, settling on a Warning rather than a Blocked readiness state.
+    private static IReadOnlyList<VhdxCatalogItem> TwoDiskCatalog() =>
+    [
+        new VhdxCatalogItem { Id = CatalogId, Path = CatalogPath, OsName = "Windows Server", OsVersion = "2022", Generation = 2 },
+        new VhdxCatalogItem { Id = SecondCatalogId, Path = SecondCatalogPath, OsName = "Windows Server", OsVersion = "2022", Generation = 2 },
+    ];
 
     /// <summary>
     /// Holds the constructed view model together with the fakes and interaction counters a test needs
@@ -128,11 +141,52 @@ public sealed class DeployQuickDeployViewModelTests
         await vm.EvaluateCommand.ExecuteAsync(null);
     }
 
-    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 2000)
+    // Debounced readiness passes run on Task.Delay continuations, which the shared thread pool
+    // can starve for hundreds of ms when the xUnit suite runs test classes in parallel. A 2s
+    // budget was too tight under that load and produced intermittent CI failures, so the wait
+    // gets generous headroom - a passing condition still returns immediately, only a genuinely
+    // failing wait pays the full timeout.
+    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 5000)
     {
         var stopwatch = Stopwatch.StartNew();
         while (!condition() && stopwatch.ElapsedMilliseconds < timeoutMs)
         {
+            await Task.Delay(15);
+        }
+    }
+
+    /// <summary>
+    /// Waits until the readiness pipeline is fully idle: no evaluation is in flight and the debounced
+    /// preflight call count has held steady across a quiet window, meaning every scheduled pass has drained.
+    /// </summary>
+    /// <remarks>
+    /// Follow-up mutations (AddVm/RemoveVm) should start from a settled state so the baseline evaluation
+    /// count captured before the mutation is stable. In the real UI the AddVm/Remove commands are gated by
+    /// <c>!IsEvaluatingReadiness</c>, so a user never triggers them mid-pass; tests invoke the commands
+    /// directly (bypassing CanExecute), so this drain reproduces that settled starting point. A fixed delay
+    /// could not close the window reliably because the debounce continuation is starved for a variable time
+    /// under the parallel suite's thread-pool pressure.
+    /// </remarks>
+    private static async Task WaitForReadinessIdleAsync(Harness harness, int quietMs = 150, int timeoutMs = 5000)
+    {
+        var overall = Stopwatch.StartNew();
+        var quiet = Stopwatch.StartNew();
+        int lastCount = -1;
+
+        while (overall.ElapsedMilliseconds < timeoutMs)
+        {
+            int count = harness.Preflight.CallCount;
+            if (harness.Vm.IsEvaluatingReadiness || count != lastCount)
+            {
+                // Still churning (evaluating or a pass just landed); restart the quiet window.
+                lastCount = count;
+                quiet.Restart();
+            }
+            else if (quiet.ElapsedMilliseconds >= quietMs)
+            {
+                return;
+            }
+
             await Task.Delay(15);
         }
     }
@@ -462,19 +516,25 @@ public sealed class DeployQuickDeployViewModelTests
     {
         // F49 regression: adding a VM used to clear the readiness report without re-scheduling an
         // evaluation, so the badges and right panel stayed stuck on the idle state permanently. Adding a
-        // bare VM must now re-evaluate; the new default entry has no base disk so it correctly blocks.
-        var harness = CreateHarness(autoEvaluateDelayMs: 30);
+        // bare VM must now re-evaluate. A two-disk catalog is used so the added entry is genuinely
+        // diskless (F26 auto-select does not fire), which correctly blocks readiness.
+        var harness = CreateHarness(autoEvaluateDelayMs: 30, catalog: TwoDiskCatalog());
         await ActivateReadyVmAsync(harness);
         await WaitUntilAsync(() => harness.Vm.LifecycleState == "Ready");
 
-        // Let any activation-scheduled debounce settle so the baseline count is stable before the add.
-        await Task.Delay(120);
+        // Drain every setup-scheduled pass so the add starts from a fully idle pipeline, mirroring the
+        // real UI's !IsEvaluatingReadiness gate before capturing the baseline evaluation count.
+        await WaitForReadinessIdleAsync(harness);
         var baselineCallCount = harness.Preflight.CallCount;
 
         harness.Vm.AddVmCommand.Execute(null);
 
+        // Wait for the re-evaluation to fully settle: the new bare entry has no base disk, so the set
+        // must resolve to Blocked with a Block-severity issue row.
         await WaitUntilAsync(() =>
-            harness.Preflight.CallCount > baselineCallCount && harness.Vm.LifecycleState == "Blocked");
+            harness.Preflight.CallCount > baselineCallCount
+            && harness.Vm.LifecycleState == "Blocked"
+            && harness.Vm.IssueRows.Any(row => row.Severity == "Block"));
 
         Assert.True(harness.Preflight.CallCount > baselineCallCount);
         Assert.NotNull(harness.Vm.ReadinessReport);
@@ -486,13 +546,21 @@ public sealed class DeployQuickDeployViewModelTests
     public async Task RemoveVm_LeavingEntries_ReschedulesReadinessForRemainingSet()
     {
         // F49 regression: removing a VM must re-evaluate the remaining set. Start blocked (two VMs, one
-        // bare) then remove the bare VM so readiness recovers to Ready for the lone configured VM.
-        var harness = CreateHarness(autoEvaluateDelayMs: 30);
+        // bare) then remove the bare VM so readiness recovers to Ready for the lone configured VM. The
+        // two-disk catalog keeps the added VM genuinely diskless so it blocks deterministically.
+        var harness = CreateHarness(autoEvaluateDelayMs: 30, catalog: TwoDiskCatalog());
         await ActivateReadyVmAsync(harness);
-        harness.Vm.AddVmCommand.Execute(null);
-        await WaitUntilAsync(() => harness.Vm.LifecycleState == "Blocked");
-        await Task.Delay(120);
 
+        // Drain the activation pass before adding, then wait for the two-VM set to settle on Blocked
+        // (the added bare entry has no base disk).
+        await WaitForReadinessIdleAsync(harness);
+        harness.Vm.AddVmCommand.Execute(null);
+        await WaitUntilAsync(() =>
+            harness.Vm.LifecycleState == "Blocked"
+            && harness.Vm.IssueRows.Any(row => row.Severity == "Block"));
+
+        // Settle the add's pass before removing so the baseline count is stable.
+        await WaitForReadinessIdleAsync(harness);
         var baselineCallCount = harness.Preflight.CallCount;
         var bareRow = harness.Vm.VmEntryRows[1];
 
@@ -515,9 +583,9 @@ public sealed class DeployQuickDeployViewModelTests
         var harness = CreateHarness(autoEvaluateDelayMs: 30);
         harness.Vm.ApplyShellState(isActive: true);
 
-        // The activation schedule evaluates the seeded default entry once; let it settle first.
+        // The activation schedule evaluates the seeded default entry once; drain it before the baseline.
         await WaitUntilAsync(() => harness.Vm.ReadinessReport is not null);
-        await Task.Delay(120);
+        await WaitForReadinessIdleAsync(harness);
         var baselineCallCount = harness.Preflight.CallCount;
 
         await harness.Vm.RemoveVmRowCommand.ExecuteAsync(harness.Vm.VmEntryRows[0]);
