@@ -42,6 +42,7 @@ They do not override `srs.md` / `acceptance-criteria.md` on user-visible behavio
 ### 6) Testing authority
 - `docs/07-testing/test-strategy.md`
 - `docs/07-testing/test-plan.md`
+- `docs/07-testing/ui-automation-ids.md`
 
 Use these when the active slice depends on validation strategy, recurring regression coverage, or manual/automated verification expectations.
 They do not override product behavior contracts; they define how behavior should be verified.

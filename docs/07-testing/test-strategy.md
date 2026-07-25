@@ -28,6 +28,9 @@
   - structured logging foundation and diagnostics export services
 - `LabAssistant.UI.Tests`
   - ViewModel workflow behavior and command-state UI logic
+- `LabAssistant.UITesting`
+  - End-to-end UI automation harness that drives the built app over UI Automation (FlaUI/UIA3) and records findings with screenshots
+  - Includes the `automation-id-coverage` audit that enforces `docs/07-testing/ui-automation-ids.md`
 
 ## What Must Be Mocked (or faked)
 - Hyper-V calls
