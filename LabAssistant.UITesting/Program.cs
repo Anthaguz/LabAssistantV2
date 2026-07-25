@@ -25,6 +25,7 @@ internal static class Program
             {
                 "dump" => RunDump(args),
                 "run" => RunScenarios(args),
+                "coverage" => RunCoverage(args),
                 "deploy" => RunDeployProof(args),
                 "sweep" => RunSweep(args),
                 _ => PrintHelp()
@@ -49,7 +50,32 @@ internal static class Program
 
         var scenarios = new List<IScenario>
         {
-            new SmokeNavigationScenario()
+            new SmokeNavigationScenario(),
+            new AutomationIdCoverageScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
+    /// Runs only the AutomationId coverage audit, so the addressability report can
+    /// be regenerated on demand without a full suite. Coverage gaps are advisory
+    /// (Warning/Info), so this exits non-zero only on a hard failure (Error/Crash).
+    /// </summary>
+    private static int RunCoverage(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new AutomationIdCoverageScenario()
         };
 
         var harness = new ScenarioHarness(exePath, config, repoRoot);
@@ -161,6 +187,7 @@ internal static class Program
         Console.WriteLine("Verbs:");
         Console.WriteLine("  dump    Launch the app and print its UI Automation tree.");
         Console.WriteLine("  run     Launch the app and run the scenario suite, writing findings.");
+        Console.WriteLine("  coverage Audit each capability's live UI tree for controls missing a stable AutomationId.");
         Console.WriteLine("  deploy  Seed resources, drive a single-VM Quick Deploy, validate, and tear down.");
         Console.WriteLine("  sweep   Remove any leftover harness-tagged Hyper-V resources.");
         return 0;
