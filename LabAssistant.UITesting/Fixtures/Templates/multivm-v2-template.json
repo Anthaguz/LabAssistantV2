@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "REPLACED_AT_SEED_TIME",
+  "name": "REPLACED_AT_SEED_TIME",
+  "description": "Harness-seeded minimal multi-VM V2 template. Three standalone Gen2 VMs, each with one bare NIC on the same host switch, no domain/topology/capability roles and no credential slots, so the V2 plan resolves with zero unresolved requirements and needs no bootable OS. Each VM has a DISTINCT memory/cpu so the deploy's per-VM fidelity can be validated. Safe to delete.",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "labNetworks": [],
+  "vmTemplates": [
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 1024,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "membershipMode": "Standalone",
+      "nics": [
+        {
+          "nicId": "primary",
+          "switchName": "REPLACED_AT_SEED_TIME"
+        }
+      ]
+    },
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 1536,
+      "cpuCount": 1,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "membershipMode": "Standalone",
+      "nics": [
+        {
+          "nicId": "primary",
+          "switchName": "REPLACED_AT_SEED_TIME"
+        }
+      ]
+    },
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "membershipMode": "Standalone",
+      "nics": [
+        {
+          "nicId": "primary",
+          "switchName": "REPLACED_AT_SEED_TIME"
+        }
+      ]
+    }
+  ]
+}

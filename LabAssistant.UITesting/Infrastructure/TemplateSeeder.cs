@@ -76,7 +76,80 @@ public sealed class TemplateSeeder
 
         return new SeededTemplate(filePath, templateName, vmName);
     }
+
+    /// <summary>
+    /// Writes a tagged multi-VM V2 template that references the seeded base disk and
+    /// switch, and returns its on-disk identity plus the per-VM ground truth. Every VM
+    /// in the fixture is stamped with its own run-tagged name (so each deployed VM is
+    /// sweepable) and its NIC names the host switch directly (the bare-switch shape, so
+    /// no VM triggers guest work). The fixture's per-VM memory and cpu are left intact
+    /// and read back into the returned list, so the scenario validates each deployed VM
+    /// against the template's own values - the single source of truth - which proves the
+    /// deploy applied each VM's OWN configuration rather than one shared config.
+    /// </summary>
+    public SeededMultiVmTemplate SeedMultiVmTemplate(ResourceTagger tagger, string baseDiskCatalogId, string switchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "multivm-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Multi-VM V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\multivm-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Multi-VM V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("mtpl");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        var vmArray = root["vmTemplates"]?.AsArray()
+            ?? throw new InvalidOperationException("Multi-VM V2 template fixture is missing its vmTemplates array.");
+        if (vmArray.Count == 0)
+        {
+            throw new InvalidOperationException("Multi-VM V2 template fixture has no VM entries.");
+        }
+
+        var seededVms = new List<SeededVm>(vmArray.Count);
+        for (int i = 0; i < vmArray.Count; i++)
+        {
+            var vm = vmArray[i]?.AsObject()
+                ?? throw new InvalidOperationException($"Multi-VM V2 template fixture VM entry {i} is not an object.");
+
+            // Each VM name carries the run prefix + an ordinal suffix so all of them are
+            // sweepable and mutually distinct.
+            var vmName = tagger.Name($"vm{i + 1}");
+            vm["vmId"] = Guid.NewGuid().ToString("N");
+            vm["name"] = vmName;
+            vm["vhdxId"] = baseDiskCatalogId;
+
+            var nic = vm["nics"]?.AsArray()?.FirstOrDefault()?.AsObject()
+                ?? throw new InvalidOperationException($"Multi-VM V2 template fixture VM entry {i} is missing its first NIC.");
+            nic["switchName"] = switchName;
+
+            // Read the per-VM ground truth straight from the fixture we are about to write,
+            // so validation compares against exactly what was deployed.
+            int memoryMb = vm["memoryMb"]?.GetValue<int>()
+                ?? throw new InvalidOperationException($"Multi-VM V2 template fixture VM entry {i} is missing memoryMb.");
+            int cpuCount = vm["cpuCount"]?.GetValue<int>()
+                ?? throw new InvalidOperationException($"Multi-VM V2 template fixture VM entry {i} is missing cpuCount.");
+
+            seededVms.Add(new SeededVm(vmName, memoryMb, cpuCount));
+        }
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededMultiVmTemplate(filePath, templateName, seededVms);
+    }
 }
 
 /// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
 public sealed record SeededTemplate(string FilePath, string TemplateName, string VmName);
+
+/// <summary>Identity of a harness-seeded multi-VM template: its file, its library display name, and the per-VM ground truth it deploys.</summary>
+public sealed record SeededMultiVmTemplate(string FilePath, string TemplateName, IReadOnlyList<SeededVm> Vms);
+
+/// <summary>The expected ground truth for one VM in a seeded multi-VM template: its tagged name and its own memory/cpu.</summary>
+public sealed record SeededVm(string VmName, int ExpectedMemoryMb, int ExpectedCpu);

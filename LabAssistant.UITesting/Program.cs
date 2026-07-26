@@ -29,6 +29,7 @@ internal static class Program
                 "capture" => RunCaptureSelfTest(args),
                 "deploy" => RunDeployProof(args),
                 "template-e2e" => RunTemplateDeployProof(args),
+                "template-multivm" => RunMultiVmTemplateDeployProof(args),
                 "sweep" => RunSweep(args),
                 _ => PrintHelp()
             };
@@ -174,6 +175,32 @@ internal static class Program
     }
 
     /// <summary>
+    /// Multi-VM end-to-end template deploy proof: seeds a tagged V2 template with three
+    /// standalone VMs (distinct memory/cpu each), drives Deploy &gt; From Template to deploy the
+    /// whole plan, validates every resulting VM against Hyper-V ground truth, then tears
+    /// everything down by tag (all VMs + template file) and proves no orphans. Exits non-zero on
+    /// any Error/Crash finding.
+    /// </summary>
+    private static int RunMultiVmTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployMultiVmScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
     /// Removes every Hyper-V resource carrying the harness tag prefix. Safe to run
     /// any time to guarantee a clean slate; never touches untagged resources.
     /// </summary>
@@ -262,6 +289,7 @@ internal static class Program
         Console.WriteLine("  capture Launch the app and self-test window screenshot capture (evidence health check).");
         Console.WriteLine("  deploy  Seed resources, drive a single-VM Quick Deploy, validate, and tear down.");
         Console.WriteLine("  template-e2e Seed a V2 template, deploy it via From Template, validate, and tear down.");
+        Console.WriteLine("  template-multivm Seed a 3-VM V2 template, deploy it via From Template, validate every VM, and tear down.");
         Console.WriteLine("  sweep   Remove any leftover harness-tagged Hyper-V resources.");
         return 0;
     }
