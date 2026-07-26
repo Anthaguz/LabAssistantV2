@@ -135,4 +135,10 @@
     <Compile Include="..\LabAssistant.WinUI\ViewModels\Machines\MachineBulkDeleteCandidate.cs" Link="WinUI\MachineBulkDeleteCandidate.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Assets base disks capability (runtime-independent view model and list item). -->
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Assets\AssetsBaseDisksViewModel.cs" Link="WinUI\AssetsBaseDisksViewModel.cs" />
+    <Compile Include="..\LabAssistant.WinUI\ViewModels\Assets\BaseDiskListItem.cs" Link="WinUI\BaseDiskListItem.cs" />
+  </ItemGroup>
+
 </Project>
