@@ -262,7 +262,94 @@
                                 TextWrapping="Wrap"
                                 Text="{x:Bind ViewModel.Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
-                    </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextPrimaryBrush}"
+                                FontWeight="SemiBold"
+                                Text="Guest bootstrap profile" />
+                            <TextBlock
+                                Foreground="{StaticResource ShellTextSecondaryBrush}"
+                                Text="Required only for images that configure the guest OS (domain controllers, domain members, routers, forest trusts). Leave every field empty for a plain boot-only image. The image must already be past OOBE with a known local administrator reachable over PowerShell Direct. Deploys that need guest work are blocked until the base disk carries this profile."
+                                TextWrapping="Wrap" />
+
+                            <Grid ColumnSpacing="8" RowSpacing="8" XYFocusKeyboardNavigation="Enabled">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock x:Name="BootstrapExpectedLocalUserLabel" Grid.Row="0" VerticalAlignment="Center" Foreground="{StaticResource ShellTextPrimaryBrush}" Text="Local user" />
+                                <TextBox
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    TabIndex="12"
+                                    PlaceholderText="Administrator"
+                                    AutomationProperties.AutomationId="AssetsBaseDiskBootstrapExpectedLocalUserTextBox"
+                                    AutomationProperties.Name="Bootstrap expected local user"
+                                    AutomationProperties.HelpText="The local account baked into the image that PowerShell Direct signs in as to configure the guest."
+                                    AutomationProperties.LabeledBy="{Binding ElementName=BootstrapExpectedLocalUserLabel}"
+                                    Text="{x:Bind ViewModel.BootstrapExpectedLocalUser, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock x:Name="BootstrapCredentialSlotLabel" Grid.Row="1" VerticalAlignment="Center" Foreground="{StaticResource ShellTextPrimaryBrush}" Text="Credential slot" />
+                                <TextBox
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    TabIndex="13"
+                                    PlaceholderText="disk.win-server-2022.local-admin"
+                                    AutomationProperties.AutomationId="AssetsBaseDiskBootstrapLocalCredentialSlotRefTextBox"
+                                    AutomationProperties.Name="Bootstrap local credential slot reference"
+                                    AutomationProperties.HelpText="The credential slot reference resolved at deploy time to the local administrator password for this image."
+                                    AutomationProperties.LabeledBy="{Binding ElementName=BootstrapCredentialSlotLabel}"
+                                    Text="{x:Bind ViewModel.BootstrapLocalCredentialSlotRef, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock x:Name="BootstrapGuestOsFamilyLabel" Grid.Row="2" VerticalAlignment="Center" Foreground="{StaticResource ShellTextPrimaryBrush}" Text="Guest OS family" />
+                                <TextBox
+                                    Grid.Row="2"
+                                    Grid.Column="1"
+                                    TabIndex="14"
+                                    PlaceholderText="WindowsServer"
+                                    AutomationProperties.AutomationId="AssetsBaseDiskBootstrapGuestOsFamilyTextBox"
+                                    AutomationProperties.Name="Bootstrap guest OS family"
+                                    AutomationProperties.HelpText="The guest operating system family, for example WindowsServer or WindowsClient."
+                                    AutomationProperties.LabeledBy="{Binding ElementName=BootstrapGuestOsFamilyLabel}"
+                                    Text="{x:Bind ViewModel.BootstrapGuestOsFamily, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock x:Name="BootstrapGuestTransportLabel" Grid.Row="3" VerticalAlignment="Center" Foreground="{StaticResource ShellTextPrimaryBrush}" Text="Guest transport" />
+                                <TextBox
+                                    Grid.Row="3"
+                                    Grid.Column="1"
+                                    TabIndex="15"
+                                    PlaceholderText="powershell-direct"
+                                    AutomationProperties.AutomationId="AssetsBaseDiskBootstrapGuestTransportTextBox"
+                                    AutomationProperties.Name="Bootstrap guest transport"
+                                    AutomationProperties.HelpText="The transport used to reach the guest, typically powershell-direct."
+                                    AutomationProperties.LabeledBy="{Binding ElementName=BootstrapGuestTransportLabel}"
+                                    Text="{x:Bind ViewModel.BootstrapGuestTransport, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock x:Name="BootstrapNotesLabel" Grid.Row="4" VerticalAlignment="Top" Foreground="{StaticResource ShellTextPrimaryBrush}" Text="Bootstrap notes" />
+                                <TextBox
+                                    Grid.Row="4"
+                                    Grid.Column="1"
+                                    TabIndex="16"
+                                    AcceptsReturn="True"
+                                    MinHeight="72"
+                                    AutomationProperties.AutomationId="AssetsBaseDiskBootstrapNotesTextBox"
+                                    AutomationProperties.Name="Bootstrap notes"
+                                    AutomationProperties.HelpText="Optional notes describing how this image was prepared for guest bootstrap."
+                                    AutomationProperties.LabeledBy="{Binding ElementName=BootstrapNotesLabel}"
+                                    TextWrapping="Wrap"
+                                    Text="{x:Bind ViewModel.BootstrapNotes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
                 </ScrollViewer>
             </Border>
         </Grid>

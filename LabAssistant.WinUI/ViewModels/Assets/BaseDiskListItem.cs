@@ -13,6 +13,11 @@ public partial class BaseDiskListItem : ObservableObject
         OsVersion = record.OsVersion;
         Generation = record.Generation;
         Notes = record.Notes;
+        BootstrapExpectedLocalUser = record.BootstrapExpectedLocalUser;
+        BootstrapLocalCredentialSlotRef = record.BootstrapLocalCredentialSlotRef;
+        BootstrapGuestOsFamily = record.BootstrapGuestOsFamily;
+        BootstrapGuestTransport = record.BootstrapGuestTransport;
+        BootstrapNotes = record.BootstrapNotes;
         SizeDisplay = record.SizeBytes.HasValue ? FormatSize(record.SizeBytes.Value) : "Size unavailable";
     }
 
@@ -27,6 +32,16 @@ public partial class BaseDiskListItem : ObservableObject
     public int Generation { get; }
 
     public string? Notes { get; }
+
+    public string? BootstrapExpectedLocalUser { get; }
+
+    public string? BootstrapLocalCredentialSlotRef { get; }
+
+    public string? BootstrapGuestOsFamily { get; }
+
+    public string? BootstrapGuestTransport { get; }
+
+    public string? BootstrapNotes { get; }
 
     public string DisplayName => string.IsNullOrWhiteSpace(OsVersion)
         ? OsName

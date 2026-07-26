@@ -56,6 +56,21 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
     private string _notes = string.Empty;
 
     [ObservableProperty]
+    private string _bootstrapExpectedLocalUser = string.Empty;
+
+    [ObservableProperty]
+    private string _bootstrapLocalCredentialSlotRef = string.Empty;
+
+    [ObservableProperty]
+    private string _bootstrapGuestOsFamily = string.Empty;
+
+    [ObservableProperty]
+    private string _bootstrapGuestTransport = string.Empty;
+
+    [ObservableProperty]
+    private string _bootstrapNotes = string.Empty;
+
+    [ObservableProperty]
     private string _selectedDiskSummaryText = "Select a base disk or import a VHDX to begin.";
 
     [ObservableProperty]
@@ -170,6 +185,11 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
             string.Empty,
             selectedPath,
             "1",
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
             string.Empty);
         SetError(null);
         SelectedDiskSummaryText = "New base disk draft. Review metadata, validate, then save to register it.";
@@ -308,7 +328,12 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
                 value.OsVersion,
                 value.Path,
                 value.Generation.ToString(),
-                value.Notes ?? string.Empty);
+                value.Notes ?? string.Empty,
+                value.BootstrapExpectedLocalUser ?? string.Empty,
+                value.BootstrapLocalCredentialSlotRef ?? string.Empty,
+                value.BootstrapGuestOsFamily ?? string.Empty,
+                value.BootstrapGuestTransport ?? string.Empty,
+                value.BootstrapNotes ?? string.Empty);
             SelectedDiskSummaryText = $"Catalog id: {value.Id}{Environment.NewLine}{value.Path}";
             SelectedDiskValidationText = value.Status;
             ReferenceWarningText = value.ReferenceSummary;
@@ -335,6 +360,16 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
     partial void OnGenerationTextChanged(string value) => HandleEditorChanged();
 
     partial void OnNotesChanged(string value) => HandleEditorChanged();
+
+    partial void OnBootstrapExpectedLocalUserChanged(string value) => HandleEditorChanged();
+
+    partial void OnBootstrapLocalCredentialSlotRefChanged(string value) => HandleEditorChanged();
+
+    partial void OnBootstrapGuestOsFamilyChanged(string value) => HandleEditorChanged();
+
+    partial void OnBootstrapGuestTransportChanged(string value) => HandleEditorChanged();
+
+    partial void OnBootstrapNotesChanged(string value) => HandleEditorChanged();
 
     private async Task LoadInventoryAsync(bool forceRefresh, CancellationToken cancellationToken = default)
     {
@@ -432,6 +467,11 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
                 OsVersion = draft.OsVersion,
                 Generation = draft.Generation,
                 Notes = draft.Notes,
+                BootstrapExpectedLocalUser = draft.BootstrapExpectedLocalUser,
+                BootstrapLocalCredentialSlotRef = draft.BootstrapLocalCredentialSlotRef,
+                BootstrapGuestOsFamily = draft.BootstrapGuestOsFamily,
+                BootstrapGuestTransport = draft.BootstrapGuestTransport,
+                BootstrapNotes = draft.BootstrapNotes,
                 IsNew = false
             }, cancellationToken);
             ApplyValidation(validation);
@@ -475,9 +515,16 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
             OsVersion = normalizedOsVersion,
             Generation = generation,
             Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes,
+            BootstrapExpectedLocalUser = NullIfBlank(BootstrapExpectedLocalUser),
+            BootstrapLocalCredentialSlotRef = NullIfBlank(BootstrapLocalCredentialSlotRef),
+            BootstrapGuestOsFamily = NullIfBlank(BootstrapGuestOsFamily),
+            BootstrapGuestTransport = NullIfBlank(BootstrapGuestTransport),
+            BootstrapNotes = NullIfBlank(BootstrapNotes),
             IsNew = SelectedDisk is null
         };
     }
+
+    private static string? NullIfBlank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void ApplyValidation(AssetsBaseDiskValidationResult validation)
     {
@@ -509,7 +556,17 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
         NotifyStateChanged();
     }
 
-    private void SetEditorFields(string osName, string osVersion, string path, string generationText, string notes)
+    private void SetEditorFields(
+        string osName,
+        string osVersion,
+        string path,
+        string generationText,
+        string notes,
+        string bootstrapExpectedLocalUser,
+        string bootstrapLocalCredentialSlotRef,
+        string bootstrapGuestOsFamily,
+        string bootstrapGuestTransport,
+        string bootstrapNotes)
     {
         _isUpdatingEditor = true;
         try
@@ -519,6 +576,11 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
             DiskPath = path;
             GenerationText = generationText;
             Notes = notes;
+            BootstrapExpectedLocalUser = bootstrapExpectedLocalUser;
+            BootstrapLocalCredentialSlotRef = bootstrapLocalCredentialSlotRef;
+            BootstrapGuestOsFamily = bootstrapGuestOsFamily;
+            BootstrapGuestTransport = bootstrapGuestTransport;
+            BootstrapNotes = bootstrapNotes;
         }
         finally
         {
@@ -528,7 +590,17 @@ public partial class AssetsBaseDisksViewModel : ViewModelBase
 
     private void ClearEditorFields()
     {
-        SetEditorFields(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+        SetEditorFields(
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty);
     }
 
     private void SetSelectedDisk(BaseDiskListItem? selectedDisk)
