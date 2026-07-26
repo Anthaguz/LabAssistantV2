@@ -31,13 +31,26 @@ public sealed class FindingRecorder
 
     public bool HasFailures => _findings.Any(f => f.Severity is FindingSeverity.Error or FindingSeverity.Crash);
 
-    /// <summary>Captures a screenshot of the app window (falls back to full screen) and returns the file path.</summary>
+    /// <summary>Captures a screenshot of the app window and returns the file path.</summary>
+    /// <remarks>
+    /// Prefers Win32 <c>PrintWindow</c> (see <see cref="WindowCapture"/>), which can read
+    /// the app's DirectComposition-rendered content; the GDI paths FlaUI exposes come back
+    /// blank for a WinUI 3 window. Falls back to FlaUI element capture, then a full-screen
+    /// grab, if the window capture is unavailable or renders blank.
+    /// </remarks>
     public string? Capture(AppHost host, string label)
     {
         try
         {
             string safe = Sanitize(label);
             string file = Path.Combine(_screenshotsDir, $"{++_screenshotCounter:D3}-{safe}.png");
+
+            IntPtr hwnd = host.MainWindow.Properties.NativeWindowHandle.ValueOrDefault;
+            if (WindowCapture.TrySaveWindowPng(hwnd, file, out bool blank) && !blank)
+            {
+                return file;
+            }
+
             CaptureImage image;
             try
             {

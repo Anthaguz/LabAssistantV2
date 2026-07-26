@@ -26,6 +26,7 @@ internal static class Program
                 "dump" => RunDump(args),
                 "run" => RunScenarios(args),
                 "coverage" => RunCoverage(args),
+                "capture" => RunCaptureSelfTest(args),
                 "deploy" => RunDeployProof(args),
                 "sweep" => RunSweep(args),
                 _ => PrintHelp()
@@ -81,6 +82,50 @@ internal static class Program
         var harness = new ScenarioHarness(exePath, config, repoRoot);
         var recorder = harness.Run(scenarios);
         return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
+    /// Capture-health self-test: launches the app and captures its main window to a PNG
+    /// via the same path the recorder uses, then reports the file, its dimensions, and
+    /// whether it rendered real content. Lets a night run's evidence pipeline be verified
+    /// before trusting it. Exits non-zero if the capture is missing or blank.
+    /// </summary>
+    private static int RunCaptureSelfTest(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        Console.WriteLine($"Launching: {exePath}");
+        using var host = AppHost.Launch(exePath);
+        Console.WriteLine($"Main window ready: \"{host.MainWindow.Title}\"");
+        // Give the window a moment to finish its first composition pass.
+        Thread.Sleep(1000);
+
+        string runDir = Path.Combine(repoRoot, "LabAssistant.UITesting", "runs",
+            DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        Directory.CreateDirectory(runDir);
+        string file = Path.Combine(runDir, "capture-selftest.png");
+
+        IntPtr hwnd = host.MainWindow.Properties.NativeWindowHandle.ValueOrDefault;
+        Console.WriteLine($"Main window HWND: 0x{hwnd.ToInt64():X}");
+
+        bool wrote = Infrastructure.WindowCapture.TrySaveWindowPng(hwnd, file, out bool blank);
+        if (!wrote)
+        {
+            Console.Error.WriteLine("PrintWindow capture FAILED (no file written).");
+            return 1;
+        }
+
+        var info = new FileInfo(file);
+        Console.WriteLine($"Wrote: {file} ({info.Length} bytes)");
+        Console.WriteLine(blank
+            ? "RESULT: BLANK - the capture rendered no real content."
+            : "RESULT: OK - the capture contains real content.");
+        return blank ? 1 : 0;
     }
 
     private static int RunDeployProof(string[] args)
@@ -188,6 +233,7 @@ internal static class Program
         Console.WriteLine("  dump    Launch the app and print its UI Automation tree.");
         Console.WriteLine("  run     Launch the app and run the scenario suite, writing findings.");
         Console.WriteLine("  coverage Audit each capability's live UI tree for controls missing a stable AutomationId.");
+        Console.WriteLine("  capture Launch the app and self-test window screenshot capture (evidence health check).");
         Console.WriteLine("  deploy  Seed resources, drive a single-VM Quick Deploy, validate, and tear down.");
         Console.WriteLine("  sweep   Remove any leftover harness-tagged Hyper-V resources.");
         return 0;
