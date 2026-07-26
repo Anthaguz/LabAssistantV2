@@ -62,6 +62,7 @@
                         <Button
                             TabIndex="0"
                             AccessKey="R"
+                            AutomationProperties.AutomationId="AssetsRefreshBaseDisksButton"
                             AutomationProperties.Name="Refresh base disks"
                             AutomationProperties.HelpText="Reload the registered base disk catalog."
                             Command="{x:Bind ViewModel.RefreshCommand}"
@@ -70,6 +71,7 @@
                         <Button
                             TabIndex="1"
                             AccessKey="I"
+                            AutomationProperties.AutomationId="AssetsImportBaseDiskButton"
                             AutomationProperties.Name="Import disk"
                             AutomationProperties.HelpText="Import a base disk into the catalog."
                             Command="{x:Bind ViewModel.AddDiskCommand}"
@@ -128,6 +130,7 @@
                             <Button
                                 TabIndex="3"
                                 AccessKey="V"
+                                AutomationProperties.AutomationId="AssetsValidateBaseDiskButton"
                                 AutomationProperties.Name="Validate base disk"
                                 AutomationProperties.HelpText="Validate the selected base disk metadata and readiness."
                                 Command="{x:Bind ViewModel.ValidateCommand}"
@@ -136,6 +139,7 @@
                             <Button
                                 TabIndex="4"
                                 AccessKey="S"
+                                AutomationProperties.AutomationId="AssetsSaveBaseDiskButton"
                                 AutomationProperties.Name="Save base disk metadata"
                                 AutomationProperties.HelpText="Save metadata changes for the selected base disk."
                                 Command="{x:Bind ViewModel.SaveMetadataCommand}"
@@ -144,6 +148,7 @@
                             <Button
                                 TabIndex="5"
                                 AccessKey="M"
+                                AutomationProperties.AutomationId="AssetsRemoveBaseDiskButton"
                                 AutomationProperties.Name="Remove base disk from catalog"
                                 AutomationProperties.HelpText="Remove the selected base disk from the catalog."
                                 Command="{x:Bind ViewModel.RemoveDiskCommand}"
@@ -188,6 +193,7 @@
                                 Grid.Row="0"
                                 Grid.Column="1"
                                 TabIndex="6"
+                                AutomationProperties.AutomationId="AssetsBaseDiskOsNameTextBox"
                                 AutomationProperties.Name="Operating system name"
                                 AutomationProperties.HelpText="Edit the operating system name for the selected base disk."
                                 AutomationProperties.LabeledBy="{Binding ElementName=OsNameLabel}"
@@ -198,6 +204,7 @@
                                 Grid.Row="1"
                                 Grid.Column="1"
                                 TabIndex="7"
+                                AutomationProperties.AutomationId="AssetsBaseDiskOsVersionTextBox"
                                 AutomationProperties.Name="Operating system version"
                                 AutomationProperties.HelpText="Edit the operating system version for the selected base disk."
                                 AutomationProperties.LabeledBy="{Binding ElementName=OsVersionLabel}"
@@ -212,6 +219,7 @@
                                 <TextBox
                                     Grid.Column="0"
                                     TabIndex="8"
+                                    AutomationProperties.AutomationId="AssetsBaseDiskPathTextBox"
                                     AutomationProperties.Name="Base disk path"
                                     AutomationProperties.HelpText="Shows the filesystem path for the selected base disk."
                                     AutomationProperties.LabeledBy="{Binding ElementName=DiskPathLabel}"
@@ -221,6 +229,7 @@
                                     Grid.Column="1"
                                     TabIndex="9"
                                     AccessKey="B"
+                                    AutomationProperties.AutomationId="AssetsBrowseBaseDiskPathButton"
                                     AutomationProperties.Name="Browse base disk path"
                                     AutomationProperties.HelpText="Open the folder that contains the selected base disk."
                                     Command="{x:Bind ViewModel.BrowsePathCommand}"
@@ -233,6 +242,7 @@
                                 Grid.Row="3"
                                 Grid.Column="1"
                                 TabIndex="10"
+                                AutomationProperties.AutomationId="AssetsBaseDiskGenerationTextBox"
                                 AutomationProperties.Name="Virtual machine generation"
                                 AutomationProperties.HelpText="Edit the Hyper-V generation recorded for the selected base disk."
                                 AutomationProperties.LabeledBy="{Binding ElementName=GenerationLabel}"
@@ -245,6 +255,7 @@
                                 TabIndex="11"
                                 AcceptsReturn="True"
                                 MinHeight="72"
+                                AutomationProperties.AutomationId="AssetsBaseDiskNotesTextBox"
                                 AutomationProperties.Name="Base disk notes"
                                 AutomationProperties.HelpText="Edit notes for the selected base disk."
                                 AutomationProperties.LabeledBy="{Binding ElementName=NotesLabel}"

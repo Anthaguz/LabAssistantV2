@@ -548,6 +548,7 @@
                         Text="V2 Template Builder" />
                     <TextBox
                         MinWidth="220"
+                        AutomationProperties.AutomationId="TemplatesBuilderNameTextBox"
                         PlaceholderText="Template name"
                         Text="{x:Bind ViewModel.TemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <TextBlock
@@ -573,6 +574,7 @@
                             Text="{x:Bind ViewModel.ValidationChipText, Mode=OneWay}" />
                     </Border>
                     <Button
+                        AutomationProperties.AutomationId="TemplatesBuilderSaveButton"
                         Background="{StaticResource ShellAccentBrush}"
                         Command="{x:Bind ViewModel.SaveCommand}"
                         Content="Save"
@@ -580,11 +582,13 @@
                         IsEnabled="{x:Bind ViewModel.SaveEnabled, Mode=OneWay}"
                         Visibility="{x:Bind ViewModel.SaveVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                     <Button
+                        AutomationProperties.AutomationId="TemplatesBuilderSaveAsButton"
                         Command="{x:Bind ViewModel.SaveAsCommand}"
                         Content="Save As"
                         IsEnabled="{x:Bind ViewModel.SaveAsEnabled, Mode=OneWay}"
                         Visibility="{x:Bind ViewModel.SaveAsVisible, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                     <Button
+                        AutomationProperties.AutomationId="TemplatesBuilderBackButton"
                         Command="{x:Bind ViewModel.BackToLibraryCommand}"
                         Content="Back"
                         IsEnabled="{x:Bind ViewModel.BackToLibraryEnabled, Mode=OneWay}" />

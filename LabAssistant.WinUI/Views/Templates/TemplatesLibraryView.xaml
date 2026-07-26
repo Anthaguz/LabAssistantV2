@@ -72,14 +72,15 @@
             <TextBox
                 Grid.Column="0"
                 TabIndex="0"
-                AutomationProperties.Name="Template search"
+                AutomationProperties.AutomationId="TemplatesSearchTextBox"
+                AutomationProperties.Name="Template search"
                 AutomationProperties.HelpText="Search templates by name, identifier, or description."
                 PlaceholderText="Search by name, id, or description"
                 KeyDown="SearchTextBox_KeyDown"
                 Text="{x:Bind ViewModel.SearchText, Mode=TwoWay}" />
-            <Button Grid.Column="1" TabIndex="1" AccessKey="A" AutomationProperties.Name="Apply search" AutomationProperties.HelpText="Apply the template search filter." Command="{x:Bind ViewModel.ApplySearchCommand}" Content="Apply" IsEnabled="{x:Bind ViewModel.CanApplySearch, Mode=OneWay}" />
-            <Button Grid.Column="2" TabIndex="2" AccessKey="C" AutomationProperties.Name="Clear search" AutomationProperties.HelpText="Clear the template search filter." Command="{x:Bind ViewModel.ClearSearchCommand}" Content="Clear" IsEnabled="{x:Bind ViewModel.CanClearSearch, Mode=OneWay}" />
-            <Button Grid.Column="3" TabIndex="3" AccessKey="R" AutomationProperties.Name="Reload template library" AutomationProperties.HelpText="Reload the template library." Command="{x:Bind ViewModel.LoadCommand}" Content="Reload" IsEnabled="{x:Bind ViewModel.CanLoad, Mode=OneWay}" />
+            <Button Grid.Column="1" TabIndex="1" AccessKey="A" AutomationProperties.AutomationId="TemplatesApplySearchButton" AutomationProperties.Name="Apply search" AutomationProperties.HelpText="Apply the template search filter." Command="{x:Bind ViewModel.ApplySearchCommand}" Content="Apply" IsEnabled="{x:Bind ViewModel.CanApplySearch, Mode=OneWay}" />
+            <Button Grid.Column="2" TabIndex="2" AccessKey="C" AutomationProperties.AutomationId="TemplatesClearSearchButton" AutomationProperties.Name="Clear search" AutomationProperties.HelpText="Clear the template search filter." Command="{x:Bind ViewModel.ClearSearchCommand}" Content="Clear" IsEnabled="{x:Bind ViewModel.CanClearSearch, Mode=OneWay}" />
+            <Button Grid.Column="3" TabIndex="3" AccessKey="R" AutomationProperties.AutomationId="TemplatesReloadLibraryButton" AutomationProperties.Name="Reload template library" AutomationProperties.HelpText="Reload the template library." Command="{x:Bind ViewModel.LoadCommand}" Content="Reload" IsEnabled="{x:Bind ViewModel.CanLoad, Mode=OneWay}" />
         </Grid>
 
         <StackPanel
@@ -87,12 +88,12 @@
             Orientation="Horizontal"
             Spacing="{StaticResource SpacingS}"
             AutomationProperties.LandmarkType="Navigation">
-            <Button TabIndex="4" AccessKey="E" AutomationProperties.Name="Open template in editor" AutomationProperties.HelpText="Open the selected template in the editor." Command="{x:Bind ViewModel.OpenInEditorCommand}" Content="Open in Editor" IsEnabled="{x:Bind ViewModel.CanOpenInEditor, Mode=OneWay}" />
-            <Button TabIndex="5" AccessKey="N" AutomationProperties.Name="Create new template" AutomationProperties.HelpText="Create a new template in the library." Command="{x:Bind ViewModel.CreateCommand}" Content="Create New" IsEnabled="{x:Bind ViewModel.CanCreate, Mode=OneWay}" />
-            <Button TabIndex="6" AccessKey="B" AutomationProperties.Name="Open template in builder" AutomationProperties.HelpText="Open the selected template in the builder." Command="{x:Bind ViewModel.OpenInBuilderCommand}" Content="Open in Builder" IsEnabled="{x:Bind ViewModel.CanOpenInBuilder, Mode=OneWay}" />
-            <Button TabIndex="7" AccessKey="V" AutomationProperties.Name="Create V2 builder" AutomationProperties.HelpText="Create a new V2 builder from the library." Command="{x:Bind ViewModel.CreateBuilderCommand}" Content="Create V2 Builder" IsEnabled="{x:Bind ViewModel.CanCreateBuilder, Mode=OneWay}" />
-            <Button TabIndex="8" AccessKey="M" AutomationProperties.Name="Rename selected template" AutomationProperties.HelpText="Rename the selected template." Command="{x:Bind ViewModel.RenameCommand}" Content="Rename" IsEnabled="{x:Bind ViewModel.CanRename, Mode=OneWay}" />
-            <Button TabIndex="9" AccessKey="D" AutomationProperties.Name="Delete selected template" AutomationProperties.HelpText="Delete the selected template from the library." Command="{x:Bind ViewModel.DeleteCommand}" Content="Delete" IsEnabled="{x:Bind ViewModel.CanDelete, Mode=OneWay}" />
+            <Button TabIndex="4" AccessKey="E" AutomationProperties.AutomationId="TemplatesOpenInEditorButton" AutomationProperties.Name="Open template in editor" AutomationProperties.HelpText="Open the selected template in the editor." Command="{x:Bind ViewModel.OpenInEditorCommand}" Content="Open in Editor" IsEnabled="{x:Bind ViewModel.CanOpenInEditor, Mode=OneWay}" />
+            <Button TabIndex="5" AccessKey="N" AutomationProperties.AutomationId="TemplatesCreateButton" AutomationProperties.Name="Create new template" AutomationProperties.HelpText="Create a new template in the library." Command="{x:Bind ViewModel.CreateCommand}" Content="Create New" IsEnabled="{x:Bind ViewModel.CanCreate, Mode=OneWay}" />
+            <Button TabIndex="6" AccessKey="B" AutomationProperties.AutomationId="TemplatesOpenInBuilderButton" AutomationProperties.Name="Open template in builder" AutomationProperties.HelpText="Open the selected template in the builder." Command="{x:Bind ViewModel.OpenInBuilderCommand}" Content="Open in Builder" IsEnabled="{x:Bind ViewModel.CanOpenInBuilder, Mode=OneWay}" />
+            <Button TabIndex="7" AccessKey="V" AutomationProperties.AutomationId="TemplatesCreateBuilderButton" AutomationProperties.Name="Create V2 builder" AutomationProperties.HelpText="Create a new V2 builder from the library." Command="{x:Bind ViewModel.CreateBuilderCommand}" Content="Create V2 Builder" IsEnabled="{x:Bind ViewModel.CanCreateBuilder, Mode=OneWay}" />
+            <Button TabIndex="8" AccessKey="M" AutomationProperties.AutomationId="TemplatesRenameButton" AutomationProperties.Name="Rename selected template" AutomationProperties.HelpText="Rename the selected template." Command="{x:Bind ViewModel.RenameCommand}" Content="Rename" IsEnabled="{x:Bind ViewModel.CanRename, Mode=OneWay}" />
+            <Button TabIndex="9" AccessKey="D" AutomationProperties.AutomationId="TemplatesDeleteButton" AutomationProperties.Name="Delete selected template" AutomationProperties.HelpText="Delete the selected template from the library." Command="{x:Bind ViewModel.DeleteCommand}" Content="Delete" IsEnabled="{x:Bind ViewModel.CanDelete, Mode=OneWay}" />
         </StackPanel>
 
         <Grid Grid.Row="3" ColumnSpacing="{StaticResource SpacingM}" XYFocusKeyboardNavigation="Enabled">
@@ -135,7 +136,7 @@
                         <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.SelectedTemplateLastModified, Mode=OneWay}" TextWrapping="Wrap" />
                         <StackPanel Spacing="{StaticResource SpacingXS}">
                             <TextBlock x:Name="RenameTemplateLabel" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Rename template" />
-                            <TextBox TabIndex="11" AutomationProperties.Name="Template name" AutomationProperties.HelpText="Enter a new name for the selected template." AutomationProperties.LabeledBy="{Binding ElementName=RenameTemplateLabel}" PlaceholderText="Template name" Text="{x:Bind ViewModel.RenameTemplateName, Mode=TwoWay}" />
+                            <TextBox TabIndex="11" AutomationProperties.AutomationId="TemplatesRenameNameTextBox" AutomationProperties.Name="Template name" AutomationProperties.HelpText="Enter a new name for the selected template." AutomationProperties.LabeledBy="{Binding ElementName=RenameTemplateLabel}" PlaceholderText="Template name" Text="{x:Bind ViewModel.RenameTemplateName, Mode=TwoWay}" />
                             <TextBlock Foreground="{StaticResource ShellTextSecondaryBrush}" Text="{x:Bind ViewModel.RenameHintText, Mode=OneWay}" TextWrapping="Wrap" />
                         </StackPanel>
                     </StackPanel>
