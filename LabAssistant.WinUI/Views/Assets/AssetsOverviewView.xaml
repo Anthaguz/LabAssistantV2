@@ -59,7 +59,8 @@
                         HorizontalAlignment="Left"
                         TabIndex="0"
                         AccessKey="B"
-                        AutomationProperties.Name="Open Base Disks"
+                        AutomationProperties.AutomationId="AssetsOpenBaseDisksButton"
+                        AutomationProperties.Name="Open Base Disks"
                         AutomationProperties.HelpText="Open the base disk asset management view."
                         Command="{x:Bind ViewModel.OpenBaseDisksCommand}"
                         Content="Open Base Disks" />
@@ -86,7 +87,8 @@
                         HorizontalAlignment="Left"
                         TabIndex="1"
                         AccessKey="S"
-                        AutomationProperties.Name="Open Switches"
+                        AutomationProperties.AutomationId="AssetsOpenSwitchesButton"
+                        AutomationProperties.Name="Open Switches"
                         AutomationProperties.HelpText="Open the virtual switch asset management view."
                         Command="{x:Bind ViewModel.OpenSwitchesCommand}"
                         Content="Open Switches" />

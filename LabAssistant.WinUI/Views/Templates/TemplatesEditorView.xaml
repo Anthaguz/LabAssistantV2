@@ -41,7 +41,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="6">
                     <TextBlock x:Name="TemplateNameLabel" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Template name" />
-                    <TextBox TabIndex="0" AutomationProperties.Name="Template name" AutomationProperties.HelpText="Edit the template name." AutomationProperties.LabeledBy="{Binding ElementName=TemplateNameLabel}" Text="{x:Bind ViewModel.TemplateName, Mode=TwoWay}" />
+                    <TextBox TabIndex="0" AutomationProperties.AutomationId="TemplatesEditorNameTextBox" AutomationProperties.Name="Template name" AutomationProperties.HelpText="Edit the template name." AutomationProperties.LabeledBy="{Binding ElementName=TemplateNameLabel}" Text="{x:Bind ViewModel.TemplateName, Mode=TwoWay}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="6">
                     <TextBlock x:Name="TemplateDescriptionLabel" Foreground="{StaticResource ShellTextPrimaryBrush}" FontWeight="SemiBold" Text="Description" />
@@ -139,7 +139,7 @@
         </Grid>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="{StaticResource SpacingS}" AutomationProperties.LandmarkType="Navigation">
-            <Button TabIndex="14" AccessKey="S" AutomationProperties.Name="Save template" AutomationProperties.HelpText="Save the template changes." Command="{x:Bind ViewModel.SaveCommand}" Content="Save" IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" />
+            <Button TabIndex="14" AccessKey="S" AutomationProperties.AutomationId="TemplatesEditorSaveButton" AutomationProperties.Name="Save template" AutomationProperties.HelpText="Save the template changes." Command="{x:Bind ViewModel.SaveCommand}" Content="Save" IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" />
             <Button TabIndex="15" AccessKey="V" AutomationProperties.Name="Validate template" AutomationProperties.HelpText="Validate the current template." Command="{x:Bind ViewModel.ValidateCommand}" Content="Validate" IsEnabled="{x:Bind ViewModel.CanValidate, Mode=OneWay}" />
             <Button TabIndex="16" AccessKey="C" AutomationProperties.Name="Cancel template editing" AutomationProperties.HelpText="Cancel template editing and return to the previous workspace state." Command="{x:Bind ViewModel.CancelCommand}" Content="Cancel" IsEnabled="{x:Bind ViewModel.CanCancel, Mode=OneWay}" />
         </StackPanel>
