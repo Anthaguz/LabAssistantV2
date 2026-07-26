@@ -100,12 +100,14 @@
                     PlaceholderText="Select a template"
                     SelectedItem="{x:Bind ViewModel.SelectedTemplateLibraryItem, Mode=TwoWay}" />
                 <Button
+                    x:Name="DeployTemplateReloadButton"
                     Grid.Column="1"
                     MinWidth="86"
                     Command="{x:Bind ViewModel.ReloadTemplatesCommand}"
                     Content="Reload"
                     ToolTipService.ToolTip="Reload templates" />
                 <Button
+                    x:Name="DeployTemplateEvaluateButton"
                     Grid.Column="2"
                     Command="{x:Bind ViewModel.EvaluateReadinessCommand}"
                     Content="{x:Bind ViewModel.EvaluateButtonText, Mode=OneWay}" />
@@ -266,6 +268,7 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBox
+                                            x:Name="DeployV2CredentialSlotUsernameTextBox"
                                             Grid.Column="0"
                                             Header="Username"
                                             PlaceholderText="User name"
@@ -275,6 +278,7 @@
                                             Grid.Column="1"
                                             Header="Password" />
                                         <Button
+                                            x:Name="DeployV2CredentialSlotSaveButton"
                                             Grid.Column="2"
                                             VerticalAlignment="Bottom"
                                             Click="OnDeployV2SaveCredentialSlotRequested"
@@ -412,10 +416,12 @@
                                     Command="{x:Bind ViewModel.OpenTemplateEditorCommand}"
                                     Content="Fix in Templates Editor" />
                                 <Button
+                                    x:Name="DeployTemplateStartButton"
                                     Command="{x:Bind ViewModel.StartDeployCommand}"
                                     Content="Start Deploy" />
                             </StackPanel>
                             <TextBlock
+                                x:Name="DeployTemplateActionStatusText"
                                 Foreground="{StaticResource ShellTextSecondaryBrush}"
                                 Text="{x:Bind ViewModel.ActionStatusText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
@@ -449,6 +455,7 @@
                             Text="Deploying from template. Live per-VM progress and step details."
                             TextWrapping="Wrap" />
                         <TextBlock
+                            x:Name="DeployTemplateProgressLifecycleText"
                             Foreground="{StaticResource ShellTextPrimaryBrush}"
                             FontWeight="SemiBold"
                             AutomationProperties.LiveSetting="Polite"
@@ -499,11 +506,13 @@
                     AutomationProperties.LocalizedLandmarkType="Deployment results summary">
                     <StackPanel Spacing="{StaticResource SpacingS}">
                         <TextBlock
+                            x:Name="DeployTemplateResultLifecycleText"
                             Foreground="{StaticResource ShellTextPrimaryBrush}"
                             FontWeight="SemiBold"
                             AutomationProperties.LiveSetting="Polite"
                             Text="{x:Bind ViewModel.LifecycleState, Mode=OneWay}" />
                         <TextBlock
+                            x:Name="DeployTemplateResultSummaryText"
                             Foreground="{StaticResource ShellTextSecondaryBrush}"
                             AutomationProperties.LiveSetting="Polite"
                             Text="{x:Bind ViewModel.ProgressSummary, Mode=OneWay}"

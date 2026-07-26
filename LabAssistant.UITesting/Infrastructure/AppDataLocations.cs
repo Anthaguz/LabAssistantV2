@@ -15,6 +15,7 @@ public sealed class AppDataLocations
             : appRoot;
         CatalogFolder = Path.Combine(AppRoot, "Catalog");
         CatalogPath = Path.Combine(CatalogFolder, "vhdx-catalog.json");
+        TemplatesFolder = Path.Combine(AppRoot, "Templates");
         VmBasePath = Path.Combine(AppRoot, "VMs");
         DifferencingDiskBasePath = Path.Combine(AppRoot, "Disks");
     }
@@ -22,6 +23,14 @@ public sealed class AppDataLocations
     public string AppRoot { get; }
     public string CatalogFolder { get; }
     public string CatalogPath { get; }
+
+    /// <summary>
+    /// Where the app persists saved lab templates (one JSON per template). The harness
+    /// seeds a tagged V2 template here and sweeps tagged template files after a run, so
+    /// this must mirror the app's AppPaths.TemplatesFolder exactly.
+    /// </summary>
+    public string TemplatesFolder { get; }
+
     public string VmBasePath { get; }
     public string DifferencingDiskBasePath { get; }
 }

@@ -28,6 +28,7 @@ internal static class Program
                 "coverage" => RunCoverage(args),
                 "capture" => RunCaptureSelfTest(args),
                 "deploy" => RunDeployProof(args),
+                "template-e2e" => RunTemplateDeployProof(args),
                 "sweep" => RunSweep(args),
                 _ => PrintHelp()
             };
@@ -148,6 +149,31 @@ internal static class Program
     }
 
     /// <summary>
+    /// End-to-end template deploy proof: seeds a tagged minimal standalone V2 template that
+    /// references the harness base disk and switch, drives Deploy &gt; From Template to deploy it,
+    /// validates the resulting VM against Hyper-V ground truth, then tears everything down by tag
+    /// (VM + template file) and proves no orphans. Exits non-zero on any Error/Crash finding.
+    /// </summary>
+    private static int RunTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployV2Scenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
     /// Removes every Hyper-V resource carrying the harness tag prefix. Safe to run
     /// any time to guarantee a clean slate; never touches untagged resources.
     /// </summary>
@@ -235,6 +261,7 @@ internal static class Program
         Console.WriteLine("  coverage Audit each capability's live UI tree for controls missing a stable AutomationId.");
         Console.WriteLine("  capture Launch the app and self-test window screenshot capture (evidence health check).");
         Console.WriteLine("  deploy  Seed resources, drive a single-VM Quick Deploy, validate, and tear down.");
+        Console.WriteLine("  template-e2e Seed a V2 template, deploy it via From Template, validate, and tear down.");
         Console.WriteLine("  sweep   Remove any leftover harness-tagged Hyper-V resources.");
         return 0;
     }

@@ -9,10 +9,12 @@ public sealed class SweepReport
     public List<string> RemovedSwitches { get; } = new();
     public List<string> RemovedDiskFiles { get; } = new();
     public List<string> CatalogEntriesRemoved { get; } = new();
+    public List<string> RemovedTemplateFiles { get; } = new();
     public List<string> Errors { get; } = new();
 
     public bool RemovedAnything =>
-        RemovedVms.Count + RemovedSwitches.Count + RemovedDiskFiles.Count + CatalogEntriesRemoved.Count > 0;
+        RemovedVms.Count + RemovedSwitches.Count + RemovedDiskFiles.Count +
+        CatalogEntriesRemoved.Count + RemovedTemplateFiles.Count > 0;
 
     public override string ToString()
     {
@@ -21,6 +23,7 @@ public sealed class SweepReport
         sb.AppendLine($"Switches removed: {string.Join(", ", RemovedSwitches)}");
         sb.AppendLine($"Disk files:       {RemovedDiskFiles.Count}");
         sb.AppendLine($"Catalog entries:  {string.Join(", ", CatalogEntriesRemoved)}");
+        sb.AppendLine($"Template files:   {string.Join(", ", RemovedTemplateFiles)}");
         if (Errors.Count > 0)
         {
             sb.AppendLine($"Errors:           {string.Join(" | ", Errors)}");
@@ -60,6 +63,7 @@ public sealed class TeardownSweeper
         RemoveTaggedSwitches(report);
         RemoveTaggedCatalogEntries(report);
         RemoveTaggedDiskFiles(report);
+        RemoveTaggedTemplateFiles(report);
         return report;
     }
 
@@ -226,6 +230,46 @@ if ($null -ne $vm) {{
             catch (Exception ex)
             {
                 report.Errors.Add($"enumerate dirs '{root}': {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes saved template files this run's tag owns. The app persists one JSON
+    /// per template under the Templates folder; the harness seeds a tagged template
+    /// there, so a file whose name carries the prefix is harness-owned and safe to
+    /// delete. This closes the one no-orphans gap the VM/switch/catalog/disk sweeps
+    /// leave open. Only ever matches the tag prefix, so a real user's template is
+    /// never touched.
+    /// </summary>
+    private void RemoveTaggedTemplateFiles(SweepReport report)
+    {
+        var folder = _appData.TemplatesFolder;
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
+        IEnumerable<string> files;
+        try
+        {
+            files = Directory.EnumerateFiles(folder, _tagger.GlobalPrefix + "-*.json", SearchOption.TopDirectoryOnly);
+        }
+        catch (Exception ex)
+        {
+            report.Errors.Add($"enumerate templates '{folder}': {ex.Message}");
+            return;
+        }
+
+        foreach (var file in files.ToList())
+        {
+            if (TryDeleteWithRetry(file, out var error))
+            {
+                report.RemovedTemplateFiles.Add(file);
+            }
+            else
+            {
+                report.Errors.Add($"delete template '{file}': {error}");
             }
         }
     }

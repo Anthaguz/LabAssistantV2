@@ -149,7 +149,16 @@ public sealed class HyperVScenarioGate
             }
         }
 
-        int total = orphanVms.Count + orphanSwitches.Count + orphanDisks.Count + orphanDirs.Count;
+        // Saved template files the harness seeded are swept by tag prefix too; a surviving
+        // tagged template file is just as much an orphan as a leftover VM or disk.
+        var orphanTemplates = new List<string>();
+        if (Directory.Exists(_appData.TemplatesFolder))
+        {
+            orphanTemplates.AddRange(Directory.EnumerateFiles(
+                _appData.TemplatesFolder, _tagger.GlobalPrefix + "-*.json", SearchOption.TopDirectoryOnly));
+        }
+
+        int total = orphanVms.Count + orphanSwitches.Count + orphanDisks.Count + orphanDirs.Count + orphanTemplates.Count;
         if (total == 0)
         {
             recorder.Record(new Finding
@@ -158,7 +167,7 @@ public sealed class HyperVScenarioGate
                 Step = "no-orphans",
                 Severity = FindingSeverity.Info,
                 Title = "Cleanup verified: no harness-tagged resources remain",
-                Detail = $"No VMs, switches, disk files, or folders with prefix '{_tagger.GlobalPrefix}-' survive."
+                Detail = $"No VMs, switches, disk files, folders, or template files with prefix '{_tagger.GlobalPrefix}-' survive."
             });
         }
         else
@@ -170,7 +179,8 @@ public sealed class HyperVScenarioGate
                 Severity = FindingSeverity.Error,
                 Title = $"Orphaned harness resources survived teardown ({total})",
                 Detail = $"VMs: [{string.Join(", ", orphanVms)}]; switches: [{string.Join(", ", orphanSwitches)}]; " +
-                         $"disk files: [{string.Join(", ", orphanDisks)}]; folders: [{string.Join(", ", orphanDirs)}]. " +
+                         $"disk files: [{string.Join(", ", orphanDisks)}]; folders: [{string.Join(", ", orphanDirs)}]; " +
+                         $"template files: [{string.Join(", ", orphanTemplates)}]. " +
                          "Manual cleanup required."
             });
         }
