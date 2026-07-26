@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "REPLACED_AT_SEED_TIME",
+  "name": "REPLACED_AT_SEED_TIME",
+  "description": "Harness-seeded minimal standalone V2 template. One Gen2 VM, one bare NIC on one lab network, no domain/topology/capability roles and no credential slots, so the V2 plan resolves with zero unresolved requirements and needs no bootable OS. Safe to delete.",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "labNetworks": [],
+  "vmTemplates": [
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "membershipMode": "Standalone",
+      "nics": [
+        {
+          "nicId": "primary",
+          "switchName": "REPLACED_AT_SEED_TIME"
+        }
+      ]
+    }
+  ]
+}

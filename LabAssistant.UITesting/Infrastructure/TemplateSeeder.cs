@@ -1,0 +1,82 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using LabAssistant.UITesting.Infrastructure.Cleanup;
+
+namespace LabAssistant.UITesting.Infrastructure;
+
+/// <summary>
+/// Seeds a minimal, deployable V2 lab template onto disk in the app's Templates
+/// folder (%APPDATA%\LabAssistant\Templates) so the From Template deploy flow has
+/// something real to select and deploy. The harness is black-box: rather than
+/// referencing the app's model types, it loads a captured V2 template fixture and
+/// rewrites only the few fields that must be per-run - the template name, the VM
+/// name, the base-disk catalog id, and the lab-network switch - then writes it
+/// exactly as the app would read it.
+///
+/// Two things carry the run tag and are therefore sweepable: the VM name (which
+/// becomes the deployed Hyper-V VM name, the hook the teardown sweeper matches)
+/// and the template file name (matched by the same prefix). Everything the plan
+/// needs to resolve without a bootable OS is baked into the fixture: a single
+/// standalone Gen2 VM with a bare NIC (no static IP/gateway/DNS), no topology
+/// role, no domain membership, no capability roles, and no credential slots, so
+/// the V2 plan reports zero unresolved requirements.
+/// </summary>
+public sealed class TemplateSeeder
+{
+    private readonly AppDataLocations _appData;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true
+    };
+
+    public TemplateSeeder(AppDataLocations appData) => _appData = appData;
+
+    /// <summary>
+    /// Writes a tagged standalone V2 template that references the seeded base disk
+    /// and switch, and returns its on-disk identity. The template and VM names both
+    /// carry the run prefix so the file and the resulting VM are both sweepable.
+    /// </summary>
+    public SeededTemplate SeedStandaloneTemplate(ResourceTagger tagger, string baseDiskCatalogId, string switchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "standalone-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Standalone V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\standalone-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Standalone V2 template fixture did not parse as a JSON object.");
+
+        // The template file name carries the tag (sweep hook for the file); the id is a plain
+        // GUID because template-file ownership is decided by the file name, not the id.
+        var templateName = tagger.Name("tpl");
+        var vmName = tagger.Name("vm");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        var vm = root["vmTemplates"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Standalone V2 template fixture is missing its first vmTemplates entry.");
+        vm["vmId"] = Guid.NewGuid().ToString("N");
+        vm["name"] = vmName;
+        vm["vhdxId"] = baseDiskCatalogId;
+
+        // The NIC names the existing host switch directly (no lab-network binding, no static
+        // IP), so the switch attaches at provision time WITHOUT setting requiresGuestWork - the
+        // proven bare-switch shape. If a networkId were used instead, the planner would demand a
+        // bootstrap profile the seeded empty disk does not carry, and the deploy would never start.
+        var nic = vm["nics"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Standalone V2 template fixture is missing its first NIC.");
+        nic["switchName"] = switchName;
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededTemplate(filePath, templateName, vmName);
+    }
+}
+
+/// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
+public sealed record SeededTemplate(string FilePath, string TemplateName, string VmName);
