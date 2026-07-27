@@ -25,6 +25,14 @@ public sealed class TemplateSeeder
 {
     private readonly AppDataLocations _appData;
 
+    /// <summary>
+    /// The local bootstrap credential-slot key authored into the DC fixture and referenced
+    /// by the real base image's bootstrap profile. The DC scenario seeds the base-disk profile
+    /// with this same key so the plan surfaces exactly one credential slot to resolve, which
+    /// the planner then reuses for domain-admin and DSRM (credential-reuse policy).
+    /// </summary>
+    public const string DcLocalBootstrapSlotKey = "disk.winserver2022.local-admin";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
@@ -143,6 +151,66 @@ public sealed class TemplateSeeder
 
         return new SeededMultiVmTemplate(filePath, templateName, seededVms);
     }
+
+    /// <summary>
+    /// Writes a tagged single first-domain-controller V2 template that references the REAL
+    /// prepared base image (by catalog id) on the given switch, and returns its on-disk
+    /// identity plus the forest ground truth. The DC VM name and the template file name both
+    /// carry the run prefix so the deployed VM and the file are sweepable.
+    ///
+    /// Unlike the bare-switch scenarios this VM is a RootDomainController with a static-IP NIC,
+    /// so the plan requires guest work (DC promotion) and therefore a bootstrap-capable base
+    /// image plus a resolved local bootstrap credential slot. The fixture's directory topology
+    /// (forest smoke.lab / SMOKE) and the VM's fixed vmId are stitched together here so
+    /// firstDomainControllerVmId always matches the VM that promotes it.
+    /// </summary>
+    public SeededDcTemplate SeedDomainControllerTemplate(ResourceTagger tagger, string baseDiskCatalogId, string switchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "dc-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"DC V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\dc-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("DC V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("dctpl");
+        var vmName = tagger.Name("dc");
+        var vmId = Guid.NewGuid().ToString("N");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        var vm = root["vmTemplates"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("DC V2 template fixture is missing its first vmTemplates entry.");
+        vm["vmId"] = vmId;
+        vm["name"] = vmName;
+        vm["vhdxId"] = baseDiskCatalogId;
+
+        // The lab network names the (already-created) switch directly. Keep the switch out of the
+        // NIC: the NIC binds by networkId so the static IP + self-DNS mark this as guest work.
+        var network = root["labNetworks"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("DC V2 template fixture is missing its first labNetworks entry.");
+        network["switchName"] = switchName;
+
+        // firstDomainControllerVmId must match the VM that promotes the forest, or the planner
+        // cannot resolve which VM owns the root domain.
+        var rootDomain = root["directoryTopology"]?["domains"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("DC V2 template fixture is missing its root domain entry.");
+        rootDomain["firstDomainControllerVmId"] = vmId;
+
+        var dnsName = rootDomain["dnsName"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("DC V2 template fixture root domain is missing dnsName.");
+        var netBiosName = rootDomain["netBiosName"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("DC V2 template fixture root domain is missing netBiosName.");
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededDcTemplate(filePath, templateName, vmName, dnsName, netBiosName, DcLocalBootstrapSlotKey);
+    }
 }
 
 /// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
@@ -153,3 +221,16 @@ public sealed record SeededMultiVmTemplate(string FilePath, string TemplateName,
 
 /// <summary>The expected ground truth for one VM in a seeded multi-VM template: its tagged name and its own memory/cpu.</summary>
 public sealed record SeededVm(string VmName, int ExpectedMemoryMb, int ExpectedCpu);
+
+/// <summary>
+/// Identity + forest ground truth of a harness-seeded single-DC template: its file, its library
+/// display name, the DC VM name it deploys, the forest/root-domain DNS + NetBIOS names to validate
+/// against after promotion, and the local bootstrap credential slot the deploy must fill.
+/// </summary>
+public sealed record SeededDcTemplate(
+    string FilePath,
+    string TemplateName,
+    string VmName,
+    string DnsName,
+    string NetBiosName,
+    string LocalBootstrapSlotKey);

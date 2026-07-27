@@ -63,6 +63,57 @@ public sealed class CatalogSeeder
         return new SeededBaseDisk(id, diskPath, "LAT Harness (empty) test");
     }
 
+    /// <summary>
+    /// Ensures the catalog entry with the given id carries a bootstrap profile, so the
+    /// V2 planner accepts guest-work VMs (DC promotion, domain join, router) that resolve
+    /// to this base image. Used for a DC/guest scenario against the REAL Windows Server
+    /// image already registered in the user's catalog: the profile marks the disk
+    /// guest-configurable and points at the local credential slot the deploy fills.
+    ///
+    /// This deliberately targets an EXISTING, untagged entry by id and only writes the
+    /// bootstrap sub-object - it never changes the id or path and never deletes the
+    /// backing VHDX - so the harness gate's tag-based sweep leaves the real image
+    /// untouched. The write is idempotent: a matching profile is a no-op. Returns true
+    /// if the entry was found (and now carries the profile), false if no such id exists.
+    /// </summary>
+    public bool EnsureBaseDiskBootstrapProfile(
+        string catalogId,
+        string expectedLocalUser,
+        string localCredentialSlotRef,
+        string guestOsFamily,
+        string guestTransport,
+        string? notes = null)
+    {
+        var items = Load();
+        var item = items.FirstOrDefault(i => string.Equals(i.Id, catalogId, StringComparison.OrdinalIgnoreCase));
+        if (item is null)
+        {
+            return false;
+        }
+
+        var desired = new CatalogBootstrapProfile
+        {
+            ExpectedLocalUser = expectedLocalUser,
+            LocalCredentialSlotRef = localCredentialSlotRef,
+            GuestOsFamily = guestOsFamily,
+            GuestTransport = guestTransport,
+            Notes = notes
+        };
+
+        if (item.BootstrapProfile is { } existing
+            && string.Equals(existing.ExpectedLocalUser, desired.ExpectedLocalUser, StringComparison.Ordinal)
+            && string.Equals(existing.LocalCredentialSlotRef, desired.LocalCredentialSlotRef, StringComparison.Ordinal)
+            && string.Equals(existing.GuestOsFamily, desired.GuestOsFamily, StringComparison.Ordinal)
+            && string.Equals(existing.GuestTransport, desired.GuestTransport, StringComparison.Ordinal))
+        {
+            return true; // already present with the expected values - nothing to write
+        }
+
+        item.BootstrapProfile = desired;
+        Save(items);
+        return true;
+    }
+
     /// <summary>Removes catalog entries whose id/path/os carries the tag; optionally deletes the backing VHDX.</summary>
     public IReadOnlyList<string> RemoveTaggedEntries(ResourceTagger tagger, bool deleteBackingFiles)
     {
@@ -142,6 +193,26 @@ public sealed class CatalogSeeder
         public string OsVersion { get; set; } = string.Empty;
         public int Generation { get; set; }
         public long? SizeBytes { get; set; }
+        public string? Notes { get; set; }
+
+        // Round-tripped so a catalog rewrite (which happens on every sweep) never strips a
+        // disk's bootstrap profile. Before this was modelled, Save() dropped it from EVERY
+        // entry - silently un-marking real user disks as guest-configurable.
+        public CatalogBootstrapProfile? BootstrapProfile { get; set; }
+
+        // Preserves any other catalog field the harness does not model (e.g. "signature")
+        // so a rewrite is lossless and cannot corrupt a real user's catalog entry.
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? AdditionalData { get; set; }
+    }
+
+    // Mirrors LabAssistant.Models.Catalog.VhdxBootstrapProfile (only the fields the harness sets).
+    private sealed class CatalogBootstrapProfile
+    {
+        public string? ExpectedLocalUser { get; set; }
+        public string? LocalCredentialSlotRef { get; set; }
+        public string? GuestOsFamily { get; set; }
+        public string? GuestTransport { get; set; }
         public string? Notes { get; set; }
     }
 }

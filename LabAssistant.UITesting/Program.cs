@@ -30,6 +30,7 @@ internal static class Program
                 "deploy" => RunDeployProof(args),
                 "template-e2e" => RunTemplateDeployProof(args),
                 "template-multivm" => RunMultiVmTemplateDeployProof(args),
+                "template-dc" => RunDcTemplateDeployProof(args),
                 "sweep" => RunSweep(args),
                 _ => PrintHelp()
             };
@@ -201,6 +202,32 @@ internal static class Program
     }
 
     /// <summary>
+    /// Single Domain Controller deploy scenario: ensures the real base image is guest-configurable,
+    /// seeds a tagged single-DC V2 template, and drives Deploy &gt; From Template to a startable plan.
+    /// With LABASSISTANT_SMOKE_ADMIN_PASSWORD set it also Starts the deploy, waits for promotion, and
+    /// validates the real forest/domain over PowerShell Direct, then tears the DC VM down by tag and
+    /// proves no orphans. Exits non-zero on any Error/Crash finding.
+    /// </summary>
+    private static int RunDcTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployDcScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
     /// Removes every Hyper-V resource carrying the harness tag prefix. Safe to run
     /// any time to guarantee a clean slate; never touches untagged resources.
     /// </summary>
@@ -290,6 +317,7 @@ internal static class Program
         Console.WriteLine("  deploy  Seed resources, drive a single-VM Quick Deploy, validate, and tear down.");
         Console.WriteLine("  template-e2e Seed a V2 template, deploy it via From Template, validate, and tear down.");
         Console.WriteLine("  template-multivm Seed a 3-VM V2 template, deploy it via From Template, validate every VM, and tear down.");
+        Console.WriteLine("  template-dc Seed a single-DC V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate AD over PowerShell Direct.");
         Console.WriteLine("  sweep   Remove any leftover harness-tagged Hyper-V resources.");
         return 0;
     }
