@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "REPLACED_AT_SEED_TIME",
+  "name": "REPLACED_AT_SEED_TIME",
+  "description": "Harness-seeded single-router V2 template. One standalone Router VM with two NICs: a LAN NIC holding the .1 gateway on a dedicated Internal switch (static IP => guest work) and an external NIC bridged onto the host Default Switch for egress. Exercises the RRAS/NAT router guest path and multi-NIC static-IP mapping. Safe to delete.",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "labNetworks": [
+    {
+      "networkId": "lan-net",
+      "name": "RouterLan",
+      "switchName": "REPLACED_AT_SEED_TIME",
+      "subnet": "10.60.0.0/24"
+    },
+    {
+      "networkId": "external-net",
+      "name": "RouterExternal",
+      "switchName": "Default Switch"
+    }
+  ],
+  "vmTemplates": [
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "topologyRole": "Router",
+      "membershipMode": "Standalone",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "lan",
+          "networkId": "lan-net",
+          "ipAddress": "10.60.0.1",
+          "prefixLength": 24,
+          "dnsServers": []
+        },
+        {
+          "nicId": "external",
+          "networkId": "external-net"
+        }
+      ]
+    }
+  ]
+}

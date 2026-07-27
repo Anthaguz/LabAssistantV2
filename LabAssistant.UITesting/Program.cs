@@ -31,6 +31,8 @@ internal static class Program
                 "template-e2e" => RunTemplateDeployProof(args),
                 "template-multivm" => RunMultiVmTemplateDeployProof(args),
                 "template-dc" => RunDcTemplateDeployProof(args),
+                "template-router" => RunRouterTemplateDeployProof(args),
+                "template-switch-autocreate" => RunSwitchAutoCreateRegression(args),
                 "sweep" => RunSweep(args),
                 _ => PrintHelp()
             };
@@ -228,6 +230,59 @@ internal static class Program
     }
 
     /// <summary>
+    /// Single-router deploy scenario: ensures the real base image is guest-configurable, seeds a tagged
+    /// single-router V2 template (multi-NIC, RRAS/NAT egress), and drives Deploy &gt; From Template to a
+    /// startable plan. With LABASSISTANT_SMOKE_ADMIN_PASSWORD set it also Starts the deploy, waits for the
+    /// router to settle, and validates over PowerShell Direct that the guest holds the templated LAN
+    /// gateway IP, then tears the router VM down by tag and proves no orphans. Exits non-zero on any
+    /// Error/Crash finding.
+    /// </summary>
+    private static int RunRouterTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployRouterScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
+    /// Switch-auto-create planning regression: seeds a tagged standalone V2 template whose NIC references
+    /// a virtual switch the harness never provisions, drives Deploy &gt; From Template, and asserts the plan
+    /// is startable (the deploy should create the missing switch). Fails on master (documenting the bug)
+    /// and passes once the deploy-network fix lands. Planning-only: no VM or switch is created. Exits
+    /// non-zero on any Error/Crash finding.
+    /// </summary>
+    private static int RunSwitchAutoCreateRegression(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new SwitchAutoCreateScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
     /// Removes every Hyper-V resource carrying the harness tag prefix. Safe to run
     /// any time to guarantee a clean slate; never touches untagged resources.
     /// </summary>
@@ -318,6 +373,8 @@ internal static class Program
         Console.WriteLine("  template-e2e Seed a V2 template, deploy it via From Template, validate, and tear down.");
         Console.WriteLine("  template-multivm Seed a 3-VM V2 template, deploy it via From Template, validate every VM, and tear down.");
         Console.WriteLine("  template-dc Seed a single-DC V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate AD over PowerShell Direct.");
+        Console.WriteLine("  template-router Seed a single-router V2 template (multi-NIC RRAS/NAT), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the LAN gateway IP over PowerShell Direct.");
+        Console.WriteLine("  template-switch-autocreate Regression: seed a template referencing an absent switch and assert the plan is startable (the deploy should create it).");
         Console.WriteLine("  sweep   Remove any leftover harness-tagged Hyper-V resources.");
         return 0;
     }

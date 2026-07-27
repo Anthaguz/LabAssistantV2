@@ -211,6 +211,68 @@ public sealed class TemplateSeeder
 
         return new SeededDcTemplate(filePath, templateName, vmName, dnsName, netBiosName, DcLocalBootstrapSlotKey);
     }
+
+    /// <summary>
+    /// Writes a tagged single-router V2 template that references the REAL prepared base image
+    /// (by catalog id) and returns its on-disk identity plus the LAN gateway IP to validate.
+    /// The router VM name and the template file name both carry the run prefix so the deployed
+    /// VM and the file are sweepable.
+    ///
+    /// The router is a standalone VM (topologyRole Router) with two NICs: a LAN NIC bound by
+    /// networkId to a dedicated Internal switch and holding the segment's .1 gateway (a static
+    /// IP, so the plan requires guest work - RRAS/NAT + address config - and therefore a
+    /// bootstrap-capable base image plus a resolved local bootstrap credential slot), and an
+    /// external NIC bridged onto the host's Default Switch for egress. Only the LAN switch is
+    /// rewritten to the harness-provisioned switch; the external NIC keeps "Default Switch"
+    /// (present on the host, not harness-owned, so never swept). The LAN static IP is read back
+    /// from the fixture we are about to write, so live validation compares against exactly what
+    /// was deployed.
+    /// </summary>
+    public SeededRouterTemplate SeedRouterTemplate(ResourceTagger tagger, string baseDiskCatalogId, string lanSwitchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "router-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Router V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\router-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Router V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("rtrtpl");
+        var vmName = tagger.Name("rtr");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        var vm = root["vmTemplates"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Router V2 template fixture is missing its first vmTemplates entry.");
+        vm["vmId"] = Guid.NewGuid().ToString("N");
+        vm["name"] = vmName;
+        vm["vhdxId"] = baseDiskCatalogId;
+
+        // Rewrite ONLY the LAN lab network onto the harness-provisioned switch. The external
+        // network keeps "Default Switch" (a host-owned switch we must never sweep).
+        var lanNetwork = root["labNetworks"]?.AsArray()
+            ?.Select(n => n?.AsObject())
+            .FirstOrDefault(n => n is not null && string.Equals(n["networkId"]?.GetValue<string>(), "lan-net", StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("Router V2 template fixture is missing its 'lan-net' labNetworks entry.");
+        lanNetwork["switchName"] = lanSwitchName;
+
+        // Read the LAN gateway IP straight from the fixture so validation checks exactly what we deploy.
+        var lanNic = vm["nics"]?.AsArray()
+            ?.Select(n => n?.AsObject())
+            .FirstOrDefault(n => n is not null && string.Equals(n["networkId"]?.GetValue<string>(), "lan-net", StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("Router V2 template fixture is missing its 'lan-net' NIC.");
+        var lanIp = lanNic["ipAddress"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("Router V2 template fixture 'lan-net' NIC is missing ipAddress.");
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededRouterTemplate(filePath, templateName, vmName, lanIp, DcLocalBootstrapSlotKey);
+    }
 }
 
 /// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
@@ -233,4 +295,17 @@ public sealed record SeededDcTemplate(
     string VmName,
     string DnsName,
     string NetBiosName,
+    string LocalBootstrapSlotKey);
+
+/// <summary>
+/// Identity + LAN ground truth of a harness-seeded single-router template: its file, its library
+/// display name, the router VM name it deploys, the LAN gateway IP the guest must end up holding
+/// (the multi-NIC static-IP the router applies), and the local bootstrap credential slot the
+/// deploy must fill.
+/// </summary>
+public sealed record SeededRouterTemplate(
+    string FilePath,
+    string TemplateName,
+    string VmName,
+    string LanIpAddress,
     string LocalBootstrapSlotKey);
