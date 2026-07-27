@@ -78,6 +78,7 @@ public sealed class ScenarioHarness
 
             host = AppHost.Launch(_exePath);
             Console.WriteLine($"Main window ready: \"{host.MainWindow.Title}\"");
+            recorder.BeginAppLogWindow();
 
             var context = new ScenarioContext(host, recorder, _config, _repoRoot, resources);
             RunGuarded(scenario, context, host, recorder);
@@ -111,6 +112,7 @@ public sealed class ScenarioHarness
         {
             host = AppHost.Launch(_exePath);
             Console.WriteLine($"Main window ready: \"{host.MainWindow.Title}\"");
+            recorder.BeginAppLogWindow();
 
             var context = new ScenarioContext(host, recorder, _config, _repoRoot, hyperV: null);
             RunGuarded(scenario, context, host, recorder);

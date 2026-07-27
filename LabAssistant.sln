@@ -38,6 +38,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabAssistant.Diagnostics.Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabAssistant.UITesting", "LabAssistant.UITesting\LabAssistant.UITesting.csproj", "{93BBC5B0-25D4-4486-B43E-3A8D88B1FA61}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabAssistant.UITesting.Tests", "LabAssistant.UITesting.Tests\LabAssistant.UITesting.Tests.csproj", "{2315ABD9-9685-4927-8190-56780C91A6E8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -104,6 +106,10 @@ Global
 		{93BBC5B0-25D4-4486-B43E-3A8D88B1FA61}.Debug|Any CPU.Build.0 = Debug|x64
 		{93BBC5B0-25D4-4486-B43E-3A8D88B1FA61}.Release|Any CPU.ActiveCfg = Release|x64
 		{93BBC5B0-25D4-4486-B43E-3A8D88B1FA61}.Release|Any CPU.Build.0 = Release|x64
+		{2315ABD9-9685-4927-8190-56780C91A6E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2315ABD9-9685-4927-8190-56780C91A6E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2315ABD9-9685-4927-8190-56780C91A6E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2315ABD9-9685-4927-8190-56780C91A6E8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

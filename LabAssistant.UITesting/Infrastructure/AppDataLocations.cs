@@ -18,6 +18,8 @@ public sealed class AppDataLocations
         TemplatesFolder = Path.Combine(AppRoot, "Templates");
         ConfigFolder = Path.Combine(AppRoot, "Config");
         CredentialSlotsPath = Path.Combine(ConfigFolder, "credential-slots.json");
+        LogsFolder = Path.Combine(AppRoot, "Logs");
+        StructuredEventsPath = Path.Combine(LogsFolder, "structured-events.jsonl");
         VmBasePath = Path.Combine(AppRoot, "VMs");
         DifferencingDiskBasePath = Path.Combine(AppRoot, "Disks");
     }
@@ -44,6 +46,18 @@ public sealed class AppDataLocations
 
     /// <summary>Full path to the app's credential-slots.json store.</summary>
     public string CredentialSlotsPath { get; }
+
+    /// <summary>
+    /// Where the app writes its structured event log (JSONL, one event per line). The
+    /// harness reads this on a deploy failure to attach the exact slice of app-side
+    /// events (operationId, stepKey, result, error) to the finding, so a person or an
+    /// agent triaging later has the app's own account of why the deploy failed - not
+    /// just a screenshot. Must mirror the app's AppPaths.LogsFolder exactly.
+    /// </summary>
+    public string LogsFolder { get; }
+
+    /// <summary>Full path to the app's active structured-events.jsonl file.</summary>
+    public string StructuredEventsPath { get; }
 
     public string VmBasePath { get; }
     public string DifferencingDiskBasePath { get; }
