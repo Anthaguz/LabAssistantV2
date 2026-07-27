@@ -16,12 +16,28 @@ public sealed class FindingRecorder
 {
     private readonly List<Finding> _findings = new();
     private readonly string _screenshotsDir;
+    private readonly string _appLogsDir;
+    private readonly AppEventLogCapture _appLog;
     private int _screenshotCounter;
+    private int _appLogCounter;
+
+    // The window into the app's structured event log for the scenario currently running.
+    // Opened per scenario (each gets a fresh app instance) so a captured slice is scoped
+    // to that scenario's session. Null until the first BeginAppLogWindow call.
+    private AppLogWindow? _appLogWindow;
 
     public FindingRecorder(string runDir)
+        : this(runDir, new AppEventLogCapture(new AppDataLocations()))
+    {
+    }
+
+    // Overload lets tests inject a capture pointed at a scratch log folder.
+    public FindingRecorder(string runDir, AppEventLogCapture appLog)
     {
         RunDir = runDir;
         _screenshotsDir = Path.Combine(runDir, "screenshots");
+        _appLogsDir = Path.Combine(runDir, "app-logs");
+        _appLog = appLog;
         Directory.CreateDirectory(_screenshotsDir);
     }
 
@@ -30,6 +46,13 @@ public sealed class FindingRecorder
     public IReadOnlyList<Finding> Findings => _findings;
 
     public bool HasFailures => _findings.Any(f => f.Severity is FindingSeverity.Error or FindingSeverity.Crash);
+
+    /// <summary>
+    /// Starts a fresh app-log window for the scenario about to run. The harness calls this
+    /// right after launching the app, so any failure recorded for the scenario captures
+    /// only the app events from that launch onward.
+    /// </summary>
+    public void BeginAppLogWindow() => _appLogWindow = _appLog.OpenWindow();
 
     /// <summary>Captures a screenshot of the app window and returns the file path.</summary>
     /// <remarks>
@@ -76,7 +99,25 @@ public sealed class FindingRecorder
         Console.WriteLine($"  [{finding.Severity}] {finding.Scenario}/{finding.Step}: {finding.Title}");
     }
 
-    /// <summary>Convenience: record a failure with a screenshot captured now.</summary>
+    /// <summary>
+    /// Captures the current scenario's slice of the app structured event log to an evidence
+    /// file and returns its path relative to the run directory, or null when no window is
+    /// open or nothing matched. Optionally narrows the slice to a single operationId.
+    /// </summary>
+    public string? CaptureAppLog(string label, string? operationId = null)
+    {
+        if (_appLogWindow is not AppLogWindow window)
+        {
+            return null;
+        }
+
+        string safe = Sanitize(label);
+        string file = Path.Combine(_appLogsDir, $"{++_appLogCounter:D3}-{safe}.jsonl");
+        int written = _appLog.WriteSlice(window, operationId, file);
+        return written > 0 ? Path.GetRelativePath(RunDir, file) : null;
+    }
+
+    /// <summary>Convenience: record a failure with a screenshot and the app log slice captured now.</summary>
     public void RecordFailure(
         AppHost host,
         string scenario,
@@ -84,9 +125,11 @@ public sealed class FindingRecorder
         FindingSeverity severity,
         string title,
         string detail,
-        Exception? exception = null)
+        Exception? exception = null,
+        string? operationId = null)
     {
         string? shot = Capture(host, $"{scenario}-{step}");
+        string? appLog = CaptureAppLog($"{scenario}-{step}", operationId);
         Record(new Finding
         {
             Scenario = scenario,
@@ -95,6 +138,7 @@ public sealed class FindingRecorder
             Title = title,
             Detail = detail,
             ScreenshotFile = shot is null ? null : Path.GetRelativePath(RunDir, shot),
+            AppLogFile = appLog,
             ExceptionType = exception?.GetType().Name,
             StackTrace = exception?.StackTrace
         });
@@ -143,6 +187,13 @@ public sealed class FindingRecorder
                 if (f.ScreenshotFile is not null)
                 {
                     md.AppendLine($"![screenshot]({f.ScreenshotFile.Replace('\\', '/')})");
+                    md.AppendLine();
+                }
+
+                if (f.AppLogFile is not null)
+                {
+                    md.AppendLine($"App event log slice: [`{f.AppLogFile.Replace('\\', '/')}`]" +
+                        $"({f.AppLogFile.Replace('\\', '/')})");
                     md.AppendLine();
                 }
             }
