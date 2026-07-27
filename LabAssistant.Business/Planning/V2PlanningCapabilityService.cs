@@ -21,6 +21,27 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         "Operations"
     };
 
+    /// <summary>
+    /// Default type used when a template references a switch that does not yet exist on the host and no explicit
+    /// switch type is declared for it. Internal keeps the lab isolated from the internet while still letting the
+    /// VMs reach each other and the host reach them (for inspection, console, RDP, or acting as a DHCP/tooling
+    /// source). External references stay blocking until an adapter mapping exists, and an existing switch of a
+    /// different type still blocks via the type-mismatch path.
+    /// </summary>
+    private const string DefaultAutoCreatedSwitchType = V2SwitchTypeCatalog.Internal;
+
+    /// <summary>
+    /// Topology roles that are treated as an evident DHCP provider for the purpose of the plan-time no-IP
+    /// visibility warning. A switch that hosts one of these infrastructure VMs is assumed to have a DHCP server,
+    /// so a NIC with no static IP there is a legitimate DHCP client rather than a silent no-address failure.
+    /// </summary>
+    private static readonly IReadOnlyList<string> DhcpProviderTopologyRoles =
+    [
+        "Router",
+        "FirstDomainController",
+        "ReplicaDomainController"
+    ];
+
     public Task<V2PlanBuildResult> BuildPlanAsync(V2PlanBuildRequest request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -119,6 +140,8 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 issues,
                 unresolved))
             .ToList();
+
+        EmitNoDhcpVisibilityWarnings(states, issues);
 
         var hasRootDc = states.Any(state => state.TopologyRoleIs("FirstDomainController"));
         var hasReplicaDc = states.Any(state => state.TopologyRoleIs("ReplicaDomainController"));
@@ -677,29 +700,28 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         for (var index = 0; index < fallbackSwitches.Count; index++)
         {
             var switchName = fallbackSwitches[index];
+            var nicId = $"fallback-{index + 1}";
             if (!availableSwitches.TryGetValue(switchName, out var switchType))
             {
-                unresolved.Add(new V2UnresolvedRequirement
-                {
-                    Kind = V2UnresolvedRequirementKind.SwitchReference,
-                    Key = switchName,
-                    AffectedVmIds = [vm.VmId],
-                    Description = $"VM '{vmName}' references unavailable switch '{switchName}'."
-                });
-                issues.Add(new V2PlanIssue
-                {
-                    Severity = V2PlanIssueSeverity.Blocking,
-                    Code = "switch-reference-missing",
-                    VmId = vm.VmId,
-                    VmName = vmName,
-                    Message = $"VM '{vmName}' references unavailable switch '{switchName}'.",
-                    SuggestedAction = "Create the switch on this host or update the template switch mapping."
-                });
+                // Legacy vm.SwitchName / vm.SwitchNames references carry no declared type, so a switch that is
+                // missing on the host is auto-created as Internal by default rather than blocking the deploy.
+                AddSwitchRequirement(
+                    switchRequirements,
+                    networkId: null,
+                    vm,
+                    vmName,
+                    nicId,
+                    switchName,
+                    DefaultAutoCreatedSwitchType,
+                    externalAdapterName: null,
+                    issues,
+                    unresolved);
+                switchType = DefaultAutoCreatedSwitchType;
             }
 
             result.Add(new V2ResolvedVmNetworkInterface
             {
-                NicId = $"fallback-{index + 1}",
+                NicId = nicId,
                 EffectiveSwitchName = switchName,
                 EffectiveSwitchType = switchType
             });
@@ -733,23 +755,22 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 return NormalizeSupportedSwitchType(legacyAvailableSwitchType) ?? NormalizeSwitchType(legacyAvailableSwitchType);
             }
 
-            unresolved.Add(new V2UnresolvedRequirement
-            {
-                Kind = V2UnresolvedRequirementKind.SwitchReference,
-                Key = effectiveSwitch,
-                AffectedVmIds = [vm.VmId],
-                Description = $"VM '{vmName}' requires switch '{effectiveSwitch}' on NIC '{nicId}', but it is not available on the current host."
-            });
-            issues.Add(new V2PlanIssue
-            {
-                Severity = V2PlanIssueSeverity.Blocking,
-                Code = "switch-reference-missing",
-                VmId = vm.VmId,
-                VmName = vmName,
-                Message = $"VM '{vmName}' requires unavailable switch '{effectiveSwitch}'.",
-                SuggestedAction = "Create the switch on this host or define a lab network switchType when the deployment should create it."
-            });
-            return null;
+            // A bare switch reference (a NIC-level switch override, or a lab network that declares no switchType)
+            // that is not present on the host is auto-created as Internal by default rather than blocking the
+            // deploy. Runtime EnsureNetworkSwitchAsync creates and cleans these up. External still blocks until an
+            // adapter mapping is supplied, and an existing switch of a different type still blocks via type mismatch.
+            AddSwitchRequirement(
+                switchRequirements,
+                networkId,
+                vm,
+                vmName,
+                nicId,
+                effectiveSwitch,
+                DefaultAutoCreatedSwitchType,
+                externalAdapterName: null,
+                issues,
+                unresolved);
+            return DefaultAutoCreatedSwitchType;
         }
 
         if (availableSwitches.TryGetValue(effectiveSwitch, out var availableSwitchType))
@@ -917,6 +938,71 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             Message = $"Switch '{switchName}' is declared with conflicting V2 switch types: {declaredType} and {expectedType}.",
             SuggestedAction = "Use one switch type per switch name, or assign different switch names to the lab networks."
         });
+    }
+
+    /// <summary>
+    /// Emits a non-blocking plan-time warning for every NIC that has no static IP and sits on an isolated
+    /// (Internal or Private) switch where no evident DHCP provider is present. Legitimate labs run their own DHCP
+    /// on a router or domain controller, so this stays non-blocking; it exists only to surface the "no IP" case up
+    /// front instead of leaving it a silent runtime mystery. A switch is considered covered when any router or
+    /// domain-controller VM has a NIC on it.
+    /// </summary>
+    private static void EmitNoDhcpVisibilityWarnings(
+        IReadOnlyList<ResolvedVmState> states,
+        List<V2PlanIssue> issues)
+    {
+        var switchesWithProvider = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var state in states)
+        {
+            if (!DhcpProviderTopologyRoles.Any(state.TopologyRoleIs))
+            {
+                continue;
+            }
+
+            foreach (var nic in state.ResolvedNics)
+            {
+                if (!string.IsNullOrWhiteSpace(nic.EffectiveSwitchName))
+                {
+                    switchesWithProvider.Add(nic.EffectiveSwitchName.Trim());
+                }
+            }
+        }
+
+        foreach (var state in states)
+        {
+            foreach (var nic in state.ResolvedNics)
+            {
+                if (!string.IsNullOrWhiteSpace(nic.IpAddress))
+                {
+                    continue;
+                }
+
+                // Only fully isolated switch types lack an inherent external DHCP source; External switches are
+                // assumed to reach a real DHCP server, so a missing static IP there is an ordinary DHCP lease.
+                if (!SwitchTypeIs(nic.EffectiveSwitchType, V2SwitchTypeCatalog.Internal) &&
+                    !SwitchTypeIs(nic.EffectiveSwitchType, V2SwitchTypeCatalog.Private))
+                {
+                    continue;
+                }
+
+                var switchName = nic.EffectiveSwitchName?.Trim();
+                if (string.IsNullOrWhiteSpace(switchName) || switchesWithProvider.Contains(switchName))
+                {
+                    continue;
+                }
+
+                var switchTypeLabel = NormalizeSwitchType(nic.EffectiveSwitchType) ?? "isolated";
+                issues.Add(new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Warning,
+                    Code = "nic-no-static-ip-no-dhcp-provider",
+                    VmId = state.Vm.VmId,
+                    VmName = state.Vm.Name,
+                    Message = $"VM '{state.Vm.Name}' NIC '{nic.NicId}' has no static IP on {switchTypeLabel} switch '{switchName}', and no router or domain controller offering DHCP is present on that switch. The VM may not receive an IP address.",
+                    SuggestedAction = "Assign a static IP to this NIC, or place a DHCP provider (for example a router or domain controller) on this switch."
+                });
+            }
+        }
     }
 
     private static bool DetermineGuestWorkRequirement(

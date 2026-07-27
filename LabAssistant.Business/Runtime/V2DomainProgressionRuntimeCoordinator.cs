@@ -16,7 +16,7 @@ internal sealed class V2DomainProgressionRuntimeCoordinator
     public Task<GuestCommandResult> PrepareGuestNetworkAsync(
         string vmName,
         V2RuntimeCredential bootstrapCredential,
-        IReadOnlyList<V2ResolvedVmNetworkInterface> nics,
+        IReadOnlyList<GuestNicPlan> nics,
         CancellationToken cancellationToken)
         => _guestCommandExecutor.ExecutePowerShellDirectAsync(
             vmName,

@@ -1175,18 +1175,60 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         var preparedNics = BuildPreparedNics(state, request.Plan.Context.Vms);
-        var result = await _domainProgressionRuntimeCoordinator.PrepareGuestNetworkAsync(
-            context.VmName,
-            credential,
-            preparedNics,
-            cancellationToken);
-
-        if (!result.Success)
+        var nicPlans = await BuildGuestNicPlansAsync(state, preparedNics, context);
+        if (nicPlans is null)
         {
-            context.MarkFailure(
-                DeploymentStepKeys.V2PrepareGuestNetwork,
-                $"Failed to prepare guest network on '{context.VmName}'. {result.Error}".Trim());
+            // BuildGuestNicPlansAsync already recorded a MarkFailure with the adapter it could not resolve.
+            return;
         }
+
+        string? lastError = null;
+        var startTick = Environment.TickCount64;
+        for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.ShouldAbort?.Invoke() == true)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            var result = await _domainProgressionRuntimeCoordinator.PrepareGuestNetworkAsync(
+                context.VmName,
+                credential,
+                nicPlans,
+                cancellationToken);
+            if (result.Success)
+            {
+                return;
+            }
+
+            lastError = result.Error;
+            var category = GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2PrepareGuestNetwork,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                lastError);
+
+            // Only a torn-down PowerShell Direct session (the guest rebooted mid-hop during the volatile
+            // specialize/OOBE window) is worth re-running: the fresh hop reconnects once the guest is back, and
+            // the network script is idempotent (it removes then re-adds the IP/routes). Any other failure is a
+            // genuine in-guest error and must surface immediately instead of burning the retry budget.
+            if (category != GuestCommandErrorCategory.GuestRebooting)
+            {
+                break;
+            }
+
+            if (attempt < request.GuestTransportMaxRetries)
+            {
+                await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+            }
+        }
+
+        context.MarkFailure(
+            DeploymentStepKeys.V2PrepareGuestNetwork,
+            $"Failed to prepare guest network on '{context.VmName}'. {lastError}".Trim());
     }
 
     private async Task ConfigureBaseRemoteAccessAsync(
@@ -2211,8 +2253,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             if (result.Success)
             {
-                context.V2GuestTransportReady = true;
                 context.LogCallback?.Invoke($"PowerShell Direct is ready on '{context.VmName}'.");
+                // A single reachable hop does not prove the guest is done rebooting. Drain the remaining
+                // specialize/OOBE reboot window before any mutating step runs, so the deploy is not racing the
+                // guest's own restarts.
+                await StabilizeGuestAsync(request, context, credential, cancellationToken);
+                context.V2GuestTransportReady = true;
                 return;
             }
 
@@ -2277,6 +2323,84 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         context.MarkFailure(
             DeploymentStepKeys.V2GuestTransportReady,
             $"PowerShell Direct did not become ready on '{context.VmName}'. Last error: {lastError ?? "unknown"}");
+    }
+
+    /// <summary>
+    /// Drains the guest's reboot-prone specialize/OOBE window after the transport first becomes reachable, so a
+    /// mutating step does not run while the guest is about to reboot out from under the PowerShell Direct hop.
+    /// Requires <see cref="V2RuntimeExecutionRequest.GuestStabilizationRequiredStableProbes"/> consecutive
+    /// "stable" probe results (no pending reboot, setup complete). A dropped hop or a "pending" result resets the
+    /// streak. If the overall <see cref="V2RuntimeExecutionRequest.GuestStabilizationTimeout"/> elapses first the
+    /// gate proceeds anyway and logs that it did: the bounded retry on the mutating steps is the backstop that
+    /// survives a late reboot, so the gate must never fail the deploy on its own.
+    /// </summary>
+    private async Task StabilizeGuestAsync(
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        V2RuntimeCredential credential,
+        CancellationToken cancellationToken)
+    {
+        var required = Math.Max(1, request.GuestStabilizationRequiredStableProbes);
+        var probeScript = GuestStabilizationProbeScriptBuilder.Build();
+        var deadlineTick = Environment.TickCount64 + (long)request.GuestStabilizationTimeout.TotalMilliseconds;
+        var startTick = Environment.TickCount64;
+        var consecutiveStable = 0;
+        var attempt = 0;
+
+        while (consecutiveStable < required)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.ShouldAbort?.Invoke() == true)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            if (Environment.TickCount64 >= deadlineTick)
+            {
+                context.LogCallback?.Invoke(
+                    $"Guest '{context.VmName}' did not report {required} consecutive stable probes within "
+                    + $"{request.GuestStabilizationTimeout}; proceeding anyway (mutating steps retry across a late reboot).");
+                return;
+            }
+
+            attempt++;
+            var result = await _guestCommandExecutor.ExecutePowerShellDirectAsync(
+                context.VmName,
+                credential,
+                probeScript,
+                cancellationToken);
+
+            if (result.Success &&
+                result.Output?.Contains(GuestStabilizationProbeScriptBuilder.StableMarker, StringComparison.Ordinal) == true)
+            {
+                consecutiveStable++;
+            }
+            else
+            {
+                // A "pending" report (setup/reboot still pending) or a dropped hop (a reboot already in flight)
+                // both mean the guest is not settled: restart the streak. Log a dropped hop through the shared
+                // readiness trace so the wait is diagnosable; a plain "pending" is expected and stays quiet.
+                consecutiveStable = 0;
+                if (!result.Success)
+                {
+                    GuestReadinessLog.Attempt(
+                        context,
+                        DeploymentStepKeys.V2GuestTransportReady,
+                        attempt,
+                        request.GuestTransportMaxRetries,
+                        Environment.TickCount64 - startTick,
+                        result.Error);
+                }
+            }
+
+            if (consecutiveStable < required)
+            {
+                await Task.Delay(request.GuestStabilizationProbeInterval, cancellationToken);
+            }
+        }
+
+        context.LogCallback?.Invoke(
+            $"Guest '{context.VmName}' is stable after {required} consecutive probes.");
     }
 
     private RuntimeCredentialCoordinator GetCredentialCoordinator(
@@ -2541,6 +2665,55 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 DnsServers = BuildPreparedDnsServers(state, nic, orderedDcIps, includeInternetFallback)
             })
             .ToArray();
+    }
+
+    /// <summary>
+    /// Correlates each prepared NIC to its host-side Hyper-V adapter MAC by switch name, so the in-guest script
+    /// can bind each static IP to the adapter that actually sits on the intended switch. Multiple NICs on the same
+    /// switch consume distinct adapters in enumeration order. Returns null (after recording a MarkFailure) when any
+    /// NIC has no resolvable adapter, so the caller aborts before running the guest script.
+    /// </summary>
+    private async Task<IReadOnlyList<GuestNicPlan>?> BuildGuestNicPlansAsync(
+        RuntimeVmState state,
+        IReadOnlyList<V2ResolvedVmNetworkInterface> preparedNics,
+        VmDeploymentContext context)
+    {
+        var hyperV = state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory);
+        var adapters = await hyperV.GetVmNetworkAdaptersAsync(context.VmName);
+        var adaptersBySwitch = adapters
+            .Where(adapter => !string.IsNullOrWhiteSpace(adapter.SwitchName) && !string.IsNullOrWhiteSpace(adapter.MacAddress))
+            .GroupBy(adapter => adapter.SwitchName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => new Queue<HyperVVmNetworkAdapterInfo>(group),
+                StringComparer.OrdinalIgnoreCase);
+
+        var plans = new List<GuestNicPlan>();
+        foreach (var nic in preparedNics)
+        {
+            if (string.IsNullOrWhiteSpace(nic.EffectiveSwitchName) ||
+                !adaptersBySwitch.TryGetValue(nic.EffectiveSwitchName, out var queue) ||
+                queue.Count == 0)
+            {
+                context.MarkFailure(
+                    DeploymentStepKeys.V2PrepareGuestNetwork,
+                    $"VM '{context.VmName}' could not resolve a Hyper-V adapter MAC for NIC '{nic.NicId}' on switch '{nic.EffectiveSwitchName ?? "(none)"}'.");
+                return null;
+            }
+
+            var adapter = queue.Dequeue();
+            plans.Add(new GuestNicPlan
+            {
+                NicId = nic.NicId,
+                MacAddress = adapter.MacAddress,
+                IpAddress = nic.IpAddress,
+                PrefixLength = nic.PrefixLength,
+                DefaultGateway = nic.DefaultGateway,
+                DnsServers = nic.DnsServers
+            });
+        }
+
+        return plans;
     }
 
     private static IReadOnlyList<string> BuildPreparedDnsServers(

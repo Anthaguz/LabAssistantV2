@@ -295,6 +295,106 @@ public sealed partial class V2PlanningCapabilityServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanAsync_MissingTypelessNetworkSwitch_AutoCreatesInternalWithoutBlocking()
+    {
+        // A network that references a not-yet-existing switch without declaring a type must auto-create an Internal
+        // switch (host-reachable, isolated) instead of hard-blocking the deploy with switch-reference-missing.
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        var network = Assert.Single(request.Template.LabNetworks!, item => item.NetworkId == "lab-core");
+        network.SwitchName = "vSwitch-Untyped";
+        network.SwitchType = null;
+        request.AvailableSwitchNames = [];
+        request.AvailableSwitches = [];
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "switch-reference-missing");
+        var requirement = Assert.Single(result.Context.NetworkSwitchRequirements);
+        Assert.Equal("vSwitch-Untyped", requirement.SwitchName);
+        Assert.Equal(V2SwitchTypeCatalog.Internal, requirement.SwitchType);
+        Assert.Single(result.Nodes, node => node.Kind == V2PlanNodeKind.EnsureNetworkSwitch);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_NicWithNoStaticIpOnIsolatedSwitchWithoutDhcpProvider_EmitsNonBlockingWarning()
+    {
+        // No static IP is allowed (labs run their own DHCP), but when there is no evident DHCP provider on an
+        // isolated switch the plan must surface a non-blocking warning so "no IP" is visible up front.
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        request.Template.LabNetworks =
+        [
+            .. request.Template.LabNetworks!,
+            new LabNetworkTemplate
+            {
+                NetworkId = "lab-isolated",
+                Name = "Isolated",
+                SwitchName = "vSwitch-Isolated",
+                SwitchType = V2SwitchTypeCatalog.Internal
+            }
+        ];
+        request.Template.VmTemplates =
+        [
+            .. request.Template.VmTemplates!,
+            new VmTemplate
+            {
+                VmId = "vm-iso01",
+                Name = "iso01",
+                MemoryMb = 2048,
+                CpuCount = 2,
+                VhdxId = "disk-iso",
+                MembershipMode = V2MembershipModeCatalog.Standalone,
+                CredentialSlots = new VmCredentialSlotBindings { LocalBootstrap = "slot-local" },
+                Nics =
+                [
+                    new VmNetworkInterfaceTemplate { NicId = "nic-iso", NetworkId = "lab-isolated" }
+                ]
+            }
+        ];
+        request.CatalogItems = [.. request.CatalogItems, CreateCatalogItem("disk-iso", "slot-local")];
+        request.AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Isolated"];
+        request.AvailableSwitches = [CreateSwitch("vSwitch-Core", "Internal"), CreateSwitch("vSwitch-Isolated", "Internal")];
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success, string.Join(" | ", result.Issues.Select(i => $"{i.Severity}:{i.Code}")));
+        var warning = Assert.Single(
+            result.Issues,
+            issue => issue.Code == "nic-no-static-ip-no-dhcp-provider");
+        Assert.Equal(V2PlanIssueSeverity.Warning, warning.Severity);
+        Assert.Equal("vm-iso01", warning.VmId);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_NicWithNoStaticIpOnSwitchHostingDomainController_SuppressesDhcpWarning()
+    {
+        // A domain controller on the same switch is treated as an evident DHCP provider, so a NIC with no static
+        // IP there is a legitimate DHCP client and must not raise the no-DHCP warning.
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+        var memberVm = Assert.Single(request.Template.VmTemplates!, vm => vm.VmId == "vm-member01");
+        var memberNic = Assert.Single(memberVm.Nics!);
+        memberNic.IpAddress = null;
+        memberNic.DefaultGateway = null;
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "nic-no-static-ip-no-dhcp-provider");
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_AllNicsHaveStaticIps_EmitsNoDhcpVisibilityWarning()
+    {
+        // Guard against false positives: the standard fully-static topology must not raise the no-DHCP warning.
+        var request = CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]);
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "nic-no-static-ip-no-dhcp-provider");
+    }
+
+    [Fact]
     public async Task BuildPlanAsync_RootAndMemberPlan_PreservesDomainReadyOrdering()
     {
         var result = await _service.BuildPlanAsync(CreateAdCoreRequest("Balanced", ["slot-local", "slot-join", "slot-admin", "slot-dsrm"]));

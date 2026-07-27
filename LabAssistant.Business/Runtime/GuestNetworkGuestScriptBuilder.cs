@@ -1,11 +1,17 @@
 using System.Text;
-using LabAssistant.Models.Templates;
+using LabAssistant.Services.PowerShell;
 
 namespace LabAssistant.Business.Runtime;
 
 internal static class GuestNetworkGuestScriptBuilder
 {
-    public static string BuildPrepareGuestNetworkScript(IReadOnlyList<V2ResolvedVmNetworkInterface> nics)
+    // Guest-side Get-NetAdapter returns MACs as separator-delimited hex (00-15-5D-..), while Hyper-V injects them
+    // bare (00155D..). Reduce the guest value to the same canonical form as Services MacAddressNormalizer
+    // (separators stripped, upper-cased) before comparing against the already-normalized injected MAC.
+    private const string CanonicalMacFunction =
+        "function ConvertTo-CanonicalMac { param([string]$Value) if ([string]::IsNullOrWhiteSpace($Value)) { return '' } return (($Value -replace '[-:. ]', '')).ToUpperInvariant() }";
+
+    public static string BuildPrepareGuestNetworkScript(IReadOnlyList<GuestNicPlan> nics)
     {
         var orderedNics = nics.OrderBy(nic => nic.NicId, StringComparer.OrdinalIgnoreCase).ToArray();
         var sb = new StringBuilder();
@@ -18,6 +24,7 @@ internal static class GuestNetworkGuestScriptBuilder
                 : "@(" + string.Join(", ", nic.DnsServers.Select(value => $"'{EscapeSingleQuotedLiteral(value)}'")) + ")";
             sb.Append("    [pscustomobject]@{");
             sb.Append($" NicId = '{EscapeSingleQuotedLiteral(nic.NicId)}';");
+            sb.Append($" MacAddress = '{EscapeSingleQuotedLiteral(MacAddressNormalizer.NormalizeMacAddress(nic.MacAddress))}';");
             sb.Append($" IpAddress = {ToPowerShellString(nic.IpAddress)};");
             sb.Append($" PrefixLength = {ToNullableInt(nic.PrefixLength)};");
             sb.Append($" DefaultGateway = {ToPowerShellString(nic.DefaultGateway)};");
@@ -27,24 +34,28 @@ internal static class GuestNetworkGuestScriptBuilder
         }
 
         sb.AppendLine(")");
-        // Guest transport (VMBus/PowerShell Direct) becomes ready before the guest's synthetic NIC is
-        // enumerable, so a single-shot Get-NetAdapter can momentarily see fewer adapters than the template
-        // intends and wrongly fail. Wait (bounded) for the expected adapter count to appear before configuring.
+        sb.AppendLine(CanonicalMacFunction);
+        // Guest transport (VMBus/PowerShell Direct) becomes ready before the guest's synthetic NICs are all
+        // enumerable, so wait (bounded) until every target MAC is present before configuring. Matching by MAC
+        // rather than enumeration order guarantees each static IP binds to the adapter on its intended switch,
+        // which is what fixes multi-NIC VMs binding the wrong address to the wrong network.
         sb.AppendLine("$__laNicDeadline = (Get-Date).AddSeconds(180)");
-        sb.AppendLine("$adapters = @(Get-NetAdapter -Physical:$false -ErrorAction SilentlyContinue | Sort-Object ifIndex)");
-        sb.AppendLine("while ($adapters.Count -lt $targetNics.Count -and (Get-Date) -lt $__laNicDeadline) {");
+        sb.AppendLine("function Get-LaMatchedAdapters { param($targets) $all = @(Get-NetAdapter -Physical:$false -ErrorAction SilentlyContinue); $map = @{}; foreach ($t in $targets) { $map[$t.MacAddress] = ($all | Where-Object { (ConvertTo-CanonicalMac $_.MacAddress) -eq $t.MacAddress } | Select-Object -First 1) }; return $map }");
+        sb.AppendLine("$adapterMap = Get-LaMatchedAdapters $targetNics");
+        sb.AppendLine("while ((@($adapterMap.Values | Where-Object { $_ }).Count -lt $targetNics.Count) -and (Get-Date) -lt $__laNicDeadline) {");
         sb.AppendLine("    Start-Sleep -Seconds 3");
-        sb.AppendLine("    $adapters = @(Get-NetAdapter -Physical:$false -ErrorAction SilentlyContinue | Sort-Object ifIndex)");
+        sb.AppendLine("    $adapterMap = Get-LaMatchedAdapters $targetNics");
         sb.AppendLine("}");
-        sb.AppendLine("if ($adapters.Count -lt $targetNics.Count) {");
+        sb.AppendLine("$missing = @($targetNics | Where-Object { -not $adapterMap[$_.MacAddress] })");
+        sb.AppendLine("if ($missing.Count -gt 0) {");
         sb.AppendLine("    $allAdapters = @(Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue | Sort-Object ifIndex)");
-        sb.AppendLine("    $inventory = ($allAdapters | ForEach-Object { \"$($_.Name) [ifIndex=$($_.ifIndex); status=$($_.Status); hidden=$($_.Hidden); desc=$($_.InterfaceDescription)]\" }) -join '; '");
+        sb.AppendLine("    $inventory = ($allAdapters | ForEach-Object { \"$($_.Name) [mac=$(ConvertTo-CanonicalMac $_.MacAddress); ifIndex=$($_.ifIndex); status=$($_.Status); hidden=$($_.Hidden)]\" }) -join '; '");
         sb.AppendLine("    if (-not $inventory) { $inventory = '(no adapters enumerated at all)' }");
-        sb.AppendLine("    throw \"Not enough guest NICs available to satisfy template network intent. Wanted $($targetNics.Count), matched $($adapters.Count) after waiting 180s. All adapters seen (incl. hidden): $inventory\"");
+        sb.AppendLine("    $wantedMacs = ($missing | ForEach-Object { $_.MacAddress }) -join ', '");
+        sb.AppendLine("    throw \"Guest NIC(s) with MAC(s) $wantedMacs did not appear within 180s. All adapters seen (incl. hidden): $inventory\"");
         sb.AppendLine("}");
-        sb.AppendLine("for ($index = 0; $index -lt $targetNics.Count; $index++) {");
-        sb.AppendLine("    $target = $targetNics[$index]");
-        sb.AppendLine("    $adapter = $adapters[$index]");
+        sb.AppendLine("foreach ($target in $targetNics) {");
+        sb.AppendLine("    $adapter = $adapterMap[$target.MacAddress]");
         sb.AppendLine("    Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Remove-NetIPAddress -Confirm:$false -ErrorAction SilentlyContinue");
         sb.AppendLine("    Get-NetRoute -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue");
         sb.AppendLine("    if ($target.IpAddress -and $target.PrefixLength) {");

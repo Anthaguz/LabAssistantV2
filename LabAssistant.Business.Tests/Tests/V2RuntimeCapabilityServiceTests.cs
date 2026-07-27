@@ -466,6 +466,233 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_PrepareGuestNetwork_GuestRebootMidHop_RetriesThenSucceeds()
+    {
+        // The guest can reboot out of its specialize/OOBE window right as prepareGuestNetwork runs, tearing down
+        // the PowerShell Direct hop ("socket target process has ended"). That torn-down transport must be retried,
+        // not treated as a fatal deploy failure, because the fresh hop reconnects once the guest is back.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var prepareAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Guest network prepared", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref prepareAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, prepareAttempts);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PrepareGuestNetwork_NonRebootError_FailsFastWithoutRetrying()
+    {
+        // A genuine in-guest script error (not a torn-down transport) is deterministic, so the step must surface it
+        // immediately instead of burning the whole transport retry budget re-running a hop that will keep failing.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var prepareAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Guest network prepared", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref prepareAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "New-NetIPAddress : Instance MSFT_NetIPAddress already exists."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, prepareAttempts);
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "dc01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("Failed to prepare guest network", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GuestStabilization_RequiresConsecutiveStableProbes_DroppedHopResetsStreak()
+    {
+        // The stabilization gate must not accept a lone stable probe: a dropped hop (a reboot already in flight)
+        // resets the streak, so the guest has to prove it is settled across N consecutive probes before any
+        // mutating step runs.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestStabilizationRequiredStableProbes = 3;
+        request.GuestStabilizationProbeInterval = TimeSpan.FromMilliseconds(1);
+        request.GuestStabilizationTimeout = TimeSpan.FromSeconds(30);
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnStabilizationProbeAsync = (vmName, _) =>
+            {
+                if (vmName != "dc01")
+                {
+                    return Task.FromResult(new GuestCommandResult { Success = true, Output = "STABLE" });
+                }
+
+                var attempt = Interlocked.Increment(ref probeAttempts);
+                // STABLE, STABLE, dropped hop (reset), STABLE, STABLE, STABLE -> passes on the sixth probe.
+                if (attempt == 3)
+                {
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "The Hyper-V socket target process has ended."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = "STABLE" });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(6, probeAttempts);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GuestStabilization_TimeoutProceedsAnywayWithoutFailing()
+    {
+        // If the guest never reports a clean stable streak within the cap, the gate proceeds anyway and lets the
+        // bounded retry on the mutating steps be the backstop. It must never fail the deploy on its own.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestStabilizationRequiredStableProbes = 3;
+        request.GuestStabilizationProbeInterval = TimeSpan.FromMilliseconds(1);
+        request.GuestStabilizationTimeout = TimeSpan.FromMilliseconds(80);
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnStabilizationProbeAsync = (vmName, _) =>
+            {
+                if (vmName != "dc01")
+                {
+                    return Task.FromResult(new GuestCommandResult { Success = true, Output = "STABLE" });
+                }
+
+                Interlocked.Increment(ref probeAttempts);
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = "PENDING" });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        // The gate never saw a STABLE probe (all PENDING), so a successful deploy proves it proceeded on the
+        // timeout instead of failing. The probe count only has to show the gate actually ran.
+        Assert.True(result.Success);
+        Assert.True(probeAttempts >= 1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PrepareGuestNetwork_MultiNic_BindsEachIpToItsSwitchAdapterByMac()
+    {
+        // Multi-NIC correctness: each static IP must bind to the adapter on its intended switch, matched by MAC,
+        // not by enumeration order. Two NICs on two switches must pair each IP with that switch's adapter MAC.
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var request = await CreateSwitchRuntimeRequestAsync(
+            [
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-alpha",
+                    Name = "Alpha",
+                    SwitchName = "vSwitch-Alpha",
+                    SwitchType = V2SwitchTypeCatalog.Internal
+                },
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-beta",
+                    Name = "Beta",
+                    SwitchName = "vSwitch-Beta",
+                    SwitchType = V2SwitchTypeCatalog.Internal
+                }
+            ],
+            [
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-alpha",
+                    NetworkId = "lab-alpha",
+                    IpAddress = "10.9.9.10",
+                    PrefixLength = 24
+                },
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-beta",
+                    NetworkId = "lab-beta",
+                    IpAddress = "10.9.8.10",
+                    PrefixLength = 24
+                }
+            ],
+            []);
+        var machineAdmin = new FakeHyperVMachineAdminService(new ConcurrentQueue<string>());
+        var service = CreateService(new FakeHyperVService(), guestExecutor, machineAdminService: machineAdmin);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        var prepareScript = scripts
+            .First(entry => entry.VmName == "networked01" &&
+                            entry.Script.Contains("Guest network prepared", StringComparison.Ordinal))
+            .Script;
+
+        // The fake host assigns MACs per attached switch in sorted order: vSwitch-Alpha -> 00155D000001,
+        // vSwitch-Beta -> 00155D000002. Each NIC line must pair its IP with its own switch's adapter MAC.
+        var alphaLine = prepareScript
+            .Split('\n')
+            .First(line => line.Contains("10.9.9.10", StringComparison.Ordinal));
+        var betaLine = prepareScript
+            .Split('\n')
+            .First(line => line.Contains("10.9.8.10", StringComparison.Ordinal));
+        Assert.Contains("00155D000001", alphaLine, StringComparison.Ordinal);
+        Assert.Contains("00155D000002", betaLine, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_GuestTransport_TransientCredentialErrorWithinGrace_RetriesThenSucceeds()
     {
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
@@ -851,7 +1078,10 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 ["slot-dsrm"] = new() { Username = "DSRM", Password = "Password123!" }
             },
             GuestTransportMaxRetries = 1,
-            GuestTransportRetryDelay = TimeSpan.FromMilliseconds(10)
+            GuestTransportRetryDelay = TimeSpan.FromMilliseconds(10),
+            GuestStabilizationRequiredStableProbes = 1,
+            GuestStabilizationProbeInterval = TimeSpan.FromMilliseconds(1),
+            GuestStabilizationTimeout = TimeSpan.FromMilliseconds(200)
         };
     }
 
@@ -907,7 +1137,10 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 ["slot-local"] = new() { Username = "Administrator", Password = "Password123!" }
             },
             GuestTransportMaxRetries = 1,
-            GuestTransportRetryDelay = TimeSpan.FromMilliseconds(10)
+            GuestTransportRetryDelay = TimeSpan.FromMilliseconds(10),
+            GuestStabilizationRequiredStableProbes = 1,
+            GuestStabilizationProbeInterval = TimeSpan.FromMilliseconds(1),
+            GuestStabilizationTimeout = TimeSpan.FromMilliseconds(200)
         };
     }
 
@@ -1173,8 +1406,19 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     {
         public Func<string, V2RuntimeCredential, string, CancellationToken, Task<GuestCommandResult>>? OnExecuteAsync { get; set; }
 
+        // The guest-stabilization gate issues a read-only probe on every VM after transport becomes ready. Default
+        // it to STABLE so the gate passes in a single hop and never spins on its timeout during tests; a test can
+        // set this hook to simulate PENDING results or dropped hops for the stabilization behavior tests.
+        public Func<string, CancellationToken, Task<GuestCommandResult>>? OnStabilizationProbeAsync { get; set; }
+
         public Task<GuestCommandResult> ExecutePowerShellDirectAsync(string vmName, V2RuntimeCredential credential, string script, CancellationToken cancellationToken = default)
         {
+            if (script.Contains("IMAGE_STATE_COMPLETE", StringComparison.Ordinal))
+            {
+                return OnStabilizationProbeAsync?.Invoke(vmName, cancellationToken)
+                    ?? Task.FromResult(new GuestCommandResult { Success = true, Output = "STABLE" });
+            }
+
             if (OnExecuteAsync != null)
             {
                 return OnExecuteAsync(vmName, credential, script, cancellationToken);
@@ -1248,27 +1492,41 @@ public sealed partial class V2RuntimeCapabilityServiceTests
 
         public Task<List<string>> GetVirtualSwitchNamesAsync() => Task.FromResult(new List<string> { "vSwitch-Core", "vSwitch-Edge", "vSwitch-External" });
 
+        // Tracks the switches attached to each VM during provisioning so GetVmNetworkAdaptersAsync can report a
+        // host-side adapter (with a MAC) per switch, mirroring how the real Hyper-V host exposes them. This is what
+        // the guest-network step correlates against by switch name to bind each static IP to the right adapter.
+        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _vmSwitches = new(StringComparer.OrdinalIgnoreCase);
+
         public Task<IReadOnlyList<HyperVVmNetworkAdapterInfo>> GetVmNetworkAdaptersAsync(string vmName)
         {
-            IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters = vmName switch
+            if (vmName == "router01")
             {
-                "router01" =>
+                IReadOnlyList<HyperVVmNetworkAdapterInfo> routerAdapters =
                 [
                     new HyperVVmNetworkAdapterInfo { AdapterName = "core", SwitchName = "vSwitch-Core", MacAddress = "00155D000001" },
                     new HyperVVmNetworkAdapterInfo { AdapterName = "external", SwitchName = "vSwitch-External", MacAddress = "00155D000002" }
-                ],
-                _ =>
-                [
-                    new HyperVVmNetworkAdapterInfo { AdapterName = "primary", SwitchName = "vSwitch-Core", MacAddress = "00155D000010" }
-                ]
-            };
+                ];
+                return Task.FromResult(routerAdapters);
+            }
 
+            var switches = _vmSwitches.TryGetValue(vmName, out var attached)
+                ? attached.Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList()
+                : ["vSwitch-Core"];
+            IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters = switches
+                .Select((name, index) => new HyperVVmNetworkAdapterInfo
+                {
+                    AdapterName = name,
+                    SwitchName = name,
+                    MacAddress = $"00155D{index + 1:X6}"
+                })
+                .ToList();
             return Task.FromResult(adapters);
         }
 
         public Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName)
         {
             RecordOperation($"AddSwitch:{vmName}:{switchName}");
+            _vmSwitches.GetOrAdd(vmName, _ => new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase))[switchName] = 1;
             return Task.FromResult(true);
         }
 
