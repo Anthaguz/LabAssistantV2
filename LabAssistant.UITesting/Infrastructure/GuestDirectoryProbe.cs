@@ -29,14 +29,24 @@ public sealed class GuestDirectoryProbe
     /// Polls the DC over PowerShell Direct until Active Directory answers (promotion can still
     /// be settling right after the deploy reports done) or the timeout elapses, then returns the
     /// forest root domain, domain DNS name, and NetBIOS name. Returns null if AD never answered.
+    ///
+    /// <paramref name="abortIf"/> is checked before every attempt: when it returns true the poll
+    /// stops immediately and returns null. The DC scenario passes a "did the app roll the VM back"
+    /// probe here so a failed deploy fails fast instead of polling a deleted VM for the full timeout.
     /// </summary>
-    public GuestForestInfo? QueryForest(string vmName, string netBiosName, TimeSpan timeout)
+    public GuestForestInfo? QueryForest(string vmName, string netBiosName, TimeSpan timeout, Func<bool>? abortIf = null)
     {
         var deadline = DateTime.UtcNow + timeout;
         string lastError = "(none)";
 
         while (DateTime.UtcNow < deadline)
         {
+            if (abortIf is not null && abortIf())
+            {
+                Console.WriteLine($"GuestDirectoryProbe: aborting AD poll on '{vmName}' - the deploy target is gone (rolled back).");
+                return null;
+            }
+
             var result = PowerShellRunner.Run(BuildScript(vmName, netBiosName), TimeSpan.FromSeconds(90));
             if (result.Success)
             {
@@ -71,7 +81,12 @@ public sealed class GuestDirectoryProbe
         return $@"
 $p = $env:{PasswordEnvVar}
 if ([string]::IsNullOrEmpty($p)) {{ Write-Error 'admin password env var is not set'; exit 3 }}
-$sec = ConvertTo-SecureString $p -AsPlainText -Force
+# Build the SecureString with core .NET types only. ConvertTo-SecureString lives in
+# Microsoft.PowerShell.Security, which does not reliably autoload in a spawned -NoProfile
+# host (PSModulePath can be inherited stripped from the parent .NET process), so we avoid it.
+$sec = New-Object System.Security.SecureString
+foreach ($ch in $p.ToCharArray()) {{ $sec.AppendChar($ch) }}
+$sec.MakeReadOnly()
 $cred = New-Object System.Management.Automation.PSCredential('{netbios}\Administrator', $sec)
 $out = Invoke-Command -VMName '{vm}' -Credential $cred -ScriptBlock {{
     Import-Module ActiveDirectory -ErrorAction Stop

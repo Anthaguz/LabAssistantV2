@@ -16,6 +16,8 @@ public sealed class AppDataLocations
         CatalogFolder = Path.Combine(AppRoot, "Catalog");
         CatalogPath = Path.Combine(CatalogFolder, "vhdx-catalog.json");
         TemplatesFolder = Path.Combine(AppRoot, "Templates");
+        ConfigFolder = Path.Combine(AppRoot, "Config");
+        CredentialSlotsPath = Path.Combine(ConfigFolder, "credential-slots.json");
         VmBasePath = Path.Combine(AppRoot, "VMs");
         DifferencingDiskBasePath = Path.Combine(AppRoot, "Disks");
     }
@@ -30,6 +32,18 @@ public sealed class AppDataLocations
     /// this must mirror the app's AppPaths.TemplatesFolder exactly.
     /// </summary>
     public string TemplatesFolder { get; }
+
+    /// <summary>
+    /// Where the app persists deploy credential slots (DPAPI-protected, one JSON array).
+    /// The DC scenario clears its own slot here before a run so the credential UI always
+    /// prompts fresh - the app caches credentials by slot key, so a stale value would
+    /// otherwise silently deploy with the wrong password - and restores the prior store
+    /// state afterward. Must mirror the app's AppPaths config folder exactly.
+    /// </summary>
+    public string ConfigFolder { get; }
+
+    /// <summary>Full path to the app's credential-slots.json store.</summary>
+    public string CredentialSlotsPath { get; }
 
     public string VmBasePath { get; }
     public string DifferencingDiskBasePath { get; }
