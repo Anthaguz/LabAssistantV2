@@ -90,6 +90,35 @@ public sealed class TemplateDeployDcScenario : IScenario
                      $"Mode: {(live ? "LIVE (deploy + guest AD validation)" : "PLANNING-ONLY (no admin password supplied)")}."
         });
 
+        // 2b) Clear this scenario's credential slot so the deploy uses the password we enter now,
+        //     not a value cached from an earlier run. The app persists deploy credentials by slot
+        //     key and reads them fresh on every plan eval, so a stale slot (e.g. a placeholder from
+        //     a prior planning run) would silently deploy with the wrong password and the DC would
+        //     never authenticate. We snapshot the prior state and restore it in the finally below,
+        //     so the user's store is left exactly as it was (no placeholder pollution, no leaked
+        //     real password) whether the run passes, fails, or throws.
+        var credSeeder = new CredentialSlotSeeder(new AppDataLocations());
+        var priorSlot = credSeeder.Capture(seeded.LocalBootstrapSlotKey);
+        credSeeder.Remove(seeded.LocalBootstrapSlotKey);
+
+        try
+        {
+            RunDeploy(context, recorder, probe, seeded, resources, live);
+        }
+        finally
+        {
+            credSeeder.Restore(priorSlot);
+        }
+    }
+
+    private void RunDeploy(
+        ScenarioContext context,
+        FindingRecorder recorder,
+        HyperVProbe probe,
+        SeededDcTemplate seeded,
+        ProvisionedResources resources,
+        bool live)
+    {
         // 3) Drive Deploy > From Template: select the template (auto-evaluates the plan).
         var page = new DeployFromTemplatePage(context.Host);
         page.Open();
@@ -202,17 +231,38 @@ public sealed class TemplateDeployDcScenario : IScenario
         });
 
         // 7) THE PRIZE: authenticate into the promoted DC and read the REAL forest/domain state.
+        //    Abort the poll the moment the app rolls the VM back (a failed guest-config step deletes
+        //    the VM), so a failed deploy fails fast instead of polling a deleted VM for the timeout.
         var guest = new GuestDirectoryProbe();
-        GuestForestInfo? forest = guest.QueryForest(seeded.VmName, seeded.NetBiosName, TimeSpan.FromMinutes(12));
+        GuestForestInfo? forest = guest.QueryForest(
+            seeded.VmName,
+            seeded.NetBiosName,
+            TimeSpan.FromMinutes(12),
+            abortIf: () => VmIsGone(probe, seeded.VmName));
 
         if (forest is null)
         {
+            bool rolledBack = VmIsGone(probe, seeded.VmName);
+            if (rolledBack)
+            {
+                recorder.RecordFailure(
+                    context.Host, Name, "validate-guest", FindingSeverity.Error,
+                    $"Deploy failed and the app rolled back DC VM '{seeded.VmName}' before promotion completed",
+                    "The DC VM was Running but then disappeared, which means a deploy step failed and the app tore the VM " +
+                    "down (cleanup worked - no orphan). This is a deploy failure inside the app, not a validation timeout: " +
+                    "check the app diagnostics log (%APPDATA%\\LabAssistant\\Logs\\structured-events.jsonl) for the failing " +
+                    "deploy.step (the guest-config steps around v2.prepareGuestNetwork are the usual culprit - a PowerShell " +
+                    "Direct session can break across the guest's post-config reboot).");
+                return;
+            }
+
             recorder.RecordFailure(
                 context.Host, Name, "validate-guest", FindingSeverity.Error,
                 $"Active Directory never answered on DC '{seeded.VmName}'",
-                $"Could not read Get-ADForest/Get-ADDomain over PowerShell Direct as '{seeded.NetBiosName}\\Administrator' " +
-                "within the timeout. Either promotion failed, or the supplied admin password does not match the base image. " +
-                "See the console output for the last PowerShell Direct error.");
+                $"The VM is still present but could not read Get-ADForest/Get-ADDomain over PowerShell Direct as " +
+                $"'{seeded.NetBiosName}\\Administrator' within the timeout. Either promotion is still in progress past the " +
+                "timeout, or the supplied admin password does not match the base image. See the console output for the " +
+                "last PowerShell Direct error.");
             return;
         }
 
@@ -268,5 +318,22 @@ public sealed class TemplateDeployDcScenario : IScenario
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// True when the VM no longer exists. Swallows a transient inventory-probe failure by
+    /// returning false, so a momentary Get-VM hiccup during the AD poll never aborts the poll
+    /// or gets misread as a rollback; a genuine rollback (VM removed) reports true.
+    /// </summary>
+    private static bool VmIsGone(HyperVProbe probe, string vmName)
+    {
+        try
+        {
+            return probe.GetVm(vmName) is null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
