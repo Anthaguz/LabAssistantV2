@@ -20,4 +20,12 @@
     <ProjectReference Include="..\LabAssistant.UITesting\LabAssistant.UITesting.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The seeder reads template fixtures relative to AppContext.BaseDirectory, so mirror the
+         harness fixtures into the test output too. -->
+    <None Include="..\LabAssistant.UITesting\Fixtures\**\*" Link="Fixtures\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
