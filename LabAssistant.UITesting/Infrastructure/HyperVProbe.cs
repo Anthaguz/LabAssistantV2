@@ -93,11 +93,27 @@ $disks = @(Get-VMHardDiskDrive -VMName $vm.Name -ErrorAction SilentlyContinue | 
     /// Returns the SwitchType of the named virtual switch (e.g. "Internal", "Private", "External"),
     /// or null when no such switch exists. Used to prove a deploy-created switch was made with the
     /// expected type without trusting the UI's success text.
+    ///
+    /// The query enumerates all switches and filters by name (rather than <c>Get-VMSwitch -Name</c>)
+    /// on purpose: <see cref="PowerShellRunner"/> runs every script under
+    /// <c>$ErrorActionPreference='Stop'</c>, and <c>Get-VMSwitch -Name '&lt;absent&gt;'</c> raises a
+    /// terminating "unable to find a virtual switch" error there even with -ErrorAction
+    /// SilentlyContinue, which would make this throw for a switch that simply does not exist yet. A
+    /// deliberately-absent switch (e.g. the switch a deploy is expected to auto-create) must read back
+    /// as null, not an exception, so enumerate-and-filter - the same shape <see cref="ListSwitchNames"/>
+    /// uses - is the only reliable way. A genuine host/module failure still surfaces as a throw.
     /// </summary>
     public string? GetSwitchType(string name)
+        => GetSwitchType(name, static script => PowerShellRunner.Run(script));
+
+    /// <summary>
+    /// Testable seam for <see cref="GetSwitchType(string)"/>: the caller supplies the PowerShell
+    /// runner so the not-found-returns-null and genuine-failure-throws contract can be exercised
+    /// without a Hyper-V host.
+    /// </summary>
+    internal static string? GetSwitchType(string name, Func<string, PowerShellResult> runner)
     {
-        var result = PowerShellRunner.Run(
-            $"Get-VMSwitch -Name '{Escape(name)}' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty SwitchType");
+        var result = runner(BuildSwitchTypeScript(name));
         if (!result.Success)
         {
             throw new InvalidOperationException($"Get-VMSwitch type probe failed: {result.StdErr.Trim()}");
@@ -106,6 +122,16 @@ $disks = @(Get-VMHardDiskDrive -VMName $vm.Name -ErrorAction SilentlyContinue | 
         var value = result.StdOut.Trim();
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
+
+    /// <summary>
+    /// Builds the switch-type probe script. Enumerates all switches and filters by exact name so an
+    /// absent switch yields empty output (and thus null) instead of the terminating not-found error a
+    /// name-qualified <c>Get-VMSwitch -Name</c> raises under <c>$ErrorActionPreference='Stop'</c>.
+    /// </summary>
+    internal static string BuildSwitchTypeScript(string name)
+        => $"Get-VMSwitch -ErrorAction SilentlyContinue | " +
+           $"Where-Object {{ $_.Name -eq '{Escape(name)}' }} | " +
+           "Select-Object -First 1 -ExpandProperty SwitchType";
 
     /// <summary>True when at least one host switch exists (borrowable in discover-existing mode).</summary>
     public bool AnySwitchExists()

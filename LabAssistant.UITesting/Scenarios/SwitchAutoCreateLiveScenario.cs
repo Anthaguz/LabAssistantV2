@@ -64,7 +64,8 @@ public sealed class SwitchAutoCreateLiveScenario : IScenario
 
         // Guard against a pre-existing switch of that name (should be impossible - it is freshly tagged -
         // but a leftover would make an Internal assertion meaningless). Fail loudly rather than green a
-        // stale switch.
+        // stale switch. GetSwitchType returns null (never throws) for an absent switch, so this guard
+        // reads clean for the expected freshly-tagged name and only trips on a genuine leftover.
         if (probe.GetSwitchType(ghostSwitch) is not null)
         {
             recorder.RecordFailure(

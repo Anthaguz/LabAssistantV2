@@ -22,6 +22,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Expose internal test seams (e.g. HyperVProbe's switch-type script builder / injectable
+         runner overload) to the harness unit tests without widening the public surface. -->
+    <InternalsVisibleTo Include="LabAssistant.UITesting.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Fixtures\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
