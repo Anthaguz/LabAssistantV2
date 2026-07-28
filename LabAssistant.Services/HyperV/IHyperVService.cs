@@ -7,6 +7,13 @@ public sealed class HyperVVmNetworkAdapterInfo
     public string? SwitchName { get; init; }
 
     public string MacAddress { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The adapter's Hyper-V operational status (for example <c>Ok</c> or <c>Degraded</c>), captured purely for
+    /// diagnostics so a NIC that is attached but reporting an empty switch name can be told apart from one that
+    /// never attached. Null when the host did not report a status.
+    /// </summary>
+    public string? Status { get; init; }
 }
 
 public interface IHyperVService

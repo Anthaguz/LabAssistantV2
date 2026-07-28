@@ -693,6 +693,195 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_PrepareGuestNetwork_DhcpNicWithUnresolvableAdapter_SkipsInsteadOfFailing()
+    {
+        // A NIC with no static IP is a DHCP/egress NIC: it has nothing to bind, so an unresolvable host adapter
+        // must not fail the whole guest-network step. Here the second NIC's switch has no host adapter at all;
+        // the deploy must still succeed and simply omit that NIC from the in-guest script.
+        var scripts = new ConcurrentQueue<(string VmName, string Script)>();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                scripts.Enqueue((vmName, script));
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var request = await CreateSwitchRuntimeRequestAsync(
+            [
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-alpha",
+                    Name = "Alpha",
+                    SwitchName = "vSwitch-Alpha",
+                    SwitchType = V2SwitchTypeCatalog.Internal
+                },
+                new LabNetworkTemplate
+                {
+                    NetworkId = "lab-beta",
+                    Name = "Beta",
+                    SwitchName = "vSwitch-Beta",
+                    SwitchType = V2SwitchTypeCatalog.Internal
+                }
+            ],
+            [
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-alpha",
+                    NetworkId = "lab-alpha",
+                    IpAddress = "10.9.9.10",
+                    PrefixLength = 24
+                },
+                new VmNetworkInterfaceTemplate
+                {
+                    NicId = "nic-beta",
+                    NetworkId = "lab-beta"
+                }
+            ],
+            []);
+        // Only the alpha switch has a host adapter; the beta (DHCP) NIC has none and no leftover to claim.
+        var hyperV = new FakeHyperVService
+        {
+            AdapterOverride = vmName => vmName == "networked01"
+                ?
+                [
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "alpha", SwitchName = "vSwitch-Alpha", MacAddress = "00155DAAAA01" }
+                ]
+                : null
+        };
+        var machineAdmin = new FakeHyperVMachineAdminService(new ConcurrentQueue<string>());
+        var service = CreateService(hyperV, guestExecutor, machineAdminService: machineAdmin);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(
+            result.Success,
+            string.Join(" | ", result.DeploymentContext.VmContexts
+                .Where(c => !c.IsSuccess)
+                .Select(c => $"{c.VmName}:{c.FailureStepKey}:{c.FailureMessage}")));
+        var prepareScript = scripts
+            .First(entry => entry.VmName == "networked01" &&
+                            entry.Script.Contains("Guest network prepared", StringComparison.Ordinal))
+            .Script;
+        Assert.Contains("nic-alpha", prepareScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("nic-beta", prepareScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RouterExternalAdapterReportsEmptySwitchName_ResolvesViaLeftoverAndSucceeds()
+    {
+        // The Default Switch / NAT egress adapter is physically attached but frequently reports an empty switch
+        // name at query time. A strict switch-name-only match dropped it and failed prepareRouterNetwork; the
+        // leftover-adapter fallback must now bind it so routing (which needs the external MAC) still proceeds.
+        var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: true);
+        var hyperV = new FakeHyperVService
+        {
+            AdapterOverride = vmName => vmName == "router01"
+                ?
+                [
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "core", SwitchName = "vSwitch-Core", MacAddress = "00155D000001" },
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "external", SwitchName = string.Empty, MacAddress = "00155D000002" }
+                ]
+                : null
+        };
+        var service = CreateService(hyperV, new FakeGuestCommandExecutor());
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:PrepareRouterNetwork");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:EnableRouterRouting");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:RouterReady");
+    }
+
+    [Fact]
+    public void CorrelateAdaptersInOrder_UnmatchedNicClaimsEmptySwitchNameAdapterAsLeftover()
+    {
+        // "Default Switch" has no like-named adapter, so it falls to the leftover pass and claims the egress
+        // adapter that reported an empty switch name; the named switch still matches its own adapter directly.
+        var adapters = new List<HyperVVmNetworkAdapterInfo>
+        {
+            new() { AdapterName = "core", SwitchName = "vSwitch-Core", MacAddress = "MACCORE" },
+            new() { AdapterName = "egress", SwitchName = string.Empty, MacAddress = "MACEGRESS" }
+        };
+
+        var result = V2RuntimeCapabilityService.CorrelateAdaptersInOrder(["Default Switch", "vSwitch-Core"], adapters);
+
+        Assert.Equal("MACEGRESS", result[0]!.MacAddress);
+        Assert.Equal("core", result[1]!.AdapterName);
+    }
+
+    [Fact]
+    public void CorrelateAdaptersInOrder_MultipleNicsOnSameSwitch_ConsumeDistinctAdaptersInOrder()
+    {
+        var adapters = new List<HyperVVmNetworkAdapterInfo>
+        {
+            new() { AdapterName = "first", SwitchName = "vSwitch-Core", MacAddress = "MAC1" },
+            new() { AdapterName = "second", SwitchName = "vSwitch-Core", MacAddress = "MAC2" }
+        };
+
+        var result = V2RuntimeCapabilityService.CorrelateAdaptersInOrder(["vSwitch-Core", "vSwitch-Core"], adapters);
+
+        Assert.Equal("MAC1", result[0]!.MacAddress);
+        Assert.Equal("MAC2", result[1]!.MacAddress);
+    }
+
+    [Fact]
+    public void CorrelateAdaptersInOrder_FewerAdaptersThanNics_LeavesTrailingEntryNull()
+    {
+        var adapters = new List<HyperVVmNetworkAdapterInfo>
+        {
+            new() { AdapterName = "a", SwitchName = "A", MacAddress = "MACA" },
+            new() { AdapterName = "b", SwitchName = "B", MacAddress = "MACB" }
+        };
+
+        var result = V2RuntimeCapabilityService.CorrelateAdaptersInOrder(["A", "B", "C"], adapters);
+
+        Assert.Equal("a", result[0]!.AdapterName);
+        Assert.Equal("b", result[1]!.AdapterName);
+        Assert.Null(result[2]);
+    }
+
+    [Fact]
+    public void CorrelateAdaptersInOrder_MultipleAdaptersReportEmptySwitchName_LeavesAmbiguousNicsNullInsteadOfGuessing()
+    {
+        // Two adapters both report an empty/dynamic switch name and two NICs are unmatched, so the pairing is
+        // ambiguous. Guessing positionally could bind a static IP or a router egress MAC to the wrong adapter, so
+        // correlation must leave both NICs null and let the caller fail loudly or skip, rather than mis-bind.
+        var adapters = new List<HyperVVmNetworkAdapterInfo>
+        {
+            new() { AdapterName = "x", SwitchName = string.Empty, MacAddress = "MACX" },
+            new() { AdapterName = "y", SwitchName = null, MacAddress = "MACY" }
+        };
+
+        var result = V2RuntimeCapabilityService.CorrelateAdaptersInOrder(["First", "Second"], adapters);
+
+        Assert.Null(result[0]);
+        Assert.Null(result[1]);
+    }
+
+    [Fact]
+    public void CorrelateAdaptersInOrder_TwoEmptySwitchNameAdaptersWithOneNamedMatch_DoesNotGuessRemainingPair()
+    {
+        // One NIC matches its named adapter; the other two NICs and two empty-switch-name adapters remain ambiguous,
+        // so only the named match resolves and the ambiguous pair stays null (no positional guess).
+        var adapters = new List<HyperVVmNetworkAdapterInfo>
+        {
+            new() { AdapterName = "core", SwitchName = "vSwitch-Core", MacAddress = "MACCORE" },
+            new() { AdapterName = "egressA", SwitchName = string.Empty, MacAddress = "MACA" },
+            new() { AdapterName = "egressB", SwitchName = string.Empty, MacAddress = "MACB" }
+        };
+
+        var result = V2RuntimeCapabilityService.CorrelateAdaptersInOrder(
+            ["vSwitch-Core", "vSwitch-Alpha", "vSwitch-Beta"],
+            adapters);
+
+        Assert.Equal("core", result[0]!.AdapterName);
+        Assert.Null(result[1]);
+        Assert.Null(result[2]);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_GuestTransport_TransientCredentialErrorWithinGrace_RetriesThenSucceeds()
     {
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
@@ -1497,8 +1686,18 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         // the guest-network step correlates against by switch name to bind each static IP to the right adapter.
         private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _vmSwitches = new(StringComparer.OrdinalIgnoreCase);
 
+        // Lets a test stand in a bespoke adapter payload for a given VM (for example an egress adapter that reports
+        // an empty switch name, which the real Default Switch / NAT adapter often does). Returning null falls back to
+        // the default derived inventory.
+        public Func<string, IReadOnlyList<HyperVVmNetworkAdapterInfo>?>? AdapterOverride { get; init; }
+
         public Task<IReadOnlyList<HyperVVmNetworkAdapterInfo>> GetVmNetworkAdaptersAsync(string vmName)
         {
+            if (AdapterOverride?.Invoke(vmName) is { } overridden)
+            {
+                return Task.FromResult(overridden);
+            }
+
             if (vmName == "router01")
             {
                 IReadOnlyList<HyperVVmNetworkAdapterInfo> routerAdapters =

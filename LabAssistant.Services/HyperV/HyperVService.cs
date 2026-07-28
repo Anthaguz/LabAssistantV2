@@ -151,7 +151,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         var script = string.Join(
             Environment.NewLine,
             $"$items = Get-VMNetworkAdapter -VMName {PowerShellCommandBuilder.Quote(vmName)} -ErrorAction Stop |",
-            "    Select-Object @{Name='AdapterName';Expression={$_.Name}}, @{Name='SwitchName';Expression={$_.SwitchName}}, @{Name='MacAddress';Expression={$_.MacAddress}} |",
+            "    Select-Object @{Name='AdapterName';Expression={$_.Name}}, @{Name='SwitchName';Expression={$_.SwitchName}}, @{Name='MacAddress';Expression={$_.MacAddress}}, @{Name='Status';Expression={($_.Status -join ',')}} |",
             "    ConvertTo-Json -Depth 3");
         var (output, error) = await ExecuteMeasuredAsync("get_vm_network_adapters", script, vmName);
         DebugLogger.LogPowerShellOutput(script, output, error);
@@ -342,7 +342,13 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
             SwitchName = element.TryGetProperty("SwitchName", out var switchName) ? switchName.GetString() : null,
             MacAddress = element.TryGetProperty("MacAddress", out var macAddress)
                 ? MacAddressNormalizer.NormalizeMacAddress(macAddress.GetString())
-                : string.Empty
+                : string.Empty,
+            Status = element.TryGetProperty("Status", out var status)
+                ? NullIfEmpty(status.GetString())
+                : null
         };
     }
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
 }

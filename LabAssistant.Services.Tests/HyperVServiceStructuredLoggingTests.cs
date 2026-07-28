@@ -65,6 +65,29 @@ public class HyperVServiceStructuredLoggingTests
                 && Equals(e.Context!["vmName"], "Router01"));
     }
 
+    [Fact]
+    public async Task GetVmNetworkAdapters_ParsesAdapters_NormalizesMacAndCapturesStatusAndEmptySwitchName()
+    {
+        // A valid adapter payload must normalize the MAC to canonical form, carry the new operational Status
+        // through for diagnostics, and preserve an empty switch name (the egress/Default Switch reporting case)
+        // rather than dropping the adapter.
+        var json = "[" +
+            "{\"AdapterName\":\"Network Adapter\",\"SwitchName\":\"vSwitch-Core\",\"MacAddress\":\"00-15-5D-AB-CD-EF\",\"Status\":\"Ok\"}," +
+            "{\"AdapterName\":\"Network Adapter 2\",\"SwitchName\":\"\",\"MacAddress\":\"00155D000099\",\"Status\":\"Degraded\"}" +
+            "]";
+        var service = new HyperVService(new StubSession((json, string.Empty)), new CapturingStructuredLogger());
+
+        var adapters = await service.GetVmNetworkAdaptersAsync("Router01");
+
+        Assert.Equal(2, adapters.Count);
+        Assert.Equal("00155DABCDEF", adapters[0].MacAddress);
+        Assert.Equal("vSwitch-Core", adapters[0].SwitchName);
+        Assert.Equal("Ok", adapters[0].Status);
+        Assert.True(string.IsNullOrEmpty(adapters[1].SwitchName));
+        Assert.Equal("00155D000099", adapters[1].MacAddress);
+        Assert.Equal("Degraded", adapters[1].Status);
+    }
+
     private static string Hex(uint code) => $"0x{code:X8}";
 
     private sealed class StubSession : IPersistentPowerShellSession

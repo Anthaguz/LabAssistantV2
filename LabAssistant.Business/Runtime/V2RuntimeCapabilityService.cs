@@ -2434,21 +2434,24 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             .OrderBy(nic => nic.EffectiveSwitchName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(nic => nic.NicId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var adapterMap = adapters
-            .Where(adapter => !string.IsNullOrWhiteSpace(adapter.SwitchName))
-            .GroupBy(adapter => adapter.SwitchName!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        var plannedSwitchNames = plans.Select(nic => nic.EffectiveSwitchName).ToArray();
+        LogAdapterInventory(context, DeploymentStepKeys.V2PrepareRouterNetwork, plannedSwitchNames, adapters);
+        var correlated = CorrelateAdaptersInOrder(plannedSwitchNames, adapters);
 
         var resolved = new List<RuntimeRouterAdapter>();
-        foreach (var nic in plans)
+        for (var i = 0; i < plans.Length; i++)
         {
+            var nic = plans[i];
+            var adapter = correlated[i];
             if (string.IsNullOrWhiteSpace(nic.EffectiveSwitchName) ||
-                !adapterMap.TryGetValue(nic.EffectiveSwitchName, out var adapter) ||
+                adapter is null ||
                 string.IsNullOrWhiteSpace(adapter.MacAddress))
             {
                 context.MarkFailure(
                     DeploymentStepKeys.V2PrepareRouterNetwork,
-                    $"Router VM '{context.VmName}' could not resolve a Hyper-V adapter for switch '{nic.EffectiveSwitchName ?? nic.NicId}'.");
+                    $"Router VM '{context.VmName}' could not resolve a Hyper-V adapter for switch "
+                    + $"'{nic.EffectiveSwitchName ?? nic.NicId}'. Observed adapters: {DescribeAdapters(adapters)}.");
                 return Array.Empty<RuntimeRouterAdapter>();
             }
 
@@ -2668,10 +2671,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     }
 
     /// <summary>
-    /// Correlates each prepared NIC to its host-side Hyper-V adapter MAC by switch name, so the in-guest script
-    /// can bind each static IP to the adapter that actually sits on the intended switch. Multiple NICs on the same
-    /// switch consume distinct adapters in enumeration order. Returns null (after recording a MarkFailure) when any
-    /// NIC has no resolvable adapter, so the caller aborts before running the guest script.
+    /// Correlates each prepared NIC to its host-side Hyper-V adapter MAC so the in-guest script can bind each
+    /// static IP to the adapter that actually sits on the intended switch. Adapters are matched by switch name
+    /// first, and a single remaining egress/DHCP adapter that reports an empty or dynamic switch name is recovered
+    /// by elimination (see <see cref="CorrelateAdaptersInOrder"/>) rather than aborting the deploy. A NIC that still
+    /// cannot be resolved is only fatal when it carries a static IP; a NIC with no static IP is left on DHCP and
+    /// skipped, so an unresolvable egress adapter no longer fails the whole guest-network step.
+    /// Returns null (after recording a MarkFailure) only when a static-IP NIC has no resolvable adapter.
     /// </summary>
     private async Task<IReadOnlyList<GuestNicPlan>?> BuildGuestNicPlansAsync(
         RuntimeVmState state,
@@ -2680,28 +2686,36 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     {
         var hyperV = state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory);
         var adapters = await hyperV.GetVmNetworkAdaptersAsync(context.VmName);
-        var adaptersBySwitch = adapters
-            .Where(adapter => !string.IsNullOrWhiteSpace(adapter.SwitchName) && !string.IsNullOrWhiteSpace(adapter.MacAddress))
-            .GroupBy(adapter => adapter.SwitchName!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => new Queue<HyperVVmNetworkAdapterInfo>(group),
-                StringComparer.OrdinalIgnoreCase);
+
+        var plannedSwitchNames = preparedNics.Select(nic => nic.EffectiveSwitchName).ToArray();
+        LogAdapterInventory(context, DeploymentStepKeys.V2PrepareGuestNetwork, plannedSwitchNames, adapters);
+        var correlated = CorrelateAdaptersInOrder(plannedSwitchNames, adapters);
 
         var plans = new List<GuestNicPlan>();
-        foreach (var nic in preparedNics)
+        for (var i = 0; i < preparedNics.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(nic.EffectiveSwitchName) ||
-                !adaptersBySwitch.TryGetValue(nic.EffectiveSwitchName, out var queue) ||
-                queue.Count == 0)
+            var nic = preparedNics[i];
+            var adapter = correlated[i];
+            if (adapter is null || string.IsNullOrWhiteSpace(adapter.MacAddress))
             {
-                context.MarkFailure(
-                    DeploymentStepKeys.V2PrepareGuestNetwork,
-                    $"VM '{context.VmName}' could not resolve a Hyper-V adapter MAC for NIC '{nic.NicId}' on switch '{nic.EffectiveSwitchName ?? "(none)"}'.");
-                return null;
+                if (!string.IsNullOrWhiteSpace(nic.IpAddress))
+                {
+                    context.MarkFailure(
+                        DeploymentStepKeys.V2PrepareGuestNetwork,
+                        $"VM '{context.VmName}' could not resolve a Hyper-V adapter MAC for NIC '{nic.NicId}' on switch "
+                        + $"'{nic.EffectiveSwitchName ?? "(none)"}'. Observed adapters: {DescribeAdapters(adapters)}.");
+                    return null;
+                }
+
+                // No static IP => the NIC runs on DHCP and has nothing to bind, so an unresolvable adapter is not
+                // fatal. Skip it (with a visible note) rather than aborting the whole guest-network step, which
+                // keeps isolated/egress topologies that legitimately rely on DHCP deployable.
+                context.LogCallback?.Invoke(
+                    $"[{DeploymentStepKeys.V2PrepareGuestNetwork}] {context.VmName}: NIC '{nic.NicId}' on switch "
+                    + $"'{nic.EffectiveSwitchName ?? "(none)"}' has no static IP and no resolvable host adapter; leaving it on DHCP.");
+                continue;
             }
 
-            var adapter = queue.Dequeue();
             plans.Add(new GuestNicPlan
             {
                 NicId = nic.NicId,
@@ -2714,6 +2728,143 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         return plans;
+    }
+
+    /// <summary>
+    /// Correlates an ordered list of planned NIC switch names to a VM's live Hyper-V adapters. Each NIC first
+    /// claims an adapter reporting the same switch name (in order, so multiple NICs on one switch consume distinct
+    /// adapters). If exactly one NIC and exactly one adapter remain unmatched afterwards, that adapter is assigned
+    /// to that NIC by elimination. This forced-pairing pass is the fix for the Default Switch / NAT egress case: such
+    /// an adapter is physically attached to the VM but frequently reports an empty or mismatched switch name at query
+    /// time, so a strict switch-name-only match would drop it and abort the deploy. The pass deliberately does NOT
+    /// guess when two or more NICs or adapters are still unmatched, because a positional guess there could bind a
+    /// static IP or a router's egress MAC to the wrong adapter; those NICs are returned null so the caller can fail
+    /// loudly (static IP) or skip (DHCP) with full diagnostics. Returns one entry per input switch name, null where
+    /// no adapter could be safely claimed.
+    /// </summary>
+    internal static HyperVVmNetworkAdapterInfo?[] CorrelateAdaptersInOrder(
+        IReadOnlyList<string?> orderedSwitchNames,
+        IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters)
+    {
+        var result = new HyperVVmNetworkAdapterInfo?[orderedSwitchNames.Count];
+        var claimed = new bool[adapters.Count];
+
+        var indicesBySwitch = new Dictionary<string, Queue<int>>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < adapters.Count; i++)
+        {
+            var switchName = adapters[i].SwitchName;
+            if (string.IsNullOrWhiteSpace(switchName))
+            {
+                continue;
+            }
+
+            if (!indicesBySwitch.TryGetValue(switchName!, out var queue))
+            {
+                queue = new Queue<int>();
+                indicesBySwitch[switchName!] = queue;
+            }
+
+            queue.Enqueue(i);
+        }
+
+        for (var n = 0; n < orderedSwitchNames.Count; n++)
+        {
+            var name = orderedSwitchNames[n];
+            if (!string.IsNullOrWhiteSpace(name) &&
+                indicesBySwitch.TryGetValue(name!, out var queue) &&
+                queue.Count > 0)
+            {
+                var index = queue.Dequeue();
+                claimed[index] = true;
+                result[n] = adapters[index];
+            }
+        }
+
+        // Leftover pass: recover a single unmatched NIC only when the pairing is forced by elimination, i.e. exactly
+        // one NIC is still unmatched AND exactly one adapter is still unclaimed. That is the Default Switch / NAT egress
+        // case: every other NIC took its like-named adapter, so the one remaining adapter can only belong to the one
+        // remaining NIC. When two or more NICs or adapters are still unmatched, positional guessing could bind a static
+        // IP (guest) or a router's egress MAC to the wrong adapter, silently landing traffic on the wrong network, so we
+        // deliberately leave those NICs null and let the caller fail loudly (static IP) or skip (DHCP) with full adapter
+        // diagnostics rather than guess.
+        var unmatchedNic = -1;
+        var unmatchedNicCount = 0;
+        for (var n = 0; n < result.Length; n++)
+        {
+            if (result[n] is null)
+            {
+                unmatchedNicCount++;
+                unmatchedNic = n;
+            }
+        }
+
+        if (unmatchedNicCount == 1)
+        {
+            var unclaimedAdapter = -1;
+            var unclaimedAdapterCount = 0;
+            for (var i = 0; i < adapters.Count; i++)
+            {
+                if (!claimed[i])
+                {
+                    unclaimedAdapterCount++;
+                    unclaimedAdapter = i;
+                }
+            }
+
+            if (unclaimedAdapterCount == 1)
+            {
+                result[unmatchedNic] = adapters[unclaimedAdapter];
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Emits a Debug structured event capturing the raw host-side adapter inventory alongside the planned switch
+    /// names at a NIC-to-adapter resolution point. This is the evidence that separates an adapter which is present
+    /// but reports an empty or mismatched switch name (resolution was too strict) from one that was never attached
+    /// (a provisioning bug). Only adapter identity, switch name, MAC, and operational status are logged; the guest
+    /// password is never part of this data, so nothing secret can leak here.
+    /// </summary>
+    private static void LogAdapterInventory(
+        VmDeploymentContext context,
+        string stepKey,
+        IReadOnlyList<string?> plannedSwitchNames,
+        IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters)
+    {
+        var planned = plannedSwitchNames.Count == 0
+            ? "(none)"
+            : string.Join(", ", plannedSwitchNames.Select(s => string.IsNullOrWhiteSpace(s) ? "(empty)" : s));
+
+        context.StructuredEventEmitter?.Invoke(
+            LaStatus.DeployNetwork_AdapterInventory,
+            "observed",
+            new Dictionary<string, object?>
+            {
+                ["stepKey"] = stepKey,
+                ["vmName"] = context.VmName,
+                ["plannedSwitches"] = planned,
+                ["adapterCount"] = adapters.Count,
+                ["adapters"] = DescribeAdapters(adapters)
+            });
+    }
+
+    /// <summary>
+    /// Renders the observed host-side adapters into a compact, secret-free string for diagnostics and failure
+    /// messages: adapter name, reported switch name (or <c>(empty)</c>), MAC (or <c>(empty)</c>), and status.
+    /// </summary>
+    private static string DescribeAdapters(IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters)
+    {
+        if (adapters.Count == 0)
+        {
+            return "(none)";
+        }
+
+        return string.Join("; ", adapters.Select(adapter =>
+            $"{adapter.AdapterName} [switch={(string.IsNullOrWhiteSpace(adapter.SwitchName) ? "(empty)" : adapter.SwitchName)}; "
+            + $"mac={(string.IsNullOrWhiteSpace(adapter.MacAddress) ? "(empty)" : adapter.MacAddress)}; "
+            + $"status={(string.IsNullOrWhiteSpace(adapter.Status) ? "(unknown)" : adapter.Status)}]"));
     }
 
     private static IReadOnlyList<string> BuildPreparedDnsServers(
