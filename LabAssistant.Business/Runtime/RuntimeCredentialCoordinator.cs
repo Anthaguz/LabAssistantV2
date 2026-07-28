@@ -45,6 +45,7 @@ internal sealed class RuntimeCredentialCoordinator
         string slotKey,
         GuestCredentialPromptRequest promptRequest,
         V2RuntimeCredential rejected,
+        long graceWindowElapsedMs,
         CancellationToken cancellationToken)
     {
         var prompt = context.RequestGuestCredential;
@@ -72,7 +73,7 @@ internal sealed class RuntimeCredentialCoordinator
             // human answers. Emit a structured "awaiting" event so the paused state is never invisible - a concurrent
             // multi-VM deploy once parked silently on an unanswered dialog with no trace in the log. The terminal
             // "resolved"/"unresolved" event below records how the pause ended.
-            EmitReprompt(context, promptRequest, LaStatus.DeployGuest_AwaitingCredentialReprompt, "awaiting", null);
+            EmitReprompt(context, promptRequest, LaStatus.DeployGuest_AwaitingCredentialReprompt, "awaiting", null, graceWindowElapsedMs);
 
             var response = await prompt(promptRequest, cancellationToken).ConfigureAwait(false);
             if (response is null || response.Cancelled)
@@ -104,7 +105,8 @@ internal sealed class RuntimeCredentialCoordinator
         GuestCredentialPromptRequest promptRequest,
         uint code,
         string result,
-        string? outcome)
+        string? outcome,
+        long? graceWindowElapsedMs = null)
     {
         if (context.StructuredEventEmitter is null)
         {
@@ -120,6 +122,12 @@ internal sealed class RuntimeCredentialCoordinator
         if (outcome != null)
         {
             data["outcome"] = outcome;
+        }
+        // Record how long the unbroken credential-rejection streak ran before the grace window was exhausted, so a
+        // recurrence under even heavier concurrency is diagnosable from the "awaiting" event alone.
+        if (graceWindowElapsedMs is { } elapsed)
+        {
+            data["graceWindowElapsedMs"] = elapsed;
         }
 
         context.StructuredEventEmitter.Invoke(code, result, data);

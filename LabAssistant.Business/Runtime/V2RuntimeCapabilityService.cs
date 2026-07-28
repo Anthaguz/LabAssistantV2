@@ -40,6 +40,11 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
     /// <summary>Environment variable that force-enables the graph scheduler for manual real-hardware trials.</summary>
     private const string GraphSchedulerEnvVariable = "LABASSISTANT_V2_USE_GRAPH_SCHEDULER";
 
+    // Monotonic wall-clock source for the guest-auth grace window, injectable so tests can drive elapsed time
+    // deterministically without real delays. Defaults to the process tick count; never read for anything a caller
+    // can observe, only for measuring the credential-rejection streak duration.
+    internal Func<long> NowTicks { get; set; } = () => Environment.TickCount64;
+
     public V2RuntimeCapabilityService(
         Func<IPersistentPowerShellSession> sessionFactory,
         Func<IPersistentPowerShellSession, IHyperVService> hyperVFactory,
@@ -2266,15 +2271,20 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         var credentialCoordinator = GetCredentialCoordinator(request.CredentialSlotValues);
 
         string? lastError = null;
-        var startTick = Environment.TickCount64;
-        var graceAttempts = Math.Max(1, request.GuestAuthGraceAttempts);
-        // Count only an UNBROKEN run of credential rejections toward the grace. The absolute attempt number also
-        // advances on the initial GuestRebooting hops (a fresh guest reboots into specialize/OOBE before its
-        // answer-file password is applied), so gating the grace on the raw attempt count trips the reprompt while
-        // the guest is still legitimately coming up - the exact failure seen when several guests specialize at once
-        // and their pre-OOBE window runs long. A reboot, transient, or any other non-rejection outcome resets this
-        // streak, so only a genuine persistent password mismatch reaches the grace.
-        var consecutiveAuthRejections = 0;
+        var startTick = NowTicks();
+        var graceWindowMs = (long)Math.Max(0, request.GuestAuthGraceWindow.TotalMilliseconds);
+        // Tolerate a credential rejection only while it could still be the transient specialize window, measured as
+        // WALL-CLOCK time rather than an attempt count. The absolute attempt number also advances on the initial
+        // GuestRebooting hops (a fresh guest reboots into specialize/OOBE before its answer-file password is applied),
+        // and under concurrent cold-start the host is CPU-bound so the same physical specialize window costs more
+        // retries - gating the grace on a fixed attempt count therefore trips the reprompt while the guest is still
+        // legitimately coming up (the exact concurrent forest-trust park in finding 81). A rejection is
+        // indistinguishable in content from a genuinely wrong password, so elapsed time is the only signal that
+        // separates them. Track when the current UNBROKEN rejection streak began: any non-rejection outcome (a
+        // reboot or transient) clears it, so only a persistent rejection accumulates toward the window. A genuinely
+        // wrong password (on an already-specialized guest, which yields only rejections and no interrupting reboots)
+        // still crosses the window after a fixed duration regardless of fleet size.
+        long? authStreakStartTick = null;
         var attempt = 0;
         while (true)
         {
@@ -2313,27 +2323,28 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 DeploymentStepKeys.V2GuestTransportReady,
                 attempt,
                 request.GuestTransportMaxRetries,
-                Environment.TickCount64 - startTick,
+                NowTicks() - startTick,
                 lastError);
 
-            // A credential rejection is deterministic: the stored bootstrap password does not match this VM's base
-            // image, so retrying it for the full budget (~15 min) is pointless. Tolerate it only during the early
-            // specialize window (a fresh clone applies its answer-file password over the first attempts). Track the
-            // rejections as a consecutive streak so an intervening reboot/transient does not push the counter; past
-            // the grace, offer an interactive re-prompt so the user can correct the credential and we retry in place
-            // against the still-running VM (no ~18-min re-provision); a correction also propagates to later VMs on
-            // the same slot. When the user cancels, or no prompt is wired (headless runs, tests), fail fast with an
-            // actionable message.
+            // A credential rejection is deterministic in content: the stored bootstrap password does not match this
+            // VM's base image, so retrying it for the full budget (~15 min) is pointless. Tolerate it only during the
+            // early specialize window (a fresh clone applies its answer-file password over the first attempts),
+            // bounded by wall-clock time so concurrent cold-start cannot exhaust it early. Past the window, offer an
+            // interactive re-prompt so the user can correct the credential and we retry in place against the
+            // still-running VM (no ~18-min re-provision); a correction also propagates to later VMs on the same slot.
+            // When the user cancels, or no prompt is wired (headless runs, tests), fail fast with an actionable
+            // message.
             if (category == GuestCommandErrorCategory.AuthenticationRejected)
             {
-                consecutiveAuthRejections++;
+                authStreakStartTick ??= NowTicks();
             }
             else
             {
-                consecutiveAuthRejections = 0;
+                authStreakStartTick = null;
             }
 
-            if (category == GuestCommandErrorCategory.AuthenticationRejected && consecutiveAuthRejections >= graceAttempts)
+            var authStreakElapsedMs = authStreakStartTick is { } streakStart ? NowTicks() - streakStart : 0L;
+            if (category == GuestCommandErrorCategory.AuthenticationRejected && authStreakElapsedMs >= graceWindowMs)
             {
                 var corrected = await credentialCoordinator.RepromptAsync(
                     context,
@@ -2346,6 +2357,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                         GuestError = GuestReadinessLog.SummarizeError(lastError)
                     },
                     credential,
+                    authStreakElapsedMs,
                     cancellationToken);
 
                 if (corrected is null)
@@ -2365,8 +2377,8 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 // already-running VM.
                 credential = corrected;
                 attempt = 0;
-                consecutiveAuthRejections = 0;
-                startTick = Environment.TickCount64;
+                authStreakStartTick = null;
+                startTick = NowTicks();
                 context.LogCallback?.Invoke(
                     $"Retrying guest sign-in on '{context.VmName}' with the updated credential.");
                 continue;

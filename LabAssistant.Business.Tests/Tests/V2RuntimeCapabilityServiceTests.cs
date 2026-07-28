@@ -420,8 +420,11 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         request.GuestTransportMaxRetries = 25;
         request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
-        request.GuestAuthGraceAttempts = 2;
+        // Time-based grace: each transport probe advances the fake clock by 1000 ms, so a one-second window tolerates
+        // the first rejection (elapsed 0) and trips on the second (elapsed 1000 ms), independent of attempt cadence.
+        request.GuestAuthGraceWindow = TimeSpan.FromMilliseconds(1000);
 
+        long clock = 0;
         var probeAttempts = 0;
         var guestExecutor = new FakeGuestCommandExecutor
         {
@@ -430,6 +433,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
                 {
                     Interlocked.Increment(ref probeAttempts);
+                    Interlocked.Add(ref clock, 1000);
                     return Task.FromResult(new GuestCommandResult
                     {
                         Success = false,
@@ -441,14 +445,15 @@ public sealed partial class V2RuntimeCapabilityServiceTests
             }
         };
         var logger = new RecordingStructuredLogger();
-        var service = CreateService(new FakeHyperVService(), guestExecutor, logger);
+        var service = CreateService(new FakeHyperVService(), guestExecutor, logger, nowTicks: () => Interlocked.Read(ref clock));
 
         var result = await service.ExecuteAsync(request);
 
         Assert.False(result.Success);
 
         // The grace window tolerates the first rejection (specialize may still be applying the password), then the
-        // loop fails fast at attempt 2 instead of grinding through all 25 retries.
+        // loop fails fast once the unbroken rejection streak exceeds the window instead of grinding through all 25
+        // retries.
         Assert.Equal(2, probeAttempts);
 
         Assert.Contains(
@@ -1126,7 +1131,9 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         request.GuestTransportMaxRetries = 25;
         request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
-        request.GuestAuthGraceAttempts = 5;
+        // Each probe advances the fake clock 1000 ms; a 10 s window tolerates the short specialize-time rejection run.
+        request.GuestAuthGraceWindow = TimeSpan.FromMilliseconds(10_000);
+        long clock = 0;
 
         var probeAttempts = 0;
         var guestExecutor = new FakeGuestCommandExecutor
@@ -1136,6 +1143,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
                 {
                     var attempt = Interlocked.Increment(ref probeAttempts);
+                    Interlocked.Add(ref clock, 1000);
                     if (attempt <= 2)
                     {
                         // A freshly cloned guest can briefly reject the (correct) password while specialize applies
@@ -1151,7 +1159,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
             }
         };
-        var service = CreateService(new FakeHyperVService(), guestExecutor);
+        var service = CreateService(new FakeHyperVService(), guestExecutor, nowTicks: () => Interlocked.Read(ref clock));
 
         var result = await service.ExecuteAsync(request);
 
@@ -1166,9 +1174,9 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         request.GuestTransportMaxRetries = 5;
         request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
-        request.GuestAuthGraceAttempts = 1;
-
-        // Wire the interactive re-prompt onto every runtime-built VM context (production wires this from the UI).
+        // A zero window means the very first rejection is past grace (no specialize tolerance), so the prompt is
+        // offered immediately; this isolates the retry-in-place-with-corrected-credential behavior.
+        request.GuestAuthGraceWindow = TimeSpan.Zero;
         var promptCount = 0;
         request.DeploymentContext = new MultiVmDeploymentContext
         {
@@ -1222,7 +1230,8 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         request.GuestTransportMaxRetries = 25;
         request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
-        request.GuestAuthGraceAttempts = 1;
+        // Zero window: the first rejection is immediately past grace, so the prompt is offered at attempt 1.
+        request.GuestAuthGraceWindow = TimeSpan.Zero;
 
         request.DeploymentContext = new MultiVmDeploymentContext
         {
@@ -1253,7 +1262,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         var result = await service.ExecuteAsync(request);
 
         Assert.False(result.Success);
-        // Grace tolerates the first rejection, the prompt is offered at attempt 1, and cancelling fails fast.
+        // Zero window: the first rejection is past grace, the prompt is offered at attempt 1, and cancelling fails fast.
         Assert.Equal(1, probeAttempts);
         Assert.Contains(
             result.DeploymentContext.VmContexts,
@@ -1273,7 +1282,11 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         request.GuestTransportMaxRetries = 25;
         request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
-        request.GuestAuthGraceAttempts = 5;
+        // Each transport probe advances the fake clock by 1000 ms; a generous 10 s window means the four-rejection
+        // run (elapsed at most ~3 s from its first rejection) never reaches the grace, while the leading reboot hops
+        // do not start the streak clock at all.
+        request.GuestAuthGraceWindow = TimeSpan.FromMilliseconds(10_000);
+        long clock = 0;
 
         // A re-prompt here would mean the grace tripped; wire one that fails the run so a spurious prompt is caught.
         var promptCount = 0;
@@ -1294,6 +1307,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
                 {
                     var attempt = Interlocked.Increment(ref probeAttempts);
+                    Interlocked.Add(ref clock, 1000);
                     if (attempt <= 2)
                     {
                         // Guest rebooted into OOBE mid-hop - the PowerShell Direct target process went away.
@@ -1318,13 +1332,13 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
             }
         };
-        var service = CreateService(new FakeHyperVService(), guestExecutor);
+        var service = CreateService(new FakeHyperVService(), guestExecutor, nowTicks: () => Interlocked.Read(ref clock));
 
         var result = await service.ExecuteAsync(request);
 
         Assert.True(result.Success);
-        // The four-rejection run (attempts 3-6) stays under the grace of 5 because the two leading reboot hops did
-        // not advance the streak; transport recovers on attempt 7 and no interactive re-prompt is offered. Under
+        // The four-rejection run (attempts 3-6) stays under the 10 s window because the two leading reboot hops did
+        // not start the streak clock; transport recovers on attempt 7 and no interactive re-prompt is offered. Under
         // the old absolute-attempt gate the reprompt would have fired at attempt 5 and cancelled the run.
         Assert.Equal(7, probeAttempts);
         Assert.Equal(0, promptCount);
@@ -1335,12 +1349,15 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     public async Task ExecuteAsync_GuestTransport_MidWindowRebootResetsRejectionStreak_RetriesThenSucceeds()
     {
         // A reboot part-way through a rejection run means the guest made progress (it restarted into a later
-        // specialize phase), so the accumulated rejection streak must reset. Two rejections, a reboot, then two
-        // more rejections must never reach a grace of 3, even though four rejections occurred in total.
+        // specialize phase), so the accumulated rejection streak clock must reset. Two rejections, a reboot, then two
+        // more rejections must never reach the window, even though four rejections occurred in total.
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         request.GuestTransportMaxRetries = 25;
         request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
-        request.GuestAuthGraceAttempts = 3;
+        // Each probe advances the fake clock 1000 ms; a 10 s window comfortably clears each two-rejection run
+        // (elapsed ~1 s) once the reboot resets the streak clock between them.
+        request.GuestAuthGraceWindow = TimeSpan.FromMilliseconds(10_000);
+        long clock = 0;
 
         var promptCount = 0;
         request.DeploymentContext = new MultiVmDeploymentContext
@@ -1360,6 +1377,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
                 {
                     var attempt = Interlocked.Increment(ref probeAttempts);
+                    Interlocked.Add(ref clock, 1000);
                     if (attempt is 1 or 2 or 4 or 5)
                     {
                         return Task.FromResult(new GuestCommandResult
@@ -1382,13 +1400,13 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
             }
         };
-        var service = CreateService(new FakeHyperVService(), guestExecutor);
+        var service = CreateService(new FakeHyperVService(), guestExecutor, nowTicks: () => Interlocked.Read(ref clock));
 
         var result = await service.ExecuteAsync(request);
 
         Assert.True(result.Success);
-        // Neither the first rejection run (attempts 1-2) nor the second (attempts 4-5) reaches the grace of 3
-        // because the reboot on attempt 3 reset the streak; transport recovers on attempt 6 with no re-prompt.
+        // Neither the first rejection run (attempts 1-2) nor the second (attempts 4-5) reaches the window because the
+        // reboot on attempt 3 reset the streak clock; transport recovers on attempt 6 with no re-prompt.
         Assert.Equal(6, probeAttempts);
         Assert.Equal(0, promptCount);
         Assert.Contains("vm:vm-dc01:GuestTransportReady", result.ExecutedNodeIds);
@@ -1398,12 +1416,15 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     public async Task ExecuteAsync_GuestTransport_PersistentRejectionAfterReboot_StillFailsFast()
     {
         // The streak reset must not let a genuine bad password retry forever: after an initial reboot resets the
-        // streak, an unbroken run of rejections past the grace still fails fast (here on the third consecutive
-        // rejection) instead of grinding through the full retry budget.
+        // streak clock, an unbroken run of rejections that exceeds the window still fails fast (here once the streak
+        // has run 2 s) instead of grinding through the full retry budget.
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
         request.GuestTransportMaxRetries = 25;
         request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
-        request.GuestAuthGraceAttempts = 3;
+        // Each probe advances the fake clock 1000 ms. With a 2 s window the post-reboot rejection streak (starting at
+        // attempt 2, elapsed 0) tolerates attempt 3 (elapsed 1 s) and trips at attempt 4 (elapsed 2 s).
+        request.GuestAuthGraceWindow = TimeSpan.FromMilliseconds(2000);
+        long clock = 0;
 
         var probeAttempts = 0;
         var guestExecutor = new FakeGuestCommandExecutor
@@ -1413,6 +1434,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
                 {
                     var attempt = Interlocked.Increment(ref probeAttempts);
+                    Interlocked.Add(ref clock, 1000);
                     if (attempt == 1)
                     {
                         return Task.FromResult(new GuestCommandResult
@@ -1433,19 +1455,82 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
             }
         };
-        var service = CreateService(new FakeHyperVService(), guestExecutor);
+        var service = CreateService(new FakeHyperVService(), guestExecutor, nowTicks: () => Interlocked.Read(ref clock));
 
         var result = await service.ExecuteAsync(request);
 
         Assert.False(result.Success);
-        // Reboot (attempt 1) resets the streak; rejections on attempts 2-4 build a consecutive run that reaches the
-        // grace of 3 on attempt 4, where the headless run (no prompt wired) fails fast rather than exhausting 25.
+        // Reboot (attempt 1) resets the streak clock; rejections on attempts 2-4 build a consecutive run whose
+        // elapsed reaches the 2 s window on attempt 4, where the headless run (no prompt wired) fails fast rather
+        // than exhausting 25.
         Assert.Equal(4, probeAttempts);
         Assert.Contains(
             result.DeploymentContext.VmContexts,
             vm => vm.VmName == "dc01" &&
                   vm.FailureMessage != null &&
                   vm.FailureMessage.Contains("does not match this VM's base image", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GuestTransport_ManyRejectionsWithinWindow_DoesNotTripUnderConcurrentColdStart()
+    {
+        // Finding 81 regression: under concurrent cold-start (two independent DC roots specializing at once) the host
+        // is CPU-bound, so a guest with the CORRECT password can keep returning "the credential is invalid" for many
+        // more retries than usual before specialize finishes - the live forest-trust park saw a guest still rejecting
+        // past a dozen hops. With the old attempt-count grace (default 9) that unbroken run tripped the re-prompt and
+        // parked the deploy headless. The time-based window must NOT trip on attempt count: here 12 consecutive
+        // rejections advance the clock only 100 ms each (1.2 s total), stay well inside a 30 s window, and transport
+        // then recovers on attempt 13 with no re-prompt.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 90;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceWindow = TimeSpan.FromSeconds(30);
+        long clock = 0;
+
+        // A re-prompt here would mean the window tripped; wire one that fails the run so a spurious prompt is caught.
+        var promptCount = 0;
+        request.DeploymentContext = new MultiVmDeploymentContext
+        {
+            VmContextRegistered = ctx => ctx.RequestGuestCredential = (_, _) =>
+            {
+                Interlocked.Increment(ref promptCount);
+                return Task.FromResult(GuestCredentialPromptResponse.Cancel());
+            }
+        };
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref probeAttempts);
+                    Interlocked.Add(ref clock, 100);
+                    if (attempt <= 12)
+                    {
+                        // Specialize is still applying the (correct) answer-file password under heavy host load.
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor, nowTicks: () => Interlocked.Read(ref clock));
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        // Twelve consecutive rejections is well past the old default grace of 9, yet the 30 s window is nowhere near
+        // exhausted, so no re-prompt fires and transport recovers on attempt 13.
+        Assert.Equal(13, probeAttempts);
+        Assert.Equal(0, promptCount);
+        Assert.Contains("vm:vm-dc01:GuestTransportReady", result.ExecutedNodeIds);
     }
 
     [Fact]
@@ -1630,15 +1715,24 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         FakeHyperVService hyperVService,
         FakeGuestCommandExecutor guestCommandExecutor,
         IStructuredLogger? logger = null,
-        IHyperVMachineAdminService? machineAdminService = null)
+        IHyperVMachineAdminService? machineAdminService = null,
+        Func<long>? nowTicks = null)
     {
-        return new V2RuntimeCapabilityService(
+        var service = new V2RuntimeCapabilityService(
             () => new FakeSession(),
             _ => hyperVService,
             guestCommandExecutor,
             new FakeCleanupOrchestrator(),
             logger,
             machineAdminService);
+        if (nowTicks != null)
+        {
+            // Deterministic wall-clock for the guest-auth grace window: tests advance it per transport probe so the
+            // time-based grace can be exercised without real delays.
+            service.NowTicks = nowTicks;
+        }
+
+        return service;
     }
 
     private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestAsync(
