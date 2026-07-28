@@ -42,6 +42,30 @@ public sealed class TemplateDeployForestTrustScenario : IScenario
     private static string RealBaseImageId =>
         Environment.GetEnvironmentVariable("LABASSISTANT_SMOKE_BASE_IMAGE_ID") ?? "b0a5e0222022400080000000000000a1";
 
+    // AD-readiness budget for a single DC, measured from the moment BOTH VMs are Running (where the guest
+    // probes start polling). It must absorb the WHOLE per-DC guest pipeline for the slowest of the two
+    // concurrently-promoting DCs, NOT just the promotion itself. Derived from the observed 2-DC pipeline
+    // plus headroom, worst-case accounting (finding 82):
+    //   - transport / PowerShell-Direct login ......... ~6 min, PLUS up to ~5 min of TIME-BASED auth grace
+    //     (a correct-password guest may legitimately tolerate transient auth-rejection during transport
+    //     before promotion even starts - the finding-81 grace fix), so transport-complete is worst-case
+    //     ~11 min. This is why a window anchored at VMs-Running is MORE fragile after the grace fix, and
+    //     why the old 12 min (which barely covered transport+grace alone) expired ~1-3 min before
+    //     domainReady finished even though both forests had actually promoted.
+    //   - installAdDomainServices ...................... ~2.5 min
+    //   - promoteFirstDomainController ................. ~1.5 min
+    //   - domainReady (post-promotion AD services + reboot) ~4-5 min
+    // ~11 + 2.5 + 1.5 + 5 = ~20 min worst case; round up to 25 min for headroom. This only BOUNDS the
+    // silent-hang failure case: the probe returns the instant Get-ADForest answers, and an app rollback is
+    // caught immediately by the VmIsGone abort, so a wider window adds no time to a healthy run.
+    private static readonly TimeSpan ForestReadinessBudget = TimeSpan.FromMinutes(25);
+
+    // Trust-readiness budget, measured from AFTER both forests are confirmed promoted. The trust steps
+    // (prepare cross-forest DNS -> create trust -> validate) run once both anchors are domainReady, so this
+    // window does NOT carry the transport/promotion cost the forest budget above absorbs; it only needs to
+    // cover the trust wraps plus their #916 transient-drop retries. Kept at the original generous 12 min.
+    private static readonly TimeSpan TrustReadinessBudget = TimeSpan.FromMinutes(12);
+
     public string Name => "template-deploy-forest-trust";
 
     public string Capability => "Deploy";
@@ -303,7 +327,7 @@ public sealed class TemplateDeployForestTrustScenario : IScenario
         GuestForestInfo? forest = directory.QueryForest(
             vmName,
             netBiosName,
-            TimeSpan.FromMinutes(12),
+            ForestReadinessBudget,
             abortIf: () => VmIsGone(probe, vmName));
 
         if (forest is null)
@@ -362,7 +386,7 @@ public sealed class TemplateDeployForestTrustScenario : IScenario
             vmName,
             netBiosName,
             expectedTrustedDomainDns,
-            TimeSpan.FromMinutes(12),
+            TrustReadinessBudget,
             abortIf: () => VmIsGone(probe, vmName));
 
         if (trust is null)
