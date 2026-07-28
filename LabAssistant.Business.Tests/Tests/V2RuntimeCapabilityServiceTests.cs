@@ -704,6 +704,86 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ConfigureRouterNat_GuestRebootMidHop_RetriesThenSucceeds()
+    {
+        // The router configuration steps run over PowerShell Direct and share the same transport-drop gap the AD DS
+        // steps had: a loaded host can tear the socket down mid-command ("target process has ended" -> GuestRebooting).
+        // The NAT script is idempotent (netsh delete-then-add with IgnoreMissing), so the drop must be retried through
+        // the shared GuestStepTransportRetry helper rather than failing the whole router deploy.
+        var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: true);
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var natAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "router01" && script.Contains("Router NAT configured", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref natAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, natAttempts);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ConfigureRouterNat_NonRebootError_FailsFastWithoutRetrying()
+    {
+        // A deterministic in-guest router error (not a torn-down transport) must surface immediately and fail the
+        // deploy, proving the new transport-drop retry did not become a blanket retry of real router failures.
+        var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: true);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var natAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "router01" && script.Contains("Router NAT configured", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref natAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "netsh : The requested operation requires elevation."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, natAttempts);
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "router01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("Failed to configure router NAT", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_GuestStabilization_RequiresConsecutiveStableProbes_DroppedHopResetsStreak()
     {
         // The stabilization gate must not accept a lone stable probe: a dropped hop (a reboot already in flight)

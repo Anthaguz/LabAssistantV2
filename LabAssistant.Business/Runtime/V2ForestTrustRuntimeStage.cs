@@ -154,15 +154,29 @@ public sealed class V2ForestTrustRuntimeStage
                 continue;
             }
 
-            var sourceResult = await _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
-                trust.SourceAnchorVmName,
-                sourceCredential!,
-                trust.TargetDomainDnsName,
+            // Cleanup runs during deploy failure/cancellation to honor the no-orphans mandate, so it must not consult
+            // the already-cancelled deploy abort signal: pass a null context (skips the abort check and per-attempt
+            // logging) and CancellationToken.None, while still retrying a transient PowerShell Direct drop so a blip
+            // does not leave a dangling trust. The GetADTrust-guarded delete script is idempotent, so re-running is safe.
+            var sourceResult = await GuestStepTransportRetry.RunAsync(
+                null,
+                request,
+                DeploymentStepKeys.V2CreateForestTrust,
+                attemptCancellation => _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
+                    trust.SourceAnchorVmName,
+                    sourceCredential!,
+                    trust.TargetDomainDnsName,
+                    attemptCancellation),
                 CancellationToken.None);
-            var targetResult = await _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
-                trust.TargetAnchorVmName,
-                targetCredential!,
-                trust.SourceDomainDnsName,
+            var targetResult = await GuestStepTransportRetry.RunAsync(
+                null,
+                request,
+                DeploymentStepKeys.V2CreateForestTrust,
+                attemptCancellation => _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
+                    trust.TargetAnchorVmName,
+                    targetCredential!,
+                    trust.SourceDomainDnsName,
+                    attemptCancellation),
                 CancellationToken.None);
 
             trustState.CleanupResidual = !sourceResult.Success || !targetResult.Success;
@@ -313,11 +327,16 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
-        var sourceResult = await _forestTrustRuntimeCoordinator.PrepareDnsForwarderAsync(
-            trust.SourceAnchorVmName,
-            sourceCredential,
-            trust.TargetDomainDnsName,
-            targetDnsServers,
+        var sourceResult = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2PrepareForestTrustDns,
+            attemptCancellation => _forestTrustRuntimeCoordinator.PrepareDnsForwarderAsync(
+                trust.SourceAnchorVmName,
+                sourceCredential,
+                trust.TargetDomainDnsName,
+                targetDnsServers,
+                attemptCancellation),
             cancellationToken);
         if (!sourceResult.Success)
         {
@@ -328,11 +347,16 @@ public sealed class V2ForestTrustRuntimeStage
             return;
         }
 
-        var targetResult = await _forestTrustRuntimeCoordinator.PrepareDnsForwarderAsync(
-            trust.TargetAnchorVmName,
-            targetCredential,
-            trust.SourceDomainDnsName,
-            sourceDnsServers,
+        var targetResult = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2PrepareForestTrustDns,
+            attemptCancellation => _forestTrustRuntimeCoordinator.PrepareDnsForwarderAsync(
+                trust.TargetAnchorVmName,
+                targetCredential,
+                trust.SourceDomainDnsName,
+                sourceDnsServers,
+                attemptCancellation),
             cancellationToken);
         if (!targetResult.Success)
         {
@@ -382,11 +406,16 @@ public sealed class V2ForestTrustRuntimeStage
         targetCredential = QualifyDomainCredential(targetCredential, trust.TargetDomainNetBiosName);
 
         MarkTrustObjectsCreated(multiContext, trust.TrustId);
-        var result = await _forestTrustRuntimeCoordinator.CreateBidirectionalForestTrustAsync(
-            trust.SourceAnchorVmName,
-            sourceCredential,
-            trust,
-            targetCredential,
+        var result = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2CreateForestTrust,
+            attemptCancellation => _forestTrustRuntimeCoordinator.CreateBidirectionalForestTrustAsync(
+                trust.SourceAnchorVmName,
+                sourceCredential,
+                trust,
+                targetCredential,
+                attemptCancellation),
             cancellationToken);
         if (!result.Success)
         {
