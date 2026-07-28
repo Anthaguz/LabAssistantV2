@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "REPLACED_AT_SEED_TIME",
+  "name": "REPLACED_AT_SEED_TIME",
+  "description": "Harness-seeded switch-auto-create V2 template for the LIVE-start regression. One minimal standalone Gen2 VM whose only NIC names a virtual switch the harness deliberately does NOT provision (a run-tagged ghost name, guaranteed absent from the host). No domain/topology/capability roles and no credential slots, so the missing switch is the sole variable: the deploy must create it. Unlike the planning-only variant this template is actually deployed so the runtime creates the switch, which is then asserted to be Internal. Safe to delete.",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "labNetworks": [],
+  "vmTemplates": [
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "membershipMode": "Standalone",
+      "nics": [
+        {
+          "nicId": "primary",
+          "switchName": "REPLACED_AT_SEED_TIME"
+        }
+      ]
+    }
+  ]
+}

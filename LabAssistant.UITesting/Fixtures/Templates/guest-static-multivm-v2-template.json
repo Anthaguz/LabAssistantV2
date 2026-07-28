@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "REPLACED_AT_SEED_TIME",
+  "name": "REPLACED_AT_SEED_TIME",
+  "description": "Harness-seeded two-VM guest-static-IP V2 template. Two standalone client VMs on the SAME dedicated Internal lab switch, each with a single NIC bound by networkId and holding its OWN distinct static IP (10.81.0.21/24 and 10.81.0.22/24). Both reference the REAL prepared Windows Server base image (guest-configurable via its bootstrap profile), so the plan requires guest work and can only start once the local bootstrap credential slot is filled. Proves per-adapter MAC binding: EACH VM must end up holding its own templated IP, without the router/Default-Switch egress complication. Safe to delete.",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "labNetworks": [
+    {
+      "networkId": "static-net",
+      "name": "GuestStaticMulti",
+      "switchName": "REPLACED_AT_SEED_TIME",
+      "subnet": "10.81.0.0/24"
+    }
+  ],
+  "vmTemplates": [
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "membershipMode": "Standalone",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "static-net",
+          "ipAddress": "10.81.0.21",
+          "prefixLength": 24,
+          "dnsServers": []
+        }
+      ]
+    },
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "membershipMode": "Standalone",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "static-net",
+          "ipAddress": "10.81.0.22",
+          "prefixLength": 24,
+          "dnsServers": []
+        }
+      ]
+    }
+  ]
+}
