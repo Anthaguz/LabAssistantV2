@@ -26,6 +26,7 @@ public sealed class RuntimeCredentialCoordinatorTests
             "slot-local",
             new GuestCredentialPromptRequest { CredentialSlotKey = "slot-local" },
             rejected,
+            0,
             System.Threading.CancellationToken.None);
 
         Assert.Null(result);
@@ -43,6 +44,7 @@ public sealed class RuntimeCredentialCoordinatorTests
             "slot-local",
             new GuestCredentialPromptRequest { CredentialSlotKey = "slot-local" },
             rejected,
+            0,
             System.Threading.CancellationToken.None);
 
         Assert.Null(result);
@@ -66,6 +68,7 @@ public sealed class RuntimeCredentialCoordinatorTests
             "slot-local",
             new GuestCredentialPromptRequest { CredentialSlotKey = "slot-local" },
             rejected,
+            0,
             System.Threading.CancellationToken.None);
 
         Assert.NotNull(result);
@@ -93,6 +96,7 @@ public sealed class RuntimeCredentialCoordinatorTests
             "slot-local",
             new GuestCredentialPromptRequest { CredentialSlotKey = "slot-local" },
             rejected,
+            0,
             System.Threading.CancellationToken.None);
 
         Assert.False(promptShown);
@@ -125,8 +129,8 @@ public sealed class RuntimeCredentialCoordinatorTests
         var context = ContextWithPrompt(Prompt);
         var request = new GuestCredentialPromptRequest { CredentialSlotKey = "slot-local" };
 
-        var first = coordinator.RepromptAsync(context, "slot-local", request, rejected, System.Threading.CancellationToken.None);
-        var second = coordinator.RepromptAsync(context, "slot-local", request, rejected, System.Threading.CancellationToken.None);
+        var first = coordinator.RepromptAsync(context, "slot-local", request, rejected, 0, System.Threading.CancellationToken.None);
+        var second = coordinator.RepromptAsync(context, "slot-local", request, rejected, 0, System.Threading.CancellationToken.None);
 
         release.SetResult();
         var results = await System.Threading.Tasks.Task.WhenAll(first, second);
@@ -156,12 +160,20 @@ public sealed class RuntimeCredentialCoordinatorTests
             "slot-local",
             new GuestCredentialPromptRequest { VmName = "vm01", CredentialSlotKey = "slot-local" },
             rejected,
+            4200,
             System.Threading.CancellationToken.None);
 
         Assert.Equal("correct", result!.Password);
         // The pause is made visible (awaiting) and its resolution is recorded (resolved), so a parked prompt is
         // never invisible in the structured log.
         Assert.Contains(events, e => e.Code == LabAssistant.Services.Diagnostics.LaStatus.DeployGuest_AwaitingCredentialReprompt);
+        // The awaiting event carries how long the rejection streak ran before the grace window was exhausted.
+        Assert.Contains(
+            events,
+            e => e.Code == LabAssistant.Services.Diagnostics.LaStatus.DeployGuest_AwaitingCredentialReprompt &&
+                 e.Data != null &&
+                 e.Data.TryGetValue("graceWindowElapsedMs", out var elapsed) &&
+                 elapsed is long ms && ms == 4200L);
         Assert.Contains(
             events,
             e => e.Code == LabAssistant.Services.Diagnostics.LaStatus.DeployGuest_CredentialRepromptResolved &&
