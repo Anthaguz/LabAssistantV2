@@ -179,6 +179,93 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task V2ForestTrustRuntimeStage_CreateTrust_GuestRebootMidHop_RetriesThenSucceeds()
+    {
+        // CreateForestTrust runs over PowerShell Direct and can hit the same torn-down-socket drop the AD DS steps
+        // did. The trust-create script is existence-guarded (GetTrustRelationship -> CreateTrustRelationship only when
+        // absent), so it is safe to re-run: a GuestRebooting drop must retry through the shared helper and recover
+        // rather than failing the trust.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var createAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref createAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.Equal(2, createAttempts);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.TrustReady);
+        Assert.False(trustContext.CleanupAttempted);
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CreateTrust_NonRebootError_FailsFastWithoutRetrying()
+    {
+        // A deterministic trust-create error (not a torn-down transport) must fail fast on the first attempt and drive
+        // cleanup, proving the transport-drop retry did not become a blanket retry of real forest-trust failures.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var createAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref createAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "New-Object : Exception calling \".ctor\" with \"3\" argument(s): The specified domain does not exist."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.Equal(1, createAttempts);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.False(trustContext.TrustReady);
+        Assert.True(trustContext.CleanupAttempted);
+    }
+
+    [Fact]
     public async Task V2ForestTrustRuntimeStage_ReadyBeforeLaterTrustFailure_CleansReadyTrustObjects()
     {
         var request = await CreateRuntimeRequestWithTwoForestTrustsAsync();

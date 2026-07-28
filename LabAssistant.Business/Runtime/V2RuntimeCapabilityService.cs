@@ -1201,7 +1201,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         // The guest network script is idempotent (it removes then re-adds the IP/routes), so a torn-down transport
         // during the volatile specialize/OOBE window is safe to re-run.
-        var result = await RunGuestStepWithTransportRetryAsync(
+        var result = await GuestStepTransportRetry.RunAsync(
             context,
             request,
             DeploymentStepKeys.V2PrepareGuestNetwork,
@@ -1216,64 +1216,6 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             context.MarkFailure(
                 DeploymentStepKeys.V2PrepareGuestNetwork,
                 $"Failed to prepare guest network on '{context.VmName}'. {result.Error}".Trim());
-        }
-    }
-
-    /// <summary>
-    /// Runs an idempotent in-guest PowerShell Direct operation with the bounded transport-drop resilience the
-    /// guest-transport and prepare-guest-network loops rely on.
-    /// </summary>
-    /// <remarks>
-    /// A lost PowerShell Direct session (classified as <see cref="GuestCommandErrorCategory.GuestRebooting"/> - the
-    /// guest rebooted mid-hop, or a loaded host tore the socket down) is retried up to
-    /// <see cref="V2RuntimeExecutionRequest.GuestTransportMaxRetries"/> because re-issuing an idempotent command
-    /// simply reconnects and re-confirms. Every other failure category is a genuine, deterministic in-guest error
-    /// and is returned immediately so the caller fails fast instead of burning the retry budget. The caller owns the
-    /// <c>MarkFailure</c> so it can attach the step-specific message. ONLY wrap operations that are safe to re-run
-    /// (feature install, DNS-client config); a non-idempotent mutation (forest promotion, domain join) must not use
-    /// this - those tolerate their own expected restart boundary instead.
-    /// </remarks>
-    private static async Task<GuestCommandResult> RunGuestStepWithTransportRetryAsync(
-        VmDeploymentContext context,
-        V2RuntimeExecutionRequest request,
-        string stepKey,
-        Func<CancellationToken, Task<GuestCommandResult>> operation,
-        CancellationToken cancellationToken)
-    {
-        var startTick = Environment.TickCount64;
-        var attempt = 1;
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (context.ShouldAbort?.Invoke() == true)
-            {
-                throw new OperationCanceledException(cancellationToken);
-            }
-
-            var result = await operation(cancellationToken);
-            if (result.Success)
-            {
-                return result;
-            }
-
-            var category = GuestReadinessLog.Attempt(
-                context,
-                stepKey,
-                attempt,
-                request.GuestTransportMaxRetries,
-                Environment.TickCount64 - startTick,
-                result.Error);
-
-            // Only a torn-down PowerShell Direct session is worth re-running; every other category is a real,
-            // deterministic error that must surface immediately, and the retry budget is finite so a persistently
-            // rebooting guest still fails rather than looping forever.
-            if (category != GuestCommandErrorCategory.GuestRebooting || attempt >= request.GuestTransportMaxRetries)
-            {
-                return result;
-            }
-
-            await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
-            attempt++;
         }
     }
 
@@ -1293,10 +1235,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await _baseRemoteAccessRuntimeCoordinator.ConfigureBaseRemoteAccessAsync(
-            context.VmName,
-            credential,
-            request.BaseRemoteAccessOptions,
+        var result = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2ConfigureBaseRemoteAccess,
+            attemptCancellation => _baseRemoteAccessRuntimeCoordinator.ConfigureBaseRemoteAccessAsync(
+                context.VmName,
+                credential,
+                request.BaseRemoteAccessOptions,
+                attemptCancellation),
             cancellationToken);
 
         if (!result.Success)
@@ -1384,10 +1331,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await _routerRuntimeCoordinator.PrepareRouterNetworkAsync(
-            context.VmName,
-            bootstrapCredential,
-            nicPlans,
+        var result = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2PrepareRouterNetwork,
+            attemptCancellation => _routerRuntimeCoordinator.PrepareRouterNetworkAsync(
+                context.VmName,
+                bootstrapCredential,
+                nicPlans,
+                attemptCancellation),
             cancellationToken);
         if (!result.Success)
         {
@@ -1414,9 +1366,14 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await _routerRuntimeCoordinator.InstallRemoteAccessFeatureAsync(
-            context.VmName,
-            bootstrapCredential,
+        var result = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2InstallRouterRemoteAccessFeature,
+            attemptCancellation => _routerRuntimeCoordinator.InstallRemoteAccessFeatureAsync(
+                context.VmName,
+                bootstrapCredential,
+                attemptCancellation),
             cancellationToken);
         if (!result.Success)
         {
@@ -1454,10 +1411,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await _routerRuntimeCoordinator.EnableRoutingAsync(
-            context.VmName,
-            bootstrapCredential,
-            externalAdapter.MacAddress,
+        var result = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2EnableRouterRouting,
+            attemptCancellation => _routerRuntimeCoordinator.EnableRoutingAsync(
+                context.VmName,
+                bootstrapCredential,
+                externalAdapter.MacAddress,
+                attemptCancellation),
             cancellationToken);
         if (!result.Success)
         {
@@ -1498,11 +1460,16 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await _routerRuntimeCoordinator.ConfigureNatAsync(
-            context.VmName,
-            bootstrapCredential,
-            externalAdapter.MacAddress,
-            internalAdapters.Select(adapter => adapter.MacAddress).ToArray(),
+        var result = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2ConfigureRouterNat,
+            attemptCancellation => _routerRuntimeCoordinator.ConfigureNatAsync(
+                context.VmName,
+                bootstrapCredential,
+                externalAdapter.MacAddress,
+                internalAdapters.Select(adapter => adapter.MacAddress).ToArray(),
+                attemptCancellation),
             cancellationToken);
         if (!result.Success)
         {
@@ -1552,10 +1519,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 return;
             }
 
-            var result = await _routerRuntimeCoordinator.ValidateCrossSwitchRoutingAsync(
-                target.Context.VmName,
-                bootstrapCredential,
-                target.Domain.DnsName,
+            var result = await GuestStepTransportRetry.RunAsync(
+                target.Context,
+                request,
+                DeploymentStepKeys.V2ValidateCrossSwitchRouting,
+                attemptCancellation => _routerRuntimeCoordinator.ValidateCrossSwitchRoutingAsync(
+                    target.Context.VmName,
+                    bootstrapCredential,
+                    target.Domain.DnsName,
+                    attemptCancellation),
                 cancellationToken);
             if (!result.Success)
             {
@@ -1604,10 +1576,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var readiness = await _routerRuntimeCoordinator.ProbeExternalReadinessAsync(
-            context.VmName,
-            bootstrapCredential,
-            externalAdapter.MacAddress,
+        var readiness = await GuestStepTransportRetry.RunAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2ValidateRouterEgress,
+            attemptCancellation => _routerRuntimeCoordinator.ProbeExternalReadinessAsync(
+                context.VmName,
+                bootstrapCredential,
+                externalAdapter.MacAddress,
+                attemptCancellation),
             cancellationToken);
         if (!readiness.Success)
         {
@@ -1643,9 +1620,14 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 return;
             }
 
-            var result = await _routerRuntimeCoordinator.ValidateRouterEgressAsync(
-                target.Context.VmName,
-                targetBootstrapCredential,
+            var result = await GuestStepTransportRetry.RunAsync(
+                target.Context,
+                request,
+                DeploymentStepKeys.V2ValidateRouterEgress,
+                attemptCancellation => _routerRuntimeCoordinator.ValidateRouterEgressAsync(
+                    target.Context.VmName,
+                    targetBootstrapCredential,
+                    attemptCancellation),
                 cancellationToken);
             if (!result.Success)
             {
@@ -1674,7 +1656,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await RunGuestStepWithTransportRetryAsync(
+        var result = await GuestStepTransportRetry.RunAsync(
             context,
             request,
             DeploymentStepKeys.V2InstallAdDomainServices,
@@ -2096,7 +2078,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         {
             var targetPlanVm = request.Plan.Context.Vms.First(vm => string.Equals(vm.VmId, targetVm.VmId, StringComparison.OrdinalIgnoreCase));
             var dnsServers = BuildDomainControllerDnsOrder(targetPlanVm, request.Plan.Context.Vms);
-            var result = await RunGuestStepWithTransportRetryAsync(
+            var result = await GuestStepTransportRetry.RunAsync(
                 context,
                 request,
                 DeploymentStepKeys.V2StabilizeDomainDns,
