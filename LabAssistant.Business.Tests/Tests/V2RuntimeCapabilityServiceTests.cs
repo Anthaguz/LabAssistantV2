@@ -1024,6 +1024,192 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_GuestTransport_LeadingRebootsThenRejections_DoesNotTripGracePrematurely()
+    {
+        // Models the concurrent-OOBE freeze: a fresh guest reboots into specialize/OOBE (GuestRebooting) BEFORE its
+        // answer-file password is applied, so the first hops are transport drops, then a short run of credential
+        // rejections while specialize finishes, then success. The leading reboot hops must NOT count toward the
+        // credential-rejection grace - only an unbroken run of rejections does - or the loop reprompts/fails while
+        // the guest is still legitimately coming up (the exact stall seen when several guests specialize at once).
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceAttempts = 5;
+
+        // A re-prompt here would mean the grace tripped; wire one that fails the run so a spurious prompt is caught.
+        var promptCount = 0;
+        request.DeploymentContext = new MultiVmDeploymentContext
+        {
+            VmContextRegistered = ctx => ctx.RequestGuestCredential = (_, _) =>
+            {
+                Interlocked.Increment(ref promptCount);
+                return Task.FromResult(GuestCredentialPromptResponse.Cancel());
+            }
+        };
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref probeAttempts);
+                    if (attempt <= 2)
+                    {
+                        // Guest rebooted into OOBE mid-hop - the PowerShell Direct target process went away.
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+
+                    if (attempt <= 6)
+                    {
+                        // Specialize is still applying the (correct) answer-file password.
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        // The four-rejection run (attempts 3-6) stays under the grace of 5 because the two leading reboot hops did
+        // not advance the streak; transport recovers on attempt 7 and no interactive re-prompt is offered. Under
+        // the old absolute-attempt gate the reprompt would have fired at attempt 5 and cancelled the run.
+        Assert.Equal(7, probeAttempts);
+        Assert.Equal(0, promptCount);
+        Assert.Contains("vm:vm-dc01:GuestTransportReady", result.ExecutedNodeIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GuestTransport_MidWindowRebootResetsRejectionStreak_RetriesThenSucceeds()
+    {
+        // A reboot part-way through a rejection run means the guest made progress (it restarted into a later
+        // specialize phase), so the accumulated rejection streak must reset. Two rejections, a reboot, then two
+        // more rejections must never reach a grace of 3, even though four rejections occurred in total.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceAttempts = 3;
+
+        var promptCount = 0;
+        request.DeploymentContext = new MultiVmDeploymentContext
+        {
+            VmContextRegistered = ctx => ctx.RequestGuestCredential = (_, _) =>
+            {
+                Interlocked.Increment(ref promptCount);
+                return Task.FromResult(GuestCredentialPromptResponse.Cancel());
+            }
+        };
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref probeAttempts);
+                    if (attempt is 1 or 2 or 4 or 5)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                        });
+                    }
+
+                    if (attempt == 3)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        // Neither the first rejection run (attempts 1-2) nor the second (attempts 4-5) reaches the grace of 3
+        // because the reboot on attempt 3 reset the streak; transport recovers on attempt 6 with no re-prompt.
+        Assert.Equal(6, probeAttempts);
+        Assert.Equal(0, promptCount);
+        Assert.Contains("vm:vm-dc01:GuestTransportReady", result.ExecutedNodeIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GuestTransport_PersistentRejectionAfterReboot_StillFailsFast()
+    {
+        // The streak reset must not let a genuine bad password retry forever: after an initial reboot resets the
+        // streak, an unbroken run of rejections past the grace still fails fast (here on the third consecutive
+        // rejection) instead of grinding through the full retry budget.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestAuthGraceAttempts = 3;
+
+        var probeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("$env:COMPUTERNAME", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref probeAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+
+                    // The stored password is genuinely wrong: every hop past the reboot is rejected.
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "Hyper-V\\Invoke-Command : The credential is invalid."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        // Reboot (attempt 1) resets the streak; rejections on attempts 2-4 build a consecutive run that reaches the
+        // grace of 3 on attempt 4, where the headless run (no prompt wired) fails fast rather than exhausting 25.
+        Assert.Equal(4, probeAttempts);
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "dc01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("does not match this VM's base image", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_BaseRemoteAccessReady_ProbeTransientFailure_RetriesThenSucceeds()
     {
         var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);

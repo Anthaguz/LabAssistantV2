@@ -147,6 +147,7 @@ facilities:
       - { value: 0x01, name: transport-ready, title: Guest transport readiness }
       - { value: 0x02, name: remote-access, title: Base remote access }
       - { value: 0x03, name: readiness-attempt, title: Readiness attempt }
+      - { value: 0x04, name: credential-reprompt, title: Guest credential re-prompt }
 
   - value: 0x42
     name: deploy.domain
@@ -412,6 +413,11 @@ codes:
   # --- deploy.guest.readiness-attempt ---
   - { facility: 0x41, operation: 0x03, status: 0x00, severity: Debug, flags: [Transient, Retryable], phase: progress, title: Readiness attempt not ready, message: "A guest readiness attempt reported the guest is not ready yet; retrying." }
   - { facility: 0x41, operation: 0x03, status: 0x01, severity: Warning, flags: [Retryable], phase: progress, title: Readiness attempt credential rejected, message: "A guest readiness attempt was rejected with an invalid credential; retrying within the grace window." }
+
+  # --- deploy.guest.credential-reprompt ---
+  - { facility: 0x41, operation: 0x04, status: 0x00, severity: Warning, flags: [UserActionable], phase: start, title: Awaiting credential reprompt, message: "A guest login exhausted the credential grace window and is awaiting an interactive credential re-prompt; the deployment is paused for this VM until the prompt is answered.", remediation: "Answer the credential prompt with the base image's local Administrator password, or cancel to fail the deployment." }
+  - { facility: 0x41, operation: 0x04, status: 0x00, severity: Success, phase: end, title: Credential reprompt resolved, message: "An interactive credential re-prompt supplied an updated credential; retrying guest login in place against the still-running VM." }
+  - { facility: 0x41, operation: 0x04, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Credential reprompt unresolved, message: "An interactive credential re-prompt was cancelled without a corrected credential; the guest transport step fails fast." }
 
   # --- deploy.step ---
   - { facility: 0x43, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Step started, message: "A deployment step started." }
