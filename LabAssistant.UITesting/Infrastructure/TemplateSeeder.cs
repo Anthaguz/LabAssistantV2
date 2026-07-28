@@ -273,6 +273,174 @@ public sealed class TemplateSeeder
 
         return new SeededRouterTemplate(filePath, templateName, vmName, lanIp, DcLocalBootstrapSlotKey);
     }
+
+    /// <summary>
+    /// Writes a tagged single guest-static-IP V2 template that references the REAL prepared base
+    /// image (by catalog id) on the given switch, and returns its on-disk identity plus the static
+    /// IP to validate. The VM name and the template file name both carry the run prefix so the
+    /// deployed VM and the file are sweepable.
+    ///
+    /// The VM is a plain standalone client with a single NIC bound by networkId to an Internal lab
+    /// switch and holding a static IP, so the plan requires guest work (in-guest static-IP config)
+    /// and therefore a bootstrap-capable base image plus a resolved local bootstrap credential slot.
+    /// This is the lean, non-DC, non-router proof of the multi-NIC/static-IP fix for the simple case.
+    /// Only the lab network's switch is rewritten; the static IP is read back from the fixture we are
+    /// about to write, so live validation compares against exactly what was deployed.
+    /// </summary>
+    public SeededGuestStaticTemplate SeedGuestStaticTemplate(ResourceTagger tagger, string baseDiskCatalogId, string switchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "guest-static-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Guest-static V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\guest-static-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Guest-static V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("gstpl");
+        var vmName = tagger.Name("gs");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        var vm = root["vmTemplates"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Guest-static V2 template fixture is missing its first vmTemplates entry.");
+        vm["vmId"] = Guid.NewGuid().ToString("N");
+        vm["name"] = vmName;
+        vm["vhdxId"] = baseDiskCatalogId;
+
+        // The lab network names the (already-created) Internal switch directly. Keep the switch out
+        // of the NIC: the NIC binds by networkId so the static IP marks this as guest work.
+        var network = root["labNetworks"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Guest-static V2 template fixture is missing its first labNetworks entry.");
+        network["switchName"] = switchName;
+
+        // Read the static IP straight from the fixture so validation checks exactly what we deploy.
+        var nic = vm["nics"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Guest-static V2 template fixture is missing its first NIC.");
+        var staticIp = nic["ipAddress"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("Guest-static V2 template fixture NIC is missing ipAddress.");
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededGuestStaticTemplate(filePath, templateName, vmName, staticIp, DcLocalBootstrapSlotKey);
+    }
+
+    /// <summary>
+    /// Writes a tagged two-VM guest-static-IP V2 template that references the REAL prepared base
+    /// image (by catalog id) on the given switch, and returns its on-disk identity plus the per-VM
+    /// static IP ground truth. Every VM name and the template file name carry the run prefix so each
+    /// deployed VM and the file are sweepable.
+    ///
+    /// Both VMs are plain standalone clients on the SAME Internal lab switch, each with a single NIC
+    /// bound by networkId and holding its OWN distinct static IP, so the plan requires guest work for
+    /// each VM (a bootstrap-capable base image + a resolved local bootstrap credential slot). The
+    /// per-VM static IP is read back from the fixture we are about to write, so live validation
+    /// compares each VM against exactly what was deployed - the proof of per-adapter MAC binding.
+    /// </summary>
+    public SeededGuestStaticMultiVmTemplate SeedGuestStaticMultiVmTemplate(ResourceTagger tagger, string baseDiskCatalogId, string switchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "guest-static-multivm-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Guest-static multi-VM V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\guest-static-multivm-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Guest-static multi-VM V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("gsmtpl");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        var network = root["labNetworks"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Guest-static multi-VM V2 template fixture is missing its first labNetworks entry.");
+        network["switchName"] = switchName;
+
+        var vmArray = root["vmTemplates"]?.AsArray()
+            ?? throw new InvalidOperationException("Guest-static multi-VM V2 template fixture is missing its vmTemplates array.");
+        if (vmArray.Count == 0)
+        {
+            throw new InvalidOperationException("Guest-static multi-VM V2 template fixture has no VM entries.");
+        }
+
+        var seededVms = new List<SeededGuestStaticVm>(vmArray.Count);
+        for (int i = 0; i < vmArray.Count; i++)
+        {
+            var vm = vmArray[i]?.AsObject()
+                ?? throw new InvalidOperationException($"Guest-static multi-VM V2 template fixture VM entry {i} is not an object.");
+
+            var vmName = tagger.Name($"gsm{i + 1}");
+            vm["vmId"] = Guid.NewGuid().ToString("N");
+            vm["name"] = vmName;
+            vm["vhdxId"] = baseDiskCatalogId;
+
+            var nic = vm["nics"]?.AsArray()?.FirstOrDefault()?.AsObject()
+                ?? throw new InvalidOperationException($"Guest-static multi-VM V2 template fixture VM entry {i} is missing its first NIC.");
+            var staticIp = nic["ipAddress"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Guest-static multi-VM V2 template fixture VM entry {i} NIC is missing ipAddress.");
+
+            seededVms.Add(new SeededGuestStaticVm(vmName, staticIp));
+        }
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededGuestStaticMultiVmTemplate(filePath, templateName, seededVms, DcLocalBootstrapSlotKey);
+    }
+
+    /// <summary>
+    /// Writes a tagged minimal standalone V2 template whose only NIC names a switch the caller
+    /// guarantees is ABSENT from the host (a run-tagged ghost name), and returns its on-disk identity.
+    /// The template file name and VM name both carry the run prefix so the file and the resulting VM
+    /// are both sweepable; the ghost switch name also carries the run prefix, so if the runtime creates
+    /// it the gate's tag-based switch sweep removes it (no orphan).
+    ///
+    /// Unlike <see cref="SeedStandaloneTemplate"/> this fixture is intended to be DEPLOYED (not just
+    /// planned): the deploy is supposed to create the missing switch as Internal, which the live
+    /// scenario then asserts against Get-VMSwitch. The VM carries no credential slots and a bare disk,
+    /// so the missing switch is the sole variable in the plan.
+    /// </summary>
+    public SeededTemplate SeedSwitchAutoCreateLiveTemplate(ResourceTagger tagger, string baseDiskCatalogId, string ghostSwitchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "switch-autocreate-live-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Switch-auto-create-live V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\switch-autocreate-live-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Switch-auto-create-live V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("saltpl");
+        var vmName = tagger.Name("sal");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        var vm = root["vmTemplates"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Switch-auto-create-live V2 template fixture is missing its first vmTemplates entry.");
+        vm["vmId"] = Guid.NewGuid().ToString("N");
+        vm["name"] = vmName;
+        vm["vhdxId"] = baseDiskCatalogId;
+
+        // The NIC names the ghost switch directly (bare-switch shape). It is deliberately absent from
+        // the host, so the plan is startable only if the deploy is willing to create the missing switch.
+        var nic = vm["nics"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Switch-auto-create-live V2 template fixture is missing its first NIC.");
+        nic["switchName"] = ghostSwitchName;
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededTemplate(filePath, templateName, vmName);
+    }
 }
 
 /// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
@@ -309,3 +477,30 @@ public sealed record SeededRouterTemplate(
     string VmName,
     string LanIpAddress,
     string LocalBootstrapSlotKey);
+
+/// <summary>
+/// Identity + static-IP ground truth of a harness-seeded single guest-static-IP template: its file,
+/// its library display name, the client VM name it deploys, the static IP the guest must end up
+/// holding (the in-guest static address applied on its adapter), and the local bootstrap credential
+/// slot the deploy must fill.
+/// </summary>
+public sealed record SeededGuestStaticTemplate(
+    string FilePath,
+    string TemplateName,
+    string VmName,
+    string StaticIpAddress,
+    string LocalBootstrapSlotKey);
+
+/// <summary>
+/// Identity + per-VM static-IP ground truth of a harness-seeded two-VM guest-static-IP template: its
+/// file, its library display name, the per-VM ground truth it deploys, and the local bootstrap
+/// credential slot the deploy must fill for every VM.
+/// </summary>
+public sealed record SeededGuestStaticMultiVmTemplate(
+    string FilePath,
+    string TemplateName,
+    IReadOnlyList<SeededGuestStaticVm> Vms,
+    string LocalBootstrapSlotKey);
+
+/// <summary>The expected ground truth for one VM in a seeded guest-static template: its tagged name and its own static IP.</summary>
+public sealed record SeededGuestStaticVm(string VmName, string StaticIpAddress);

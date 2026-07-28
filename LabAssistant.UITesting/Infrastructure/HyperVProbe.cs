@@ -89,6 +89,24 @@ $disks = @(Get-VMHardDiskDrive -VMName $vm.Name -ErrorAction SilentlyContinue | 
     public IReadOnlyList<string> ListSwitchNames(string prefix)
         => QueryNames($"Get-VMSwitch -ErrorAction SilentlyContinue | Where-Object {{ $_.Name -like '{Escape(prefix)}*' }} | ForEach-Object {{ $_.Name }}");
 
+    /// <summary>
+    /// Returns the SwitchType of the named virtual switch (e.g. "Internal", "Private", "External"),
+    /// or null when no such switch exists. Used to prove a deploy-created switch was made with the
+    /// expected type without trusting the UI's success text.
+    /// </summary>
+    public string? GetSwitchType(string name)
+    {
+        var result = PowerShellRunner.Run(
+            $"Get-VMSwitch -Name '{Escape(name)}' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty SwitchType");
+        if (!result.Success)
+        {
+            throw new InvalidOperationException($"Get-VMSwitch type probe failed: {result.StdErr.Trim()}");
+        }
+
+        var value = result.StdOut.Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
     /// <summary>True when at least one host switch exists (borrowable in discover-existing mode).</summary>
     public bool AnySwitchExists()
         => QueryNames("Get-VMSwitch -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }").Count > 0;
