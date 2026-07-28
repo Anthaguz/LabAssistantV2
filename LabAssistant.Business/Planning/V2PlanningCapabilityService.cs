@@ -1,3 +1,4 @@
+using LabAssistant.Business.Runtime;
 using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Templates;
 using LabAssistant.Models.Validation;
@@ -433,8 +434,15 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
             RequiresDomainJoin = requiresDomainJoin,
             IsRouterCapable = string.Equals(topologyRole, "Router", StringComparison.OrdinalIgnoreCase)
         };
-        state.HasExternalSwitchAttachment = state.ResolvedNics.Any(nic => SwitchTypeIs(nic.EffectiveSwitchType, "External"));
-        state.HasNonExternalSwitchAttachment = state.ResolvedNics.Any(nic => !SwitchTypeIs(nic.EffectiveSwitchType, "External"));
+        // Router VMs may reach egress through a NAT-capable host switch (Hyper-V Default Switch) that reports
+        // type Internal, so router external classification accepts that as a WAN attachment in addition to a
+        // true External switch. Non-router states keep the strict External-type check, so member egress
+        // expectations and general switch reconciliation are unchanged.
+        Func<V2ResolvedVmNetworkInterface, bool> isExternalAttachment = state.IsRouterCapable
+            ? nic => RouterExternalAttachmentPolicy.IsExternalAttachment(nic.EffectiveSwitchType, nic.EffectiveSwitchName)
+            : nic => RouterExternalAttachmentPolicy.IsExternalSwitchType(nic.EffectiveSwitchType);
+        state.HasExternalSwitchAttachment = state.ResolvedNics.Any(isExternalAttachment);
+        state.HasNonExternalSwitchAttachment = state.ResolvedNics.Any(nic => !isExternalAttachment(nic));
         state.RouterProvidesEgress = state.IsRouterCapable && state.HasExternalSwitchAttachment && state.HasNonExternalSwitchAttachment;
 
         return state;

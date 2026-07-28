@@ -195,6 +195,40 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_RouterExternalOnDefaultSwitch_ClassifiesNatSwitchAsExternalAndCompletesRouterTail()
+    {
+        // The router WAN lands on Hyper-V's Default Switch, a NAT switch reported as Internal. The external
+        // classification must accept it as the egress attachment so the whole router tail runs to success
+        // instead of failing the "no external switch attachment" gate the way a strict type == External check did.
+        var request = await CreateRuntimeRequestAsync(
+            "Balanced",
+            includeStandalone: false,
+            includeRouter: true,
+            routerExternalOnDefaultSwitch: true);
+        var hyperV = new FakeHyperVService
+        {
+            AdapterOverride = vmName => vmName == "router01"
+                ?
+                [
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "core", SwitchName = "vSwitch-Core", MacAddress = "00155D000001" },
+                    new HyperVVmNetworkAdapterInfo { AdapterName = "external", SwitchName = "Default Switch", MacAddress = "00155D000002" }
+                ]
+                : null
+        };
+        var service = CreateService(hyperV, new FakeGuestCommandExecutor());
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success, string.Join(" | ", result.DeploymentContext.VmContexts
+            .Where(c => !c.IsSuccess)
+            .Select(c => $"{c.VmName}:{c.FailureStepKey}:{c.FailureMessage}")));
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:EnableRouterRouting");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:ConfigureRouterNat");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:ValidateRouterEgress");
+        Assert.Contains(result.ExecutedNodeIds, nodeId => nodeId == "vm:vm-router01:RouterReady");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ReusesExistingTypedNetworkSwitchWithoutCreatingOrDeletingIt()
     {
         var operations = new ConcurrentQueue<string>();
@@ -1644,9 +1678,10 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     private async Task<V2RuntimeExecutionRequest> CreateRuntimeRequestAsync(
         string profile,
         bool includeStandalone,
-        bool includeRouter)
+        bool includeRouter,
+        bool routerExternalOnDefaultSwitch = false)
     {
-        var template = CreateTemplate(profile, includeStandalone, includeRouter);
+        var template = CreateTemplate(profile, includeStandalone, includeRouter, routerExternalOnDefaultSwitch);
         var catalogItems = new List<VhdxCatalogItem>
         {
             CreateCatalogItem("disk-dc", "slot-local"),
@@ -1664,16 +1699,22 @@ public sealed partial class V2RuntimeCapabilityServiceTests
             catalogItems.Add(CreateCatalogItem("disk-router", "slot-local"));
         }
 
+        // The router external net normally resolves to a true External switch. The Default-Switch variant models
+        // a live Hyper-V host where the router WAN is bridged onto the built-in Default Switch (a NAT switch that
+        // Hyper-V reports as Internal), exercising the NAT-capable external classification.
+        var externalSwitchName = routerExternalOnDefaultSwitch ? "Default Switch" : "vSwitch-External";
+        var externalSwitchType = routerExternalOnDefaultSwitch ? "Internal" : "External";
+
         var plan = await _planningService.BuildPlanAsync(new V2PlanBuildRequest
         {
             Template = template,
             CatalogItems = catalogItems,
-            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"],
+            AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", externalSwitchName],
             AvailableSwitches =
             [
                 CreateSwitch("vSwitch-Core", "Internal"),
                 CreateSwitch("vSwitch-Edge", "Internal"),
-                CreateSwitch("vSwitch-External", "External")
+                CreateSwitch(externalSwitchName, externalSwitchType)
             ],
             ResolvedCredentialSlotKeys = ["slot-local", "slot-join", "slot-admin", "slot-dsrm"],
             DefaultDeploymentProfile = profile
@@ -1767,8 +1808,9 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         StopAllOnAnyVmFailure = true
     };
 
-    private static LabTemplate CreateTemplate(string profile, bool includeStandalone, bool includeRouter)
+    private static LabTemplate CreateTemplate(string profile, bool includeStandalone, bool includeRouter, bool routerExternalOnDefaultSwitch = false)
     {
+        var externalSwitchName = routerExternalOnDefaultSwitch ? "Default Switch" : "vSwitch-External";
         var template = new LabTemplate
         {
             Id = $"template-{profile.ToLowerInvariant()}",
@@ -1794,7 +1836,7 @@ public sealed partial class V2RuntimeCapabilityServiceTests
                 {
                     NetworkId = "lab-external",
                     Name = "External",
-                    SwitchName = "vSwitch-External"
+                    SwitchName = externalSwitchName
                 }
             ]
         };

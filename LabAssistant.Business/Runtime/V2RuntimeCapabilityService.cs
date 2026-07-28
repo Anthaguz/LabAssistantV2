@@ -1402,7 +1402,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         var adapters = await EnsureRouterAdapterInventoryAsync(state, context);
         var externalAdapter = adapters
-            .FirstOrDefault(adapter => SwitchTypeIs(adapter.SwitchType, "External"));
+            .FirstOrDefault(adapter => RouterExternalAttachmentPolicy.IsExternalAttachment(adapter.SwitchType, adapter.SwitchName));
         if (externalAdapter is null)
         {
             context.MarkFailure(
@@ -1448,9 +1448,9 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
         var adapters = await EnsureRouterAdapterInventoryAsync(state, context);
         var externalAdapter = adapters
-            .FirstOrDefault(adapter => SwitchTypeIs(adapter.SwitchType, "External"));
+            .FirstOrDefault(adapter => RouterExternalAttachmentPolicy.IsExternalAttachment(adapter.SwitchType, adapter.SwitchName));
         var internalAdapters = adapters
-            .Where(adapter => !SwitchTypeIs(adapter.SwitchType, "External"))
+            .Where(adapter => !RouterExternalAttachmentPolicy.IsExternalAttachment(adapter.SwitchType, adapter.SwitchName))
             .ToArray();
         if (externalAdapter is null || internalAdapters.Length == 0)
         {
@@ -1567,7 +1567,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         var adapters = await EnsureRouterAdapterInventoryAsync(state, context);
-        var externalAdapter = adapters.FirstOrDefault(adapter => SwitchTypeIs(adapter.SwitchType, "External"));
+        var externalAdapter = adapters.FirstOrDefault(adapter => RouterExternalAttachmentPolicy.IsExternalAttachment(adapter.SwitchType, adapter.SwitchName));
         if (externalAdapter is null)
         {
             context.MarkFailure(
@@ -2538,14 +2538,18 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         return adapters
-            .Select(adapter => new RouterNicPlan
+            .Select(adapter =>
             {
-                SwitchName = adapter.SwitchName,
-                MacAddress = adapter.MacAddress,
-                IsExternal = SwitchTypeIs(adapter.SwitchType, "External"),
-                IpAddress = SwitchTypeIs(adapter.SwitchType, "External") ? null : adapter.Nic.IpAddress,
-                PrefixLength = SwitchTypeIs(adapter.SwitchType, "External") ? null : adapter.Nic.PrefixLength,
-                DnsServers = SwitchTypeIs(adapter.SwitchType, "External") ? Array.Empty<string>() : adapter.Nic.DnsServers
+                var isExternal = RouterExternalAttachmentPolicy.IsExternalAttachment(adapter.SwitchType, adapter.SwitchName);
+                return new RouterNicPlan
+                {
+                    SwitchName = adapter.SwitchName,
+                    MacAddress = adapter.MacAddress,
+                    IsExternal = isExternal,
+                    IpAddress = isExternal ? null : adapter.Nic.IpAddress,
+                    PrefixLength = isExternal ? null : adapter.Nic.PrefixLength,
+                    DnsServers = isExternal ? Array.Empty<string>() : adapter.Nic.DnsServers
+                };
             })
             .ToArray();
     }
@@ -2585,9 +2589,6 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 .First())
             .ToArray();
     }
-
-    private static bool SwitchTypeIs(string? switchType, string expectedType)
-        => string.Equals(switchType, expectedType, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsDomainControllerRole(RuntimeVmState state)
         => string.Equals(state.PlanVm.TopologyRole, "FirstDomainController", StringComparison.OrdinalIgnoreCase) ||
