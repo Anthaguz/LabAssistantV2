@@ -360,6 +360,7 @@ codes:
   - { facility: 0x20, operation: 0x0C, status: 0x00, severity: Success, phase: end, title: VM network adapters listed, message: "The virtual machine network adapters were listed." }
   - { facility: 0x20, operation: 0x0C, status: 0x01, severity: Error, phase: end, title: List VM network adapters failed, message: "The virtual machine network adapters could not be listed." }
   - { facility: 0x20, operation: 0x0C, status: 0x02, severity: Warning, phase: atomic, title: VM network adapter parse warning, message: "A virtual machine network adapter entry could not be parsed and was skipped." }
+  - { facility: 0x20, operation: 0x0C, status: 0x03, severity: Debug, phase: progress, title: VM network adapter stderr tolerated, message: "A non-fatal error stream accompanied a valid adapter payload; the adapters were returned and the warning was not treated as a query failure." }
   - { facility: 0x20, operation: 0x0D, status: 0x00, severity: Success, phase: end, title: Switch attached to VM, message: "A virtual switch was attached to the virtual machine." }
   - { facility: 0x20, operation: 0x0D, status: 0x01, severity: Error, phase: end, title: Attach switch to VM failed, message: "A virtual switch could not be attached to the virtual machine." }
   - { facility: 0x20, operation: 0x0E, status: 0x00, severity: Success, phase: end, title: Switches attached to VM, message: "Virtual switches were attached to the virtual machine." }

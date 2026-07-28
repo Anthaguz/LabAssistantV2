@@ -97,13 +97,62 @@ public class HyperVServiceAdapterQueryTests
         Assert.Equal("LAT-20260728-023205-switch", adapters[1].SwitchName);
     }
 
+    [Fact]
+    public async Task GetVmNetworkAdaptersAsync_BenignStderrWithValidJson_StillReturnsAdapters()
+    {
+        // A non-terminating warning on the error stream (module-autoload noise, a per-adapter CIM hiccup) can arrive
+        // alongside a valid adapter payload. Because the query uses -ErrorAction Stop, a real terminating failure
+        // would have left the success stream empty, so a populated payload proves the error was non-fatal. The
+        // adapters must still be returned - blanking them on any stderr is the same no-adapters/no-IP failure class.
+        const string json = """
+        {
+          "AdapterName": "Network Adapter",
+          "SwitchName": "LAT-20260728-024352-switch",
+          "MacAddress": "00155D0006BC",
+          "Status": "Ok"
+        }
+        """;
+        var service = new HyperVService(new CapturingSession(json, "WARNING: The 'Hyper-V' module loaded with warnings."));
+
+        var adapters = await service.GetVmNetworkAdaptersAsync("vm1");
+
+        var adapter = Assert.Single(adapters);
+        Assert.Equal("LAT-20260728-024352-switch", adapter.SwitchName);
+        Assert.Equal("00155D0006BC", adapter.MacAddress);
+        // A tolerated benign warning must not be recorded as a query failure.
+        Assert.Null(service.LastFailureMetadata);
+    }
+
+    [Fact]
+    public async Task GetVmNetworkAdaptersAsync_EmptyOutputWithError_ReturnsEmptyAndCapturesFailureMetadata()
+    {
+        // A genuine terminating failure (VM missing, access denied) empties the success stream and leaves only an
+        // error. That IS a real failure: return no adapters AND capture the error as failure metadata so callers
+        // surface an actionable runtime diagnostic instead of a silently-empty list.
+        var service = new HyperVService(new CapturingSession(
+            string.Empty,
+            "Get-VMNetworkAdapter : Hyper-V was unable to find a virtual machine named \"vm1\"."));
+
+        var adapters = await service.GetVmNetworkAdaptersAsync("vm1");
+
+        Assert.Empty(adapters);
+        Assert.NotNull(service.LastFailureMetadata);
+    }
+
     private sealed class CapturingSession : IPersistentPowerShellSession
     {
         private readonly string _output;
+        private readonly string _error;
 
         public CapturingSession(string output)
+            : this(output, string.Empty)
+        {
+        }
+
+        public CapturingSession(string output, string error)
         {
             _output = output;
+            _error = error;
         }
 
         public string? LastCommand { get; private set; }
@@ -111,7 +160,7 @@ public class HyperVServiceAdapterQueryTests
         public Task<(string Output, string Error)> ExecuteAsync(string command)
         {
             LastCommand = command;
-            return Task.FromResult((_output, string.Empty));
+            return Task.FromResult((_output, _error));
         }
 
         public void Dispose()
