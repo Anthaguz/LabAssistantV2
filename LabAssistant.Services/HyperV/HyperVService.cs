@@ -152,6 +152,35 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         var (output, error) = await ExecuteMeasuredAsync("get_vm_network_adapters", script, vmName);
         DebugLogger.LogPowerShellOutput(script, output, error);
 
+        // Parse the payload FIRST, before deciding whether a non-empty error stream is fatal. The query runs with
+        // -ErrorAction Stop, so a TERMINATING failure (VM not found, access denied) stops the pipeline before
+        // ConvertTo-Json runs and leaves the success stream empty. That means a non-empty error stream arriving
+        // ALONGSIDE a valid adapter payload can only be a NON-terminating error/warning (module-autoload noise, a
+        // per-adapter CIM hiccup): the adapters it returned are real. Blanking the whole list on any stderr would
+        // silently reproduce the no-adapters/no-IP failure, so we only treat a non-empty error as fatal when there
+        // is no usable payload to return.
+        if (TryParseVmNetworkAdapters(output, vmName, out var adapters))
+        {
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                LogStructured(
+                    LaStatus.Hyperv_VMNetworkAdapterStderrTolerated,
+                    Guid.NewGuid().ToString("N"),
+                    "tolerated",
+                    new Dictionary<string, object?>
+                    {
+                        ["vmName"] = vmName,
+                        ["adapterCount"] = adapters.Count,
+                        ["error"] = error
+                    });
+            }
+
+            ClearLastFailureMetadata();
+            return adapters;
+        }
+
+        // No usable adapter payload. A non-empty error is now a genuine failure worth capturing for diagnostics so
+        // callers surface an actionable runtime error instead of a silently-empty adapter list.
         if (!string.IsNullOrWhiteSpace(error))
         {
             CaptureFailureMetadataAndReturnSuccess(error);
@@ -159,10 +188,23 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         }
 
         ClearLastFailureMetadata();
-        output = PowerShellOutputCleaner.Clean(output);
+        return Array.Empty<HyperVVmNetworkAdapterInfo>();
+    }
+
+    // Cleans and parses the Get-VMNetworkAdapter JSON payload into adapter records. Returns false (with an empty
+    // list) when the payload is empty or unusable so the caller can decide how to treat an accompanying error
+    // stream. A malformed-but-non-empty payload is recorded as a parse warning here rather than swallowed silently.
+    private bool TryParseVmNetworkAdapters(
+        string rawOutput,
+        string vmName,
+        out IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters)
+    {
+        adapters = Array.Empty<HyperVVmNetworkAdapterInfo>();
+
+        var output = PowerShellOutputCleaner.Clean(rawOutput);
         if (string.IsNullOrWhiteSpace(output))
         {
-            return Array.Empty<HyperVVmNetworkAdapterInfo>();
+            return false;
         }
 
         try
@@ -170,22 +212,24 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
             using var document = JsonDocument.Parse(output);
             if (document.RootElement.ValueKind == JsonValueKind.Array)
             {
-                return document.RootElement
+                adapters = document.RootElement
                     .EnumerateArray()
                     .Select(MapVmNetworkAdapter)
                     .ToArray();
+                return true;
             }
 
             if (document.RootElement.ValueKind == JsonValueKind.Object)
             {
-                return [MapVmNetworkAdapter(document.RootElement)];
+                adapters = [MapVmNetworkAdapter(document.RootElement)];
+                return true;
             }
         }
         catch (JsonException ex)
         {
-            // The adapter query succeeded but returned output we could not parse. Surface an empty
-            // result so callers fail later with explicit runtime diagnostics, but record why here so
-            // the malformed payload is diagnosable instead of being silently swallowed.
+            // The adapter query succeeded but returned output we could not parse. Record why here so the malformed
+            // payload is diagnosable instead of being silently swallowed; the caller returns an empty result so
+            // downstream resolution fails later with explicit runtime diagnostics.
             LogStructured(
                 LaStatus.Hyperv_VMNetworkAdapterParseWarning,
                 Guid.NewGuid().ToString("N"),
@@ -198,7 +242,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
                 });
         }
 
-        return Array.Empty<HyperVVmNetworkAdapterInfo>();
+        return false;
     }
 
     /// <summary>
