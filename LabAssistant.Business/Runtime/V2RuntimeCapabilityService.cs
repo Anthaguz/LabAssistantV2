@@ -1199,9 +1199,50 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        string? lastError = null;
+        // The guest network script is idempotent (it removes then re-adds the IP/routes), so a torn-down transport
+        // during the volatile specialize/OOBE window is safe to re-run.
+        var result = await RunGuestStepWithTransportRetryAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2PrepareGuestNetwork,
+            attemptCancellation => _domainProgressionRuntimeCoordinator.PrepareGuestNetworkAsync(
+                context.VmName,
+                credential,
+                nicPlans,
+                attemptCancellation),
+            cancellationToken);
+        if (!result.Success)
+        {
+            context.MarkFailure(
+                DeploymentStepKeys.V2PrepareGuestNetwork,
+                $"Failed to prepare guest network on '{context.VmName}'. {result.Error}".Trim());
+        }
+    }
+
+    /// <summary>
+    /// Runs an idempotent in-guest PowerShell Direct operation with the bounded transport-drop resilience the
+    /// guest-transport and prepare-guest-network loops rely on.
+    /// </summary>
+    /// <remarks>
+    /// A lost PowerShell Direct session (classified as <see cref="GuestCommandErrorCategory.GuestRebooting"/> - the
+    /// guest rebooted mid-hop, or a loaded host tore the socket down) is retried up to
+    /// <see cref="V2RuntimeExecutionRequest.GuestTransportMaxRetries"/> because re-issuing an idempotent command
+    /// simply reconnects and re-confirms. Every other failure category is a genuine, deterministic in-guest error
+    /// and is returned immediately so the caller fails fast instead of burning the retry budget. The caller owns the
+    /// <c>MarkFailure</c> so it can attach the step-specific message. ONLY wrap operations that are safe to re-run
+    /// (feature install, DNS-client config); a non-idempotent mutation (forest promotion, domain join) must not use
+    /// this - those tolerate their own expected restart boundary instead.
+    /// </remarks>
+    private static async Task<GuestCommandResult> RunGuestStepWithTransportRetryAsync(
+        VmDeploymentContext context,
+        V2RuntimeExecutionRequest request,
+        string stepKey,
+        Func<CancellationToken, Task<GuestCommandResult>> operation,
+        CancellationToken cancellationToken)
+    {
         var startTick = Environment.TickCount64;
-        for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+        var attempt = 1;
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (context.ShouldAbort?.Invoke() == true)
@@ -1209,43 +1250,31 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                 throw new OperationCanceledException(cancellationToken);
             }
 
-            var result = await _domainProgressionRuntimeCoordinator.PrepareGuestNetworkAsync(
-                context.VmName,
-                credential,
-                nicPlans,
-                cancellationToken);
+            var result = await operation(cancellationToken);
             if (result.Success)
             {
-                return;
+                return result;
             }
 
-            lastError = result.Error;
             var category = GuestReadinessLog.Attempt(
                 context,
-                DeploymentStepKeys.V2PrepareGuestNetwork,
+                stepKey,
                 attempt,
                 request.GuestTransportMaxRetries,
                 Environment.TickCount64 - startTick,
-                lastError);
+                result.Error);
 
-            // Only a torn-down PowerShell Direct session (the guest rebooted mid-hop during the volatile
-            // specialize/OOBE window) is worth re-running: the fresh hop reconnects once the guest is back, and
-            // the network script is idempotent (it removes then re-adds the IP/routes). Any other failure is a
-            // genuine in-guest error and must surface immediately instead of burning the retry budget.
-            if (category != GuestCommandErrorCategory.GuestRebooting)
+            // Only a torn-down PowerShell Direct session is worth re-running; every other category is a real,
+            // deterministic error that must surface immediately, and the retry budget is finite so a persistently
+            // rebooting guest still fails rather than looping forever.
+            if (category != GuestCommandErrorCategory.GuestRebooting || attempt >= request.GuestTransportMaxRetries)
             {
-                break;
+                return result;
             }
 
-            if (attempt < request.GuestTransportMaxRetries)
-            {
-                await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
-            }
+            await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+            attempt++;
         }
-
-        context.MarkFailure(
-            DeploymentStepKeys.V2PrepareGuestNetwork,
-            $"Failed to prepare guest network on '{context.VmName}'. {lastError}".Trim());
     }
 
     private async Task ConfigureBaseRemoteAccessAsync(
@@ -1645,9 +1674,14 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
-        var result = await _firstDomainControllerRuntimeCoordinator.EnsureAdDomainServicesInstalledAsync(
-            context.VmName,
-            credential,
+        var result = await RunGuestStepWithTransportRetryAsync(
+            context,
+            request,
+            DeploymentStepKeys.V2InstallAdDomainServices,
+            attemptCancellation => _firstDomainControllerRuntimeCoordinator.EnsureAdDomainServicesInstalledAsync(
+                context.VmName,
+                credential,
+                attemptCancellation),
             cancellationToken);
         if (!result.Success)
         {
@@ -2062,10 +2096,15 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         {
             var targetPlanVm = request.Plan.Context.Vms.First(vm => string.Equals(vm.VmId, targetVm.VmId, StringComparison.OrdinalIgnoreCase));
             var dnsServers = BuildDomainControllerDnsOrder(targetPlanVm, request.Plan.Context.Vms);
-            var result = await _domainProgressionRuntimeCoordinator.StabilizeDomainDnsAsync(
-                targetVm.Name,
-                domainAdminCredential,
-                dnsServers,
+            var result = await RunGuestStepWithTransportRetryAsync(
+                context,
+                request,
+                DeploymentStepKeys.V2StabilizeDomainDns,
+                attemptCancellation => _domainProgressionRuntimeCoordinator.StabilizeDomainDnsAsync(
+                    targetVm.Name,
+                    domainAdminCredential,
+                    dnsServers,
+                    attemptCancellation),
                 cancellationToken);
 
             if (!result.Success)
