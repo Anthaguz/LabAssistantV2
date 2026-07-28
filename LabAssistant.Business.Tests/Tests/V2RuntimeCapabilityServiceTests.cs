@@ -545,6 +545,165 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_InstallAdDomainServices_GuestRebootMidHop_RetriesThenSucceeds()
+    {
+        // installAdDomainServices runs over PowerShell Direct while a freshly bootstrapped, loaded host can tear the
+        // socket down mid-command ("target process has ended" -> GuestRebooting). That was the live 050926 failure:
+        // the single-shot install turned a transient transport drop into a hard deploy failure + full rollback. The
+        // feature-install script is idempotent, so the drop must be retried instead.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var installAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("AD-Domain-Services", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref installAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, installAttempts);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InstallAdDomainServices_NonRebootError_FailsFastWithoutRetrying()
+    {
+        // A genuine in-guest install error (not a torn-down transport) is deterministic, so the step must surface it
+        // immediately and fail the deploy instead of re-running an install that will keep failing. This proves the
+        // new transport-drop retry did not turn into a blanket retry of real failures.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var installAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("AD-Domain-Services", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref installAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "Install-WindowsFeature : The request to add or remove features on the specified server failed."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, installAttempts);
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "dc01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("Failed to install AD DS", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StabilizeDomainDns_GuestRebootMidHop_RetriesThenSucceeds()
+    {
+        // stabilizeDomainDns is idempotent (it re-applies the DNS client server list), so a torn-down PowerShell
+        // Direct hop must be retried rather than failing the whole deploy - the same zero-tolerance gap class as
+        // installAdDomainServices.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var stabilizeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Domain DNS stabilized", StringComparison.Ordinal))
+                {
+                    var attempt = Interlocked.Increment(ref stabilizeAttempts);
+                    if (attempt == 1)
+                    {
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Hyper-V\\Invoke-Command : The Hyper-V socket target process has ended."
+                        });
+                    }
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, stabilizeAttempts);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StabilizeDomainDns_NonRebootError_FailsFastWithoutRetrying()
+    {
+        // A deterministic in-guest DNS error must fail fast and surface, not burn the transport retry budget.
+        var request = await CreateRuntimeRequestAsync("Conservative", includeStandalone: false, includeRouter: false);
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var stabilizeAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("Domain DNS stabilized", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref stabilizeAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "Set-DnsClientServerAddress : Invalid parameter InterfaceIndex."
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var service = CreateService(new FakeHyperVService(), guestExecutor);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Equal(1, stabilizeAttempts);
+        Assert.Contains(
+            result.DeploymentContext.VmContexts,
+            vm => vm.VmName == "dc01" &&
+                  vm.FailureMessage != null &&
+                  vm.FailureMessage.Contains("Failed to stabilize domain DNS", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_GuestStabilization_RequiresConsecutiveStableProbes_DroppedHopResetsStreak()
     {
         // The stabilization gate must not accept a lone stable probe: a dropped hop (a reboot already in flight)
