@@ -32,7 +32,10 @@ internal static class Program
                 "template-multivm" => RunMultiVmTemplateDeployProof(args),
                 "template-dc" => RunDcTemplateDeployProof(args),
                 "template-router" => RunRouterTemplateDeployProof(args),
+                "template-guest-static" => RunGuestStaticTemplateDeployProof(args),
+                "template-guest-static-multivm" => RunGuestStaticMultiVmTemplateDeployProof(args),
                 "template-switch-autocreate" => RunSwitchAutoCreateRegression(args),
+                "template-switch-autocreate-live" => RunSwitchAutoCreateLiveRegression(args),
                 "sweep" => RunSweep(args),
                 _ => PrintHelp()
             };
@@ -257,6 +260,87 @@ internal static class Program
     }
 
     /// <summary>
+    /// Single guest-static-IP deploy scenario: ensures the real base image is guest-configurable, seeds a
+    /// tagged single-VM V2 template whose NIC carries a templated static IP, and drives Deploy &gt; From
+    /// Template to a startable plan. With LABASSISTANT_SMOKE_ADMIN_PASSWORD set it also Starts the deploy,
+    /// waits for the VM to settle, and validates over PowerShell Direct that the guest holds the templated
+    /// static IP, then tears the VM down by tag and proves no orphans. Exits non-zero on any Error/Crash
+    /// finding.
+    /// </summary>
+    private static int RunGuestStaticTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployGuestStaticScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
+    /// Two-VM guest-static-IP deploy scenario: ensures the real base image is guest-configurable, seeds a
+    /// tagged V2 template with two VMs on one Internal switch each holding a DISTINCT static IP, and drives
+    /// Deploy &gt; From Template to a startable plan. With LABASSISTANT_SMOKE_ADMIN_PASSWORD set it also Starts
+    /// the deploy, waits for both VMs to settle, and validates over PowerShell Direct that EACH guest holds
+    /// its OWN templated static IP (per-adapter MAC binding), then tears both VMs down by tag and proves no
+    /// orphans. Exits non-zero on any Error/Crash finding.
+    /// </summary>
+    private static int RunGuestStaticMultiVmTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployGuestStaticMultiVmScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
+    /// Live switch-auto-create regression: seeds a tagged standalone V2 template whose NIC references a
+    /// virtual switch the harness never provisions, drives Deploy &gt; From Template, and - once the plan is
+    /// startable - Starts the deploy so the runtime creates the missing switch, then asserts via Get-VMSwitch
+    /// that the created switch is Internal before the gate tears down VM + switch by tag. Fails on master
+    /// (documenting the bug, before Start) and proves the runtime half of the fix once it lands. Exits
+    /// non-zero on any Error/Crash finding.
+    /// </summary>
+    private static int RunSwitchAutoCreateLiveRegression(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new SwitchAutoCreateLiveScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
     /// Switch-auto-create planning regression: seeds a tagged standalone V2 template whose NIC references
     /// a virtual switch the harness never provisions, drives Deploy &gt; From Template, and asserts the plan
     /// is startable (the deploy should create the missing switch). Fails on master (documenting the bug)
@@ -374,7 +458,10 @@ internal static class Program
         Console.WriteLine("  template-multivm Seed a 3-VM V2 template, deploy it via From Template, validate every VM, and tear down.");
         Console.WriteLine("  template-dc Seed a single-DC V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate AD over PowerShell Direct.");
         Console.WriteLine("  template-router Seed a single-router V2 template (multi-NIC RRAS/NAT), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the LAN gateway IP over PowerShell Direct.");
+        Console.WriteLine("  template-guest-static Seed a single-VM V2 template with a templated static IP, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the in-guest static IP over PowerShell Direct.");
+        Console.WriteLine("  template-guest-static-multivm Seed a 2-VM V2 template (distinct static IPs on one Internal switch), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate each VM's own in-guest static IP over PowerShell Direct.");
         Console.WriteLine("  template-switch-autocreate Regression: seed a template referencing an absent switch and assert the plan is startable (the deploy should create it).");
+        Console.WriteLine("  template-switch-autocreate-live Regression: seed a template referencing an absent switch, Start the deploy, and assert the runtime creates it as an Internal switch (Get-VMSwitch).");
         Console.WriteLine("  sweep   Remove any leftover harness-tagged Hyper-V resources.");
         return 0;
     }
