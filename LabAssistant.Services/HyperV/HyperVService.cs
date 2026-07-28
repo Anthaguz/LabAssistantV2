@@ -151,7 +151,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         var script = string.Join(
             Environment.NewLine,
             $"$items = Get-VMNetworkAdapter -VMName {PowerShellCommandBuilder.Quote(vmName)} -ErrorAction Stop |",
-            "    Select-Object @{Name='AdapterName';Expression={$_.Name}}, @{Name='SwitchName';Expression={$_.SwitchName}}, @{Name='MacAddress';Expression={$_.MacAddress}}, @{Name='Status';Expression={($_.Status -join ',')}} |",
+            "    Select-Object @{Name='AdapterName';Expression={$_.Name}}, @{Name='SwitchName';Expression={$_.SwitchName}}, @{Name='MacAddress';Expression={$_.MacAddress}}, @{Name='Status';Expression={($_.Status -join ',')}}, @{Name='Connected';Expression={$_.Connected}}, @{Name='IsManagementOs';Expression={$_.IsManagementOs}} |",
             "    ConvertTo-Json -Depth 3");
         var (output, error) = await ExecuteMeasuredAsync("get_vm_network_adapters", script, vmName);
         DebugLogger.LogPowerShellOutput(script, output, error);
@@ -345,10 +345,22 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
                 : string.Empty,
             Status = element.TryGetProperty("Status", out var status)
                 ? NullIfEmpty(status.GetString())
-                : null
+                : null,
+            Connected = ReadNullableBool(element, "Connected"),
+            IsManagementOs = ReadNullableBool(element, "IsManagementOs")
         };
     }
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static bool? ReadNullableBool(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value)
+            ? value.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => null
+            }
+            : null;
 }

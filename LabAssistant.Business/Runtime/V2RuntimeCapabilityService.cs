@@ -1110,6 +1110,23 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        // Diagnostic-only: capture the exact ordered switch-name list handed to the switch-attach call (adapter[0]
+        // is connected to the default NIC, the rest are added in order). This reveals whether a switch such as
+        // "Default Switch" actually made it into the connect/add calls, which separates a never-attached egress NIC
+        // from one that attaches but later reports an empty switch name at resolution time. No secrets are involved.
+        context.StructuredEventEmitter?.Invoke(
+            LaStatus.DeployNetwork_SwitchAttachPlan,
+            "attaching",
+            new Dictionary<string, object?>
+            {
+                ["stepKey"] = DeploymentStepKeys.V2ProvisionVm,
+                ["vmName"] = context.VmName,
+                ["switchCount"] = context.VirtualSwitchNames.Count,
+                ["switchNames"] = context.VirtualSwitchNames.Count == 0
+                    ? "(none)"
+                    : string.Join(", ", context.VirtualSwitchNames.Select(name => string.IsNullOrWhiteSpace(name) ? "(empty)" : name))
+            });
+
         if (!await hyperV.AddVirtualSwitchesToVmAsync(context.VmName, context.VirtualSwitchNames))
         {
             context.MarkFailure(
@@ -2864,8 +2881,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         return string.Join("; ", adapters.Select(adapter =>
             $"{adapter.AdapterName} [switch={(string.IsNullOrWhiteSpace(adapter.SwitchName) ? "(empty)" : adapter.SwitchName)}; "
             + $"mac={(string.IsNullOrWhiteSpace(adapter.MacAddress) ? "(empty)" : adapter.MacAddress)}; "
-            + $"status={(string.IsNullOrWhiteSpace(adapter.Status) ? "(unknown)" : adapter.Status)}]"));
+            + $"status={(string.IsNullOrWhiteSpace(adapter.Status) ? "(unknown)" : adapter.Status)}; "
+            + $"connected={DescribeBool(adapter.Connected)}; "
+            + $"mgmtOs={DescribeBool(adapter.IsManagementOs)}]"));
     }
+
+    private static string DescribeBool(bool? value) =>
+        value is null ? "(unknown)" : (value.Value ? "true" : "false");
 
     private static IReadOnlyList<string> BuildPreparedDnsServers(
         RuntimeVmState state,

@@ -168,6 +168,7 @@ facilities:
       - { value: 0x02, name: cleanup, title: Clean up switch }
       - { value: 0x03, name: create, title: Create switch }
       - { value: 0x04, name: adapter-resolve, title: Resolve VM adapters }
+      - { value: 0x05, name: switch-attach, title: Attach VM switches }
 
   - value: 0x45
     name: deploy.cleanup
@@ -430,6 +431,7 @@ codes:
   - { facility: 0x44, operation: 0x03, status: 0x00, severity: Info,    phase: start, title: Creating switch, message: "Creating a virtual switch for the deployment." }
   - { facility: 0x44, operation: 0x03, status: 0x00, severity: Success, phase: end,   title: Switch created, message: "A virtual switch was created for the deployment." }
   - { facility: 0x44, operation: 0x04, status: 0x00, severity: Debug, phase: progress, title: Adapter inventory, message: "Observed the VM's host network adapters while resolving NIC-to-adapter bindings." }
+  - { facility: 0x44, operation: 0x05, status: 0x00, severity: Debug, phase: progress, title: Switch attach plan, message: "Attaching the planned virtual switches to a VM during provisioning." }
 
   # --- deploy.cleanup (vm / step) ---
   - { facility: 0x45, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Cleaning up VM, message: "Rolling back resources created for a virtual machine." }

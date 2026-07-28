@@ -14,6 +14,21 @@ public sealed class HyperVVmNetworkAdapterInfo
     /// never attached. Null when the host did not report a status.
     /// </summary>
     public string? Status { get; init; }
+
+    /// <summary>
+    /// Whether the adapter reports as connected to a virtual switch, captured purely for diagnostics. This is the
+    /// signal that distinguishes an egress adapter that is physically attached but reports an empty or mismatched
+    /// switch name (<c>Connected == true</c>) from one that was never attached (<c>Connected == false</c>). Null
+    /// when the host did not report the value.
+    /// </summary>
+    public bool? Connected { get; init; }
+
+    /// <summary>
+    /// Whether the adapter belongs to the management OS rather than the guest, captured purely for diagnostics so a
+    /// host-side management adapter is not mistaken for a guest NIC during resolution triage. Null when the host did
+    /// not report the value.
+    /// </summary>
+    public bool? IsManagementOs { get; init; }
 }
 
 public interface IHyperVService
