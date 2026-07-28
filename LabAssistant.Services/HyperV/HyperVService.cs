@@ -204,7 +204,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
     /// <summary>
     /// Builds the PowerShell that queries a VM's network adapters and projects them to JSON.
     /// The pipeline must terminate in <c>ConvertTo-Json</c> writing to the success stream: a prior
-    /// version assigned the pipeline to a variable (<c>$items = ...</c>) and never emitted it, so the
+    /// version captured the pipeline into a local variable instead of emitting it, so the
     /// persistent session captured empty stdout, <see cref="GetVmNetworkAdaptersAsync"/> returned no
     /// adapters, and every guest-network deploy failed to resolve a NIC. Keep the terminal emit.
     /// </summary>
