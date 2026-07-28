@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using LabAssistant.Models.Deployment;
+using LabAssistant.Services.Diagnostics;
 
 namespace LabAssistant.Business.Runtime;
 
@@ -48,7 +50,9 @@ internal sealed class RuntimeCredentialCoordinator
         var prompt = context.RequestGuestCredential;
         if (prompt is null)
         {
-            // Headless run (or tests): no interactive seam, so the caller falls back to fail-fast.
+            // Headless run (or tests): no interactive seam, so the caller falls back to fail-fast. No park happens
+            // here (this returns immediately) and MarkFailure emits the terminal step.run.end, so there is nothing
+            // to make visible - the awaiting/resolved diagnostics events only fire when a prompt is actually wired.
             return null;
         }
 
@@ -60,12 +64,20 @@ internal sealed class RuntimeCredentialCoordinator
             // matches the credential this VM just had rejected, adopt it instead of prompting the user again.
             if (_slotValues.TryGetValue(slotKey, out var current) && !CredentialsEqual(current, rejected))
             {
+                EmitReprompt(context, promptRequest, LaStatus.DeployGuest_CredentialRepromptResolved, "resolved", "adoptedFromPeer");
                 return current;
             }
+
+            // Diagnostics (visibility): entering an interactive re-prompt suspends this VM's transport loop until a
+            // human answers. Emit a structured "awaiting" event so the paused state is never invisible - a concurrent
+            // multi-VM deploy once parked silently on an unanswered dialog with no trace in the log. The terminal
+            // "resolved"/"unresolved" event below records how the pause ended.
+            EmitReprompt(context, promptRequest, LaStatus.DeployGuest_AwaitingCredentialReprompt, "awaiting", null);
 
             var response = await prompt(promptRequest, cancellationToken).ConfigureAwait(false);
             if (response is null || response.Cancelled)
             {
+                EmitReprompt(context, promptRequest, LaStatus.DeployGuest_CredentialRepromptUnresolved, "cancelled", "cancelled");
                 return null;
             }
 
@@ -75,12 +87,42 @@ internal sealed class RuntimeCredentialCoordinator
                 Password = response.Password ?? string.Empty
             };
             _slotValues[slotKey] = corrected;
+            EmitReprompt(context, promptRequest, LaStatus.DeployGuest_CredentialRepromptResolved, "resolved", "userSupplied");
             return corrected;
         }
         finally
         {
             gate.Release();
         }
+    }
+
+    // Structured visibility for the interactive credential re-prompt seam: an "awaiting" event when the loop pauses on
+    // the prompt, and a terminal "resolved"/"unresolved" event describing how the pause ended. Guarded on the emitter
+    // being wired so headless runs and tests without a logger are unaffected.
+    private static void EmitReprompt(
+        VmDeploymentContext context,
+        GuestCredentialPromptRequest promptRequest,
+        uint code,
+        string result,
+        string? outcome)
+    {
+        if (context.StructuredEventEmitter is null)
+        {
+            return;
+        }
+
+        var data = new Dictionary<string, object?>
+        {
+            ["stepKey"] = DeploymentStepKeys.V2GuestTransportReady,
+            ["vmName"] = promptRequest.VmName,
+            ["credentialSlotKey"] = promptRequest.CredentialSlotKey
+        };
+        if (outcome != null)
+        {
+            data["outcome"] = outcome;
+        }
+
+        context.StructuredEventEmitter.Invoke(code, result, data);
     }
 
     private static bool CredentialsEqual(V2RuntimeCredential left, V2RuntimeCredential right) =>

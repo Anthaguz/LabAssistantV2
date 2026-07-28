@@ -134,4 +134,39 @@ public sealed class RuntimeCredentialCoordinatorTests
         Assert.Equal(1, promptCount);
         Assert.All(results, r => Assert.Equal("correct", r!.Password));
     }
+
+    [Fact]
+    public async Task RepromptAsync_UserSuppliesCredential_EmitsAwaitingThenResolved()
+    {
+        var rejected = new V2RuntimeCredential { Username = "Administrator", Password = "wrong" };
+        var slots = CreateSlots("slot-local", rejected);
+        var coordinator = new RuntimeCredentialCoordinator(slots);
+
+        var events = new System.Collections.Generic.List<(uint Code, string? Result, System.Collections.Generic.IReadOnlyDictionary<string, object?>? Data)>();
+        var context = ContextWithPrompt((_, _) => System.Threading.Tasks.Task.FromResult(new GuestCredentialPromptResponse
+        {
+            Cancelled = false,
+            Username = "Administrator",
+            Password = "correct"
+        }));
+        context.StructuredEventEmitter = (code, result, data) => events.Add((code, result, data));
+
+        var result = await coordinator.RepromptAsync(
+            context,
+            "slot-local",
+            new GuestCredentialPromptRequest { VmName = "vm01", CredentialSlotKey = "slot-local" },
+            rejected,
+            System.Threading.CancellationToken.None);
+
+        Assert.Equal("correct", result!.Password);
+        // The pause is made visible (awaiting) and its resolution is recorded (resolved), so a parked prompt is
+        // never invisible in the structured log.
+        Assert.Contains(events, e => e.Code == LabAssistant.Services.Diagnostics.LaStatus.DeployGuest_AwaitingCredentialReprompt);
+        Assert.Contains(
+            events,
+            e => e.Code == LabAssistant.Services.Diagnostics.LaStatus.DeployGuest_CredentialRepromptResolved &&
+                 e.Data != null &&
+                 e.Data.TryGetValue("outcome", out var outcome) &&
+                 (outcome as string) == "userSupplied");
+    }
 }

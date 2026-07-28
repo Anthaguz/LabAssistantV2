@@ -2247,6 +2247,13 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         string? lastError = null;
         var startTick = Environment.TickCount64;
         var graceAttempts = Math.Max(1, request.GuestAuthGraceAttempts);
+        // Count only an UNBROKEN run of credential rejections toward the grace. The absolute attempt number also
+        // advances on the initial GuestRebooting hops (a fresh guest reboots into specialize/OOBE before its
+        // answer-file password is applied), so gating the grace on the raw attempt count trips the reprompt while
+        // the guest is still legitimately coming up - the exact failure seen when several guests specialize at once
+        // and their pre-OOBE window runs long. A reboot, transient, or any other non-rejection outcome resets this
+        // streak, so only a genuine persistent password mismatch reaches the grace.
+        var consecutiveAuthRejections = 0;
         var attempt = 0;
         while (true)
         {
@@ -2290,11 +2297,22 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             // A credential rejection is deterministic: the stored bootstrap password does not match this VM's base
             // image, so retrying it for the full budget (~15 min) is pointless. Tolerate it only during the early
-            // specialize window (a fresh clone applies its answer-file password over the first attempts). Past that,
-            // offer an interactive re-prompt so the user can correct the credential and we retry in place against the
-            // still-running VM (no ~18-min re-provision); a correction also propagates to later VMs on the same slot.
-            // When the user cancels, or no prompt is wired (headless runs, tests), fail fast with an actionable message.
-            if (category == GuestCommandErrorCategory.AuthenticationRejected && attempt >= graceAttempts)
+            // specialize window (a fresh clone applies its answer-file password over the first attempts). Track the
+            // rejections as a consecutive streak so an intervening reboot/transient does not push the counter; past
+            // the grace, offer an interactive re-prompt so the user can correct the credential and we retry in place
+            // against the still-running VM (no ~18-min re-provision); a correction also propagates to later VMs on
+            // the same slot. When the user cancels, or no prompt is wired (headless runs, tests), fail fast with an
+            // actionable message.
+            if (category == GuestCommandErrorCategory.AuthenticationRejected)
+            {
+                consecutiveAuthRejections++;
+            }
+            else
+            {
+                consecutiveAuthRejections = 0;
+            }
+
+            if (category == GuestCommandErrorCategory.AuthenticationRejected && consecutiveAuthRejections >= graceAttempts)
             {
                 var corrected = await credentialCoordinator.RepromptAsync(
                     context,
@@ -2321,10 +2339,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
                     return;
                 }
 
-                // Retry in place with the corrected credential: reset the attempt budget and the specialize grace
-                // window so the new credential gets a fresh set of attempts against the already-running VM.
+                // Retry in place with the corrected credential: reset the attempt budget, the rejection streak, and
+                // the specialize grace window so the new credential gets a fresh set of attempts against the
+                // already-running VM.
                 credential = corrected;
                 attempt = 0;
+                consecutiveAuthRejections = 0;
                 startTick = Environment.TickCount64;
                 context.LogCallback?.Invoke(
                     $"Retrying guest sign-in on '{context.VmName}' with the updated credential.");
