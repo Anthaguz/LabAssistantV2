@@ -524,6 +524,120 @@ public sealed class TemplateSeeder
 
         return new SeededDcMemberTemplate(filePath, templateName, dcVmName, memberVmName, dnsName, netBiosName, DcLocalBootstrapSlotKey);
     }
+
+    /// <summary>
+    /// Writes a tagged two-forest + bidirectional forest-trust V2 template that references the REAL
+    /// prepared base image (by catalog id) and returns its on-disk identity plus the per-forest ground
+    /// truth to validate after deploy. Both DC VM names and the template file name carry the run prefix
+    /// so the deployed VMs and the file are all sweepable.
+    ///
+    /// The topology has two root forests on one shared Internal switch: forest-alpha (alpha.lab / ALPHA)
+    /// and forest-beta (beta.lab / BETA), each with a single FirstDomainController on a static NIC that
+    /// serves its own DNS, plus one bidirectional Forest trust between the roots. Both DCs reference a
+    /// bootstrap-capable base image, so the plan requires guest work (two DC promotions + the trust
+    /// steps) and therefore a resolved local bootstrap credential slot; the planner reuses that single
+    /// slot for each domain's domain-admin/DSRM and for the cross-forest trust credential.
+    ///
+    /// Each domain's firstDomainControllerVmId is stitched to the VM that owns that domain by matching
+    /// vmTemplate.domainId to the domain id (not by array position), so the wiring stays correct even if
+    /// the fixture's VM order changes. Only the lab network's switch is rewritten; the forest/domain DNS
+    /// + NetBIOS names are read back from the fixture we are about to write, so live validation compares
+    /// each guest against exactly what was deployed.
+    /// </summary>
+    public SeededForestTrustTemplate SeedForestTrustTemplate(ResourceTagger tagger, string baseDiskCatalogId, string switchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "forest-trust-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Forest-trust V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\forest-trust-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Forest-trust V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("fttpl");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        // The lab network names the (already-created) Internal switch directly. The NICs bind by
+        // networkId (static IPs), so the switch stays out of the NICs and both DCs need guest work.
+        var network = root["labNetworks"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Forest-trust V2 template fixture is missing its first labNetworks entry.");
+        network["switchName"] = switchName;
+
+        var domains = root["directoryTopology"]?["domains"]?.AsArray()
+            ?? throw new InvalidOperationException("Forest-trust V2 template fixture is missing its directoryTopology.domains array.");
+        var vmArray = root["vmTemplates"]?.AsArray()
+            ?? throw new InvalidOperationException("Forest-trust V2 template fixture is missing its vmTemplates array.");
+
+        // Give each DC VM a fresh tagged identity, then stitch its new vmId into the domain it owns by
+        // matching the VM's domainId to the domain id. Both VMs are FirstDomainController, so role alone
+        // cannot disambiguate them - the domainId is the authoritative link.
+        var seeded = new List<(string DomainId, string VmName, string DnsName, string NetBiosName)>();
+        foreach (var domainNode in domains)
+        {
+            var domain = domainNode?.AsObject()
+                ?? throw new InvalidOperationException("Forest-trust V2 template fixture has a malformed domain entry.");
+            var domainId = domain["domainId"]?.GetValue<string>()
+                ?? throw new InvalidOperationException("Forest-trust V2 template fixture domain is missing domainId.");
+
+            var vm = vmArray
+                .Select(n => n?.AsObject())
+                .FirstOrDefault(n => n is not null &&
+                    string.Equals(n["domainId"]?.GetValue<string>(), domainId, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException(
+                    $"Forest-trust V2 template fixture has no vmTemplate whose domainId is '{domainId}'.");
+
+            var dnsName = domain["dnsName"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Forest-trust V2 template fixture domain '{domainId}' is missing dnsName.");
+            var netBiosName = domain["netBiosName"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Forest-trust V2 template fixture domain '{domainId}' is missing netBiosName.");
+
+            // Each DC gets a per-forest suffix (dc-<netbios>) so the two FirstDomainController VMs never
+            // collide on the same run-tagged name; both remain harness-owned and sweepable by prefix.
+            var vmId = Guid.NewGuid().ToString("N");
+            var vmName = tagger.Name("dc-" + netBiosName.ToLowerInvariant());
+            vm["vmId"] = vmId;
+            vm["name"] = vmName;
+            vm["vhdxId"] = baseDiskCatalogId;
+            domain["firstDomainControllerVmId"] = vmId;
+
+            seeded.Add((domainId, vmName, dnsName, netBiosName));
+        }
+
+        // Resolve the two anchors by the trust's source/target domain ids so the source DC (where the
+        // runtime creates the trust) is unambiguous regardless of domain declaration order.
+        var trust = root["directoryTopology"]?["trusts"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Forest-trust V2 template fixture is missing its trust entry.");
+        var sourceDomainId = trust["sourceDomainId"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("Forest-trust V2 template fixture trust is missing sourceDomainId.");
+        var targetDomainId = trust["targetDomainId"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("Forest-trust V2 template fixture trust is missing targetDomainId.");
+
+        var source = seeded.FirstOrDefault(item => string.Equals(item.DomainId, sourceDomainId, StringComparison.OrdinalIgnoreCase));
+        var target = seeded.FirstOrDefault(item => string.Equals(item.DomainId, targetDomainId, StringComparison.OrdinalIgnoreCase));
+        if (source.VmName is null || target.VmName is null)
+        {
+            throw new InvalidOperationException(
+                "Forest-trust V2 template fixture trust references a domain that has no seeded DC VM.");
+        }
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededForestTrustTemplate(
+            filePath,
+            templateName,
+            source.VmName,
+            source.DnsName,
+            source.NetBiosName,
+            target.VmName,
+            target.DnsName,
+            target.NetBiosName,
+            DcLocalBootstrapSlotKey);
+    }
 }
 
 /// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
@@ -601,4 +715,23 @@ public sealed record SeededDcMemberTemplate(
     string MemberVmName,
     string DnsName,
     string NetBiosName,
+    string LocalBootstrapSlotKey);
+
+/// <summary>
+/// Identity + per-forest ground truth of a harness-seeded two-forest + bidirectional forest-trust
+/// template: its file, its library display name, the source and target DC VM names it deploys, each
+/// forest/root-domain DNS + NetBIOS names to validate against (each DC promotes its own forest and the
+/// runtime establishes the trust between them), and the local bootstrap credential slot the deploy must
+/// fill for both DCs. "Source" and "target" follow the trust's own sourceDomainId/targetDomainId so the
+/// source DC is the anchor the runtime creates the trust from; the harness proves BOTH sides in-guest.
+/// </summary>
+public sealed record SeededForestTrustTemplate(
+    string FilePath,
+    string TemplateName,
+    string SourceDcVmName,
+    string SourceDnsName,
+    string SourceNetBiosName,
+    string TargetDcVmName,
+    string TargetDnsName,
+    string TargetNetBiosName,
     string LocalBootstrapSlotKey);

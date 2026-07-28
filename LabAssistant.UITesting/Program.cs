@@ -32,6 +32,7 @@ internal static class Program
                 "template-multivm" => RunMultiVmTemplateDeployProof(args),
                 "template-dc" => RunDcTemplateDeployProof(args),
                 "template-dc-member" => RunDcMemberTemplateDeployProof(args),
+                "template-forest-trust" => RunForestTrustTemplateDeployProof(args),
                 "template-router" => RunRouterTemplateDeployProof(args),
                 "template-guest-static" => RunGuestStaticTemplateDeployProof(args),
                 "template-guest-static-multivm" => RunGuestStaticMultiVmTemplateDeployProof(args),
@@ -254,6 +255,34 @@ internal static class Program
         var scenarios = new List<IScenario>
         {
             new TemplateDeployDcMemberScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
+    /// Two-forest + bidirectional forest-trust deploy scenario (the top complexity rung): ensures the
+    /// real base image is guest-configurable, seeds a tagged two-VM V2 template (two FirstDomainControllers,
+    /// each promoting its own forest on a shared Internal switch, linked by one bidirectional Forest trust),
+    /// and drives Deploy &gt; From Template to a startable plan. With LABASSISTANT_SMOKE_ADMIN_PASSWORD set it
+    /// also Starts the deploy, waits for both DCs, confirms each promoted its own forest, and validates over
+    /// PowerShell Direct that a forest+bidirectional trust exists BOTH ways (Get-ADTrust from each side),
+    /// then tears both DCs down by tag and proves no orphans. Exits non-zero on any Error/Crash finding.
+    /// </summary>
+    private static int RunForestTrustTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployForestTrustScenario()
         };
 
         var harness = new ScenarioHarness(exePath, config, repoRoot);
@@ -487,6 +516,7 @@ internal static class Program
         Console.WriteLine("  template-multivm Seed a 3-VM V2 template, deploy it via From Template, validate every VM, and tear down.");
         Console.WriteLine("  template-dc Seed a single-DC V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate AD over PowerShell Direct.");
         Console.WriteLine("  template-dc-member Seed a DC + domain-joined member V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the DC forest and the member's domain membership over PowerShell Direct.");
+        Console.WriteLine("  template-forest-trust Seed a two-forest V2 template (two DCs on one Internal switch + a bidirectional Forest trust), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate each forest and the trust BOTH ways over PowerShell Direct (Get-ADTrust).");
         Console.WriteLine("  template-router Seed a single-router V2 template (multi-NIC RRAS/NAT), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the LAN gateway IP over PowerShell Direct.");
         Console.WriteLine("  template-guest-static Seed a single-VM V2 template with a templated static IP, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the in-guest static IP over PowerShell Direct.");
         Console.WriteLine("  template-guest-static-multivm Seed a 2-VM V2 template (distinct static IPs on one Internal switch), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate each VM's own in-guest static IP over PowerShell Direct.");

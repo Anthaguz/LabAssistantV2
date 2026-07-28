@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "REPLACED_AT_SEED_TIME",
+  "name": "REPLACED_AT_SEED_TIME",
+  "description": "Harness-seeded two-forest + bidirectional forest-trust V2 template. Two root forests on one shared Internal switch: forest-alpha (alpha.lab / ALPHA) with a FirstDomainController on a static 10.0.0.10/24 NIC that serves its own DNS, and forest-beta (beta.lab / BETA) with a FirstDomainController on a static 10.0.0.20/24 NIC that serves its own DNS. A single bidirectional Forest trust links the two roots; the runtime prepares a conditional DNS forwarder on each DC pointing at the peer (so cross-forest resolution works over the shared L2 with no router), creates the trust from the source anchor, and validates it. Both DCs reference the REAL prepared Windows Server base image (guest-configurable via its bootstrap profile) so the V2 plan requires guest work - two DC promotions plus the trust steps - and can only start once the local bootstrap credential slot is filled. Only localBootstrap is authored on each VM; the planner reuses it for each domain's domain-admin/DSRM and for the cross-forest trust credential. Safe to delete.",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "directoryTopology": {
+    "forests": [
+      {
+        "forestId": "forest-alpha",
+        "rootDomainId": "domain-alpha"
+      },
+      {
+        "forestId": "forest-beta",
+        "rootDomainId": "domain-beta"
+      }
+    ],
+    "domains": [
+      {
+        "domainId": "domain-alpha",
+        "dnsName": "alpha.lab",
+        "netBiosName": "ALPHA",
+        "forestId": "forest-alpha",
+        "relationKind": "Root",
+        "firstDomainControllerVmId": "REPLACED_AT_SEED_TIME"
+      },
+      {
+        "domainId": "domain-beta",
+        "dnsName": "beta.lab",
+        "netBiosName": "BETA",
+        "forestId": "forest-beta",
+        "relationKind": "Root",
+        "firstDomainControllerVmId": "REPLACED_AT_SEED_TIME"
+      }
+    ],
+    "trusts": [
+      {
+        "trustId": "trust-alpha-beta",
+        "sourceDomainId": "domain-alpha",
+        "targetDomainId": "domain-beta",
+        "trustType": "Forest",
+        "direction": "Bidirectional"
+      }
+    ]
+  },
+  "labNetworks": [
+    {
+      "networkId": "trust-net",
+      "name": "TrustLan",
+      "switchName": "REPLACED_AT_SEED_TIME",
+      "subnet": "10.0.0.0/24"
+    }
+  ],
+  "vmTemplates": [
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "topologyRole": "FirstDomainController",
+      "domainId": "domain-alpha",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "trust-net",
+          "ipAddress": "10.0.0.10",
+          "prefixLength": 24,
+          "dnsServers": [
+            "10.0.0.10"
+          ]
+        }
+      ]
+    },
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "topologyRole": "FirstDomainController",
+      "domainId": "domain-beta",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "trust-net",
+          "ipAddress": "10.0.0.20",
+          "prefixLength": 24,
+          "dnsServers": [
+            "10.0.0.20"
+          ]
+        }
+      ]
+    }
+  ]
+}
