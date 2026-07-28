@@ -31,6 +31,7 @@ internal static class Program
                 "template-e2e" => RunTemplateDeployProof(args),
                 "template-multivm" => RunMultiVmTemplateDeployProof(args),
                 "template-dc" => RunDcTemplateDeployProof(args),
+                "template-dc-member" => RunDcMemberTemplateDeployProof(args),
                 "template-router" => RunRouterTemplateDeployProof(args),
                 "template-guest-static" => RunGuestStaticTemplateDeployProof(args),
                 "template-guest-static-multivm" => RunGuestStaticMultiVmTemplateDeployProof(args),
@@ -225,6 +226,34 @@ internal static class Program
         var scenarios = new List<IScenario>
         {
             new TemplateDeployDcScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
+    /// DC + domain-joined member deploy scenario: ensures the real base image is guest-configurable,
+    /// seeds a tagged two-VM V2 template (a FirstDomainController that promotes a forest + a DomainMember
+    /// that joins it), and drives Deploy &gt; From Template to a startable plan. With
+    /// LABASSISTANT_SMOKE_ADMIN_PASSWORD set it also Starts the deploy, waits for both VMs, confirms the
+    /// DC promoted the forest, and validates over PowerShell Direct that the member reports
+    /// PartOfDomain=true for the templated domain, then tears both VMs down by tag and proves no orphans.
+    /// Exits non-zero on any Error/Crash finding.
+    /// </summary>
+    private static int RunDcMemberTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployDcMemberScenario()
         };
 
         var harness = new ScenarioHarness(exePath, config, repoRoot);
@@ -457,6 +486,7 @@ internal static class Program
         Console.WriteLine("  template-e2e Seed a V2 template, deploy it via From Template, validate, and tear down.");
         Console.WriteLine("  template-multivm Seed a 3-VM V2 template, deploy it via From Template, validate every VM, and tear down.");
         Console.WriteLine("  template-dc Seed a single-DC V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate AD over PowerShell Direct.");
+        Console.WriteLine("  template-dc-member Seed a DC + domain-joined member V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the DC forest and the member's domain membership over PowerShell Direct.");
         Console.WriteLine("  template-router Seed a single-router V2 template (multi-NIC RRAS/NAT), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the LAN gateway IP over PowerShell Direct.");
         Console.WriteLine("  template-guest-static Seed a single-VM V2 template with a templated static IP, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the in-guest static IP over PowerShell Direct.");
         Console.WriteLine("  template-guest-static-multivm Seed a 2-VM V2 template (distinct static IPs on one Internal switch), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate each VM's own in-guest static IP over PowerShell Direct.");

@@ -441,6 +441,89 @@ public sealed class TemplateSeeder
 
         return new SeededTemplate(filePath, templateName, vmName);
     }
+
+    /// <summary>
+    /// Writes a tagged DC + domain-joined member V2 template that references the REAL prepared base
+    /// image (by catalog id) on the given switch, and returns its on-disk identity plus the DC/member
+    /// VM names and the forest/domain ground truth to validate against. Both VM names and the template
+    /// file name carry the run prefix so the deployed VMs and the file are sweepable.
+    ///
+    /// The template's directory topology (forest smoke.lab / SMOKE) has a FirstDomainController VM on
+    /// a static NIC that serves its own DNS, and a DomainMember VM on a static NIC whose DNS points at
+    /// the DC so it can locate and join the domain. Both reference a bootstrap-capable base image, so
+    /// the plan requires guest work (DC promotion + a domain join) and therefore a resolved local
+    /// bootstrap credential slot. The DC's fixed vmId is stitched into firstDomainControllerVmId here
+    /// so the domain always points at the VM that promotes it. Only the lab network's switch is
+    /// rewritten; the forest/domain DNS + NetBIOS names are read back from the fixture we are about to
+    /// write, so live validation compares each guest against exactly what was deployed.
+    /// </summary>
+    public SeededDcMemberTemplate SeedDomainControllerMemberTemplate(ResourceTagger tagger, string baseDiskCatalogId, string switchName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "dc-member-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"DC-member V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\dc-member-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("DC-member V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("dcmtpl");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        // The lab network names the (already-created) Internal switch directly. The NICs bind by
+        // networkId (static IPs), so the switch stays out of the NICs and both VMs need guest work.
+        var network = root["labNetworks"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("DC-member V2 template fixture is missing its first labNetworks entry.");
+        network["switchName"] = switchName;
+
+        var vmArray = root["vmTemplates"]?.AsArray()
+            ?? throw new InvalidOperationException("DC-member V2 template fixture is missing its vmTemplates array.");
+
+        // Identify the two roles by their authored intent, not by position: the DC is the
+        // FirstDomainController, the member is the DomainMember. This keeps the seeder correct even if
+        // the fixture's VM order changes.
+        var dcVm = vmArray
+            .Select(n => n?.AsObject())
+            .FirstOrDefault(n => n is not null &&
+                string.Equals(n["topologyRole"]?.GetValue<string>(), "FirstDomainController", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("DC-member V2 template fixture is missing its FirstDomainController VM.");
+        var memberVm = vmArray
+            .Select(n => n?.AsObject())
+            .FirstOrDefault(n => n is not null &&
+                string.Equals(n["membershipMode"]?.GetValue<string>(), "DomainMember", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("DC-member V2 template fixture is missing its DomainMember VM.");
+
+        var dcVmId = Guid.NewGuid().ToString("N");
+        var dcVmName = tagger.Name("dc");
+        dcVm["vmId"] = dcVmId;
+        dcVm["name"] = dcVmName;
+        dcVm["vhdxId"] = baseDiskCatalogId;
+
+        var memberVmName = tagger.Name("mem");
+        memberVm["vmId"] = Guid.NewGuid().ToString("N");
+        memberVm["name"] = memberVmName;
+        memberVm["vhdxId"] = baseDiskCatalogId;
+
+        // firstDomainControllerVmId must match the VM that promotes the forest, or the planner cannot
+        // resolve which VM owns the root domain the member then joins.
+        var rootDomain = root["directoryTopology"]?["domains"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("DC-member V2 template fixture is missing its root domain entry.");
+        rootDomain["firstDomainControllerVmId"] = dcVmId;
+
+        var dnsName = rootDomain["dnsName"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("DC-member V2 template fixture root domain is missing dnsName.");
+        var netBiosName = rootDomain["netBiosName"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("DC-member V2 template fixture root domain is missing netBiosName.");
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededDcMemberTemplate(filePath, templateName, dcVmName, memberVmName, dnsName, netBiosName, DcLocalBootstrapSlotKey);
+    }
 }
 
 /// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
@@ -504,3 +587,18 @@ public sealed record SeededGuestStaticMultiVmTemplate(
 
 /// <summary>The expected ground truth for one VM in a seeded guest-static template: its tagged name and its own static IP.</summary>
 public sealed record SeededGuestStaticVm(string VmName, string StaticIpAddress);
+
+/// <summary>
+/// Identity + forest ground truth of a harness-seeded DC + domain-joined member template: its file,
+/// its library display name, the DC VM name and the member VM name it deploys, the forest/root-domain
+/// DNS + NetBIOS names to validate against (the DC promotes them and the member joins them), and the
+/// local bootstrap credential slot the deploy must fill for both VMs.
+/// </summary>
+public sealed record SeededDcMemberTemplate(
+    string FilePath,
+    string TemplateName,
+    string DcVmName,
+    string MemberVmName,
+    string DnsName,
+    string NetBiosName,
+    string LocalBootstrapSlotKey);
