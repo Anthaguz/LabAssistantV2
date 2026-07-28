@@ -1110,6 +1110,23 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             return;
         }
 
+        // Diagnostic-only: capture the exact ordered switch-name list handed to the switch-attach call (adapter[0]
+        // is connected to the default NIC, the rest are added in order). This reveals whether a switch such as
+        // "Default Switch" actually made it into the connect/add calls, which separates a never-attached egress NIC
+        // from one that attaches but later reports an empty switch name at resolution time. No secrets are involved.
+        context.StructuredEventEmitter?.Invoke(
+            LaStatus.DeployNetwork_SwitchAttachPlan,
+            "attaching",
+            new Dictionary<string, object?>
+            {
+                ["stepKey"] = DeploymentStepKeys.V2ProvisionVm,
+                ["vmName"] = context.VmName,
+                ["switchCount"] = context.VirtualSwitchNames.Count,
+                ["switchNames"] = context.VirtualSwitchNames.Count == 0
+                    ? "(none)"
+                    : string.Join(", ", context.VirtualSwitchNames.Select(name => string.IsNullOrWhiteSpace(name) ? "(empty)" : name))
+            });
+
         if (!await hyperV.AddVirtualSwitchesToVmAsync(context.VmName, context.VirtualSwitchNames))
         {
             context.MarkFailure(
@@ -1175,18 +1192,60 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         }
 
         var preparedNics = BuildPreparedNics(state, request.Plan.Context.Vms);
-        var result = await _domainProgressionRuntimeCoordinator.PrepareGuestNetworkAsync(
-            context.VmName,
-            credential,
-            preparedNics,
-            cancellationToken);
-
-        if (!result.Success)
+        var nicPlans = await BuildGuestNicPlansAsync(state, preparedNics, context);
+        if (nicPlans is null)
         {
-            context.MarkFailure(
-                DeploymentStepKeys.V2PrepareGuestNetwork,
-                $"Failed to prepare guest network on '{context.VmName}'. {result.Error}".Trim());
+            // BuildGuestNicPlansAsync already recorded a MarkFailure with the adapter it could not resolve.
+            return;
         }
+
+        string? lastError = null;
+        var startTick = Environment.TickCount64;
+        for (var attempt = 1; attempt <= request.GuestTransportMaxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.ShouldAbort?.Invoke() == true)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            var result = await _domainProgressionRuntimeCoordinator.PrepareGuestNetworkAsync(
+                context.VmName,
+                credential,
+                nicPlans,
+                cancellationToken);
+            if (result.Success)
+            {
+                return;
+            }
+
+            lastError = result.Error;
+            var category = GuestReadinessLog.Attempt(
+                context,
+                DeploymentStepKeys.V2PrepareGuestNetwork,
+                attempt,
+                request.GuestTransportMaxRetries,
+                Environment.TickCount64 - startTick,
+                lastError);
+
+            // Only a torn-down PowerShell Direct session (the guest rebooted mid-hop during the volatile
+            // specialize/OOBE window) is worth re-running: the fresh hop reconnects once the guest is back, and
+            // the network script is idempotent (it removes then re-adds the IP/routes). Any other failure is a
+            // genuine in-guest error and must surface immediately instead of burning the retry budget.
+            if (category != GuestCommandErrorCategory.GuestRebooting)
+            {
+                break;
+            }
+
+            if (attempt < request.GuestTransportMaxRetries)
+            {
+                await Task.Delay(request.GuestTransportRetryDelay, cancellationToken);
+            }
+        }
+
+        context.MarkFailure(
+            DeploymentStepKeys.V2PrepareGuestNetwork,
+            $"Failed to prepare guest network on '{context.VmName}'. {lastError}".Trim());
     }
 
     private async Task ConfigureBaseRemoteAccessAsync(
@@ -2211,8 +2270,12 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
             if (result.Success)
             {
-                context.V2GuestTransportReady = true;
                 context.LogCallback?.Invoke($"PowerShell Direct is ready on '{context.VmName}'.");
+                // A single reachable hop does not prove the guest is done rebooting. Drain the remaining
+                // specialize/OOBE reboot window before any mutating step runs, so the deploy is not racing the
+                // guest's own restarts.
+                await StabilizeGuestAsync(request, context, credential, cancellationToken);
+                context.V2GuestTransportReady = true;
                 return;
             }
 
@@ -2279,6 +2342,84 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             $"PowerShell Direct did not become ready on '{context.VmName}'. Last error: {lastError ?? "unknown"}");
     }
 
+    /// <summary>
+    /// Drains the guest's reboot-prone specialize/OOBE window after the transport first becomes reachable, so a
+    /// mutating step does not run while the guest is about to reboot out from under the PowerShell Direct hop.
+    /// Requires <see cref="V2RuntimeExecutionRequest.GuestStabilizationRequiredStableProbes"/> consecutive
+    /// "stable" probe results (no pending reboot, setup complete). A dropped hop or a "pending" result resets the
+    /// streak. If the overall <see cref="V2RuntimeExecutionRequest.GuestStabilizationTimeout"/> elapses first the
+    /// gate proceeds anyway and logs that it did: the bounded retry on the mutating steps is the backstop that
+    /// survives a late reboot, so the gate must never fail the deploy on its own.
+    /// </summary>
+    private async Task StabilizeGuestAsync(
+        V2RuntimeExecutionRequest request,
+        VmDeploymentContext context,
+        V2RuntimeCredential credential,
+        CancellationToken cancellationToken)
+    {
+        var required = Math.Max(1, request.GuestStabilizationRequiredStableProbes);
+        var probeScript = GuestStabilizationProbeScriptBuilder.Build();
+        var deadlineTick = Environment.TickCount64 + (long)request.GuestStabilizationTimeout.TotalMilliseconds;
+        var startTick = Environment.TickCount64;
+        var consecutiveStable = 0;
+        var attempt = 0;
+
+        while (consecutiveStable < required)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.ShouldAbort?.Invoke() == true)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            if (Environment.TickCount64 >= deadlineTick)
+            {
+                context.LogCallback?.Invoke(
+                    $"Guest '{context.VmName}' did not report {required} consecutive stable probes within "
+                    + $"{request.GuestStabilizationTimeout}; proceeding anyway (mutating steps retry across a late reboot).");
+                return;
+            }
+
+            attempt++;
+            var result = await _guestCommandExecutor.ExecutePowerShellDirectAsync(
+                context.VmName,
+                credential,
+                probeScript,
+                cancellationToken);
+
+            if (result.Success &&
+                result.Output?.Contains(GuestStabilizationProbeScriptBuilder.StableMarker, StringComparison.Ordinal) == true)
+            {
+                consecutiveStable++;
+            }
+            else
+            {
+                // A "pending" report (setup/reboot still pending) or a dropped hop (a reboot already in flight)
+                // both mean the guest is not settled: restart the streak. Log a dropped hop through the shared
+                // readiness trace so the wait is diagnosable; a plain "pending" is expected and stays quiet.
+                consecutiveStable = 0;
+                if (!result.Success)
+                {
+                    GuestReadinessLog.Attempt(
+                        context,
+                        DeploymentStepKeys.V2GuestTransportReady,
+                        attempt,
+                        request.GuestTransportMaxRetries,
+                        Environment.TickCount64 - startTick,
+                        result.Error);
+                }
+            }
+
+            if (consecutiveStable < required)
+            {
+                await Task.Delay(request.GuestStabilizationProbeInterval, cancellationToken);
+            }
+        }
+
+        context.LogCallback?.Invoke(
+            $"Guest '{context.VmName}' is stable after {required} consecutive probes.");
+    }
+
     private RuntimeCredentialCoordinator GetCredentialCoordinator(
         IReadOnlyDictionary<string, V2RuntimeCredential> slotValues)
     {
@@ -2310,21 +2451,24 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             .OrderBy(nic => nic.EffectiveSwitchName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(nic => nic.NicId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var adapterMap = adapters
-            .Where(adapter => !string.IsNullOrWhiteSpace(adapter.SwitchName))
-            .GroupBy(adapter => adapter.SwitchName!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        var plannedSwitchNames = plans.Select(nic => nic.EffectiveSwitchName).ToArray();
+        LogAdapterInventory(context, DeploymentStepKeys.V2PrepareRouterNetwork, plannedSwitchNames, adapters);
+        var correlated = CorrelateAdaptersInOrder(plannedSwitchNames, adapters);
 
         var resolved = new List<RuntimeRouterAdapter>();
-        foreach (var nic in plans)
+        for (var i = 0; i < plans.Length; i++)
         {
+            var nic = plans[i];
+            var adapter = correlated[i];
             if (string.IsNullOrWhiteSpace(nic.EffectiveSwitchName) ||
-                !adapterMap.TryGetValue(nic.EffectiveSwitchName, out var adapter) ||
+                adapter is null ||
                 string.IsNullOrWhiteSpace(adapter.MacAddress))
             {
                 context.MarkFailure(
                     DeploymentStepKeys.V2PrepareRouterNetwork,
-                    $"Router VM '{context.VmName}' could not resolve a Hyper-V adapter for switch '{nic.EffectiveSwitchName ?? nic.NicId}'.");
+                    $"Router VM '{context.VmName}' could not resolve a Hyper-V adapter for switch "
+                    + $"'{nic.EffectiveSwitchName ?? nic.NicId}'. Observed adapters: {DescribeAdapters(adapters)}.");
                 return Array.Empty<RuntimeRouterAdapter>();
             }
 
@@ -2542,6 +2686,208 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             })
             .ToArray();
     }
+
+    /// <summary>
+    /// Correlates each prepared NIC to its host-side Hyper-V adapter MAC so the in-guest script can bind each
+    /// static IP to the adapter that actually sits on the intended switch. Adapters are matched by switch name
+    /// first, and a single remaining egress/DHCP adapter that reports an empty or dynamic switch name is recovered
+    /// by elimination (see <see cref="CorrelateAdaptersInOrder"/>) rather than aborting the deploy. A NIC that still
+    /// cannot be resolved is only fatal when it carries a static IP; a NIC with no static IP is left on DHCP and
+    /// skipped, so an unresolvable egress adapter no longer fails the whole guest-network step.
+    /// Returns null (after recording a MarkFailure) only when a static-IP NIC has no resolvable adapter.
+    /// </summary>
+    private async Task<IReadOnlyList<GuestNicPlan>?> BuildGuestNicPlansAsync(
+        RuntimeVmState state,
+        IReadOnlyList<V2ResolvedVmNetworkInterface> preparedNics,
+        VmDeploymentContext context)
+    {
+        var hyperV = state.GetOrCreateHyperV(_sessionFactory, _hyperVFactory);
+        var adapters = await hyperV.GetVmNetworkAdaptersAsync(context.VmName);
+
+        var plannedSwitchNames = preparedNics.Select(nic => nic.EffectiveSwitchName).ToArray();
+        LogAdapterInventory(context, DeploymentStepKeys.V2PrepareGuestNetwork, plannedSwitchNames, adapters);
+        var correlated = CorrelateAdaptersInOrder(plannedSwitchNames, adapters);
+
+        var plans = new List<GuestNicPlan>();
+        for (var i = 0; i < preparedNics.Count; i++)
+        {
+            var nic = preparedNics[i];
+            var adapter = correlated[i];
+            if (adapter is null || string.IsNullOrWhiteSpace(adapter.MacAddress))
+            {
+                if (!string.IsNullOrWhiteSpace(nic.IpAddress))
+                {
+                    context.MarkFailure(
+                        DeploymentStepKeys.V2PrepareGuestNetwork,
+                        $"VM '{context.VmName}' could not resolve a Hyper-V adapter MAC for NIC '{nic.NicId}' on switch "
+                        + $"'{nic.EffectiveSwitchName ?? "(none)"}'. Observed adapters: {DescribeAdapters(adapters)}.");
+                    return null;
+                }
+
+                // No static IP => the NIC runs on DHCP and has nothing to bind, so an unresolvable adapter is not
+                // fatal. Skip it (with a visible note) rather than aborting the whole guest-network step, which
+                // keeps isolated/egress topologies that legitimately rely on DHCP deployable.
+                context.LogCallback?.Invoke(
+                    $"[{DeploymentStepKeys.V2PrepareGuestNetwork}] {context.VmName}: NIC '{nic.NicId}' on switch "
+                    + $"'{nic.EffectiveSwitchName ?? "(none)"}' has no static IP and no resolvable host adapter; leaving it on DHCP.");
+                continue;
+            }
+
+            plans.Add(new GuestNicPlan
+            {
+                NicId = nic.NicId,
+                MacAddress = adapter.MacAddress,
+                IpAddress = nic.IpAddress,
+                PrefixLength = nic.PrefixLength,
+                DefaultGateway = nic.DefaultGateway,
+                DnsServers = nic.DnsServers
+            });
+        }
+
+        return plans;
+    }
+
+    /// <summary>
+    /// Correlates an ordered list of planned NIC switch names to a VM's live Hyper-V adapters. Each NIC first
+    /// claims an adapter reporting the same switch name (in order, so multiple NICs on one switch consume distinct
+    /// adapters). If exactly one NIC and exactly one adapter remain unmatched afterwards, that adapter is assigned
+    /// to that NIC by elimination. This forced-pairing pass is the fix for the Default Switch / NAT egress case: such
+    /// an adapter is physically attached to the VM but frequently reports an empty or mismatched switch name at query
+    /// time, so a strict switch-name-only match would drop it and abort the deploy. The pass deliberately does NOT
+    /// guess when two or more NICs or adapters are still unmatched, because a positional guess there could bind a
+    /// static IP or a router's egress MAC to the wrong adapter; those NICs are returned null so the caller can fail
+    /// loudly (static IP) or skip (DHCP) with full diagnostics. Returns one entry per input switch name, null where
+    /// no adapter could be safely claimed.
+    /// </summary>
+    internal static HyperVVmNetworkAdapterInfo?[] CorrelateAdaptersInOrder(
+        IReadOnlyList<string?> orderedSwitchNames,
+        IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters)
+    {
+        var result = new HyperVVmNetworkAdapterInfo?[orderedSwitchNames.Count];
+        var claimed = new bool[adapters.Count];
+
+        var indicesBySwitch = new Dictionary<string, Queue<int>>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < adapters.Count; i++)
+        {
+            var switchName = adapters[i].SwitchName;
+            if (string.IsNullOrWhiteSpace(switchName))
+            {
+                continue;
+            }
+
+            if (!indicesBySwitch.TryGetValue(switchName!, out var queue))
+            {
+                queue = new Queue<int>();
+                indicesBySwitch[switchName!] = queue;
+            }
+
+            queue.Enqueue(i);
+        }
+
+        for (var n = 0; n < orderedSwitchNames.Count; n++)
+        {
+            var name = orderedSwitchNames[n];
+            if (!string.IsNullOrWhiteSpace(name) &&
+                indicesBySwitch.TryGetValue(name!, out var queue) &&
+                queue.Count > 0)
+            {
+                var index = queue.Dequeue();
+                claimed[index] = true;
+                result[n] = adapters[index];
+            }
+        }
+
+        // Leftover pass: recover a single unmatched NIC only when the pairing is forced by elimination, i.e. exactly
+        // one NIC is still unmatched AND exactly one adapter is still unclaimed. That is the Default Switch / NAT egress
+        // case: every other NIC took its like-named adapter, so the one remaining adapter can only belong to the one
+        // remaining NIC. When two or more NICs or adapters are still unmatched, positional guessing could bind a static
+        // IP (guest) or a router's egress MAC to the wrong adapter, silently landing traffic on the wrong network, so we
+        // deliberately leave those NICs null and let the caller fail loudly (static IP) or skip (DHCP) with full adapter
+        // diagnostics rather than guess.
+        var unmatchedNic = -1;
+        var unmatchedNicCount = 0;
+        for (var n = 0; n < result.Length; n++)
+        {
+            if (result[n] is null)
+            {
+                unmatchedNicCount++;
+                unmatchedNic = n;
+            }
+        }
+
+        if (unmatchedNicCount == 1)
+        {
+            var unclaimedAdapter = -1;
+            var unclaimedAdapterCount = 0;
+            for (var i = 0; i < adapters.Count; i++)
+            {
+                if (!claimed[i])
+                {
+                    unclaimedAdapterCount++;
+                    unclaimedAdapter = i;
+                }
+            }
+
+            if (unclaimedAdapterCount == 1)
+            {
+                result[unmatchedNic] = adapters[unclaimedAdapter];
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Emits a Debug structured event capturing the raw host-side adapter inventory alongside the planned switch
+    /// names at a NIC-to-adapter resolution point. This is the evidence that separates an adapter which is present
+    /// but reports an empty or mismatched switch name (resolution was too strict) from one that was never attached
+    /// (a provisioning bug). Only adapter identity, switch name, MAC, and operational status are logged; the guest
+    /// password is never part of this data, so nothing secret can leak here.
+    /// </summary>
+    private static void LogAdapterInventory(
+        VmDeploymentContext context,
+        string stepKey,
+        IReadOnlyList<string?> plannedSwitchNames,
+        IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters)
+    {
+        var planned = plannedSwitchNames.Count == 0
+            ? "(none)"
+            : string.Join(", ", plannedSwitchNames.Select(s => string.IsNullOrWhiteSpace(s) ? "(empty)" : s));
+
+        context.StructuredEventEmitter?.Invoke(
+            LaStatus.DeployNetwork_AdapterInventory,
+            "observed",
+            new Dictionary<string, object?>
+            {
+                ["stepKey"] = stepKey,
+                ["vmName"] = context.VmName,
+                ["plannedSwitches"] = planned,
+                ["adapterCount"] = adapters.Count,
+                ["adapters"] = DescribeAdapters(adapters)
+            });
+    }
+
+    /// <summary>
+    /// Renders the observed host-side adapters into a compact, secret-free string for diagnostics and failure
+    /// messages: adapter name, reported switch name (or <c>(empty)</c>), MAC (or <c>(empty)</c>), and status.
+    /// </summary>
+    private static string DescribeAdapters(IReadOnlyList<HyperVVmNetworkAdapterInfo> adapters)
+    {
+        if (adapters.Count == 0)
+        {
+            return "(none)";
+        }
+
+        return string.Join("; ", adapters.Select(adapter =>
+            $"{adapter.AdapterName} [switch={(string.IsNullOrWhiteSpace(adapter.SwitchName) ? "(empty)" : adapter.SwitchName)}; "
+            + $"mac={(string.IsNullOrWhiteSpace(adapter.MacAddress) ? "(empty)" : adapter.MacAddress)}; "
+            + $"status={(string.IsNullOrWhiteSpace(adapter.Status) ? "(unknown)" : adapter.Status)}; "
+            + $"connected={DescribeBool(adapter.Connected)}; "
+            + $"mgmtOs={DescribeBool(adapter.IsManagementOs)}]"));
+    }
+
+    private static string DescribeBool(bool? value) =>
+        value is null ? "(unknown)" : (value.Value ? "true" : "false");
 
     private static IReadOnlyList<string> BuildPreparedDnsServers(
         RuntimeVmState state,

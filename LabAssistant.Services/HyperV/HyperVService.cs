@@ -148,11 +148,7 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
 
     public async Task<IReadOnlyList<HyperVVmNetworkAdapterInfo>> GetVmNetworkAdaptersAsync(string vmName)
     {
-        var script = string.Join(
-            Environment.NewLine,
-            $"$items = Get-VMNetworkAdapter -VMName {PowerShellCommandBuilder.Quote(vmName)} -ErrorAction Stop |",
-            "    Select-Object @{Name='AdapterName';Expression={$_.Name}}, @{Name='SwitchName';Expression={$_.SwitchName}}, @{Name='MacAddress';Expression={$_.MacAddress}} |",
-            "    ConvertTo-Json -Depth 3");
+        var script = BuildGetVmNetworkAdaptersScript(vmName);
         var (output, error) = await ExecuteMeasuredAsync("get_vm_network_adapters", script, vmName);
         DebugLogger.LogPowerShellOutput(script, output, error);
 
@@ -203,6 +199,22 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
         }
 
         return Array.Empty<HyperVVmNetworkAdapterInfo>();
+    }
+
+    /// <summary>
+    /// Builds the PowerShell that queries a VM's network adapters and projects them to JSON.
+    /// The pipeline must terminate in <c>ConvertTo-Json</c> writing to the success stream: a prior
+    /// version captured the pipeline into a local variable instead of emitting it, so the
+    /// persistent session captured empty stdout, <see cref="GetVmNetworkAdaptersAsync"/> returned no
+    /// adapters, and every guest-network deploy failed to resolve a NIC. Keep the terminal emit.
+    /// </summary>
+    internal static string BuildGetVmNetworkAdaptersScript(string vmName)
+    {
+        return string.Join(
+            Environment.NewLine,
+            $"Get-VMNetworkAdapter -VMName {PowerShellCommandBuilder.Quote(vmName)} -ErrorAction Stop |",
+            "    Select-Object @{Name='AdapterName';Expression={$_.Name}}, @{Name='SwitchName';Expression={$_.SwitchName}}, @{Name='MacAddress';Expression={$_.MacAddress}}, @{Name='Status';Expression={($_.Status -join ',')}}, @{Name='Connected';Expression={$_.Connected}}, @{Name='IsManagementOs';Expression={$_.IsManagementOs}} |",
+            "    ConvertTo-Json -Depth 3");
     }
 
     public async Task<bool> AddVirtualSwitchToVmAsync(string vmName, string switchName)
@@ -342,7 +354,25 @@ public class HyperVService : IHyperVService, IHyperVFailureDiagnosticsProvider
             SwitchName = element.TryGetProperty("SwitchName", out var switchName) ? switchName.GetString() : null,
             MacAddress = element.TryGetProperty("MacAddress", out var macAddress)
                 ? MacAddressNormalizer.NormalizeMacAddress(macAddress.GetString())
-                : string.Empty
+                : string.Empty,
+            Status = element.TryGetProperty("Status", out var status)
+                ? NullIfEmpty(status.GetString())
+                : null,
+            Connected = ReadNullableBool(element, "Connected"),
+            IsManagementOs = ReadNullableBool(element, "IsManagementOs")
         };
     }
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static bool? ReadNullableBool(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value)
+            ? value.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => null
+            }
+            : null;
 }

@@ -7,6 +7,28 @@ public sealed class HyperVVmNetworkAdapterInfo
     public string? SwitchName { get; init; }
 
     public string MacAddress { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The adapter's Hyper-V operational status (for example <c>Ok</c> or <c>Degraded</c>), captured purely for
+    /// diagnostics so a NIC that is attached but reporting an empty switch name can be told apart from one that
+    /// never attached. Null when the host did not report a status.
+    /// </summary>
+    public string? Status { get; init; }
+
+    /// <summary>
+    /// Whether the adapter reports as connected to a virtual switch, captured purely for diagnostics. This is the
+    /// signal that distinguishes an egress adapter that is physically attached but reports an empty or mismatched
+    /// switch name (<c>Connected == true</c>) from one that was never attached (<c>Connected == false</c>). Null
+    /// when the host did not report the value.
+    /// </summary>
+    public bool? Connected { get; init; }
+
+    /// <summary>
+    /// Whether the adapter belongs to the management OS rather than the guest, captured purely for diagnostics so a
+    /// host-side management adapter is not mistaken for a guest NIC during resolution triage. Null when the host did
+    /// not report the value.
+    /// </summary>
+    public bool? IsManagementOs { get; init; }
 }
 
 public interface IHyperVService

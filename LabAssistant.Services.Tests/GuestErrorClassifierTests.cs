@@ -31,6 +31,26 @@ public class GuestErrorClassifierTests
     }
 
     [Theory]
+    [InlineData("The running command stopped because the preference variable \"ErrorActionPreference\" is set to Stop: The Hyper-V socket target process has ended.")]
+    [InlineData("[dc01] The background process reported an error with the following message: \"The Hyper-V socket target process has ended.\".")]
+    [InlineData("FullyQualifiedErrorId : 2100,PSSessionStateBroken")]
+    [InlineData("CategoryInfo : OpenError: (dc01:String) [], PSDirectException")]
+    [InlineData("CategoryInfo : OpenError: (dc01:String) [], PSRemotingTransportException")]
+    public void Classify_GuestRebootMessages_ReturnsGuestRebooting(string error)
+    {
+        Assert.Equal(GuestCommandErrorCategory.GuestRebooting, GuestErrorClassifier.Classify(error));
+    }
+
+    [Fact]
+    public void Classify_CredentialRejectionTakesPrecedenceOverReboot()
+    {
+        // A message carrying both signatures is a real credential rejection, not a reboot: fail fast.
+        Assert.Equal(
+            GuestCommandErrorCategory.AuthenticationRejected,
+            GuestErrorClassifier.Classify("The credential is invalid. PSSessionStateBroken"));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]

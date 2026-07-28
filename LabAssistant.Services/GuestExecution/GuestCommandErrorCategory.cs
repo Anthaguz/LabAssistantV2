@@ -20,5 +20,16 @@ public enum GuestCommandErrorCategory
     /// deterministic: retrying the same credential cannot succeed, so the loop should stop and surface an
     /// actionable error (or prompt for a corrected credential) instead of exhausting its retry budget.
     /// </summary>
-    AuthenticationRejected
+    AuthenticationRejected,
+
+    /// <summary>
+    /// The PowerShell Direct session was torn down mid-hop because the guest went away - almost always a guest
+    /// reboot during the volatile specialize/OOBE window (surfaced as "The Hyper-V socket target process has
+    /// ended", <c>PSSessionStateBroken</c>, or <c>PSDirectException</c>). This is transient and self-heals: the
+    /// next fresh hop reconnects once the guest finishes booting, so a mutating step that hit it should re-run
+    /// the whole hop rather than fail the deploy. It is called out as its own category (rather than folded into
+    /// <see cref="Transient"/>) so a step can retry specifically on a lost transport while still failing fast on
+    /// a genuine in-guest script error.
+    /// </summary>
+    GuestRebooting
 }

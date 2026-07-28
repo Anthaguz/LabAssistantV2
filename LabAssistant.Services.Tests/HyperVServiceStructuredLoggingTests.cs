@@ -65,6 +65,36 @@ public class HyperVServiceStructuredLoggingTests
                 && Equals(e.Context!["vmName"], "Router01"));
     }
 
+    [Fact]
+    public async Task GetVmNetworkAdapters_ParsesAdapters_NormalizesMacAndCapturesStatusAndEmptySwitchName()
+    {
+        // A valid adapter payload must normalize the MAC to canonical form, carry the new operational Status
+        // through for diagnostics, and preserve an empty switch name (the egress/Default Switch reporting case)
+        // rather than dropping the adapter.
+        var json = "[" +
+            "{\"AdapterName\":\"Network Adapter\",\"SwitchName\":\"vSwitch-Core\",\"MacAddress\":\"00-15-5D-AB-CD-EF\",\"Status\":\"Ok\",\"Connected\":true,\"IsManagementOs\":false}," +
+            "{\"AdapterName\":\"Network Adapter 2\",\"SwitchName\":\"\",\"MacAddress\":\"00155D000099\",\"Status\":\"Degraded\",\"Connected\":false}" +
+            "]";
+        var service = new HyperVService(new StubSession((json, string.Empty)), new CapturingStructuredLogger());
+
+        var adapters = await service.GetVmNetworkAdaptersAsync("Router01");
+
+        Assert.Equal(2, adapters.Count);
+        Assert.Equal("00155DABCDEF", adapters[0].MacAddress);
+        Assert.Equal("vSwitch-Core", adapters[0].SwitchName);
+        Assert.Equal("Ok", adapters[0].Status);
+        Assert.True(adapters[0].Connected);
+        Assert.False(adapters[0].IsManagementOs);
+        Assert.True(string.IsNullOrEmpty(adapters[1].SwitchName));
+        Assert.Equal("00155D000099", adapters[1].MacAddress);
+        Assert.Equal("Degraded", adapters[1].Status);
+        // The egress adapter reports an empty switch name but Connected=false here; the point is the flag is
+        // captured, so the next live run can tell attached-but-empty (Connected=true) from never-attached.
+        Assert.False(adapters[1].Connected);
+        // IsManagementOs was absent on the second adapter, so it must come back null rather than defaulting.
+        Assert.Null(adapters[1].IsManagementOs);
+    }
+
     private static string Hex(uint code) => $"0x{code:X8}";
 
     private sealed class StubSession : IPersistentPowerShellSession

@@ -31,6 +31,26 @@ public sealed class V2RuntimeExecutionRequest
     /// Default 9 (~90s at the default 10s retry delay).
     /// </summary>
     public int GuestAuthGraceAttempts { get; set; } = 9;
+
+    /// <summary>
+    /// Number of consecutive successful "guest stable" probe hops required, before mutating guest steps run, to
+    /// conclude the guest is past its reboot-prone specialize/OOBE window. A single successful transport hop only
+    /// proves the guest is reachable right now, not that it is done rebooting, so the runtime drains the volatile
+    /// window by requiring several clean probes in a row (no pending reboot, setup complete). Default 3.
+    /// </summary>
+    public int GuestStabilizationRequiredStableProbes { get; set; } = 3;
+
+    /// <summary>
+    /// Delay between guest-stabilization probe hops. Default 5s.
+    /// </summary>
+    public TimeSpan GuestStabilizationProbeInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Overall cap on the guest-stabilization gate. If the guest has not reported the required consecutive stable
+    /// probes within this budget the runtime proceeds anyway (logging that it did so) rather than failing the
+    /// deploy, because the bounded retry on the mutating steps still survives a stray late reboot. Default 3 min.
+    /// </summary>
+    public TimeSpan GuestStabilizationTimeout { get; set; } = TimeSpan.FromMinutes(3);
 }
 
 public sealed class V2BaseRemoteAccessOptions
