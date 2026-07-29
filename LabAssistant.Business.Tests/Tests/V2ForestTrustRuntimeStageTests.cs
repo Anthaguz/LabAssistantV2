@@ -695,6 +695,108 @@ public sealed partial class V2RuntimeCapabilityServiceTests
             $"Transport budget {transportBudget.TotalSeconds:F0}s must outlast the reboot-recovery window {request.GuestAuthGraceWindow.TotalSeconds:F0}s so rollback cleanup does not exhaust mid-reboot.");
     }
 
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupHangingCall_AbandonedByPerAttemptTimeout_RetriesThenSucceeds()
+    {
+        // Finding 85 rework: the real failure was not a missing wrap or a bad classification, it was a cleanup attempt
+        // that BLOCKS. A PowerShell Direct call into a mid-reboot DC can hang in connection negotiation; the one-shot
+        // session's timeout surfaces that as a thrown exception, and the retry loop used to let it escape uncaught,
+        // aborting cleanup with no terminal event (cleanup.start then permanent silence). With a per-attempt timeout the
+        // frozen attempt is abandoned and the loop regains control to retry through the reboot and then succeed.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 90;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestCleanupAttemptTimeout = TimeSpan.FromMilliseconds(50);
+        request.GuestCleanupRetryBudget = TimeSpan.FromSeconds(30);
+
+        var sourceDeleteAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = async (vmName, _, script, attemptCancellation) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+                return new GuestCommandResult { Success = true, Output = vmName };
+            }
+
+            if (vmName == "dc01" && script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal))
+            {
+                var attempt = Interlocked.Increment(ref sourceDeleteAttempts);
+                if (attempt == 1)
+                {
+                    // Never return until the per-attempt timeout cancels the attempt token: this is the hang the
+                    // wrap must survive. Without the per-attempt bound this await would block the loop forever.
+                    await Task.Delay(Timeout.Infinite, attemptCancellation);
+                }
+            }
+
+            return new GuestCommandResult { Success = true, Output = vmName };
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.True(sourceDeleteAttempts >= 2, $"Expected cleanup to abandon the hung attempt and retry, saw {sourceDeleteAttempts} attempt(s).");
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.CleanupAttempted);
+        Assert.False(trustContext.CleanupResidual);
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupHangingCall_NeverRecovers_BoundedFailsAndFlagsResidual()
+    {
+        // The per-attempt timeout must not trade an infinite hang for an unbounded retry loop: a cleanup call that
+        // hangs on EVERY attempt (a genuinely gone DC that never finishes negotiating) must exhaust the wall-clock
+        // retry budget and then flag residual, returning a terminal result rather than hanging. The whole point of
+        // finding 85 is that this path must always end - success or bounded failure - so the backstop sees residual.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 90;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+        request.GuestCleanupAttemptTimeout = TimeSpan.FromMilliseconds(20);
+        request.GuestCleanupRetryBudget = TimeSpan.FromMilliseconds(100);
+
+        var sourceDeleteAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = async (vmName, _, script, attemptCancellation) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+                return new GuestCommandResult { Success = true, Output = vmName };
+            }
+
+            if (script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal))
+            {
+                if (vmName == "dc01")
+                {
+                    Interlocked.Increment(ref sourceDeleteAttempts);
+                }
+
+                // Hang on every attempt: the guest never finishes negotiating. Each attempt is abandoned at the
+                // per-attempt timeout and the loop must stop once the retry budget elapses.
+                await Task.Delay(Timeout.Infinite, attemptCancellation);
+            }
+
+            return new GuestCommandResult { Success = true, Output = vmName };
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.True(sourceDeleteAttempts >= 2, $"Expected cleanup to retry the hung attempt before bounded-failing, saw {sourceDeleteAttempts} attempt(s).");
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.CleanupAttempted);
+        Assert.True(trustContext.CleanupResidual);
+    }
+
     private static (MultiVmDeploymentContext MultiContext, IReadOnlyList<V2ForestTrustAnchorState> Anchors) CreateForestTrustStageContext(
         V2RuntimeExecutionRequest request)
     {

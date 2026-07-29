@@ -41,6 +41,16 @@ namespace LabAssistant.Business.Runtime;
 /// bad credential would only slow the best-effort cleanup before residual is flagged, never hang it forever. That
 /// budget (default 90 x 10s = ~15 min) also comfortably outlasts the ~340-360s a rebooting DC needs to become
 /// reachable again during rollback, so the cleanup retry spans the reboot rather than expiring mid-recovery.
+/// <paramref name="perAttemptTimeout"/> and <paramref name="retryBudget"/> are opted into ONLY by the rollback cleanup
+/// path. A cleanup delete runs into a DC that is rebooting or being torn down, where PowerShell Direct connection
+/// negotiation can BLOCK rather than fail fast; the one-shot session's own timeout surfaces that block as a thrown
+/// <see cref="TimeoutException"/>, and a per-attempt cancellation surfaces as an <see cref="OperationCanceledException"/>.
+/// Left unhandled, either throw escapes the loop uncaught and aborts cleanup with no terminal event (the finding-85
+/// hang). When <paramref name="perAttemptTimeout"/> is supplied, each attempt is bounded by a fresh linked timeout and
+/// those two throws are caught and converted into a retryable <see cref="GuestCommandErrorCategory.GuestRebooting"/>
+/// transport drop, so the loop regains control to retry through the reboot or, once <paramref name="retryBudget"/>
+/// elapses, RETURN a bounded failure the caller can report (residual flagged) instead of hanging. The deploy path
+/// leaves both <see langword="null"/>, so its bounding (attempt count only) and exception behavior are unchanged.
 /// </remarks>
 internal static class GuestStepTransportRetry
 {
@@ -50,7 +60,9 @@ internal static class GuestStepTransportRetry
         string stepKey,
         Func<CancellationToken, Task<GuestCommandResult>> operation,
         CancellationToken cancellationToken,
-        bool retryAuthenticationRejection = false)
+        bool retryAuthenticationRejection = false,
+        TimeSpan? perAttemptTimeout = null,
+        TimeSpan? retryBudget = null)
     {
         var startTick = Environment.TickCount64;
         var attempt = 1;
@@ -62,23 +74,61 @@ internal static class GuestStepTransportRetry
                 throw new OperationCanceledException(cancellationToken);
             }
 
-            var result = await operation(cancellationToken);
+            GuestCommandResult result;
+            var attemptTimedOut = false;
+            if (perAttemptTimeout is { } attemptTimeout)
+            {
+                // Bound this single attempt so a frozen PowerShell Direct negotiation into a rebooting DC cannot
+                // block the loop forever. The linked source cancels on either the outer token or the per-attempt
+                // timeout; the one-shot session kills the child process tree on cancel, so nothing is leaked.
+                using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                attemptCts.CancelAfter(attemptTimeout);
+                try
+                {
+                    result = await operation(attemptCts.Token);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // A genuine outer cancellation, not the per-attempt timeout: propagate it.
+                    throw;
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
+                {
+                    // The per-attempt bound (or the session's own timeout) abandoned a blocked call. Treat it as a
+                    // transport drop so the loop retries rather than aborting cleanup with an uncaught throw.
+                    attemptTimedOut = true;
+                    result = new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = $"Guest step '{stepKey}' did not complete within {attemptTimeout.TotalSeconds:F0}s on attempt {attempt} and was abandoned.",
+                        ErrorCategory = GuestCommandErrorCategory.GuestRebooting
+                    };
+                }
+            }
+            else
+            {
+                result = await operation(cancellationToken);
+            }
+
             if (result.Success)
             {
                 return result;
             }
 
             // With a context we log + emit the per-attempt readiness event (and classify inside it); without one
-            // (cleanup) we still classify identically but stay silent per attempt.
-            var category = context is not null
-                ? GuestReadinessLog.Attempt(
-                    context,
-                    stepKey,
-                    attempt,
-                    request.GuestTransportMaxRetries,
-                    Environment.TickCount64 - startTick,
-                    result.Error)
-                : GuestErrorClassifier.Classify(result.Error);
+            // (cleanup) we still classify identically but stay silent per attempt. An abandoned attempt is already
+            // classified as a transport drop, so it skips re-parsing a synthesized message.
+            var category = attemptTimedOut
+                ? GuestCommandErrorCategory.GuestRebooting
+                : (context is not null
+                    ? GuestReadinessLog.Attempt(
+                        context,
+                        stepKey,
+                        attempt,
+                        request.GuestTransportMaxRetries,
+                        Environment.TickCount64 - startTick,
+                        result.Error)
+                    : GuestErrorClassifier.Classify(result.Error));
 
             // A torn-down PowerShell Direct session is always worth re-running. The rollback cleanup path additionally
             // opts into retrying a credential rejection, because a session that broke while a DC reboots surfaces
@@ -87,7 +137,13 @@ internal static class GuestStepTransportRetry
             // finite so a persistently failing guest still fails rather than looping forever.
             var retryable = category == GuestCommandErrorCategory.GuestRebooting
                 || (retryAuthenticationRejection && category == GuestCommandErrorCategory.AuthenticationRejected);
-            if (!retryable || attempt >= request.GuestTransportMaxRetries)
+
+            // Deploy bounds by attempt count only (byte-identical to before). Cleanup additionally bounds by the
+            // wall-clock retry budget so that blocked attempts (up to the per-attempt timeout each) cannot overrun the
+            // intended ceiling, and so a fast-failing guest is still retried long enough to span the reboot.
+            var budgetExhausted = attempt >= request.GuestTransportMaxRetries
+                || (retryBudget is { } budget && Environment.TickCount64 - startTick >= (long)budget.TotalMilliseconds);
+            if (!retryable || budgetExhausted)
             {
                 return result;
             }

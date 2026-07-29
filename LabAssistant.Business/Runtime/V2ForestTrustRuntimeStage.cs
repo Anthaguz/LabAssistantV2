@@ -172,7 +172,9 @@ public sealed class V2ForestTrustRuntimeStage
                     trust.TargetDomainDnsName,
                     attemptCancellation),
                 CancellationToken.None,
-                retryAuthenticationRejection: true);
+                retryAuthenticationRejection: true,
+                perAttemptTimeout: request.GuestCleanupAttemptTimeout,
+                retryBudget: request.GuestCleanupRetryBudget);
             var targetResult = await GuestStepTransportRetry.RunAsync(
                 null,
                 request,
@@ -183,7 +185,9 @@ public sealed class V2ForestTrustRuntimeStage
                     trust.SourceDomainDnsName,
                     attemptCancellation),
                 CancellationToken.None,
-                retryAuthenticationRejection: true);
+                retryAuthenticationRejection: true,
+                perAttemptTimeout: request.GuestCleanupAttemptTimeout,
+                retryBudget: request.GuestCleanupRetryBudget);
 
             trustState.CleanupResidual = !sourceResult.Success || !targetResult.Success;
             var error = string.Join(
