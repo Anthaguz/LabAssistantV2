@@ -1,0 +1,153 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "REPLACED_AT_SEED_TIME",
+  "name": "REPLACED_AT_SEED_TIME",
+  "description": "Harness-seeded routed cross-forest + bidirectional forest-trust V2 template (the capstone rung). Two root forests on SEPARATE gatewayed Internal switches bridged by a 3-NIC router: forest-alpha (alpha.lab / ALPHA) with a FirstDomainController on alpha-net (static 10.70.0.10/24, default gateway 10.70.0.1 = the router's alpha leg, serving its own DNS) and forest-beta (beta.lab / BETA) with a FirstDomainController on beta-net (static 10.71.0.10/24, default gateway 10.71.0.1 = the router's beta leg, serving its own DNS). A standalone Router VM carries three NICs - a LAN leg on alpha-net (10.70.0.1), a LAN leg on beta-net (10.71.0.1), and an external NIC on the host Default Switch for egress - so the two forests can only reach each other THROUGH the router (no shared L2 shortcut). A single bidirectional Forest trust links the two roots; the runtime prepares a conditional DNS forwarder on each DC pointing at the peer across the routed boundary, creates the trust from the source anchor, and validates it. Because the anchor network sets are disjoint and the router carries a leg on each side, the planner must order the forest-trust/DNS-prep stage AFTER the router is routing (RouterReady -> prepareForestTrustDns). All three VMs reference the REAL prepared Windows Server base image (guest-configurable via its bootstrap profile) so the V2 plan requires guest work - router RRAS/NAT config plus two DC promotions plus the trust steps - and can only start once the local bootstrap credential slot is filled. Only localBootstrap is authored on each VM; the planner reuses it for each domain's domain-admin/DSRM and for the cross-forest trust credential. Safe to delete.",
+  "templateRevision": 1,
+  "createdWithAppVersion": "0.0.0",
+  "templateType": "lab-template",
+  "deploymentProfile": "Balanced",
+  "directoryTopology": {
+    "forests": [
+      {
+        "forestId": "forest-alpha",
+        "rootDomainId": "domain-alpha"
+      },
+      {
+        "forestId": "forest-beta",
+        "rootDomainId": "domain-beta"
+      }
+    ],
+    "domains": [
+      {
+        "domainId": "domain-alpha",
+        "dnsName": "alpha.lab",
+        "netBiosName": "ALPHA",
+        "forestId": "forest-alpha",
+        "relationKind": "Root",
+        "firstDomainControllerVmId": "REPLACED_AT_SEED_TIME"
+      },
+      {
+        "domainId": "domain-beta",
+        "dnsName": "beta.lab",
+        "netBiosName": "BETA",
+        "forestId": "forest-beta",
+        "relationKind": "Root",
+        "firstDomainControllerVmId": "REPLACED_AT_SEED_TIME"
+      }
+    ],
+    "trusts": [
+      {
+        "trustId": "trust-alpha-beta",
+        "sourceDomainId": "domain-alpha",
+        "targetDomainId": "domain-beta",
+        "trustType": "Forest",
+        "direction": "Bidirectional"
+      }
+    ]
+  },
+  "labNetworks": [
+    {
+      "networkId": "alpha-net",
+      "name": "AlphaLan",
+      "switchName": "REPLACED_AT_SEED_TIME",
+      "subnet": "10.70.0.0/24"
+    },
+    {
+      "networkId": "beta-net",
+      "name": "BetaLan",
+      "switchName": "REPLACED_AT_SEED_TIME",
+      "subnet": "10.71.0.0/24"
+    },
+    {
+      "networkId": "external-net",
+      "name": "RouterExternal",
+      "switchName": "Default Switch"
+    }
+  ],
+  "vmTemplates": [
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "topologyRole": "FirstDomainController",
+      "domainId": "domain-alpha",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "alpha-net",
+          "ipAddress": "10.70.0.10",
+          "prefixLength": 24,
+          "defaultGateway": "10.70.0.1",
+          "dnsServers": [
+            "10.70.0.10"
+          ]
+        }
+      ]
+    },
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "topologyRole": "FirstDomainController",
+      "domainId": "domain-beta",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "primary",
+          "networkId": "beta-net",
+          "ipAddress": "10.71.0.10",
+          "prefixLength": 24,
+          "defaultGateway": "10.71.0.1",
+          "dnsServers": [
+            "10.71.0.10"
+          ]
+        }
+      ]
+    },
+    {
+      "vmId": "REPLACED_AT_SEED_TIME",
+      "name": "REPLACED_AT_SEED_TIME",
+      "memoryMb": 2048,
+      "cpuCount": 2,
+      "vhdxId": "REPLACED_AT_SEED_TIME",
+      "topologyRole": "Router",
+      "membershipMode": "Standalone",
+      "capabilityRoles": [],
+      "credentialSlots": {
+        "localBootstrap": "disk.winserver2022.local-admin"
+      },
+      "nics": [
+        {
+          "nicId": "lan-alpha",
+          "networkId": "alpha-net",
+          "ipAddress": "10.70.0.1",
+          "prefixLength": 24,
+          "dnsServers": []
+        },
+        {
+          "nicId": "lan-beta",
+          "networkId": "beta-net",
+          "ipAddress": "10.71.0.1",
+          "prefixLength": 24,
+          "dnsServers": []
+        },
+        {
+          "nicId": "external",
+          "networkId": "external-net"
+        }
+      ]
+    }
+  ]
+}

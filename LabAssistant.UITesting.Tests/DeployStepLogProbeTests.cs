@@ -84,4 +84,83 @@ public sealed class DeployStepLogProbeTests
     [Fact]
     public void Unknown_result_value_is_ignored()
         => Assert.Null(Find(End("2026-07-28T13:05:00.0000000Z", Vm, Step, "retrying")));
+
+    // --- Ordering readers: FindStepEventTimestamp (start lower-bound + terminal upper-bound) ---
+    // These back the routed cross-forest ordering proof: the router's enableRouterRouting success must
+    // precede the first prepareForestTrustDns start on either DC.
+
+    private const string DnsStep = "v2.prepareForestTrustDns";
+    private const string DcVm = "LAT-20260728-071810-dc-alpha";
+
+    private static DateTimeOffset? StartTs(string vm, string stepKey, params string[] lines)
+        => DeployStepLogProbe.FindStepEventTimestamp(
+            lines, vm, stepKey, Window, "deploy.step.run.start", expectedOutcome: null, earliest: true);
+
+    private static DateTimeOffset? TerminalTs(string vm, string stepKey, DeployStepOutcome outcome, params string[] lines)
+        => DeployStepLogProbe.FindStepEventTimestamp(
+            lines, vm, stepKey, Window, "deploy.step.run.end", expectedOutcome: outcome, earliest: false);
+
+    [Fact]
+    public void Start_timestamp_reads_the_run_start_event()
+    {
+        var ts = StartTs(DcVm, DnsStep, Start("2026-07-28T13:20:00.0000000Z", DcVm, DnsStep));
+        Assert.Equal(
+            DateTimeOffset.Parse("2026-07-28T13:20:00.0000000Z", null, System.Globalization.DateTimeStyles.RoundtripKind),
+            ts);
+    }
+
+    [Fact]
+    public void Start_timestamp_takes_the_earliest_when_the_step_is_retried()
+    {
+        // A retried step emits several starts; the FIRST is the correct ordering lower bound.
+        var ts = StartTs(
+            DcVm,
+            DnsStep,
+            Start("2026-07-28T13:25:00.0000000Z", DcVm, DnsStep),
+            Start("2026-07-28T13:20:00.0000000Z", DcVm, DnsStep));
+        Assert.Equal(
+            DateTimeOffset.Parse("2026-07-28T13:20:00.0000000Z", null, System.Globalization.DateTimeStyles.RoundtripKind),
+            ts);
+    }
+
+    [Fact]
+    public void Start_timestamp_ignores_the_terminal_event()
+        => Assert.Null(StartTs(DcVm, DnsStep, End("2026-07-28T13:20:00.0000000Z", DcVm, DnsStep, "success")));
+
+    [Fact]
+    public void Terminal_timestamp_matches_only_the_expected_outcome()
+    {
+        // A failed-then-success retry: asking for Success must return the success ts, not the failure.
+        var ts = TerminalTs(
+            Vm,
+            Step,
+            DeployStepOutcome.Success,
+            End("2026-07-28T13:05:00.0000000Z", Vm, Step, "failed"),
+            End("2026-07-28T13:06:00.0000000Z", Vm, Step, "success"));
+        Assert.Equal(
+            DateTimeOffset.Parse("2026-07-28T13:06:00.0000000Z", null, System.Globalization.DateTimeStyles.RoundtripKind),
+            ts);
+    }
+
+    [Fact]
+    public void Terminal_timestamp_is_null_when_no_end_matches_the_outcome()
+        => Assert.Null(TerminalTs(Vm, Step, DeployStepOutcome.Success, End("2026-07-28T13:05:00.0000000Z", Vm, Step, "failed")));
+
+    [Fact]
+    public void Ordering_holds_when_router_routing_success_precedes_first_trust_dns_start()
+    {
+        var lines = new[]
+        {
+            End("2026-07-28T13:10:00.0000000Z", Vm, Step, "success"),          // router enableRouterRouting success
+            Start("2026-07-28T13:18:00.0000000Z", DcVm, DnsStep),              // first prepareForestTrustDns start
+            Start("2026-07-28T13:19:00.0000000Z", "LAT-20260728-071810-dc-beta", DnsStep)
+        };
+
+        var routingSuccess = TerminalTs(Vm, Step, DeployStepOutcome.Success, lines);
+        var firstDnsStart = StartTs(DcVm, DnsStep, lines);
+
+        Assert.NotNull(routingSuccess);
+        Assert.NotNull(firstDnsStart);
+        Assert.True(routingSuccess!.Value < firstDnsStart!.Value);
+    }
 }
