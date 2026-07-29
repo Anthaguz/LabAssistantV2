@@ -3158,6 +3158,14 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
         // signal it would be skipped here and orphaned: the still-running VM plus its differencing disk and folder
         // (finding 86). A fully successful run never reaches this with the cancellation flag set, so successful
         // deployments are still left intact.
+        //
+        // DRIFT LANDMINE (finding 88, tracked post-merge follow-up): AnchorBeingTornDown in
+        // LabAssistant.Business/Runtime/V2ForestTrustRuntimeStage.cs (the #924 finding-87 skip, ~:799) is a
+        // byte-identical inline copy of this predicate - it must PREDICT this exact teardown decision because the trust
+        // cleanup stage runs before VM teardown in the same cancel path. The two MUST stay identical: editing one
+        // without the other silently reintroduces a dangling trust (over-skip there) or a mid-reboot hang (under-skip).
+        // Kept as two copies tonight so #924 and #925 stay independently reviewable; finding 88 consolidates both into a
+        // single shared VmCancelTeardownPolicy.ShouldTearDown once both land. If you touch one copy, update the other.
         return !context.IsSuccess || context.WasCancelled || multiContext.IsCancellationRequested;
     }
 
