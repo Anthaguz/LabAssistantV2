@@ -42,6 +42,12 @@ public sealed class DeployStepLogProbe
     // references no app project (it drives the built exe), so the event/field names are pinned here.
     private const string StepEndEvent = "deploy.step.run.end";
 
+    // The app's per-step START event (deploy.step.run phase=start). It carries the same
+    // context.stepKey / context.vmName as the end event but no result field. Reading it lets a scenario
+    // anchor an ORDERING assertion at the moment a step began (e.g. the first prepareForestTrustDns
+    // start) rather than only at completion.
+    private const string StepStartEvent = "deploy.step.run.start";
+
     private readonly string _logsFolder;
 
     public DeployStepLogProbe(AppDataLocations locations)
@@ -256,6 +262,180 @@ public sealed class DeployStepLogProbe
         "failed" => DeployStepOutcome.Failed,
         _ => null
     };
+
+    /// <summary>
+    /// Returns the EARLIEST start timestamp of <paramref name="stepKey"/> on <paramref name="vmName"/>
+    /// (the <c>deploy.step.run.start</c> event) at or after <paramref name="window"/>, or null when the
+    /// step never started. Earliest wins so a retried step reports when it FIRST began - the correct
+    /// lower bound for an ordering assertion ("router routing finished before trust-DNS prep started").
+    /// </summary>
+    public DateTimeOffset? ReadStepStartTimestamp(string vmName, string stepKey, AppLogWindow window)
+        => ReadStepEventTimestamp(vmName, stepKey, window.StartUtc, StepStartEvent, expectedOutcome: null, earliest: true);
+
+    /// <summary>
+    /// Returns the timestamp of the terminal <c>deploy.step.run.end</c> event for <paramref name="stepKey"/>
+    /// on <paramref name="vmName"/> whose result maps to <paramref name="expectedOutcome"/>, at or after
+    /// <paramref name="window"/>, or null when no such terminal is present. The LATEST matching terminal
+    /// wins so a re-run's final outcome is authoritative - the correct upper bound for the predecessor
+    /// side of an ordering assertion (when the step actually COMPLETED with the expected result).
+    /// </summary>
+    public DateTimeOffset? ReadStepTerminalTimestamp(string vmName, string stepKey, AppLogWindow window, DeployStepOutcome expectedOutcome)
+        => ReadStepEventTimestamp(vmName, stepKey, window.StartUtc, StepEndEvent, expectedOutcome, earliest: false);
+
+    private DateTimeOffset? ReadStepEventTimestamp(
+        string vmName,
+        string stepKey,
+        DateTimeOffset windowStart,
+        string eventName,
+        DeployStepOutcome? expectedOutcome,
+        bool earliest)
+    {
+        if (!Directory.Exists(_logsFolder))
+        {
+            return null;
+        }
+
+        try
+        {
+            var lines = new List<string>();
+            foreach (string file in Directory.EnumerateFiles(_logsFolder, LogGlob))
+            {
+                lines.AddRange(ReadLinesShared(file));
+            }
+
+            return FindStepEventTimestamp(lines, vmName, stepKey, windowStart, eventName, expectedOutcome, earliest);
+        }
+        catch
+        {
+            // Reading evidence must never throw into a scenario's assertion path.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Pure parse over structured-event lines: returns the timestamp of the <paramref name="eventName"/>
+    /// event for the given VM + step at or after <paramref name="windowStart"/>. When
+    /// <paramref name="expectedOutcome"/> is non-null, only end events whose result maps to it are
+    /// considered (start events carry no result, so pass null for those). When several match,
+    /// <paramref name="earliest"/> selects the first-by-timestamp (step-start lower bound) versus the
+    /// last-by-timestamp (final terminal). Returns null when no matching event is present. Malformed
+    /// lines are skipped.
+    /// </summary>
+    internal static DateTimeOffset? FindStepEventTimestamp(
+        IEnumerable<string> lines,
+        string vmName,
+        string stepKey,
+        DateTimeOffset windowStart,
+        string eventName,
+        DeployStepOutcome? expectedOutcome,
+        bool earliest)
+    {
+        DateTimeOffset? bestTs = null;
+
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (!TryReadStepEvent(line, eventName, out DateTimeOffset ts, out string? lineVm, out string? lineStep, out DeployStepOutcome? outcome))
+            {
+                continue;
+            }
+
+            if (ts < windowStart ||
+                !string.Equals(lineVm, vmName, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(lineStep, stepKey, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (expectedOutcome is not null && outcome != expectedOutcome)
+            {
+                continue;
+            }
+
+            if (bestTs is null || (earliest ? ts < bestTs.Value : ts >= bestTs.Value))
+            {
+                bestTs = ts;
+            }
+        }
+
+        return bestTs;
+    }
+
+    /// <summary>
+    /// Parses a deploy.step event of the given <paramref name="eventName"/> into its timestamp, VM name,
+    /// step key, and (when present) mapped result. Returns false for any other event or a malformed line.
+    /// The result field is optional: start events omit it, so callers that read starts pass
+    /// <c>expectedOutcome: null</c> and ignore the out outcome.
+    /// </summary>
+    private static bool TryReadStepEvent(
+        string line,
+        string eventName,
+        out DateTimeOffset ts,
+        out string? vmName,
+        out string? stepKey,
+        out DeployStepOutcome? outcome)
+    {
+        ts = default;
+        vmName = null;
+        stepKey = null;
+        outcome = null;
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(line);
+            JsonElement root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("event", out JsonElement eventElement) ||
+                eventElement.ValueKind != JsonValueKind.String ||
+                !string.Equals(eventElement.GetString(), eventName, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!root.TryGetProperty("ts", out JsonElement tsElement) ||
+                tsElement.ValueKind != JsonValueKind.String ||
+                !DateTimeOffset.TryParse(
+                    tsElement.GetString(),
+                    null,
+                    System.Globalization.DateTimeStyles.RoundtripKind,
+                    out ts))
+            {
+                return false;
+            }
+
+            if (root.TryGetProperty("result", out JsonElement resultElement) &&
+                resultElement.ValueKind == JsonValueKind.String)
+            {
+                outcome = MapOutcome(resultElement.GetString());
+            }
+
+            if (root.TryGetProperty("context", out JsonElement context) &&
+                context.ValueKind == JsonValueKind.Object)
+            {
+                if (context.TryGetProperty("vmName", out JsonElement vmElement) &&
+                    vmElement.ValueKind == JsonValueKind.String)
+                {
+                    vmName = vmElement.GetString();
+                }
+
+                if (context.TryGetProperty("stepKey", out JsonElement stepElement) &&
+                    stepElement.ValueKind == JsonValueKind.String)
+                {
+                    stepKey = stepElement.GetString();
+                }
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Reads a file the app may still hold open for writing. Opening with

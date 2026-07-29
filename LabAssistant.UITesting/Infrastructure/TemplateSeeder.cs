@@ -638,6 +638,187 @@ public sealed class TemplateSeeder
             target.NetBiosName,
             DcLocalBootstrapSlotKey);
     }
+
+    /// <summary>
+    /// Writes a tagged ROUTED cross-forest + bidirectional forest-trust V2 template (the capstone rung):
+    /// two root forests on SEPARATE gatewayed Internal switches bridged by a 3-NIC router, linked by one
+    /// bidirectional Forest trust. It forks the same fixture shape as <see cref="SeedForestTrustTemplate"/>
+    /// but rewrites TWO lab-network switches (alpha-net and beta-net) onto the caller's harness-owned
+    /// switch names and leaves external-net on "Default Switch" (host-owned, never swept), and it also
+    /// tags the standalone Router VM. Because the two anchor DCs live on disjoint switches and the router
+    /// carries a leg on each, the planner must order the forest-trust/DNS-prep stage AFTER the router is
+    /// routing (the RouterReady -> prepareForestTrustDns edge). All three VMs reference the REAL prepared
+    /// base image so the plan requires guest work and can only start once the local bootstrap slot is filled.
+    ///
+    /// Each DC's firstDomainControllerVmId is stitched to the VM that owns its domain by matching
+    /// vmTemplate.domainId (not array position); the router is resolved by topologyRole. Each DC's static
+    /// IP, default gateway (the router's LAN leg on its subnet), and subnet are read back from the fixture
+    /// we are about to write so live validation - especially the route-hop next-hop check - compares each
+    /// guest against exactly what was deployed. "Source"/"target" follow the trust's own
+    /// sourceDomainId/targetDomainId so the source DC is the anchor the runtime creates the trust from.
+    /// </summary>
+    public SeededForestTrustRoutedTemplate SeedForestTrustRoutedTemplate(
+        ResourceTagger tagger,
+        string baseDiskCatalogId,
+        string switchAName,
+        string switchBName)
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Templates", "forest-trust-routed-v2-template.json");
+        if (!File.Exists(fixturePath))
+        {
+            throw new FileNotFoundException(
+                $"Routed forest-trust V2 template fixture not found at '{fixturePath}'. Ensure Fixtures\\Templates\\forest-trust-routed-v2-template.json is copied to output.");
+        }
+
+        var root = JsonNode.Parse(File.ReadAllText(fixturePath))?.AsObject()
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture did not parse as a JSON object.");
+
+        var templateName = tagger.Name("ftrtpl");
+        root["id"] = Guid.NewGuid().ToString("N");
+        root["name"] = templateName;
+
+        // Rewrite the two Internal lab-network switches onto the harness-owned (ghost) switch names; the
+        // NICs bind by networkId (static IPs), so the switches stay out of the NICs and both DCs + the
+        // router need guest work. external-net keeps "Default Switch" (a host-owned switch we never sweep).
+        var networks = root["labNetworks"]?.AsArray()
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture is missing its labNetworks array.");
+        var alphaNet = FindNetwork(networks, "alpha-net");
+        var betaNet = FindNetwork(networks, "beta-net");
+        alphaNet["switchName"] = switchAName;
+        betaNet["switchName"] = switchBName;
+
+        // Map networkId -> subnet so each DC's own subnet can be read back for the route-hop assertion.
+        var subnetByNetwork = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var networkNode in networks)
+        {
+            var network = networkNode?.AsObject();
+            var networkId = network?["networkId"]?.GetValue<string>();
+            var subnet = network?["subnet"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(networkId) && !string.IsNullOrWhiteSpace(subnet))
+            {
+                subnetByNetwork[networkId!] = subnet!;
+            }
+        }
+
+        var domains = root["directoryTopology"]?["domains"]?.AsArray()
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture is missing its directoryTopology.domains array.");
+        var vmArray = root["vmTemplates"]?.AsArray()
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture is missing its vmTemplates array.");
+
+        // Tag + stitch each DC by domainId, reading back its NIC's static IP, default gateway (the router
+        // LAN leg on this DC's subnet), and subnet so the scenario proves the route to the peer uses the
+        // router as its next hop. Both DCs are FirstDomainController, so domainId is the authoritative link.
+        var seeded = new List<RoutedDcSeed>();
+        foreach (var domainNode in domains)
+        {
+            var domain = domainNode?.AsObject()
+                ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture has a malformed domain entry.");
+            var domainId = domain["domainId"]?.GetValue<string>()
+                ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture domain is missing domainId.");
+
+            var vm = vmArray
+                .Select(n => n?.AsObject())
+                .FirstOrDefault(n => n is not null &&
+                    string.Equals(n["domainId"]?.GetValue<string>(), domainId, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException(
+                    $"Routed forest-trust V2 template fixture has no vmTemplate whose domainId is '{domainId}'.");
+
+            var dnsName = domain["dnsName"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Routed forest-trust V2 template fixture domain '{domainId}' is missing dnsName.");
+            var netBiosName = domain["netBiosName"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Routed forest-trust V2 template fixture domain '{domainId}' is missing netBiosName.");
+
+            var vmId = Guid.NewGuid().ToString("N");
+            var vmName = tagger.Name("dc-" + netBiosName.ToLowerInvariant());
+            vm["vmId"] = vmId;
+            vm["name"] = vmName;
+            vm["vhdxId"] = baseDiskCatalogId;
+            domain["firstDomainControllerVmId"] = vmId;
+
+            var nic = vm["nics"]?.AsArray()?.FirstOrDefault()?.AsObject()
+                ?? throw new InvalidOperationException($"Routed forest-trust V2 template fixture DC for domain '{domainId}' is missing its NIC.");
+            var networkId = nic["networkId"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Routed forest-trust V2 template fixture DC for domain '{domainId}' has a NIC with no networkId.");
+            var dcIp = nic["ipAddress"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Routed forest-trust V2 template fixture DC for domain '{domainId}' has a NIC with no ipAddress.");
+            var gateway = nic["defaultGateway"]?.GetValue<string>()
+                ?? throw new InvalidOperationException($"Routed forest-trust V2 template fixture DC for domain '{domainId}' has a NIC with no defaultGateway (the routed topology needs each DC to reach the peer through the router).");
+            if (!subnetByNetwork.TryGetValue(networkId, out var subnet))
+            {
+                throw new InvalidOperationException(
+                    $"Routed forest-trust V2 template fixture DC for domain '{domainId}' references network '{networkId}' which has no subnet.");
+            }
+
+            seeded.Add(new RoutedDcSeed(domainId, vmName, dnsName, netBiosName, dcIp, gateway, subnet));
+        }
+
+        // Tag the standalone Router VM (resolved by role, not position).
+        var routerVm = vmArray
+            .Select(n => n?.AsObject())
+            .FirstOrDefault(n => n is not null &&
+                string.Equals(n["topologyRole"]?.GetValue<string>(), "Router", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture is missing its Router vmTemplate.");
+        var routerVmName = tagger.Name("rtr");
+        routerVm["vmId"] = Guid.NewGuid().ToString("N");
+        routerVm["name"] = routerVmName;
+        routerVm["vhdxId"] = baseDiskCatalogId;
+
+        // Resolve the two anchors by the trust's source/target domain ids so the source DC (where the
+        // runtime creates the trust) is unambiguous regardless of domain declaration order.
+        var trust = root["directoryTopology"]?["trusts"]?.AsArray()?.FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture is missing its trust entry.");
+        var sourceDomainId = trust["sourceDomainId"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture trust is missing sourceDomainId.");
+        var targetDomainId = trust["targetDomainId"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("Routed forest-trust V2 template fixture trust is missing targetDomainId.");
+
+        var source = seeded.FirstOrDefault(item => string.Equals(item.DomainId, sourceDomainId, StringComparison.OrdinalIgnoreCase));
+        var target = seeded.FirstOrDefault(item => string.Equals(item.DomainId, targetDomainId, StringComparison.OrdinalIgnoreCase));
+        if (source is null || target is null)
+        {
+            throw new InvalidOperationException(
+                "Routed forest-trust V2 template fixture trust references a domain that has no seeded DC VM.");
+        }
+
+        Directory.CreateDirectory(_appData.TemplatesFolder);
+        var filePath = Path.Combine(_appData.TemplatesFolder, templateName + ".json");
+        File.WriteAllText(filePath, root.ToJsonString(JsonOptions));
+
+        return new SeededForestTrustRoutedTemplate(
+            filePath,
+            templateName,
+            routerVmName,
+            source.VmName,
+            source.DnsName,
+            source.NetBiosName,
+            source.DcIp,
+            source.Gateway,
+            source.Subnet,
+            target.VmName,
+            target.DnsName,
+            target.NetBiosName,
+            target.DcIp,
+            target.Gateway,
+            target.Subnet,
+            switchAName,
+            switchBName,
+            DcLocalBootstrapSlotKey);
+    }
+
+    private static JsonObject FindNetwork(JsonArray networks, string networkId)
+        => networks
+            .Select(n => n?.AsObject())
+            .FirstOrDefault(n => n is not null && string.Equals(n["networkId"]?.GetValue<string>(), networkId, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException($"Routed forest-trust V2 template fixture is missing its '{networkId}' labNetworks entry.");
+
+    private sealed record RoutedDcSeed(
+        string DomainId,
+        string VmName,
+        string DnsName,
+        string NetBiosName,
+        string DcIp,
+        string Gateway,
+        string Subnet);
 }
 
 /// <summary>Identity of a harness-seeded template: its file, its library display name, and the VM name it deploys.</summary>
@@ -734,4 +915,36 @@ public sealed record SeededForestTrustTemplate(
     string TargetDcVmName,
     string TargetDnsName,
     string TargetNetBiosName,
+    string LocalBootstrapSlotKey);
+
+/// <summary>
+/// Identity + per-forest ground truth of a harness-seeded ROUTED cross-forest + bidirectional
+/// forest-trust template (the capstone rung): its file, its library display name, the standalone
+/// Router VM name, and for each side the DC VM name, forest/root-domain DNS + NetBIOS names, the DC's
+/// static IP, the default gateway it uses (the router's LAN leg on that DC's subnet), and that DC's
+/// subnet. The gateway + peer subnet let the scenario prove the trust traffic crossed the router
+/// (route-hop next hop = the DC's gateway to reach the peer on the OTHER subnet). It also echoes the
+/// two harness-owned Internal switch names so the no-orphans sweep can assert both were removed.
+/// "Source"/"target" follow the trust's own sourceDomainId/targetDomainId, so the source DC is the
+/// anchor the runtime creates the trust from; the harness proves BOTH sides in-guest. All three VMs
+/// share the one local bootstrap credential slot the deploy must fill.
+/// </summary>
+public sealed record SeededForestTrustRoutedTemplate(
+    string FilePath,
+    string TemplateName,
+    string RouterVmName,
+    string SourceDcVmName,
+    string SourceDnsName,
+    string SourceNetBiosName,
+    string SourceDcIpAddress,
+    string SourceGatewayIpAddress,
+    string SourceSubnet,
+    string TargetDcVmName,
+    string TargetDnsName,
+    string TargetNetBiosName,
+    string TargetDcIpAddress,
+    string TargetGatewayIpAddress,
+    string TargetSubnet,
+    string SwitchAName,
+    string SwitchBName,
     string LocalBootstrapSlotKey);
