@@ -790,25 +790,14 @@ public sealed class V2ForestTrustRuntimeStage
             return false;
         }
 
-        // Mirror the terminal cleanup gate NeedsCleanup in V2RuntimeCapabilityService (the finding-86 / PR #925 fix,
-        // line ~3161): a VM is torn down when it created host resources AND (it failed, was cancelled mid-step, or the
-        // whole run is being aborted via multiContext.IsCancellationRequested). This predicate MUST equal that gate:
-        // the trust cleanup stage runs BEFORE the VM/disk teardown in the same cancel path, so it has to PREDICT which
-        // anchors teardown will remove and skip their moot in-guest delete. Note the IsCancellationRequested term is
-        // the finding-86 addition, so this fold composes with #925 and must land with it; on a tree without #925 the
-        // pre-fix NeedsCleanup lacks that term and the two would diverge for a run-created anchor that finished before
-        // the abort landed. When the VM is being removed, deleting the trust object inside it is moot - the object dies
-        // with the disk - and retrying it for the full budget would block the mandatory teardown; a surviving anchor
-        // keeps a real dangling half that must be cleared, so it must NOT be skipped.
-        //
-        // DRIFT LANDMINE (finding 88, tracked post-merge follow-up): this predicate is a byte-identical inline copy of
-        // NeedsCleanup in LabAssistant.Business/Runtime/V2RuntimeCapabilityService.cs (the #925 gate, method at ~:3144,
-        // predicate at ~:3161). The two MUST stay identical - editing one without the other silently reintroduces a
-        // dangling trust (over-skip here) or a mid-reboot hang (under-skip). Kept inline tonight so #924 and #925 stay
-        // independently reviewable off origin/master; finding 88 consolidates both into a single shared
-        // VmCancelTeardownPolicy.ShouldTearDown once both land. If you touch one copy, update the other.
-        var createdResources = anchor.VmFolderCreated || anchor.DifferencingDiskCreated || anchor.VmRegistered || anchor.VmStarted;
-        return createdResources && (!anchor.IsSuccess || anchor.WasCancelled || multiContext.IsCancellationRequested);
+        // The anchor teardown prediction must equal the terminal cleanup gate (V2RuntimeCapabilityService.NeedsCleanup):
+        // the trust cleanup stage runs BEFORE the VM/disk teardown in the same cancel path, so it has to predict which
+        // anchors teardown will remove and skip their moot in-guest trust delete. When the VM is being removed, deleting
+        // the trust object inside it is moot - the object dies with the disk - and retrying it for the full budget would
+        // block the mandatory teardown; a surviving anchor keeps a real dangling half that must be cleared, so it must
+        // NOT be skipped. Both decisions now share one predicate (finding 88) so they cannot drift; see
+        // VmCancelTeardownPolicy for the full rule and the equivalence matrix test that pins them identical.
+        return VmCancelTeardownPolicy.ShouldTearDown(anchor, multiContext);
     }
 
     private void EmitTrustEvent(
