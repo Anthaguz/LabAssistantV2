@@ -16,6 +16,20 @@ public enum DeployStepOutcome
 }
 
 /// <summary>
+/// The per-anchor honest-telemetry carried in the context of a <c>deploy.forest-trust.cleanup.end</c> terminal
+/// with <c>result=skipped</c> (the findings-86/87 moot-skip terminal). Each anchor outcome is one of
+/// <c>skipped</c> / <c>success</c> / <c>failed</c>; <see cref="SkipReason"/> states why the in-guest delete was
+/// skipped (the anchor's own VM is being torn down in the same cancel). For the #921 both-run-created case the
+/// authoritative honest-skip proof is <see cref="SourceAnchorOutcome"/>=<c>skipped</c> AND
+/// <see cref="TargetAnchorOutcome"/>=<c>skipped</c> AND a non-empty <see cref="SkipReason"/> - which
+/// distinguishes "correctly skipped as moot" from "cleanup silently did nothing". Any field absent reads null.
+/// </summary>
+public sealed record TrustCleanupSkipDetail(
+    string? SourceAnchorOutcome,
+    string? TargetAnchorOutcome,
+    string? SkipReason);
+
+/// <summary>
 /// Host-side reader of the app's structured event log (<c>structured-events*.jsonl</c>) that proves a
 /// specific deploy STEP reached a terminal state, scoped to one VM. Where <see cref="GuestNetworkProbe"/>
 /// reads the guest to prove an outcome, this reads the app's own per-step account
@@ -93,6 +107,13 @@ public sealed class DeployStepLogProbe
     /// rollback verdict keys its headline pass/fail criterion directly off this rather than inferring the run
     /// outcome from navigated-away + VMs-gone.</summary>
     public const string RunTerminalEvent = "deploy.orchestration.run.end";
+
+    // Context sub-fields the moot-skip cleanup terminal (cleanup.end result=skipped) carries, pinned to the
+    // locked #924 event contract: each anchor's outcome plus the reason the in-guest delete was skipped. The
+    // runtime adds these to the same nested context object EmitTrustEvent already writes (trustId/stepKey/...).
+    private const string SourceAnchorOutcomeField = "sourceAnchorOutcome";
+    private const string TargetAnchorOutcomeField = "targetAnchorOutcome";
+    private const string SkipReasonField = "skipReason";
 
     private readonly string _logsFolder;
 
@@ -674,6 +695,131 @@ public sealed class DeployStepLogProbe
 
         return best;
     }
+
+    /// <summary>
+    /// Returns the per-anchor honest-telemetry from the latest <c>deploy.forest-trust.cleanup.end</c> terminal
+    /// with <c>result=skipped</c> at or after <paramref name="window"/>, or null when no skipped terminal is
+    /// present. Lets the rollback scenario assert the moot-skip terminal is honest (both anchor outcomes
+    /// <c>skipped</c> + a stated reason) rather than a silent no-op. Never throws into an assertion path.
+    /// </summary>
+    public TrustCleanupSkipDetail? ReadTrustCleanupSkipDetail(AppLogWindow window)
+    {
+        if (!Directory.Exists(_logsFolder))
+        {
+            return null;
+        }
+
+        try
+        {
+            var lines = new List<string>();
+            foreach (string file in Directory.EnumerateFiles(_logsFolder, LogGlob))
+            {
+                lines.AddRange(ReadLinesShared(file));
+            }
+
+            return FindTrustCleanupSkipDetail(lines, window.StartUtc);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Pure parse over structured-event lines: returns the per-anchor skip detail of the latest
+    /// <c>deploy.forest-trust.cleanup.end</c> (result=skipped) at or after <paramref name="windowStart"/>, or
+    /// null when none matches. Malformed lines are skipped; a matching terminal with no anchor context yields a
+    /// detail whose fields are null (so the caller can tell "skipped terminal, but incomplete telemetry" apart
+    /// from "no skipped terminal").
+    /// </summary>
+    internal static TrustCleanupSkipDetail? FindTrustCleanupSkipDetail(
+        IEnumerable<string> lines,
+        DateTimeOffset windowStart)
+    {
+        DateTimeOffset bestTs = default;
+        TrustCleanupSkipDetail? best = null;
+
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (!TryReadTrustCleanupSkip(line, out DateTimeOffset ts, out TrustCleanupSkipDetail? detail))
+            {
+                continue;
+            }
+
+            if (ts < windowStart)
+            {
+                continue;
+            }
+
+            if (best is null || ts >= bestTs)
+            {
+                best = detail;
+                bestTs = ts;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Parses a <c>deploy.forest-trust.cleanup.end</c> line with <c>result=skipped</c> into its timestamp and
+    /// per-anchor context detail. Returns false for any other event/result, a malformed line, or a line missing
+    /// ts/result. A skipped terminal with no anchor context still parses (detail fields null) so the caller can
+    /// distinguish an honest full-detail skip from an incomplete-telemetry one.
+    /// </summary>
+    private static bool TryReadTrustCleanupSkip(
+        string line,
+        out DateTimeOffset ts,
+        out TrustCleanupSkipDetail? detail)
+    {
+        ts = default;
+        detail = null;
+
+        if (!TryReadEventResult(line, out ts, out string? eventName, out string? result))
+        {
+            return false;
+        }
+
+        if (!string.Equals(eventName, TrustCleanupEndEvent, StringComparison.Ordinal) ||
+            !string.Equals(result, "skipped", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(line);
+            JsonElement root = doc.RootElement;
+            string? source = null;
+            string? target = null;
+            string? reason = null;
+
+            if (root.TryGetProperty("context", out JsonElement context) &&
+                context.ValueKind == JsonValueKind.Object)
+            {
+                source = ReadStringField(context, SourceAnchorOutcomeField);
+                target = ReadStringField(context, TargetAnchorOutcomeField);
+                reason = ReadStringField(context, SkipReasonField);
+            }
+
+            detail = new TrustCleanupSkipDetail(source, target, reason);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string? ReadStringField(JsonElement context, string field)
+        => context.TryGetProperty(field, out JsonElement element) && element.ValueKind == JsonValueKind.String
+            ? element.GetString()
+            : null;
 
     /// <summary>
     /// Parses any structured-event line into its <c>event</c> name, <c>ts</c>, and <c>result</c>. Returns

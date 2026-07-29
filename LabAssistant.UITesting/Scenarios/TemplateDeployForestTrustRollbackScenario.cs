@@ -494,6 +494,10 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                              "the combined #924+#925 repro flipping from cancelled_with_residuals to plain cancelled - and it corroborates " +
                              "the host-side zero-orphans centerpiece below."
                 });
+                if (cleanupSkipped)
+                {
+                    RecordHonestSkipTelemetry(recorder, stepLog, logWindow);
+                }
                 RecordOrphanFinding(recorder, orphans, seeded, gating: true);
                 RecordBestEffortInGuest(recorder, probe, seeded);
                 return;
@@ -898,6 +902,51 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
     /// them, so this is typically not applicable; it never fails the run and only adds colour when a DC still
     /// happens to be present at read time.
     /// </summary>
+    /// <summary>
+    /// Records the per-anchor honest-telemetry of the moot-skip cleanup terminal. For #921 (both DC anchors
+    /// run-created) the honest proof is both anchor outcomes = <c>skipped</c> plus a stated <c>skipReason</c>,
+    /// which distinguishes "correctly skipped as moot" from "cleanup silently did nothing". A skipped terminal
+    /// that lacks that full detail is surfaced as a non-gating Warning (a possible broken honest-skip emit path);
+    /// the authoritative PASS still rests on the run-cancelled terminal + the host-side zero-orphans centerpiece.
+    /// </summary>
+    private void RecordHonestSkipTelemetry(FindingRecorder recorder, DeployStepLogProbe stepLog, AppLogWindow logWindow)
+    {
+        TrustCleanupSkipDetail? detail = stepLog.ReadTrustCleanupSkipDetail(logWindow);
+        bool bothSkipped =
+            string.Equals(detail?.SourceAnchorOutcome, "skipped", StringComparison.Ordinal) &&
+            string.Equals(detail?.TargetAnchorOutcome, "skipped", StringComparison.Ordinal);
+        bool reasonPresent = !string.IsNullOrWhiteSpace(detail?.SkipReason);
+
+        if (bothSkipped && reasonPresent)
+        {
+            recorder.Record(new Finding
+            {
+                Scenario = Name,
+                Step = "honest-skip-telemetry",
+                Severity = FindingSeverity.Info,
+                Title = "HONEST TELEMETRY: both trust anchors reported skipped-as-moot with a stated reason",
+                Detail = "The deploy.forest-trust.cleanup.end (result=skipped) terminal carries sourceAnchorOutcome=skipped, " +
+                         $"targetAnchorOutcome=skipped, and skipReason=\"{detail!.SkipReason}\": both anchors' own VMs were being torn " +
+                         "down in the same cancel, so the runtime honestly recorded skipping each moot in-guest DeleteLocalSideOfTrust " +
+                         "rather than silently doing nothing. This is the finding-87 honest-skip design proven at the per-anchor level."
+            });
+            return;
+        }
+
+        recorder.Record(new Finding
+        {
+            Scenario = Name,
+            Step = "honest-skip-telemetry",
+            Severity = FindingSeverity.Warning,
+            Title = "INCOMPLETE honest-skip telemetry on the skipped terminal (non-gating)",
+            Detail = "The cleanup.end terminal reported result=skipped, but its context did not carry the full honest-skip detail " +
+                     $"(sourceAnchorOutcome={detail?.SourceAnchorOutcome ?? "<absent>"}, targetAnchorOutcome=" +
+                     $"{detail?.TargetAnchorOutcome ?? "<absent>"}, skipReason={(reasonPresent ? "present" : "<absent>")}). For #921 both " +
+                     "anchors are run-created so both outcomes should be skipped with a stated reason; missing detail may signal a broken " +
+                     "honest-skip emit path worth surfacing. Non-gating: the run-cancelled terminal + host-side zero-orphans still gate the PASS."
+        });
+    }
+
     private void RecordBestEffortInGuest(FindingRecorder recorder, HyperVProbe probe, SeededForestTrustTemplate seeded)
     {
         bool anyVmPresent = !VmIsGone(probe, seeded.SourceDcVmName) || !VmIsGone(probe, seeded.TargetDcVmName);
