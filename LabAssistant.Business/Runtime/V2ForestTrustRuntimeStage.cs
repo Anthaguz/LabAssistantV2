@@ -154,42 +154,109 @@ public sealed class V2ForestTrustRuntimeStage
                 continue;
             }
 
+            // Skip the in-guest local-side trust delete for any anchor whose VM the runtime is tearing down in this
+            // same rollback (finding 87): destroying the VM removes its AD database and the trust object with it, so an
+            // in-guest delete there is not just moot, it actively harms the no-orphans guarantee - retrying it against a
+            // rebooting or vanishing DC for the full cleanup budget is exactly what would block the mandatory VM/disk
+            // teardown that runs after this stage. Only a surviving anchor keeps a real, dangling one-sided trust that
+            // must be cleared, so run the bounded retry there and skip the anchors being destroyed.
+            var sourceTornDown = AnchorBeingTornDown(multiContext, trust.SourceAnchorVmName);
+            var targetTornDown = AnchorBeingTornDown(multiContext, trust.TargetAnchorVmName);
+
             // Cleanup runs during deploy failure/cancellation to honor the no-orphans mandate, so it must not consult
             // the already-cancelled deploy abort signal: pass a null context (skips the abort check and per-attempt
             // logging) and CancellationToken.None, while still retrying a transient PowerShell Direct drop so a blip
             // does not leave a dangling trust. The GetADTrust-guarded delete script is idempotent, so re-running is safe.
-            var sourceResult = await GuestStepTransportRetry.RunAsync(
-                null,
-                request,
-                DeploymentStepKeys.V2CreateForestTrust,
-                attemptCancellation => _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
-                    trust.SourceAnchorVmName,
-                    sourceCredential!,
-                    trust.TargetDomainDnsName,
-                    attemptCancellation),
-                CancellationToken.None);
-            var targetResult = await GuestStepTransportRetry.RunAsync(
-                null,
-                request,
-                DeploymentStepKeys.V2CreateForestTrust,
-                attemptCancellation => _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
-                    trust.TargetAnchorVmName,
-                    targetCredential!,
-                    trust.SourceDomainDnsName,
-                    attemptCancellation),
-                CancellationToken.None);
+            // retryAuthenticationRejection: true because rollback puts the DCs back into flux (reboot/teardown), where a
+            // broken session surfaces "the credential is invalid" (OpenError/PSSessionStateBroken) even though the
+            // domain-admin credential was already validated at trust creation; the deploy path must fail fast on that
+            // signature but this best-effort, bounded cleanup must retry it rather than leave an orphan trust.
+            GuestCommandResult? sourceResult = null;
+            if (!sourceTornDown)
+            {
+                sourceResult = await GuestStepTransportRetry.RunAsync(
+                    null,
+                    request,
+                    DeploymentStepKeys.V2CreateForestTrust,
+                    attemptCancellation => _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
+                        trust.SourceAnchorVmName,
+                        sourceCredential!,
+                        trust.TargetDomainDnsName,
+                        attemptCancellation),
+                    CancellationToken.None,
+                    retryAuthenticationRejection: true,
+                    perAttemptTimeout: request.GuestCleanupAttemptTimeout,
+                    retryBudget: request.GuestCleanupRetryBudget);
+            }
 
-            trustState.CleanupResidual = !sourceResult.Success || !targetResult.Success;
+            GuestCommandResult? targetResult = null;
+            if (!targetTornDown)
+            {
+                targetResult = await GuestStepTransportRetry.RunAsync(
+                    null,
+                    request,
+                    DeploymentStepKeys.V2CreateForestTrust,
+                    attemptCancellation => _forestTrustRuntimeCoordinator.CleanupForestTrustAsync(
+                        trust.TargetAnchorVmName,
+                        targetCredential!,
+                        trust.SourceDomainDnsName,
+                        attemptCancellation),
+                    CancellationToken.None,
+                    retryAuthenticationRejection: true,
+                    perAttemptTimeout: request.GuestCleanupAttemptTimeout,
+                    retryBudget: request.GuestCleanupRetryBudget);
+            }
+
+            // A skipped side is never a residual: its trust object is destroyed with the anchor VM. Residual means a
+            // side we actually attempted could not complete its idempotent delete.
+            trustState.CleanupResidual = sourceResult is { Success: false } || targetResult is { Success: false };
+
             var error = string.Join(
                 " ",
-                new[] { sourceResult.Error, targetResult.Error }.Where(value => !string.IsNullOrWhiteSpace(value)));
+                new[] { sourceResult?.Error, targetResult?.Error }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+            // Honest, deterministic per-side telemetry so the rollback verdict can distinguish a real delete from a
+            // deliberate skip and never reads a fabricated success for work that was not done.
+            var perSideContext = new Dictionary<string, object?>
+            {
+                ["sourceAnchorOutcome"] = sourceTornDown ? "skipped" : (sourceResult!.Success ? "success" : "failed"),
+                ["targetAnchorOutcome"] = targetTornDown ? "skipped" : (targetResult!.Success ? "success" : "failed")
+            };
+            if (sourceTornDown || targetTornDown)
+            {
+                perSideContext["skipReason"] = "Anchor VM is being torn down on rollback; the trust object is destroyed with the VM disk.";
+            }
+
+            uint terminalCode;
+            string terminalResult;
+            if (trustState.CleanupResidual)
+            {
+                // A side that actually ran could not finish its delete - honest failure/residual terminal.
+                terminalCode = LaStatus.DeployForestTrust_ForestTrustCleanupFailed;
+                terminalResult = "failed";
+            }
+            else if (sourceResult is null && targetResult is null)
+            {
+                // Both anchors are being destroyed, so nothing was deleted in-guest. Emit a distinct skipped terminal
+                // rather than fabricating a success for work we deliberately did not do.
+                terminalCode = LaStatus.DeployForestTrust_ForestTrustCleanupSkipped;
+                terminalResult = "skipped";
+            }
+            else
+            {
+                // At least one surviving anchor's delete ran and succeeded; any skipped side is moot. Honest success.
+                terminalCode = LaStatus.DeployForestTrust_ForestTrustCleanedUp;
+                terminalResult = "success";
+            }
+
             EmitTrustEvent(
-                trustState.CleanupResidual ? LaStatus.DeployForestTrust_ForestTrustCleanupFailed : LaStatus.DeployForestTrust_ForestTrustCleanedUp,
+                terminalCode,
                 multiContext,
                 trust,
                 "cleanup",
-                trustState.CleanupResidual ? "failed" : "success",
-                string.IsNullOrWhiteSpace(error) ? null : error);
+                terminalResult,
+                string.IsNullOrWhiteSpace(error) ? null : error,
+                perSideContext);
         }
     }
 
@@ -712,13 +779,46 @@ public sealed class V2ForestTrustRuntimeStage
             .ToArray();
     }
 
+    private static bool AnchorBeingTornDown(MultiVmDeploymentContext multiContext, string anchorVmName)
+    {
+        var anchor = multiContext.VmContexts.FirstOrDefault(vm =>
+            string.Equals(vm.VmName, anchorVmName, StringComparison.OrdinalIgnoreCase));
+        if (anchor is null)
+        {
+            // An anchor the runtime does not manage (for example a pre-existing external DC) is never torn down here,
+            // so its dangling trust half must still be cleared in-guest.
+            return false;
+        }
+
+        // Mirror the terminal cleanup gate NeedsCleanup in V2RuntimeCapabilityService (the finding-86 / PR #925 fix,
+        // line ~3161): a VM is torn down when it created host resources AND (it failed, was cancelled mid-step, or the
+        // whole run is being aborted via multiContext.IsCancellationRequested). This predicate MUST equal that gate:
+        // the trust cleanup stage runs BEFORE the VM/disk teardown in the same cancel path, so it has to PREDICT which
+        // anchors teardown will remove and skip their moot in-guest delete. Note the IsCancellationRequested term is
+        // the finding-86 addition, so this fold composes with #925 and must land with it; on a tree without #925 the
+        // pre-fix NeedsCleanup lacks that term and the two would diverge for a run-created anchor that finished before
+        // the abort landed. When the VM is being removed, deleting the trust object inside it is moot - the object dies
+        // with the disk - and retrying it for the full budget would block the mandatory teardown; a surviving anchor
+        // keeps a real dangling half that must be cleared, so it must NOT be skipped.
+        //
+        // DRIFT LANDMINE (finding 88, tracked post-merge follow-up): this predicate is a byte-identical inline copy of
+        // NeedsCleanup in LabAssistant.Business/Runtime/V2RuntimeCapabilityService.cs (the #925 gate, method at ~:3144,
+        // predicate at ~:3161). The two MUST stay identical - editing one without the other silently reintroduces a
+        // dangling trust (over-skip here) or a mid-reboot hang (under-skip). Kept inline tonight so #924 and #925 stay
+        // independently reviewable off origin/master; finding 88 consolidates both into a single shared
+        // VmCancelTeardownPolicy.ShouldTearDown once both land. If you touch one copy, update the other.
+        var createdResources = anchor.VmFolderCreated || anchor.DifferencingDiskCreated || anchor.VmRegistered || anchor.VmStarted;
+        return createdResources && (!anchor.IsSuccess || anchor.WasCancelled || multiContext.IsCancellationRequested);
+    }
+
     private void EmitTrustEvent(
         uint code,
         MultiVmDeploymentContext multiContext,
         V2ResolvedTrustPlanningContext trust,
         string phase,
         string result,
-        string? error = null)
+        string? error = null,
+        IReadOnlyDictionary<string, object?>? extraContext = null)
     {
         var context = new Dictionary<string, object?>
         {
@@ -735,6 +835,14 @@ public sealed class V2ForestTrustRuntimeStage
         if (!string.IsNullOrWhiteSpace(error))
         {
             context["error"] = error;
+        }
+
+        if (extraContext is not null)
+        {
+            foreach (var entry in extraContext)
+            {
+                context[entry.Key] = entry.Value;
+            }
         }
 
         _structuredLogger.Log(code, multiContext.OperationId, result, context);

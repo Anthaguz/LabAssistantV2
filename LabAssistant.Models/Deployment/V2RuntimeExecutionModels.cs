@@ -23,6 +23,37 @@ public sealed class V2RuntimeExecutionRequest
     public TimeSpan GuestTransportRetryDelay { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Per-attempt wall-clock ceiling for a single in-guest PowerShell Direct call issued by the rollback
+    /// forest-trust cleanup retry. A cleanup delete runs into a DC that is rebooting or being torn down, and
+    /// PowerShell Direct connection negotiation can BLOCK (not fail fast) while the guest KVP exchange service is
+    /// mid-restart. The one-shot session already enforces a 5 minute host-side timeout, but 5 minutes is far too
+    /// long for a retry cadence that must cycle several times across a ~340-360s reboot, and - more importantly -
+    /// that timeout surfaces as a thrown exception, which the retry loop must convert into a bounded, retryable
+    /// transport drop rather than let escape. This shorter bound abandons a frozen call quickly (killing its
+    /// process tree, so no orphan powershell.exe and no held per-VM lock) and hands control back to the retry loop
+    /// so it can retry through the reboot or bounded-fail cleanly. Default 90s: long enough for a healthy delete to
+    /// complete, short enough that roughly four to five attempts span the ~360s reboot window. Applies ONLY to the
+    /// cleanup path; the deploy path keeps the one-shot session's own timeout unchanged.
+    /// </summary>
+    public TimeSpan GuestCleanupAttemptTimeout { get; set; } = TimeSpan.FromSeconds(90);
+
+    /// <summary>
+    /// Wall-clock ceiling for a single in-guest forest-trust cleanup delete retry. Each side of a trust (the source
+    /// and target deletes) is bounded independently by this budget, so a dual-DC trust can retry up to two of these
+    /// windows serially during rollback. Because a cleanup attempt can either fail fast (guest off) in seconds or
+    /// block up to <see cref="GuestCleanupAttemptTimeout"/> (guest mid-reboot), a fixed attempt count cannot bound
+    /// both cases correctly: enough attempts to span the reboot at the fast-fail cadence would let blocked attempts
+    /// run for hours, while few enough attempts to cap blocked time would give up before a fast-failing guest
+    /// finishes rebooting. Wall-clock is the correct primitive (the same lesson as <see cref="GuestAuthGraceWindow"/>):
+    /// the cleanup retries until either the delete succeeds or this budget elapses, regardless of how each attempt
+    /// failed. Default 15 minutes, matching the ~15 min transport budget (<see cref="GuestTransportMaxRetries"/> x
+    /// <see cref="GuestTransportRetryDelay"/>) so it comfortably outlasts the documented ~340-360s rollback reboot
+    /// with roughly 2.5x margin and never expires mid-recovery to leave a dangling trust; a genuinely gone DC
+    /// bounded-fails at this ceiling and flags residual rather than hanging.
+    /// </summary>
+    public TimeSpan GuestCleanupRetryBudget { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>
     /// Wall-clock window during which an unbroken run of guest-login credential rejections is tolerated as the
     /// transient specialize window before the loop offers an interactive re-prompt and otherwise fails fast. A
     /// freshly cloned VM applies its answer-file password during specialize, so the first PowerShell Direct hops

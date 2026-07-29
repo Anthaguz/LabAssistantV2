@@ -453,6 +453,7 @@ codes:
   - { facility: 0x46, operation: 0x01, status: 0x00, severity: Info,    phase: start, title: Cleaning up forest trust, message: "Cleaning up a forest trust created for the deployment." }
   - { facility: 0x46, operation: 0x01, status: 0x00, severity: Success, phase: end,   title: Forest trust cleaned up, message: "A forest trust created for the deployment was cleaned up." }
   - { facility: 0x46, operation: 0x01, status: 0x01, severity: Warning, flags: [UserActionable], phase: end, title: Forest trust cleanup failed, message: "A forest trust could not be cleaned up.", remediation: "Check the domain controllers for a leftover trust and remove it manually." }
+  - { facility: 0x46, operation: 0x01, status: 0x02, severity: Info,    phase: end, title: Forest trust cleanup skipped, message: "The in-guest forest trust deletion was skipped because the anchor VM is being torn down on rollback; the trust object is destroyed with the VM disk." }
   - { facility: 0x46, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Preparing DNS for forest trust, message: "Preparing DNS forwarding for a forest trust." }
   - { facility: 0x46, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: DNS prepared for forest trust, message: "DNS forwarding for the forest trust was prepared." }
   - { facility: 0x46, operation: 0x02, status: 0x01, severity: Error,   phase: end,   title: DNS preparation failed, message: "DNS forwarding for the forest trust could not be prepared." }
