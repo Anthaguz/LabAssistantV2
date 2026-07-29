@@ -3124,7 +3124,7 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
 
     private async Task CleanupSingleVmAsync(RuntimeVmState state, MultiVmDeploymentContext multiContext)
     {
-        if (!NeedsCleanup(state))
+        if (!NeedsCleanup(state, multiContext))
         {
             return;
         }
@@ -3141,11 +3141,24 @@ public sealed class V2RuntimeCapabilityService : IV2RuntimeCapabilityService
             cleanupResult.HasResiduals ? "completed_with_residuals" : "completed");
     }
 
-    private static bool NeedsCleanup(RuntimeVmState state)
+    private static bool NeedsCleanup(RuntimeVmState state, MultiVmDeploymentContext multiContext)
     {
         var context = state.Context;
-        return (!context.IsSuccess || context.WasCancelled) &&
-               (context.VmFolderCreated || context.DifferencingDiskCreated || context.VmRegistered || context.VmStarted);
+        var createdResources = context.VmFolderCreated || context.DifferencingDiskCreated || context.VmRegistered || context.VmStarted;
+        if (!createdResources)
+        {
+            return false;
+        }
+
+        // A VM that failed, or was itself cancelled mid-step, always needs teardown. Additionally, when the run as a
+        // whole is being aborted - a user cancel, or a stop-all VM failure that requested cancellation - every VM the
+        // runtime created must be torn down, including one whose own per-VM steps all completed successfully before the
+        // abort landed. Such a VM keeps IsSuccess=true and WasCancelled=false because a later cross-VM stage (for
+        // example forest trust) was cancelled after it had already finished, so without the run-level cancellation
+        // signal it would be skipped here and orphaned: the still-running VM plus its differencing disk and folder
+        // (finding 86). A fully successful run never reaches this with the cancellation flag set, so successful
+        // deployments are still left intact.
+        return !context.IsSuccess || context.WasCancelled || multiContext.IsCancellationRequested;
     }
 
     private static bool IsRootFirstDomainController(RuntimeVmState state)
