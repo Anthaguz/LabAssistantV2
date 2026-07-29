@@ -172,7 +172,7 @@ public sealed class DeployFromTemplatePage
             bool saveEverFired = false;
 
             var outcome = CredentialSlotFill.FillSlotWithRetry(
-                attemptFocus: () => SelectRowAndFocusPassword(first, username),
+                attemptFocus: () => SelectRowAndFocusPassword(username),
                 typePassword: () => Keyboard.Type(password),
                 save: () => saveEverFired |= TrySaveCredentialSlot(),
                 hasPersisted: () => HasSlotPersisted(store, storeBefore, rowsBefore),
@@ -248,13 +248,21 @@ public sealed class DeployFromTemplatePage
     }
 
     /// <summary>
-    /// Selects the slot row, sets the username, and focuses the password box, returning true only once
-    /// keyboard focus is confirmed on that box. Re-asserts focus while polling so a transient miss does
-    /// not defeat the attempt; a persistent miss returns false so the caller retries rather than type
-    /// into the void.
+    /// Re-reads the current first unresolved slot row, selects it, sets the username, and focuses the
+    /// password box, returning true only once keyboard focus is confirmed on that box. The row is
+    /// re-queried on every attempt (never a stale handle captured before a Save re-rendered the list),
+    /// so a retry always acts on the live first row. Re-asserts focus while polling so a transient miss
+    /// does not defeat the attempt; a persistent miss returns false so the caller retries rather than
+    /// type into the void.
     /// </summary>
-    private bool SelectRowAndFocusPassword(ListBoxItem row, string username)
+    private bool SelectRowAndFocusPassword(string username)
     {
+        var row = Window.ByAutomationId("DeployV2CredentialSlotsListView")?.AsListBox()?.Items.FirstOrDefault();
+        if (row is null)
+        {
+            return false;
+        }
+
         row.Select();
         Thread.Sleep(200);
         Window.ByAutomationId("DeployV2CredentialSlotUsernameTextBox")?.SetValue(username);
