@@ -20,9 +20,15 @@ namespace LabAssistant.UITesting.Scenarios;
 /// router VM to provision and settle, then authenticate over PowerShell Direct as the local
 /// ".\Administrator" and assert the guest actually holds the templated LAN gateway IP - the direct
 /// test of the multi-NIC MAC-mapping fix (a static IP stapled to the wrong adapter shows up here as
-/// the expected address being absent). The router VM and template file carry the run tag so the gate
-/// tears them down and proves no orphans; the real base image is only annotated with a bootstrap
-/// profile (never deleted), and the host Default Switch is never touched.
+/// the expected address being absent). It then drives the RRAS/NAT tail to completion: the LAN IP is
+/// set by the EARLY prepareRouterNetwork step, so the scenario reads the app's own
+/// deploy.step.run.end events to assert the later router steps actually finished - install RRAS,
+/// enable routing, and configure NAT must SUCCEED, while cross-switch and egress validation must be
+/// terminally SKIPPED (they only run when other guests sit behind the router; driving those to
+/// success needs a routed-domain topology and is out of scope here). Finally it corroborates the
+/// RRAS/routing/NAT state in-guest over PowerShell Direct. The router VM and template file carry the
+/// run tag so the gate tears them down and proves no orphans; the real base image is only annotated
+/// with a bootstrap profile (never deleted), and the host Default Switch is never touched.
 /// </summary>
 public sealed class TemplateDeployRouterScenario : IScenario
 {
@@ -30,6 +36,16 @@ public sealed class TemplateDeployRouterScenario : IScenario
     // scenario is not pinned to one machine, but defaulted to the known WS2022 image id here.
     private static string RealBaseImageId =>
         Environment.GetEnvironmentVariable("LABASSISTANT_SMOKE_BASE_IMAGE_ID") ?? "b0a5e0222022400080000000000000a1";
+
+    // Router-tail step keys exactly as the app emits them on deploy.step.run.end. The harness
+    // references no app project (it drives the built exe over UI Automation), so these mirror
+    // LabAssistant.Models.Deployment.DeploymentStepKeys as a pinned log contract.
+    private const string StepInstallRouterRemoteAccessFeature = "v2.installRouterRemoteAccessFeature";
+    private const string StepEnableRouterRouting = "v2.enableRouterRouting";
+    private const string StepConfigureRouterNat = "v2.configureRouterNat";
+    private const string StepValidateCrossSwitchRouting = "v2.validateCrossSwitchRouting";
+    private const string StepValidateRouterEgress = "v2.validateRouterEgress";
+    private const string StepRouterReady = "v2.routerReady";
 
     public string Name => "template-deploy-router";
 
@@ -197,6 +213,10 @@ public sealed class TemplateDeployRouterScenario : IScenario
         }
 
         // 6) LIVE: start the deploy, wait for the router VM to provision, then validate the guest IPs.
+        //    Open the step-log window BEFORE Start Deploy so every deploy.step.run.end this run emits
+        //    falls inside it - the router-tail assertions below read those completion events back.
+        var stepLog = new DeployStepLogProbe(new AppDataLocations());
+        var logWindow = stepLog.OpenWindow();
         page.StartDeploy();
         recorder.Record(new Finding
         {
@@ -292,6 +312,184 @@ public sealed class TemplateDeployRouterScenario : IScenario
                 $"Expected the LAN static IP '{seeded.LanIpAddress}' on the router, but the guest reported only: " +
                 $"{string.Join(", ", addresses)}. A missing static IP points at the multi-NIC mapping (the static address " +
                 "was stapled to the wrong adapter, or guest network config did not apply).");
+            // The LAN IP is set by the EARLY prepareRouterNetwork step; without it the RRAS/NAT tail
+            // never ran, so there is nothing to assert past this point.
+            return;
+        }
+
+        // 8) ROUTER TAIL: the LAN IP above only proves the early prepareRouterNetwork step. Assert the
+        //    RRAS/NAT tail the deploy is supposed to drive AFTER it actually completes - reading the
+        //    app's own deploy.step.run.end events - so a run can no longer green out the moment the
+        //    static IP appears while the interesting router-config steps go unproven.
+        AssertRouterTailCompleted(context, recorder, probe, stepLog, logWindow, seeded);
+    }
+
+    /// <summary>
+    /// Waits for the router-tail steps to reach their terminal state and asserts each landed where the
+    /// standalone (no-dependent-guest) router contract requires: the RRAS feature install, routing
+    /// enable, NAT configure, and routerReady steps must all succeed, while the cross-switch and egress
+    /// validations must be terminally SKIPPED (they only run when other guests sit behind the router).
+    /// Asserting "skipped" explicitly - rather than ignoring those two - means a silent flip to failed
+    /// is still caught. Finally corroborates the RRAS/NAT state in-guest over PowerShell Direct.
+    /// </summary>
+    private void AssertRouterTailCompleted(
+        ScenarioContext context,
+        FindingRecorder recorder,
+        HyperVProbe probe,
+        DeployStepLogProbe stepLog,
+        AppLogWindow logWindow,
+        SeededRouterTemplate seeded)
+    {
+        // routerReady is the terminal router step, so waiting for it also guarantees every earlier tail
+        // step already has a run.end event on disk. abortIf a rollback so a failed tail step (which
+        // never reaches routerReady) fails fast instead of polling for the whole timeout.
+        DeployStepOutcome? routerReady = stepLog.WaitForStepTerminal(
+            seeded.VmName,
+            StepRouterReady,
+            logWindow,
+            TimeSpan.FromMinutes(12),
+            abortIf: () => VmIsGone(probe, seeded.VmName));
+
+        if (routerReady != DeployStepOutcome.Success)
+        {
+            bool rolledBack = VmIsGone(probe, seeded.VmName);
+            string detail = routerReady is null && rolledBack
+                ? "The router VM was rolled back before routerReady, so a router-tail step failed and the app tore the VM down " +
+                  "(cleanup worked - no orphan). Check %APPDATA%\\LabAssistant\\Logs\\structured-events.jsonl for the failing " +
+                  "deploy.step.run.end (the RRAS/NAT steps around v2.enableRouterRouting / v2.configureRouterNat are the usual culprit)."
+                : routerReady is null
+                    ? "No routerReady terminal event appeared within the timeout, so the RRAS/NAT tail did not complete. Check the app's structured event log."
+                    : $"routerReady reached a terminal state of '{routerReady}' instead of success.";
+            recorder.RecordFailure(
+                context.Host, Name, "router-tail", FindingSeverity.Error,
+                "Router deploy did not drive the RRAS/NAT tail to routerReady=success", detail);
+            return;
+        }
+
+        recorder.Record(new Finding
+        {
+            Scenario = Name,
+            Step = "router-tail",
+            Severity = FindingSeverity.Info,
+            Title = "Router reached routerReady=success; asserting the RRAS/NAT tail steps",
+            Detail = "The deploy emitted a successful v2.routerReady, so every earlier router-tail step has a terminal event to assert."
+        });
+
+        // The steps that must SUCCEED on a standalone router (these are the #916 retry-wrapped RRAS/NAT
+        // steps that previously never reached success in any run - the coverage gap this closes).
+        (string StepKey, string Label)[] mustSucceed =
+        {
+            (StepInstallRouterRemoteAccessFeature, "install RRAS/Routing feature"),
+            (StepEnableRouterRouting, "enable routing"),
+            (StepConfigureRouterNat, "configure NAT")
+        };
+        foreach (var (stepKey, label) in mustSucceed)
+        {
+            DeployStepOutcome? outcome = stepLog.ReadStepTerminal(seeded.VmName, stepKey, logWindow);
+            if (outcome == DeployStepOutcome.Success)
+            {
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "router-tail",
+                    Severity = FindingSeverity.Info,
+                    Title = $"Router tail step succeeded: {stepKey} ({label})",
+                    Detail = "Read from the app's deploy.step.run.end event - the step actually ran to completion, not just planned."
+                });
+            }
+            else
+            {
+                recorder.RecordFailure(
+                    context.Host, Name, "router-tail", FindingSeverity.Error,
+                    $"Router tail step '{stepKey}' ({label}) did not succeed",
+                    $"Expected a deploy.step.run.end with result=success for '{stepKey}' on '{seeded.VmName}', but observed " +
+                    $"'{(outcome is null ? "no terminal event" : outcome.ToString())}'. This is the RRAS/NAT completion coverage the run must prove.");
+            }
+        }
+
+        // The steps that must be terminally SKIPPED on a standalone router: cross-switch routing and
+        // outbound egress validation only execute when OTHER guests depend on the router, which this
+        // single-router topology has none of. Driving them to success is deliberately out of scope
+        // (it needs a routed-domain topology). Asserting skipped still catches a silent flip to failed.
+        (string StepKey, string Label)[] mustSkip =
+        {
+            (StepValidateCrossSwitchRouting, "cross-switch routing validation"),
+            (StepValidateRouterEgress, "router egress validation")
+        };
+        foreach (var (stepKey, label) in mustSkip)
+        {
+            DeployStepOutcome? outcome = stepLog.ReadStepTerminal(seeded.VmName, stepKey, logWindow);
+            if (outcome == DeployStepOutcome.Skipped)
+            {
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "router-tail",
+                    Severity = FindingSeverity.Info,
+                    Title = $"Router tail step skipped as expected: {stepKey} ({label})",
+                    Detail = "A standalone router has no dependent guests, so this validation is terminally skipped by contract."
+                });
+            }
+            else if (outcome == DeployStepOutcome.Failed || outcome is null)
+            {
+                recorder.RecordFailure(
+                    context.Host, Name, "router-tail", FindingSeverity.Error,
+                    $"Router tail step '{stepKey}' ({label}) was expected to be skipped but was not",
+                    $"On a standalone router this step must be terminally skipped, but observed " +
+                    $"'{(outcome is null ? "no terminal event" : outcome.ToString())}'. A failed here is a regression to catch.");
+            }
+            else
+            {
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "router-tail",
+                    Severity = FindingSeverity.Warning,
+                    Title = $"Router tail step '{stepKey}' ({label}) succeeded instead of skipping",
+                    Detail = "This standalone-router scenario expects a skip; a success means dependent guests were present, i.e. the topology changed."
+                });
+            }
+        }
+
+        // 9) IN-GUEST CORROBORATION: read the RRAS/routing/NAT state straight from the router over
+        //    PowerShell Direct, so completion is proven against the running guest, not only the app log.
+        var routerProbe = new GuestRouterProbe();
+        GuestRouterState? state = routerProbe.QueryRouterState(
+            seeded.VmName,
+            TimeSpan.FromMinutes(4),
+            abortIf: () => VmIsGone(probe, seeded.VmName));
+
+        if (state is null)
+        {
+            recorder.RecordFailure(
+                context.Host, Name, "router-tail-guest", FindingSeverity.Error,
+                $"The router guest never answered the RRAS/NAT state probe on '{seeded.VmName}'",
+                "The app reported routerReady=success, but the guest could not be read over PowerShell Direct within the timeout " +
+                "(or the VM was rolled back). See the console output for the last PowerShell Direct error.");
+            return;
+        }
+
+        if (state.IsFullyConfigured)
+        {
+            recorder.Record(new Finding
+            {
+                Scenario = Name,
+                Step = "router-tail-guest",
+                Severity = FindingSeverity.Info,
+                Title = "IN-GUEST VALIDATION PASSED: router holds RRAS installed, IPv4 forwarding enabled, and NAT configured",
+                Detail = $"RemoteAccess+Routing installed, {state.Ipv4ForwardingEnabledCount} IPv4 interface(s) forwarding, IP NAT installed. " +
+                         "Read live from the router guest over PowerShell Direct, corroborating the deploy.step.run.end tail."
+            });
+        }
+        else
+        {
+            recorder.RecordFailure(
+                context.Host, Name, "router-tail-guest", FindingSeverity.Error,
+                "Router guest is missing part of the expected RRAS/NAT state",
+                $"Expected RRAS+Routing installed, IPv4 forwarding enabled, and IP NAT installed, but the guest reported: " +
+                $"RemoteAccessInstalled={state.RemoteAccessInstalled}, RoutingInstalled={state.RoutingInstalled}, " +
+                $"Ipv4ForwardingEnabledCount={state.Ipv4ForwardingEnabledCount}, NatInstalled={state.NatInstalled}. " +
+                "The app logged routerReady=success, so a mismatch here points at a router-config step that reported success without applying.");
         }
     }
 
