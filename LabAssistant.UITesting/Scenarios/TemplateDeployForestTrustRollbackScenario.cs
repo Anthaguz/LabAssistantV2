@@ -31,21 +31,35 @@ namespace LabAssistant.UITesting.Scenarios;
 /// checkpoints, where the trust is fully created but not yet marked READY. Cleanup then removes a COMPLETE
 /// real trust - a stronger no-orphans proof than interrupting a partial create.
 ///
-/// The verdict (a single pure classifier, <see cref="ClassifyRollback"/>), strongest first:
-///   PASS (authoritative): BOTH <c>create.end</c>=success (a real, fully-created trust existed) AND the
-///       cleanup WRAP ran to a success terminal (<c>cleanup.start</c>(started) then <c>cleanup.end</c>
-///       =success). This distinguishes "cleanupForestTrust actually executed and removed a real trust" from
-///       "the trust merely died when the VM was destroyed", and is the first live coverage of the wrap (#916).
-///   GATING FAIL: cleanup ran but reported residual (<c>cleanup.end</c>=failed - EXPECTED until the finding-85
-///       cleanup-retry fix lands, so this verb's live PASS is coupled to finding 85), or cleanup started but
-///       never reached a terminal end (hung), or a full trust was created and cancelled yet cleanup never ran.
+/// The verdict (a single pure classifier, <see cref="ClassifyRollback"/>), reframed for the findings-86/87
+/// moot-skip product behaviour: on cancel the runtime SKIPS the in-guest DeleteLocalSideOfTrust for any anchor
+/// whose OWN VM is being torn down in the same cancel (run-created), because deleting a trust object on a disk
+/// about to be wiped is MOOT - the trust dies with the disk. In THIS scenario BOTH DCs are run-created, so both
+/// anchor deletes are skipped-as-moot and the cleanup stage emits an HONEST <c>cleanup.end</c>=skipped terminal
+/// (not success). The authoritative proof therefore shifts from "cleanup.end=success" to the RUNTIME tearing
+/// everything down promptly with zero orphans - a STRONGER proof (it pins that the runtime itself cleans up,
+/// not the harness backstop). Strongest first:
+///   PASS (authoritative): <c>create.end</c>=success (a real, fully-created trust existed) AND the cleanup wrap
+///       reached an HONEST terminal - <c>cleanup.end</c>=skipped-as-moot (expected here, both anchors run-created)
+///       OR =success (only if a surviving pre-existing anchor path ran) - AND ZERO ORPHANS before the gate
+///       backstop: the runtime tore down every run-created VM + differencing disk within TeardownBudget. The
+///       zero-orphans-before-backstop check is the CENTERPIECE - it directly proves findings 86 (mandatory
+///       teardown no longer gated behind best-effort in-guest cleanup) and 87 (no ~30-min orphan-and-Running
+///       window on a cancelled dual-DC deploy).
+///   GATING FAIL: cleanup ran but reported residual (<c>cleanup.end</c>=failed - the finding-85 hard-fail this
+///       verb's live PASS is coupled to the #924 cleanup-retry fix eliminating), or cleanup started but never
+///       reached ANY terminal within budget (a hang - the finding-85 hang the fix must not reintroduce), or the
+///       runtime left orphans / exceeded TeardownBudget (the finding-86/87 regression the centerpiece pins).
 ///   INCONCLUSIVE (never a false pass/fail, re-run): the deploy reached a READY trust before the cancel took
 ///       effect (validate.end=success, no cleanup), or no fully-created trust was observed (cancel too early),
-///       or cleanup succeeded but create.end=success was not confirmed.
-///   MONEY: zero orphans host-side, read directly BEFORE the gate's backstop sweep - both DC VMs gone, no
-///       run-tagged VMs / differencing disks survive, and the shared real base image is intact. (The shared
-///       Internal switch is gate-owned - the app references but never created it - so it is intentionally left
-///       to the gate backstop and not asserted gone here.)
+///       or cleanup ran to an honest terminal but create.end=success was not confirmed, or the cleanup stage was
+///       silent (no start + no terminal) yet the runtime still left zero orphans - no leak, but the honest stage
+///       could not be confirmed, so re-run. The fix thread ALWAYS emits a terminal per cleanup.start, so a truly
+///       silent case should never legitimately occur post-fix; this branch is defence-in-depth on the emit path.
+///   MONEY: zero orphans host-side, read directly BEFORE the gate's backstop sweep - both DC VMs gone within
+///       TeardownBudget, no run-tagged VMs / differencing disks survive, and the shared real base image is
+///       intact. (The shared Internal switch is gate-owned - the app references but never created it - so it is
+///       intentionally left to the gate backstop and not asserted gone here; this verb has no run-created switch.)
 ///   In-guest GuestTrustProbe is best-effort and NON-gating: once the app tears the DCs down the trust objects
 ///       are gone with them, so an in-guest read is typically not applicable and never fails the run.
 ///
@@ -81,16 +95,20 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
     // more than a couple of RPCs of headroom but runs before the VMs are removed. 8 min is generous.
     private static readonly TimeSpan CleanupObservationBudget = TimeSpan.FromMinutes(8);
 
-    // Budget from cleanup.start until a TERMINAL cleanup.end (success or failed) lands. Deleting the local
-    // side on each anchor over PowerShell Direct with the #916 transient-drop retries can take longer than a
-    // couple of RPCs, so this is generous; if no terminal appears the wrap is treated as hung (a real
-    // finding), never as a clean completion.
+    // Budget from cleanup.start until a TERMINAL cleanup.end lands. The terminal is exactly one of
+    // success | failed | skipped (skipped-as-moot is the EXPECTED terminal here: both DC anchors are
+    // run-created, so both in-guest deletes are correctly skipped). Skipped is near-instant (no in-guest work);
+    // success/failed over PowerShell Direct with the #916 transient-drop retries can take longer, so this is
+    // generous. If no terminal appears the wrap is treated as hung (a real finding), never as a clean completion.
     private static readonly TimeSpan CleanupEndBudget = TimeSpan.FromMinutes(6);
 
-    // Budget from the cancel until both DC VMs are gone (the app's teardown stops + removes each VM and
-    // deletes its differencing disk). Two VMs plus disk deletes settle well within this; 10 min bounds a
-    // wedged teardown so the money orphan-check is not read prematurely.
-    private static readonly TimeSpan TeardownBudget = TimeSpan.FromMinutes(10);
+    // Budget from the cancel until both DC VMs are gone - the LOAD-BEARING finding-87 assertion, not merely a
+    // safety bound. A correct prompt teardown of two VMs + differencing disks is host-side Remove-VM + disk
+    // delete (~1-3 min, not compute-sensitive), so 6 min is a 2-3x margin on a shared box. Critically it also
+    // catches a HALF regression: a single-side in-guest-cleanup block is ~15 min on its own, so any regression
+    // to the old behaviour (mandatory teardown gated behind best-effort in-guest trust cleanup) blows 6 min and
+    // fails. 10 min would let a single-side regression that happened to resolve fast slip; 6 min is the tripwire.
+    private static readonly TimeSpan TeardownBudget = TimeSpan.FromMinutes(6);
 
     public string Name => "template-deploy-forest-trust-rollback";
 
@@ -341,10 +359,11 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
 
     /// <summary>
     /// Reads the app's own account of the rollback and proves it was clean via a single pure verdict
-    /// (<see cref="ClassifyRollback"/>). The authoritative PASS requires BOTH a real, fully-created trust
-    /// (create.end=success) AND a cleanup wrap that ran to a success terminal; the host-side zero-orphans money
-    /// check then runs (gating on the fail/pass paths, non-gating on inconclusive), followed by a best-effort
-    /// non-gating in-guest note on the pass path.
+    /// (<see cref="ClassifyRollback"/>). The authoritative PASS requires a real, fully-created trust
+    /// (create.end=success), an HONEST cleanup terminal (skipped-as-moot - expected here since both DCs are
+    /// run-created - or success), AND zero orphans before the gate backstop (the runtime tore down every
+    /// run-created VM + differencing disk within TeardownBudget). Zero-orphans-before-backstop is the gating
+    /// centerpiece (findings 86/87). A best-effort non-gating in-guest note follows on the pass path.
     /// </summary>
     private void AssertCleanRollback(
         ScenarioContext context,
@@ -356,31 +375,35 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
         SeededForestTrustTemplate seeded,
         ProvisionedResources resources)
     {
-        // Give the app time to run cleanupForestTrust and report its terminal end. Cleanup runs before the
-        // VMs are removed, so waiting for it first is the natural order.
+        // Give the app time to run cleanupForestTrust and report its terminal end. The wrap always emits one
+        // cleanup.start then one cleanup.end per trust, so waiting for the start first is the natural order.
         bool cleanupStarted = stepLog.WaitForTrustEvent(
             DeployStepLogProbe.TrustCleanupStartEvent, "started", logWindow, CleanupObservationBudget);
 
-        // After the start, wait for a TERMINAL cleanup.end - success OR failed - over ONE combined budget,
-        // polling both. The success finding below is gated on actually observing a success terminal, so a
-        // cleanup that starts and then hangs/throws between cleanup.start and cleanup.end (or a residual end
-        // that lands later than a fixed success-only grace) can never be mistaken for a clean completion.
+        // After the start, wait for the SINGLE terminal cleanup.end - success | skipped | failed - over one
+        // combined budget, polling all three. skipped-as-moot is the EXPECTED terminal here (both anchor VMs
+        // are being torn down, so the in-guest deletes are correctly skipped); success only if a surviving
+        // pre-existing anchor path ran; failed is a residual (finding-85). Each finding below is gated on
+        // actually observing its terminal, so a cleanup that starts then hangs/throws between start and end can
+        // never be mistaken for a clean completion.
         bool cleanupSucceeded = false;
+        bool cleanupSkipped = false;
         bool cleanupResidual = false;
         if (cleanupStarted)
         {
             var endDeadline = DateTime.UtcNow + CleanupEndBudget;
             while (true)
             {
-                if (stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCleanupEndEvent, "success", logWindow))
-                {
-                    cleanupSucceeded = true;
-                    break;
-                }
+                // Read ALL three terminals each poll and let ClassifyRollback's precedence decide, rather than
+                // breaking on the first-seen marker. This keeps the read layer from masking a residual behind a
+                // co-occurring skipped/success marker (defence-in-depth over the "exactly one terminal per
+                // cleanup.start" contract) so the classifier's residual-is-gating guarantee holds end to end.
+                cleanupSucceeded = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCleanupEndEvent, "success", logWindow);
+                cleanupSkipped = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCleanupEndEvent, "skipped", logWindow);
+                cleanupResidual = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCleanupEndEvent, "failed", logWindow);
 
-                if (stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCleanupEndEvent, "failed", logWindow))
+                if (cleanupSucceeded || cleanupSkipped || cleanupResidual)
                 {
-                    cleanupResidual = true;
                     break;
                 }
 
@@ -393,43 +416,65 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
             }
         }
 
-        // The two qualifying facts. create.end=success proves a REAL, fully-created trust existed (the atomic
+        // The two qualifying log facts. create.end=success proves a REAL, fully-created trust existed (the atomic
         // guest New-ADTrust attempt completed) and is the positive precondition of the authoritative PASS.
         // validate.end=success proves the trust reached READY, which only happens if the cancel landed after
         // the whole trust was already established.
         bool createEnded = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCreateEndEvent, "success", logWindow);
         bool trustValidated = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustValidateEndEvent, "success", logWindow);
 
-        var verdict = ClassifyRollback(cleanupStarted, cleanupSucceeded, cleanupResidual, createEnded, trustValidated);
+        // The CENTERPIECE: probe the host directly, BEFORE the gate's backstop sweep, for what the RUNTIME's own
+        // cancel teardown removed. This is the finding-86/87 proof and it gates the PASS.
+        var orphans = ProbeOrphans(context, recorder, hyperV, probe, seeded, resources);
+        if (orphans.EnumerationFailed)
+        {
+            // The no-orphans invariant cannot be verified here (Hyper-V/disk enumeration threw); ProbeOrphans
+            // already recorded the Error and the gate backstop still runs. Without the centerpiece we cannot
+            // assert PASS, so stop.
+            return;
+        }
+
+        var verdict = ClassifyRollback(
+            cleanupStarted, cleanupSucceeded, cleanupSkipped, cleanupResidual, createEnded, trustValidated,
+            orphans.NoTaggedLeftovers, orphans.TeardownWithinBudget);
+
         switch (verdict)
         {
             case RollbackVerdict.Pass:
-                // AUTHORITATIVE: the cleanup wrap ran to success ON A REAL, FULLY-CREATED TRUST. This is the
-                // heart of finding 79 and its precondition is create.end=success, not merely "cleanup ran".
+                // AUTHORITATIVE: a real, fully-created trust existed, the cleanup wrap reached an honest terminal,
+                // and the RUNTIME tore everything down with zero orphans. The heart of the reframed finding 79.
                 recorder.Record(new Finding
                 {
                     Scenario = Name,
                     Step = "cleanup-ran",
                     Severity = FindingSeverity.Info,
-                    Title = "AUTHORITATIVE: the cleanupForestTrust wrap executed and completed on a fully-created trust",
-                    Detail = "The app's structured log shows deploy.forest-trust.create.end (result=success) - a real, complete " +
-                             "bidirectional trust existed - followed by deploy.forest-trust.cleanup.start (result=started) and " +
-                             "deploy.forest-trust.cleanup.end (result=success): on the cancel the runtime ran " +
-                             "DeleteLocalSideOfTrustRelationship on each anchor as its no-orphans mechanism, rather than letting the " +
-                             "trust die incidentally with the VMs. This is the first live coverage of the forest-trust cleanup wrap (#916)."
+                    Title = cleanupSkipped
+                        ? "AUTHORITATIVE: the cleanup wrap honestly SKIPPED both moot in-guest deletes; the runtime tore everything down"
+                        : "AUTHORITATIVE: the cleanupForestTrust wrap executed to success on a fully-created trust",
+                    Detail = cleanupSkipped
+                        ? "The app's structured log shows deploy.forest-trust.create.end (result=success) - a real, complete " +
+                          "bidirectional trust existed - followed by deploy.forest-trust.cleanup.start (result=started) and " +
+                          "deploy.forest-trust.cleanup.end (result=skipped): both trust anchors' own VMs were being torn down in " +
+                          "the same cancel, so the runtime correctly skipped the moot in-guest DeleteLocalSideOfTrust (the trust " +
+                          "object dies with the disk) and instead relied on the mandatory VM/disk teardown. This is the honest " +
+                          "moot-skip terminal (findings 86/87), and the zero-orphans check below proves the teardown happened."
+                        : "The app's structured log shows deploy.forest-trust.create.end (result=success) - a real, complete " +
+                          "bidirectional trust existed - followed by deploy.forest-trust.cleanup.start (result=started) and " +
+                          "deploy.forest-trust.cleanup.end (result=success): a surviving pre-existing anchor path ran the in-guest " +
+                          "DeleteLocalSideOfTrustRelationship as its no-orphans mechanism. First live coverage of the cleanup wrap (#916)."
                 });
                 recorder.Record(new Finding
                 {
                     Scenario = Name,
                     Step = "cancel-during-validate",
                     Severity = FindingSeverity.Info,
-                    Title = "The cancel landed after the trust was created but before it was READY; cleanup removed the real trust",
+                    Title = "The cancel landed after the trust was created but before it was READY; the runtime rolled back cleanly",
                     Detail = "create.end=success with no validate.end=success in the window: the guest create attempt is atomic and " +
                              "completes once started, so the cancel was designed to land during the following validate stage, where the " +
-                             "trust is fully created but not yet marked ready. Cleanup then removed a complete real trust - a stronger " +
-                             "no-orphans proof than interrupting a partial create."
+                             "trust is fully created but not yet marked ready. The runtime then removed a complete real trust's artifacts " +
+                             "and tore down all run-created resources - a stronger no-orphans proof than interrupting a partial create."
                 });
-                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                RecordOrphanFinding(recorder, orphans, seeded, gating: true);
                 RecordBestEffortInGuest(recorder, probe, seeded);
                 return;
 
@@ -438,12 +483,10 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                     context.Host, Name, "cleanup-ran", FindingSeverity.Error,
                     "cleanupForestTrust ran but reported residual (did not fully remove the trust)",
                     "deploy.forest-trust.cleanup.start ran and the wrap executed, but cleanup.end reported result=failed - one or both " +
-                    "local sides of the trust may remain. The cleanup WRAP did run (finding 79's core question answered YES), but it left " +
-                    "residual. NOTE: until the finding-85 fix lands (cleanup's in-guest trust-deletion is not yet wrapped in the " +
-                    "transport-retry helper and hard-fails on the PSDirect credential-invalid transient), a residual end is EXPECTED on " +
-                    "live runs - this verb's live PASS is coupled to finding 85. Because the DC VMs are torn down on this path the " +
-                    "in-guest trust dies with them, but a residual report still warrants investigation.");
-                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                    "local sides of the trust may remain. NOTE: cleanup's in-guest trust-deletion hard-failing on the PSDirect " +
+                    "credential-invalid transient is finding 85; this verb's live PASS is coupled to the #924 cleanup-retry fix landing, " +
+                    "after which a residual end is a genuine regression. The zero-orphans check still follows to show host-side leakage.");
+                RecordOrphanFinding(recorder, orphans, seeded, gating: true);
                 return;
 
             case RollbackVerdict.FailCleanupHung:
@@ -451,24 +494,24 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                     context.Host, Name, "cleanup-ran", FindingSeverity.Error,
                     "cleanupForestTrust started but never reached a terminal end",
                     $"'{DeployStepLogProbe.TrustCleanupStartEvent}' (result=started) appeared, but no terminal " +
-                    $"'{DeployStepLogProbe.TrustCleanupEndEvent}' (success or failed) followed within {CleanupEndBudget.TotalMinutes:N0} min. " +
-                    "The cleanup wrap began but did not complete - it likely hung or threw between deleting the local side on each " +
-                    "anchor, or the process was torn down mid-cleanup. Treated as a real finding: the no-orphans wrap did not finish. " +
-                    "Host-side orphan verification still follows to show whether resources leaked.");
-                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                    $"'{DeployStepLogProbe.TrustCleanupEndEvent}' (success, skipped or failed) followed within {CleanupEndBudget.TotalMinutes:N0} min. " +
+                    "The cleanup wrap began but did not complete - it likely hung between anchors (the finding-85 hang the #924 fix must " +
+                    "NOT reintroduce), or the process was torn down mid-cleanup. Treated as a real finding. The zero-orphans check still " +
+                    "follows to show whether resources leaked.");
+                RecordOrphanFinding(recorder, orphans, seeded, gating: true);
                 return;
 
-            case RollbackVerdict.FailCleanupDidNotRun:
+            case RollbackVerdict.FailOrphansLeaked:
                 recorder.RecordFailure(
-                    context.Host, Name, "cleanup-ran", FindingSeverity.Error,
-                    "cleanupForestTrust did NOT run after a full-create cancel",
-                    "deploy.forest-trust.create.end=success shows a real, fully-created trust existed and the deploy was cancelled " +
-                    $"(no validate.end=success), but no '{DeployStepLogProbe.TrustCleanupStartEvent}' (result=started) appeared within " +
-                    $"{CleanupObservationBudget.TotalMinutes:N0} min. On this path CleanupFailedOrCancelledAsync is the no-orphans " +
-                    "mechanism for the trust; its absence means the trust would only be removed incidentally when the VMs are destroyed, " +
-                    "leaving no guarantee for a trust that outlived its DCs. Treated as a real finding, not a harness issue - the cancel " +
-                    "did reach teardown (see orphan check).");
-                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                    context.Host, Name, "rollback-no-orphans", FindingSeverity.Error,
+                    "the runtime's cancel teardown left orphans or exceeded the teardown budget (findings 86/87)",
+                    "A real, fully-created trust was cancelled and the cleanup stage reached its honest terminal (or was silent), but " +
+                    $"the runtime did NOT tear down every run-created resource within TeardownBudget ({TeardownBudget.TotalMinutes:N0} min): " +
+                    "one or more run-tagged VMs / differencing disks survive, or both DCs were still present past the budget. This is the " +
+                    "exact finding-86/87 regression the reframe pins - mandatory teardown must not be gated behind best-effort in-guest " +
+                    "cleanup, and a cancelled dual-DC deploy must not leave a lingering orphan-and-Running window. The gate's backstop " +
+                    "will still sweep tagged leftovers so the box is left clean, but the runtime owning prompt teardown is the product invariant.");
+                RecordOrphanFinding(recorder, orphans, seeded, gating: true);
                 return;
 
             case RollbackVerdict.InconclusiveReadyTrust:
@@ -480,10 +523,11 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                     Title = "INCONCLUSIVE: the deploy reached a READY trust before the cancel took effect",
                     Detail = "The log shows deploy.forest-trust.validate.end=success and no cleanup start within the window: the trust " +
                              "was fully established and the deploy effectively completed before the navigate-away cancel landed, so there " +
-                             "was nothing for cleanupForestTrust to roll back. This is NOT a false pass and NOT a failure; re-run to land " +
-                             "the cancel during the validate stage (before the trust is marked ready). Host-side orphan verification still follows."
+                             "was nothing for cleanupForestTrust to roll back and the VMs remaining is a successful deploy, not a leak. " +
+                             "This is NOT a false pass and NOT a failure; re-run to land the cancel during the validate stage (before the " +
+                             "trust is marked ready). Host-side orphan verification still follows as non-gating evidence."
                 });
-                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: false);
+                RecordOrphanFinding(recorder, orphans, seeded, gating: false);
                 return;
 
             case RollbackVerdict.InconclusiveNoCreate:
@@ -498,7 +542,7 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                              "remove (its precondition, TrustObjectsCreated, was never set). This is NOT a false pass and NOT a failure; " +
                              "re-run to land the cancel after the create attempt commits. Host-side orphan verification still follows."
                 });
-                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: false);
+                RecordOrphanFinding(recorder, orphans, seeded, gating: false);
                 return;
 
             case RollbackVerdict.InconclusiveCleanupWithoutCreateEnd:
@@ -507,49 +551,82 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                     Scenario = Name,
                     Step = "rollback-inconclusive",
                     Severity = FindingSeverity.Warning,
-                    Title = "INCONCLUSIVE: cleanup ran to success but a fully-created trust was not confirmed",
-                    Detail = "deploy.forest-trust.cleanup.start -> cleanup.end=success appeared, but no deploy.forest-trust.create.end" +
-                             "=success was observed in the window, so the authoritative PASS precondition (a real, fully-created trust) " +
-                             "cannot be asserted. The cleanup wrap did run, but this run cannot claim it removed a complete trust. This is " +
-                             "NOT a false pass and NOT a failure; re-run. Host-side orphan verification still follows."
+                    Title = "INCONCLUSIVE: cleanup reached an honest terminal but a fully-created trust was not confirmed",
+                    Detail = "deploy.forest-trust.cleanup.start -> cleanup.end (success or skipped) appeared, but no deploy.forest-trust." +
+                             "create.end=success was observed in the window, so the authoritative PASS precondition (a real, fully-created " +
+                             "trust) cannot be asserted. The cleanup wrap did run, but this run cannot claim it acted on a complete trust. " +
+                             "This is NOT a false pass and NOT a failure; re-run. Host-side orphan verification still follows."
                 });
-                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: false);
+                RecordOrphanFinding(recorder, orphans, seeded, gating: false);
+                return;
+
+            case RollbackVerdict.InconclusiveSilentButClean:
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "rollback-inconclusive",
+                    Severity = FindingSeverity.Warning,
+                    Title = "INCONCLUSIVE: the runtime left zero orphans but the cleanup stage was silent (no honest terminal)",
+                    Detail = "deploy.forest-trust.create.end=success shows a real trust existed and the runtime tore down every " +
+                             "run-created resource with zero orphans, but NO cleanup.start and NO cleanup.end terminal appeared in the " +
+                             "window. There is no leak, but the honest cleanup stage could not be confirmed. The fix thread always emits a " +
+                             "terminal for every cleanup.start, so a truly silent case should not legitimately occur post-fix; if this " +
+                             "branch fires it signals a broken emit path worth surfacing. This is NOT a false pass and NOT a failure; re-run."
+                });
+                RecordOrphanFinding(recorder, orphans, seeded, gating: false);
                 return;
         }
     }
 
     /// <summary>
-    /// The pure rollback verdict over five log-derived facts, extracted so it is unit-testable without a live
-    /// deploy. The authoritative PASS requires BOTH a fully-created trust (create.end=success) AND a cleanup
-    /// wrap that ran to a success terminal; any ambiguity resolves to INCONCLUSIVE (never a false pass), and a
-    /// cleanup that ran but left residual, hung, or failed to run at all on a real trust is a gating failure.
+    /// The pure rollback verdict over the log-derived facts PLUS the host-side zero-orphans facts, extracted so
+    /// it is unit-testable without a live deploy. Reframed for the findings-86/87 moot-skip behaviour: the
+    /// authoritative PASS requires a fully-created trust (create.end=success), an HONEST cleanup terminal
+    /// (success OR skipped-as-moot), AND zero orphans before the backstop (no tagged leftovers AND teardown
+    /// within budget). A cleanup that reported residual or hung is a gating failure; a runtime that left orphans
+    /// or blew the teardown budget on the cancel path is the gating finding-86/87 failure; any remaining
+    /// ambiguity is a non-gating INCONCLUSIVE (never a false pass, never a false fail).
     /// </summary>
     internal static RollbackVerdict ClassifyRollback(
         bool cleanupStarted,
         bool cleanupSucceeded,
+        bool cleanupSkipped,
         bool cleanupResidual,
         bool createEnded,
-        bool trustValidated)
+        bool trustValidated,
+        bool noTaggedLeftovers,
+        bool teardownWithinBudget)
     {
+        bool zeroOrphans = noTaggedLeftovers && teardownWithinBudget;
+
         if (cleanupStarted)
         {
-            // The cleanup WRAP ran - finding 79's core question is answered YES. Qualify the terminal and the
-            // fully-created precondition.
+            // A residual terminal (cleanup.end=failed) is gating and must never be masked by a co-occurring
+            // skipped flag; a genuine success terminal still wins over a stale residual (defensive - the live
+            // path sets exactly one terminal).
             if (cleanupResidual && !cleanupSucceeded)
             {
                 return RollbackVerdict.FailCleanupResidual;
             }
 
-            if (!cleanupSucceeded)
+            // Started but no terminal of any kind within budget - a hang (the finding-85 hang), gating.
+            if (!cleanupSucceeded && !cleanupSkipped && !cleanupResidual)
             {
                 return RollbackVerdict.FailCleanupHung;
             }
 
-            return createEnded ? RollbackVerdict.Pass : RollbackVerdict.InconclusiveCleanupWithoutCreateEnd;
+            // Honest terminal (success or skipped-as-moot). The authoritative PASS additionally requires a
+            // confirmed fully-created trust and zero orphans before the backstop.
+            if (!createEnded)
+            {
+                return RollbackVerdict.InconclusiveCleanupWithoutCreateEnd;
+            }
+
+            return zeroOrphans ? RollbackVerdict.Pass : RollbackVerdict.FailOrphansLeaked;
         }
 
-        // The cleanup wrap did NOT run. Distinguish "the deploy already finished" from "cleanup should have
-        // run on a real trust but didn't".
+        // The cleanup stage never started. Distinguish "the deploy already finished" from "cancel too early"
+        // from the defence-in-depth silent case.
         if (trustValidated)
         {
             return RollbackVerdict.InconclusiveReadyTrust;
@@ -560,40 +637,47 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
             return RollbackVerdict.InconclusiveNoCreate;
         }
 
-        return RollbackVerdict.FailCleanupDidNotRun;
+        // A real trust existed and the deploy was cancelled, but no cleanup terminal was observed. Orphans
+        // decide: a leak is the gating finding-86/87 failure; zero orphans with a silent stage is a non-gating
+        // re-run (no leak, but the honest cleanup stage could not be confirmed).
+        return zeroOrphans ? RollbackVerdict.InconclusiveSilentButClean : RollbackVerdict.FailOrphansLeaked;
     }
 
     /// <summary>
     /// The possible outcomes of the rollback proof. PASS is the only clean success; the three Fail* outcomes are
-    /// gating findings; the three Inconclusive* outcomes are non-gating "re-run" verdicts that never report a
-    /// false pass or a false fail.
+    /// gating findings (residual cleanup, a hung cleanup, or the runtime leaking orphans / blowing the teardown
+    /// budget on the cancel path); the four Inconclusive* outcomes are non-gating "re-run" verdicts that never
+    /// report a false pass or a false fail.
     /// </summary>
     internal enum RollbackVerdict
     {
         Pass,
         FailCleanupResidual,
         FailCleanupHung,
-        FailCleanupDidNotRun,
+        FailOrphansLeaked,
         InconclusiveReadyTrust,
         InconclusiveNoCreate,
-        InconclusiveCleanupWithoutCreateEnd
+        InconclusiveCleanupWithoutCreateEnd,
+        InconclusiveSilentButClean
     }
 
     /// <summary>
-    /// Proves the APP's own cancel path removed everything it created, read directly from Hyper-V/disk BEFORE
-    /// the gate's unconditional backstop sweep. Waits for both DC VMs to disappear, then asserts no run-tagged
-    /// VMs / differencing disks survive and the shared real base image is intact. The shared Internal switch is
-    /// gate-owned (the app never created it) so it is deliberately not asserted gone here.
-    /// When <paramref name="gating"/> is false the result is recorded as evidence but a leak is still an Error.
+    /// Probes the host directly for what the runtime's own cancel teardown removed, read BEFORE the gate's
+    /// unconditional backstop sweep. Waits up to <see cref="TeardownBudget"/> for both DC VMs to disappear
+    /// (the finding-87 timing assertion), then enumerates surviving run-tagged VMs / differencing disks and
+    /// confirms the shared real base image is intact. Records NOTHING on the success path - the caller records
+    /// the appropriate finding via <see cref="RecordOrphanFinding"/> so the gating severity follows the verdict.
+    /// On a Hyper-V/disk enumeration failure it records an Error and returns <c>EnumerationFailed = true</c>.
+    /// The shared Internal switch is gate-owned (the app never created it) so it is deliberately not asserted
+    /// gone here; this verb has no run-created switch.
     /// </summary>
-    private void AssertNoOrphansHostSide(
+    private OrphanProbe ProbeOrphans(
         ScenarioContext context,
         FindingRecorder recorder,
         HyperVScenarioResources hyperV,
         HyperVProbe probe,
         SeededForestTrustTemplate seeded,
-        ProvisionedResources resources,
-        bool gating)
+        ProvisionedResources resources)
     {
         var vmNames = new[] { seeded.SourceDcVmName, seeded.TargetDcVmName };
         bool bothGone = WaitForAllVmsGone(probe, vmNames, TeardownBudget);
@@ -626,41 +710,79 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                 "Could not verify the app's rollback left no orphans: Hyper-V/disk enumeration failed",
                 $"Enumerating tagged VMs/disks threw '{ex.Message}', so the no-orphans invariant cannot be confirmed here. " +
                 "The gate's backstop still runs; inspect Hyper-V manually for surviving '" + globalPrefix + "' resources.");
-            return;
+            return new OrphanProbe(EnumerationFailed: true, TeardownWithinBudget: bothGone, NoTaggedLeftovers: false,
+                BaseImageIntact: true, SurvivingVms: Array.Empty<string>(), OrphanDisks: Array.Empty<string>(),
+                OrphanDirs: Array.Empty<string>(), BothGone: bothGone, GlobalPrefix: globalPrefix);
         }
 
         // The shared base image must survive: the app's cancel cleanup must never delete resources it did not create.
         bool baseImageIntact = string.IsNullOrEmpty(resources.BaseDiskPath) || File.Exists(resources.BaseDiskPath);
 
-        int leaks = survivingVms.Count + orphanDisks.Count + orphanDirs.Count + (bothGone ? 0 : 1) + (baseImageIntact ? 0 : 1);
-        if (leaks == 0)
+        // "No tagged leftovers" folds every artifact the runtime should have removed plus the base-image-intact
+        // invariant; TeardownBudget (bothGone) is kept distinct so the finding-87 timing regression is nameable.
+        bool noTaggedLeftovers = survivingVms.Count == 0 && orphanDisks.Count == 0 && orphanDirs.Count == 0 && baseImageIntact;
+
+        return new OrphanProbe(EnumerationFailed: false, TeardownWithinBudget: bothGone, NoTaggedLeftovers: noTaggedLeftovers,
+            BaseImageIntact: baseImageIntact, SurvivingVms: survivingVms, OrphanDisks: orphanDisks, OrphanDirs: orphanDirs,
+            BothGone: bothGone, GlobalPrefix: globalPrefix);
+    }
+
+    /// <summary>
+    /// Records the zero-orphans MONEY finding (Info) when the runtime's cancel teardown left the box clean, or a
+    /// leak finding otherwise (Error when <paramref name="gating"/>, else a non-gating Warning for the
+    /// inconclusive lanes where surviving VMs are expected rather than a leak).
+    /// </summary>
+    private void RecordOrphanFinding(FindingRecorder recorder, OrphanProbe orphans, SeededForestTrustTemplate seeded, bool gating)
+    {
+        bool clean = orphans.NoTaggedLeftovers && orphans.TeardownWithinBudget;
+        if (clean)
         {
             recorder.Record(new Finding
             {
                 Scenario = Name,
                 Step = "rollback-no-orphans",
                 Severity = FindingSeverity.Info,
-                Title = "MONEY: the app's cancel path left zero orphans (verified before the gate backstop)",
-                Detail = $"Both DC VMs ('{seeded.SourceDcVmName}', '{seeded.TargetDcVmName}') are gone, no '{globalPrefix}' VMs, " +
-                         "differencing disks or folders survive, and the shared real base image is intact - so the runtime's own " +
-                         "cancellation teardown (not the harness gate) removed everything it created."
+                Title = "MONEY: the runtime's cancel path left zero orphans (verified before the gate backstop)",
+                Detail = $"Both DC VMs ('{seeded.SourceDcVmName}', '{seeded.TargetDcVmName}') are gone within the " +
+                         $"{TeardownBudget.TotalMinutes:N0}-min teardown budget, no '{orphans.GlobalPrefix}' VMs, differencing disks or " +
+                         "folders survive, and the shared real base image is intact - so the runtime's own cancellation teardown (not the " +
+                         "harness gate) promptly removed everything it created. This is the finding-86/87 proof: mandatory teardown is not " +
+                         "gated behind best-effort in-guest cleanup, and there is no lingering orphan-and-Running window."
             });
             return;
         }
 
+        int leaks = orphans.SurvivingVms.Count + orphans.OrphanDisks.Count + orphans.OrphanDirs.Count
+            + (orphans.TeardownWithinBudget ? 0 : 1) + (orphans.BaseImageIntact ? 0 : 1);
         recorder.Record(new Finding
         {
             Scenario = Name,
             Step = "rollback-no-orphans",
             Severity = gating ? FindingSeverity.Error : FindingSeverity.Warning,
-            Title = $"The app's cancel path left {leaks} orphan(s) before the gate backstop",
-            Detail = $"Surviving DC VMs: [{string.Join(", ", survivingVms)}] (both-gone={bothGone}); disk files: " +
-                     $"[{string.Join(", ", orphanDisks)}]; folders: [{string.Join(", ", orphanDirs)}]; base image intact={baseImageIntact}. " +
-                     "A mistimed cancel that leaves orphans would be a REAL product finding (the runtime's rollback did not clean up), " +
-                     "distinct from a harness issue: the harness only navigated away; the runtime owns the teardown. The gate's sweep " +
-                     "will still remove tagged leftovers so the box is left clean."
+            Title = $"The runtime's cancel path left {leaks} orphan(s) before the gate backstop",
+            Detail = $"Surviving DC VMs: [{string.Join(", ", orphans.SurvivingVms)}] (both-gone-in-budget={orphans.TeardownWithinBudget}); " +
+                     $"disk files: [{string.Join(", ", orphans.OrphanDisks)}]; folders: [{string.Join(", ", orphans.OrphanDirs)}]; base image " +
+                     $"intact={orphans.BaseImageIntact}. On the cancel path this is a REAL product finding (findings 86/87 - the runtime's " +
+                     "rollback did not promptly clean up), distinct from a harness issue: the harness only navigated away; the runtime owns " +
+                     "the teardown. The gate's sweep will still remove tagged leftovers so the box is left clean."
         });
     }
+
+    /// <summary>
+    /// Host-side orphan facts from <see cref="ProbeOrphans"/>. <see cref="NoTaggedLeftovers"/> folds no surviving
+    /// VMs/disks/folders AND the base-image-intact invariant; <see cref="TeardownWithinBudget"/> (both DCs gone
+    /// within <see cref="TeardownBudget"/>) is kept distinct so the finding-87 timing regression is nameable.
+    /// </summary>
+    private readonly record struct OrphanProbe(
+        bool EnumerationFailed,
+        bool TeardownWithinBudget,
+        bool NoTaggedLeftovers,
+        bool BaseImageIntact,
+        IReadOnlyList<string> SurvivingVms,
+        IReadOnlyList<string> OrphanDisks,
+        IReadOnlyList<string> OrphanDirs,
+        bool BothGone,
+        string GlobalPrefix);
 
     /// <summary>
     /// Best-effort, NON-gating in-guest read. Once the app tears the DCs down the trust objects are gone with

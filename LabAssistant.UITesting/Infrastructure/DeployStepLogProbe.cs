@@ -59,7 +59,8 @@ public sealed class DeployStepLogProbe
 
     /// <summary>The create-trust step started (<c>result=started</c>) - emitted just before the long
     /// guest CreateBidirectionalForestTrust call, after the trust objects are marked created. The
-    /// rollback scenario keys its mid-create cancel off this so real trust artifacts are in place.</summary>
+    /// rollback scenario keys its cancel off this so real trust artifacts are in place; the cancel is then
+    /// observed at the following validate stage (the atomic create attempt completes first).</summary>
     public const string TrustCreateStartEvent = "deploy.forest-trust.create.start";
 
     /// <summary>The create-trust step reached a terminal end (<c>result=success</c> when the trust was
@@ -75,9 +76,12 @@ public sealed class DeployStepLogProbe
     /// of the trust on each anchor because the deploy was cancelled or failed.</summary>
     public const string TrustCleanupStartEvent = "deploy.forest-trust.cleanup.start";
 
-    /// <summary>The cleanup wrap reached a terminal end (<c>result=success</c> = both sides removed;
-    /// <c>result=failed</c> = residual left behind, itself a real finding). This is the AUTHORITATIVE
-    /// proof that cleanupForestTrust executed rather than the trust merely dying with the torn-down VM.</summary>
+    /// <summary>The cleanup wrap reached its single terminal end. <c>result=success</c> = a surviving anchor's
+    /// local side was removed; <c>result=skipped</c> = the in-guest delete was correctly skipped as moot because
+    /// the anchor's own VM is being torn down in the same cancel (findings 86/87 - the trust dies with the disk);
+    /// <c>result=failed</c> = residual left behind (a real finding). Exactly one terminal is emitted per
+    /// cleanup.start. This is the AUTHORITATIVE proof that cleanupForestTrust executed and reached an honest
+    /// terminal rather than hanging or the trust merely dying with the torn-down VM.</summary>
     public const string TrustCleanupEndEvent = "deploy.forest-trust.cleanup.end";
 
     private readonly string _logsFolder;
@@ -349,7 +353,7 @@ public sealed class DeployStepLogProbe
     /// <paramref name="result"/> appears at or after <paramref name="window"/>, then returns true. Returns
     /// false if none appears within <paramref name="timeout"/>, or as soon as <paramref name="abortIf"/>
     /// reports true. Used by the rollback scenario to wait for <see cref="TrustCreateStartEvent"/> before
-    /// injecting the mid-create cancel.
+    /// injecting the cancel that lands during the following validate stage.
     /// </summary>
     public bool WaitForTrustEvent(
         string eventName,
