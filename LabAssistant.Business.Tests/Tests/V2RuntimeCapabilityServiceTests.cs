@@ -380,6 +380,65 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_CancelledDuringForestTrust_TearsDownSuccessfullyProvisionedVms()
+    {
+        // Finding 86: when the run is cancelled during a cross-VM stage (forest trust), every VM the runtime created
+        // must be torn down - including VMs that finished all of their own per-VM steps before the cancel landed and
+        // so still read IsSuccess=true/WasCancelled=false. The trust target root (fabrikamdc01) is the sharpest proof:
+        // it is fully promoted before CreateForestTrust runs, and the trust stage only ever touches the trust source
+        // context, so the cancel never marks the target. Before the fix it was skipped by the cleanup gate and left
+        // running (orphaning the VM + its differencing disk + folder); it must now be cleaned up.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        using var cts = new CancellationTokenSource();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                // Cancel the moment the trust is being created: both root domains are ready by now, so every DC has
+                // finished its per-VM work, mirroring the live rollback repro.
+                if (script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+                {
+                    cts.Cancel();
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var cleanupOrchestrator = new RecordingCleanupOrchestrator();
+        var service = CreateService(new FakeHyperVService(), guestExecutor, cleanupOrchestrator: cleanupOrchestrator);
+
+        var result = await service.ExecuteAsync(request, cts.Token);
+
+        Assert.False(result.Success);
+        Assert.Equal(DeploymentOperationState.Cancelled, result.DeploymentContext.OperationState);
+
+        // The trust target root finished cleanly yet the run was cancelled: it must be swept, not orphaned.
+        var target = Assert.Single(result.DeploymentContext.VmContexts, vm => vm.VmName == "fabrikamdc01");
+        Assert.True(target.IsSuccess);
+        Assert.False(target.WasCancelled);
+        Assert.Contains("fabrikamdc01", cleanupOrchestrator.CleanedVmNames);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FullySuccessfulForestTrust_DoesNotTearDownAnyVm()
+    {
+        // Regression guard for the finding-86 fix: the run-level cancellation clause added to the cleanup gate must
+        // not touch a run that completed successfully. A green deploy leaves every VM in place.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, _, _) => Task.FromResult(new GuestCommandResult { Success = true, Output = vmName })
+        };
+        var cleanupOrchestrator = new RecordingCleanupOrchestrator();
+        var service = CreateService(new FakeHyperVService(), guestExecutor, cleanupOrchestrator: cleanupOrchestrator);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Empty(cleanupOrchestrator.CleanedVmNames);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_BaseRemoteAccess_UsesDeployTimeOptions()
     {
         var request = await CreateRuntimeRequestAsync("Balanced", includeStandalone: false, includeRouter: false);
@@ -1750,13 +1809,14 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         FakeGuestCommandExecutor guestCommandExecutor,
         IStructuredLogger? logger = null,
         IHyperVMachineAdminService? machineAdminService = null,
-        Func<long>? nowTicks = null)
+        Func<long>? nowTicks = null,
+        IVmCleanupOrchestrator? cleanupOrchestrator = null)
     {
         var service = new V2RuntimeCapabilityService(
             () => new FakeSession(),
             _ => hyperVService,
             guestCommandExecutor,
-            new FakeCleanupOrchestrator(),
+            cleanupOrchestrator ?? new FakeCleanupOrchestrator(),
             logger,
             machineAdminService);
         if (nowTicks != null)
@@ -2405,6 +2465,21 @@ public sealed partial class V2RuntimeCapabilityServiceTests
     {
         public Task<VmCleanupResult> CleanupAsync(VmDeploymentContext context, IHyperVService hyperVService)
         {
+            return Task.FromResult(new VmCleanupResult { VmName = context.VmName });
+        }
+    }
+
+    // Records which VMs the runtime handed to cleanup so a test can assert the cancel-teardown gate reached (or
+    // deliberately skipped) a given VM. Thread-safe because per-VM cleanup can run concurrently across states.
+    private sealed class RecordingCleanupOrchestrator : IVmCleanupOrchestrator
+    {
+        private readonly ConcurrentQueue<string> _cleanedVmNames = new();
+
+        public IReadOnlyCollection<string> CleanedVmNames => _cleanedVmNames.ToArray();
+
+        public Task<VmCleanupResult> CleanupAsync(VmDeploymentContext context, IHyperVService hyperVService)
+        {
+            _cleanedVmNames.Enqueue(context.VmName);
             return Task.FromResult(new VmCleanupResult { VmName = context.VmName });
         }
     }
