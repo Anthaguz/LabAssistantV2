@@ -6,6 +6,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
@@ -18,6 +19,7 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
     private readonly IV2PlanningCapabilityService _v2PlanningCapabilityService;
     private readonly IV2RuntimeCapabilityService _v2RuntimeCapabilityService;
     private readonly ILocalCredentialSlotStore _localCredentialSlotStore;
+    private readonly IStructuredLogger _structuredLogger;
     private readonly Action _refreshSharedUiState;
     private readonly Action _refreshResultsPanelState;
     private readonly Action _onOpenResultsPanelRequested;
@@ -29,6 +31,7 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         IV2PlanningCapabilityService v2PlanningCapabilityService,
         IV2RuntimeCapabilityService v2RuntimeCapabilityService,
         ILocalCredentialSlotStore localCredentialSlotStore,
+        IStructuredLogger structuredLogger,
         Action refreshSharedUiState,
         Action refreshResultsPanelState,
         Action onOpenResultsPanelRequested)
@@ -39,10 +42,13 @@ internal sealed class DeployFromTemplateWorkspaceHost : IDeployFromTemplateCompo
         _v2PlanningCapabilityService = v2PlanningCapabilityService;
         _v2RuntimeCapabilityService = v2RuntimeCapabilityService;
         _localCredentialSlotStore = localCredentialSlotStore;
+        _structuredLogger = structuredLogger;
         _refreshSharedUiState = refreshSharedUiState;
         _refreshResultsPanelState = refreshResultsPanelState;
         _onOpenResultsPanelRequested = onOpenResultsPanelRequested;
     }
+
+    public IStructuredLogger StructuredLogger => _structuredLogger;
 
     public AppSettings DeploymentSettings => _referenceDataService.DeploymentSettings;
 

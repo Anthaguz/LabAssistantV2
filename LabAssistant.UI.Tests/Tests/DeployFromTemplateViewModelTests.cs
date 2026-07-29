@@ -2,6 +2,7 @@ using LabAssistant.Business.Templates;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Models.Deploy;
 using LabAssistant.WinUI.ViewModels.Deploy;
 using Xunit;
@@ -217,7 +218,154 @@ public sealed class DeployFromTemplateViewModelTests
         Assert.Contains(harness.Host.Upserts, upsert => upsert.SlotKey == "bootstrap" && upsert.Username == "labadmin");
         Assert.True(harness.Vm.V2Review.CanStartDeploy);
         Assert.True(harness.Vm.StartDeployCommand.CanExecute(null));
+
+        // Finding 91 path B: the save/upsert emits the selected key and the store's before/after slot-key list,
+        // so a live wedge where the fill never lands the key in the store is diagnosable from the log alone.
+        var save = Assert.Single(PlanBuildEvents(harness), e => e.Result == "saved");
+        Assert.Equal("bootstrap", save.Context!["selectedSlotKey"]);
+        Assert.Contains("bootstrap", (string)save.Context!["storeKeysAfter"]!);
     }
+
+    [Fact]
+    public void SelectingV2Template_ReadyPlan_EmitsStartSummaryAndReadyTerminal()
+    {
+        var harness = CreateHarness();
+        harness.Host.V2PlanFactory = (_, _, _) => ReadyPlan();
+        var item = harness.Host.AddTemplate("V2", V2Path, TemplateExecutionEngine.V2UnifiedPlanning);
+
+        harness.Vm.SelectedTemplateLibraryItem = item;
+
+        // Finding 91: exactly one operationId-scoped build - start -> credential-resolution summary -> one terminal.
+        var planEvents = PlanBuildEvents(harness);
+        var operationId = Assert.Single(planEvents.Select(e => e.OperationId).Distinct());
+        Assert.NotEmpty(operationId);
+
+        var start = Assert.Single(planEvents, e => e.Phase == "start");
+        Assert.Equal("started", start.Result);
+        Assert.Equal("V2", start.Context!["template"]);
+
+        var summary = Assert.Single(planEvents, e => e.Phase == "progress" && e.Result == "resolved");
+        Assert.Equal("resolved", summary.Result);
+
+        var terminal = Assert.Single(planEvents, e => e.Phase == "end");
+        Assert.Equal("success", terminal.Result);
+        Assert.Equal(true, terminal.Context!["startable"]);
+    }
+
+    [Fact]
+    public void SelectingV2Template_BlockedByUnresolvedCredential_EmitsBlockedTerminalWithUnresolvedKey()
+    {
+        var harness = CreateHarness();
+        harness.Host.SlotDefinitions.Add(new LocalCredentialSlotDefinition { SlotKey = "bootstrap" });
+        harness.Host.V2PlanFactory = (_, _, _) => new V2PlanBuildResult
+        {
+            Success = true,
+            Context = new V2ResolvedPlanningContext
+            {
+                ResolvedDeploymentProfileName = "Default",
+                Vms =
+                [
+                    new V2ResolvedVmPlanningContext
+                    {
+                        VmId = "vm1",
+                        VmName = "VM1",
+                        RequiresGuestWork = true,
+                        ResolvedCatalogItemId = null,
+                        SearchedVhdxId = "disk.winserver2022",
+                        CatalogMatchOutcome = "miss",
+                        TemplateAuthoredBootstrapSlot = null,
+                        CatalogProfileBootstrapSlot = null,
+                        BootstrapSlotSource = "none",
+                        EffectiveBootstrapCredentialSlot = null
+                    }
+                ]
+            },
+            UnresolvedRequirements =
+            [
+                new V2UnresolvedRequirement
+                {
+                    Kind = V2UnresolvedRequirementKind.CredentialSlot,
+                    Key = "bootstrap",
+                    AffectedVmIds = ["vm1"],
+                    Description = "Bootstrap admin credential."
+                }
+            ],
+            Issues =
+            [
+                new V2PlanIssue
+                {
+                    Severity = V2PlanIssueSeverity.Blocking,
+                    Code = "credential-slot-missing",
+                    VmId = "vm1",
+                    VmName = "VM1",
+                    Message = "VM 'VM1' requires a credential-slot reference for guest bootstrap access."
+                }
+            ]
+        };
+        var item = harness.Host.AddTemplate("V2", V2Path, TemplateExecutionEngine.V2UnifiedPlanning);
+
+        harness.Vm.SelectedTemplateLibraryItem = item;
+
+        var planEvents = PlanBuildEvents(harness);
+
+        // The summary names the exact unresolved key so a wedged plan-review is a one-line diagnosis.
+        var summary = Assert.Single(planEvents, e => e.Phase == "progress" && e.Result == "resolved");
+        Assert.Contains("bootstrap", (string)summary.Context!["unresolvedCredentialKeys"]!);
+        Assert.Equal(1, summary.Context!["unresolvedCredentialCount"]);
+
+        // Per-VM T1/T2 diagnosis: catalog-miss and a null bootstrap slot on a guest-work VM are the exact
+        // inputs that expand the credential-slot count, so the summary must name the affected VM by id.
+        Assert.Contains("vm1", (string)summary.Context!["catalogMissVmIds"]!);
+        Assert.Contains("vm1", (string)summary.Context!["bootstrapSlotMissVmIds"]!);
+        Assert.Contains("catalog=<miss>", (string)summary.Context!["vmDiagnostics"]!);
+        Assert.Contains("bootstrapSlot=<null>", (string)summary.Context!["vmDiagnostics"]!);
+
+        // Source-resolution diagnostics: a wedged run must show which catalog branch missed (with the searched
+        // VhdxId) and that neither bootstrap source supplied a slot, so template-load-drop vs catalog-miss vs
+        // base re-identification is readable from one emitted line.
+        var vmDiagnostics = (string)summary.Context!["vmDiagnostics"]!;
+        Assert.Contains("catalogMatch=miss", vmDiagnostics);
+        Assert.Contains("searchedVhdxId=disk.winserver2022", vmDiagnostics);
+        Assert.Contains("bootstrapAuthored=<null>", vmDiagnostics);
+        Assert.Contains("credential-slot-missing@vm1", (string)summary.Context!["blockingIssueDetails"]!);
+        Assert.Contains("bootstrapCatalog=<null>", vmDiagnostics);
+        Assert.Contains("bootstrapSource=none", vmDiagnostics);
+
+        // Credential-store probe (path A): the bootstrap record is present in the store but classified
+        // record-absent here because no value was upserted, so the requirement stays unresolved. On a live
+        // wedge this line separates record-absent from decrypt-threw from found-ok on each replan.
+        var probe = Assert.Single(planEvents, e => e.Phase == "progress" && e.Result == "probed");
+        Assert.Contains("bootstrap=record-absent", (string)probe.Context!["storeSlotOutcomes"]!);
+        // Per-requirement detail names the key, affected VM, and that the store did not resolve it - the exact
+        // line that reads out the collapsed single-key H-A requirement on a live wedged run.
+        Assert.Contains("bootstrap|vms=vm1|resolved=False", (string)summary.Context!["credentialRequirementDetails"]!);
+
+        // Exactly one terminal, and it is the honest "blocked" outcome (not "success").
+        var terminal = Assert.Single(planEvents, e => e.Phase == "end");
+        Assert.Equal("blocked", terminal.Result);
+        Assert.Equal(false, terminal.Context!["startable"]);
+        Assert.Equal(1, terminal.Context!["unresolvedRequirementCount"]);
+    }
+
+    [Fact]
+    public void SelectingV2Template_BlockedPlan_ResetsActionStatusOffBuildingLabel()
+    {
+        var harness = CreateHarness();
+        harness.Host.V2PlanFactory = (_, _, _) => BlockedPlan();
+        var item = harness.Host.AddTemplate("V2", V2Path, TemplateExecutionEngine.V2UnifiedPlanning);
+
+        harness.Vm.SelectedTemplateLibraryItem = item;
+
+        // Finding 90-A: the action status must reflect the blocked outcome, not the frozen "Building..." lie
+        // that made a correctly-blocked plan look like a hang.
+        Assert.DoesNotContain("Building V2 plan", harness.Vm.ActionStatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(harness.Vm.V2Review.StatusText, harness.Vm.ActionStatusText);
+    }
+
+    private static IReadOnlyList<StructuredLogEvent> PlanBuildEvents(Harness harness) =>
+        harness.Host.Logger.Events
+            .Where(e => e.Event.StartsWith("deploy.orchestration.plan", StringComparison.Ordinal))
+            .ToList();
 
     [Fact]
     public async Task ExternalSwitchAdapterMapping_FlowsIntoPlanBuild()

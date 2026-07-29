@@ -3,6 +3,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.ViewModels.Deploy;
 
 namespace LabAssistant.UI.Tests.Tests;
@@ -17,6 +18,11 @@ internal sealed class FakeFromTemplateCompositionHost : IDeployFromTemplateCompo
 {
     private readonly Dictionary<string, TemplateEditorDocument> _documentsByPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, V2RuntimeCredential> _credentialValues = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Captures every plan-review telemetry event so tests can assert the emit contract.</summary>
+    public CollectingStructuredLogger Logger { get; } = new();
+
+    public IStructuredLogger StructuredLogger => Logger;
 
     public List<TemplateLibraryItem> Templates { get; } = [];
 
@@ -138,4 +144,25 @@ internal sealed class FakeFromTemplateCompositionHost : IDeployFromTemplateCompo
 
         return V2Result;
     }
+}
+
+/// <summary>
+/// Minimal <see cref="IStructuredLogger"/> that records every emitted event so plan-review telemetry
+/// (finding 91) can be asserted without a file sink. The default <c>Log(uint code, ...)</c> interface
+/// method composes the event from the code and routes it through <see cref="Log(StructuredLogEvent)"/>,
+/// so recording that overload captures the code-based plan-build events verbatim.
+/// </summary>
+internal sealed class CollectingStructuredLogger : IStructuredLogger
+{
+    public List<StructuredLogEvent> Events { get; } = [];
+
+    public void Log(StructuredLogEvent logEvent) => Events.Add(logEvent);
+
+    public void Log(
+        StructuredLogLevel level,
+        string eventName,
+        string operationId,
+        string? result = null,
+        IReadOnlyDictionary<string, object?>? context = null)
+        => Events.Add(StructuredLogEvent.Create(level, eventName, operationId, result, context));
 }

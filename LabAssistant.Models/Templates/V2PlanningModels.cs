@@ -170,9 +170,47 @@ public sealed class V2ResolvedVmPlanningContext
 
     public string? ResolvedCatalogPath { get; init; }
 
+    /// <summary>
+    /// Diagnostic: the <c>vm.VhdxId</c> the planner searched the catalog for. Non-null here with a null
+    /// <see cref="ResolvedCatalogItemId"/> means the VM carried a VhdxId that no catalog entry Id matched
+    /// (the VhdxId-first, no-fallthrough branch of catalog resolution missed).
+    /// </summary>
+    public string? SearchedVhdxId { get; init; }
+
+    /// <summary>
+    /// Diagnostic: the resolved catalog entry's stored <c>Signature</c> when a catalog item matched, otherwise null.
+    /// </summary>
+    public string? ResolvedCatalogSignature { get; init; }
+
+    /// <summary>
+    /// Diagnostic: which catalog match branch produced the outcome: <c>vhdxId</c>, <c>path</c>, <c>signature</c>,
+    /// or <c>miss</c>. Distinguishes a base re-identification/mutation miss from a genuine no-reference case.
+    /// </summary>
+    public string? CatalogMatchOutcome { get; init; }
+
     public string? BootstrapProfileRef { get; init; }
 
     public bool HasBootstrapProfile { get; init; }
+
+    /// <summary>
+    /// Diagnostic: the bootstrap credential slot authored directly on the template VM
+    /// (<c>vm.CredentialSlots.LocalBootstrap</c>), or null when the template did not author one. A null here on a
+    /// forest-trust DC (whose fixture authors localBootstrap) is direct evidence the template-load path dropped it.
+    /// </summary>
+    public string? TemplateAuthoredBootstrapSlot { get; init; }
+
+    /// <summary>
+    /// Diagnostic: the bootstrap credential slot supplied by the resolved catalog entry's bootstrap profile
+    /// (<c>BootstrapProfile.LocalCredentialSlotRef</c>), or null when there is no profile or it carries no ref.
+    /// </summary>
+    public string? CatalogProfileBootstrapSlot { get; init; }
+
+    /// <summary>
+    /// Diagnostic: which source supplied the effective bootstrap slot: <c>template-authored</c>,
+    /// <c>catalog-profile</c>, or <c>none</c> (final-null, the state that expands the plan to a distinct
+    /// credential requirement per purpose/VM).
+    /// </summary>
+    public string? BootstrapSlotSource { get; init; }
 
     public string? EffectiveBootstrapUser { get; init; }
 
