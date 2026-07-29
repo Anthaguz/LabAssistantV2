@@ -48,6 +48,38 @@ public sealed class DeployStepLogProbe
     // start) rather than only at completion.
     private const string StepStartEvent = "deploy.step.run.start";
 
+    // The forest-trust lifecycle markers (facility deploy.forest-trust) are NOT deploy.step.run.end
+    // events: the runtime emits them via EmitTrustEvent as code-based events whose dotted name is
+    // facility.operation.phase and whose context carries trustId / stepKey but NO vmName. The cleanup
+    // wrap in particular (CleanupFailedOrCancelledAsync) emits ONLY these markers - it never routes
+    // through the per-step deploy.step.run.end path - so proving "cleanupForestTrust actually ran" on
+    // the rollback path can only be read here. The dotted names are pinned to match the app's status
+    // registry (status-codes.yaml facility 0x46 = deploy.forest-trust, phase start/end).
+    private const string TrustEventPrefix = "deploy.forest-trust.";
+
+    /// <summary>The create-trust step started (<c>result=started</c>) - emitted just before the long
+    /// guest CreateBidirectionalForestTrust call, after the trust objects are marked created. The
+    /// rollback scenario keys its mid-create cancel off this so real trust artifacts are in place.</summary>
+    public const string TrustCreateStartEvent = "deploy.forest-trust.create.start";
+
+    /// <summary>The create-trust step reached a terminal end (<c>result=success</c> when the trust was
+    /// fully created, <c>result=failed</c> when it threw/was interrupted).</summary>
+    public const string TrustCreateEndEvent = "deploy.forest-trust.create.end";
+
+    /// <summary>The trust-validate step reached a terminal end (<c>result=success</c> means the trust
+    /// was validated / TrustReady). Its absence is what the rollback scenario asserts: a cancelled
+    /// create must never reach a validated trust.</summary>
+    public const string TrustValidateEndEvent = "deploy.forest-trust.validate.end";
+
+    /// <summary>The cleanup wrap started (<c>result=started</c>) - the app began removing the local side
+    /// of the trust on each anchor because the deploy was cancelled or failed.</summary>
+    public const string TrustCleanupStartEvent = "deploy.forest-trust.cleanup.start";
+
+    /// <summary>The cleanup wrap reached a terminal end (<c>result=success</c> = both sides removed;
+    /// <c>result=failed</c> = residual left behind, itself a real finding). This is the AUTHORITATIVE
+    /// proof that cleanupForestTrust executed rather than the trust merely dying with the torn-down VM.</summary>
+    public const string TrustCleanupEndEvent = "deploy.forest-trust.cleanup.end";
+
     private readonly string _logsFolder;
 
     public DeployStepLogProbe(AppDataLocations locations)
@@ -313,6 +345,87 @@ public sealed class DeployStepLogProbe
     }
 
     /// <summary>
+    /// Polls the log until a forest-trust lifecycle event named <paramref name="eventName"/> with
+    /// <paramref name="result"/> appears at or after <paramref name="window"/>, then returns true. Returns
+    /// false if none appears within <paramref name="timeout"/>, or as soon as <paramref name="abortIf"/>
+    /// reports true. Used by the rollback scenario to wait for <see cref="TrustCreateStartEvent"/> before
+    /// injecting the mid-create cancel.
+    /// </summary>
+    public bool WaitForTrustEvent(
+        string eventName,
+        string result,
+        AppLogWindow window,
+        TimeSpan timeout,
+        Func<bool>? abortIf = null,
+        TimeSpan? pollInterval = null)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        var interval = pollInterval ?? TimeSpan.FromSeconds(2);
+
+        while (true)
+        {
+            if (abortIf is not null && abortIf())
+            {
+                Console.WriteLine(
+                    $"DeployStepLogProbe: aborting wait for trust event '{eventName}' (result={result}) - abort signalled.");
+                return false;
+            }
+
+            if (ReadTrustEvent(eventName, result, window))
+            {
+                return true;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                Console.WriteLine(
+                    $"DeployStepLogProbe: trust event '{eventName}' (result={result}) never appeared within the timeout.");
+                return false;
+            }
+
+            Thread.Sleep(interval);
+        }
+    }
+
+    /// <summary>
+    /// Returns true when a forest-trust lifecycle event named <paramref name="eventName"/> with
+    /// <paramref name="result"/> is present at or after <paramref name="window"/>, without waiting. Reading
+    /// evidence is failure-tolerant: a locked/missing log or a parse error degrades to "not seen".
+    /// </summary>
+    public bool ReadTrustEvent(string eventName, string result, AppLogWindow window)
+        => ReadTrustEventTimestamp(eventName, result, window) is not null;
+
+    /// <summary>
+    /// Returns the latest timestamp of a forest-trust lifecycle event named <paramref name="eventName"/>
+    /// with <paramref name="result"/> at or after <paramref name="window"/>, or null when none is present.
+    /// The timestamp lets callers assert ORDERING between trust markers (e.g. cleanup started after create
+    /// started); the rollback scenario only needs presence, but the timestamp seam is reused for ordering
+    /// proofs. Never throws into a scenario's assertion path.
+    /// </summary>
+    public DateTimeOffset? ReadTrustEventTimestamp(string eventName, string result, AppLogWindow window)
+    {
+        if (!Directory.Exists(_logsFolder))
+        {
+            return null;
+        }
+
+        try
+        {
+            var lines = new List<string>();
+            foreach (string file in Directory.EnumerateFiles(_logsFolder, LogGlob))
+            {
+                lines.AddRange(ReadLinesShared(file));
+            }
+
+            return FindTrustEventTimestamp(lines, eventName, result, window.StartUtc);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Pure parse over structured-event lines: returns the timestamp of the <paramref name="eventName"/>
     /// event for the given VM + step at or after <paramref name="windowStart"/>. When
     /// <paramref name="expectedOutcome"/> is non-null, only end events whose result maps to it are
@@ -363,6 +476,48 @@ public sealed class DeployStepLogProbe
         }
 
         return bestTs;
+    }
+
+    /// <summary>
+    /// Pure parse over structured-event lines: returns the latest timestamp of a forest-trust lifecycle
+    /// event whose <c>event</c> equals <paramref name="eventName"/> and whose <c>result</c> equals
+    /// <paramref name="result"/> at or after <paramref name="windowStart"/>, or null when none matches.
+    /// Malformed lines and events outside the deploy.forest-trust facility are skipped.
+    /// </summary>
+    internal static DateTimeOffset? FindTrustEventTimestamp(
+        IEnumerable<string> lines,
+        string eventName,
+        string result,
+        DateTimeOffset windowStart)
+    {
+        DateTimeOffset? best = null;
+
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (!TryReadTrustEvent(line, out DateTimeOffset ts, out string? lineEvent, out string? lineResult))
+            {
+                continue;
+            }
+
+            if (ts < windowStart ||
+                !string.Equals(lineEvent, eventName, StringComparison.Ordinal) ||
+                !string.Equals(lineResult, result, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (best is null || ts >= best.Value)
+            {
+                best = ts;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>
@@ -430,6 +585,66 @@ public sealed class DeployStepLogProbe
             }
 
             return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Parses a forest-trust lifecycle line (event name under <see cref="TrustEventPrefix"/>) into its
+    /// timestamp, event name, and result. Returns false for any other event, a malformed line, or a line
+    /// missing ts/result. Unlike <see cref="TryReadStepEvent"/> this requires NO vmName: trust events are
+    /// keyed by trustId/stepKey, not a VM.
+    /// </summary>
+    private static bool TryReadTrustEvent(
+        string line,
+        out DateTimeOffset ts,
+        out string? eventName,
+        out string? result)
+    {
+        ts = default;
+        eventName = null;
+        result = null;
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(line);
+            JsonElement root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("event", out JsonElement eventElement) ||
+                eventElement.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            string? name = eventElement.GetString();
+            if (name is null || !name.StartsWith(TrustEventPrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!root.TryGetProperty("ts", out JsonElement tsElement) ||
+                tsElement.ValueKind != JsonValueKind.String ||
+                !DateTimeOffset.TryParse(
+                    tsElement.GetString(),
+                    null,
+                    System.Globalization.DateTimeStyles.RoundtripKind,
+                    out ts))
+            {
+                return false;
+            }
+
+            if (!root.TryGetProperty("result", out JsonElement resultElement) ||
+                resultElement.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            eventName = name;
+            result = resultElement.GetString();
+            return result is not null;
         }
         catch (JsonException)
         {

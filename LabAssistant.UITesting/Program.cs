@@ -34,6 +34,7 @@ internal static class Program
                 "template-dc-member" => RunDcMemberTemplateDeployProof(args),
                 "template-forest-trust" => RunForestTrustTemplateDeployProof(args),
                 "template-forest-trust-routed" => RunForestTrustRoutedTemplateDeployProof(args),
+                "template-forest-trust-rollback" => RunForestTrustRollbackTemplateDeployProof(args),
                 "template-router" => RunRouterTemplateDeployProof(args),
                 "template-guest-static" => RunGuestStaticTemplateDeployProof(args),
                 "template-guest-static-multivm" => RunGuestStaticMultiVmTemplateDeployProof(args),
@@ -325,6 +326,34 @@ internal static class Program
     }
 
     /// <summary>
+    /// Forest-trust ROLLBACK deploy scenario (finding 79): reuses the #918 two-forest template, but on the
+    /// live path Starts the deploy, waits for the app's log to report the create-trust step started, then
+    /// cancels by navigating away and proves the runtime's cleanupForestTrust wrap ran
+    /// (deploy.forest-trust.cleanup.start -&gt; cleanup.end) with zero orphans host-side before the gate's
+    /// backstop sweep. A cancel that lands after the trust is already validated is reported INCONCLUSIVE, never
+    /// a false pass. The planning-only path (no password) just proves the plan is startable. Exits non-zero on
+    /// any Error/Crash finding.
+    /// </summary>
+    private static int RunForestTrustRollbackTemplateDeployProof(string[] args)
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string repoRoot = LocateRepoRoot(baseDir);
+        string testEnvPath = Path.Combine(baseDir, "Fixtures", "testenv.json");
+
+        var config = HarnessConfig.Load(testEnvPath);
+        string exePath = config.ResolveAppExePath(repoRoot);
+
+        var scenarios = new List<IScenario>
+        {
+            new TemplateDeployForestTrustRollbackScenario()
+        };
+
+        var harness = new ScenarioHarness(exePath, config, repoRoot);
+        var recorder = harness.Run(scenarios);
+        return recorder.HasFailures ? 2 : 0;
+    }
+
+    /// <summary>
     /// Single-router deploy scenario: ensures the real base image is guest-configurable, seeds a tagged
     /// single-router V2 template (multi-NIC, RRAS/NAT egress), and drives Deploy &gt; From Template to a
     /// startable plan. With LABASSISTANT_SMOKE_ADMIN_PASSWORD set it also Starts the deploy, waits for the
@@ -552,6 +581,7 @@ internal static class Program
         Console.WriteLine("  template-dc-member Seed a DC + domain-joined member V2 template, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the DC forest and the member's domain membership over PowerShell Direct.");
         Console.WriteLine("  template-forest-trust Seed a two-forest V2 template (two DCs on one Internal switch + a bidirectional Forest trust), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate each forest and the trust BOTH ways over PowerShell Direct (Get-ADTrust).");
         Console.WriteLine("  template-forest-trust-routed Seed a ROUTED two-forest V2 template (two DCs on separate gatewayed Internal switches bridged by a 3-NIC router + a bidirectional Forest trust), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the trust BOTH ways, assert (from the app step log) that router routing finished before the first forest-trust DNS prep started, and prove the trust crossed the router via a guest route-hop.");
+        Console.WriteLine("  template-forest-trust-rollback Seed the same two-forest V2 template; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy, cancel mid-create by navigating away, and prove the cleanupForestTrust wrap ran (structured log) with zero orphans host-side. Without a password, proves the plan is startable.");
         Console.WriteLine("  template-router Seed a single-router V2 template (multi-NIC RRAS/NAT), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the LAN gateway IP over PowerShell Direct.");
         Console.WriteLine("  template-guest-static Seed a single-VM V2 template with a templated static IP, drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate the in-guest static IP over PowerShell Direct.");
         Console.WriteLine("  template-guest-static-multivm Seed a 2-VM V2 template (distinct static IPs on one Internal switch), drive it to a startable plan; with LABASSISTANT_SMOKE_ADMIN_PASSWORD set, deploy + validate each VM's own in-guest static IP over PowerShell Direct.");
