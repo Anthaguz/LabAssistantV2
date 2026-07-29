@@ -114,6 +114,19 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
     // fails. 10 min would let a single-side regression that happened to resolve fast slip; 6 min is the tripwire.
     private static readonly TimeSpan TeardownBudget = TimeSpan.FromMinutes(6);
 
+    // Budget from the cleanup terminal until the run-level deploy.orchestration.run.end terminal lands (finding
+    // 89b). On a cancel, the ORCHESTRATION terminal is emitted only AFTER all three terminal cleanup stages
+    // complete (trust cleanup.end -> VM teardown -> switch cleanup), so it necessarily lands LATER than the
+    // cleanup.end this scenario keys on (~13s later in practice). A single read taken right after the cleanup-end
+    // poll structurally races it and samples null -> a false InconclusiveRunOutcomeUnconfirmed. The run terminal
+    // is GUARANTEED exactly once per deploy (EmitDeployTerminalEvent), so poll until it lands; only genuine
+    // budget-expiry-with-still-no-terminal stays unconfirmed (real silence, the honest belt-and-suspenders lane).
+    private static readonly TimeSpan RunTerminalBudget = TimeSpan.FromMinutes(5);
+
+    // Poll cadence for the run-level terminal. The terminal resolves as soon as it lands, so the cadence only
+    // bounds detection latency, not the common-case wait.
+    private static readonly TimeSpan RunTerminalPollInterval = TimeSpan.FromSeconds(2);
+
     public string Name => "template-deploy-forest-trust-rollback";
 
     public string Capability => "Deploy";
@@ -429,8 +442,17 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
 
         // The HEADLINE run-level signal: the single deploy.orchestration.run.end terminal. result=cancelled is a
         // clean cancel with zero residuals (the PASS criterion); cancelled_with_residuals is a gating leak;
-        // success means the deploy finished (cancel too late = re-run). Read directly rather than inferred.
-        RunOutcome runOutcome = MapRunOutcome(stepLog.ReadRunTerminalResult(logWindow));
+        // success means the deploy finished (cancel too late = re-run). On a cancel this terminal is emitted only
+        // AFTER all three cleanup stages complete, so it lands LATER than the cleanup.end poll above (finding
+        // 89b): poll until it appears rather than reading once and racing it. Only a genuine budget expiry with
+        // still no terminal maps to Unknown -> the honest InconclusiveRunOutcomeUnconfirmed lane.
+        RunOutcome runOutcome = PollRunOutcome(
+            () => stepLog.ReadRunTerminalResult(logWindow),
+            RunTerminalBudget,
+            RunTerminalPollInterval,
+            static () => DateTime.UtcNow,
+            Thread.Sleep);
+
 
         // The CENTERPIECE: probe the host directly, BEFORE the gate's backstop sweep, for what the RUNTIME's own
         // cancel teardown removed. This is the finding-86/87 proof and it gates the PASS.
@@ -773,6 +795,44 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
         "success" => RunOutcome.Completed,
         _ => RunOutcome.Unknown
     };
+
+    /// <summary>
+    /// Polls the run-level <c>deploy.orchestration.run.end</c> terminal until it is PRESENT or the budget expires
+    /// (finding 89b). On a cancel the orchestration terminal is emitted only after all cleanup stages complete, so
+    /// it lands later than the cleanup.end this scenario already waited on; a single read structurally races it.
+    /// The terminal is guaranteed exactly once per deploy, so poll only while the raw result is still ABSENT
+    /// (<paramref name="readRunTerminal"/> returns null); the moment ANY terminal string is present it is mapped
+    /// and returned immediately - including a failure/unrecognized variant, which resolves to
+    /// <see cref="RunOutcome.Unknown"/> now rather than stalling the whole budget. Only a genuinely absent terminal
+    /// at budget expiry returns Unknown (the honest "unconfirmed" lane). Pure over injected clock/sleep so it is
+    /// unit-testable without real waiting.
+    /// </summary>
+    internal static RunOutcome PollRunOutcome(
+        Func<string?> readRunTerminal,
+        TimeSpan budget,
+        TimeSpan pollInterval,
+        Func<DateTime> utcNow,
+        Action<TimeSpan> sleep)
+    {
+        DateTime deadline = utcNow() + budget;
+        while (true)
+        {
+            string? result = readRunTerminal();
+            if (result is not null)
+            {
+                // Terminal present (guaranteed exactly once): map and return NOW. A present-but-unrecognized
+                // result maps to Unknown here - it does not keep us polling, so only a still-absent terminal stalls.
+                return MapRunOutcome(result);
+            }
+
+            if (utcNow() >= deadline)
+            {
+                return RunOutcome.Unknown;
+            }
+
+            sleep(pollInterval);
+        }
+    }
 
     /// <summary>
     /// Probes the host directly for what the runtime's own cancel teardown removed, read BEFORE the gate's
