@@ -797,6 +797,187 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.True(trustContext.CleanupResidual);
     }
 
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupBothAnchorsBeingTornDown_SkipsInGuestDeleteAndDoesNotConsumeBudget()
+    {
+        // Finding 87: on a full cancel both trust anchors are run-created VMs the runtime is about to destroy, so the
+        // in-guest local-side delete is moot - the trust object dies with the disk. It must be SKIPPED, not retried:
+        // retrying a delete against a rebooting or vanishing DC for the whole cleanup budget is exactly what blocked the
+        // mandatory VM/disk teardown and left the ~30-minute orphan window (the finding-86 pairing). Proof: the delete
+        // script is never invoked and cleanup returns promptly even though the executor would hang forever if it ran.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        // A budget large enough that, if the skip regressed, a single hung attempt would block well past the guard.
+        request.GuestCleanupAttemptTimeout = TimeSpan.FromSeconds(30);
+        request.GuestCleanupRetryBudget = TimeSpan.FromMinutes(15);
+
+        var deleteInvocations = 0;
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = async (vmName, _, script, attemptCancellation) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+                return new GuestCommandResult { Success = true, Output = vmName };
+            }
+
+            if (script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref deleteInvocations);
+                // If the skip regresses and this runs, hang forever so the timeout guard below fails loudly.
+                await Task.Delay(Timeout.Infinite, attemptCancellation);
+            }
+
+            return new GuestCommandResult { Success = true, Output = vmName };
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+
+        // Both anchors are run-created (differencing disk + registration) and the run is cancelling, so the finding-86
+        // gate tears both down - which is precisely when their in-guest trust delete becomes moot.
+        foreach (var vmContext in multiContext.VmContexts)
+        {
+            vmContext.DifferencingDiskCreated = true;
+            vmContext.VmRegistered = true;
+        }
+
+        var cleanupTask = stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+        var finished = await Task.WhenAny(cleanupTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.True(
+            ReferenceEquals(finished, cleanupTask),
+            "Cleanup must return promptly by skipping the moot in-guest delete, not block on the retry budget.");
+        await cleanupTask;
+
+        Assert.Equal(0, deleteInvocations);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.CleanupAttempted);
+        // A skipped side is not a residual: the trust object is destroyed with the anchor VM, nothing dangles.
+        Assert.False(trustContext.CleanupResidual);
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupSurvivingAnchor_RunsInGuestDeleteWhileTornDownAnchorIsSkipped()
+    {
+        // Finding 87: when only one anchor survives the rollback (for example a pre-existing DC the run did not create),
+        // that survivor keeps a real one-sided trust that must be cleared, so its in-guest delete still runs under the
+        // bounded retry wrap; the other anchor is being destroyed, so its delete is skipped. This proves the decoupling
+        // is precise and does not silently drop a survivor's dangling trust.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var sourceDeleteAttempts = 0;
+        var targetDeleteAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = (vmName, _, script, _) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+
+            if (script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal))
+            {
+                if (vmName == "dc01")
+                {
+                    var attempt = Interlocked.Increment(ref sourceDeleteAttempts);
+                    if (attempt == 1)
+                    {
+                        // The survivor's session can still blip on the finding-81 transient; the wrap must retry it.
+                        return Task.FromResult(new GuestCommandResult
+                        {
+                            Success = false,
+                            Error = "Invoke-Command : The credential is invalid. OpenError PSSessionStateBroken"
+                        });
+                    }
+                }
+                else if (vmName == "fabrikamdc01")
+                {
+                    Interlocked.Increment(ref targetDeleteAttempts);
+                }
+            }
+
+            return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+        };
+        var logger = new RecordingStructuredLogger();
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor, logger);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+
+        // Only the target anchor is run-created (being torn down). The source anchor is pre-existing and survives.
+        var targetContext = multiContext.VmContexts.Single(vm => vm.VmName == "fabrikamdc01");
+        targetContext.DifferencingDiskCreated = true;
+        targetContext.VmRegistered = true;
+
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.True(sourceDeleteAttempts >= 2, $"Surviving anchor delete must run and retry the transient, saw {sourceDeleteAttempts}.");
+        Assert.Equal(0, targetDeleteAttempts);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.False(trustContext.CleanupResidual);
+        Assert.Contains(logger.Events, item =>
+            item.Code == $"0x{LaStatus.DeployForestTrust_ForestTrustCleanedUp:X8}" &&
+            item.Result == "success" &&
+            item.Context != null &&
+            item.Context.TryGetValue("sourceAnchorOutcome", out var sourceOutcome) &&
+            string.Equals(sourceOutcome?.ToString(), "success", StringComparison.Ordinal) &&
+            item.Context.TryGetValue("targetAnchorOutcome", out var targetOutcome) &&
+            string.Equals(targetOutcome?.ToString(), "skipped", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupBothAnchorsTornDown_EmitsSkippedTerminalNotSuccess()
+    {
+        // Finding 87 telemetry contract: a skip is not a success. When both anchors are being destroyed the terminal
+        // must be a distinct cleanup.end result=skipped carrying per-side outcomes and a reason, never a fabricated
+        // cleaned-up/success for work that was deliberately not done.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = (vmName, _, script, _) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+            }
+
+            return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+        };
+        var logger = new RecordingStructuredLogger();
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor, logger);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        foreach (var vmContext in multiContext.VmContexts)
+        {
+            vmContext.DifferencingDiskCreated = true;
+            vmContext.VmRegistered = true;
+        }
+
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.Contains(logger.Events, item =>
+            item.Code == $"0x{LaStatus.DeployForestTrust_ForestTrustCleanupSkipped:X8}" &&
+            item.OperationId == multiContext.OperationId &&
+            item.Result == "skipped" &&
+            item.Context != null &&
+            item.Context.TryGetValue("sourceAnchorOutcome", out var sourceOutcome) &&
+            string.Equals(sourceOutcome?.ToString(), "skipped", StringComparison.Ordinal) &&
+            item.Context.TryGetValue("targetAnchorOutcome", out var targetOutcome) &&
+            string.Equals(targetOutcome?.ToString(), "skipped", StringComparison.Ordinal) &&
+            item.Context.TryGetValue("skipReason", out _));
+        Assert.DoesNotContain(logger.Events, item =>
+            item.Code == $"0x{LaStatus.DeployForestTrust_ForestTrustCleanedUp:X8}" && item.Result == "success");
+    }
+
     private static (MultiVmDeploymentContext MultiContext, IReadOnlyList<V2ForestTrustAnchorState> Anchors) CreateForestTrustStageContext(
         V2RuntimeExecutionRequest request)
     {
