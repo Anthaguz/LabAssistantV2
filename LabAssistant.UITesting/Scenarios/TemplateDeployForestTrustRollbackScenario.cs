@@ -39,23 +39,27 @@ namespace LabAssistant.UITesting.Scenarios;
 /// (not success). The authoritative proof therefore shifts from "cleanup.end=success" to the RUNTIME tearing
 /// everything down promptly with zero orphans - a STRONGER proof (it pins that the runtime itself cleans up,
 /// not the harness backstop). Strongest first:
-///   PASS (authoritative): <c>create.end</c>=success (a real, fully-created trust existed) AND the cleanup wrap
-///       reached an HONEST terminal - <c>cleanup.end</c>=skipped-as-moot (expected here, both anchors run-created)
-///       OR =success (only if a surviving pre-existing anchor path ran) - AND ZERO ORPHANS before the gate
-///       backstop: the runtime tore down every run-created VM + differencing disk within TeardownBudget. The
-///       zero-orphans-before-backstop check is the CENTERPIECE - it directly proves findings 86 (mandatory
-///       teardown no longer gated behind best-effort in-guest cleanup) and 87 (no ~30-min orphan-and-Running
-///       window on a cancelled dual-DC deploy).
-///   GATING FAIL: cleanup ran but reported residual (<c>cleanup.end</c>=failed - the finding-85 hard-fail this
+///   PASS (authoritative): <c>create.end</c>=success (a real, fully-created trust existed) AND the RUN-LEVEL
+///       terminal <c>deploy.orchestration.run.end</c>=cancelled (the headline CLEAN-cancel signal, NOT
+///       cancelled_with_residuals) AND the cleanup wrap reached an HONEST terminal - <c>cleanup.end</c>=skipped-as-moot
+///       (expected here, both anchors run-created) OR =success (only if a surviving pre-existing anchor path ran) -
+///       AND ZERO ORPHANS before the gate backstop: the runtime tore down every run-created VM + differencing disk
+///       within TeardownBudget. The run-cancelled terminal and the host-side zero-orphans check are belt-and-suspenders
+///       for findings 86 (mandatory teardown no longer gated behind best-effort in-guest cleanup) and 87 (no ~30-min
+///       orphan-and-Running window on a cancelled dual-DC deploy); the combined #924+#925 repro flips the run terminal
+///       from cancelled_with_residuals to plain cancelled.
+///   GATING FAIL: the run terminal reported <c>cancelled_with_residuals</c> (residuals remained - findings 86/87 not
+///       fully closed), or cleanup ran but reported residual (<c>cleanup.end</c>=failed - the finding-85 hard-fail this
 ///       verb's live PASS is coupled to the #924 cleanup-retry fix eliminating), or cleanup started but never
 ///       reached ANY terminal within budget (a hang - the finding-85 hang the fix must not reintroduce), or the
 ///       runtime left orphans / exceeded TeardownBudget (the finding-86/87 regression the centerpiece pins).
-///   INCONCLUSIVE (never a false pass/fail, re-run): the deploy reached a READY trust before the cancel took
-///       effect (validate.end=success, no cleanup), or no fully-created trust was observed (cancel too early),
-///       or cleanup ran to an honest terminal but create.end=success was not confirmed, or the cleanup stage was
-///       silent (no start + no terminal) yet the runtime still left zero orphans - no leak, but the honest stage
-///       could not be confirmed, so re-run. The fix thread ALWAYS emits a terminal per cleanup.start, so a truly
-///       silent case should never legitimately occur post-fix; this branch is defence-in-depth on the emit path.
+///   INCONCLUSIVE (never a false pass/fail, re-run): the deploy completed (run terminal=success, cancel too late,
+///       nothing rolled back - validate.end=success corroborates), or no fully-created trust was observed (cancel too
+///       early), or cleanup ran to an honest terminal but create.end=success was not confirmed, or the cleanup stage was
+///       silent (no start + no terminal) yet the runtime still left zero orphans, or a real trust was cleaned up with
+///       zero orphans but the clean run-cancelled terminal could not be confirmed (run outcome unconfirmed). The fix
+///       thread ALWAYS emits a terminal per cleanup.start and a run-level terminal per run, so these branches are
+///       defence-in-depth on the emit path.
 ///   MONEY: zero orphans host-side, read directly BEFORE the gate's backstop sweep - both DC VMs gone within
 ///       TeardownBudget, no run-tagged VMs / differencing disks survive, and the shared real base image is
 ///       intact. (The shared Internal switch is gate-owned - the app references but never created it - so it is
@@ -423,6 +427,11 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
         bool createEnded = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCreateEndEvent, "success", logWindow);
         bool trustValidated = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustValidateEndEvent, "success", logWindow);
 
+        // The HEADLINE run-level signal: the single deploy.orchestration.run.end terminal. result=cancelled is a
+        // clean cancel with zero residuals (the PASS criterion); cancelled_with_residuals is a gating leak;
+        // success means the deploy finished (cancel too late = re-run). Read directly rather than inferred.
+        RunOutcome runOutcome = MapRunOutcome(stepLog.ReadRunTerminalResult(logWindow));
+
         // The CENTERPIECE: probe the host directly, BEFORE the gate's backstop sweep, for what the RUNTIME's own
         // cancel teardown removed. This is the finding-86/87 proof and it gates the PASS.
         var orphans = ProbeOrphans(context, recorder, hyperV, probe, seeded, resources);
@@ -436,7 +445,7 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
 
         var verdict = ClassifyRollback(
             cleanupStarted, cleanupSucceeded, cleanupSkipped, cleanupResidual, createEnded, trustValidated,
-            orphans.NoTaggedLeftovers, orphans.TeardownWithinBudget);
+            orphans.NoTaggedLeftovers, orphans.TeardownWithinBudget, runOutcome);
 
         switch (verdict)
         {
@@ -474,8 +483,32 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                              "trust is fully created but not yet marked ready. The runtime then removed a complete real trust's artifacts " +
                              "and tore down all run-created resources - a stronger no-orphans proof than interrupting a partial create."
                 });
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "rollback-no-orphans",
+                    Severity = FindingSeverity.Info,
+                    Title = "HEADLINE: the run-level terminal reported a CLEAN cancel with zero residuals",
+                    Detail = "deploy.orchestration.run.end reported result=cancelled (NOT cancelled_with_residuals): the runtime's own " +
+                             "authoritative run outcome confirms the cancel left zero residuals. This is the headline findings-86/87 signal - " +
+                             "the combined #924+#925 repro flipping from cancelled_with_residuals to plain cancelled - and it corroborates " +
+                             "the host-side zero-orphans centerpiece below."
+                });
                 RecordOrphanFinding(recorder, orphans, seeded, gating: true);
                 RecordBestEffortInGuest(recorder, probe, seeded);
+                return;
+
+            case RollbackVerdict.FailCancelledWithResiduals:
+                recorder.RecordFailure(
+                    context.Host, Name, "rollback-no-orphans", FindingSeverity.Error,
+                    "the run cancelled WITH residuals (findings 86/87 not fully closed)",
+                    "The run-level terminal deploy.orchestration.run.end reported result=cancelled_with_residuals: the runtime " +
+                    "cancelled the deploy but could not clean up every resource it created, so residuals remained. This is the " +
+                    "exact findings-86/87 regression the reframe pins - with #925 (VMs torn down) and #924/finding-87 (trust cleanup " +
+                    "returns promptly via the moot-skip path) the combined repro must FLIP to a plain result=cancelled. A " +
+                    "cancelled_with_residuals terminal means that flip did not fully happen. The host-side orphan detail below " +
+                    "root-causes which resources leaked; the gate's backstop still sweeps tagged leftovers so the box is left clean.");
+                RecordOrphanFinding(recorder, orphans, seeded, gating: true);
                 return;
 
             case RollbackVerdict.FailCleanupResidual:
@@ -575,17 +608,36 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                 });
                 RecordOrphanFinding(recorder, orphans, seeded, gating: false);
                 return;
+
+            case RollbackVerdict.InconclusiveRunOutcomeUnconfirmed:
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "rollback-inconclusive",
+                    Severity = FindingSeverity.Warning,
+                    Title = "INCONCLUSIVE: a real trust was cleaned up with zero orphans, but the run-cancelled terminal was not confirmed",
+                    Detail = "create.end=success, an honest cleanup terminal, and zero orphans all held, but no clean " +
+                             "deploy.orchestration.run.end (result=cancelled) terminal was read in the window - the run outcome was a " +
+                             "failure variant or the terminal was unreadable/absent. The headline PASS criterion (a clean run-cancelled " +
+                             "signal) could not be asserted, so this is NOT a false pass and NOT a failure; re-run. If it recurs it may " +
+                             "signal a broken run-terminal emit path worth surfacing. Host-side orphan verification still follows."
+                });
+                RecordOrphanFinding(recorder, orphans, seeded, gating: false);
+                return;
         }
     }
 
     /// <summary>
     /// The pure rollback verdict over the log-derived facts PLUS the host-side zero-orphans facts, extracted so
-    /// it is unit-testable without a live deploy. Reframed for the findings-86/87 moot-skip behaviour: the
-    /// authoritative PASS requires a fully-created trust (create.end=success), an HONEST cleanup terminal
-    /// (success OR skipped-as-moot), AND zero orphans before the backstop (no tagged leftovers AND teardown
-    /// within budget). A cleanup that reported residual or hung is a gating failure; a runtime that left orphans
-    /// or blew the teardown budget on the cancel path is the gating finding-86/87 failure; any remaining
-    /// ambiguity is a non-gating INCONCLUSIVE (never a false pass, never a false fail).
+    /// it is unit-testable without a live deploy. Reframed for the findings-86/87 moot-skip behaviour and keyed
+    /// on the RUN-LEVEL orchestration terminal (<paramref name="runOutcome"/>) as the headline signal: the
+    /// authoritative PASS requires a fully-created trust (create.end=success), the clean run terminal
+    /// (<see cref="RunOutcome.Cancelled"/> - NOT <see cref="RunOutcome.CancelledWithResiduals"/>), an HONEST
+    /// cleanup terminal (success OR skipped-as-moot), AND zero orphans before the backstop (no tagged leftovers
+    /// AND teardown within budget). A run that reported <see cref="RunOutcome.CancelledWithResiduals"/>, a
+    /// cleanup that reported residual or hung, or a runtime that left orphans / blew the teardown budget is a
+    /// gating failure; a completed run (<see cref="RunOutcome.Completed"/> = cancel landed too late) or any
+    /// remaining ambiguity is a non-gating INCONCLUSIVE (never a false pass, never a false fail).
     /// </summary>
     internal static RollbackVerdict ClassifyRollback(
         bool cleanupStarted,
@@ -595,38 +647,70 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
         bool createEnded,
         bool trustValidated,
         bool noTaggedLeftovers,
-        bool teardownWithinBudget)
+        bool teardownWithinBudget,
+        RunOutcome runOutcome)
     {
         bool zeroOrphans = noTaggedLeftovers && teardownWithinBudget;
 
+        // Cleanup-stage faults are the most specific root causes, so name them first. A residual terminal
+        // (cleanup.end=failed) is gating and must never be masked by a co-occurring skipped flag; a genuine
+        // success terminal still wins over a stale residual (defensive - the live path sets exactly one
+        // terminal). A start with no terminal of any kind within budget is the finding-85 hang.
         if (cleanupStarted)
         {
-            // A residual terminal (cleanup.end=failed) is gating and must never be masked by a co-occurring
-            // skipped flag; a genuine success terminal still wins over a stale residual (defensive - the live
-            // path sets exactly one terminal).
             if (cleanupResidual && !cleanupSucceeded)
             {
                 return RollbackVerdict.FailCleanupResidual;
             }
 
-            // Started but no terminal of any kind within budget - a hang (the finding-85 hang), gating.
             if (!cleanupSucceeded && !cleanupSkipped && !cleanupResidual)
             {
                 return RollbackVerdict.FailCleanupHung;
             }
+        }
 
+        // HEADLINE gating signal: the run itself reported residuals remained on cancel (findings 86/87 not fully
+        // closed). result=cancelled_with_residuals is a HARD gating fail, NEVER inconclusive - both cancelled
+        // variants satisfy the "run ended Cancelled" precondition, but only the residual-free variant is
+        // PASS-eligible; the residual variant must not fall through and be masked as a benign re-run. (A more
+        // specific cleanup-stage residual/hang above still wins as the actionable root cause; both are gating.)
+        if (runOutcome == RunOutcome.CancelledWithResiduals)
+        {
+            return RollbackVerdict.FailCancelledWithResiduals;
+        }
+
+        // HEADLINE inconclusive: the deploy completed (run terminal = success), so the cancel landed too late and
+        // nothing was rolled back. Surviving VMs here are a successful deploy, not a leak - re-run.
+        if (runOutcome == RunOutcome.Completed)
+        {
+            return RollbackVerdict.InconclusiveReadyTrust;
+        }
+
+        if (cleanupStarted)
+        {
             // Honest terminal (success or skipped-as-moot). The authoritative PASS additionally requires a
-            // confirmed fully-created trust and zero orphans before the backstop.
+            // confirmed fully-created trust, the clean run-cancelled terminal, and zero orphans before backstop.
             if (!createEnded)
             {
                 return RollbackVerdict.InconclusiveCleanupWithoutCreateEnd;
             }
 
-            return zeroOrphans ? RollbackVerdict.Pass : RollbackVerdict.FailOrphansLeaked;
+            // A leak (host truth) is gating even if the run terminal claimed clean - never a false pass.
+            if (!zeroOrphans)
+            {
+                return RollbackVerdict.FailOrphansLeaked;
+            }
+
+            // Real trust, honest cleanup, zero orphans. PASS requires the clean run-cancelled headline signal;
+            // absent it (Unknown/unreadable), the run outcome is unconfirmed so we re-run rather than pass.
+            return runOutcome == RunOutcome.Cancelled
+                ? RollbackVerdict.Pass
+                : RollbackVerdict.InconclusiveRunOutcomeUnconfirmed;
         }
 
         // The cleanup stage never started. Distinguish "the deploy already finished" from "cancel too early"
-        // from the defence-in-depth silent case.
+        // from the defence-in-depth silent case. validate.end=success is the conservative corroborator when the
+        // run terminal was not the clean cancelled/completed signal.
         if (trustValidated)
         {
             return RollbackVerdict.InconclusiveReadyTrust;
@@ -644,22 +728,47 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
     }
 
     /// <summary>
-    /// The possible outcomes of the rollback proof. PASS is the only clean success; the three Fail* outcomes are
-    /// gating findings (residual cleanup, a hung cleanup, or the runtime leaking orphans / blowing the teardown
-    /// budget on the cancel path); the four Inconclusive* outcomes are non-gating "re-run" verdicts that never
-    /// report a false pass or a false fail.
+    /// The possible outcomes of the rollback proof. PASS is the only clean success; the Fail* outcomes are
+    /// gating findings (a run that cancelled with residuals, residual cleanup, a hung cleanup, or the runtime
+    /// leaking orphans / blowing the teardown budget on the cancel path); the Inconclusive* outcomes are
+    /// non-gating "re-run" verdicts that never report a false pass or a false fail.
     /// </summary>
     internal enum RollbackVerdict
     {
         Pass,
+        FailCancelledWithResiduals,
         FailCleanupResidual,
         FailCleanupHung,
         FailOrphansLeaked,
         InconclusiveReadyTrust,
         InconclusiveNoCreate,
         InconclusiveCleanupWithoutCreateEnd,
-        InconclusiveSilentButClean
+        InconclusiveSilentButClean,
+        InconclusiveRunOutcomeUnconfirmed
     }
+
+    /// <summary>
+    /// The authoritative run-level outcome, read from the single <c>deploy.orchestration.run.end</c> terminal.
+    /// <see cref="Cancelled"/> is the clean-cancel headline PASS signal (zero residuals); <see cref="CancelledWithResiduals"/>
+    /// is a gating residual leak; <see cref="Completed"/> means the deploy finished (cancel too late = re-run);
+    /// <see cref="Unknown"/> covers a failure variant or an unreadable/absent terminal (never a PASS on its own).
+    /// </summary>
+    internal enum RunOutcome
+    {
+        Cancelled,
+        CancelledWithResiduals,
+        Completed,
+        Unknown
+    }
+
+    /// <summary>Maps the raw <c>deploy.orchestration.run.end</c> result string to a <see cref="RunOutcome"/>.</summary>
+    internal static RunOutcome MapRunOutcome(string? result) => result switch
+    {
+        "cancelled" => RunOutcome.Cancelled,
+        "cancelled_with_residuals" => RunOutcome.CancelledWithResiduals,
+        "success" => RunOutcome.Completed,
+        _ => RunOutcome.Unknown
+    };
 
     /// <summary>
     /// Probes the host directly for what the runtime's own cancel teardown removed, read BEFORE the gate's

@@ -84,6 +84,16 @@ public sealed class DeployStepLogProbe
     /// terminal rather than hanging or the trust merely dying with the torn-down VM.</summary>
     public const string TrustCleanupEndEvent = "deploy.forest-trust.cleanup.end";
 
+    /// <summary>The single RUN-LEVEL orchestration terminal (facility deploy.orchestration, operation run,
+    /// phase end - status-codes.yaml facility 0x40 / op 0x02). Emitted once per deploy from
+    /// <c>EmitDeployTerminalEvent</c> off <c>multiContext.OperationState</c>, its <c>result</c> is the
+    /// authoritative run outcome: <c>success</c> (deploy completed - cancel landed too late / nothing rolled
+    /// back), <c>cancelled</c> (clean cancel, ZERO residuals - the headline no-orphans signal), or
+    /// <c>cancelled_with_residuals</c> (cancel that left residuals - findings 86/87 not fully closed). The
+    /// rollback verdict keys its headline pass/fail criterion directly off this rather than inferring the run
+    /// outcome from navigated-away + VMs-gone.</summary>
+    public const string RunTerminalEvent = "deploy.orchestration.run.end";
+
     private readonly string _logsFolder;
 
     public DeployStepLogProbe(AppDataLocations locations)
@@ -597,12 +607,80 @@ public sealed class DeployStepLogProbe
     }
 
     /// <summary>
-    /// Parses a forest-trust lifecycle line (event name under <see cref="TrustEventPrefix"/>) into its
-    /// timestamp, event name, and result. Returns false for any other event, a malformed line, or a line
-    /// missing ts/result. Unlike <see cref="TryReadStepEvent"/> this requires NO vmName: trust events are
-    /// keyed by trustId/stepKey, not a VM.
+    /// Returns the latest <c>result</c> of the run-level orchestration terminal
+    /// (<see cref="RunTerminalEvent"/>) at or after <paramref name="window"/>, or null when none is present.
+    /// The value is one of <c>success</c> / <c>cancelled</c> / <c>cancelled_with_residuals</c> (or the failure
+    /// variants); the rollback verdict maps it to its headline run outcome. Never throws into an assertion path.
     /// </summary>
-    private static bool TryReadTrustEvent(
+    public string? ReadRunTerminalResult(AppLogWindow window)
+    {
+        if (!Directory.Exists(_logsFolder))
+        {
+            return null;
+        }
+
+        try
+        {
+            var lines = new List<string>();
+            foreach (string file in Directory.EnumerateFiles(_logsFolder, LogGlob))
+            {
+                lines.AddRange(ReadLinesShared(file));
+            }
+
+            return FindLatestEventResult(lines, RunTerminalEvent, window.StartUtc);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Pure parse over structured-event lines: returns the <c>result</c> of the latest event whose
+    /// <c>event</c> equals <paramref name="eventName"/> at or after <paramref name="windowStart"/>, or null
+    /// when none matches. Malformed lines are skipped. Used to read the single run-level orchestration terminal.
+    /// </summary>
+    internal static string? FindLatestEventResult(
+        IEnumerable<string> lines,
+        string eventName,
+        DateTimeOffset windowStart)
+    {
+        DateTimeOffset bestTs = default;
+        string? best = null;
+
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (!TryReadEventResult(line, out DateTimeOffset ts, out string? lineEvent, out string? lineResult))
+            {
+                continue;
+            }
+
+            if (ts < windowStart || !string.Equals(lineEvent, eventName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (best is null || ts >= bestTs)
+            {
+                best = lineResult;
+                bestTs = ts;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Parses any structured-event line into its <c>event</c> name, <c>ts</c>, and <c>result</c>. Returns
+    /// false for a malformed line or one missing event/ts/result. This is the general reader; the
+    /// forest-trust reader (<see cref="TryReadTrustEvent"/>) layers the facility-prefix filter on top.
+    /// </summary>
+    private static bool TryReadEventResult(
         string line,
         out DateTimeOffset ts,
         out string? eventName,
@@ -619,12 +697,6 @@ public sealed class DeployStepLogProbe
             if (root.ValueKind != JsonValueKind.Object ||
                 !root.TryGetProperty("event", out JsonElement eventElement) ||
                 eventElement.ValueKind != JsonValueKind.String)
-            {
-                return false;
-            }
-
-            string? name = eventElement.GetString();
-            if (name is null || !name.StartsWith(TrustEventPrefix, StringComparison.Ordinal))
             {
                 return false;
             }
@@ -646,14 +718,41 @@ public sealed class DeployStepLogProbe
                 return false;
             }
 
-            eventName = name;
+            eventName = eventElement.GetString();
             result = resultElement.GetString();
-            return result is not null;
+            return eventName is not null && result is not null;
         }
         catch (JsonException)
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Parses a forest-trust lifecycle line (event name under <see cref="TrustEventPrefix"/>) into its
+    /// timestamp, event name, and result. Delegates to <see cref="TryReadEventResult"/> and layers the
+    /// facility-prefix filter on top, so any non-forest-trust event is rejected. Unlike
+    /// <see cref="TryReadStepEnd"/> this requires NO vmName: trust events are keyed by trustId/stepKey.
+    /// </summary>
+    private static bool TryReadTrustEvent(
+        string line,
+        out DateTimeOffset ts,
+        out string? eventName,
+        out string? result)
+    {
+        if (!TryReadEventResult(line, out ts, out eventName, out result))
+        {
+            return false;
+        }
+
+        if (eventName is null || !eventName.StartsWith(TrustEventPrefix, StringComparison.Ordinal))
+        {
+            eventName = null;
+            result = null;
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
