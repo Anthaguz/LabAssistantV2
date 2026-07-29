@@ -642,6 +642,48 @@ public sealed partial class V2PlanningCapabilityServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanAsync_RoutedCrossForestTrust_OrdersTrustDnsAfterRouterReady()
+    {
+        // Two forests whose first domain controllers sit on different gatewayed subnets bridged only by a router.
+        // The trust's cross-forest DNS forwarding and RPC cannot flow until the router is routing between the
+        // subnets, so trust DNS preparation must wait for RouterReady (finding 83). Domain readiness alone does not
+        // establish that path, and a FirstDomainController never carries RequiresRouterDependency, so this edge is
+        // the only thing keeping the trust stage from racing the router.
+        var request = CreateRoutedForestTrustRequest(["slot-local", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"]);
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        var routerNode = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.RouterReady));
+        var prepareDns = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.PrepareForestTrustDns));
+        Assert.Contains(result.Dependencies, dep =>
+            dep.FromNodeId == routerNode.NodeId &&
+            dep.ToNodeId == prepareDns.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.RouterRequired);
+        // The ordering edge makes trust DNS preparation inadmissible until the router completes.
+        Assert.True(routerNode.WaveHint < prepareDns.WaveHint);
+    }
+
+    [Fact]
+    public async Task BuildPlanAsync_SameL2ForestTrust_AddsNoRouterOrderingEdge()
+    {
+        // Regression guard for finding 83: when both controllers share one switch and no router exists (the #918
+        // topology), nothing may order trust DNS preparation behind router readiness. The full same-L2 trust
+        // dependency shape is asserted unchanged by BuildPlanAsync_ManagedBidirectionalForestTrust above; this test
+        // pins the specific negative - no RouterReady node and no RouterRequired edge into trust DNS preparation.
+        var request = CreateManagedForestTrustRequest(["slot-local", "slot-admin", "slot-dsrm", "slot-fabrikam-admin"]);
+
+        var result = await _service.BuildPlanAsync(request);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain(result.Nodes, node => node.Kind == V2PlanNodeKind.RouterReady);
+        var prepareDns = Assert.Single(result.Nodes.Where(node => node.Kind == V2PlanNodeKind.PrepareForestTrustDns));
+        Assert.DoesNotContain(result.Dependencies, dep =>
+            dep.ToNodeId == prepareDns.NodeId &&
+            dep.ReasonCode == V2PlanDependencyReasonCode.RouterRequired);
+    }
+
+    [Fact]
     public async Task BuildPlanAsync_ManagedForestTrustMissingDomainAdminSlot_BlocksBeforeRuntime()
     {
         var request = CreateManagedForestTrustRequest(["slot-local", "slot-admin", "slot-dsrm"]);
@@ -1163,6 +1205,66 @@ public sealed partial class V2PlanningCapabilityServiceTests
         ];
         request.CatalogItems = request.CatalogItems.Concat([CreateCatalogItem("disk-fabrikamdc", "slot-local")]).ToArray();
         request.ResolvedCredentialSlotKeys = resolvedSlots;
+
+        return request;
+    }
+
+    private static V2PlanBuildRequest CreateRoutedForestTrustRequest(IReadOnlyCollection<string> resolvedSlots)
+    {
+        var request = CreateManagedForestTrustRequest(resolvedSlots);
+
+        // Move the two forests onto disjoint gatewayed subnets and bridge them with a 3-NIC router (core + edge, plus
+        // an external leg for egress). Source anchor dc01 stays on lab-core; target anchor fabrikamdc01 moves to
+        // lab-edge, so the trust now spans a router-bridged boundary.
+        request.Template.LabNetworks =
+        [
+            new LabNetworkTemplate { NetworkId = "lab-core", Name = "Core", SwitchName = "vSwitch-Core" },
+            new LabNetworkTemplate { NetworkId = "lab-edge", Name = "Edge", SwitchName = "vSwitch-Edge" },
+            new LabNetworkTemplate { NetworkId = "lab-external", Name = "External", SwitchName = "vSwitch-External" }
+        ];
+
+        var fabrikamDc = request.Template.VmTemplates.Single(vm => vm.VmId == "vm-fabrikamdc01");
+        fabrikamDc.Nics =
+        [
+            new VmNetworkInterfaceTemplate
+            {
+                NicId = "nic-fabrikamdc",
+                NetworkId = "lab-edge",
+                IpAddress = "10.0.1.50",
+                PrefixLength = 24,
+                DefaultGateway = "10.0.1.1",
+                DnsServers = ["10.0.1.50"]
+            }
+        ];
+
+        request.Template.VmTemplates.Add(new VmTemplate
+        {
+            VmId = "vm-router",
+            Name = "router01",
+            MemoryMb = 4096,
+            CpuCount = 2,
+            VhdxId = "disk-router",
+            TopologyRole = "Router",
+            CredentialSlots = new VmCredentialSlotBindings
+            {
+                LocalBootstrap = "slot-local"
+            },
+            Nics =
+            [
+                new VmNetworkInterfaceTemplate { NicId = "nic-router-core", NetworkId = "lab-core", IpAddress = "10.0.0.1", PrefixLength = 24 },
+                new VmNetworkInterfaceTemplate { NicId = "nic-router-edge", NetworkId = "lab-edge", IpAddress = "10.0.1.1", PrefixLength = 24 },
+                new VmNetworkInterfaceTemplate { NicId = "nic-router-external", NetworkId = "lab-external" }
+            ]
+        });
+
+        request.CatalogItems = request.CatalogItems.Concat([CreateCatalogItem("disk-router", "slot-local")]).ToArray();
+        request.AvailableSwitchNames = ["vSwitch-Core", "vSwitch-Edge", "vSwitch-External"];
+        request.AvailableSwitches =
+        [
+            CreateSwitch("vSwitch-Core", "Internal"),
+            CreateSwitch("vSwitch-Edge", "Internal"),
+            CreateSwitch("vSwitch-External", "External")
+        ];
 
         return request;
     }
