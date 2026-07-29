@@ -28,6 +28,19 @@ namespace LabAssistant.Business.Runtime;
 /// for the no-orphans cleanup path, which runs under <see cref="System.Threading.CancellationToken.None"/> and must
 /// not consult the (already-cancelled) deploy abort signal; that path still classifies the drop the same way but skips
 /// per-attempt logging (the cleanup stage emits its own outcome event).
+///
+/// <paramref name="retryAuthenticationRejection"/> defaults to <see langword="false"/> so the deploy path preserves its
+/// fail-fast contract: a deterministic credential rejection surfaces immediately and never burns the retry budget. It
+/// is opted into ONLY by the rollback cleanup path, where a broken PowerShell Direct session on a DC that is rebooting
+/// or being torn down surfaces "The credential is invalid" wrapped in an <c>OpenError</c> / <c>PSSessionStateBroken</c> /
+/// <c>PSDirectException</c> - the finding-81 transient, which is content-indistinguishable from a genuine wrong password
+/// (both carry that identical structured identity). That case cannot be told apart by content, so the deploy path must
+/// still fail fast on it. Cleanup can safely tolerate it because it has context the deploy path lacks: the domain-admin
+/// credential was already validated when the trust was created, the delete script is idempotent (GetADTrust-guarded),
+/// and the retry is still bounded by <see cref="V2RuntimeExecutionRequest.GuestTransportMaxRetries"/>, so a genuinely
+/// bad credential would only slow the best-effort cleanup before residual is flagged, never hang it forever. That
+/// budget (default 90 x 10s = ~15 min) also comfortably outlasts the ~340-360s a rebooting DC needs to become
+/// reachable again during rollback, so the cleanup retry spans the reboot rather than expiring mid-recovery.
 /// </remarks>
 internal static class GuestStepTransportRetry
 {
@@ -36,7 +49,8 @@ internal static class GuestStepTransportRetry
         V2RuntimeExecutionRequest request,
         string stepKey,
         Func<CancellationToken, Task<GuestCommandResult>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool retryAuthenticationRejection = false)
     {
         var startTick = Environment.TickCount64;
         var attempt = 1;
@@ -66,10 +80,14 @@ internal static class GuestStepTransportRetry
                     result.Error)
                 : GuestErrorClassifier.Classify(result.Error);
 
-            // Only a torn-down PowerShell Direct session is worth re-running; every other category is a real,
-            // deterministic error that must surface immediately, and the retry budget is finite so a persistently
-            // rebooting guest still fails rather than looping forever.
-            if (category != GuestCommandErrorCategory.GuestRebooting || attempt >= request.GuestTransportMaxRetries)
+            // A torn-down PowerShell Direct session is always worth re-running. The rollback cleanup path additionally
+            // opts into retrying a credential rejection, because a session that broke while a DC reboots surfaces
+            // "the credential is invalid" indistinguishably from a genuine wrong password (see the type remarks). Every
+            // other category is a real, deterministic error that must surface immediately, and the retry budget is
+            // finite so a persistently failing guest still fails rather than looping forever.
+            var retryable = category == GuestCommandErrorCategory.GuestRebooting
+                || (retryAuthenticationRejection && category == GuestCommandErrorCategory.AuthenticationRejected);
+            if (!retryable || attempt >= request.GuestTransportMaxRetries)
             {
                 return result;
             }

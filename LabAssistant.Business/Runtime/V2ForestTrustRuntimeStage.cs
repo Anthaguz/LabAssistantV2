@@ -158,6 +158,10 @@ public sealed class V2ForestTrustRuntimeStage
             // the already-cancelled deploy abort signal: pass a null context (skips the abort check and per-attempt
             // logging) and CancellationToken.None, while still retrying a transient PowerShell Direct drop so a blip
             // does not leave a dangling trust. The GetADTrust-guarded delete script is idempotent, so re-running is safe.
+            // retryAuthenticationRejection: true because rollback puts the DCs back into flux (reboot/teardown), where a
+            // broken session surfaces "the credential is invalid" (OpenError/PSSessionStateBroken) even though the
+            // domain-admin credential was already validated at trust creation; the deploy path must fail fast on that
+            // signature but this best-effort, bounded cleanup must retry it rather than leave an orphan trust.
             var sourceResult = await GuestStepTransportRetry.RunAsync(
                 null,
                 request,
@@ -167,7 +171,8 @@ public sealed class V2ForestTrustRuntimeStage
                     sourceCredential!,
                     trust.TargetDomainDnsName,
                     attemptCancellation),
-                CancellationToken.None);
+                CancellationToken.None,
+                retryAuthenticationRejection: true);
             var targetResult = await GuestStepTransportRetry.RunAsync(
                 null,
                 request,
@@ -177,7 +182,8 @@ public sealed class V2ForestTrustRuntimeStage
                     targetCredential!,
                     trust.SourceDomainDnsName,
                     attemptCancellation),
-                CancellationToken.None);
+                CancellationToken.None,
+                retryAuthenticationRejection: true);
 
             trustState.CleanupResidual = !sourceResult.Success || !targetResult.Success;
             var error = string.Join(

@@ -492,6 +492,209 @@ public sealed partial class V2RuntimeCapabilityServiceTests
         Assert.True(trustContext.CleanupAttempted);
     }
 
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupCredentialInvalidTransient_RetriesThenSucceeds()
+    {
+        // Finding 85: on rollback the DCs go back into flux, so the best-effort in-guest trust deletion can hit a
+        // broken PowerShell Direct session that surfaces "the credential is invalid" wrapped in an
+        // OpenError / PSSessionStateBroken / PSDirectException - the finding-81 transient, which the classifier reads as
+        // AuthenticationRejected. The domain-admin credential was already validated when the trust was created and the
+        // delete is idempotent, so the cleanup path must retry that signature rather than fail fast and leave a
+        // dangling trust (a no-orphans violation).
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 5;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var sourceDeleteAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = (vmName, _, script, _) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+
+            if (vmName == "dc01" && script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal))
+            {
+                var attempt = Interlocked.Increment(ref sourceDeleteAttempts);
+                if (attempt == 1)
+                {
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "Invoke-Command : The credential is invalid. OpenError: (LAT-dc-alpha:String) [], PSDirectException FullyQualifiedErrorId : PSSessionStateBroken"
+                    });
+                }
+            }
+
+            return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.True(sourceDeleteAttempts >= 2, $"Expected cleanup to retry the credential-invalid transient, saw {sourceDeleteAttempts} attempt(s).");
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.CleanupAttempted);
+        Assert.False(trustContext.CleanupResidual);
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CreateTrust_CredentialInvalidError_FailsFastWithoutRetrying()
+    {
+        // Finding-81 constraint: on the DEPLOY path a credential rejection - even when it arrives wrapped in a broken
+        // session OpenError / PSSessionStateBroken - is content-indistinguishable from a genuine wrong password, so it
+        // must still fail fast on the first attempt. The cleanup-only auth tolerance must not widen this path.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var createAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor
+        {
+            OnExecuteAsync = (vmName, _, script, _) =>
+            {
+                if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref createAttempts);
+                    return Task.FromResult(new GuestCommandResult
+                    {
+                        Success = false,
+                        Error = "Invoke-Command : The credential is invalid. OpenError: (LAT-dc-alpha:String) [], PSDirectException FullyQualifiedErrorId : PSSessionStateBroken"
+                    });
+                }
+
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.Equal(1, createAttempts);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.False(trustContext.TrustReady);
+        Assert.True(trustContext.CleanupAttempted);
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupDeterministicError_FailsFastAndFlagsResidual()
+    {
+        // The cleanup auth tolerance must not become a blanket retry: a deterministic delete error that is neither a
+        // transport drop nor a credential rejection must fail fast on the first attempt and flag residual, so an
+        // operator sees an unrecoverable orphan rather than the cleanup looping the whole transport budget.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 25;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var sourceDeleteAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = (vmName, _, script, _) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+
+            if (vmName == "dc01" && script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref sourceDeleteAttempts);
+                return Task.FromResult(new GuestCommandResult
+                {
+                    Success = false,
+                    Error = "Remove-ADTrust : The specified directory service attribute or value does not exist."
+                });
+            }
+
+            return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.Equal(1, sourceDeleteAttempts);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.CleanupAttempted);
+        Assert.True(trustContext.CleanupResidual);
+    }
+
+    [Fact]
+    public async Task V2ForestTrustRuntimeStage_CleanupCredentialInvalidNeverRecovers_ExhaustsBoundedRetriesAndFlagsResidual()
+    {
+        // Hard constraint: the cleanup auth tolerance must stay bounded. A credential rejection that never clears (the
+        // worst case, a genuinely unusable credential during rollback) must exhaust GuestTransportMaxRetries and then
+        // flag residual, never loop the best-effort cleanup forever.
+        var request = await CreateRuntimeRequestWithForestTrustAsync();
+        request.GuestTransportMaxRetries = 3;
+        request.GuestTransportRetryDelay = TimeSpan.FromMilliseconds(1);
+
+        var sourceDeleteAttempts = 0;
+        var guestExecutor = new FakeGuestCommandExecutor();
+        var (multiContext, anchors) = CreateForestTrustStageContext(request);
+        guestExecutor.OnExecuteAsync = (vmName, _, script, _) =>
+        {
+            if (vmName == "dc01" && script.Contains("CreateTrustRelationship", StringComparison.Ordinal))
+            {
+                multiContext.RequestUserCancellation();
+                return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+            }
+
+            if (vmName == "dc01" && script.Contains("DeleteLocalSideOfTrustRelationship", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref sourceDeleteAttempts);
+                return Task.FromResult(new GuestCommandResult
+                {
+                    Success = false,
+                    Error = "Invoke-Command : The credential is invalid. OpenError: (LAT-dc-alpha:String) [], PSDirectException FullyQualifiedErrorId : PSSessionStateBroken"
+                });
+            }
+
+            return Task.FromResult(new GuestCommandResult { Success = true, Output = vmName });
+        };
+        var stage = new V2ForestTrustRuntimeStage(guestExecutor);
+        var executedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var trustStates = stage.InitializeRuntimeState(request, anchors, multiContext);
+
+        await stage.ExecuteAsync(request, multiContext, anchors, executedNodeIds, CancellationToken.None);
+        await stage.CleanupFailedOrCancelledAsync(request, multiContext, trustStates);
+
+        Assert.Equal(3, sourceDeleteAttempts);
+        var trustContext = Assert.Single(multiContext.V2TrustContexts);
+        Assert.True(trustContext.CleanupAttempted);
+        Assert.True(trustContext.CleanupResidual);
+    }
+
+    [Fact]
+    public void V2RuntimeExecutionRequest_DefaultTransportBudget_OutlastsRebootRecoveryWindow()
+    {
+        // Finding 85 no-orphans invariant: the forest-trust cleanup retry (including its opted-in tolerance of the
+        // credential-invalid transient) is bounded by the transport budget, GuestTransportMaxRetries x
+        // GuestTransportRetryDelay. That budget MUST outlast the reboot/specialize window a DC needs to become
+        // reachable again during rollback - the same window the deploy-path auth grace (GuestAuthGraceWindow) measures,
+        // whose documented tail is ~340-360s - or the cleanup would exhaust mid-reboot and leave exactly the dangling
+        // trust it exists to remove. Pin the ceiling so a future budget reduction cannot silently reintroduce orphans.
+        var request = new V2RuntimeExecutionRequest();
+        var transportBudget = request.GuestTransportRetryDelay * request.GuestTransportMaxRetries;
+
+        Assert.True(
+            transportBudget >= request.GuestAuthGraceWindow,
+            $"Transport budget {transportBudget.TotalSeconds:F0}s must outlast the reboot-recovery window {request.GuestAuthGraceWindow.TotalSeconds:F0}s so rollback cleanup does not exhaust mid-reboot.");
+    }
+
     private static (MultiVmDeploymentContext MultiContext, IReadOnlyList<V2ForestTrustAnchorState> Anchors) CreateForestTrustStageContext(
         V2RuntimeExecutionRequest request)
     {
