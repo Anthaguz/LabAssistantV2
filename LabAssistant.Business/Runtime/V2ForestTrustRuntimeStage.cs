@@ -800,6 +800,13 @@ public sealed class V2ForestTrustRuntimeStage
         // the abort landed. When the VM is being removed, deleting the trust object inside it is moot - the object dies
         // with the disk - and retrying it for the full budget would block the mandatory teardown; a surviving anchor
         // keeps a real dangling half that must be cleared, so it must NOT be skipped.
+        //
+        // DRIFT LANDMINE (finding 88, tracked post-merge follow-up): this predicate is a byte-identical inline copy of
+        // NeedsCleanup in LabAssistant.Business/Runtime/V2RuntimeCapabilityService.cs (the #925 gate, method at ~:3144,
+        // predicate at ~:3161). The two MUST stay identical - editing one without the other silently reintroduces a
+        // dangling trust (over-skip here) or a mid-reboot hang (under-skip). Kept inline tonight so #924 and #925 stay
+        // independently reviewable off origin/master; finding 88 consolidates both into a single shared
+        // VmCancelTeardownPolicy.ShouldTearDown once both land. If you touch one copy, update the other.
         var createdResources = anchor.VmFolderCreated || anchor.DifferencingDiskCreated || anchor.VmRegistered || anchor.VmStarted;
         return createdResources && (!anchor.IsSuccess || anchor.WasCancelled || multiContext.IsCancellationRequested);
     }
