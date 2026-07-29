@@ -1380,6 +1380,16 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
         var domainReadyByDomainId = states
             .Where(state => state.ResolvedDomain is not null && state.TryGetNode(V2PlanNodeKind.DomainReady) is not null)
             .ToDictionary(state => state.ResolvedDomain!.DomainId, state => state.TryGetNode(V2PlanNodeKind.DomainReady)!, StringComparer.OrdinalIgnoreCase);
+        var statesByVmId = states.ToDictionary(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase);
+        // Resolve the router the same deterministic way EmitDependencies does (lowest Name, then VmId, that carries a
+        // RouterReady node). A routed cross-forest trust must not start its DNS/RPC work until this node is forwarding
+        // between the two forests' subnets.
+        var routerState = states
+            .Where(state => state.IsRouterCapable)
+            .OrderBy(state => state.Vm.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(state => state.Vm.VmId, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(state => state.TryGetNode(V2PlanNodeKind.RouterReady) is not null);
+        var routerNode = routerState?.TryGetNode(V2PlanNodeKind.RouterReady);
 
         foreach (var trust in trusts)
         {
@@ -1397,9 +1407,59 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 AddDependencyIfPresent(targetReady, prepareDns, V2PlanDependencyReasonCode.TrustRequired, "Forest trust DNS preparation waits for target domain readiness.", dependencies);
             }
 
+            // When the two trust endpoints sit on different router-bridged subnets, the trust's cross-forest DNS
+            // forwarding and RPC cannot flow until the router is routing between them. Domain readiness alone does not
+            // imply that path exists, and a FirstDomainController never carries RequiresRouterDependency, so without
+            // this edge the trust stage races the router and only survives on #916's transient DNS/RPC retries (a
+            // masked, flaky green). Same-L2 trusts (both controllers on one switch, no router) and any trust whose
+            // endpoints the router does not bridge are deliberately left untouched.
+            if (routerNode is not null &&
+                routerState is not null &&
+                prepareDns is not null &&
+                statesByVmId.TryGetValue(trust.SourceAnchorVmId, out var sourceAnchorState) &&
+                statesByVmId.TryGetValue(trust.TargetAnchorVmId, out var targetAnchorState) &&
+                TrustSpansRouterBridgedBoundary(routerState, sourceAnchorState, targetAnchorState))
+            {
+                AddDependencyIfPresent(routerNode, prepareDns, V2PlanDependencyReasonCode.RouterRequired, "Forest trust DNS preparation waits for router readiness.", dependencies);
+            }
+
             AddDependencyIfPresent(prepareDns, createTrust, V2PlanDependencyReasonCode.TrustRequired, "Forest trust creation waits for DNS forwarding preparation.", dependencies);
             AddDependencyIfPresent(createTrust, validateTrust, V2PlanDependencyReasonCode.TrustRequired, "Forest trust validation waits for trust creation.", dependencies);
         }
+    }
+
+    /// <summary>
+    /// Determines whether a forest trust spans a router-bridged boundary, meaning its two domain-controller
+    /// endpoints sit on disjoint networks that the router carries a leg on each of. This is the structural
+    /// condition under which the trust's cross-subnet DNS forwarding and RPC depend on the router forwarding
+    /// traffic, so the trust's DNS-preparation node must wait for router readiness. It intentionally does not use
+    /// the coarse router-required or egress classification: the only thing that matters here is whether the two
+    /// endpoints can reach each other without the router. A same-L2 trust (shared network) returns false, as does a
+    /// trust whose endpoints the router does not bridge.
+    /// </summary>
+    private static bool TrustSpansRouterBridgedBoundary(
+        ResolvedVmState routerState,
+        ResolvedVmState sourceState,
+        ResolvedVmState targetState)
+    {
+        var sourceNetworks = sourceState.NetworkKeys;
+        var targetNetworks = targetState.NetworkKeys;
+        if (sourceNetworks.Count == 0 || targetNetworks.Count == 0)
+        {
+            return false;
+        }
+
+        // Shared network: the controllers already reach each other on one L2, so the router is not on the trust path.
+        var targetNetworkSet = new HashSet<string>(targetNetworks, StringComparer.OrdinalIgnoreCase);
+        if (sourceNetworks.Any(network => targetNetworkSet.Contains(network)))
+        {
+            return false;
+        }
+
+        // Disjoint networks: the edge is warranted only if the router actually bridges both, so it is the thing that
+        // makes them reachable to each other.
+        var routerNetworkSet = new HashSet<string>(routerState.NetworkKeys, StringComparer.OrdinalIgnoreCase);
+        return routerNetworkSet.Overlaps(sourceNetworks) && routerNetworkSet.Overlaps(targetNetworks);
     }
 
     private static void EmitSwitchDependencies(
