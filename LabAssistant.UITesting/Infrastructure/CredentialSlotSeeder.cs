@@ -81,6 +81,17 @@ public sealed class CredentialSlotSeeder
         Save(records);
     }
 
+    /// <summary>
+    /// Number of credential-slot records currently persisted (0 when the store is absent or empty).
+    /// The credential-fill automation reads this before and after each UI Save so it can confirm the
+    /// product actually Upserted a record - a ground-truth signal that a Save reached the store, used
+    /// to distinguish a real persist from a fill that silently no-oped.
+    /// </summary>
+    public int Count() => Load().Count;
+
+    /// <summary>True when a record for the given slot key exists in the store.</summary>
+    public bool Contains(string slotKey) => Find(Load(), slotKey) is not null;
+
     private static JsonObject? Find(JsonArray records, string slotKey)
     {
         foreach (var node in records)
