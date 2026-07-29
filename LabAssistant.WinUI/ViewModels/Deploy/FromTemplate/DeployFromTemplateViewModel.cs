@@ -12,6 +12,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Infrastructure;
 using LabAssistant.WinUI.Models.Deploy;
 
@@ -511,6 +512,8 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
     }
 
     // IDeployFromTemplateV2ReviewHost.
+    IStructuredLogger IDeployFromTemplateV2ReviewHost.StructuredLogger => _host.StructuredLogger;
+
     Task IDeployFromTemplateV2ReviewHost.EnsureReferenceDataAsync(bool forceRefresh) => _host.EnsureReferenceDataAsync(forceRefresh);
 
     IReadOnlyList<LocalCredentialSlotDefinition> IDeployFromTemplateV2ReviewHost.LoadLocalCredentialSlotDefinitions() =>
@@ -733,6 +736,10 @@ internal sealed partial class DeployFromTemplateViewModel : ViewModelBase,
         SetWorkflowState(false, false, "Evaluating", 20, "Reviewing V2 deployment plan...");
         SetActionStatus("Building V2 plan and review state...");
         await _v2ReviewController.RefreshPlanAsync(ActiveTemplateDocument.Template);
+        // Finding 90-A: RefreshPlanAsync has returned, so the "Building..." label is now a lie. Re-set the
+        // action status to the review panel's honest outcome (ready / blocked / planning-failed) instead of
+        // leaving the frozen in-progress text that made a correctly-blocked plan look like a hang.
+        SetActionStatus(V2Review.StatusText);
         SetWorkflowState(
             false,
             false,

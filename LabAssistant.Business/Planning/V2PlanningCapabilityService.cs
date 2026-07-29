@@ -2093,6 +2093,30 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
 
         public V2ResolvedVmPlanningContext ToContext()
         {
+            // Diagnostic-only derivations (no planning effect): expose the raw bootstrap-slot sources and the
+            // catalog match branch so a wedged plan-review distinguishes template-load-drop vs catalog-miss vs
+            // base re-identification directly from the emitted telemetry (finding 91).
+            var templateAuthoredBootstrap = V2PlanningCapabilityService.Normalize(Vm.CredentialSlots?.LocalBootstrap);
+            var catalogProfileBootstrap = V2PlanningCapabilityService.Normalize(BootstrapProfile?.LocalCredentialSlotRef);
+            var bootstrapSlotSource = templateAuthoredBootstrap is not null
+                ? "template-authored"
+                : catalogProfileBootstrap is not null
+                    ? "catalog-profile"
+                    : "none";
+            var searchedVhdxId = V2PlanningCapabilityService.Normalize(Vm.VhdxId);
+            // Mirror ResolveCatalogItem's precedence exactly so the label never lies: VhdxId-first has no
+            // fallthrough (a non-null CatalogItem with a searched VhdxId resolved by id); otherwise a VhdPath
+            // that did not match falls through to signature, so "path" is only truthful when the resolved
+            // entry's Path actually equals the searched VhdPath - otherwise the match came from signature.
+            var catalogMatchOutcome = CatalogItem is null
+                ? "miss"
+                : searchedVhdxId is not null
+                    ? "vhdxId"
+                    : V2PlanningCapabilityService.Normalize(Vm.VhdPath) is not null
+                      && string.Equals(CatalogItem.Path, Vm.VhdPath, StringComparison.OrdinalIgnoreCase)
+                        ? "path"
+                        : "signature";
+
             return new V2ResolvedVmPlanningContext
             {
                 VmId = Vm.VmId,
@@ -2103,8 +2127,14 @@ public sealed class V2PlanningCapabilityService : IV2PlanningCapabilityService
                 CapabilityRoles = KnownCapabilityRoles.ToArray(),
                 ResolvedCatalogItemId = CatalogItem?.Id,
                 ResolvedCatalogPath = CatalogItem?.Path,
+                SearchedVhdxId = searchedVhdxId,
+                ResolvedCatalogSignature = CatalogItem?.Signature,
+                CatalogMatchOutcome = catalogMatchOutcome,
                 BootstrapProfileRef = Vm.BootstrapProfileRef,
                 HasBootstrapProfile = BootstrapProfile is not null,
+                TemplateAuthoredBootstrapSlot = templateAuthoredBootstrap,
+                CatalogProfileBootstrapSlot = catalogProfileBootstrap,
+                BootstrapSlotSource = bootstrapSlotSource,
                 EffectiveBootstrapUser = BootstrapProfile?.ExpectedLocalUser,
                 EffectiveBootstrapCredentialSlot = EffectiveBootstrapSlot,
                 EffectiveDomainAdminCredentialSlot = EffectiveDomainAdminSlot,

@@ -4,12 +4,19 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Models.Templates;
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Models.Deploy;
 
 namespace LabAssistant.WinUI.ViewModels.Deploy;
 
 internal interface IDeployFromTemplateCompositionHost
 {
+    /// <summary>
+    /// Structured event sink used to emit operationId-scoped plan-review build telemetry so a wedged,
+    /// non-startable plan-review is diagnosable from the log rather than a silent black hole.
+    /// </summary>
+    IStructuredLogger StructuredLogger { get; }
+
     AppSettings DeploymentSettings { get; }
 
     IReadOnlyList<string> AvailableSwitches { get; }

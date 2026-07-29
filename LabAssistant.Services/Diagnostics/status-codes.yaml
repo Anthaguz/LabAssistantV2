@@ -233,7 +233,15 @@ codes:
   - { facility: 0x30, operation: 0x03, status: 0x01, severity: Warning, flags: [Retryable], phase: end, title: VM remove failed, message: "The virtual machine could not be removed while running.", remediation: "Stop the VM before removing it." }
 
   # deploy.orchestration
+  # deploy.orchestration.plan - plan-review build lifecycle. These make a wedged, non-startable plan-review
+  # diagnosable live: a start, a per-key credential-resolution summary, and exactly one terminal every build.
   - { facility: 0x40, operation: 0x01, status: 0x00, severity: Success, phase: end, title: Plan ready, message: "The deployment plan was produced." }
+  - { facility: 0x40, operation: 0x01, status: 0x01, severity: Info,    phase: start,    title: Building plan, message: "Building the deployment plan and review state." }
+  - { facility: 0x40, operation: 0x01, status: 0x02, severity: Info,    phase: progress, title: Credential resolution, message: "Resolved the plan's credential slot requirements." }
+  - { facility: 0x40, operation: 0x01, status: 0x03, severity: Warning, flags: [UserActionable], phase: end, title: Plan blocked, message: "The deployment plan is blocked by unresolved review items.", remediation: "Resolve the listed blocking review items before starting the deployment." }
+  - { facility: 0x40, operation: 0x01, status: 0x04, severity: Error, flags: [UserActionable], phase: end, title: Plan build failed, message: "The deployment plan could not be built.", remediation: "Review the error detail in this event for the specific cause." }
+  - { facility: 0x40, operation: 0x01, status: 0x05, severity: Info, phase: progress, title: Credential store probe, message: "Probed the local credential slot store for the plan's credential keys." }
+  - { facility: 0x40, operation: 0x01, status: 0x06, severity: Info, phase: progress, title: Credential slot saved, message: "Saved a credential slot value from plan-review and re-planned." }
   - { facility: 0x40, operation: 0x02, status: 0x00, severity: Info,    phase: start, title: Deploying, message: "The deployment is starting." }
   - { facility: 0x40, operation: 0x02, status: 0x00, severity: Success, phase: end,   title: Deploy succeeded, message: "The deployment completed successfully." }
   - { facility: 0x40, operation: 0x02, status: 0x01, severity: Error, flags: [UserActionable], phase: end, title: Deploy failed, message: "The deployment failed.", remediation: "Review the failed step in the log for the specific cause." }

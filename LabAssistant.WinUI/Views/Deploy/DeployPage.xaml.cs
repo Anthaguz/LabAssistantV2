@@ -12,6 +12,7 @@ using LabAssistant.Models.Catalog;
 using LabAssistant.Models.Configuration;
 using LabAssistant.Models.Deployment;
 using LabAssistant.Services.HyperV;
+using LabAssistant.Services.Logging;
 using LabAssistant.WinUI.Shell;
 using LabAssistant.WinUI.ViewModels;
 using LabAssistant.WinUI.ViewModels.Deploy;
@@ -139,6 +140,7 @@ public sealed partial class DeployPage : Page, ICapabilityPage
         var v2PlanningCapabilityService = services.GetRequiredService<IV2PlanningCapabilityService>();
         var v2RuntimeCapabilityService = services.GetRequiredService<IV2RuntimeCapabilityService>();
         var hyperVMachineAdminService = services.GetRequiredService<IHyperVMachineAdminService>();
+        var structuredLogger = services.GetRequiredService<IStructuredLogger>();
 
         var referenceDataService = new DeployReferenceDataService(
             settingsStore,
@@ -183,6 +185,7 @@ public sealed partial class DeployPage : Page, ICapabilityPage
                 v2PlanningCapabilityService,
                 v2RuntimeCapabilityService,
                 localCredentialSlotStore,
+                structuredLogger,
                 RefreshOverviewSummary,
                 OnLaneResultsPanelStateChanged,
                 () => _shellHost?.RightPanel.Toggle()),
