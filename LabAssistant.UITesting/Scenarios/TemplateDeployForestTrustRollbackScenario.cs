@@ -11,36 +11,43 @@ namespace LabAssistant.UITesting.Scenarios;
 /// prepare/create/validate, the runtime's cleanupForestTrust wrap
 /// (<c>V2ForestTrustRuntimeStage.CleanupFailedOrCancelledAsync</c> - DeleteLocalSideOfTrustRelationship on
 /// each anchor) fires ONLY on deploy cancellation/failure, so it had zero live coverage. This scenario
-/// induces a cancel at a meaningful mid-trust point and proves the system rolls back cleanly with no
-/// orphans.
+/// induces a cancel while a real trust is in place and proves the system rolls back cleanly with no orphans.
 ///
 /// It reuses the exact #918 two-forest topology (same seeder, fixture, credential slot, and guest probes):
 /// forest-alpha (alpha.lab / ALPHA) and forest-beta (beta.lab / BETA), each a FirstDomainController on one
 /// shared Internal switch, linked by one bidirectional Forest trust. The only difference is the LIVE path:
 /// instead of validating the finished trust, it Starts the deploy, waits for the app's own structured log to
 /// report that the create-trust step STARTED (<c>deploy.forest-trust.create.start</c>, result=started - which
-/// the runtime emits AFTER MarkTrustObjectsCreated, so real trust artifacts are already in place and both
-/// forests have necessarily promoted for the dependency-gated create to begin), then CANCELS by navigating
-/// the shell away from Deploy. That fires <c>DeployPage.OnNavigatedFrom</c>, which requests user cancellation
-/// so the runtime tears down everything it created.
+/// the runtime emits just before MarkTrustObjectsCreated and the atomic guest create call, so both forests
+/// have necessarily promoted for the dependency-gated create to begin), then CANCELS by navigating the shell
+/// away from Deploy. That fires <c>DeployPage.OnNavigatedFrom</c>, which requests user cancellation so the
+/// runtime tears down everything it created.
 ///
-/// The assertions, strongest first:
-///   (a) AUTHORITATIVE: the app's structured log shows the cleanup WRAP ran -
-///       <c>deploy.forest-trust.cleanup.start</c>(started) then <c>deploy.forest-trust.cleanup.end</c>. A
-///       success end means both local sides were removed; a failed end means cleanup ran but left residual
-///       (a real finding, still proof the wrap executed). This is the whole point: it distinguishes
-///       "cleanupForestTrust actually executed" from "the trust merely died when the VM was destroyed".
-///   (b) the create step did NOT reach a validated trust: no <c>create.end</c>=success and no
-///       <c>validate.end</c>=success. If either is present the cancel landed too late (trust fully
-///       created/validated before the navigate took effect) - reported INCONCLUSIVE, never a false PASS and
-///       never a false FAIL, with a retry hint.
-///   (c) MONEY: zero orphans host-side, read directly BEFORE the gate's backstop sweep - both DC VMs gone,
-///       no run-tagged VMs / differencing disks survive, and the shared real base image is intact. This
-///       proves the APP's own cancel path cleaned up, not the harness gate. (The shared Internal switch is
-///       gate-owned - the app references but never created it - so it is intentionally left to the gate
-///       backstop and not asserted gone here.)
-///   (d) in-guest GuestTrustProbe is best-effort and NON-gating: once the app tears the DCs down the trust
-///       objects are gone with them, so an in-guest read is typically not applicable and never fails the run.
+/// TIMING - why the cancel targets the VALIDATE stage, not "mid-create": the guest create call goes through
+/// <c>GuestStepTransportRetry.RunAsync</c>, which checks cancellation ONLY before the first attempt, and the
+/// first New-ADTrust attempt is atomic - once it starts it runs to completion and emits create.end=success.
+/// MarkTrustObjectsCreated (cleanup's precondition) runs just before that attempt. So a navigate-away cancel
+/// cannot interrupt the create itself; it is instead observed at the following validate stage's cancellation
+/// checkpoints, where the trust is fully created but not yet marked READY. Cleanup then removes a COMPLETE
+/// real trust - a stronger no-orphans proof than interrupting a partial create.
+///
+/// The verdict (a single pure classifier, <see cref="ClassifyRollback"/>), strongest first:
+///   PASS (authoritative): BOTH <c>create.end</c>=success (a real, fully-created trust existed) AND the
+///       cleanup WRAP ran to a success terminal (<c>cleanup.start</c>(started) then <c>cleanup.end</c>
+///       =success). This distinguishes "cleanupForestTrust actually executed and removed a real trust" from
+///       "the trust merely died when the VM was destroyed", and is the first live coverage of the wrap (#916).
+///   GATING FAIL: cleanup ran but reported residual (<c>cleanup.end</c>=failed - EXPECTED until the finding-85
+///       cleanup-retry fix lands, so this verb's live PASS is coupled to finding 85), or cleanup started but
+///       never reached a terminal end (hung), or a full trust was created and cancelled yet cleanup never ran.
+///   INCONCLUSIVE (never a false pass/fail, re-run): the deploy reached a READY trust before the cancel took
+///       effect (validate.end=success, no cleanup), or no fully-created trust was observed (cancel too early),
+///       or cleanup succeeded but create.end=success was not confirmed.
+///   MONEY: zero orphans host-side, read directly BEFORE the gate's backstop sweep - both DC VMs gone, no
+///       run-tagged VMs / differencing disks survive, and the shared real base image is intact. (The shared
+///       Internal switch is gate-owned - the app references but never created it - so it is intentionally left
+///       to the gate backstop and not asserted gone here.)
+///   In-guest GuestTrustProbe is best-effort and NON-gating: once the app tears the DCs down the trust objects
+///       are gone with them, so an in-guest read is typically not applicable and never fails the run.
 ///
 /// The planning-only path (no admin password) mirrors #918: it proves the template seeds and reaches a
 /// startable plan, then stops - there is nothing to cancel without a live deploy. Both DC VMs and the
@@ -142,7 +149,7 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
             Title = $"Seeded two-forest + trust V2 template '{seeded.TemplateName}' for the rollback proof",
             Detail = $"File '{seeded.FilePath}', source DC '{seeded.SourceDcVmName}' (forest '{seeded.SourceDnsName}'), " +
                      $"target DC '{seeded.TargetDcVmName}' (forest '{seeded.TargetDnsName}'), image '{RealBaseImageId}', " +
-                     $"switch '{resources.SwitchName}'. Mode: {(live ? "LIVE (deploy, cancel mid-create, prove clean rollback)" : "PLANNING-ONLY (no admin password supplied)")}."
+                     $"switch '{resources.SwitchName}'. Mode: {(live ? "LIVE (deploy, cancel during validate, prove clean rollback)" : "PLANNING-ONLY (no admin password supplied)")}."
         });
 
         // 2b) Clear this scenario's credential slot so the deploy uses the password we enter now; restore the
@@ -254,7 +261,8 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
             Severity = FindingSeverity.Info,
             Title = $"Start Deploy clicked for forest-trust rollback template '{seeded.TemplateName}'",
             Detail = $"Promoting forests '{seeded.SourceDnsName}' and '{seeded.TargetDnsName}', then beginning a " +
-                     "bidirectional forest trust between them - which the scenario cancels mid-create."
+                     "bidirectional forest trust between them - which the scenario cancels once the trust has been " +
+                     "created, so the cancel lands during validation."
         });
 
         // 6) Wait for BOTH DCs to reach Running before arming the VmIsGone abort (which reads null-as-gone,
@@ -272,9 +280,12 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
         recorder.Capture(context.Host, "forest-trust-rollback-vms-running");
 
         // 7) PRECONDITION + INJECTION TIMING: wait until the create-trust step STARTS. The runtime emits this
-        //    only after both forests promoted (the create is dependency-gated) and after MarkTrustObjectsCreated,
-        //    so when it appears there are real trust artifacts to roll back and the long guest create call is in
-        //    flight - the widest window to land a mid-create cancel. Abort fast if the app rolls a DC back.
+        //    only after both forests promoted (the create is dependency-gated) and just before
+        //    MarkTrustObjectsCreated + the atomic guest create call, so when it appears there are real trust
+        //    artifacts to roll back. Because the create attempt cannot be interrupted mid-flight (see the class
+        //    doc), navigating now lets the OnNavigatedFrom cancellation propagate and be observed at the
+        //    following validate stage - where the trust is fully created but not yet READY. Abort fast if the
+        //    app rolls a DC back.
         bool createStarted = stepLog.WaitForTrustEvent(
             DeployStepLogProbe.TrustCreateStartEvent,
             "started",
@@ -292,7 +303,7 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                     : "The create-trust step never started within the budget",
                 rolledBack
                     ? "The deploy failed and tore a DC down before the trust create began, so this run could not inject a " +
-                      "MID-CREATE cancel. The gate still verifies no orphans; re-run to exercise the rollback path."
+                      "cancel against a real trust. The gate still verifies no orphans; re-run to exercise the rollback path."
                     : $"No '{DeployStepLogProbe.TrustCreateStartEvent}' (result=started) appeared within {CreateStartBudget.TotalMinutes:N0} " +
                       "min. Both forests must promote before the trust create begins; a promotion likely hung. Check the deploy logs.");
             return;
@@ -306,7 +317,8 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
             Title = "Create-trust step started; trust objects are in place - injecting cancel now",
             Detail = "The app logged deploy.forest-trust.create.start (result=started). Both forests promoted (the create is " +
                      "gated behind both anchors) and MarkTrustObjectsCreated has run, so cleanup has real artifacts to remove. " +
-                     "Navigating the shell away from Deploy to request cancellation while the guest create call is in flight."
+                     "Navigating the shell away from Deploy to request cancellation; the atomic create attempt completes and the " +
+                     "cancel is observed at the following validate stage, before the trust is marked ready."
         });
 
         // 8) INJECT THE CANCEL: navigate the shell away from Deploy. DeployPage.OnNavigatedFrom requests user
@@ -320,17 +332,19 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
             Step = "cancel",
             Severity = FindingSeverity.Info,
             Title = "Navigated away from Deploy to cancel the in-flight forest-trust deploy",
-            Detail = "The shell left the Deploy page mid-create, which fires the page's OnNavigatedFrom cancellation so the " +
-                     "app tears down everything it created (the cleanupForestTrust wrap plus the VMs/disks)."
+            Detail = "The shell left the Deploy page while a real trust was in place, which fires the page's OnNavigatedFrom " +
+                     "cancellation so the app tears down everything it created (the cleanupForestTrust wrap plus the VMs/disks)."
         });
 
         AssertCleanRollback(context, recorder, hyperV, probe, stepLog, logWindow, seeded, resources);
     }
 
     /// <summary>
-    /// Reads the app's own account of the rollback and proves it was clean. Order of verdict: first the
-    /// INCONCLUSIVE guard (cancel landed too late), then the AUTHORITATIVE cleanup-ran proof, then the
-    /// host-side zero-orphans money check, then a best-effort non-gating in-guest note.
+    /// Reads the app's own account of the rollback and proves it was clean via a single pure verdict
+    /// (<see cref="ClassifyRollback"/>). The authoritative PASS requires BOTH a real, fully-created trust
+    /// (create.end=success) AND a cleanup wrap that ran to a success terminal; the host-side zero-orphans money
+    /// check then runs (gating on the fail/pass paths, non-gating on inconclusive), followed by a best-effort
+    /// non-gating in-guest note on the pass path.
     /// </summary>
     private void AssertCleanRollback(
         ScenarioContext context,
@@ -379,106 +393,190 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
             }
         }
 
-        // INCONCLUSIVE guard: if the create fully succeeded or the trust was validated before our navigate
-        // took effect, the cancel did not interrupt the create - this run cannot claim the mid-create partial
-        // path. Report inconclusive (NOT a pass, NOT a fail) with a retry hint. The gate still proves orphans.
-        bool createFullySucceeded = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCreateEndEvent, "success", logWindow);
+        // The two qualifying facts. create.end=success proves a REAL, fully-created trust existed (the atomic
+        // guest New-ADTrust attempt completed) and is the positive precondition of the authoritative PASS.
+        // validate.end=success proves the trust reached READY, which only happens if the cancel landed after
+        // the whole trust was already established.
+        bool createEnded = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustCreateEndEvent, "success", logWindow);
         bool trustValidated = stepLog.ReadTrustEvent(DeployStepLogProbe.TrustValidateEndEvent, "success", logWindow);
-        if (createFullySucceeded || trustValidated)
+
+        var verdict = ClassifyRollback(cleanupStarted, cleanupSucceeded, cleanupResidual, createEnded, trustValidated);
+        switch (verdict)
         {
-            recorder.Record(new Finding
+            case RollbackVerdict.Pass:
+                // AUTHORITATIVE: the cleanup wrap ran to success ON A REAL, FULLY-CREATED TRUST. This is the
+                // heart of finding 79 and its precondition is create.end=success, not merely "cleanup ran".
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "cleanup-ran",
+                    Severity = FindingSeverity.Info,
+                    Title = "AUTHORITATIVE: the cleanupForestTrust wrap executed and completed on a fully-created trust",
+                    Detail = "The app's structured log shows deploy.forest-trust.create.end (result=success) - a real, complete " +
+                             "bidirectional trust existed - followed by deploy.forest-trust.cleanup.start (result=started) and " +
+                             "deploy.forest-trust.cleanup.end (result=success): on the cancel the runtime ran " +
+                             "DeleteLocalSideOfTrustRelationship on each anchor as its no-orphans mechanism, rather than letting the " +
+                             "trust die incidentally with the VMs. This is the first live coverage of the forest-trust cleanup wrap (#916)."
+                });
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "cancel-during-validate",
+                    Severity = FindingSeverity.Info,
+                    Title = "The cancel landed after the trust was created but before it was READY; cleanup removed the real trust",
+                    Detail = "create.end=success with no validate.end=success in the window: the guest create attempt is atomic and " +
+                             "completes once started, so the cancel was designed to land during the following validate stage, where the " +
+                             "trust is fully created but not yet marked ready. Cleanup then removed a complete real trust - a stronger " +
+                             "no-orphans proof than interrupting a partial create."
+                });
+                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                RecordBestEffortInGuest(recorder, probe, seeded);
+                return;
+
+            case RollbackVerdict.FailCleanupResidual:
+                recorder.RecordFailure(
+                    context.Host, Name, "cleanup-ran", FindingSeverity.Error,
+                    "cleanupForestTrust ran but reported residual (did not fully remove the trust)",
+                    "deploy.forest-trust.cleanup.start ran and the wrap executed, but cleanup.end reported result=failed - one or both " +
+                    "local sides of the trust may remain. The cleanup WRAP did run (finding 79's core question answered YES), but it left " +
+                    "residual. NOTE: until the finding-85 fix lands (cleanup's in-guest trust-deletion is not yet wrapped in the " +
+                    "transport-retry helper and hard-fails on the PSDirect credential-invalid transient), a residual end is EXPECTED on " +
+                    "live runs - this verb's live PASS is coupled to finding 85. Because the DC VMs are torn down on this path the " +
+                    "in-guest trust dies with them, but a residual report still warrants investigation.");
+                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                return;
+
+            case RollbackVerdict.FailCleanupHung:
+                recorder.RecordFailure(
+                    context.Host, Name, "cleanup-ran", FindingSeverity.Error,
+                    "cleanupForestTrust started but never reached a terminal end",
+                    $"'{DeployStepLogProbe.TrustCleanupStartEvent}' (result=started) appeared, but no terminal " +
+                    $"'{DeployStepLogProbe.TrustCleanupEndEvent}' (success or failed) followed within {CleanupEndBudget.TotalMinutes:N0} min. " +
+                    "The cleanup wrap began but did not complete - it likely hung or threw between deleting the local side on each " +
+                    "anchor, or the process was torn down mid-cleanup. Treated as a real finding: the no-orphans wrap did not finish. " +
+                    "Host-side orphan verification still follows to show whether resources leaked.");
+                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                return;
+
+            case RollbackVerdict.FailCleanupDidNotRun:
+                recorder.RecordFailure(
+                    context.Host, Name, "cleanup-ran", FindingSeverity.Error,
+                    "cleanupForestTrust did NOT run after a full-create cancel",
+                    "deploy.forest-trust.create.end=success shows a real, fully-created trust existed and the deploy was cancelled " +
+                    $"(no validate.end=success), but no '{DeployStepLogProbe.TrustCleanupStartEvent}' (result=started) appeared within " +
+                    $"{CleanupObservationBudget.TotalMinutes:N0} min. On this path CleanupFailedOrCancelledAsync is the no-orphans " +
+                    "mechanism for the trust; its absence means the trust would only be removed incidentally when the VMs are destroyed, " +
+                    "leaving no guarantee for a trust that outlived its DCs. Treated as a real finding, not a harness issue - the cancel " +
+                    "did reach teardown (see orphan check).");
+                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
+                return;
+
+            case RollbackVerdict.InconclusiveReadyTrust:
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "rollback-inconclusive",
+                    Severity = FindingSeverity.Warning,
+                    Title = "INCONCLUSIVE: the deploy reached a READY trust before the cancel took effect",
+                    Detail = "The log shows deploy.forest-trust.validate.end=success and no cleanup start within the window: the trust " +
+                             "was fully established and the deploy effectively completed before the navigate-away cancel landed, so there " +
+                             "was nothing for cleanupForestTrust to roll back. This is NOT a false pass and NOT a failure; re-run to land " +
+                             "the cancel during the validate stage (before the trust is marked ready). Host-side orphan verification still follows."
+                });
+                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: false);
+                return;
+
+            case RollbackVerdict.InconclusiveNoCreate:
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "rollback-inconclusive",
+                    Severity = FindingSeverity.Warning,
+                    Title = "INCONCLUSIVE: no fully-created trust was observed before teardown",
+                    Detail = "Neither deploy.forest-trust.create.end=success nor a cleanup start appeared in the window: the cancel " +
+                             "likely landed before MarkTrustObjectsCreated, so there were no trust artifacts for cleanupForestTrust to " +
+                             "remove (its precondition, TrustObjectsCreated, was never set). This is NOT a false pass and NOT a failure; " +
+                             "re-run to land the cancel after the create attempt commits. Host-side orphan verification still follows."
+                });
+                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: false);
+                return;
+
+            case RollbackVerdict.InconclusiveCleanupWithoutCreateEnd:
+                recorder.Record(new Finding
+                {
+                    Scenario = Name,
+                    Step = "rollback-inconclusive",
+                    Severity = FindingSeverity.Warning,
+                    Title = "INCONCLUSIVE: cleanup ran to success but a fully-created trust was not confirmed",
+                    Detail = "deploy.forest-trust.cleanup.start -> cleanup.end=success appeared, but no deploy.forest-trust.create.end" +
+                             "=success was observed in the window, so the authoritative PASS precondition (a real, fully-created trust) " +
+                             "cannot be asserted. The cleanup wrap did run, but this run cannot claim it removed a complete trust. This is " +
+                             "NOT a false pass and NOT a failure; re-run. Host-side orphan verification still follows."
+                });
+                AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: false);
+                return;
+        }
+    }
+
+    /// <summary>
+    /// The pure rollback verdict over five log-derived facts, extracted so it is unit-testable without a live
+    /// deploy. The authoritative PASS requires BOTH a fully-created trust (create.end=success) AND a cleanup
+    /// wrap that ran to a success terminal; any ambiguity resolves to INCONCLUSIVE (never a false pass), and a
+    /// cleanup that ran but left residual, hung, or failed to run at all on a real trust is a gating failure.
+    /// </summary>
+    internal static RollbackVerdict ClassifyRollback(
+        bool cleanupStarted,
+        bool cleanupSucceeded,
+        bool cleanupResidual,
+        bool createEnded,
+        bool trustValidated)
+    {
+        if (cleanupStarted)
+        {
+            // The cleanup WRAP ran - finding 79's core question is answered YES. Qualify the terminal and the
+            // fully-created precondition.
+            if (cleanupResidual && !cleanupSucceeded)
             {
-                Scenario = Name,
-                Step = "rollback-inconclusive",
-                Severity = FindingSeverity.Warning,
-                Title = "INCONCLUSIVE: the cancel landed after the trust was already created/validated",
-                Detail = "The log shows " +
-                         (trustValidated ? "deploy.forest-trust.validate.end=success" : "deploy.forest-trust.create.end=success") +
-                         " within the window, so the navigate-away cancel did not interrupt the create as intended - the guest " +
-                         "create call completed faster than the cancel took effect. Cleanup " +
-                         (cleanupStarted ? "still ran on the full trust" : "was not observed") + ". This is NOT a false pass " +
-                         "and NOT a failure; re-run to land the cancel mid-create. Host-side orphan verification still follows."
-            });
+                return RollbackVerdict.FailCleanupResidual;
+            }
 
-            // Still verify no orphans - a mistimed cancel must never leak resources either.
-            AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: false);
-            return;
+            if (!cleanupSucceeded)
+            {
+                return RollbackVerdict.FailCleanupHung;
+            }
+
+            return createEnded ? RollbackVerdict.Pass : RollbackVerdict.InconclusiveCleanupWithoutCreateEnd;
         }
 
-        // (a) AUTHORITATIVE: prove the cleanup WRAP executed. This is the heart of finding 79.
-        if (!cleanupStarted)
+        // The cleanup wrap did NOT run. Distinguish "the deploy already finished" from "cleanup should have
+        // run on a real trust but didn't".
+        if (trustValidated)
         {
-            recorder.RecordFailure(
-                context.Host, Name, "cleanup-ran", FindingSeverity.Error,
-                "cleanupForestTrust did NOT run after a mid-create cancel",
-                $"The create-trust step had started (trust objects were marked created) and the deploy was cancelled, but no " +
-                $"'{DeployStepLogProbe.TrustCleanupStartEvent}' (result=started) appeared within {CleanupObservationBudget.TotalMinutes:N0} " +
-                "min. On this path CleanupFailedOrCancelledAsync is the no-orphans mechanism for the trust; its absence means " +
-                "the trust would only be removed incidentally when the VMs are destroyed, leaving no guarantee for a trust that " +
-                "outlived its DCs. Treated as a real finding, not a harness issue - the cancel did reach teardown (see orphan check).");
-            AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
-            return;
+            return RollbackVerdict.InconclusiveReadyTrust;
         }
 
-        if (cleanupResidual && !cleanupSucceeded)
+        if (!createEnded)
         {
-            recorder.RecordFailure(
-                context.Host, Name, "cleanup-ran", FindingSeverity.Error,
-                "cleanupForestTrust ran but reported residual (did not fully remove the trust)",
-                "deploy.forest-trust.cleanup.start ran and the wrap executed, but cleanup.end reported result=failed - one or both " +
-                "local sides of the trust may remain. The cleanup WRAP did run (finding 79's core question answered YES), but it " +
-                "left residual, which is itself a real finding: check the DCs for a leftover trust. Because the DC VMs are torn " +
-                "down on this path the in-guest trust dies with them, but a residual report still warrants investigation.");
-            AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
-            return;
+            return RollbackVerdict.InconclusiveNoCreate;
         }
 
-        // Cleanup STARTED but never reached a terminal end within the budget: it hung/threw between
-        // cleanup.start and cleanup.end. This must NOT be reported as a clean completion - it is the exact
-        // failure mode (a cleanup that begins but never finishes) the scenario exists to catch.
-        if (!cleanupSucceeded)
-        {
-            recorder.RecordFailure(
-                context.Host, Name, "cleanup-ran", FindingSeverity.Error,
-                "cleanupForestTrust started but never reached a terminal end",
-                $"'{DeployStepLogProbe.TrustCleanupStartEvent}' (result=started) appeared, but no terminal " +
-                $"'{DeployStepLogProbe.TrustCleanupEndEvent}' (success or failed) followed within {CleanupEndBudget.TotalMinutes:N0} min. " +
-                "The cleanup wrap began but did not complete - it likely hung or threw between deleting the local side on each " +
-                "anchor, or the process was torn down mid-cleanup. Treated as a real finding: the no-orphans wrap did not finish. " +
-                "Host-side orphan verification still follows to show whether resources leaked.");
-            AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
-            return;
-        }
+        return RollbackVerdict.FailCleanupDidNotRun;
+    }
 
-        recorder.Record(new Finding
-        {
-            Scenario = Name,
-            Step = "cleanup-ran",
-            Severity = FindingSeverity.Info,
-            Title = "AUTHORITATIVE: the cleanupForestTrust wrap executed and completed",
-            Detail = "The app's structured log shows deploy.forest-trust.cleanup.start (result=started) followed by " +
-                     "deploy.forest-trust.cleanup.end (result=success): the runtime ran DeleteLocalSideOfTrustRelationship on each " +
-                     "anchor as its no-orphans mechanism, rather than letting the trust die incidentally with the VMs. This is the " +
-                     "first live coverage of the forest-trust cleanup wrap (#916)."
-        });
-
-        // (b) The cancel interrupted the create before a validated trust existed (already established above:
-        //     neither create.end=success nor validate.end=success is present).
-        recorder.Record(new Finding
-        {
-            Scenario = Name,
-            Step = "create-interrupted",
-            Severity = FindingSeverity.Info,
-            Title = "The create-trust step was interrupted before reaching a validated trust",
-            Detail = "No deploy.forest-trust.create.end=success and no deploy.forest-trust.validate.end=success appeared in the " +
-                     "window, confirming the cancel landed mid-create as intended (not after the trust was already established)."
-        });
-
-        // (c) MONEY: prove zero orphans host-side, read directly before the gate's backstop sweep.
-        AssertNoOrphansHostSide(context, recorder, hyperV, probe, seeded, resources, gating: true);
-
-        // (d) Best-effort, non-gating in-guest note.
-        RecordBestEffortInGuest(recorder, probe, seeded);
+    /// <summary>
+    /// The possible outcomes of the rollback proof. PASS is the only clean success; the three Fail* outcomes are
+    /// gating findings; the three Inconclusive* outcomes are non-gating "re-run" verdicts that never report a
+    /// false pass or a false fail.
+    /// </summary>
+    internal enum RollbackVerdict
+    {
+        Pass,
+        FailCleanupResidual,
+        FailCleanupHung,
+        FailCleanupDidNotRun,
+        InconclusiveReadyTrust,
+        InconclusiveNoCreate,
+        InconclusiveCleanupWithoutCreateEnd
     }
 
     /// <summary>
