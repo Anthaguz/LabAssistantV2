@@ -807,11 +807,18 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
                 .Where(v => vmNames.Contains(v, StringComparer.OrdinalIgnoreCase))
                 .ToList();
 
-            foreach (var root in new[] { appData.DifferencingDiskBasePath, appData.VmBasePath })
+            var diskRoots = new[] { appData.DifferencingDiskBasePath, appData.VmBasePath };
+
+            // Run-CREATED disk leftovers only: FindOrphanDisks excludes the harness-seeded shared base image,
+            // which is provision-created (not a runtime residual) and is asserted to SURVIVE via baseImageIntact.
+            // Counting it here would make a correct run - where the base correctly survives - always false-fail
+            // as a 1-orphan leak (finding 89). Directories never include the base file, so they need no exclusion.
+            orphanDisks = FindOrphanDisks(diskRoots, globalPrefix, resources.BaseDiskPath);
+
+            foreach (var root in diskRoots)
             {
                 if (Directory.Exists(root))
                 {
-                    orphanDisks.AddRange(Directory.EnumerateFiles(root, globalPrefix + "*", SearchOption.AllDirectories));
                     orphanDirs.AddRange(Directory.EnumerateDirectories(root, globalPrefix + "*", SearchOption.AllDirectories));
                 }
             }
@@ -838,6 +845,43 @@ public sealed class TemplateDeployForestTrustRollbackScenario : IScenario
         return new OrphanProbe(EnumerationFailed: false, TeardownWithinBudget: bothGone, NoTaggedLeftovers: noTaggedLeftovers,
             BaseImageIntact: baseImageIntact, SurvivingVms: survivingVms, OrphanDisks: orphanDisks, OrphanDirs: orphanDirs,
             BothGone: bothGone, GlobalPrefix: globalPrefix);
+    }
+
+    /// <summary>
+    /// Enumerates run-tagged disk files (<paramref name="globalPrefix"/>*) under <paramref name="roots"/>,
+    /// EXCLUDING the harness-seeded shared base image at <paramref name="baseDiskPath"/>. The base image is
+    /// provision-created by the harness (never a runtime residual) and is asserted to SURVIVE separately
+    /// (baseImageIntact = "cleanup must not delete what it did not create"); counting it as an orphan would make
+    /// a correct rollback - where the base correctly survives - ALWAYS trip a false 1-orphan leak (finding 89),
+    /// a self-contradiction with the survive assertion. Only genuine runtime-created leftovers are returned. A
+    /// null/empty <paramref name="baseDiskPath"/> excludes nothing; matching is by normalized full path,
+    /// case-insensitive (Windows filesystem). Missing roots are skipped.
+    /// </summary>
+    internal static List<string> FindOrphanDisks(IEnumerable<string> roots, string globalPrefix, string? baseDiskPath)
+    {
+        string? normalizedBase = string.IsNullOrEmpty(baseDiskPath) ? null : Path.GetFullPath(baseDiskPath);
+        var result = new List<string>();
+
+        foreach (var root in roots)
+        {
+            if (!Directory.Exists(root))
+            {
+                continue;
+            }
+
+            foreach (string file in Directory.EnumerateFiles(root, globalPrefix + "*", SearchOption.AllDirectories))
+            {
+                if (normalizedBase is not null &&
+                    string.Equals(Path.GetFullPath(file), normalizedBase, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                result.Add(file);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
