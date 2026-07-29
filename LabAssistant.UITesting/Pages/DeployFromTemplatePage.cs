@@ -212,12 +212,16 @@ public sealed class DeployFromTemplatePage
     }
 
     /// <summary>
-    /// Builds an honest, self-attributing failure message. It distinguishes a harness fill-miss (focus
-    /// never landed, or the Save button never became enabled so nothing was typed into it) from a genuine
-    /// product Save/Upsert failure (focus landed, Save fired, yet the store never gained the record) - so
-    /// a real product bug is never masked and a harness flake is never mis-blamed on the product.
+    /// Builds an honest, self-attributing failure message that never silently masks a stuck fill. It
+    /// separates the two clear harness fill-misses (focus never landed; or the Save button never enabled,
+    /// so nothing was typed in) and the one clear product bug (Save reached the store but the plan still
+    /// lists the slot). Crucially, the focus-landed + Save-fired + nothing-persisted case is left OPEN
+    /// between an empty-password harness type-miss and a product Save/Upsert failure - the two cannot be
+    /// told apart from the harness side alone (a landed focus does not prove the keystrokes registered),
+    /// so the message says "password-empty suspected" and points at the product-side Save telemetry as
+    /// the deciding cross-check rather than prematurely blaming the product.
     /// </summary>
-    private static string DescribeFillFailure(CredentialFillOutcome outcome, bool saveEverFired, bool reachedStore)
+    internal static string DescribeFillFailure(CredentialFillOutcome outcome, bool saveEverFired, bool reachedStore)
     {
         if (!outcome.FocusEverLanded)
         {
@@ -237,8 +241,10 @@ public sealed class DeployFromTemplatePage
                    $"{outcome.Attempts} attempt(s) - the plan still reports it unresolved (product re-plan/resolver issue)";
         }
 
-        return $"credential Save fired with a focused password box but the store never gained the record after " +
-               $"{outcome.Attempts} attempt(s) - a product Save/Upsert failure, not a harness fill-miss";
+        return $"credential Save did not persist after {outcome.Attempts} attempt(s) despite the password box " +
+               "being focused and Save firing (password-empty suspected) - either an empty-password harness " +
+               "type-miss or a product Save/Upsert failure; cross-check the product Save telemetry for whether " +
+               "the password was non-empty at Upsert to decide which";
     }
 
     /// <summary>
