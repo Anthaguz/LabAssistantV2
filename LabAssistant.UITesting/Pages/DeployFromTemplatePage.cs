@@ -124,58 +124,186 @@ public sealed class DeployFromTemplatePage
             ?? Window.ByAutomationId("DeployTemplateProgressLifecycleText")?.SafeName()
             ?? string.Empty;
 
+    private const int MaxFillAttempts = 4;
+    private static readonly TimeSpan PersistBudget = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan PersistPollInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan FocusBudget = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan FocusPollInterval = TimeSpan.FromMilliseconds(200);
+
     /// <summary>
-    /// Defensive credential-slot resolution. The minimal standalone template needs
-    /// none, but if a plan surfaces unresolved slots this fills each with a throwaway
-    /// credential - safe because guest configuration never runs on the non-bootable
-    /// seeded base disk - so the harness can still reach a startable plan. Each save
-    /// re-plans, shrinking the unresolved list, so the loop re-reads the first row
-    /// until none remain. Returns how many slots it filled.
+    /// Credential-slot resolution. The minimal standalone template needs none, but if a plan
+    /// surfaces unresolved slots this fills each and drives the app's real Save so the store gains
+    /// the record and the plan becomes startable. Each save re-plans, shrinking the unresolved list,
+    /// so the loop re-reads the first row until none remain. Returns how many slots it filled.
+    ///
+    /// The fill is persistence-verified, not fire-and-forget. The WinUI PasswordBox has no Value
+    /// pattern, so the password is entered as real keystrokes after focusing the box; a focus miss
+    /// would type an empty password, no-op the Save, and leave the plan wedged while the loop spun to
+    /// a false success. So each attempt asserts keyboard focus landed before typing, then verifies the
+    /// slot actually left the unresolved list (the app re-planned off a persisted record) before
+    /// counting it - retrying focus+type+Save on a bounded budget. If a slot still will not persist,
+    /// it throws <see cref="CredentialFillException"/> rather than mask the failure: with focus and a
+    /// non-empty password proven, a non-persisting Save is a genuine product Save/Upsert bug, and a
+    /// focus that never lands is a harness fill-miss - the message says which.
     /// </summary>
     public int ResolveCredentialSlots(string username, string password, TimeSpan timeout)
     {
+        var store = new CredentialSlotSeeder(new AppDataLocations());
         int resolved = 0;
         var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
+
+        while (true)
         {
             var list = Window.ByAutomationId("DeployV2CredentialSlotsListView")?.AsListBox();
+            int rowsBefore = list?.Items.Length ?? 0;
             var first = list?.Items.FirstOrDefault();
             if (first is null)
             {
-                break;
+                break; // no unresolved slots remain
             }
 
-            try
+            if (DateTime.UtcNow >= deadline)
             {
-                first.Select();
-                Thread.Sleep(300);
-                Window.ByAutomationId("DeployV2CredentialSlotUsernameTextBox")?.SetValue(username);
-
-                var pass = Window.ByAutomationId("DeployV2CredentialSlotPasswordBox");
-                if (pass is not null)
-                {
-                    pass.Focus();
-                    Keyboard.Type(password);
-                }
-
-                var save = Window.ByAutomationId("DeployV2CredentialSlotSaveButton");
-                if (save is null)
-                {
-                    break;
-                }
-
-                save.Activate();
-                resolved++;
-                Thread.Sleep(2000); // save re-plans; loop re-reads remaining slots
+                throw new CredentialFillException(
+                    $"Credential slots did not all resolve within {timeout.TotalSeconds:0}s; {rowsBefore} slot(s) still unresolved.");
             }
-            catch
+
+            int storeBefore = store.Count();
+            bool saveEverFired = false;
+
+            var outcome = CredentialSlotFill.FillSlotWithRetry(
+                attemptFocus: () => SelectRowAndFocusPassword(first, username),
+                typePassword: () => Keyboard.Type(password),
+                save: () => saveEverFired |= TrySaveCredentialSlot(),
+                hasPersisted: () => HasSlotPersisted(store, storeBefore, rowsBefore),
+                maxAttempts: MaxFillAttempts,
+                persistBudget: PersistBudget,
+                pollInterval: PersistPollInterval,
+                utcNow: () => DateTime.UtcNow,
+                sleep: Thread.Sleep);
+
+            if (!outcome.Persisted)
             {
-                // Best-effort: a slot that cannot be driven should not crash the run; the
-                // scenario reports the still-blocked plan as a finding instead.
-                break;
+                throw new CredentialFillException(
+                    DescribeFillFailure(outcome, saveEverFired, reachedStore: store.Count() > storeBefore));
             }
+
+            resolved++;
         }
 
         return resolved;
+    }
+
+    /// <summary>
+    /// True once the current Save has demonstrably taken: the app's store gained a record (ground-truth
+    /// Upsert) or the slot left the unresolved list (the app re-planned off a persisted credential). The
+    /// row-count signal is gated on the list actually being found, so a transient UIA-tree null cannot be
+    /// mistaken for a resolved slot - the very false-success class this hardening exists to prevent.
+    /// </summary>
+    private bool HasSlotPersisted(CredentialSlotSeeder store, int storeCountBefore, int rowsBefore)
+    {
+        if (store.Count() > storeCountBefore)
+        {
+            return true;
+        }
+
+        var list = Window.ByAutomationId("DeployV2CredentialSlotsListView")?.AsListBox();
+        return list is not null && list.Items.Length < rowsBefore;
+    }
+
+    /// <summary>
+    /// Builds an honest, self-attributing failure message. It distinguishes a harness fill-miss (focus
+    /// never landed, or the Save button never became enabled so nothing was typed into it) from a genuine
+    /// product Save/Upsert failure (focus landed, Save fired, yet the store never gained the record) - so
+    /// a real product bug is never masked and a harness flake is never mis-blamed on the product.
+    /// </summary>
+    private static string DescribeFillFailure(CredentialFillOutcome outcome, bool saveEverFired, bool reachedStore)
+    {
+        if (!outcome.FocusEverLanded)
+        {
+            return $"keyboard focus never landed on DeployV2CredentialSlotPasswordBox after {outcome.Attempts} " +
+                   "attempt(s), so the password could not be typed into the box (harness fill-miss)";
+        }
+
+        if (!saveEverFired)
+        {
+            return $"the credential Save button never became enabled across {outcome.Attempts} attempt(s) even " +
+                   "though the password box was focused - the typed password did not populate the box (harness fill-miss)";
+        }
+
+        if (reachedStore)
+        {
+            return $"credential Save reached the store but the slot never left the unresolved list after " +
+                   $"{outcome.Attempts} attempt(s) - the plan still reports it unresolved (product re-plan/resolver issue)";
+        }
+
+        return $"credential Save fired with a focused password box but the store never gained the record after " +
+               $"{outcome.Attempts} attempt(s) - a product Save/Upsert failure, not a harness fill-miss";
+    }
+
+    /// <summary>
+    /// Selects the slot row, sets the username, and focuses the password box, returning true only once
+    /// keyboard focus is confirmed on that box. Re-asserts focus while polling so a transient miss does
+    /// not defeat the attempt; a persistent miss returns false so the caller retries rather than type
+    /// into the void.
+    /// </summary>
+    private bool SelectRowAndFocusPassword(ListBoxItem row, string username)
+    {
+        row.Select();
+        Thread.Sleep(200);
+        Window.ByAutomationId("DeployV2CredentialSlotUsernameTextBox")?.SetValue(username);
+
+        var pass = Window.ByAutomationId("DeployV2CredentialSlotPasswordBox");
+        if (pass is null)
+        {
+            return false;
+        }
+
+        var focusDeadline = DateTime.UtcNow + FocusBudget;
+        while (true)
+        {
+            pass.Focus();
+            if (HasKeyboardFocus(pass))
+            {
+                return true;
+            }
+
+            if (DateTime.UtcNow >= focusDeadline)
+            {
+                return false;
+            }
+
+            Thread.Sleep(FocusPollInterval);
+        }
+    }
+
+    /// <summary>
+    /// Activates the credential Save button, returning true only when it was actually clickable (present
+    /// and enabled) so the caller can tell a fired Save from one that never happened because the button
+    /// stayed disabled. A no-op returning false when the button is absent or disabled.
+    /// </summary>
+    private bool TrySaveCredentialSlot()
+    {
+        var save = Window.ByAutomationId("DeployV2CredentialSlotSaveButton");
+        if (save is not null && save.IsEnabled)
+        {
+            save.Activate();
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Reads an element's keyboard-focus state safely (false when the property is unavailable).</summary>
+    private static bool HasKeyboardFocus(AutomationElement element)
+    {
+        try
+        {
+            return element.Properties.HasKeyboardFocus.ValueOrDefault;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
